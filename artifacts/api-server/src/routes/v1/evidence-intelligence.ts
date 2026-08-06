@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import { z } from "zod";
 
 import { requireMember } from "../../middlewares/requireMember";
 import {
@@ -26,6 +27,12 @@ import {
   isClaimGraphTarget,
   listClaimGraphs,
 } from "../../services/claim-graphs";
+import {
+  compileLossCorroboration,
+  listLossCorroborations,
+  LossCorroborationError,
+  reviewLossCorroboration,
+} from "../../services/loss-corroborations";
 
 const router: IRouter = Router();
 
@@ -33,13 +40,72 @@ function sendError(res: Response, error: unknown): void {
   if (
     error instanceof EvidenceIntelligenceError ||
     error instanceof ClaimExecutionError ||
-    error instanceof ClaimGraphError
+    error instanceof ClaimGraphError ||
+    error instanceof LossCorroborationError
   ) {
     res.status(error.statusCode).json({ error: error.message });
     return;
   }
   res.status(500).json({ error: "Evidence Intelligence could not complete the request." });
 }
+
+const coordinatesSchema = z.object({
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+});
+
+const corroborationInputSchema = z.object({
+  canonicalGraphId: z.string().uuid(),
+  propertyCoordinates: coordinatesSchema.nullable().default(null),
+  roofFacets: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(120),
+        azimuthDegrees: z.number().finite(),
+        weight: z.number().finite().gt(0).lte(1).optional(),
+      }),
+    )
+    .max(24)
+    .default([]),
+  sources: z
+    .array(
+      z.object({
+        sourceArtifactId: z.string().uuid(),
+        sourceKind: z.enum(["weather", "property", "inspection", "photo", "document", "other"]),
+        provider: z.string().trim().min(1).max(160),
+        providerVersion: z.string().trim().min(1).max(160),
+        retrievedAt: z.string().trim().min(1).max(64),
+        qualityScore: z.number().finite().min(0).max(100),
+        coverageScore: z.number().finite().min(0).max(100),
+        missingFields: z.array(z.string().trim().min(1).max(160)).max(24).default([]),
+        temporalCoverage: z.object({
+          startsAt: z.string().trim().min(1).max(64),
+          endsAt: z.string().trim().min(1).max(64),
+        }),
+        observations: z
+          .array(
+            z.object({
+              id: z.string().trim().min(1).max(120),
+              signal: z.enum(["supporting", "contradicting", "neutral"]),
+              phenomenon: z.string().trim().min(1).max(120),
+              observedAt: z.string().trim().min(1).max(64),
+              magnitudeScore: z.number().finite().min(0).max(100),
+              coordinates: coordinatesSchema.nullable().optional(),
+              directionDegrees: z.number().finite().nullable().optional(),
+            }),
+          )
+          .min(1)
+          .max(30),
+      }),
+    )
+    .min(1)
+    .max(24),
+});
+
+const corroborationReviewSchema = z.object({
+  status: z.enum(["verified", "rejected"]),
+  reviewNote: z.string().trim().max(2_000).nullable().optional(),
+});
 
 function boundedString(value: unknown, field: string, maxLength = 240): string {
   const normalized = typeof value === "string" ? value.trim() : "";
@@ -293,6 +359,73 @@ router.get(
 );
 
 router.get(
+  "/bie/claims/:id/corroborations",
+  requireMember("crm.read"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(await listLossCorroborations(req.member!.organizationId, String(req.params.id)));
+    } catch (error) {
+      sendError(res, error);
+    }
+  },
+);
+
+/**
+ * This endpoint accepts only structured, source-linked observations. It does
+ * not call a weather provider or an AI model: those adapters must preserve
+ * their source artifact first, then submit an explicit normalized reading.
+ */
+router.post(
+  "/bie/claims/:id/corroborations",
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const parsed = corroborationInputSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Loss corroboration input is invalid.", details: parsed.error.issues.map((issue) => issue.message) });
+        return;
+      }
+      res.status(201).json(
+        await compileLossCorroboration(
+          req.member!.organizationId,
+          String(req.params.id),
+          req.member!.user.id,
+          parsed.data,
+        ),
+      );
+    } catch (error) {
+      sendError(res, error);
+    }
+  },
+);
+
+router.post(
+  "/bie/claims/:id/corroborations/:corroborationId/review",
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const parsed = corroborationReviewSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Loss corroboration review is invalid." });
+        return;
+      }
+      res.json(
+        await reviewLossCorroboration(
+          req.member!.organizationId,
+          String(req.params.id),
+          String(req.params.corroborationId),
+          req.member!.user.id,
+          parsed.data.status,
+          parsed.data.reviewNote ?? null,
+        ),
+      );
+    } catch (error) {
+      sendError(res, error);
+    }
+  },
+);
+
+router.get(
   "/bie/claims/:id/routes",
   requireMember("crm.read"),
   async (req: Request, res: Response): Promise<void> => {
@@ -340,6 +473,10 @@ router.post(
       res.status(201).json(
         await compileClaimRoutePacket(req.member!.organizationId, String(req.params.id), req.member!.user.id, {
           certificateId: boundedString(req.body?.certificateId, "Certificate ID", 80),
+          corroborationId:
+            req.body?.corroborationId === undefined || req.body?.corroborationId === null
+              ? undefined
+              : boundedString(req.body?.corroborationId, "Corroboration ID", 80),
           target: boundedString(req.body?.target, "Target", 120),
           operation: boundedString(req.body?.operation, "Operation", 160),
           adapterName: boundedString(req.body?.adapterName, "Adapter name", 120),

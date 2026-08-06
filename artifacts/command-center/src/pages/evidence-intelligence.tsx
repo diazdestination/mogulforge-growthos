@@ -119,6 +119,51 @@ interface ClaimGraph {
   createdAt: string;
 }
 
+interface LossCorroboration {
+  id: string;
+  version: number;
+  status: 'computed' | 'verified' | 'rejected';
+  calculationVersion: string;
+  sourceManifestHash: string;
+  assessmentHash: string;
+  reviewNote: string | null;
+  assessment: {
+    contradictions?: unknown[];
+    limitations?: string[];
+    breakdown?: {
+      state?: 'insufficient_evidence' | 'mixed_evidence' | 'corroborating_signals' | 'contradicting_signals';
+      confidenceScore?: number;
+      sourceCoverageScore?: number;
+      missingnessScore?: number;
+      crossSourceConsistencyScore?: number;
+      sourceCount?: number;
+      distinctProviderCount?: number;
+    };
+  };
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
+type CorroborationSourceDraft = {
+  artifactId: string;
+  sourceKind: 'weather' | 'property' | 'inspection' | 'photo' | 'document' | 'other';
+  provider: string;
+  providerVersion: string;
+  retrievedDate: string;
+  coverageStart: string;
+  coverageEnd: string;
+  signal: 'supporting' | 'contradicting' | 'neutral';
+  phenomenon: string;
+  eventDate: string;
+  magnitudeScore: string;
+  qualityScore: string;
+  coverageScore: string;
+  latitude: string;
+  longitude: string;
+  directionDegrees: string;
+  missingFields: string;
+};
+
 interface CaseDetail {
   case: EvidenceCase;
   artifacts: EvidenceArtifact[];
@@ -127,6 +172,7 @@ interface CaseDetail {
   certificates: EvidenceCertificate[];
   eligibleEstimates: EligibleEstimate[];
   graphs: ClaimGraph[];
+  corroborations: LossCorroboration[];
   policy: {
     aiDraftOnly: true;
     humanIssuanceRequired: true;
@@ -156,6 +202,19 @@ function sizeLabel(bytes: number): string {
 
 function moneyLabel(cents: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+}
+
+function isoDate(value: string): string {
+  if (!value) throw new Error('Enter every source date before computing corroboration.');
+  return `${value}T12:00:00.000Z`;
+}
+
+function blankCorroborationSource(date = new Date().toISOString().slice(0, 10)): CorroborationSourceDraft {
+  return {
+    artifactId: '', sourceKind: 'weather', provider: '', providerVersion: '1.0', retrievedDate: date,
+    coverageStart: date, coverageEnd: date, signal: 'supporting', phenomenon: 'hail', eventDate: date,
+    magnitudeScore: '75', qualityScore: '80', coverageScore: '80', latitude: '', longitude: '', directionDegrees: '', missingFields: '',
+  };
 }
 
 function statusLabel(status: CaseStatus): string {
@@ -221,6 +280,11 @@ export default function EvidenceIntelligence() {
   const [noteText, setNoteText] = useState('');
   const [sourceLabel, setSourceLabel] = useState('');
   const [approved, setApproved] = useState(false);
+  const [corroborationSources, setCorroborationSources] = useState<CorroborationSourceDraft[]>(() => [blankCorroborationSource(), blankCorroborationSource()]);
+  const [propertyLatitude, setPropertyLatitude] = useState('');
+  const [propertyLongitude, setPropertyLongitude] = useState('');
+  const [roofFacetId, setRoofFacetId] = useState('');
+  const [roofFacetAzimuth, setRoofFacetAzimuth] = useState('');
 
   const casesQuery = useQuery({
     queryKey: ['evidence-cases'],
@@ -319,6 +383,30 @@ export default function EvidenceIntelligence() {
     onError: (err) => setError(err instanceof Error ? err.message : 'The claim graph could not be compiled.'),
   });
 
+  const compileCorroborationMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => request<LossCorroboration>(`/bie/claims/${selectedId}/corroborations`, {
+      method: 'POST', body: JSON.stringify(payload),
+    }),
+    onSuccess: async (record) => {
+      setNotice(`Deterministic corroboration v${record.version} computed. It remains decision support until a contractor reviews the linked sources.`);
+      setError(null);
+      await refresh();
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'Loss corroboration could not be computed.'),
+  });
+
+  const reviewCorroborationMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'verified' | 'rejected' }) => request<LossCorroboration>(`/bie/claims/${selectedId}/corroborations/${id}/review`, {
+      method: 'POST', body: JSON.stringify({ status }),
+    }),
+    onSuccess: async (record) => {
+      setNotice(record.status === 'verified' ? 'Corroboration inputs and limitations were verified in the audit trail.' : 'Corroboration assessment was rejected and remains excluded from any future execution path.');
+      setError(null);
+      await refresh();
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'The corroboration review could not be saved.'),
+  });
+
   const detail = detailQuery.data;
   const currentCertificate = detail?.certificates.find((item) => item.status === 'draft') ?? detail?.certificates.find((item) => item.status === 'issued') ?? detail?.certificates[0];
   const currentObservations = useMemo(
@@ -331,10 +419,71 @@ export default function EvidenceIntelligence() {
     currentObservations.every((item) => item.status !== 'ai_draft') &&
     currentObservations.some((item) => item.status === 'verified'),
   );
-  const busy = createMutation.isPending || uploadMutation.isPending || analyzeMutation.isPending || reviewMutation.isPending || issueMutation.isPending || compileGraphMutation.isPending;
+  const busy = createMutation.isPending || uploadMutation.isPending || analyzeMutation.isPending || reviewMutation.isPending || issueMutation.isPending || compileGraphMutation.isPending || compileCorroborationMutation.isPending || reviewCorroborationMutation.isPending;
 
   function createCase(event: FormEvent) {
     event.preventDefault(); setNotice(null); setError(null); createMutation.mutate();
+  }
+
+  function updateCorroborationSource(index: number, field: keyof CorroborationSourceDraft, value: string) {
+    setCorroborationSources((current) => current.map((source, sourceIndex) => sourceIndex === index ? { ...source, [field]: value } : source));
+  }
+
+  function computeCorroboration() {
+    try {
+      const graph = detail?.graphs.find((item) => item.status === 'valid');
+      if (!graph) throw new Error('Compile a valid canonical claim graph before corroborating loss evidence.');
+      const supplied = corroborationSources.filter((source) => source.artifactId.trim() || source.provider.trim());
+      if (!supplied.length) throw new Error('Add at least one source-linked observation.');
+      const numberValue = (value: string, field: string) => {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) throw new Error(`${field} must be a number.`);
+        return parsed;
+      };
+      const coordinateValue = (latitude: string, longitude: string, label: string) => {
+        if (!latitude.trim() && !longitude.trim()) return null;
+        if (!latitude.trim() || !longitude.trim()) throw new Error(`${label} needs both latitude and longitude.`);
+        return { latitude: numberValue(latitude, `${label} latitude`), longitude: numberValue(longitude, `${label} longitude`) };
+      };
+      const payload = {
+        canonicalGraphId: graph.id,
+        propertyCoordinates: coordinateValue(propertyLatitude, propertyLongitude, 'Property location'),
+        roofFacets: roofFacetId.trim() || roofFacetAzimuth.trim()
+          ? (() => {
+              if (!roofFacetId.trim() || !roofFacetAzimuth.trim()) throw new Error('Roof facet ID and azimuth must be supplied together.');
+              return [{ id: roofFacetId.trim(), azimuthDegrees: numberValue(roofFacetAzimuth, 'Roof facet azimuth') }];
+            })()
+          : [],
+        sources: supplied.map((source) => {
+          if (!source.artifactId || !source.provider.trim() || !source.providerVersion.trim() || !source.phenomenon.trim()) {
+            throw new Error('Every supplied source needs an artifact, provider, version, and phenomenon.');
+          }
+          return {
+            sourceArtifactId: source.artifactId,
+            sourceKind: source.sourceKind,
+            provider: source.provider.trim(),
+            providerVersion: source.providerVersion.trim(),
+            retrievedAt: isoDate(source.retrievedDate),
+            qualityScore: numberValue(source.qualityScore, 'Source quality'),
+            coverageScore: numberValue(source.coverageScore, 'Source coverage'),
+            missingFields: source.missingFields.split(',').map((field) => field.trim()).filter(Boolean),
+            temporalCoverage: { startsAt: isoDate(source.coverageStart), endsAt: isoDate(source.coverageEnd) },
+            observations: [{
+              id: `${source.artifactId}:${source.phenomenon.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'observation'}`,
+              signal: source.signal,
+              phenomenon: source.phenomenon.trim(),
+              observedAt: isoDate(source.eventDate),
+              magnitudeScore: numberValue(source.magnitudeScore, 'Observation magnitude'),
+              coordinates: coordinateValue(source.latitude, source.longitude, 'Source location'),
+              directionDegrees: source.directionDegrees.trim() ? numberValue(source.directionDegrees, 'Source direction') : null,
+            }],
+          };
+        }),
+      };
+      setNotice(null); setError(null); compileCorroborationMutation.mutate(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Loss corroboration input is invalid.');
+    }
   }
 
   return (
@@ -429,6 +578,18 @@ export default function EvidenceIntelligence() {
               </div>
 
               {(detail.eligibleEstimates.length > 0 || detail.graphs.length > 0) && <section className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5"><div className="flex flex-col justify-between gap-3 md:flex-row md:items-start"><div><div className="flex items-center gap-2"><Fingerprint className="h-5 w-5 text-primary" /><h3 className="font-semibold">1b · Canonical claim compiler</h3></div><p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">Compile a native MogulForge estimate into a source-ledger claim graph. Every line total, subtotal, and grand total is checked before any target representation can be produced.</p></div><span className="rounded-full border border-primary/20 bg-primary/[0.05] px-2 py-1 text-[10px] font-semibold text-primary">DETERMINISTIC · NO AI REQUIRED</span></div><div className="mt-4 grid gap-3 lg:grid-cols-2">{detail.eligibleEstimates.map((estimate) => <div key={estimate.id} className="rounded-lg border border-border bg-background/50 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold">{estimate.title}</p><p className="mt-1 text-xs text-muted-foreground">{estimate.status.replace(/_/g, ' ')} · {moneyLabel(estimate.totalCents)}</p></div><button disabled={busy} onClick={() => { setNotice(null); setError(null); compileGraphMutation.mutate(estimate.id); }} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md border border-primary/30 px-3 text-xs font-semibold text-primary disabled:opacity-50">{compileGraphMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Fingerprint className="h-3.5 w-3.5" />} Compile</button></div></div>)}{!detail.eligibleEstimates.length && <div className="rounded-lg border border-dashed border-border p-4 text-xs text-muted-foreground">Link this claim to a lead with an estimate to compile its first canonical graph.</div>}{detail.graphs.map((graph) => <div key={graph.id} className={cn('rounded-lg border p-3', graph.status === 'valid' ? 'border-emerald-500/25 bg-emerald-500/[0.04]' : 'border-destructive/25 bg-destructive/[0.04]')}><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold">Claim graph · v{graph.version}</p><p className="mt-1 text-xs text-muted-foreground">{graph.status === 'valid' ? `${graph.invariantReport.length} invariants intact` : `${graph.invariantReport.filter((item) => !item.passed).length} invariant failure${graph.invariantReport.filter((item) => !item.passed).length === 1 ? '' : 's'} · target compilation blocked`}</p></div>{graph.status === 'valid' ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <CircleAlert className="h-5 w-5 text-destructive" />}</div><p className="mt-3 font-mono text-[10px] text-muted-foreground">Graph SHA-256 {shortHash(graph.graphHash)}</p></div>)}</div></section>}
+
+              {(detail.graphs.some((graph) => graph.status === 'valid') || detail.corroborations.length > 0) && <section className="rounded-xl border border-primary/25 bg-card p-4 shadow-sm md:p-5">
+                <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start"><div><div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /><h3 className="font-semibold">1c · Deterministic loss corroboration</h3></div><p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">Link independently captured source artifacts to the canonical claim graph. MogulForge exposes time, distance, directional exposure, coverage, and missing-data effects instead of asking an AI to guess.</p></div><span className="rounded-full border border-primary/20 bg-primary/[0.05] px-2 py-1 text-[10px] font-semibold text-primary">REPLAYABLE · HUMAN REVIEW</span></div>
+
+                {detail.graphs.some((graph) => graph.status === 'valid') && detail.artifacts.length > 0 ? <div className="mt-4 space-y-3 rounded-lg border border-border bg-background/40 p-3"><div className="grid gap-3 md:grid-cols-3"><div><label className="text-[11px] font-semibold">Property latitude <span className="font-normal text-muted-foreground">(optional)</span></label><input value={propertyLatitude} onChange={(event) => setPropertyLatitude(event.target.value)} inputMode="decimal" placeholder="32.7767" className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></div><div><label className="text-[11px] font-semibold">Property longitude <span className="font-normal text-muted-foreground">(optional)</span></label><input value={propertyLongitude} onChange={(event) => setPropertyLongitude(event.target.value)} inputMode="decimal" placeholder="-96.7970" className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></div><div><label className="text-[11px] font-semibold">Roof facet / azimuth <span className="font-normal text-muted-foreground">(optional)</span></label><div className="mt-1 flex gap-2"><input value={roofFacetId} onChange={(event) => setRoofFacetId(event.target.value)} placeholder="south" className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs" /><input value={roofFacetAzimuth} onChange={(event) => setRoofFacetAzimuth(event.target.value)} inputMode="decimal" placeholder="180°" className="h-9 w-20 rounded-md border border-border bg-background px-2 text-xs" /></div></div></div>
+                  <p className="text-[11px] text-muted-foreground">Use source documents already attached to this claim. Leave geographic or roof data blank only when it is genuinely unavailable—the resulting missingness is shown and penalized explicitly.</p>
+                  <div className="space-y-3">{corroborationSources.map((source, index) => <div key={`${index}-${source.artifactId}`} className="rounded-lg border border-border bg-card p-3"><div className="mb-2 flex items-center justify-between gap-2"><p className="text-xs font-semibold">Source {index + 1}</p>{corroborationSources.length > 1 && <button type="button" onClick={() => setCorroborationSources((current) => current.filter((_, sourceIndex) => sourceIndex !== index))} className="text-[11px] font-medium text-muted-foreground hover:text-destructive">Remove</button>}</div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><label className="text-[11px] font-semibold">Artifact<select value={source.artifactId} onChange={(event) => updateCorroborationSource(index, 'artifactId', event.target.value)} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs"><option value="">Select evidence…</option>{detail.artifacts.map((artifact) => <option key={artifact.id} value={artifact.id}>{artifact.kind} · {artifact.filename}</option>)}</select></label><label className="text-[11px] font-semibold">Source kind<select value={source.sourceKind} onChange={(event) => updateCorroborationSource(index, 'sourceKind', event.target.value)} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs">{['weather','property','inspection','photo','document','other'].map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select></label><label className="text-[11px] font-semibold">Provider<input value={source.provider} onChange={(event) => updateCorroborationSource(index, 'provider', event.target.value)} placeholder="Provider / inspector" className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-[11px] font-semibold">Provider version<input value={source.providerVersion} onChange={(event) => updateCorroborationSource(index, 'providerVersion', event.target.value)} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-[11px] font-semibold">Finding<select value={source.signal} onChange={(event) => updateCorroborationSource(index, 'signal', event.target.value)} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs"><option value="supporting">Supporting</option><option value="contradicting">Contradicting</option><option value="neutral">Neutral</option></select></label><label className="text-[11px] font-semibold">Phenomenon<input value={source.phenomenon} onChange={(event) => updateCorroborationSource(index, 'phenomenon', event.target.value)} placeholder="hail" className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-[11px] font-semibold">Event date<input type="date" value={source.eventDate} onChange={(event) => updateCorroborationSource(index, 'eventDate', event.target.value)} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-[11px] font-semibold">Magnitude 0–100<input type="number" min="0" max="100" value={source.magnitudeScore} onChange={(event) => updateCorroborationSource(index, 'magnitudeScore', event.target.value)} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-[11px] font-semibold">Quality 0–100<input type="number" min="0" max="100" value={source.qualityScore} onChange={(event) => updateCorroborationSource(index, 'qualityScore', event.target.value)} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-[11px] font-semibold">Coverage 0–100<input type="number" min="0" max="100" value={source.coverageScore} onChange={(event) => updateCorroborationSource(index, 'coverageScore', event.target.value)} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-[11px] font-semibold">Coverage starts<input type="date" value={source.coverageStart} onChange={(event) => updateCorroborationSource(index, 'coverageStart', event.target.value)} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-[11px] font-semibold">Coverage ends<input type="date" value={source.coverageEnd} onChange={(event) => updateCorroborationSource(index, 'coverageEnd', event.target.value)} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label></div><div className="mt-2 grid gap-2 sm:grid-cols-4"><label className="text-[11px] font-semibold">Source latitude<input value={source.latitude} onChange={(event) => updateCorroborationSource(index, 'latitude', event.target.value)} inputMode="decimal" className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-[11px] font-semibold">Source longitude<input value={source.longitude} onChange={(event) => updateCorroborationSource(index, 'longitude', event.target.value)} inputMode="decimal" className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-[11px] font-semibold">Direction °<input value={source.directionDegrees} onChange={(event) => updateCorroborationSource(index, 'directionDegrees', event.target.value)} inputMode="decimal" placeholder="180" className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-[11px] font-semibold">Missing fields<input value={source.missingFields} onChange={(event) => updateCorroborationSource(index, 'missingFields', event.target.value)} placeholder="comma separated" className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label></div></div>)}</div>
+                  <div className="flex flex-col gap-2 sm:flex-row"><button type="button" onClick={() => setCorroborationSources((current) => [...current, blankCorroborationSource(detail.case.lossDate?.slice(0, 10) || undefined)])} className="inline-flex h-9 items-center justify-center rounded-md border border-border px-3 text-xs font-semibold">Add independent source</button><button type="button" disabled={busy} onClick={computeCorroboration} className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50">{compileCorroborationMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />} Compute corroboration</button></div>
+                </div> : <div className="mt-4 rounded-lg border border-dashed border-border p-4 text-xs text-muted-foreground">Compile a valid claim graph and attach at least one source artifact before creating a deterministic corroboration assessment.</div>}
+
+                {detail.corroborations.length > 0 && <div className="mt-4 space-y-3">{detail.corroborations.map((record) => <article key={record.id} className={cn('rounded-lg border p-4', record.status === 'verified' ? 'border-emerald-500/30 bg-emerald-500/[0.04]' : record.status === 'rejected' ? 'border-destructive/25 bg-destructive/[0.04]' : 'border-amber-500/25 bg-amber-500/[0.04]')}><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">Loss corroboration · v{record.version}</p><span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold uppercase">{record.status}</span><span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium">{(record.assessment.breakdown?.state || 'insufficient_evidence').replace(/_/g, ' ')}</span></div><p className="mt-2 text-xs text-muted-foreground">Confidence {record.assessment.breakdown?.confidenceScore ?? 0}/100 · Coverage {record.assessment.breakdown?.sourceCoverageScore ?? 0}/100 · Missingness {record.assessment.breakdown?.missingnessScore ?? 0}/100 · Consistency {record.assessment.breakdown?.crossSourceConsistencyScore ?? 0}/100</p><p className="mt-1 text-xs text-muted-foreground">{record.assessment.breakdown?.sourceCount ?? 0} sources / {record.assessment.breakdown?.distinctProviderCount ?? 0} providers · {record.assessment.contradictions?.length ?? 0} explicit contradiction{record.assessment.contradictions?.length === 1 ? '' : 's'}</p></div>{record.status === 'computed' && <div className="flex shrink-0 gap-2"><button disabled={busy} onClick={() => reviewCorroborationMutation.mutate({ id: record.id, status: 'verified' })} className="inline-flex h-8 items-center gap-1 rounded-md bg-emerald-600 px-3 text-xs font-semibold text-white disabled:opacity-50"><Check className="h-3.5 w-3.5" /> Verify inputs</button><button disabled={busy} onClick={() => reviewCorroborationMutation.mutate({ id: record.id, status: 'rejected' })} className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold disabled:opacity-50"><X className="h-3.5 w-3.5" /> Reject</button></div>}</div><div className="mt-3 grid gap-2 rounded-md bg-background/50 p-3 font-mono text-[10px] text-muted-foreground sm:grid-cols-2"><p>Source manifest · {shortHash(record.sourceManifestHash)}</p><p>Assessment proof · {shortHash(record.assessmentHash)}</p></div>{record.assessment.limitations?.length ? <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">{record.assessment.limitations.join(' ')}</p> : null}</article>)}</div>}
+              </section>}
 
               <section className="rounded-xl border border-primary/25 bg-card p-4 shadow-sm md:p-5">
                 <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start"><div><div className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /><h3 className="font-semibold">2 · Build the grounded AI draft</h3></div><p className="mt-1 max-w-3xl text-sm text-muted-foreground">GPT-5.6 Sol receives only approved artifacts. Every finding must cite this case’s run-local evidence manifest or the entire draft is rejected.</p></div><button disabled={busy || detail.artifacts.length === 0 || detail.artifacts.some((item) => !item.aiUseApprovedAt)} onClick={() => { setNotice(null); setError(null); analyzeMutation.mutate(); }} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">{analyzeMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing evidence…</> : <><ScanSearch className="h-4 w-4" /> Generate evidence draft</>}</button></div>

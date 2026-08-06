@@ -32,6 +32,7 @@ export type CertificateStatus = "draft" | "issued" | "superseded";
 export type ClaimGraphStatus = "valid" | "invalid";
 export type ClaimRoutePacketStatus = "ready" | "executing" | "reconciling" | "completed" | "failed" | "blocked";
 export type ClaimExecutionReceiptState = "prepared" | "indeterminate" | "succeeded" | "failed" | "reconciled";
+export type ClaimCorroborationStatus = "computed" | "verified" | "rejected";
 
 export const claimCasesTable = pgTable(
   "claim_cases",
@@ -234,6 +235,45 @@ export const claimCanonicalGraphsTable = pgTable(
 );
 
 /**
+ * A deterministic, human-reviewable assessment of whether independently
+ * sourced observations corroborate or contradict a reported loss. The full
+ * source manifest and calculation result are stored separately and hashed so
+ * a later reviewer can replay the result without asking an AI to explain it.
+ */
+export const claimLossCorroborationsTable = pgTable(
+  "claim_loss_corroborations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => claimCasesTable.id),
+    canonicalGraphId: uuid("canonical_graph_id")
+      .notNull()
+      .references(() => claimCanonicalGraphsTable.id),
+    version: integer("version").notNull(),
+    status: text("status").$type<ClaimCorroborationStatus>().notNull().default("computed"),
+    calculationVersion: text("calculation_version").notNull(),
+    sourceManifest: jsonb("source_manifest").$type<Record<string, unknown>>().notNull(),
+    sourceManifestHash: text("source_manifest_hash").notNull(),
+    assessment: jsonb("assessment").$type<Record<string, unknown>>().notNull(),
+    assessmentHash: text("assessment_hash").notNull(),
+    createdByUserId: varchar("created_by_user_id").references(() => usersTable.id),
+    reviewedByUserId: varchar("reviewed_by_user_id").references(() => usersTable.id),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewNote: text("review_note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("claim_loss_corroborations_case_version_uniq").on(table.caseId, table.version),
+    index("claim_loss_corroborations_org_case_idx").on(table.organizationId, table.caseId, table.createdAt),
+    index("claim_loss_corroborations_org_graph_idx").on(table.organizationId, table.canonicalGraphId),
+  ],
+);
+
+/**
  * A route packet is the immutable, constraint-carrying handoff from verified
  * evidence to a future target adapter. It cannot itself execute a target-side
  * operation; an executor must pass the packet's preconditions first.
@@ -251,6 +291,7 @@ export const claimRoutePacketsTable = pgTable(
     certificateId: uuid("certificate_id")
       .notNull()
       .references(() => claimCertificatesTable.id),
+    corroborationId: uuid("corroboration_id").references(() => claimLossCorroborationsTable.id),
     version: integer("version").notNull(),
     status: text("status").$type<ClaimRoutePacketStatus>().notNull().default("ready"),
     target: text("target").notNull(),
@@ -315,5 +356,6 @@ export type ClaimEvidenceRun = typeof claimEvidenceRunsTable.$inferSelect;
 export type ClaimObservation = typeof claimObservationsTable.$inferSelect;
 export type ClaimCertificate = typeof claimCertificatesTable.$inferSelect;
 export type ClaimCanonicalGraph = typeof claimCanonicalGraphsTable.$inferSelect;
+export type ClaimLossCorroboration = typeof claimLossCorroborationsTable.$inferSelect;
 export type ClaimRoutePacket = typeof claimRoutePacketsTable.$inferSelect;
 export type ClaimExecutionReceipt = typeof claimExecutionReceiptsTable.$inferSelect;

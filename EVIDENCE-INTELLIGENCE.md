@@ -43,6 +43,12 @@ issues the certificate.
     with node-level source paths, transformation rules, financial-conservation
     checks, and a graph digest. A graph with failed invariants is retained for
     diagnosis but blocked from target compilation.
+13. Source-linked weather, property, inspection, photo, or document readings
+    may compile into a deterministic loss-corroboration assessment. Its
+    versioned source manifest and result are hashed, and its spatial,
+    temporal, directional, quality, coverage, missingness, and contradiction
+    components remain visible for contractor review. It never invents a source
+    or decides coverage, causation, safety, damages, or eligibility.
 
 ## OpenAI implementation
 
@@ -74,6 +80,8 @@ source material.
 - `GET /api/v1/bie/claims/:id/graphs`
 - `POST /api/v1/bie/claims/:id/graphs/native-estimate`
 - `GET /api/v1/bie/claims/:id/graphs/:graphId/targets/:target`
+- `GET|POST /api/v1/bie/claims/:id/corroborations`
+- `POST /api/v1/bie/claims/:id/corroborations/:corroborationId/review`
 - `GET|POST /api/v1/bie/claims/:id/routes`
 
 Read operations require `crm.read`. Case creation, evidence intake, analysis,
@@ -96,6 +104,13 @@ The deterministic release gates require:
 - an indeterminate external write may only be reconciled, never blindly retried
 - a declared estimate line total, subtotal, or grand total that disagrees with
   the canonical computation blocks target compilation
+- loss corroboration is replayable from a valid canonical graph and source
+  artifact digests; source ordering cannot change its result
+- spatial, directional, temporal, and source-data gaps remain explicit in the
+  result and lower the corresponding confidence rather than being silently
+  filled by an AI
+- a route that opts into loss corroboration requires a human-verified assessment
+  whose assessment hash still matches the compiled packet
 
 The first live synthetic verification record is committed at
 `artifacts/api-server/evals/results/2026-08-06-local.json`.
@@ -118,15 +133,16 @@ Then open `http://localhost:8080/evidence` while signed in.
 
 ## Verification snapshot — 2026-08-06
 
-- Current production UI and API bundles: passed
-- Current Docker image rebuild: passed
+- Current workspace typecheck and production UI/API bundles: passed
+- Current Docker image rebuild and local service restart: passed
 - Current local app: serves the MogulForge GrowthOS bundle at `:8080`; the
   protected Evidence API returns the expected unauthenticated `401`
 - Current Command Center suite: 190/190 passed
-- Current Claim Kernel, graph compiler, Evidence Intelligence, redaction, and
-  route-inventory suites: 26/26 passed
-- Current local database schema: frozen manifest/integrity columns plus route
-  packet and execution-receipt tables confirmed
+- Current Claim Kernel, canonical graph, loss corroboration, Evidence
+  Intelligence, redaction, and route-inventory suites: 35/35 passed
+- Current local database schema: frozen manifest/integrity columns, canonical
+  graph, loss-corroboration, route-packet/corroboration binding, and
+  execution-receipt tables confirmed
 
 Older evidence-flow test records remain useful historical evidence, but they
 are not a substitute for rerunning the relevant check after a later change.

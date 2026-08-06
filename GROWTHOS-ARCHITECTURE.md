@@ -30,6 +30,9 @@ The local recovery branch implements these deterministic controls:
 8. Native MogulForge estimates compile into canonical claim graphs with
    node-level source paths, transformation rules, financial-conservation
    invariants, and deterministic graph digests.
+9. Source-linked loss observations compile into a hash-bound corroboration
+   assessment that exposes spatial, temporal, directional, source-quality,
+   coverage, missingness, and contradiction components for human review.
 
 The route compiler does **not** execute a browser action, contact a carrier,
 or hold credentials. That separation is intentional.
@@ -40,7 +43,7 @@ or hold credentials. That separation is intentional.
 Contractor UI
     -> MogulForge API / PostgreSQL (authoritative cases, certificates, route packets)
     -> Object storage (large artifacts, immutable receipt evidence; planned)
-    -> Private claim kernel (normalization and deterministic validation; planned)
+    -> Private claim kernel (local normalization and deterministic validation)
     -> Isolated executor (target interaction only after preflight; planned)
 ```
 
@@ -65,10 +68,14 @@ their respective platform agreements and test fixtures are available.
 
 ### Stage 3 — deterministic loss corroboration
 
-Add provider-versioned weather/property inputs, explicit spatial/temporal
-coverage and missingness records, deterministic exposure calculations, and a
-decomposable confidence result. AI may explain the result but must not invent or
-silently alter the calculation.
+Implemented locally: versioned, source-artifact-linked observations; explicit
+quality, coverage, and missing-field declarations; time-window relevance;
+great-circle distance; roof-facet directional alignment; cross-source
+contradiction detection; decomposable confidence; source-manifest and result
+hashes; and immutable contractor verification/rejection. A verified assessment
+may be bound as an optional precondition on a route packet. It does not call a
+weather service, infer missing evidence, or determine coverage, causation,
+safety, or damages. Provider adapters remain a separate future integration.
 
 ### Stage 4 — proof-obligated target execution
 

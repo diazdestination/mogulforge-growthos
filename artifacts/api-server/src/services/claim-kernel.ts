@@ -104,6 +104,10 @@ export type RoutePacket = {
   claimId: string;
   certificateId: string;
   certificateIntegrityHash: string;
+  corroboration?: {
+    id: string;
+    assessmentHash: string;
+  };
   routeVersion: number;
   target: string;
   operation: string;
@@ -244,6 +248,8 @@ export function buildRoutePacket(input: {
   claimId: string;
   certificateId: string;
   certificateIntegrityHash: string;
+  corroborationId?: string;
+  corroborationAssessmentHash?: string;
   routeVersion: number;
   target: string;
   operation: string;
@@ -257,6 +263,12 @@ export function buildRoutePacket(input: {
 }): { packet: RoutePacket; digest: string } {
   if (!/^[a-f0-9]{64}$/i.test(input.certificateIntegrityHash)) {
     throw new Error("An issued certificate integrity hash is required for a route packet.");
+  }
+  if (Boolean(input.corroborationId) !== Boolean(input.corroborationAssessmentHash)) {
+    throw new Error("A corroboration ID and assessment hash must be provided together for a route packet.");
+  }
+  if (input.corroborationAssessmentHash && !/^[a-f0-9]{64}$/i.test(input.corroborationAssessmentHash)) {
+    throw new Error("A corroboration assessment hash must be a SHA-256 digest.");
   }
   if (!Number.isInteger(input.routeVersion) || input.routeVersion < 1) {
     throw new Error("Route packet version must be a positive integer.");
@@ -283,11 +295,15 @@ export function buildRoutePacket(input: {
   }));
   const capabilityRequirements = [...new Set(input.capabilityRequirements.map((item) => item.trim()).filter(Boolean))].sort();
   if (capabilityRequirements.length === 0) throw new Error("At least one execution capability is required.");
+  const corroboration = input.corroborationId
+    ? { id: requireNonBlank(input.corroborationId, "Corroboration ID"), assessmentHash: input.corroborationAssessmentHash!.toLowerCase() }
+    : undefined;
 
   const idempotencyKey = sha256Canonical({
     claimId: input.claimId,
     certificateId: input.certificateId,
     certificateIntegrityHash: input.certificateIntegrityHash,
+    corroboration,
     routeVersion: input.routeVersion,
     target,
     operation,
@@ -299,6 +315,7 @@ export function buildRoutePacket(input: {
     claimId: input.claimId,
     certificateId: input.certificateId,
     certificateIntegrityHash: input.certificateIntegrityHash,
+    ...(corroboration ? { corroboration } : {}),
     routeVersion: input.routeVersion,
     target,
     operation,
@@ -308,6 +325,9 @@ export function buildRoutePacket(input: {
       { code: "certificate-integrity", description: "The issued certificate hash still matches this packet.", expected: input.certificateIntegrityHash },
       { code: "human-review-complete", description: "All evidence observations were reviewed by a human.", expected: true },
       { code: "human-verification-present", description: "At least one observation was human verified.", expected: true },
+      ...(corroboration
+        ? [{ code: "corroboration-verified", description: "The bound loss corroboration assessment remains human verified.", expected: corroboration.assessmentHash }]
+        : []),
       { code: "adapter-fingerprint", description: "The target adapter matches the compiled fingerprint.", expected: adapter.fingerprint },
     ],
     postconditions,
@@ -324,6 +344,8 @@ export function evaluateRoutePreflight(input: {
   packet: RoutePacket;
   allObservationsReviewed: boolean;
   verifiedObservationCount: number;
+  corroborationVerified?: boolean;
+  corroborationAssessmentHash?: string | null;
   adapterFingerprint: string | null;
 }): RoutePreflightResult {
   const checks = [
@@ -353,6 +375,21 @@ export function evaluateRoutePreflight(input: {
           ? "At least one observation is human verified."
           : "No human-verified observation is present.",
     },
+    ...(input.packet.corroboration
+      ? [
+          {
+            code: "corroboration-verified",
+            passed:
+              input.corroborationVerified === true &&
+              input.corroborationAssessmentHash === input.packet.corroboration.assessmentHash,
+            reason:
+              input.corroborationVerified === true &&
+              input.corroborationAssessmentHash === input.packet.corroboration.assessmentHash
+                ? "Human-verified corroboration assessment hash matches the route packet."
+                : "Bound corroboration is missing, unverified, or does not match the route packet.",
+          },
+        ]
+      : []),
     {
       code: "adapter-fingerprint",
       passed: input.adapterFingerprint === input.packet.adapter.fingerprint,

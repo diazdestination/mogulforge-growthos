@@ -120,4 +120,51 @@ describe("MogulForge Claim Kernel", () => {
     expect(canTransitionExecutionState("indeterminate", "prepared")).toBe(false);
     expect(canTransitionExecutionState("indeterminate", "reconciled")).toBe(true);
   });
+
+  it("binds a human-verified corroboration assessment when a route requires one", () => {
+    const corroborationHash = "c".repeat(64);
+    const { packet } = buildRoutePacket({
+      claimId: "claim-1",
+      certificateId: "certificate-1",
+      certificateIntegrityHash: integrityHash,
+      corroborationId: "corroboration-1",
+      corroborationAssessmentHash: corroborationHash,
+      routeVersion: 2,
+      target: "carrier-portal",
+      operation: "submit-claim-package",
+      adapterName: "carrier-portal",
+      adapterVersion: "1.0.0",
+      adapterFingerprint: "adapter-sha256-1",
+      postconditions: [{ code: "confirmation-number", description: "A target confirmation number is captured." }],
+      capabilityRequirements: ["carrier:write:claim"],
+      maxExternalWrites: 1,
+      maxAttempts: 1,
+    });
+    expect(packet.corroboration).toEqual({ id: "corroboration-1", assessmentHash: corroborationHash });
+
+    const blocked = evaluateRoutePreflight({
+      certificateIssued: true,
+      certificateIntegrityHash: integrityHash,
+      packet,
+      allObservationsReviewed: true,
+      verifiedObservationCount: 1,
+      corroborationVerified: false,
+      corroborationAssessmentHash: corroborationHash,
+      adapterFingerprint: "adapter-sha256-1",
+    });
+    expect(blocked.allowed).toBe(false);
+    expect(blocked.checks.find((item) => item.code === "corroboration-verified")?.passed).toBe(false);
+
+    const allowed = evaluateRoutePreflight({
+      certificateIssued: true,
+      certificateIntegrityHash: integrityHash,
+      packet,
+      allObservationsReviewed: true,
+      verifiedObservationCount: 1,
+      corroborationVerified: true,
+      corroborationAssessmentHash: corroborationHash,
+      adapterFingerprint: "adapter-sha256-1",
+    });
+    expect(allowed.allowed).toBe(true);
+  });
 });

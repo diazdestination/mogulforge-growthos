@@ -5,6 +5,7 @@ import {
   claimCertificatesTable,
   claimEvidenceArtifactsTable,
   claimEvidenceRunsTable,
+  claimLossCorroborationsTable,
   claimObservationsTable,
   claimRoutePacketsTable,
   db,
@@ -113,7 +114,7 @@ export async function createEvidenceCase(
 
 export async function getEvidenceCase(organizationId: string, caseId: string) {
   const claimCase = await requireCase(organizationId, caseId);
-  const [artifacts, runs, observations, certificates, graphs, routePackets, eligibleEstimates] = await Promise.all([
+  const [artifacts, runs, observations, certificates, graphs, corroborations, routePackets, eligibleEstimates] = await Promise.all([
     db
       .select()
       .from(claimEvidenceArtifactsTable)
@@ -166,6 +167,16 @@ export async function getEvidenceCase(organizationId: string, caseId: string) {
       .orderBy(desc(claimCanonicalGraphsTable.version)),
     db
       .select()
+      .from(claimLossCorroborationsTable)
+      .where(
+        and(
+          eq(claimLossCorroborationsTable.organizationId, organizationId),
+          eq(claimLossCorroborationsTable.caseId, caseId),
+        ),
+      )
+      .orderBy(desc(claimLossCorroborationsTable.version)),
+    db
+      .select()
       .from(claimRoutePacketsTable)
       .where(
         and(
@@ -195,6 +206,7 @@ export async function getEvidenceCase(organizationId: string, caseId: string) {
     observations,
     certificates,
     graphs,
+    corroborations,
     routePackets,
     eligibleEstimates,
     policy: {

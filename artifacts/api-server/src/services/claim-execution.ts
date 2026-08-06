@@ -2,6 +2,7 @@ import {
   claimCasesTable,
   claimCertificatesTable,
   claimExecutionReceiptsTable,
+  claimLossCorroborationsTable,
   claimRoutePacketsTable,
   db,
   type ClaimExecutionReceiptState,
@@ -29,6 +30,7 @@ export class ClaimExecutionError extends Error {
 
 export type CompileRouteInput = {
   certificateId: string;
+  corroborationId?: string;
   target: string;
   operation: string;
   adapterName: string;
@@ -130,6 +132,27 @@ export async function compileClaimRoutePacket(
   if (!policy.allObservationsReviewed || policy.verifiedObservationCount < 1) {
     throw new ClaimExecutionError("Certificate review policy is not satisfied for execution.", 409);
   }
+  const corroboration = input.corroborationId
+    ? (
+        await db
+          .select()
+          .from(claimLossCorroborationsTable)
+          .where(
+            and(
+              eq(claimLossCorroborationsTable.organizationId, organizationId),
+              eq(claimLossCorroborationsTable.caseId, caseId),
+              eq(claimLossCorroborationsTable.id, input.corroborationId),
+            ),
+          )
+          .limit(1)
+      )[0]
+    : null;
+  if (input.corroborationId && !corroboration) {
+    throw new ClaimExecutionError("Loss corroboration assessment not found.", 404);
+  }
+  if (corroboration && (corroboration.status !== "verified" || !/^[a-f0-9]{64}$/i.test(corroboration.assessmentHash))) {
+    throw new ClaimExecutionError("Only a human-verified, integrity-bound loss corroboration may become a route precondition.", 409);
+  }
 
   const [latest] = await db
     .select({ version: claimRoutePacketsTable.version })
@@ -144,6 +167,8 @@ export async function compileClaimRoutePacket(
       claimId: caseId,
       certificateId: certificate.id,
       certificateIntegrityHash: certificate.integrityHash,
+      corroborationId: corroboration?.id,
+      corroborationAssessmentHash: corroboration?.assessmentHash,
       routeVersion: version,
       target: input.target,
       operation: input.operation,
@@ -165,6 +190,7 @@ export async function compileClaimRoutePacket(
       organizationId,
       caseId,
       certificateId: certificate.id,
+      corroborationId: corroboration?.id ?? null,
       version,
       target: compiled.packet.target,
       operation: compiled.packet.operation,
@@ -191,6 +217,7 @@ export async function compileClaimRoutePacket(
       certificateId: certificate.id,
       packetHash: created.packetHash,
       certificateIntegrityHash: certificate.integrityHash,
+      corroborationId: corroboration?.id ?? null,
       target: created.target,
       operation: created.operation,
       adapterFingerprint: created.adapterFingerprint,
@@ -218,6 +245,21 @@ export async function preflightClaimRoutePacket(
     )
     .limit(1);
   if (!certificate) throw new ClaimExecutionError("Route packet certificate is missing.", 409);
+  const corroboration = routePacket.corroborationId
+    ? (
+        await db
+          .select()
+          .from(claimLossCorroborationsTable)
+          .where(
+            and(
+              eq(claimLossCorroborationsTable.organizationId, organizationId),
+              eq(claimLossCorroborationsTable.caseId, caseId),
+              eq(claimLossCorroborationsTable.id, routePacket.corroborationId),
+            ),
+          )
+          .limit(1)
+      )[0] ?? null
+    : null;
 
   const packet = asRoutePacket(routePacket.packet);
   const policy = readReviewPolicy(certificate.integrityManifest);
@@ -227,6 +269,8 @@ export async function preflightClaimRoutePacket(
     packet,
     allObservationsReviewed: policy.allObservationsReviewed,
     verifiedObservationCount: policy.verifiedObservationCount,
+    corroborationVerified: corroboration?.status === "verified",
+    corroborationAssessmentHash: corroboration?.assessmentHash ?? null,
     adapterFingerprint: activeAdapterFingerprint,
   });
   return { routePacket, ...result };
