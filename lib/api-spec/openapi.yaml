@@ -3,7 +3,7 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: Painless GrowthOS API
+  description: MogulForge GrowthOS API
 servers:
   - url: /api
     description: Base API path
@@ -1233,6 +1233,41 @@ paths:
                 $ref: "#/components/schemas/Lead"
         "404":
           description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /v1/leads/{id}/won-revenue:
+    patch:
+      operationId: correctWonRevenue
+      tags: [leads]
+      summary: Correct the won revenue on a lead after a win
+      description: Admin-only correction of the recorded revenue amount. The attribution category is intentionally left unchanged.
+      parameters:
+        - $ref: "#/components/parameters/IdPathParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WonRevenueCorrectionInput"
+      responses:
+        "204":
+          description: Revenue corrected
+        "400":
+          description: Invalid revenue amount
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Lead not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Lead has not been won
           content:
             application/json:
               schema:
@@ -4633,6 +4668,14 @@ components:
           type: [integer, "null"]
         lostReason:
           type: [string, "null"]
+    WonRevenueCorrectionInput:
+      type: object
+      required: [wonRevenueCents]
+      properties:
+        wonRevenueCents:
+          type: [integer, "null"]
+          minimum: 0
+          description: New revenue amount in cents. Pass null to clear the figure.
     ReferralSubmissionInput:
       type: object
       required: [name]

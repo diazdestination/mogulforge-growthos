@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -20,6 +20,7 @@ import { DEFAULT_SERVICES, LEGACY_SERVICE_SLUGS } from "./settings";
 const WEBSITE_SERVICES_SOURCE = fileURLToPath(
   new URL("../../../website/src/content/services.ts", import.meta.url),
 );
+const websitePackageAvailable = existsSync(WEBSITE_SERVICES_SOURCE);
 
 function loadWebsiteContentSlugs(): Set<string> {
   const source = readFileSync(WEBSITE_SERVICES_SOURCE, "utf8");
@@ -32,8 +33,12 @@ function loadWebsiteContentSlugs(): Set<string> {
   return slugs;
 }
 
-describe("default service slugs match website page copy", () => {
-  const contentSlugs = loadWebsiteContentSlugs();
+const describeWebsiteParity = websitePackageAvailable ? describe : describe.skip;
+
+describeWebsiteParity("default service slugs match website page copy", () => {
+  const contentSlugs = websitePackageAvailable
+    ? loadWebsiteContentSlugs()
+    : new Set<string>();
 
   it("extracts the website content slugs (guard against parser drift)", () => {
     // If the website file moves or its formatting changes so the extraction

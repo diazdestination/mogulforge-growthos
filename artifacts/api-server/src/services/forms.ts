@@ -640,7 +640,7 @@ export async function getPublicForm(organizationId: string, slug: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Seeding: the Painless assessment as a form config
+// Seed the default home-services assessment as a form config.
 // ---------------------------------------------------------------------------
 
 export const DEFAULT_ASSESSMENT_SEED_KEY = "default.assessment";

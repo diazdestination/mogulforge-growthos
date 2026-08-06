@@ -313,7 +313,7 @@ PRODUCT6="crm"
 REMOTE6="crm-template"
 
 cat > "$ASSEMBLE6/.github/workflows/sync-from-upstream.yml" << YAML
-# Sync this template repo with the latest upstream Painless CRM monorepo.
+# Sync this template repo with its configured upstream CRM monorepo.
 name: Sync from upstream monorepo
 
 on:
@@ -321,7 +321,7 @@ on:
     inputs:
       monorepo_url:
         description: >
-          HTTPS clone URL of the upstream Painless CRM monorepo.
+          HTTPS clone URL of the upstream CRM monorepo.
           Leave blank to use the MONOREPO_URL repository secret.
         required: false
         type: string
@@ -361,7 +361,7 @@ jobs:
 
       - name: Configure git identity
         run: |
-          git config --global user.email "template-sync@painless-crm"
+          git config --global user.email "template-sync@mogulforge.local"
           git config --global user.name "Template Sync"
 
       - name: Run export and push

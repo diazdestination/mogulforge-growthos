@@ -5,7 +5,7 @@
 # One-time setup: moves the staged sync-from-upstream GitHub Actions workflow
 # into the correct location and pushes it.
 #
-# Run this once from any local clone of a Painless CRM template repository:
+# Run this once from a maintained client-template repository:
 #
 #   bash scripts/install-sync-workflow.sh
 #

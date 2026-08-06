@@ -132,6 +132,11 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /reports/roi": "crm.read",
   "GET /reports/roi/export": "crm.read",
   "GET /audit-events": "audit.read",
+  // Billing changes the organization's subscription and payment-management
+  // state; keep every surface admin-only.
+  "GET /billing": "settings.manage",
+  "POST /billing/checkout": "settings.manage",
+  "POST /billing/portal": "settings.manage",
   // settings surfaces
   "GET /settings": "crm.read",
   // read-only effective availability; needed by anyone booking appointments
@@ -215,6 +220,10 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "PATCH /onboarding": "settings.manage",
   "POST /onboarding/test-lead": "settings.manage",
   "DELETE /onboarding/test-lead": "settings.manage",
+  // Demo data changes organization-wide sample records, so only admins may
+  // load or clear it.
+  "POST /demo-data": "settings.manage",
+  "DELETE /demo-data": "settings.manage",
 };
 
 // DELETE routes allowed to use something weaker than crm.delete, with the

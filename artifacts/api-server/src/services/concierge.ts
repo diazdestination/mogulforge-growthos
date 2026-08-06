@@ -57,7 +57,7 @@ function conciergeAi(): AiProvider {
 
 export const CONCIERGE_DISCLOSURE_VERSION = "concierge-v1-2026-08";
 
-/** Effective org concierge config (defaults = original Painless behavior). */
+/** Effective organization concierge config. */
 export type ConciergeConfig = Required<ConciergeSettings>;
 
 /** Intent catalog as a key-indexed map for a config. */

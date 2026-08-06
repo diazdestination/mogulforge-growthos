@@ -139,13 +139,13 @@ YAML
   # resync from GitHub without touching the monorepo locally.
   mkdir -p "$tmpdir/.github/workflows"
   cat > "$tmpdir/.github/workflows/sync-from-upstream.yml" << YAML
-# Sync this template repo with the latest upstream Painless CRM monorepo.
+# Sync this template repo with its configured upstream CRM monorepo.
 #
 # How to use
 # ----------
 # 1. Add a secret named MONOREPO_URL to this repository's Settings → Secrets
-#    that contains the HTTPS clone URL of your upstream Painless CRM monorepo
-#    (e.g. https://<token>@github.com/YOUR_ORG/painless-crm.git).
+#    that contains the HTTPS clone URL of your upstream CRM monorepo
+#    (e.g. https://<token>@github.com/YOUR_ORG/your-crm.git).
 # 2. Go to Actions → "Sync from upstream monorepo" → Run workflow.
 #
 # The workflow clones the monorepo, runs the export script for this product,
@@ -158,7 +158,7 @@ on:
     inputs:
       monorepo_url:
         description: >
-          HTTPS clone URL of the upstream Painless CRM monorepo.
+          HTTPS clone URL of the upstream CRM monorepo.
           Leave blank to use the MONOREPO_URL repository secret.
         required: false
         type: string
@@ -200,7 +200,7 @@ jobs:
 
       - name: Configure git identity
         run: |
-          git config --global user.email "template-sync@painless-crm"
+          git config --global user.email "template-sync@mogulforge.local"
           git config --global user.name "Template Sync"
 
       - name: Run export and push

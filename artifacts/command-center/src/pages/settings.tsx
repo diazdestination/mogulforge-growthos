@@ -185,7 +185,7 @@ function BusinessProfileTab() {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Business name</Label>
-            <Input value={profile.businessName ?? ''} onChange={set('businessName')} placeholder="Painless Roofing & Water Restoration" />
+            <Input value={profile.businessName ?? ''} onChange={set('businessName')} placeholder="MogulForge Home Services" />
           </div>
           <div className="space-y-1.5">
             <Label>Phone</Label>
@@ -219,7 +219,7 @@ function BusinessProfileTab() {
           </div>
           <div className="space-y-1.5">
             <Label>Website URL</Label>
-            <Input value={profile.website ?? ''} onChange={set('website')} placeholder="https://painlessroofing.com" />
+            <Input value={profile.website ?? ''} onChange={set('website')} placeholder="https://example.com" />
           </div>
           <div className="space-y-1.5">
             <Label>Facebook URL</Label>
@@ -931,7 +931,7 @@ function WebhooksTab() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-3">
-            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/hooks/painless" />
+            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/hooks/mogulforge" />
             <Button
               disabled={!url.startsWith('http') || create.isPending}
               onClick={() => create.mutate({ data: { url } }, { onSuccess: () => setUrl('') })}

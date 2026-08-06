@@ -1,122 +1,77 @@
-# Painless Command Center — Client Template
+# MogulForge GrowthOS
 
-A full-stack roofing CRM: pipeline board, lead management, scheduling, automated emails, portal access for homeowners, and an AI roof concierge. Built on React + Vite (frontend) and Node/Fastify + PostgreSQL (API server).
+MogulForge GrowthOS is an AI-powered command center for home-services businesses. It combines lead capture, pipeline management, automated follow-up, scheduling, estimates, homeowner communication, attribution, and an AI concierge in one multi-tenant CRM.
 
----
+This is the product repository. It is separate from the MogulForge marketing website and from the original upstream CRM template.
 
-## ⚡ First thing after cloning: activate the sync workflow
+## Repository identity
 
-This repository ships with a **Sync from upstream monorepo** GitHub Actions workflow that lets you pull the latest updates from the Painless CRM monorepo with one click. It needs a one-time setup step to become dispatchable:
+- **Local checkout:** `C:\Users\diazd\dev\projects\mogulforge`
+- **GitHub:** `diazdestination/mogulforge-crm` (private)
+- **Default branch:** `main`
+- **Do not push to:** `diazdestination/MogulForge-crm-template-`
+- **Marketing website:** `diazdestination/MogulForge` (a separate Next.js codebase)
 
-**Option A — GitHub Codespaces (automatic)**
+## What is included
 
-Open this repo in a Codespace. The devcontainer runs the activation script automatically on container create — nothing else to do.
+- React + Vite command-center UI
+- Fastify API and PostgreSQL/Drizzle data layer
+- Self-hosted email/password authentication
+- Multi-tenant organizations and role-aware access
+- Lead pipeline, contacts, properties, tasks, appointments, and estimates
+- AI concierge, automations, next-best actions, and demo-data seeding
+- Stripe-ready billing with an optional enforcement gate
+- Single-container production build plus Docker Compose and Fly.io configuration
 
-**Option B — local clone (one command)**
+## Run locally with Docker
 
-```bash
-bash scripts/install-sync-workflow.sh
+Copy `.env.example` to `.env`, provide local-only values, and run:
+
+```powershell
+docker compose up -d --build
 ```
 
-This moves the staged workflow file into `.github/workflows/` and pushes it. After that, go to **Actions → "Sync from upstream monorepo" → Run workflow** to pull future updates.
+Then open `http://localhost:8080`.
 
-> The script is safe to re-run; it exits immediately if the workflow is already in place.
+The local stack uses:
 
----
+- App: `http://localhost:8080`
+- PostgreSQL: `localhost:5433`
 
-## Rebranding for a new client
+Do not commit `.env` or print its secret values into logs or chat.
 
-**Everything client-specific lives in two config files. Edit both before your first deploy.**
+## Run in development mode
 
-| File | Audience | What to change |
-|---|---|---|
-| `artifacts/command-center/src/lib/client.config.ts` | **Frontend** (browser bundle) | Business name, short name, app title, primary color (hex + HSL), phone, timezone |
-| `artifacts/api-server/src/lib/client.config.ts` | **Backend** (server process) | Default org name, org slug, fallback business name, AI assistant name, AI greeting |
+See [DEV-LOCAL.md](DEV-LOCAL.md) for the Windows setup, database bootstrap, API/frontend processes, and troubleshooting notes.
 
-### Why two files?
+## Deploy
 
-The frontend config is baked into the browser bundle at build time (Vite replaces references at compile time — values are never fetched from the server). The backend config is loaded by the Node.js process at startup and seeds the database on first boot. Merging them into one file would require shipping server-only secrets alongside client JS, or adding a runtime fetch step before the app renders — neither is worth the trade-off.
+- [DEPLOY.md](DEPLOY.md) covers the container and self-hosting model.
+- [BETA-LAUNCH.md](BETA-LAUNCH.md) is the Fly.io launch checklist.
+- `fly.toml` includes the production port and schema release command.
 
-### Values that must stay in sync
-
-A few values appear in both configs and need to match:
-
-| Value | Frontend key | Backend key |
-|---|---|---|
-| Business name | `businessName` | `defaultOrgName` |
-| Short business name | `businessShortName` | `businessShortName` |
-| Phone number | `phone` | `phone` |
-
-If these drift apart, the UI and outbound messages (email, SMS) will show different names — update both whenever you change one.
-
-### After editing those files
-
-1. **Logo** — replace `artifacts/command-center/public/favicon.ico` and any logo assets with the new client's logo.
-2. **Domain/origin** — set the `DOMAIN` environment variable (used by the API server to build portal links and OG cards).
-
-> **No manual edits to `index.html` or `index.css` are needed.** The browser tab title, Open Graph meta tags, and the `--primary` CSS variable are all injected automatically from `client.config.ts` at build time via the `clientBrandingPlugin` in `vite.config.ts`.
-
----
-
-## Local development
-
-### Prerequisites
-- Node 22+
-- pnpm 9+
-- PostgreSQL 15+ (or a `DATABASE_URL` pointing at one)
-
-### Setup
-
-```bash
-# Install dependencies
-pnpm install
-
-# Push the database schema
-pnpm --filter @workspace/db run push
-
-# Start the API server
-pnpm --filter @workspace/api-server run dev
-
-# In a separate terminal, start the CRM frontend
-pnpm --filter @workspace/command-center run dev
-```
-
-The CRM will be available at the URL printed by Vite (usually `http://localhost:5173`).
-
-### Environment variables
-
-Copy `.env.example` (if present) or create a `.env` file in `artifacts/api-server/` with:
-
-```
-PORT=3001
-DATABASE_URL=postgresql://user:pass@localhost:5432/yourdb
-SESSION_SECRET=a-long-random-string
-# Optional: OPENAI_API_KEY for the AI concierge
-```
-
----
-
-## Deploying
-
-This monorepo is designed for Replit deployment (Autoscale or Reserved VM). On Replit:
-
-1. Fork or import this repo into a new Repl.
-2. Add the required secrets via **Secrets** in the Replit sidebar.
-3. The `artifacts/api-server` and `artifacts/command-center` workflows start automatically.
-
-For other platforms, build both packages (`pnpm --filter @workspace/command-center run build` and `pnpm --filter @workspace/api-server run build`) and deploy the resulting artifacts as two services (API + static SPA).
-
----
+Set `SESSION_SECRET` before any public deployment. Stripe and OpenAI integrations remain disabled-safe when their optional keys are absent.
 
 ## Architecture
 
-```
+```text
 artifacts/
-  api-server/       Node.js API (Express + Drizzle ORM)
-  command-center/   React + Vite SPA (Tailwind, shadcn/ui, Wouter)
+  api-server/       Fastify API and background services
+  command-center/   React + Vite application
 lib/
-  api-zod/          Shared API schema (Zod)
-  api-client-react/ React Query hooks generated from the schema
-  db/               Drizzle schema + migrations
-  replit-auth-web/  Auth hooks (Replit OIDC)
+  api-spec/         OpenAPI source
+  api-zod/          Generated request/response schemas
+  api-client-react/ Generated React Query client
+  db/               Drizzle schema and database tooling
 ```
+
+Client-facing defaults live in both:
+
+- `artifacts/command-center/src/lib/client.config.ts`
+- `artifacts/api-server/src/lib/client.config.ts`
+
+Keep those two files aligned when changing the product name, color, assistant identity, or default organization details.
+
+## Product status
+
+The repository is beta-ready and has been validated as a production Docker build. A public Fly.io deployment and the first owner registration are still launch steps, not completed state.

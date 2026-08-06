@@ -39,7 +39,7 @@ export async function sendInviteEmail(params: {
     }
     const settings = await getOrgSettings(params.organizationId);
     const businessName =
-      settings.businessProfile?.businessName?.trim() || "Painless Roofing";
+      settings.businessProfile?.businessName?.trim() || "MogulForge";
     const url = crmAppUrl();
     const roleLabel = params.role.replace(/_/g, " ");
     const body = [

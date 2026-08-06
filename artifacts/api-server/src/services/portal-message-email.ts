@@ -206,7 +206,7 @@ export async function notifyAssignedRepOfPortalMessage(params: {
       .trim();
     const settings = await getOrgSettings(params.organizationId);
     const businessName =
-      settings.businessProfile?.businessName?.trim() || "Painless Roofing";
+      settings.businessProfile?.businessName?.trim() || "MogulForge";
     const url = leadDetailUrl(params.leadId);
     const preview =
       params.messageContent.length > 500
@@ -384,7 +384,7 @@ export async function notifyAssignedRepOfPortalPhotos(params: {
       .trim();
     const settings = await getOrgSettings(params.organizationId);
     const businessName =
-      settings.businessProfile?.businessName?.trim() || "Painless Roofing";
+      settings.businessProfile?.businessName?.trim() || "MogulForge";
     const url = leadDetailUrl(params.leadId);
     const photoWord = params.photoCount === 1 ? "photo" : "photos";
     const subject = `New damage ${photoWord} from ${leadName || "a homeowner"} (${params.photoCount})`;
@@ -624,7 +624,7 @@ export async function notifyHomeownerOfTeamReply(params: {
 
     const settings = await getOrgSettings(params.organizationId);
     const businessName =
-      settings.businessProfile?.businessName?.trim() || "Painless Roofing";
+      settings.businessProfile?.businessName?.trim() || "MogulForge";
     const url = portalUrl();
     const preview =
       params.messageContent.length > 500

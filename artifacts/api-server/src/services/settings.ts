@@ -124,7 +124,7 @@ export async function getOrgSettings(organizationId: string): Promise<OrgSetting
     return updated ?? { ...existing, services: normalized };
   }
   // Lazily created rows get flavor-appropriate seeds: the legacy default org
-  // keeps its historical (Painless roofing) profile; every other org starts
+  // keeps its historical seeded profile; every other org starts
   // industry-neutral — its own name, no borrowed phone/city/services.
   const legacy = await isLegacyDefaultOrg(organizationId);
   const [org] = await db
@@ -138,7 +138,7 @@ export async function getOrgSettings(organizationId: string): Promise<OrgSetting
         ? {
             organizationId,
             businessProfile: {
-              businessName: "Painless Roofing & Water Restoration",
+              businessName: "MogulForge Home Services",
               phone: "(404) 444-4476",
               city: "Canton",
               state: "GA",
@@ -357,7 +357,7 @@ export async function getAppointmentReminderSettings(
 
 /**
  * Effective concierge behavior: org override merged over the built-in
- * (Painless roofing) defaults, sanitized so the state machine always has a
+ * seeded defaults, sanitized so the state machine always has a
  * usable intent catalog and non-empty copy.
  */
 export async function getConciergeSettings(

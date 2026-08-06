@@ -18,7 +18,7 @@ import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
 import app from "../../app";
 import { createSession } from "../../lib/auth";
 import { clearLegacyOrgCache } from "../../lib/orgFlavor";
-import { ensureMembership } from "../../services/org";
+import { ensureMembership, getDefaultOrganization } from "../../services/org";
 import {
   getAppointmentReminderSettings,
   getConciergeSettings,
@@ -87,7 +87,14 @@ afterAll(async () => {
 
 describe("org-less sign-in", () => {
   it("does not auto-attach new users to the default org once it has members", async () => {
-    // The default org always has members in this environment (seeded data).
+    // Seed the condition this test claims to exercise so it also holds in a
+    // completely fresh disposable database.
+    const defaultOrg = await getDefaultOrganization();
+    await makeUser({
+      organizationId: defaultOrg.id,
+      role: "owner",
+      isPlatformAdmin: true,
+    });
     const u = await makeUser();
     const after = await ensureMembership(u.id);
     expect(after?.organizationId).toBeNull();

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,7 +20,8 @@ const scriptPath = path.resolve(
   moduleDir,
   "../../../website/scripts/generate-og-images.mjs",
 );
-const script = readFileSync(scriptPath, "utf8");
+const websitePackageAvailable = existsSync(scriptPath);
+const script = websitePackageAvailable ? readFileSync(scriptPath, "utf8") : "";
 
 /** Extracts the first capture group or fails with a pointer to the script. */
 function extract(re: RegExp, what: string): string {
@@ -34,7 +35,9 @@ function extract(re: RegExp, what: string): string {
   return m[1];
 }
 
-describe("OG share-card brand parity (website script vs API renderer)", () => {
+const describeWebsiteParity = websitePackageAvailable ? describe : describe.skip;
+
+describeWebsiteParity("OG share-card brand parity (website script vs API renderer)", () => {
   it("uses the same navy background color", () => {
     expect(extract(/const NAVY = '([^']+)'/, "NAVY")).toBe(OG_CARD_BRAND.navy);
   });

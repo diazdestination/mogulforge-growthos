@@ -266,7 +266,7 @@ async function ensureRepo() {
     console.log(`ℹ️   Creating repository github.com/${owner}/${repo} …`);
     await ghApi("POST", `/user/repos`, {
       name: repo,
-      description: `Painless CRM — ${repo} template`,
+      description: `MogulForge GrowthOS — ${repo} client template`,
       private: false,
       auto_init: true,
       default_branch: "main",
@@ -449,7 +449,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) (async () => {
     {
       message: commitMessage,
       tree: treeSha,
-      author: { name: "Template Sync", email: "template-sync@painless-crm" },
+      author: { name: "Template Sync", email: "template-sync@mogulforge.local" },
       parents: parentSha ? [parentSha] : [],
     },
   );
