@@ -27,6 +27,7 @@ import {
   CreditCard,
   Search,
   Bot,
+  FileSearch2,
 } from 'lucide-react';
 import { canManageSettings, canViewAuditLog } from '@/lib/permissions';
 import { CLIENT } from '@/lib/client.config';
@@ -43,6 +44,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { title: 'BIE Command', href: '/', icon: Bot },
+  { title: 'Evidence Intelligence', href: '/evidence', icon: FileSearch2 },
   { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { title: 'Assistant', href: '/assistant', icon: Sparkles },
   { title: 'Pipeline', href: '/pipeline', icon: Trello },

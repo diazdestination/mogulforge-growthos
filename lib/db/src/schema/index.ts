@@ -34,3 +34,4 @@ export * from "./rate-limits";
 export * from "./assistant-history";
 export * from "./capture";
 export * from "./bie";
+export * from "./evidence-intelligence";

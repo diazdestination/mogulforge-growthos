@@ -36,6 +36,11 @@ services:
       DATABASE_URL: postgresql://postgres:mogulforge@db:5432/mogulforge
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
       NODE_ENV: production
+      # Evidence Intelligence uses the OpenAI Agents SDK. Keep the key in an
+      # ignored env file; Compose passes it at runtime and never bakes it into
+      # the image.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_EVIDENCE_MODEL: ${OPENAI_EVIDENCE_MODEL:-gpt-5.6-sol}
       # ENABLE_DEV_LOGIN intentionally unset → no-password backdoor is OFF in prod.
     depends_on:
       db:

@@ -8,6 +8,7 @@ import {
   CircleAlert,
   Database,
   FileUp,
+  FileSearch2,
   Gauge,
   Loader2,
   Play,
@@ -314,6 +315,9 @@ export default function Bie() {
             <p className="mt-3 text-xs text-muted-foreground">Last calculated {new Date(briefing.generatedAt).toLocaleString()}. Pipeline value is not claimed revenue.</p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
+            <Link href="/evidence" className="inline-flex h-10 items-center gap-2 rounded-md border border-primary/30 bg-background px-4 text-sm font-semibold text-primary shadow-sm hover:bg-primary/5">
+              <FileSearch2 className="h-4 w-4" /> Open Evidence Intelligence
+            </Link>
             <button onClick={() => { setError(null); setNotice(null); briefingMutation.mutate(); }} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-60">
               {briefingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Run recovery briefing
             </button>

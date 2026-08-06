@@ -17,9 +17,12 @@ export function CreateOrgScreen() {
 
   const createOrg = useCreateOrg({
     mutation: {
-      onSuccess: () => {
-        // Refetch everything: the user now has an org and full app access.
-        queryClient.invalidateQueries();
+      onSuccess: async () => {
+        // Registration can leave the browser at /signup. Once the org exists,
+        // force the canonical app entry so that stale auth/session queries and
+        // the public-only path cannot briefly render the signed-in 404 page.
+        await queryClient.invalidateQueries();
+        window.location.assign(import.meta.env.BASE_URL || '/');
       },
       onError: (err) => {
         const message =

@@ -1440,6 +1440,10 @@ export async function ensureDefaultAutomations(
 }
 
 async function maybeCleanupOrphanedUploads(): Promise<void> {
+  // Self-hosted/Fly installations can run without Replit Object Storage.
+  // In that configuration there is no bucket to clean, so stay silent instead
+  // of emitting a false operational error on every scheduler interval.
+  if (!process.env.PRIVATE_OBJECT_DIR) return;
   const now = Date.now();
   if (now - lastUploadCleanupAt < UPLOAD_CLEANUP_INTERVAL_MS) return;
   lastUploadCleanupAt = now;

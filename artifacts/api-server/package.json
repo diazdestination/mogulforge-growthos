@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@google-cloud/storage": "^7.21.0",
+    "@openai/agents": "^0.14.3",
     "@replit/connectors-sdk": "^0.4.1",
     "@resvg/resvg-js": "^2.6.2",
     "@types/qrcode": "^1.5.6",

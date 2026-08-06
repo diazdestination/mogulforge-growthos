@@ -44,6 +44,9 @@ app.use(
 // CSV lead imports post the raw file contents as a JSON string (up to 5MB
 // of CSV, ~6MB with JSON escaping); the route re-enforces the 5MB CSV cap.
 app.use("/api/v1/lead-imports", express.json({ limit: "8mb" }));
+// Evidence Intelligence accepts an explicitly approved artifact as base64 JSON.
+// The route itself enforces a 5MB raw cap and a strict MIME allowlist.
+app.use("/api/v1/bie/claims", express.json({ limit: "8mb" }));
 // Keep the raw body around for webhook signature verification (Resend/svix
 // signs the exact bytes, not the re-serialized JSON).
 app.use(

@@ -25,6 +25,7 @@ import {
   LogOut,
   Command as CommandIcon,
   Bot,
+  FileSearch2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -53,6 +54,7 @@ const nav = (href: string, label: string, icon: LucideIcon, keywords = ''): CmdI
 
 const ITEMS: CmdItem[] = [
   nav('/', 'BIE Revenue Command', Bot, 'growthos revenue recovery agents autopilot home'),
+  nav('/evidence', 'Evidence Intelligence', FileSearch2, 'claims proof photos documents certificate contractor ai'),
   nav('/dashboard', 'Dashboard', LayoutDashboard, 'overview operations'),
   nav('/assistant', 'Assistant', Sparkles, 'ai chat'),
   nav('/pipeline', 'Pipeline', Trello, 'board kanban leads deals'),

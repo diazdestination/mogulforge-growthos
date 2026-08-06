@@ -33,12 +33,14 @@ import deliveryStatusRouter from "./delivery-status";
 import billingRouter from "./billing";
 import demoRouter from "./demo";
 import bieRouter from "./bie";
+import evidenceIntelligenceRouter from "./evidence-intelligence";
 
 const router: IRouter = Router();
 
 router.use(billingRouter);
 router.use(demoRouter);
 router.use(bieRouter);
+router.use(evidenceIntelligenceRouter);
 router.use(meRouter);
 router.use(contactsRouter);
 router.use(leadsRouter);

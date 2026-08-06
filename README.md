@@ -15,11 +15,13 @@ This is the product repository. It is separate from the MogulForge marketing web
 ## What is included
 
 - React + Vite command-center UI
-- Fastify API and PostgreSQL/Drizzle data layer
+- Express API and PostgreSQL/Drizzle data layer
 - Self-hosted email/password authentication
 - Multi-tenant organizations and role-aware access
 - Lead pipeline, contacts, properties, tasks, appointments, and estimates
 - AI concierge, automations, next-best actions, and demo-data seeding
+- Evidence Intelligence with approved source artifacts, grounded AI drafts,
+  human review, and tamper-evident Loss Evidence Certificates
 - Stripe-ready billing with an optional enforcement gate
 - Single-container production build plus Docker Compose and Fly.io configuration
 
@@ -71,6 +73,10 @@ Client-facing defaults live in both:
 - `artifacts/api-server/src/lib/client.config.ts`
 
 Keep those two files aligned when changing the product name, color, assistant identity, or default organization details.
+
+The standalone Evidence Intelligence architecture, trust gates, verification
+record, and operating instructions are documented in
+[EVIDENCE-INTELLIGENCE.md](EVIDENCE-INTELLIGENCE.md).
 
 ## Product status
 

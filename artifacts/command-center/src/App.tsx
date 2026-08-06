@@ -33,6 +33,7 @@ import Capture from '@/pages/capture';
 import Onboarding from '@/pages/onboarding';
 import Platform from '@/pages/platform';
 import Bie from '@/pages/bie';
+import EvidenceIntelligence from '@/pages/evidence-intelligence';
 import { CreateOrgScreen } from '@/components/create-org';
 import { useGetSession, getGetSessionQueryKey } from '@workspace/api-client-react';
 
@@ -244,6 +245,7 @@ function AuthedApp() {
         <Switch>
         <Route path="/" component={Bie} />
         <Route path="/bie" component={Bie} />
+        <Route path="/evidence" component={EvidenceIntelligence} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/assistant" component={Assistant} />
         <Route path="/pipeline" component={Pipeline} />

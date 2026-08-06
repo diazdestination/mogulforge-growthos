@@ -151,6 +151,16 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /bie/autopilot": "crm.read",
   "PUT /bie/autopilot": "settings.manage",
   "POST /bie/autopilot/run": "settings.manage",
+  // Evidence Intelligence stores tenant-owned source artifacts and produces
+  // AI drafts only. Every consequential transition remains a human write.
+  "GET /bie/claims": "crm.read",
+  "POST /bie/claims": "crm.write",
+  "GET /bie/claims/:id": "crm.read",
+  "POST /bie/claims/:id/artifacts": "crm.write",
+  "GET /bie/claims/:id/artifacts/:artifactId/content": "crm.read",
+  "POST /bie/claims/:id/analyze": "crm.write",
+  "POST /bie/claims/:id/observations/:observationId/review": "crm.write",
+  "POST /bie/claims/:id/certificates/:certificateId/issue": "crm.write",
   // settings surfaces
   "GET /settings": "crm.read",
   // read-only effective availability; needed by anyone booking appointments
