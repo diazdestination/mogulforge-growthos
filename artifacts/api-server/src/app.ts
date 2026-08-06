@@ -1,3 +1,4 @@
+import path from "node:path";
 import express, { type Express } from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
@@ -56,5 +57,20 @@ app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 
 app.use("/api", router);
+
+// Single-container production: serve the built SPA from the same origin as the
+// API, so relative /api/* calls just work with no proxy. In dev the SPA is
+// served by Vite, so this only runs when NODE_ENV=production and a build dir is
+// configured (STATIC_DIR, set in the Docker image).
+if (process.env.NODE_ENV === "production" && process.env.STATIC_DIR) {
+  const staticDir = path.resolve(process.env.STATIC_DIR);
+  app.use(express.static(staticDir));
+  // SPA history fallback: any non-/api GET returns index.html. Unmatched /api
+  // routes fall through to the API's own 404 instead of the SPA shell.
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api/")) return next();
+    res.sendFile(path.join(staticDir, "index.html"));
+  });
+}
 
 export default app;

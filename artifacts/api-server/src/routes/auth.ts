@@ -8,7 +8,9 @@ import { db, usersTable } from '@workspace/db';
 import { eq } from 'drizzle-orm';
 import { Router, type IRouter, type Request, type Response } from 'express';
 import * as oidc from 'openid-client';
+import { z } from 'zod';
 
+import { hashPassword, verifyPassword } from '../lib/password';
 import { ensureMembership } from '../services/org';
 import { reportCallbackBruteForceBlock } from '../services/security-alerts';
 import {
@@ -71,6 +73,18 @@ function setSessionCookie(res: Response, sid: string) {
   res.cookie(SESSION_COOKIE, sid, {
     httpOnly: true,
     secure: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: SESSION_TTL,
+  });
+}
+
+// Session cookie for self-hosted (non-OIDC) auth. Secure only in production so
+// it still stores over plain http://localhost in local dev.
+function setLocalSessionCookie(res: Response, sid: string) {
+  res.cookie(SESSION_COOKIE, sid, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
     maxAge: SESSION_TTL,
@@ -416,5 +430,192 @@ router.post('/mobile-auth/logout', async (req: Request, res: Response) => {
   }
   res.json(LogoutMobileSessionResponse.parse({ success: true }));
 });
+
+// ── Self-hosted email + password auth ───────────────────────────────────────
+// Replaces the Replit OIDC flow for off-Replit deployments. Reuses the same
+// DB-backed session store (createSession) and org-bootstrap path
+// (ensureMembership) as OIDC: the first registered user becomes the default
+// org's owner; everyone after joins via the self-serve create-org flow.
+
+const RegisterBody = z.object({
+  email: z.string().email().max(320),
+  password: z.string().min(8).max(200),
+  firstName: z.string().trim().max(100).optional(),
+  lastName: z.string().trim().max(100).optional(),
+});
+
+const LoginBody = z.object({
+  email: z.string().email().max(320),
+  password: z.string().min(1).max(200),
+});
+
+type SessionUserFields = {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  profileImageUrl: string | null;
+};
+
+function sessionUser(u: SessionUserFields) {
+  return {
+    id: u.id,
+    email: u.email,
+    firstName: u.firstName,
+    lastName: u.lastName,
+    profileImageUrl: u.profileImageUrl,
+  };
+}
+
+async function startLocalSession(res: Response, user: SessionUserFields) {
+  const sid = await createSession({
+    user: sessionUser(user),
+    access_token: 'local-password-auth',
+    // No refresh_token / expires_at → authMiddleware never contacts an IdP.
+  });
+  setLocalSessionCookie(res, sid);
+}
+
+router.post('/auth/register', async (req: Request, res: Response) => {
+  const parsed = RegisterBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'A valid email and a password of at least 8 characters are required',
+    });
+    return;
+  }
+  const email = parsed.data.email.toLowerCase();
+  const { password, firstName, lastName } = parsed.data;
+  const passwordHash = await hashPassword(password);
+
+  const [existing] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.email, email));
+
+  let dbUser;
+  if (existing) {
+    // Adopt a pre-provisioned invite row (keeps its org + role); otherwise the
+    // email is genuinely taken.
+    if (!existing.id.startsWith('invite:')) {
+      res.status(409).json({ error: 'An account with this email already exists' });
+      return;
+    }
+    const [adopted] = await db
+      .update(usersTable)
+      .set({
+        passwordHash,
+        firstName: firstName ?? existing.firstName,
+        lastName: lastName ?? existing.lastName,
+        updatedAt: new Date(),
+      })
+      .where(eq(usersTable.id, existing.id))
+      .returning();
+    dbUser = (await ensureMembership(adopted.id)) ?? adopted;
+  } else {
+    const [created] = await db
+      .insert(usersTable)
+      .values({
+        email,
+        passwordHash,
+        firstName: firstName ?? null,
+        lastName: lastName ?? null,
+      })
+      .returning();
+    dbUser = (await ensureMembership(created.id)) ?? created;
+  }
+
+  await startLocalSession(res, dbUser);
+  res.json({ user: sessionUser(dbUser) });
+});
+
+router.post('/auth/login', async (req: Request, res: Response) => {
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  if (await invalidAuthAttemptLimiter.isBlockedShared(ip)) {
+    res
+      .status(429)
+      .json({ error: 'Too many failed login attempts, please try again later' });
+    return;
+  }
+
+  const parsed = LoginBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Email and password are required' });
+    return;
+  }
+  const email = parsed.data.email.toLowerCase();
+
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.email, email));
+
+  const ok = !!user && (await verifyPassword(parsed.data.password, user.passwordHash));
+  if (!ok) {
+    // Count the failure toward this IP's brute-force budget (shared limiter
+    // with the OIDC callback so pivoting between routes hits the same block).
+    const justBlocked = await invalidAuthAttemptLimiter.recordFailure(ip);
+    if (justBlocked) {
+      void reportCallbackBruteForceBlock({
+        ip,
+        windowMs: INVALID_AUTH_WINDOW_MS,
+        maxFailures: INVALID_AUTH_MAX_FAILURES,
+      });
+    }
+    res.status(401).json({ error: 'Invalid email or password' });
+    return;
+  }
+  if (!user.isActive) {
+    res.status(403).json({ error: 'This account has been deactivated' });
+    return;
+  }
+
+  await startLocalSession(res, user);
+  res.json({ user: sessionUser(user) });
+});
+
+router.post('/auth/logout', async (req: Request, res: Response) => {
+  const sid = getSessionId(req);
+  await clearSession(res, sid);
+  res.json({ success: true });
+});
+
+// ── Local development only ──────────────────────────────────────────────────
+// Off-Replit there is no OIDC provider to complete /login, so this route mints
+// a real DB-backed session for a seeded local user through the SAME
+// upsertUser + createSession path the OIDC callback uses (so the seeded user
+// becomes the default org's owner on a fresh DB). Double-gated on NODE_ENV and
+// an explicit ENABLE_DEV_LOGIN flag so it can NEVER activate on Replit, where
+// NODE_ENV=production and the flag is unset.
+if (
+  process.env.NODE_ENV === 'development' &&
+  process.env.ENABLE_DEV_LOGIN === 'true'
+) {
+  router.get('/dev/login', async (req: Request, res: Response) => {
+    const dbUser = await upsertUser({
+      sub: 'dev-local-user',
+      // Must be a real, TLD-bearing address — the AuthUser response schema
+      // rejects bare hosts like dev@localhost.
+      email: 'dev@example.com',
+      first_name: 'Local',
+      last_name: 'Dev',
+    });
+    const sessionData: SessionData = {
+      user: {
+        id: dbUser.id,
+        email: dbUser.email,
+        firstName: dbUser.firstName,
+        lastName: dbUser.lastName,
+        profileImageUrl: dbUser.profileImageUrl,
+      },
+      access_token: 'dev-local-no-oidc',
+      // No refresh_token / expires_at → authMiddleware never contacts OIDC.
+    };
+    const sid = await createSession(sessionData);
+    setLocalSessionCookie(res, sid);
+    req.log?.warn('[dev] minted local dev session via ENABLE_DEV_LOGIN');
+    res.redirect(getSafeReturnTo(req.query.returnTo));
+  });
+}
 
 export default router;

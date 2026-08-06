@@ -19,6 +19,9 @@
   "pnpm": {
     "overrides": {
       "zod": "4.4.3"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

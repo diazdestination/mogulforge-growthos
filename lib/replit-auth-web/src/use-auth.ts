@@ -55,7 +55,13 @@ export function useAuth(): AuthState {
 
   const logout = useCallback(() => {
     const base = getBasePath();
-    window.location.href = `/api/logout?returnTo=${encodeURIComponent(base)}`;
+    // Self-hosted logout: clear the DB session server-side, then reload to the
+    // base path (which renders the sign-in screen). No OIDC end-session round-trip.
+    void fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+      .catch(() => {})
+      .finally(() => {
+        window.location.href = base;
+      });
   }, []);
 
   return {

@@ -17,7 +17,7 @@ export const CLIENT = {
    * Also used as a fallback in outbound messages when the org
    * settings haven't loaded.
    */
-  defaultOrgName: 'Painless Roofing & Water Restoration',
+  defaultOrgName: 'MogulForge',
 
   /**
    * URL-safe slug for the default org.
@@ -25,24 +25,24 @@ export const CLIENT = {
    * Used as the database key — changing this after first boot
    * requires a manual DB migration.
    */
-  defaultOrgSlug: 'painless',
+  defaultOrgSlug: 'mogulforge',
 
   /**
    * Short business name used in fallback email/SMS copy when the
    * org's full business name isn't available.
    */
-  businessShortName: 'Painless Roofing',
+  businessShortName: 'MogulForge',
 
   /**
    * Name of the AI concierge shown in the public-facing chat widget.
    */
-  aiAssistantName: 'AI Roof Concierge',
+  aiAssistantName: 'Forge Assistant',
 
   /**
    * Fallback phone number used in OG share cards before org settings are
-   * configured. Update to the client's business phone.
+   * configured. TODO: set to your business phone (or edit in Settings).
    */
-  phone: '(404) 444-4476',
+  phone: '(555) 010-0000',
 
   /**
    * Opening greeting sent by the AI concierge at the start of every chat.
@@ -50,5 +50,5 @@ export const CLIENT = {
    * in a single SMS if the widget is running in SMS mode.
    */
   aiGreeting:
-    "Hi, I'm the Painless AI Roof Concierge. I'll get you the right help in about a minute — and if anything looks dangerous I'll tell you what to do right away.",
+    "Hi, I'm Forge — your MogulForge assistant. Tell me what you need and I'll get you to the right help in about a minute.",
 } as const;

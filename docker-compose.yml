@@ -1,0 +1,47 @@
+# MogulForge — self-host stack (Postgres + single app container).
+# Quick start:
+#   1. cp .env.example .env   &&   set a real SESSION_SECRET
+#   2. docker compose up -d db
+#   3. docker compose run --rm app sh -lc \
+#        "cd /app && pnpm --filter @workspace/db exec drizzle-kit push --force"   # one-time schema
+#   4. docker compose up -d --build app
+#   5. open http://localhost:8080  → "Create account" (first account becomes owner)
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mogulforge
+      POSTGRES_DB: mogulforge
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # Host 5433 avoids colliding with a standalone dev Postgres on 5432;
+      # the app container still reaches this DB internally at db:5432.
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mogulforge"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PORT: 3001
+      STATIC_DIR: /app/public
+      DATABASE_URL: postgresql://postgres:mogulforge@db:5432/mogulforge
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      NODE_ENV: production
+      # ENABLE_DEV_LOGIN intentionally unset → no-password backdoor is OFF in prod.
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:3001"
+
+volumes:
+  pgdata:

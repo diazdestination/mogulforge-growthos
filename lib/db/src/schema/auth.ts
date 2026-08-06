@@ -32,6 +32,12 @@ export const usersTable = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  /**
+   * scrypt password hash for self-hosted email/password auth
+   * (format: "scrypt$<salt>$<hash>"). Null for users who authenticate via an
+   * external IdP (e.g. Replit OIDC) instead of a local password.
+   */
+  passwordHash: varchar("password_hash"),
   organizationId: uuid("organization_id").references(
     () => organizationsTable.id,
   ),

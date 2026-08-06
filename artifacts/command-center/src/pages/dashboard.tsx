@@ -2,7 +2,52 @@ import { useGetDashboardSummary, useGetEmailProviderStatus, useGetMarketingSumma
 import { Loader2, Trello, Calendar, CheckSquare, Activity as ActivityIcon, Globe, Sparkles, MessageSquare, ArrowRight } from 'lucide-react';
 import { Link } from 'wouter';
 import { format } from 'date-fns';
+import { useState } from 'react';
 import { canManageSettings } from '@/lib/permissions';
+
+/** Empty-state CTA: seed the org with sample leads so a fresh CRM feels alive. */
+function DemoDataBanner() {
+  const [busy, setBusy] = useState(false);
+  async function load() {
+    setBusy(true);
+    try {
+      const r = await fetch('/api/v1/demo-data', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      window.location.reload();
+    } catch {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="rounded-xl border border-primary/30 bg-primary/5 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+          <Sparkles className="w-5 h-5" />
+        </div>
+        <div>
+          <p className="font-semibold text-sm text-foreground">
+            Your CRM is empty — want to see it in action?
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Load sample leads across the full pipeline to explore. You can clear
+            them anytime.
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={load}
+        disabled={busy}
+        className="shrink-0 inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 rounded-md font-semibold text-sm transition-colors disabled:opacity-60"
+      >
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+        {busy ? 'Loading…' : 'Load sample data'}
+      </button>
+    </div>
+  );
+}
 
 function EmailFailureBanner() {
   const { data: emailProvider } = useGetEmailProviderStatus();
@@ -56,6 +101,10 @@ export default function Dashboard() {
         </header>
 
         {me && canManageSettings(me.role) && <EmailFailureBanner />}
+
+        {me && canManageSettings(me.role) && (summary?.totalLeads ?? 0) === 0 && (
+          <DemoDataBanner />
+        )}
 
         {/* Top Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">

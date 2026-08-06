@@ -23,10 +23,13 @@ import {
   TrendingUp,
   BadgeDollarSign,
   RotateCcw,
-  Webhook
+  Webhook,
+  CreditCard,
+  Search
 } from 'lucide-react';
 import { canManageSettings, canViewAuditLog } from '@/lib/permissions';
 import { CLIENT } from '@/lib/client.config';
+import { CommandPalette } from './command-palette';
 import { useEffect, useState } from 'react';
 
 interface NavItem {
@@ -54,6 +57,7 @@ const navItems: NavItem[] = [
   { title: 'Forms', href: '/forms', icon: ClipboardList, requireSettings: true },
   { title: 'Audit Log', href: '/audit', icon: Shield, requireAudit: true },
   { title: 'Settings', href: '/settings', icon: Settings2, requireSettings: true },
+  { title: 'Billing', href: '/billing', icon: CreditCard, requireSettings: true },
 ];
 
 /** Org display name from live org config, with build-time fallback. */
@@ -113,6 +117,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-[100dvh] w-full bg-background flex-col md:flex-row">
+      <CommandPalette />
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 bg-sidebar border-r border-sidebar-border flex-col shrink-0">
         <div className="h-16 flex items-center px-6 border-b border-sidebar-border shrink-0">
@@ -129,6 +134,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         
+        <div className="px-3 pt-3">
+          <button
+            onClick={() => window.dispatchEvent(new Event('mogulforge:cmdk'))}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-sidebar-border text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 transition-colors text-sm"
+          >
+            <Search className="w-4 h-4" />
+            <span className="flex-1 text-left">Search…</span>
+            <kbd className="text-[10px] font-mono border border-sidebar-border rounded px-1.5 py-0.5">⌘K</kbd>
+          </button>
+        </div>
+
         <div className="flex-1 py-4 overflow-y-auto">
           <nav className="px-3 space-y-1.5">
             {visibleItems.map((item) => {

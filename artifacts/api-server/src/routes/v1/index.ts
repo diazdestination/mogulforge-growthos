@@ -30,9 +30,13 @@ import orgsRouter from "./orgs";
 import onboardingRouter from "./onboarding";
 import reportsRouter from "./reports";
 import deliveryStatusRouter from "./delivery-status";
+import billingRouter from "./billing";
+import demoRouter from "./demo";
 
 const router: IRouter = Router();
 
+router.use(billingRouter);
+router.use(demoRouter);
 router.use(meRouter);
 router.use(contactsRouter);
 router.use(leadsRouter);

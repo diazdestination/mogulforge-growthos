@@ -9,6 +9,13 @@ export const organizationsTable = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     timezone: text("timezone").notNull().default("America/New_York"),
+    // Billing (Stripe) — all nullable; unused until STRIPE_SECRET_KEY is set.
+    stripeCustomerId: text("stripe_customer_id"),
+    stripeSubscriptionId: text("stripe_subscription_id"),
+    // trialing | active | past_due | canceled | incomplete | null
+    subscriptionStatus: text("subscription_status"),
+    planTier: text("plan_tier"),
+    trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
