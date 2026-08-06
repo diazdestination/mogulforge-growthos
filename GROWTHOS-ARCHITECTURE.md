@@ -89,6 +89,8 @@ Deploy only after approval: public edge/DNS, artifact object storage, queue
 transport, private compute, managed PostgreSQL, key management, monitoring,
 backups, incident response, and beta acceptance tests. No provider account,
 credential, spend, or live target action is implied by this repository.
+The exact no-memory implementation and verification handoff is maintained in
+[GROWTHOS-RESUME.md](GROWTHOS-RESUME.md).
 
 ## Non-negotiable safety rules
 

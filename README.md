@@ -58,7 +58,7 @@ Set `SESSION_SECRET` before any public deployment. Stripe and OpenAI integration
 
 ```text
 artifacts/
-  api-server/       Fastify API and background services
+  api-server/       Express API and background services
   command-center/   React + Vite application
 lib/
   api-spec/         OpenAPI source
@@ -77,6 +77,11 @@ Keep those two files aligned when changing the product name, color, assistant id
 The standalone Evidence Intelligence architecture, trust gates, verification
 record, and operating instructions are documented in
 [EVIDENCE-INTELLIGENCE.md](EVIDENCE-INTELLIGENCE.md).
+
+For a zero-memory handoff into the remaining source-adapter, executor, and
+deployment work, start with [GROWTHOS-RESUME.md](GROWTHOS-RESUME.md). It records
+the canonical repository, verified baseline, exact implementation seams, and
+the external-account gates that cannot safely be guessed or simulated.
 
 ## Product status
 
