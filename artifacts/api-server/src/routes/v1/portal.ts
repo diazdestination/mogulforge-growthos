@@ -194,6 +194,7 @@ router.post(
     const validation = await validatePhotoObjects(
       objectStorageService,
       parsed.data.photoPaths,
+      session.organizationId,
     );
     if (!validation.ok) {
       res.status(400).json({ error: validation.reason });

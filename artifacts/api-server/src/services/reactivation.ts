@@ -658,37 +658,47 @@ export async function drainReactivationCampaigns(organizationId?: string): Promi
 
 async function drainCampaign(campaign: ReactivationCampaign): Promise<void> {
   if (!campaign.launchedAt) return;
-  const [{ processed }] = await db
-    .select({
-      processed: sql<number>`count(*) FILTER (WHERE ${reactivationCampaignLeadsTable.status} <> 'pending')::int`,
-    })
-    .from(reactivationCampaignLeadsTable)
-    .where(eq(reactivationCampaignLeadsTable.campaignId, campaign.id));
-  const elapsedHours = (Date.now() - campaign.launchedAt.getTime()) / 3_600_000;
-  // First tick always releases at least one lead so a launch shows progress.
-  const target = Math.min(
-    campaign.totalLeads,
-    Math.max(1, Math.ceil(elapsedHours * campaign.ratePerHour)),
-  );
-  const budget = Math.min(target - Number(processed), MAX_ENROLL_PER_TICK);
-  if (budget <= 0) return;
-
   const playbook = await getOrgPlaybook(campaign.organizationId, campaign.playbookId);
   if (!playbook) return;
 
-  // Claim a batch atomically so concurrent ticks never double-process.
-  const claimed = await db.execute(sql`
-    UPDATE ${reactivationCampaignLeadsTable} SET status = 'enrolled', enrolled_at = now()
-    WHERE id IN (
-      SELECT id FROM ${reactivationCampaignLeadsTable}
-      WHERE campaign_id = ${campaign.id} AND status = 'pending'
-      ORDER BY created_at
-      LIMIT ${budget}
-      FOR UPDATE SKIP LOCKED
-    )
-    RETURNING id, lead_id
-  `);
-  const rows = claimed.rows as { id: string; lead_id: string }[];
+  // Serialize the target calculation and claim for this campaign. Multiple
+  // scheduler instances can otherwise all observe processed=0 and each claim
+  // a different row, defeating the hourly pacing target.
+  const rows = await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${campaign.id}))`,
+    );
+    const [{ processed }] = await tx
+      .select({
+        processed: sql<number>`count(*) FILTER (WHERE ${reactivationCampaignLeadsTable.status} <> 'pending')::int`,
+      })
+      .from(reactivationCampaignLeadsTable)
+      .where(eq(reactivationCampaignLeadsTable.campaignId, campaign.id));
+    const elapsedHours =
+      (Date.now() - campaign.launchedAt!.getTime()) / 3_600_000;
+    // First tick always releases at least one lead so a launch shows progress.
+    const target = Math.min(
+      campaign.totalLeads,
+      Math.max(1, Math.ceil(elapsedHours * campaign.ratePerHour)),
+    );
+    const budget = Math.min(
+      target - Number(processed),
+      MAX_ENROLL_PER_TICK,
+    );
+    if (budget <= 0) return [];
+    const claimed = await tx.execute(sql`
+      UPDATE ${reactivationCampaignLeadsTable} SET status = 'enrolled', enrolled_at = now()
+      WHERE id IN (
+        SELECT id FROM ${reactivationCampaignLeadsTable}
+        WHERE campaign_id = ${campaign.id} AND status = 'pending'
+        ORDER BY created_at
+        LIMIT ${budget}
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING id, lead_id
+    `);
+    return claimed.rows as { id: string; lead_id: string }[];
+  });
 
   for (const row of rows) {
     try {

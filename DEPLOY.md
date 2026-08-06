@@ -40,9 +40,12 @@ docker compose up -d --build app
   /logout`) using Node's built-in **scrypt** + the DB-backed session store — no
   OIDC, no `REPL_ID`. Per-IP brute-force limiting.
 - Replit OIDC routes remain but are dormant without `REPL_ID`.
-- Replit-only integrations (object-storage sidecar, connector proxy) guard on
-  `REPLIT_*` env and stay inactive off-Replit. Features that depend on them
-  (e.g. image object-storage) need an S3/GCS adapter before use; core CRM does not.
+- Private image uploads use signed, short-lived URLs backed by Postgres by
+  default, so assessment and portal photos work in Docker/Fly without the
+  Replit Object Storage sidecar. The legacy Replit/GCS adapter remains opt-in.
+- Gmail through the Replit connector is optional. Resend is the portable email
+  provider; without either provider, development uses an explicit no-delivery
+  mock and surfaces that state in the UI/logs.
 
 ## Production notes
 
@@ -53,7 +56,12 @@ docker compose up -d --build app
   DB / early beta). Switch to generated migrations as the schema stabilizes.
 - **Secrets:** never commit `.env`. `SESSION_SECRET` must be stable across
   restarts or all sessions invalidate.
+- **Public origin:** set `APP_ORIGIN` to the canonical HTTPS origin. It is used
+  for trusted same-origin checks and outbound links.
+- **Object storage:** `OBJECT_STORAGE_PROVIDER=postgres` is the zero-service
+  default. For larger production media volumes, add a dedicated S3/R2 adapter
+  behind the same object-service interface before moving bytes out of Postgres.
 - **Image size:** the runtime copies the whole built workspace for simplicity;
   `pnpm deploy --filter @workspace/api-server` can slim it later.
-- **Do not push to the template repo** (`mogulforge-crm-template-`). The `origin`
-  remote was removed; add your own private remote when you want to push.
+- **Repository:** this deployment belongs to the private
+  `diazdestination/mogulforge-crm` repository, not the older CRM template.

@@ -35,3 +35,4 @@ export * from "./assistant-history";
 export * from "./capture";
 export * from "./bie";
 export * from "./evidence-intelligence";
+export * from "./object-storage";

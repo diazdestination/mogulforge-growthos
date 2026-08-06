@@ -476,6 +476,15 @@ export function parseUnsubscribeToken(
 
 /** Public base URL for links in outbound email (dev domain or published domain). */
 export function publicBaseUrl(): string {
+  const configured =
+    process.env.APP_ORIGIN?.trim() || process.env.APP_URL?.trim();
+  if (configured) {
+    try {
+      return new URL(configured).origin;
+    } catch {
+      // Fall through to legacy deployment variables.
+    }
+  }
   const domain =
     (process.env.REPLIT_DOMAINS ?? "").split(",")[0]?.trim() ||
     process.env.REPLIT_DEV_DOMAIN ||

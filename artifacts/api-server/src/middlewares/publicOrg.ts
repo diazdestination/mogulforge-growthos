@@ -39,11 +39,22 @@ function requestHostname(req: Request): string | null {
  */
 export function ownHostnames(): Set<string> {
   const hosts = new Set<string>();
+  const add = (raw: string | undefined) => {
+    if (!raw) return;
+    const value = raw.trim();
+    if (!value) return;
+    try {
+      hosts.add(new URL(value).hostname.toLowerCase());
+    } catch {
+      hosts.add(value.replace(/^\/\//, "").split("/")[0].split(":")[0].toLowerCase());
+    }
+  };
+  add(process.env.APP_ORIGIN);
+  for (const origin of (process.env.APP_ORIGINS ?? "").split(",")) add(origin);
   const dev = process.env.REPLIT_DEV_DOMAIN;
-  if (dev) hosts.add(dev.toLowerCase());
+  if (dev) add(dev);
   for (const d of (process.env.REPLIT_DOMAINS ?? "").split(",")) {
-    const h = d.trim().toLowerCase();
-    if (h) hosts.add(h);
+    add(d);
   }
   return hosts;
 }

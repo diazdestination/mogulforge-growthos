@@ -9,9 +9,9 @@ import { authMiddleware } from "./middlewares/authMiddleware";
 
 const app: Express = express();
 
-// We run behind Replit's proxy; trust the first hop so req.ip reflects the
-// real client address (used for rate limiting) without honoring arbitrary
-// client-spoofed X-Forwarded-For chains.
+// Production runs behind one trusted reverse-proxy hop (Fly, Replit, or the
+// operator's ingress), so req.ip reflects the client without trusting an
+// arbitrary forwarded chain.
 app.set("trust proxy", 1);
 
 app.use(
@@ -35,6 +35,12 @@ app.use(
 );
 app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
+// The portable object-store adapter accepts a signed, short-lived raw PUT.
+// This must run before the general JSON parser so image bytes are preserved.
+app.use(
+  "/api/v1/public/uploads/local",
+  express.raw({ type: () => true, limit: "10mb" }),
+);
 // Voice-note transcription posts base64 audio (up to ~5MB raw, ~7MB as
 // base64 JSON); everything else keeps the conservative default limit.
 app.use(

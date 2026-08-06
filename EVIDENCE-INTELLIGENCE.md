@@ -107,11 +107,10 @@ Then open `http://localhost:8080/evidence` while signed in.
 - Issued certificate content hash length: 64 characters
 - Audit events recorded for the live synthetic flow: 7
 
-The broader legacy API suite is not fully green in an unconfigured self-hosted
-environment. Its remaining failures are outside Evidence Intelligence and are
-principally coupled to Replit Object Storage, test-only session secrets, and an
-older email-provider test expectation. Do not represent the entire legacy API
-suite as passing until those fixtures are made portable.
+The full API suite is now portable and green in the configured self-hosted test
+environment: 936 passed and 15 intentionally skipped. Replit-only Object
+Storage was replaced by signed Postgres-backed uploads by default, test runtime
+defaults are explicit, and the legacy email-provider expectation was corrected.
 
 ## Not deployed
 

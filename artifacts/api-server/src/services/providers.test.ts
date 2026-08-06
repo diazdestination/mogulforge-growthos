@@ -40,14 +40,20 @@ describe("adaptiveEmailProvider", () => {
     vi.restoreAllMocks();
   });
 
-  it("propagates failure when Gmail throws and Resend is not configured", async () => {
-    // Spy on the gmail provider to simulate a transient send failure.
+  it("uses the explicit mock provider when no real email provider is configured", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    // An unbound Gmail connector is not a configured provider and therefore
+    // must not turn local/self-hosted development into an email outage.
     vi.spyOn(providers.gmailEmailProvider, "send").mockRejectedValue(
       new Error("connector not bound"),
     );
-    await expect(
-      adaptiveEmailProvider.send("user@example.com", "Subject", "Body"),
-    ).rejects.toThrow(/connector not bound|All configured providers failed/i);
+    const result = await adaptiveEmailProvider.send(
+      "user@example.com",
+      "Subject",
+      "Body",
+    );
+    expect(result.provider).toBe("mock-email");
+    vi.unstubAllEnvs();
   });
 
   it("falls back to Resend when Gmail fails and Resend succeeds", async () => {

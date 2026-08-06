@@ -69,7 +69,7 @@ function EmailFailureBanner() {
         {emailProvider.lastSendFailureDetail ? <>: <span className="font-mono text-xs">{emailProvider.lastSendFailureDetail}</span></> : ''}
         {'. '}
         {emailProvider.provider === 'gmail'
-          ? 'The Gmail connection may have expired — reconnect Gmail from the Replit Connectors panel to resume sending.'
+          ? 'The Gmail connection may have expired — reconnect Gmail or configure Resend to resume sending.'
           : 'Check the email provider configuration to resume sending.'}{' '}
         <Link href="/settings" className="font-semibold underline">
           Review automation settings

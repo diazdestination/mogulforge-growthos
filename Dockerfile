@@ -16,8 +16,8 @@ COPY . .
 # come from optional deps, not build scripts, so skipping scripts avoids the
 # ERR_PNPM_IGNORED_BUILDS hard error while still producing working binaries.
 RUN pnpm install --no-frozen-lockfile --ignore-scripts
-# vite.config requires PORT + BASE_PATH at eval time (PORT unused for a static
-# build; BASE_PATH=/ serves at the site root).
+# Explicit production defaults; the Vite config also has portable local
+# defaults so ordinary builds no longer depend on platform-injected variables.
 ENV NODE_ENV=production PORT=3001 BASE_PATH=/
 RUN pnpm --filter @workspace/command-center run build
 RUN pnpm --filter @workspace/api-server run build

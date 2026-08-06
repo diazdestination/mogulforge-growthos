@@ -50,6 +50,10 @@ const EMAIL = `portal-add-photo-${Date.now()}@example.com`;
 const EMAIL_OTHER = `portal-add-photo-other-${Date.now()}@example.com`;
 
 beforeAll(async () => {
+  server = app.listen(0);
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
+
   const [o] = await db
     .insert(organizationsTable)
     .values({
@@ -78,8 +82,10 @@ beforeAll(async () => {
 
   // Upload a real image and a non-image object to exercise validation.
   const storage = new ObjectStorageService();
-  const imageUrl = await storage.getObjectEntityUploadURL();
-  const putImage = await fetch(imageUrl, {
+  const imageUrl = await storage.getObjectEntityUploadURL({
+    organizationId: org.id,
+  });
+  const putImage = await fetch(new URL(imageUrl, baseUrl), {
     method: "PUT",
     headers: { "content-type": "image/png" },
     body: PNG_BYTES,
@@ -87,8 +93,10 @@ beforeAll(async () => {
   if (!putImage.ok) throw new Error(`test upload failed: ${putImage.status}`);
   uploadedImagePath = storage.normalizeObjectEntityPath(imageUrl);
 
-  const textUrl = await storage.getObjectEntityUploadURL();
-  const putText = await fetch(textUrl, {
+  const textUrl = await storage.getObjectEntityUploadURL({
+    organizationId: org.id,
+  });
+  const putText = await fetch(new URL(textUrl, baseUrl), {
     method: "PUT",
     headers: { "content-type": "text/plain" },
     body: "not an image",
@@ -105,9 +113,6 @@ beforeAll(async () => {
     expiresAt: new Date(Date.now() + 60_000),
   });
 
-  server = app.listen(0);
-  await new Promise<void>((resolve) => server.once("listening", resolve));
-  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 });
 
 afterAll(async () => {
@@ -525,8 +530,10 @@ describe("per-claim photo cap", () => {
 
     // A genuinely new, valid image now bounces off the cap with a 400.
     const storage = new ObjectStorageService();
-    const freshUrl = await storage.getObjectEntityUploadURL();
-    const put = await fetch(freshUrl, {
+    const freshUrl = await storage.getObjectEntityUploadURL({
+      organizationId: org.id,
+    });
+    const put = await fetch(new URL(freshUrl, baseUrl), {
       method: "PUT",
       headers: { "content-type": "image/png" },
       body: PNG_BYTES,

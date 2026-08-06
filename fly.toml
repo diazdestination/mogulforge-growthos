@@ -23,6 +23,8 @@ primary_region = "iad"      # <-- pick a region near you (fly platform regions)
   NODE_ENV = "production"
   PORT = "3001"
   STATIC_DIR = "/app/public"
+  APP_ORIGIN = "https://mogulforge.ai"
+  OBJECT_STORAGE_PROVIDER = "postgres"
 
 [http_service]
   internal_port = 3001

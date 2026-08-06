@@ -10,12 +10,14 @@ import { getOrgSettings } from "./settings";
 
 /**
  * Absolute URL of the CRM app the invitee should sign in to.
- * APP_URL wins when set; otherwise derive from the Replit domain for this
- * environment (production deployments expose the published domain here).
+ * APP_URL wins when set. APP_ORIGIN is the portable deployment-level base;
+ * the Replit domain remains a backward-compatible fallback.
  */
 export function crmAppUrl(): string {
   const override = process.env.APP_URL?.trim();
   if (override) return override.replace(/\/$/, "");
+  const origin = process.env.APP_ORIGIN?.trim();
+  if (origin) return `${origin.replace(/\/$/, "")}/crm/`;
   const domain = process.env.REPLIT_DOMAINS?.split(",")[0]?.trim();
   if (domain) return `https://${domain}/crm/`;
   return "http://localhost:5000/crm/";

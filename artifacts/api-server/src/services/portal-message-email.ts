@@ -30,6 +30,8 @@ export function leadDetailUrl(leadId: string): string {
 export function portalUrl(): string {
   const override = process.env.APP_URL?.trim();
   if (override) return `${override.replace(/\/$/, "")}/portal`;
+  const origin = process.env.APP_ORIGIN?.trim();
+  if (origin) return `${origin.replace(/\/$/, "")}/portal`;
   const domain = process.env.REPLIT_DOMAINS?.split(",")[0]?.trim();
   if (domain) return `https://${domain}/portal`;
   return "http://localhost:5000/portal";

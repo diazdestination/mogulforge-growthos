@@ -35,6 +35,8 @@ services:
       STATIC_DIR: /app/public
       DATABASE_URL: postgresql://postgres:mogulforge@db:5432/mogulforge
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
+      OBJECT_STORAGE_PROVIDER: ${OBJECT_STORAGE_PROVIDER:-postgres}
       NODE_ENV: production
       # Evidence Intelligence uses the OpenAI Agents SDK. Keep the key in an
       # ignored env file; Compose passes it at runtime and never bakes it into

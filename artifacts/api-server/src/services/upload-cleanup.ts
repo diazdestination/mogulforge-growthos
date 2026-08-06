@@ -1,8 +1,7 @@
-import type { File } from "@google-cloud/storage";
 import { activitiesTable, db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
-import { ObjectStorageService, objectStorageClient } from "../lib/objectStorage";
+import { ObjectStorageService } from "../lib/objectStorage";
 
 /** Grace period before an unreferenced upload is considered orphaned. */
 export const DEFAULT_UPLOAD_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -36,33 +35,7 @@ export interface UploadObject {
 /** Lists objects under the private `uploads/` prefix in the bucket. */
 export async function listUploadObjects(): Promise<UploadObject[]> {
   const service = new ObjectStorageService();
-  let privateDir = service.getPrivateObjectDir();
-  if (privateDir.endsWith("/")) privateDir = privateDir.slice(0, -1);
-
-  // privateDir looks like /<bucket>/<base...>; uploads live at <base...>/uploads/
-  const parts = privateDir.replace(/^\//, "").split("/");
-  const bucketName = parts[0];
-  const basePrefix = parts.slice(1).join("/");
-  const uploadsPrefix = basePrefix ? `${basePrefix}/uploads/` : "uploads/";
-
-  const bucket = objectStorageClient.bucket(bucketName);
-  const [files] = await bucket.getFiles({ prefix: uploadsPrefix });
-
-  return files.map((file: File) => {
-    const entityId = file.name.startsWith(basePrefix ? `${basePrefix}/` : "")
-      ? file.name.slice(basePrefix ? basePrefix.length + 1 : 0)
-      : file.name;
-    const created = file.metadata.timeCreated
-      ? new Date(file.metadata.timeCreated as string)
-      : new Date();
-    return {
-      objectPath: `/objects/${entityId}`,
-      createdAt: created,
-      remove: async () => {
-        await file.delete({ ignoreNotFound: true });
-      },
-    };
-  });
+  return service.listObjectEntityUploads();
 }
 
 export interface CleanupResult {

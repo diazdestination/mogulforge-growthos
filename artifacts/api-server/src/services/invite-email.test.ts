@@ -36,8 +36,16 @@ describe("crmAppUrl", () => {
 
   it("falls back to the first Replit domain with the /crm/ path", () => {
     vi.stubEnv("APP_URL", "");
+    vi.stubEnv("APP_ORIGIN", "");
     vi.stubEnv("REPLIT_DOMAINS", "myapp.repl.co,other.repl.co");
     expect(crmAppUrl()).toBe("https://myapp.repl.co/crm/");
+    vi.unstubAllEnvs();
+  });
+
+  it("builds the CRM route from the portable APP_ORIGIN", () => {
+    vi.stubEnv("APP_URL", "");
+    vi.stubEnv("APP_ORIGIN", "https://mogulforge.ai/");
+    expect(crmAppUrl()).toBe("https://mogulforge.ai/crm/");
     vi.unstubAllEnvs();
   });
 });

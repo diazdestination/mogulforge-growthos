@@ -617,7 +617,11 @@ router.post(
       return;
     }
     try {
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL({
+        organizationId: req.member!.organizationId,
+        contentType: parsed.data.contentType,
+        size: parsed.data.size,
+      });
       const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
       res.json({ uploadURL, objectPath });
     } catch (error) {
@@ -644,6 +648,7 @@ router.post(
     const validation = await validatePhotoObjects(
       objectStorageService,
       parsed.data.photoPaths,
+      req.member!.organizationId,
     );
     if (!validation.ok) {
       res.status(400).json({ error: validation.reason });
