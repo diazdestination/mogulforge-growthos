@@ -16,10 +16,10 @@ repository. Read the imported resume pack before planning or editing.
 
 ## Hard safety boundaries
 
-- Never use or push to `diazdestination/MogulForge-crm-template-`. The clone under
-  `Documents\Codex\2026-08-03\mogulforge-crm-template\work\MogulForge-crm-template`
-  is stale upstream source, not this product.
-- The private `diazdestination/MogulForge` repository is the separate marketing site.
+- Never use or push to `diazdestination/MogulForge-crm-template-`. Its stale local clone
+  was removed on 2026-08-06; do not recreate it for product work.
+- The private `diazdestination/MogulForge` repository is the separate marketing site. Its
+  old local clone was removed on 2026-08-06 so this CRM is the sole local MogulForge repo.
 - Do not push, merge, deploy, publish, create paid resources, change DNS, enable billing,
   or use production credentials without Diego's explicit approval for that action.
 - Preserve unrelated working-tree items. In particular, do not delete or commit
