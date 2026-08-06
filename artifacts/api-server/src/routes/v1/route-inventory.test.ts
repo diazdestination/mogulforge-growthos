@@ -161,6 +161,11 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "POST /bie/claims/:id/analyze": "crm.write",
   "POST /bie/claims/:id/observations/:observationId/review": "crm.write",
   "POST /bie/claims/:id/certificates/:certificateId/issue": "crm.write",
+  "GET /bie/claims/:id/graphs": "crm.read",
+  "POST /bie/claims/:id/graphs/native-estimate": "crm.write",
+  "GET /bie/claims/:id/graphs/:graphId/targets/:target": "crm.read",
+  "GET /bie/claims/:id/routes": "crm.read",
+  "POST /bie/claims/:id/routes": "crm.write",
   // settings surfaces
   "GET /settings": "crm.read",
   // read-only effective availability; needed by anyone booking appointments

@@ -14,15 +14,39 @@ import {
   validateArtifactKind,
   validateEvidenceMimeType,
 } from "../../services/evidence-intelligence";
+import {
+  ClaimExecutionError,
+  compileClaimRoutePacket,
+  listClaimRoutePackets,
+} from "../../services/claim-execution";
+import {
+  ClaimGraphError,
+  compileClaimGraphForTarget,
+  compileNativeEstimateForClaim,
+  isClaimGraphTarget,
+  listClaimGraphs,
+} from "../../services/claim-graphs";
 
 const router: IRouter = Router();
 
 function sendError(res: Response, error: unknown): void {
-  if (error instanceof EvidenceIntelligenceError) {
+  if (
+    error instanceof EvidenceIntelligenceError ||
+    error instanceof ClaimExecutionError ||
+    error instanceof ClaimGraphError
+  ) {
     res.status(error.statusCode).json({ error: error.message });
     return;
   }
   res.status(500).json({ error: "Evidence Intelligence could not complete the request." });
+}
+
+function boundedString(value: unknown, field: string, maxLength = 240): string {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (!normalized || normalized.length > maxLength) {
+    throw new ClaimExecutionError(`${field} is required and must be ${maxLength} characters or fewer.`);
+  }
+  return normalized;
 }
 
 router.get(
@@ -207,6 +231,125 @@ router.post(
           String(req.params.certificateId),
           req.member!.user.id,
         ),
+      );
+    } catch (error) {
+      sendError(res, error);
+    }
+  },
+);
+
+router.get(
+  "/bie/claims/:id/graphs",
+  requireMember("crm.read"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(await listClaimGraphs(req.member!.organizationId, String(req.params.id)));
+    } catch (error) {
+      sendError(res, error);
+    }
+  },
+);
+
+router.post(
+  "/bie/claims/:id/graphs/native-estimate",
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.status(201).json(
+        await compileNativeEstimateForClaim(
+          req.member!.organizationId,
+          String(req.params.id),
+          boundedString(req.body?.estimateId, "Estimate ID", 80),
+          req.member!.user.id,
+        ),
+      );
+    } catch (error) {
+      sendError(res, error);
+    }
+  },
+);
+
+router.get(
+  "/bie/claims/:id/graphs/:graphId/targets/:target",
+  requireMember("crm.read"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const target = String(req.params.target);
+      if (!isClaimGraphTarget(target)) {
+        throw new ClaimGraphError("Unsupported target compilation profile.");
+      }
+      res.json(
+        await compileClaimGraphForTarget(
+          req.member!.organizationId,
+          String(req.params.id),
+          String(req.params.graphId),
+          target,
+        ),
+      );
+    } catch (error) {
+      sendError(res, error);
+    }
+  },
+);
+
+router.get(
+  "/bie/claims/:id/routes",
+  requireMember("crm.read"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(await listClaimRoutePackets(req.member!.organizationId, String(req.params.id)));
+    } catch (error) {
+      sendError(res, error);
+    }
+  },
+);
+
+/**
+ * Compilation is deliberately separate from execution. This endpoint creates
+ * an immutable, reviewable handoff packet but never contacts a carrier, CRM,
+ * browser, or third-party target.
+ */
+router.post(
+  "/bie/claims/:id/routes",
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const postconditions = Array.isArray(req.body?.postconditions)
+        ? req.body.postconditions.map((item: unknown) => {
+            const value = item as Record<string, unknown>;
+            return {
+              code: boundedString(value?.code, "Postcondition code", 120),
+              description: boundedString(value?.description, "Postcondition description", 500),
+            };
+          })
+        : [];
+      const capabilityRequirements = Array.isArray(req.body?.capabilityRequirements)
+        ? req.body.capabilityRequirements.map((item: unknown) => boundedString(item, "Capability", 160))
+        : [];
+      if (postconditions.length === 0 || postconditions.length > 12) {
+        throw new ClaimExecutionError("Provide between one and twelve target-side postconditions.");
+      }
+      if (capabilityRequirements.length === 0 || capabilityRequirements.length > 12) {
+        throw new ClaimExecutionError("Provide between one and twelve required capabilities.");
+      }
+      const maxExternalWrites = req.body?.maxExternalWrites ?? 1;
+      const maxAttempts = req.body?.maxAttempts ?? 1;
+      if (!Number.isInteger(maxExternalWrites) || !Number.isInteger(maxAttempts)) {
+        throw new ClaimExecutionError("Route budgets must be whole numbers.");
+      }
+      res.status(201).json(
+        await compileClaimRoutePacket(req.member!.organizationId, String(req.params.id), req.member!.user.id, {
+          certificateId: boundedString(req.body?.certificateId, "Certificate ID", 80),
+          target: boundedString(req.body?.target, "Target", 120),
+          operation: boundedString(req.body?.operation, "Operation", 160),
+          adapterName: boundedString(req.body?.adapterName, "Adapter name", 120),
+          adapterVersion: boundedString(req.body?.adapterVersion, "Adapter version", 120),
+          adapterFingerprint: boundedString(req.body?.adapterFingerprint, "Adapter fingerprint", 256),
+          postconditions,
+          capabilityRequirements,
+          maxExternalWrites,
+          maxAttempts,
+        }),
       );
     } catch (error) {
       sendError(res, error);

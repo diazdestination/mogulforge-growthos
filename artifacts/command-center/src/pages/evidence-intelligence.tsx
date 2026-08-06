@@ -54,6 +54,7 @@ interface EvidenceRun {
   status: 'running' | 'completed' | 'failed';
   model: string;
   promptVersion: string;
+  manifestHash: string;
   error: string | null;
   startedAt: string;
 }
@@ -91,8 +92,31 @@ interface EvidenceCertificate {
   limitations: string[];
   recommendedNextSteps: string[];
   contentHash: string;
+  integrityVersion: string;
+  integrityHash: string;
   createdAt: string;
   issuedAt: string | null;
+}
+
+interface EligibleEstimate {
+  id: string;
+  title: string;
+  status: string;
+  subtotalCents: number;
+  taxCents: number;
+  totalCents: number;
+  updatedAt: string;
+}
+
+interface ClaimGraph {
+  id: string;
+  version: number;
+  status: 'valid' | 'invalid';
+  sourceKind: string;
+  sourceReference: string;
+  graphHash: string;
+  invariantReport: Array<{ code: string; passed: boolean }>;
+  createdAt: string;
 }
 
 interface CaseDetail {
@@ -101,6 +125,8 @@ interface CaseDetail {
   runs: EvidenceRun[];
   observations: EvidenceObservation[];
   certificates: EvidenceCertificate[];
+  eligibleEstimates: EligibleEstimate[];
+  graphs: ClaimGraph[];
   policy: {
     aiDraftOnly: true;
     humanIssuanceRequired: true;
@@ -126,6 +152,10 @@ function shortHash(value: string): string {
 function sizeLabel(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   return `${(bytes / 1024 / (bytes > 1024 * 1024 ? 1024 : 1)).toFixed(1)} ${bytes > 1024 * 1024 ? 'MB' : 'KB'}`;
+}
+
+function moneyLabel(cents: number): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
 }
 
 function statusLabel(status: CaseStatus): string {
@@ -281,6 +311,14 @@ export default function EvidenceIntelligence() {
     onError: (err) => setError(err instanceof Error ? err.message : 'The certificate could not be issued.'),
   });
 
+  const compileGraphMutation = useMutation({
+    mutationFn: (estimateId: string) => request<ClaimGraph>(`/bie/claims/${selectedId}/graphs/native-estimate`, {
+      method: 'POST', body: JSON.stringify({ estimateId }),
+    }),
+    onSuccess: async (graph) => { setNotice(graph.status === 'valid' ? 'Canonical claim graph compiled with every financial invariant intact.' : 'Claim graph recorded with invariant failures. It is blocked from target compilation.'); setError(null); await refresh(); },
+    onError: (err) => setError(err instanceof Error ? err.message : 'The claim graph could not be compiled.'),
+  });
+
   const detail = detailQuery.data;
   const currentCertificate = detail?.certificates.find((item) => item.status === 'draft') ?? detail?.certificates.find((item) => item.status === 'issued') ?? detail?.certificates[0];
   const currentObservations = useMemo(
@@ -293,7 +331,7 @@ export default function EvidenceIntelligence() {
     currentObservations.every((item) => item.status !== 'ai_draft') &&
     currentObservations.some((item) => item.status === 'verified'),
   );
-  const busy = createMutation.isPending || uploadMutation.isPending || analyzeMutation.isPending || reviewMutation.isPending || issueMutation.isPending;
+  const busy = createMutation.isPending || uploadMutation.isPending || analyzeMutation.isPending || reviewMutation.isPending || issueMutation.isPending || compileGraphMutation.isPending;
 
   function createCase(event: FormEvent) {
     event.preventDefault(); setNotice(null); setError(null); createMutation.mutate();
@@ -390,6 +428,8 @@ export default function EvidenceIntelligence() {
                 </section>
               </div>
 
+              {(detail.eligibleEstimates.length > 0 || detail.graphs.length > 0) && <section className="rounded-xl border border-border bg-card p-4 shadow-sm md:p-5"><div className="flex flex-col justify-between gap-3 md:flex-row md:items-start"><div><div className="flex items-center gap-2"><Fingerprint className="h-5 w-5 text-primary" /><h3 className="font-semibold">1b · Canonical claim compiler</h3></div><p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted-foreground">Compile a native MogulForge estimate into a source-ledger claim graph. Every line total, subtotal, and grand total is checked before any target representation can be produced.</p></div><span className="rounded-full border border-primary/20 bg-primary/[0.05] px-2 py-1 text-[10px] font-semibold text-primary">DETERMINISTIC · NO AI REQUIRED</span></div><div className="mt-4 grid gap-3 lg:grid-cols-2">{detail.eligibleEstimates.map((estimate) => <div key={estimate.id} className="rounded-lg border border-border bg-background/50 p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold">{estimate.title}</p><p className="mt-1 text-xs text-muted-foreground">{estimate.status.replace(/_/g, ' ')} · {moneyLabel(estimate.totalCents)}</p></div><button disabled={busy} onClick={() => { setNotice(null); setError(null); compileGraphMutation.mutate(estimate.id); }} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md border border-primary/30 px-3 text-xs font-semibold text-primary disabled:opacity-50">{compileGraphMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Fingerprint className="h-3.5 w-3.5" />} Compile</button></div></div>)}{!detail.eligibleEstimates.length && <div className="rounded-lg border border-dashed border-border p-4 text-xs text-muted-foreground">Link this claim to a lead with an estimate to compile its first canonical graph.</div>}{detail.graphs.map((graph) => <div key={graph.id} className={cn('rounded-lg border p-3', graph.status === 'valid' ? 'border-emerald-500/25 bg-emerald-500/[0.04]' : 'border-destructive/25 bg-destructive/[0.04]')}><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold">Claim graph · v{graph.version}</p><p className="mt-1 text-xs text-muted-foreground">{graph.status === 'valid' ? `${graph.invariantReport.length} invariants intact` : `${graph.invariantReport.filter((item) => !item.passed).length} invariant failure${graph.invariantReport.filter((item) => !item.passed).length === 1 ? '' : 's'} · target compilation blocked`}</p></div>{graph.status === 'valid' ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <CircleAlert className="h-5 w-5 text-destructive" />}</div><p className="mt-3 font-mono text-[10px] text-muted-foreground">Graph SHA-256 {shortHash(graph.graphHash)}</p></div>)}</div></section>}
+
               <section className="rounded-xl border border-primary/25 bg-card p-4 shadow-sm md:p-5">
                 <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start"><div><div className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /><h3 className="font-semibold">2 · Build the grounded AI draft</h3></div><p className="mt-1 max-w-3xl text-sm text-muted-foreground">GPT-5.6 Sol receives only approved artifacts. Every finding must cite this case’s run-local evidence manifest or the entire draft is rejected.</p></div><button disabled={busy || detail.artifacts.length === 0 || detail.artifacts.some((item) => !item.aiUseApprovedAt)} onClick={() => { setNotice(null); setError(null); analyzeMutation.mutate(); }} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">{analyzeMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing evidence…</> : <><ScanSearch className="h-4 w-4" /> Generate evidence draft</>}</button></div>
                 {detail.runs[0]?.status === 'failed' && <p className="mt-3 rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">Latest run failed: {detail.runs[0].error}</p>}
@@ -397,7 +437,7 @@ export default function EvidenceIntelligence() {
 
               {currentCertificate && (
                 <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                  <div className="border-b border-border bg-muted/30 p-4 md:p-5"><div className="flex flex-col justify-between gap-3 md:flex-row md:items-start"><div><div className="flex flex-wrap items-center gap-2"><FileCheck2 className="h-5 w-5 text-primary" /><h3 className="font-semibold">Loss Evidence Certificate · v{currentCertificate.version}</h3><span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase', currentCertificate.status === 'issued' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700' : 'border-amber-500/30 bg-amber-500/10 text-amber-700')}>{currentCertificate.status === 'draft' ? 'AI draft · not issued' : currentCertificate.status}</span></div><p className="mt-2 max-w-4xl text-sm leading-relaxed text-muted-foreground">{currentCertificate.executiveSummary}</p></div><div className="shrink-0 rounded-lg border border-border bg-background px-3 py-2"><p className="text-[10px] font-semibold uppercase text-muted-foreground">Certificate fingerprint</p><p className="mt-1 font-mono text-[10px]">{shortHash(currentCertificate.contentHash)}</p></div></div></div>
+                  <div className="border-b border-border bg-muted/30 p-4 md:p-5"><div className="flex flex-col justify-between gap-3 md:flex-row md:items-start"><div><div className="flex flex-wrap items-center gap-2"><FileCheck2 className="h-5 w-5 text-primary" /><h3 className="font-semibold">Loss Evidence Certificate · v{currentCertificate.version}</h3><span className={cn('rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase', currentCertificate.status === 'issued' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700' : 'border-amber-500/30 bg-amber-500/10 text-amber-700')}>{currentCertificate.status === 'draft' ? 'AI draft · not issued' : currentCertificate.status}</span></div><p className="mt-2 max-w-4xl text-sm leading-relaxed text-muted-foreground">{currentCertificate.executiveSummary}</p></div><div className="shrink-0 rounded-lg border border-border bg-background px-3 py-2"><p className="text-[10px] font-semibold uppercase text-muted-foreground">{currentCertificate.status === 'issued' && currentCertificate.integrityHash ? 'Issued proof hash' : 'Draft content hash'}</p><p className="mt-1 font-mono text-[10px]">{shortHash(currentCertificate.status === 'issued' && currentCertificate.integrityHash ? currentCertificate.integrityHash : currentCertificate.contentHash)}</p></div></div></div>
                   <div className="space-y-4 p-4 md:p-5">
                     <div className="flex items-center justify-between"><div><h4 className="font-semibold">3 · Contractor observation review</h4><p className="mt-1 text-xs text-muted-foreground">Verify or reject every statement. Unreviewed AI output cannot be issued.</p></div><span className="text-xs text-muted-foreground">{currentObservations.filter((item) => item.status !== 'ai_draft').length}/{currentObservations.length} reviewed</span></div>
                     <div className="space-y-3">
@@ -409,6 +449,8 @@ export default function EvidenceIntelligence() {
                     </div>
 
                     {(currentCertificate.conflicts.length > 0 || currentCertificate.gaps.length > 0 || currentCertificate.limitations.length > 0) && <div className="grid gap-3 lg:grid-cols-3">{currentCertificate.conflicts.length > 0 && <div className="rounded-lg border border-amber-500/25 bg-amber-500/[0.05] p-3"><p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Conflicts</p>{currentCertificate.conflicts.map((item, index) => <p key={index} className="mt-2 text-xs text-muted-foreground">{item.summary}</p>)}</div>}{currentCertificate.gaps.length > 0 && <div className="rounded-lg border border-border p-3"><p className="text-xs font-semibold">Evidence gaps</p>{currentCertificate.gaps.map((item, index) => <p key={index} className="mt-2 text-xs text-muted-foreground"><strong>{item.title}</strong> · {item.reason}</p>)}</div>}{currentCertificate.limitations.length > 0 && <div className="rounded-lg border border-border p-3"><p className="text-xs font-semibold">Limitations</p>{currentCertificate.limitations.map((item, index) => <p key={index} className="mt-2 text-xs text-muted-foreground">{item}</p>)}</div>}</div>}
+
+                    {currentCertificate.integrityHash && <div className="rounded-lg border border-primary/25 bg-primary/[0.04] p-4"><div className="flex items-start gap-2"><Fingerprint className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><div><p className="text-sm font-semibold">Replayable proof package</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">This {currentCertificate.status === 'issued' ? 'issued' : 'draft'} certificate binds its content, frozen evidence manifest, model/prompt version, and contractor review ledger into one deterministic integrity package.</p><div className="mt-3 grid gap-2 font-mono text-[10px] text-muted-foreground sm:grid-cols-2"><p>Evidence manifest · {detail.runs.find((run) => run.id === currentCertificate.runId)?.manifestHash ? shortHash(detail.runs.find((run) => run.id === currentCertificate.runId)!.manifestHash) : 'legacy run'}</p><p>Integrity package · {shortHash(currentCertificate.integrityHash)}</p></div></div></div></div>}
 
                     <div className="flex flex-col justify-between gap-3 rounded-lg border border-primary/25 bg-primary/[0.05] p-4 md:flex-row md:items-center"><div className="flex items-start gap-2"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><div><p className="text-sm font-semibold">Authorized contractor issuance</p><p className="mt-1 text-xs text-muted-foreground">Issuing attests that the contractor reviewed the observations. It does not make this an insurance, engineering, legal, or coverage determination.</p></div></div>{currentCertificate.status === 'draft' ? <button disabled={busy || !readyToIssue} onClick={() => issueMutation.mutate(currentCertificate.id)} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">{issueMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <BadgeCheck className="h-4 w-4" />} Issue certificate</button> : <span className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white"><BadgeCheck className="h-4 w-4" /> Issued {currentCertificate.issuedAt ? new Date(currentCertificate.issuedAt).toLocaleDateString() : ''}</span>}</div>
                   </div>

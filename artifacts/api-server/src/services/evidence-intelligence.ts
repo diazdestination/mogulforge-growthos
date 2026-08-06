@@ -1,16 +1,19 @@
 import { createHash } from "node:crypto";
 import {
   claimCasesTable,
+  claimCanonicalGraphsTable,
   claimCertificatesTable,
   claimEvidenceArtifactsTable,
   claimEvidenceRunsTable,
   claimObservationsTable,
+  claimRoutePacketsTable,
   db,
+  estimatesTable,
   type CertificateFinding,
   type EvidenceArtifactKind,
   type ObservationStatus,
 } from "@workspace/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 
 import { recordAudit } from "./audit";
 import {
@@ -20,6 +23,11 @@ import {
   type EvidenceDraft,
 } from "./evidence-agent";
 import { redactEvidenceText } from "./evidence-redaction";
+import {
+  buildCertificateIntegrityManifest,
+  buildEvidenceManifest,
+  CERTIFICATE_INTEGRITY_VERSION,
+} from "./claim-kernel";
 
 export const MAX_EVIDENCE_BYTES = 5 * 1024 * 1024;
 export const ALLOWED_EVIDENCE_MIME_TYPES = [
@@ -105,7 +113,7 @@ export async function createEvidenceCase(
 
 export async function getEvidenceCase(organizationId: string, caseId: string) {
   const claimCase = await requireCase(organizationId, caseId);
-  const [artifacts, runs, observations, certificates] = await Promise.all([
+  const [artifacts, runs, observations, certificates, graphs, routePackets, eligibleEstimates] = await Promise.all([
     db
       .select()
       .from(claimEvidenceArtifactsTable)
@@ -146,6 +154,38 @@ export async function getEvidenceCase(organizationId: string, caseId: string) {
         ),
       )
       .orderBy(desc(claimCertificatesTable.version)),
+    db
+      .select()
+      .from(claimCanonicalGraphsTable)
+      .where(
+        and(
+          eq(claimCanonicalGraphsTable.organizationId, organizationId),
+          eq(claimCanonicalGraphsTable.caseId, caseId),
+        ),
+      )
+      .orderBy(desc(claimCanonicalGraphsTable.version)),
+    db
+      .select()
+      .from(claimRoutePacketsTable)
+      .where(
+        and(
+          eq(claimRoutePacketsTable.organizationId, organizationId),
+          eq(claimRoutePacketsTable.caseId, caseId),
+        ),
+      )
+      .orderBy(desc(claimRoutePacketsTable.version)),
+    claimCase.leadId
+      ? db
+          .select()
+          .from(estimatesTable)
+          .where(
+            and(
+              eq(estimatesTable.organizationId, organizationId),
+              eq(estimatesTable.leadId, claimCase.leadId),
+            ),
+          )
+          .orderBy(desc(estimatesTable.updatedAt))
+      : Promise.resolve([]),
   ]);
 
   return {
@@ -154,6 +194,9 @@ export async function getEvidenceCase(organizationId: string, caseId: string) {
     runs,
     observations,
     certificates,
+    graphs,
+    routePackets,
+    eligibleEstimates,
     policy: {
       aiDraftOnly: true,
       humanIssuanceRequired: true,
@@ -321,6 +364,46 @@ function draftContentHash(draft: ReturnType<typeof mapAndValidateDraft>): string
   );
 }
 
+function certificateIntegrityFor(input: {
+  certificate: {
+    id: string | null;
+    version: number;
+    status: "draft" | "issued";
+    contentHash: string;
+  };
+  claimCase: Awaited<ReturnType<typeof requireCase>>;
+  run: {
+    id: string;
+    manifestHash: string;
+    promptVersion: string;
+    model: string;
+  };
+  observations: Array<{
+    id: string;
+    artifactId: string | null;
+    category: string;
+    statement: string;
+    locator: string | null;
+    basis: string | null;
+    confidence: number;
+    needsHumanReview: boolean;
+    status: ObservationStatus;
+    reviewedByUserId: string | null;
+    reviewedAt: Date | null;
+  }>;
+}) {
+  return buildCertificateIntegrityManifest({
+    certificate: input.certificate,
+    claim: {
+      id: input.claimCase.id,
+      lossType: input.claimCase.lossType,
+      lossDate: input.claimCase.lossDate?.toISOString() ?? null,
+    },
+    evidenceRun: input.run,
+    observations: input.observations,
+  });
+}
+
 export async function analyzeEvidenceCase(
   organizationId: string,
   caseId: string,
@@ -336,7 +419,7 @@ export async function analyzeEvidenceCase(
         eq(claimEvidenceArtifactsTable.caseId, caseId),
       ),
     )
-    .orderBy(claimEvidenceArtifactsTable.createdAt);
+    .orderBy(asc(claimEvidenceArtifactsTable.createdAt), asc(claimEvidenceArtifactsTable.id));
 
   if (artifacts.length === 0) throw new EvidenceIntelligenceError("Add evidence before running analysis.", 409);
   const unapproved = artifacts.filter((artifact) => !artifact.aiUseApprovedAt);
@@ -347,10 +430,9 @@ export async function analyzeEvidenceCase(
     );
   }
 
-  const aliases = new Map<string, string>();
+  const { manifest, digest: manifestHash, aliases } = buildEvidenceManifest(artifacts);
   const agentArtifacts: AgentEvidenceArtifact[] = artifacts.map((artifact, index) => {
-    const alias = `E${index + 1}`;
-    aliases.set(alias, artifact.id);
+    const alias = manifest.artifacts[index]!.alias;
     return {
       alias,
       filename: artifact.filename,
@@ -370,6 +452,8 @@ export async function analyzeEvidenceCase(
       caseId,
       model,
       promptVersion: EVIDENCE_PROMPT_VERSION,
+      manifest: manifest as unknown as Record<string, unknown>,
+      manifestHash,
       initiatedByUserId: actorUserId,
     })
     .returning();
@@ -399,7 +483,7 @@ export async function analyzeEvidenceCase(
       .limit(1);
     const version = (latestCertificate?.version ?? 0) + 1;
 
-    const [certificate] = await db.transaction(async (tx) => {
+    const certificate = await db.transaction(async (tx) => {
       await tx
         .update(claimCertificatesTable)
         .set({ status: "superseded" })
@@ -411,24 +495,29 @@ export async function analyzeEvidenceCase(
           ),
         );
 
-      if (draft.findings.length > 0) {
-        await tx.insert(claimObservationsTable).values(
-          draft.findings.map((finding) => ({
-            organizationId,
-            caseId,
-            runId: run.id,
-            artifactId: finding.citations[0]?.artifactId ?? null,
-            category: finding.category,
-            statement: finding.statement,
-            locator: finding.citations[0]?.locator ?? null,
-            basis: finding.citations[0]?.basis ?? null,
-            confidence: finding.confidence,
-            needsHumanReview: finding.needsHumanReview,
-          })),
-        );
-      }
+      const observations =
+        draft.findings.length > 0
+          ? await tx
+              .insert(claimObservationsTable)
+              .values(
+                draft.findings.map((finding) => ({
+                  organizationId,
+                  caseId,
+                  runId: run.id,
+                  artifactId: finding.citations[0]?.artifactId ?? null,
+                  category: finding.category,
+                  statement: finding.statement,
+                  locator: finding.citations[0]?.locator ?? null,
+                  basis: finding.citations[0]?.basis ?? null,
+                  confidence: finding.confidence,
+                  needsHumanReview: finding.needsHumanReview,
+                })),
+              )
+              .returning()
+          : [];
 
-      const inserted = await tx
+      const contentHash = draftContentHash(draft);
+      const [inserted] = await tx
         .insert(claimCertificatesTable)
         .values({
           organizationId,
@@ -441,7 +530,8 @@ export async function analyzeEvidenceCase(
           gaps: draft.gaps,
           limitations: draft.limitations,
           recommendedNextSteps: draft.recommendedNextSteps,
-          contentHash: draftContentHash(draft),
+          contentHash,
+          integrityVersion: CERTIFICATE_INTEGRITY_VERSION,
           modelDetails: {
             model: result.model,
             promptVersion: EVIDENCE_PROMPT_VERSION,
@@ -450,6 +540,28 @@ export async function analyzeEvidenceCase(
           createdByUserId: actorUserId,
         })
         .returning();
+
+      const integrity = certificateIntegrityFor({
+        certificate: {
+          id: inserted.id,
+          version,
+          status: "draft",
+          contentHash,
+        },
+        claimCase,
+        run,
+        observations,
+      });
+      const [boundCertificate] = await tx
+        .update(claimCertificatesTable)
+        .set({
+          integrityVersion: CERTIFICATE_INTEGRITY_VERSION,
+          integrityManifest: integrity.manifest as unknown as Record<string, unknown>,
+          integrityHash: integrity.digest,
+        })
+        .where(eq(claimCertificatesTable.id, inserted.id))
+        .returning();
+      if (!boundCertificate) throw new EvidenceIntelligenceError("Certificate integrity binding failed.", 503);
 
       await tx
         .update(claimEvidenceRunsTable)
@@ -466,7 +578,7 @@ export async function analyzeEvidenceCase(
         .update(claimCasesTable)
         .set({ status: "review", updatedByUserId: actorUserId })
         .where(and(eq(claimCasesTable.organizationId, organizationId), eq(claimCasesTable.id, caseId)));
-      return inserted;
+      return boundCertificate;
     });
 
     await recordAudit({
@@ -553,7 +665,7 @@ export async function issueEvidenceCertificate(
   certificateId: string,
   actorUserId: string,
 ) {
-  await requireCase(organizationId, caseId);
+  const claimCase = await requireCase(organizationId, caseId);
   const [certificate] = await db
     .select()
     .from(claimCertificatesTable)
@@ -583,6 +695,36 @@ export async function issueEvidenceCertificate(
   const readiness = evaluateIssueReadiness(observations);
   if (!readiness.ready) throw new EvidenceIntelligenceError(readiness.reason!, 409);
 
+  const [run] = await db
+    .select()
+    .from(claimEvidenceRunsTable)
+    .where(
+      and(
+        eq(claimEvidenceRunsTable.organizationId, organizationId),
+        eq(claimEvidenceRunsTable.caseId, caseId),
+        eq(claimEvidenceRunsTable.id, certificate.runId),
+      ),
+    )
+    .limit(1);
+  if (!run?.manifestHash) {
+    throw new EvidenceIntelligenceError(
+      "This legacy evidence run has no frozen manifest. Run a new analysis before issuing a certificate.",
+      409,
+    );
+  }
+
+  const integrity = certificateIntegrityFor({
+    certificate: {
+      id: certificate.id,
+      version: certificate.version,
+      status: "issued",
+      contentHash: certificate.contentHash,
+    },
+    claimCase,
+    run,
+    observations,
+  });
+
   const now = new Date();
   const [issued] = await db.transaction(async (tx) => {
     await tx
@@ -597,7 +739,14 @@ export async function issueEvidenceCertificate(
       );
     const rows = await tx
       .update(claimCertificatesTable)
-      .set({ status: "issued", issuedAt: now, issuedByUserId: actorUserId })
+      .set({
+        status: "issued",
+        issuedAt: now,
+        issuedByUserId: actorUserId,
+        integrityVersion: CERTIFICATE_INTEGRITY_VERSION,
+        integrityManifest: integrity.manifest as unknown as Record<string, unknown>,
+        integrityHash: integrity.digest,
+      })
       .where(
         and(
           eq(claimCertificatesTable.organizationId, organizationId),
@@ -624,7 +773,13 @@ export async function issueEvidenceCertificate(
     action: "evidence.certificate_issued",
     entityType: "claim_certificate",
     entityId: issued.id,
-    metadata: { caseId, version: issued.version, contentHash: issued.contentHash },
+    metadata: {
+      caseId,
+      version: issued.version,
+      contentHash: issued.contentHash,
+      integrityHash: issued.integrityHash,
+      manifestHash: run.manifestHash,
+    },
   });
   return issued;
 }

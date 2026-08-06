@@ -29,6 +29,9 @@ export type EvidenceArtifactKind = "photo" | "document" | "note" | "weather" | "
 export type EvidenceRunStatus = "running" | "completed" | "failed";
 export type ObservationStatus = "ai_draft" | "verified" | "rejected";
 export type CertificateStatus = "draft" | "issued" | "superseded";
+export type ClaimGraphStatus = "valid" | "invalid";
+export type ClaimRoutePacketStatus = "ready" | "executing" | "reconciling" | "completed" | "failed" | "blocked";
+export type ClaimExecutionReceiptState = "prepared" | "indeterminate" | "succeeded" | "failed" | "reconciled";
 
 export const claimCasesTable = pgTable(
   "claim_cases",
@@ -106,6 +109,8 @@ export const claimEvidenceRunsTable = pgTable(
     model: text("model").notNull(),
     promptVersion: text("prompt_version").notNull(),
     traceId: text("trace_id"),
+    manifest: jsonb("manifest").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    manifestHash: text("manifest_hash").notNull().default(""),
     usage: jsonb("usage").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
     error: text("error"),
     initiatedByUserId: varchar("initiated_by_user_id").references(() => usersTable.id),
@@ -180,6 +185,9 @@ export const claimCertificatesTable = pgTable(
     limitations: jsonb("limitations").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
     recommendedNextSteps: jsonb("recommended_next_steps").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
     contentHash: text("content_hash").notNull(),
+    integrityVersion: text("integrity_version").notNull().default(""),
+    integrityManifest: jsonb("integrity_manifest").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    integrityHash: text("integrity_hash").notNull().default(""),
     modelDetails: jsonb("model_details").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
     createdByUserId: varchar("created_by_user_id").references(() => usersTable.id),
     issuedByUserId: varchar("issued_by_user_id").references(() => usersTable.id),
@@ -192,8 +200,120 @@ export const claimCertificatesTable = pgTable(
   ],
 );
 
+/**
+ * Canonical claim graphs are source-ledger-backed representations of a claim
+ * or estimate. A graph with failed invariants is retained for diagnosis but is
+ * not eligible for target compilation or execution.
+ */
+export const claimCanonicalGraphsTable = pgTable(
+  "claim_canonical_graphs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => claimCasesTable.id),
+    version: integer("version").notNull(),
+    status: text("status").$type<ClaimGraphStatus>().notNull(),
+    sourceKind: text("source_kind").notNull(),
+    sourceReference: text("source_reference").notNull(),
+    rulesetVersion: text("ruleset_version").notNull(),
+    graph: jsonb("graph").$type<Record<string, unknown>>().notNull(),
+    graphHash: text("graph_hash").notNull(),
+    invariantReport: jsonb("invariant_report").$type<Record<string, unknown>[]>().notNull(),
+    createdByUserId: varchar("created_by_user_id").references(() => usersTable.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("claim_canonical_graphs_case_version_uniq").on(table.caseId, table.version),
+    index("claim_canonical_graphs_org_case_idx").on(table.organizationId, table.caseId, table.createdAt),
+    index("claim_canonical_graphs_org_source_idx").on(table.organizationId, table.sourceKind, table.sourceReference),
+  ],
+);
+
+/**
+ * A route packet is the immutable, constraint-carrying handoff from verified
+ * evidence to a future target adapter. It cannot itself execute a target-side
+ * operation; an executor must pass the packet's preconditions first.
+ */
+export const claimRoutePacketsTable = pgTable(
+  "claim_route_packets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => claimCasesTable.id),
+    certificateId: uuid("certificate_id")
+      .notNull()
+      .references(() => claimCertificatesTable.id),
+    version: integer("version").notNull(),
+    status: text("status").$type<ClaimRoutePacketStatus>().notNull().default("ready"),
+    target: text("target").notNull(),
+    operation: text("operation").notNull(),
+    adapterName: text("adapter_name").notNull(),
+    adapterVersion: text("adapter_version").notNull(),
+    adapterFingerprint: text("adapter_fingerprint").notNull(),
+    certificateIntegrityHash: text("certificate_integrity_hash").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    packet: jsonb("packet").$type<Record<string, unknown>>().notNull(),
+    packetHash: text("packet_hash").notNull(),
+    sideEffectBudget: jsonb("side_effect_budget").$type<Record<string, unknown>>().notNull(),
+    createdByUserId: varchar("created_by_user_id").references(() => usersTable.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("claim_route_packets_case_version_uniq").on(table.caseId, table.version),
+    uniqueIndex("claim_route_packets_org_idempotency_uniq").on(table.organizationId, table.idempotencyKey),
+    index("claim_route_packets_org_case_idx").on(table.organizationId, table.caseId, table.createdAt),
+  ],
+);
+
+/**
+ * A receipt records only what an executor can prove. An indeterminate receipt
+ * is deliberately distinct from failure so retry policy cannot conceal a
+ * possible duplicate external write.
+ */
+export const claimExecutionReceiptsTable = pgTable(
+  "claim_execution_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => claimCasesTable.id),
+    routePacketId: uuid("route_packet_id")
+      .notNull()
+      .references(() => claimRoutePacketsTable.id),
+    attempt: integer("attempt").notNull(),
+    state: text("state").$type<ClaimExecutionReceiptState>().notNull().default("prepared"),
+    receipt: jsonb("receipt").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    receiptHash: text("receipt_hash").notNull().default(""),
+    targetEvidence: jsonb("target_evidence").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("claim_execution_receipts_route_attempt_uniq").on(table.routePacketId, table.attempt),
+    index("claim_execution_receipts_org_route_idx").on(table.organizationId, table.routePacketId, table.createdAt),
+  ],
+);
+
 export type ClaimCase = typeof claimCasesTable.$inferSelect;
 export type ClaimEvidenceArtifact = typeof claimEvidenceArtifactsTable.$inferSelect;
 export type ClaimEvidenceRun = typeof claimEvidenceRunsTable.$inferSelect;
 export type ClaimObservation = typeof claimObservationsTable.$inferSelect;
 export type ClaimCertificate = typeof claimCertificatesTable.$inferSelect;
+export type ClaimCanonicalGraph = typeof claimCanonicalGraphsTable.$inferSelect;
+export type ClaimRoutePacket = typeof claimRoutePacketsTable.$inferSelect;
+export type ClaimExecutionReceipt = typeof claimExecutionReceiptsTable.$inferSelect;

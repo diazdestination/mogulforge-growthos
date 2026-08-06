@@ -1,8 +1,7 @@
 # MogulForge Evidence Intelligence
 
 Evidence Intelligence is a standalone GrowthOS capability in the canonical
-`diazdestination/mogulforge-crm` product. It has no Jarvis dependency and no
-shared runtime, storage, or naming relationship with Jarvis.
+`diazdestination/mogulforge-crm` product.
 
 ## Product promise
 
@@ -28,7 +27,22 @@ issues the certificate.
    and each organization receives a stable privacy-preserving safety identifier.
 7. Every model finding begins as `ai_draft`. All observations must be reviewed
    and at least one must be human-verified before issuance is possible.
-8. Every issue, review, upload, run, and failure transition is audit logged.
+8. Each analysis run freezes an ordered evidence manifest with run-local
+   aliases, source metadata, approval times, and a deterministic SHA-256
+   manifest digest.
+9. Each certificate receives a deterministic integrity package that binds the
+   content hash, frozen manifest digest, prompt/model version, and human review
+   ledger. Issuance recomputes that package after the final review decisions.
+10. Every issue, review, upload, run, and failure transition is audit logged.
+11. An issued, integrity-bound certificate may be compiled into a
+    constraint-carrying route packet. The packet carries immutable target
+    preconditions, postconditions, adapter fingerprint, capability requirements,
+    side-effect budget, and a deterministic idempotency key. Compilation does
+    not contact any target system.
+12. A native MogulForge estimate can be compiled into a canonical claim graph
+    with node-level source paths, transformation rules, financial-conservation
+    checks, and a graph digest. A graph with failed invariants is retained for
+    diagnosis but blocked from target compilation.
 
 ## OpenAI implementation
 
@@ -57,6 +71,10 @@ source material.
 - `POST /api/v1/bie/claims/:id/analyze`
 - `POST /api/v1/bie/claims/:id/observations/:observationId/review`
 - `POST /api/v1/bie/claims/:id/certificates/:certificateId/issue`
+- `GET /api/v1/bie/claims/:id/graphs`
+- `POST /api/v1/bie/claims/:id/graphs/native-estimate`
+- `GET /api/v1/bie/claims/:id/graphs/:graphId/targets/:target`
+- `GET|POST /api/v1/bie/claims/:id/routes`
 
 Read operations require `crm.read`. Case creation, evidence intake, analysis,
 review, and issuance require `crm.write`. The route-inventory test enforces the
@@ -72,6 +90,12 @@ The deterministic release gates require:
 - 0 unapproved artifacts sent to the model
 - 0 AI-draft observations allowed through the issuance gate
 - at least 1 human-verified observation before issuance
+- identical canonical inputs always produce identical manifest, certificate,
+  and route-packet hashes
+- no route packet compiles from a non-issued or integrity-mismatched certificate
+- an indeterminate external write may only be reconciled, never blindly retried
+- a declared estimate line total, subtotal, or grand total that disagrees with
+  the canonical computation blocks target compilation
 
 The first live synthetic verification record is committed at
 `artifacts/api-server/evals/results/2026-08-06-local.json`.
@@ -94,26 +118,23 @@ Then open `http://localhost:8080/evidence` while signed in.
 
 ## Verification snapshot — 2026-08-06
 
-- Production UI and API bundles: passed
-- Docker image build and health endpoint: passed
-- Command Center suite: 190/190 passed
-- Evidence and route-permission suite: 12/12 passed
-- Desktop contractor flow: passed
-- 390x844 mobile rendering: passed
-- Live GPT-5.6 Sol structured run: passed
-- Local redaction of synthetic email and phone: passed
-- Embedded prompt-injection instruction ignored: passed
-- Three observations human-verified before issuance: passed
-- Issued certificate content hash length: 64 characters
-- Audit events recorded for the live synthetic flow: 7
+- Current production UI and API bundles: passed
+- Current Docker image rebuild: passed
+- Current local app: serves the MogulForge GrowthOS bundle at `:8080`; the
+  protected Evidence API returns the expected unauthenticated `401`
+- Current Command Center suite: 190/190 passed
+- Current Claim Kernel, graph compiler, Evidence Intelligence, redaction, and
+  route-inventory suites: 26/26 passed
+- Current local database schema: frozen manifest/integrity columns plus route
+  packet and execution-receipt tables confirmed
 
-The full API suite is now portable and green in the configured self-hosted test
-environment: 936 passed and 15 intentionally skipped. Replit-only Object
-Storage was replaced by signed Postgres-backed uploads by default, test runtime
-defaults are explicit, and the legacy email-provider expectation was corrected.
+Older evidence-flow test records remain useful historical evidence, but they
+are not a substitute for rerunning the relevant check after a later change.
 
 ## Not deployed
 
 This checkpoint verifies the local Docker product. It does not claim that the
 feature has been deployed to Fly.io, enabled on `mogulforge.ai`, or evaluated
-on beta customer data.
+on beta customer data. It also does not yet include a live carrier adapter,
+credential vault, Cloudflare queue, Fly executor, Wolfram kernel, or target-side
+browser submission. Those are separate, explicitly gated next stages.
