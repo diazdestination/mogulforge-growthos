@@ -32,6 +32,7 @@ import Reactivation from '@/pages/reactivation';
 import Capture from '@/pages/capture';
 import Onboarding from '@/pages/onboarding';
 import Platform from '@/pages/platform';
+import Bie from '@/pages/bie';
 import { CreateOrgScreen } from '@/components/create-org';
 import { useGetSession, getGetSessionQueryKey } from '@workspace/api-client-react';
 
@@ -241,7 +242,9 @@ function AuthedApp() {
     <AccessGate>
       <Shell>
         <Switch>
-        <Route path="/" component={Dashboard} />
+        <Route path="/" component={Bie} />
+        <Route path="/bie" component={Bie} />
+        <Route path="/dashboard" component={Dashboard} />
         <Route path="/assistant" component={Assistant} />
         <Route path="/pipeline" component={Pipeline} />
         <Route path="/insights" component={Insights} />

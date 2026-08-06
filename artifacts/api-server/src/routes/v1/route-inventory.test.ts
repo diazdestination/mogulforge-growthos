@@ -137,6 +137,20 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /billing": "settings.manage",
   "POST /billing/checkout": "settings.manage",
   "POST /billing/portal": "settings.manage",
+  // BIE Revenue Command Center. Read access can inspect tenant-owned
+  // evidence; only writers may review/execute actions, and owners/admins
+  // exclusively configure or trigger autopilot.
+  "GET /bie/briefing": "crm.read",
+  "POST /bie/briefing/run": "crm.read",
+  "GET /bie/sources": "crm.read",
+  "GET /bie/actions": "crm.read",
+  "POST /bie/actions/generate": "crm.write",
+  "POST /bie/actions/:id/approve": "crm.write",
+  "POST /bie/actions/:id/reject": "crm.write",
+  "POST /bie/actions/:id/execute": "crm.write",
+  "GET /bie/autopilot": "crm.read",
+  "PUT /bie/autopilot": "settings.manage",
+  "POST /bie/autopilot/run": "settings.manage",
   // settings surfaces
   "GET /settings": "crm.read",
   // read-only effective availability; needed by anyone booking appointments

@@ -24,6 +24,7 @@ import {
   CornerDownLeft,
   LogOut,
   Command as CommandIcon,
+  Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -51,7 +52,8 @@ const nav = (href: string, label: string, icon: LucideIcon, keywords = ''): CmdI
 });
 
 const ITEMS: CmdItem[] = [
-  nav('/', 'Dashboard', LayoutDashboard, 'home overview'),
+  nav('/', 'BIE Revenue Command', Bot, 'growthos revenue recovery agents autopilot home'),
+  nav('/dashboard', 'Dashboard', LayoutDashboard, 'overview operations'),
   nav('/assistant', 'Assistant', Sparkles, 'ai chat'),
   nav('/pipeline', 'Pipeline', Trello, 'board kanban leads deals'),
   nav('/insights', 'Insights', TrendingUp, 'analytics metrics'),

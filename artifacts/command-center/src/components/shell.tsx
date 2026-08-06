@@ -25,7 +25,8 @@ import {
   RotateCcw,
   Webhook,
   CreditCard,
-  Search
+  Search,
+  Bot,
 } from 'lucide-react';
 import { canManageSettings, canViewAuditLog } from '@/lib/permissions';
 import { CLIENT } from '@/lib/client.config';
@@ -41,7 +42,8 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { title: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { title: 'BIE Command', href: '/', icon: Bot },
+  { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { title: 'Assistant', href: '/assistant', icon: Sparkles },
   { title: 'Pipeline', href: '/pipeline', icon: Trello },
   { title: 'Insights', href: '/insights', icon: TrendingUp },
