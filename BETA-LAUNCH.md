@@ -44,6 +44,31 @@ beta users; they each **Create account** → their own org.
 
 ---
 
+## Launching from the Fly dashboard / GitHub (mobile-friendly)
+
+You can launch entirely from a browser — no CLI, no laptop:
+
+1. Fly dashboard → **Launch from GitHub** → pick `mogulforge-crm`
+   (private repo, so grant the Fly GitHub App access to it).
+2. On the config screen, confirm it builds with the **Dockerfile** (not a buildpack).
+3. Add **Postgres** when offered (this is the part that costs money).
+4. **Secrets** — set these BEFORE the first deploy:
+   - `SESSION_SECRET` = a long random hex string (stable; changing it logs everyone out)
+   - `AUTO_MIGRATE` = `true`
+
+**Why `AUTO_MIGRATE`:** the schema is normally applied by `release_command` in
+`fly.toml`. The dashboard launcher regenerates config and can silently drop the
+`[deploy]` section — you'd get a "successful" deploy serving an **empty database**:
+landing page fine, then every API call 500s. `AUTO_MIGRATE=true` makes the app push
+its own schema at startup, so the database is correct on any deploy path. It's
+advisory-locked (safe with multiple machines) and off unless explicitly set.
+
+Once a CLI deploy with our `fly.toml` is working, you can drop `AUTO_MIGRATE` and
+let `release_command` own migrations again — that's the better long-term shape,
+since migrating from inside the serving process isn't what you want with real data.
+
+---
+
 ## Windows / PowerShell notes (Diego's machine, verified 2026-08-06)
 
 `flyctl` v0.4.79 is installed at `C:\Users\diazd\.fly\bin\` and is on the persistent
