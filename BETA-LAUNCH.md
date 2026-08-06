@@ -25,6 +25,8 @@ fly postgres create --name mogulforge-db
 fly postgres attach mogulforge-db
 
 # 4. Session secret (stable — changing it logs everyone out)
+#    NOTE: this $(...) form is bash. On Windows PowerShell use the two-liner in
+#    the "Windows / PowerShell notes" section below — it does NOT work as-is.
 fly secrets set SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
 
 # 5. Deploy. The release_command in fly.toml pushes the DB schema automatically.
@@ -39,6 +41,40 @@ beta users; they each **Create account** → their own org.
 
 > If `fly postgres create` isn't available on your plan, use any managed Postgres
 > (Neon, Supabase, RDS) and set `fly secrets set DATABASE_URL=postgres://...`.
+
+---
+
+## Windows / PowerShell notes (Diego's machine, verified 2026-08-06)
+
+`flyctl` v0.4.79 is installed at `C:\Users\diazd\.fly\bin\` and is on the persistent
+User PATH. The installer's `fly` symlink step needs admin and was skipped, so a
+`fly.cmd` shim was added next to it — **both `fly` and `flyctl` work**, no elevation.
+
+Step 4 above is bash. In PowerShell, `$(node -e "...")` does NOT interpolate — you'd
+set the literal string as your secret and every session cookie would break. Use:
+
+```powershell
+$secret = node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+fly secrets set SESSION_SECRET=$secret
+```
+
+Everything else in the Fly sequence works unchanged in PowerShell.
+
+### Custom domain on Cloudflare (mogulforge.ai)
+
+`mogulforge.ai` uses Cloudflare nameservers (`newt`/`roxy.ns.cloudflare.com`).
+Cloudflare is **DNS/CDN only** — it does not run this container (Workers are V8
+isolates, not Node; D1 is SQLite, not Postgres). So Fly (or any container host)
+runs the app and Cloudflare points at it. Plan: keep the marketing site on the
+root domain, put the CRM on **`app.mogulforge.ai`** (confirmed unused).
+
+```bash
+fly certs add app.mogulforge.ai      # then add the record it prints, in Cloudflare
+```
+
+⚠️ Set that DNS record to **DNS-only (grey cloud)** until the cert is issued —
+Cloudflare's proxy (orange cloud) breaks Fly's ACME validation. After it's live you
+can enable the proxy with SSL mode **Full (strict)**.
 
 ---
 
