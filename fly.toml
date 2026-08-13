@@ -1,38 +1,31 @@
-# MogulForge — Fly.io deploy config (single container).
-# Deploys straight from local Docker — no git remote needed.
+# fly.toml app configuration file generated for mogulforge-growthos on 2026-08-13T22:36:47Z
 #
-#   fly launch --no-deploy --copy-config --name <your-app-name>   # first time
-#   fly postgres create   &&   fly postgres attach <pg-app>        # sets DATABASE_URL secret
-#   fly secrets set SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-#   fly deploy                                                     # builds + runs release_command (schema push) + goes live
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
-# Then open the printed https URL → "Create account" (first account = owner).
 
-app = "mogulforge"          # <-- change to a globally-unique app name
-primary_region = "iad"      # <-- pick a region near you (fly platform regions)
+app = 'mogulforge-growthos'
+primary_region = 'iad'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [deploy]
-  # Runs on a temp machine (with secrets) before the new version goes live —
-  # applies the DB schema automatically on every deploy.
   release_command = "sh -lc 'cd /app && pnpm --filter @workspace/db exec drizzle-kit push --force'"
 
 [env]
-  NODE_ENV = "production"
-  PORT = "3001"
-  STATIC_DIR = "/app/public"
-  APP_ORIGIN = "https://mogulforge.ai"
-  OBJECT_STORAGE_PROVIDER = "postgres"
+  APP_ORIGIN = 'https://mogulforge.ai'
+  NODE_ENV = 'production'
+  OBJECT_STORAGE_PROVIDER = 'postgres'
+  PORT = '3001'
+  STATIC_DIR = '/app/public'
 
 [http_service]
   internal_port = 3001
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "1gb"
+  size = 'shared-cpu-1x'
+  memory = '1gb'
