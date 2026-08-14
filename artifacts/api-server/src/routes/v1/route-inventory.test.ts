@@ -58,6 +58,7 @@ const SESSION_ONLY_ROUTES = new Set([
 const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   // me / users
   "GET /me": "crm.read",
+  "PATCH /me": "crm.read",
   "GET /users": "users.read",
   "POST /users/invite": "users.manage",
   "POST /users/:id/resend-invite": "users.manage",
