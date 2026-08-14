@@ -19,6 +19,7 @@ import app from "../../app";
 import { createSession } from "../../lib/auth";
 import { clearLegacyOrgCache } from "../../lib/orgFlavor";
 import { ensureMembership, getDefaultOrganization } from "../../services/org";
+import { createInviteToken } from "../../services/invite-token";
 import {
   getAppointmentReminderSettings,
   getConciergeSettings,
@@ -492,6 +493,19 @@ describe("founding beta registration gate", () => {
       });
 
       delete process.env.BETA_SIGNUP_ALLOWLIST;
+      const missingTokenSignup = await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: invitedEmail,
+          password: "correct-horse-battery-staple",
+        }),
+      });
+      expect(missingTokenSignup.status).toBe(403);
+      expect(await missingTokenSignup.json()).toMatchObject({
+        code: "BETA_INVITE_TOKEN_REQUIRED",
+      });
+
       const inviteSignup = await fetch(`${baseUrl}/api/auth/register`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -499,6 +513,11 @@ describe("founding beta registration gate", () => {
           email: invitedEmail,
           password: "correct-horse-battery-staple",
           firstName: "Invited",
+          inviteToken: createInviteToken({
+            inviteId: invited.id,
+            organizationId: org.id,
+            email: invitedEmail,
+          }),
         }),
       });
       expect(inviteSignup.status).toBe(200);
@@ -521,6 +540,11 @@ describe("founding beta registration gate", () => {
           email: revokedEmail,
           password: "correct-horse-battery-staple",
           firstName: "Revoked",
+          inviteToken: createInviteToken({
+            inviteId: revoked.id,
+            organizationId: org.id,
+            email: revokedEmail,
+          }),
         }),
       });
       expect(revokedSignup.status).toBe(403);

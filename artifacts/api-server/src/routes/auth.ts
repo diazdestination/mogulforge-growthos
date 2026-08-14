@@ -11,6 +11,7 @@ import * as oidc from 'openid-client';
 import { z } from 'zod';
 
 import { hashPassword, verifyPassword } from '../lib/password';
+import { verifyInviteToken } from '../services/invite-token';
 import { ensureMembership } from '../services/org';
 import { reportCallbackBruteForceBlock } from '../services/security-alerts';
 import {
@@ -446,6 +447,7 @@ const RegisterBody = z.object({
   password: z.string().min(8).max(200),
   firstName: z.string().trim().max(100).optional(),
   lastName: z.string().trim().max(100).optional(),
+  inviteToken: z.string().trim().min(1).max(4096).optional(),
 });
 
 const LoginBody = z.object({
@@ -504,7 +506,7 @@ router.post('/auth/register', async (req: Request, res: Response) => {
     return;
   }
   const email = parsed.data.email.toLowerCase();
-  const { password, firstName, lastName } = parsed.data;
+  const { password, firstName, lastName, inviteToken } = parsed.data;
 
   const [existing] = await db
     .select()
@@ -523,6 +525,23 @@ router.post('/auth/register', async (req: Request, res: Response) => {
     res.status(403).json({
       error: 'This GrowthOS invitation is no longer active. Ask your MogulForge administrator for a new invitation.',
       code: 'BETA_INVITE_REVOKED',
+    });
+    return;
+  }
+  if (
+    existing?.id.startsWith('invite:') &&
+    (!inviteToken ||
+      !existing.organizationId ||
+      !existing.email ||
+      !verifyInviteToken(inviteToken, {
+        inviteId: existing.id,
+        organizationId: existing.organizationId,
+        email: existing.email,
+      }))
+  ) {
+    res.status(403).json({
+      error: 'This invitation link is invalid or has expired. Ask your MogulForge administrator to resend it.',
+      code: 'BETA_INVITE_TOKEN_REQUIRED',
     });
     return;
   }

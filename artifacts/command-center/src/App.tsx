@@ -44,8 +44,12 @@ const AUTH_INPUT_CLASS =
   'w-full h-11 px-4 rounded-md border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-shadow';
 
 function LoginScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'register' }) {
+  const inviteParams =
+    initialMode === 'register' ? new URLSearchParams(window.location.search) : null;
+  const inviteToken = inviteParams?.get('invite')?.trim() || undefined;
+  const invitedEmail = inviteParams?.get('email')?.trim() || '';
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(invitedEmail);
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -71,6 +75,7 @@ function LoginScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'regis
               password,
               firstName: firstName || undefined,
               lastName: lastName || undefined,
+              inviteToken,
             };
       const res = await fetch(path, {
         method: 'POST',
@@ -108,7 +113,9 @@ function LoginScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'regis
         <p className="text-muted-foreground text-center mb-8 text-sm">
           {mode === 'login'
             ? 'Sign in to your mission control.'
-            : 'Create your account to get started.'}
+            : inviteToken
+              ? 'Create your account to accept your secure team invitation.'
+              : 'Create your account to get started.'}
         </p>
 
         <form onSubmit={submit} className="w-full flex flex-col gap-3">
@@ -137,6 +144,7 @@ function LoginScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'regis
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            readOnly={mode === 'register' && !!inviteToken}
             autoComplete="email"
           />
           <input

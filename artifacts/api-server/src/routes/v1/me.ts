@@ -179,6 +179,7 @@ router.post(
       inviter.email ||
       "A teammate";
     const inviteEmail = await sendInviteEmail({
+      invitedUserId: user.id,
       organizationId: req.member!.organizationId,
       to: user.email!,
       inviteeFirstName: user.firstName,
@@ -250,6 +251,7 @@ router.post(
       actor.user.email ||
       "A teammate";
     const result = await sendInviteEmail({
+      invitedUserId: target.id,
       organizationId: actor.organizationId,
       to: target.email,
       inviteeFirstName: target.firstName,
