@@ -316,10 +316,12 @@ export async function checkSendEligibility(
  */
 export async function recordBlockedSend(input: {
   organizationId: string;
+  actorUserId?: string | null;
   channel: SendChannel;
   reason: string;
   outcome: "blocked" | "deferred";
-  source: string; // e.g. "playbook", "automation"
+  source: string; // e.g. "playbook", "automation", "crm-compose"
+  mode?: "automated" | "manual";
   leadId?: string | null;
   contactId?: string | null;
   resumeAt?: Date;
@@ -327,7 +329,7 @@ export async function recordBlockedSend(input: {
   try {
     await db.insert(auditEventsTable).values({
       organizationId: input.organizationId,
-      actorUserId: null,
+      actorUserId: input.actorUserId ?? null,
       action: `send.${input.outcome}`,
       entityType: input.leadId ? "lead" : "contact",
       entityId: input.leadId ?? input.contactId ?? null,
@@ -339,6 +341,9 @@ export async function recordBlockedSend(input: {
       },
     });
     if (input.leadId) {
+      const deliveryLabel = `${input.mode === "manual" ? "" : "Automated "}${
+        input.channel === "email" ? "email" : "text"
+      }`;
       await db.insert(activitiesTable).values({
         organizationId: input.organizationId,
         leadId: input.leadId,
@@ -346,8 +351,8 @@ export async function recordBlockedSend(input: {
         type: input.outcome === "deferred" ? "message_deferred" : "message_blocked",
         title:
           input.outcome === "deferred"
-            ? `Automated ${input.channel === "email" ? "email" : "text"} deferred (${humanReason(input.reason)})`
-            : `Automated ${input.channel === "email" ? "email" : "text"} blocked (${humanReason(input.reason)})`,
+            ? `${deliveryLabel} deferred (${humanReason(input.reason)})`
+            : `${deliveryLabel} blocked (${humanReason(input.reason)})`,
         metadata: {
           channel: input.channel,
           reason: input.reason,

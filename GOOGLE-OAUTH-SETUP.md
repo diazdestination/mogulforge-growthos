@@ -24,9 +24,9 @@ access. `gmail.send` is enough for the current product behavior.
 
 ## Google Cloud configuration
 
-Use two separate Google Cloud projects: one for local/development testing and
-one for production. This prevents beta redirects, test users, credentials, and
-consent configuration from contaminating the production app.
+Use two separate Google Cloud projects: one for staging/development testing
+and one for production. This prevents beta redirects, test users, credentials,
+and consent configuration from contaminating the production app.
 
 ### Production project
 
@@ -53,16 +53,31 @@ consent configuration from contaminating the production app.
 9. Submit the app for verification. The homepage/privacy/terms content and the
    in-product consent explanation must match the narrow sending behavior.
 
-### Development project
+### Staging/development project
 
-Repeat the setup in a development-only project and use the local application
-origin actually serving the API. For the existing combined local container:
+1. Create or select a separate project named
+   `MogulForge GrowthOS Staging`.
+2. Enable the **Gmail API** and configure the same app name, support email, and
+   four narrow scopes described above.
+3. Keep the audience in **Testing** while running the private beta acceptance
+   suite, and add only the beta Google accounts as test users.
+4. Create a **Web application** OAuth client and add this exact staging redirect:
 
-`http://localhost:8080/api/v1/integrations/gmail/callback`
+   `https://mogulforge-growthos-staging.fly.dev/api/v1/integrations/gmail/callback`
 
-Google testing mode is useful for a small allowlist, but it is not a reliable
-production substitute: external test-user authorizations can expire after
-seven days. Submit production verification in parallel with beta engineering.
+5. If the same staging project is also used for local engineering, add the
+   existing combined-container redirect as a second authorized URI:
+
+   `http://localhost:8080/api/v1/integrations/gmail/callback`
+
+6. Put the staging client ID and secret only in the
+   `mogulforge-growthos-staging` Fly app's secret vault. Never reuse the
+   production OAuth client in staging.
+
+Google Testing mode supports a small allowlist, but it is not a reliable
+production substitute: external test-user authorizations for non-identity
+scopes can expire after seven days. Submit production verification in parallel
+with beta engineering.
 
 ## Required environment variables
 
@@ -80,8 +95,8 @@ encryption key: rotating it requires a re-encryption migration or all users
 must reconnect.
 
 For Fly, these values belong in Fly secrets, not `fly.toml` or a committed env
-file. Setting secrets and deploying are production account actions and require
-the owner's approval at the release gate.
+file. Apply the staging values only to `mogulforge-growthos-staging`; production
+credentials remain a separate release-gated action.
 
 ## Beta acceptance test
 

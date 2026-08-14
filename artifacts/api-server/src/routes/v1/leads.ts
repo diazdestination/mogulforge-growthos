@@ -32,10 +32,12 @@ import {
   recordActionFeedback,
 } from "../../services/next-best-action";
 import { notifyHomeownerOfTeamReply } from "../../services/portal-message-email";
+import { sendGmailForUser } from "../../services/gmail-oauth";
 import {
-  gmailEmailProvider,
-  isGmailConfigured,
-} from "../../services/providers";
+  checkSendEligibility,
+  handleProviderFailure,
+  recordBlockedSend,
+} from "../../services/send-gate";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -504,14 +506,6 @@ router.post(
       res.status(400).json({ error: "This lead's contact has no email address" });
       return;
     }
-    if (!isGmailConfigured()) {
-      res.status(503).json({
-        error:
-          "Gmail is not connected. Connect the Gmail integration to send emails from the CRM.",
-      });
-      return;
-    }
-
     const subject = parsed.data.subject.trim();
     const body = parsed.data.body.trim();
     if (!subject || !body) {
@@ -519,16 +513,60 @@ router.post(
       return;
     }
 
-    let sent: { id: string; provider: string };
+    // A direct CRM compose is a human-approved one-to-one message. Enforce
+    // hard contact preferences and suppressions, while leaving quiet hours
+    // and marketing frequency caps to automated outreach paths.
+    const eligibility = await checkSendEligibility({
+      organizationId: req.member!.organizationId,
+      contact,
+      channel: "email",
+      kind: "transactional",
+    });
+    if (!eligibility.ok) {
+      await recordBlockedSend({
+        organizationId: req.member!.organizationId,
+        actorUserId: req.member!.user.id,
+        channel: "email",
+        outcome: eligibility.outcome,
+        reason: eligibility.reason,
+        source: "crm-compose",
+        mode: "manual",
+        leadId: lead.id,
+        contactId: contact.id,
+        resumeAt: "resumeAt" in eligibility ? eligibility.resumeAt : undefined,
+      });
+      res.status(409).json({
+        error: `Email blocked by contact preferences (${eligibility.reason})`,
+      });
+      return;
+    }
+
+    let sent: { id: string; provider: "gmail"; senderEmail: string };
     try {
-      sent = await gmailEmailProvider.send(contact.email, subject, body);
+      sent = await sendGmailForUser({
+        organizationId: req.member!.organizationId,
+        userId: req.member!.user.id,
+        to: contact.email,
+        subject,
+        body,
+      });
     } catch (err) {
       console.error("[leads] Gmail send failed:", err);
-      res.status(502).json({
+      await handleProviderFailure({
+        organizationId: req.member!.organizationId,
+        channel: "email",
+        address: contact.email,
+        err,
+        source: "crm-compose",
+      });
+      const message = err instanceof Error ? err.message : "";
+      res.status(message.includes("Connect your Gmail account") ? 503 : 502).json({
         error:
-          err instanceof Error && err.message.includes("invalid recipient")
-            ? "The contact's email address is not a valid recipient"
-            : "Sending the email through Gmail failed. Try again in a moment.",
+          message.includes("Connect your Gmail account")
+            ? "Connect your Gmail account in Settings before sending email."
+            : message.includes("invalid recipient")
+              ? "The contact's email address is not a valid recipient"
+              : "Sending the email through Gmail failed. Try again in a moment.",
       });
       return;
     }
@@ -543,6 +581,7 @@ router.post(
       metadata: {
         channel: "email",
         to: contact.email,
+        from: sent.senderEmail,
         subject,
         provider: sent.provider,
         providerMessageId: sent.id,
@@ -555,7 +594,13 @@ router.post(
       action: "lead.email_sent",
       entityType: "lead",
       entityId: lead.id,
-      metadata: { to: contact.email, subject, provider: sent.provider },
+      metadata: {
+        to: contact.email,
+        from: sent.senderEmail,
+        subject,
+        provider: sent.provider,
+        providerMessageId: sent.id,
+      },
     });
     res.status(201).json(activity);
   },
