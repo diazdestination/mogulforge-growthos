@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { encryptSecret } from "../lib/token-encryption";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import { getGmailConnection, getGmailStatus } from "./gmail-oauth";
+import { listGoogleModules } from "./google-business-graph";
 
 const previousEncryptionKey = process.env.OAUTH_TOKEN_ENCRYPTION_KEY;
 const orgIds: string[] = [];
@@ -79,5 +80,23 @@ describe("per-user Gmail connection isolation", () => {
       email: null,
     });
   });
-});
 
+  it("reports optional modules without inventing granted access", async () => {
+    const modules = await listGoogleModules(orgIds[0]!, userIds[0]!);
+    expect(modules.find((module) => module.id === "gmail_send")).toMatchObject({
+      permissionGranted: true,
+      enabled: false,
+      maturity: "available",
+    });
+    expect(modules.find((module) => module.id === "drive_selected_files")).toMatchObject({
+      permissionGranted: false,
+      enabled: false,
+      access: "selected_files",
+    });
+    expect(modules.find((module) => module.id === "gmail_intelligence")).toMatchObject({
+      permissionGranted: false,
+      maturity: "deferred_restricted",
+      risk: "restricted",
+    });
+  });
+});

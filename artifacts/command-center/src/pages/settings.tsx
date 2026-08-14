@@ -1156,18 +1156,35 @@ type GmailConnectionStatus = {
   scope: string;
 };
 
+type GoogleModuleStatus = {
+  id: string;
+  name: string;
+  purpose: string;
+  access: string;
+  maturity: 'available' | 'foundation' | 'requires_provider_approval' | 'deferred_restricted';
+  risk: 'standard' | 'sensitive' | 'restricted';
+  permissionGranted: boolean;
+  enabled: boolean;
+  lastSyncedAt: string | null;
+};
+
 function GmailConnectionTab({ callbackState }: { callbackState: string | null }) {
   const { toast } = useToast();
   const [status, setStatus] = useState<GmailConnectionStatus | null>(null);
+  const [modules, setModules] = useState<GoogleModuleStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/v1/integrations/gmail', { credentials: 'include' });
-      if (!response.ok) throw new Error('Could not load Gmail connection status');
+      const [response, modulesResponse] = await Promise.all([
+        fetch('/api/v1/integrations/gmail', { credentials: 'include' }),
+        fetch('/api/v1/integrations/google/modules', { credentials: 'include' }),
+      ]);
+      if (!response.ok || !modulesResponse.ok) throw new Error('Could not load Google connection status');
       setStatus((await response.json()) as GmailConnectionStatus);
+      setModules((await modulesResponse.json()) as GoogleModuleStatus[]);
     } catch (error) {
       toast({ title: error instanceof Error ? error.message : 'Could not load Gmail connection', variant: 'destructive' });
     } finally {
@@ -1275,6 +1292,42 @@ function GmailConnectionTab({ callbackState }: { callbackState: string | null })
               <Button variant="ghost" onClick={() => void load()} disabled={busy || loading}>
                 <RefreshCw className="mr-2 h-4 w-4" />Refresh status
               </Button>
+            </div>
+
+            <div className="border-t border-border pt-5">
+              <div className="mb-4">
+                <h3 className="font-semibold">Google Business Graph modules</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  GrowthOS will request each permission only when its connector is ready and you choose to enable it.
+                  Declining a module never disables the CRM or other connected sources.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {modules.map((module) => (
+                  <div key={module.id} className="rounded-lg border border-border p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">{module.name}</p>
+                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{module.purpose}</p>
+                      </div>
+                      <Badge variant={module.enabled ? 'default' : 'secondary'}>
+                        {module.enabled
+                          ? 'Enabled'
+                          : module.maturity === 'available'
+                            ? 'Available'
+                            : module.maturity === 'foundation'
+                              ? 'Next'
+                              : module.maturity === 'requires_provider_approval'
+                                ? 'Approval required'
+                                : 'Restricted / later'}
+                      </Badge>
+                    </div>
+                    <p className="mt-3 text-[11px] text-muted-foreground">
+                      Access: {module.access.replace(/_/g, ' ')} · Risk class: {module.risk}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           </>
         )}

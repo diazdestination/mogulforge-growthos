@@ -123,6 +123,11 @@ All P0 gates are required before inviting external testers.
 - Add the Recovered Revenue Ledger with conservative outcome definitions.
 - Add an always-on job runner with leases, idempotency, retry/backoff, and a
   visible failures queue. Keep autonomous customer contact off by default.
+- Add the permissioned Google Business Graph in this order: Calendar
+  availability, user-selected Drive/Sheets assets, Analytics, Search Console,
+  Ads, and Business Profile. Keep restricted Gmail inbox reading outside the
+  founding beta unless verification, security assessment, and retention gates
+  are completed.
 
 ### Phase 2 — operational reliability
 
@@ -219,4 +224,3 @@ Code cannot safely create or consent to these on the owner's behalf:
 No customer Gmail password is ever collected by MogulForge. Google performs
 sign-in and consent; GrowthOS receives revocable authorization for the narrow
 send scope and stores the refresh token encrypted for that user and tenant.
-

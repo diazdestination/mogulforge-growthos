@@ -64,6 +64,16 @@ revoked, or failing connection blocks visibly and never falls back to another
 person's mailbox. Unattended organization-level campaigns require a separately
 selected organization sender and policy; that behavior is not yet implemented.
 
+## Permissioned Google Business Graph
+
+The Google connection is a modular business-data surface, not a Gmail-only
+special case or blanket “super connector.” Users authorize capabilities
+incrementally and may keep any module off. Source content is normalized into
+provenance-carrying Business Graph facts before BIE uses it; connected content
+is untrusted data and can never grant an agent instructions or tool authority.
+The module/scoping and continuous-scouting contract is maintained in
+[GOOGLE-BUSINESS-GRAPH.md](GOOGLE-BUSINESS-GRAPH.md).
+
 ## Delivery sequence
 
 ### Stage 1 — evidence integrity and controlled handoff

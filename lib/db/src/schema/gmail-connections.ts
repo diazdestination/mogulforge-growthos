@@ -6,6 +6,7 @@ import {
   uniqueIndex,
   uuid,
   varchar,
+  boolean,
 } from "drizzle-orm/pg-core";
 
 import { usersTable } from "./auth";
@@ -67,6 +68,8 @@ export const oauthTransactionsTable = pgTable(
       .notNull()
       .references(() => usersTable.id, { onDelete: "cascade" }),
     provider: text("provider").notNull(),
+    module: text("module").notNull().default("gmail_send"),
+    requestedScopes: text("requested_scopes").array().notNull().default([]),
     stateHash: text("state_hash").notNull(),
     encryptedCodeVerifier: text("encrypted_code_verifier").notNull(),
     returnPath: text("return_path").notNull().default("/settings"),
@@ -84,3 +87,40 @@ export const oauthTransactionsTable = pgTable(
 
 export type GmailConnection = typeof gmailConnectionsTable.$inferSelect;
 
+/** User-controlled module switches over one incrementally-authorized account. */
+export const googleIntegrationModulesTable = pgTable(
+  "google_integration_modules",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    module: text("module").notNull(),
+    enabled: boolean("enabled").notNull().default(false),
+    enabledAt: timestamp("enabled_at", { withTimezone: true }),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    lastCursor: text("last_cursor"),
+    lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
+    lastErrorCode: text("last_error_code"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("google_integration_modules_org_user_module_uniq").on(
+      table.organizationId,
+      table.userId,
+      table.module,
+    ),
+    index("google_integration_modules_org_enabled_idx").on(
+      table.organizationId,
+      table.enabled,
+    ),
+  ],
+);

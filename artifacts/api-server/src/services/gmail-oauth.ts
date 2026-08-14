@@ -17,7 +17,7 @@ import {
 import { isSafeMailbox } from "./providers";
 
 const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
-const SCOPES = ["openid", "email", "profile", GMAIL_SEND_SCOPE];
+const IDENTITY_SCOPES = ["openid", "email", "profile"];
 const OAUTH_TTL_MS = 10 * 60 * 1000;
 
 function oauthConfig() {
@@ -96,6 +96,16 @@ export async function beginGmailOAuth(input: {
   userId: string;
   returnPath?: string;
 }): Promise<string> {
+  return beginGoogleOAuth({ ...input, module: "gmail_send", scopes: [GMAIL_SEND_SCOPE] });
+}
+
+export async function beginGoogleOAuth(input: {
+  organizationId: string;
+  userId: string;
+  module: string;
+  scopes: string[];
+  returnPath?: string;
+}): Promise<string> {
   const oauth = client();
   // Reading the encryption key now fails before we create an unusable flow.
   const context = credentialContext(input.organizationId, input.userId);
@@ -106,6 +116,8 @@ export async function beginGmailOAuth(input: {
     organizationId: input.organizationId,
     userId: input.userId,
     provider: "gmail",
+    module: input.module,
+    requestedScopes: input.scopes,
     stateHash: sha256Base64Url(state),
     encryptedCodeVerifier: encryptSecret(codeVerifier, `${context}:oauth`),
     returnPath: safeReturnPath(input.returnPath),
@@ -115,7 +127,7 @@ export async function beginGmailOAuth(input: {
     access_type: "offline",
     prompt: "consent",
     include_granted_scopes: true,
-    scope: SCOPES,
+    scope: [...IDENTITY_SCOPES, ...input.scopes],
     state,
     code_challenge: codeChallenge,
     code_challenge_method: CodeChallengeMethod.S256,
@@ -127,7 +139,7 @@ export async function completeGmailOAuth(input: {
   userId: string;
   state: string;
   code: string;
-}): Promise<{ email: string; returnPath: string }> {
+}): Promise<{ email: string; returnPath: string; module: string }> {
   const now = new Date();
   const [transaction] = await db
     .select()
@@ -181,11 +193,14 @@ export async function completeGmailOAuth(input: {
   if (!encryptedRefreshToken) {
     throw new Error("Google did not issue offline access; disconnect the app in Google and try again");
   }
-  const grantedScopes = (tokens.scope ?? SCOPES.join(" "))
+  const grantedScopes = Array.from(new Set([
+    ...(existing?.grantedScopes ?? []),
+    ...(tokens.scope ?? [...IDENTITY_SCOPES, ...transaction.requestedScopes].join(" "))
     .split(/\s+/)
-    .filter(Boolean);
-  if (!grantedScopes.includes(GMAIL_SEND_SCOPE)) {
-    throw new Error("Gmail send permission was not granted");
+    .filter(Boolean),
+  ]));
+  if (!transaction.requestedScopes.every((scope) => grantedScopes.includes(scope))) {
+    throw new Error("The requested Google permission was not granted");
   }
 
   await db
@@ -214,7 +229,11 @@ export async function completeGmailOAuth(input: {
         updatedAt: now,
       },
     });
-  return { email, returnPath: safeReturnPath(transaction.returnPath) };
+  return {
+    email,
+    returnPath: safeReturnPath(transaction.returnPath),
+    module: transaction.module,
+  };
 }
 
 export async function sendGmailForUser(input: {
