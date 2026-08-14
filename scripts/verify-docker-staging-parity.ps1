@@ -67,13 +67,17 @@ try {
   Invoke-ComposeChecked 'Build the exact production Docker image' @('build', 'app')
   Invoke-ComposeChecked 'Apply schema as the restricted application role' @('run', '--rm', 'schema')
 
-  $viewOwner = (& docker @composePrefix exec -T db psql -U postgres -d growthos_parity -Atc "SELECT tableowner FROM pg_catalog.pg_views WHERE schemaname = 'public' AND viewname = 'pg_stat_monitor';").Trim()
-  if ($LASTEXITCODE -ne 0 -or $viewOwner -ne 'fly_provider') {
+  $viewOwnerOutput = & docker @composePrefix exec -T db psql -U postgres -d growthos_parity -Atc "SELECT viewowner FROM pg_catalog.pg_views WHERE schemaname = 'public' AND viewname = 'pg_stat_monitor';"
+  $viewOwnerExitCode = $LASTEXITCODE
+  $viewOwner = ([string]($viewOwnerOutput -join '')).Trim()
+  if ($viewOwnerExitCode -ne 0 -or $viewOwner -ne 'fly_provider') {
     throw "Provider-owned monitoring view was not preserved; owner was '$viewOwner'."
   }
 
-  $requiredTables = (& docker @composePrefix exec -T db psql -U postgres -d growthos_parity -Atc "SELECT string_agg(tablename, ',' ORDER BY tablename) FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename IN ('identity_tokens', 'users');").Trim()
-  if ($LASTEXITCODE -ne 0 -or $requiredTables -ne 'identity_tokens,users') {
+  $requiredTablesOutput = & docker @composePrefix exec -T db psql -U postgres -d growthos_parity -Atc "SELECT string_agg(tablename, ',' ORDER BY tablename) FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename IN ('identity_tokens', 'users');"
+  $requiredTablesExitCode = $LASTEXITCODE
+  $requiredTables = ([string]($requiredTablesOutput -join '')).Trim()
+  if ($requiredTablesExitCode -ne 0 -or $requiredTables -ne 'identity_tokens,users') {
     throw "Required identity tables were not created; found '$requiredTables'."
   }
 
@@ -118,4 +122,3 @@ try {
     Write-Host "Parity stack kept for inspection: $projectName" -ForegroundColor Yellow
   }
 }
-
