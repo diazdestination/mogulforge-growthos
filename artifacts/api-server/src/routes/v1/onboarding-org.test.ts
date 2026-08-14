@@ -498,7 +498,10 @@ describe("founding beta registration gate", () => {
       const [adopted] = await db
         .select()
         .from(usersTable)
-        .where(eq(usersTable.id, invited.id));
+        .where(eq(usersTable.email, invitedEmail));
+      createdUserIds.push(adopted.id);
+      expect(adopted.id).not.toBe(invited.id);
+      expect(adopted.id.startsWith("invite:")).toBe(false);
       expect(adopted.organizationId).toBe(org.id);
       expect(adopted.role).toBe("sales_rep");
       expect(adopted.isActive).toBe(true);

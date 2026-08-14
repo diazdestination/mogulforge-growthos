@@ -530,9 +530,15 @@ router.post('/auth/register', async (req: Request, res: Response) => {
 
   let dbUser;
   if (existing) {
+    const localUserId = crypto.randomUUID();
     const [adopted] = await db
       .update(usersTable)
       .set({
+        // Retire the invite placeholder at the same boundary that proves
+        // control of the invited address. Leaving an activated account with
+        // an "invite:" id makes the team UI and resend endpoint continue to
+        // treat it as pending.
+        id: localUserId,
         passwordHash,
         firstName: firstName ?? existing.firstName,
         lastName: lastName ?? existing.lastName,
