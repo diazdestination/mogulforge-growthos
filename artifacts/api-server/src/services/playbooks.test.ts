@@ -75,9 +75,13 @@ beforeAll(async () => {
   });
 });
 
-beforeEach(() => {
+  beforeEach(() => {
   getGmailStatusMock.mockReset();
-  getGmailStatusMock.mockResolvedValue({ configured: true, connected: true });
+  getGmailStatusMock.mockResolvedValue({
+    configured: true,
+    connected: true,
+    senderActive: true,
+  });
   sendGmailForUserMock.mockReset();
   sendGmailForUserMock.mockResolvedValue({
     id: "gmail-playbook-test",
@@ -263,6 +267,7 @@ describe("closer engine playbooks", () => {
     getGmailStatusMock.mockResolvedValue({
       configured: true,
       connected: false,
+      senderActive: true,
     });
     const { lead } = await makeLead();
     const enrollment = await autoEnrollLead(org.id, lead.id);
@@ -284,6 +289,34 @@ describe("closer engine playbooks", () => {
     expect(after.status).toBe("paused");
     expect(after.currentStep).toBe(0);
     expect(after.pauseReason).toContain("assigned user must connect Gmail");
+  });
+
+  it("pauses an automated email before claiming it when the assigned user is inactive", async () => {
+    getGmailStatusMock.mockResolvedValue({
+      configured: true,
+      connected: false,
+      senderActive: false,
+    });
+    const { lead } = await makeLead();
+    const enrollment = await autoEnrollLead(org.id, lead.id);
+
+    const result = await executePlaybookStep(org.id, {
+      enrollmentId: enrollment!.id,
+      stepIndex: 0,
+    });
+
+    expect(result).toEqual({
+      status: "skipped",
+      detail: "paused: assigned_sender_inactive",
+    });
+    expect(sendGmailForUserMock).not.toHaveBeenCalled();
+    const [after] = await db
+      .select()
+      .from(playbookEnrollmentsTable)
+      .where(eq(playbookEnrollmentsTable.id, enrollment!.id));
+    expect(after.status).toBe("paused");
+    expect(after.currentStep).toBe(0);
+    expect(after.pauseReason).toContain("assigned user is no longer active");
   });
 
   it("skips an SMS step without consent but still advances", async () => {

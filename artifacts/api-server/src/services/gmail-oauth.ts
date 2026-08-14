@@ -4,6 +4,7 @@ import {
   db,
   gmailConnectionsTable,
   oauthTransactionsTable,
+  usersTable,
   type GmailConnection,
 } from "@workspace/db";
 import { and, eq, gt, isNull } from "drizzle-orm";
@@ -153,10 +154,27 @@ async function getStoredGmailConnection(
 }
 
 export async function getGmailStatus(organizationId: string, userId: string) {
-  const connection = await getStoredGmailConnection(organizationId, userId);
+  const [connection, sender] = await Promise.all([
+    getStoredGmailConnection(organizationId, userId),
+    db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.id, userId),
+          eq(usersTable.organizationId, organizationId),
+          eq(usersTable.isActive, true),
+        ),
+      )
+      .then((rows) => rows[0] ?? null),
+  ]);
+  const senderActive = Boolean(sender);
   return {
     configured: gmailOAuthConfigured(),
-    connected: Boolean(connection?.encryptedRefreshToken && !connection.revokedAt),
+    connected: Boolean(
+      senderActive && connection?.encryptedRefreshToken && !connection.revokedAt,
+    ),
+    senderActive,
     email: connection?.email ?? null,
     connectedAt: connection?.connectedAt ?? null,
     lastUsedAt: connection?.lastUsedAt ?? null,
@@ -319,6 +337,19 @@ export async function sendGmailForUser(input: {
   body: string;
 }): Promise<{ id: string; provider: "gmail"; senderEmail: string }> {
   if (!isSafeMailbox(input.to)) throw new Error("Refusing to send email: invalid recipient address");
+  const [sender] = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(
+      and(
+        eq(usersTable.id, input.userId),
+        eq(usersTable.organizationId, input.organizationId),
+        eq(usersTable.isActive, true),
+      ),
+    );
+  if (!sender) {
+    throw new Error("Gmail sender account is not active");
+  }
   const connection = await getGmailConnection(input.organizationId, input.userId);
   if (!connection?.encryptedRefreshToken) {
     throw new Error("Connect your Gmail account before sending this BIE action");

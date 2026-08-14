@@ -547,6 +547,24 @@ export async function executePlaybookStep(
       return { status: "skipped", detail: `paused: ${reason}` };
     }
     const gmail = await getGmailStatus(organizationId, lead.assignedUserId);
+    if (!gmail.senderActive) {
+      const reason = "assigned_sender_inactive";
+      await pauseEnrollment(
+        enrollment.id,
+        "Automated email paused: the assigned user is no longer active",
+      );
+      await recordBlockedSend({
+        organizationId,
+        channel: "email",
+        reason,
+        outcome: "blocked",
+        source: "playbook",
+        mode: "automated",
+        leadId: lead.id,
+        contactId: contact.id,
+      });
+      return { status: "skipped", detail: `paused: ${reason}` };
+    }
     if (!gmail.configured || !gmail.connected) {
       const reason = gmail.configured
         ? "assigned_sender_gmail_not_connected"

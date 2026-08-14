@@ -127,6 +127,7 @@ describe("per-user Gmail connection isolation", () => {
   it("does not report another tenant's sender in connection status", async () => {
     expect(await getGmailStatus(orgIds[0]!, userIds[0]!)).toMatchObject({
       connected: true,
+      senderActive: true,
       email: "sender-a@example.test",
     });
     expect(await getGmailStatus(orgIds[1]!, userIds[1]!)).toMatchObject({
@@ -184,6 +185,36 @@ describe("Gmail authorization lifecycle", () => {
         response: { status: 429, data: { error: { status: "RESOURCE_EXHAUSTED" } } },
       }),
     ).toEqual({ code: "RESOURCE_EXHAUSTED", reconnectRequired: false });
+  });
+
+  it("blocks a deactivated sender before contacting Google", async () => {
+    await db
+      .update(usersTable)
+      .set({ isActive: false })
+      .where(eq(usersTable.id, userIds[0]!));
+    try {
+      expect(await getGmailStatus(orgIds[0]!, userIds[0]!)).toMatchObject({
+        connected: false,
+        senderActive: false,
+        email: "sender-a@example.test",
+      });
+      await expect(
+        sendGmailForUser({
+          organizationId: orgIds[0]!,
+          userId: userIds[0]!,
+          to: "recipient@example.com",
+          subject: "Deactivated sender test",
+          body: "No provider request should be made.",
+        }),
+      ).rejects.toThrow("Gmail sender account is not active");
+      expect(googleMocks.setCredentials).not.toHaveBeenCalled();
+      expect(googleMocks.request).not.toHaveBeenCalled();
+    } finally {
+      await db
+        .update(usersTable)
+        .set({ isActive: true })
+        .where(eq(usersTable.id, userIds[0]!));
+    }
   });
 
   it("fails closed and requires reconnect when Google rejects a revoked grant", async () => {
