@@ -72,7 +72,11 @@ afterAll(async () => {
 
 beforeEach(async () => {
   getGmailStatusMock.mockReset();
-  getGmailStatusMock.mockResolvedValue({ configured: true, connected: true });
+  getGmailStatusMock.mockResolvedValue({
+    configured: true,
+    connected: true,
+    senderActive: true,
+  });
   sendGmailForUserMock.mockReset();
   sendGmailForUserMock.mockResolvedValue({
     id: "gmail-stage-behavior-test",
