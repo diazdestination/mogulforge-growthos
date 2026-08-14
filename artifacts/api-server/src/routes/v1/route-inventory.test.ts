@@ -175,6 +175,12 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /settings/inspection-availability": "crm.read",
   "GET /settings/email-provider": "settings.manage",
   "GET /settings/sms-provider": "settings.manage",
+  // Gmail authorization is personal to the signed-in member, not an org-wide
+  // admin credential. Tenant/user binding is enforced again in the service.
+  "GET /integrations/gmail": "crm.read",
+  "POST /integrations/gmail/connect": "crm.read",
+  "GET /integrations/gmail/callback": "crm.read",
+  "DELETE /integrations/gmail": "crm.read",
   "PUT /settings": "settings.manage",
   "GET /installation": "settings.manage",
   "POST /installation/checks": "settings.manage",
@@ -263,6 +269,9 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
 const DELETE_EXEMPTIONS: Record<string, Permission> = {
   // Personal, per-user resource — deleting your own saved filter.
   "DELETE /saved-filters/:id": "crm.read",
+  // Personal, per-user authorization — revokes only the caller's own Gmail
+  // token and cannot remove another member's connection or organization data.
+  "DELETE /integrations/gmail": "crm.read",
   // Removes one photo path from a lead's activity row, not the lead itself;
   // write-level access is the correct bar.
   "DELETE /leads/:id/photos": "crm.write",

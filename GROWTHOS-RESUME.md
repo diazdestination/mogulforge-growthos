@@ -169,6 +169,21 @@ Before any public launch, re-check account state live, use a stable
 and test the production API with a real authorized account. A local Docker
 success is necessary evidence, not proof of a public deployment.
 
+## Beta success and per-user Gmail handoff — 2026-08-13
+
+- [BETA-SUCCESS-PLAN.md](BETA-SUCCESS-PLAN.md) is the current product,
+  founding-cohort, metrics, reliability, and launch-gate plan.
+- [GOOGLE-OAUTH-SETUP.md](GOOGLE-OAUTH-SETUP.md) is the operator runbook for
+  the user-owned Gmail sending model.
+- The recovery branch now contains a per-user, tenant-scoped Gmail OAuth seam:
+  state + PKCE, encrypted refresh tokens, status/connect/callback/disconnect
+  endpoints, a Settings connection surface, revocation, and BIE sending as the
+  executing user. It does not contain Google credentials.
+- API and command-center typechecks pass; the pure credential-boundary tests
+  pass; the command-center suite passes 190/190. A real OAuth round trip and
+  DB-backed two-tenant/two-sender suite remain required before this is called
+  beta-ready. Docker/Postgres was stopped during this checkpoint.
+
 ## Completion discipline
 
 When any future phase finishes:

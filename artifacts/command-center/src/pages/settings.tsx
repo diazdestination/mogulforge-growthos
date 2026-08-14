@@ -1085,6 +1085,7 @@ function TagsTab() {
 
 export default function Settings() {
   const { data: me, isLoading } = useGetMe();
+  const gmailReturn = new URLSearchParams(window.location.search).get('gmail');
 
   if (isLoading) {
     return <div className="flex h-full items-center justify-center bg-background"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -1103,9 +1104,10 @@ export default function Settings() {
         </div>
       </header>
       <div className="flex-1 overflow-auto p-6 max-w-4xl w-full">
-        <Tabs defaultValue="business">
+        <Tabs defaultValue={gmailReturn ? 'integrations' : 'business'}>
           <TabsList className="mb-4 flex-wrap h-auto">
             <TabsTrigger value="business">Business</TabsTrigger>
+            <TabsTrigger value="integrations">Connections</TabsTrigger>
             <TabsTrigger value="team">Team</TabsTrigger>
             <TabsTrigger value="services">Services & Areas</TabsTrigger>
             <TabsTrigger value="scheduling">Scheduling</TabsTrigger>
@@ -1122,6 +1124,7 @@ export default function Settings() {
             <TabsTrigger value="reviews">Google Reviews</TabsTrigger>
           </TabsList>
           <TabsContent value="business" className="space-y-6"><BusinessProfileTab /><FallbackInboxTab /></TabsContent>
+          <TabsContent value="integrations"><GmailConnectionTab callbackState={gmailReturn} /></TabsContent>
           <TabsContent value="team"><TeamTab meId={me.id} meRole={me.role} /></TabsContent>
           <TabsContent value="services"><ServicesTab /></TabsContent>
           <TabsContent value="scheduling" className="space-y-6"><SchedulingTab /><ReminderTab /></TabsContent>
@@ -1139,6 +1142,144 @@ export default function Settings() {
         </Tabs>
       </div>
     </div>
+  );
+}
+
+type GmailConnectionStatus = {
+  configured: boolean;
+  connected: boolean;
+  email: string | null;
+  connectedAt: string | null;
+  lastUsedAt: string | null;
+  lastErrorAt: string | null;
+  lastErrorCode: string | null;
+  scope: string;
+};
+
+function GmailConnectionTab({ callbackState }: { callbackState: string | null }) {
+  const { toast } = useToast();
+  const [status, setStatus] = useState<GmailConnectionStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/v1/integrations/gmail', { credentials: 'include' });
+      if (!response.ok) throw new Error('Could not load Gmail connection status');
+      setStatus((await response.json()) as GmailConnectionStatus);
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : 'Could not load Gmail connection', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+    if (callbackState === 'connected') toast({ title: 'Gmail connected' });
+    if (callbackState === 'denied') toast({ title: 'Gmail permission was not granted', variant: 'destructive' });
+    if (callbackState === 'failed') toast({ title: 'Gmail connection failed. Please try again.', variant: 'destructive' });
+    // The callback state is a one-time display hint; status is authoritative.
+    if (callbackState) window.history.replaceState({}, '', '/settings');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const connect = async () => {
+    setBusy(true);
+    try {
+      const response = await fetch('/api/v1/integrations/gmail/connect', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ returnPath: '/settings' }),
+      });
+      const body = (await response.json()) as { authorizationUrl?: string; error?: string };
+      if (!response.ok || !body.authorizationUrl) throw new Error(body.error ?? 'Could not start Gmail connection');
+      window.location.assign(body.authorizationUrl);
+    } catch (error) {
+      setBusy(false);
+      toast({ title: error instanceof Error ? error.message : 'Could not start Gmail connection', variant: 'destructive' });
+    }
+  };
+
+  const disconnect = async () => {
+    if (!window.confirm('Disconnect this Gmail account? GrowthOS will immediately stop sending from it.')) return;
+    setBusy(true);
+    try {
+      const response = await fetch('/api/v1/integrations/gmail', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Could not disconnect Gmail');
+      toast({ title: 'Gmail disconnected' });
+      await load();
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : 'Could not disconnect Gmail', variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Your Gmail sending account</CardTitle>
+        <CardDescription>
+          Connect the Google account you want GrowthOS to send from. Every team member connects their own account;
+          MogulForge never asks for a Gmail password and never silently sends from the owner's mailbox.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Checking connection…</div>
+        ) : (
+          <>
+            <div className="rounded-lg border border-border bg-muted/20 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">{status?.connected ? 'Connected' : 'Not connected'}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {status?.connected ? status.email : status?.configured ? 'Connect Gmail to approve and send BIE emails.' : 'A MogulForge administrator must finish the production Google OAuth configuration.'}
+                  </p>
+                </div>
+                <Badge variant={status?.connected ? 'default' : 'secondary'}>{status?.connected ? 'Ready to send' : 'Action needed'}</Badge>
+              </div>
+              {status?.connectedAt && <p className="mt-3 text-xs text-muted-foreground">Connected {new Date(status.connectedAt).toLocaleString()}</p>}
+              {status?.lastUsedAt && <p className="mt-1 text-xs text-muted-foreground">Last used {new Date(status.lastUsedAt).toLocaleString()}</p>}
+              {status?.lastErrorAt && <Alert variant="destructive" className="mt-3"><AlertTitle>Most recent Gmail send needs attention</AlertTitle><AlertDescription>{status.lastErrorCode ?? 'Provider error'} · {new Date(status.lastErrorAt).toLocaleString()}</AlertDescription></Alert>}
+            </div>
+
+            <Alert>
+              <ShieldAlert className="h-4 w-4" />
+              <AlertTitle>Narrow permission by design</AlertTitle>
+              <AlertDescription>
+                GrowthOS requests Gmail send access for messages you approve. It does not request permission to read,
+                delete, or organize your inbox. You can revoke access here or from your Google Account at any time.
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex flex-wrap gap-3">
+              {status?.connected ? (
+                <>
+                  <Button onClick={connect} disabled={busy || !status.configured} variant="outline">
+                    {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Reconnect another account
+                  </Button>
+                  <Button onClick={disconnect} disabled={busy} variant="destructive">Disconnect Gmail</Button>
+                </>
+              ) : (
+                <Button onClick={connect} disabled={busy || !status?.configured}>
+                  {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Connect Gmail
+                </Button>
+              )}
+              <Button variant="ghost" onClick={() => void load()} disabled={busy || loading}>
+                <RefreshCw className="mr-2 h-4 w-4" />Refresh status
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

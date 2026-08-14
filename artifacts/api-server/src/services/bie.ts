@@ -26,7 +26,7 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import * as crm from "./crm";
 import { recordAudit } from "./audit";
 import { getBusinessName } from "./settings";
-import { getEmailProviderStatus, providers } from "./providers";
+import { sendGmailForUser } from "./gmail-oauth";
 import { checkSendEligibility, recordBlockedSend } from "./send-gate";
 
 const SOURCES: BieSource[] = [
@@ -609,8 +609,9 @@ export async function executeBieProposal(
 
     const contact = await crm.getContact(organizationId, lead.contactId);
     if (!contact?.email) return markAction(proposal.id, "blocked", "The lead has no email address.");
-    const provider = await getEmailProviderStatus();
-    if (provider.provider === "mock") return markAction(proposal.id, "blocked", "Connect Gmail or configure Resend before BIE can send email.");
+    if (!actorUserId) {
+      return markAction(proposal.id, "blocked", "A connected user must approve and send this email.");
+    }
     if (!(await emailCapRemaining(organizationId, policy.dailyEmailCap))) {
       return markAction(proposal.id, "blocked", `BIE daily email cap (${policy.dailyEmailCap}) has been reached.`);
     }
@@ -635,7 +636,13 @@ export async function executeBieProposal(
     }
     const subject = typeof proposal.payload.subject === "string" ? proposal.payload.subject : "A quick check-in";
     const body = typeof proposal.payload.body === "string" ? proposal.payload.body : proposal.rationale;
-    const sent = await providers.email.send(contact.email, subject, body);
+    const sent = await sendGmailForUser({
+      organizationId,
+      userId: actorUserId,
+      to: contact.email,
+      subject,
+      body,
+    });
     await crm.createActivity(organizationId, {
       leadId: lead.id,
       contactId: contact.id,
@@ -643,7 +650,7 @@ export async function executeBieProposal(
       type: "bie_email_sent",
       title: `BIE email sent: ${subject}`,
       body: body.slice(0, 300),
-      metadata: { channel: "email", to: contact.email, provider: sent.provider, providerMessageId: sent.id, source: "bie.revenue_recovery" },
+      metadata: { channel: "email", to: contact.email, from: sent.senderEmail, provider: sent.provider, providerMessageId: sent.id, source: "bie.revenue_recovery" },
     });
     await recordAudit({ organizationId, actorUserId, action: "bie.email_sent", entityType: "bie_action_proposal", entityId: proposal.id, metadata: { leadId: lead.id, provider: sent.provider } });
     return markAction(proposal.id, "executed", `Email sent through ${sent.provider}.`);

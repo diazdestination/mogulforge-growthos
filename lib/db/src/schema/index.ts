@@ -36,3 +36,4 @@ export * from "./capture";
 export * from "./bie";
 export * from "./evidence-intelligence";
 export * from "./object-storage";
+export * from "./gmail-connections";

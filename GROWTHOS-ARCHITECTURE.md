@@ -50,6 +50,20 @@ Contractor UI
 The API/database owns business state. Queue transport, edge services, and
 browser workers may not become a competing source of truth.
 
+## User-owned communication identity
+
+GrowthOS does not use a platform owner's personal mailbox as a shared sending
+provider. Each member may authorize their own Gmail account with MogulForge's
+central Google OAuth application and the narrow `gmail.send` scope. Refresh
+tokens are encrypted with AES-256-GCM and bound to the exact organization and
+user; OAuth state is short-lived, single-use, and paired with PKCE. Disconnect
+revokes Google access where available and always removes the local credential.
+
+For approval-first BIE email, the executing user is the sender. A missing,
+revoked, or failing connection blocks visibly and never falls back to another
+person's mailbox. Unattended organization-level campaigns require a separately
+selected organization sender and policy; that behavior is not yet implemented.
+
 ## Delivery sequence
 
 ### Stage 1 — evidence integrity and controlled handoff
