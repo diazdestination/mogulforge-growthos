@@ -372,6 +372,147 @@ describe("onboarding wizard state", () => {
   });
 });
 
+describe("member self-service profile", () => {
+  it("updates only the signed-in member inside their organization", async () => {
+    const [org] = await db
+      .insert(organizationsTable)
+      .values({
+        name: "Profile Test Co",
+        slug: `profile-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      })
+      .returning();
+    createdOrgIds.push(org.id);
+
+    const user = await makeUser({
+      organizationId: org.id,
+      role: "sales_rep",
+      firstName: "Wrong",
+      lastName: "Name",
+    });
+    const sid = await sessionFor(user.id);
+    const res = await authed(sid)("/api/v1/me", {
+      method: "PATCH",
+      body: JSON.stringify({ firstName: "Diego", lastName: "Diaz" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    expect(body.firstName).toBe("Diego");
+    expect(body.lastName).toBe("Diaz");
+    expect(body.role).toBe("sales_rep");
+
+    const [stored] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, user.id));
+    expect(stored.firstName).toBe("Diego");
+    expect(stored.lastName).toBe("Diaz");
+    expect(stored.organizationId).toBe(org.id);
+  });
+
+  it("rejects an empty profile patch", async () => {
+    const defaultOrg = await getDefaultOrganization();
+    const user = await makeUser({
+      organizationId: defaultOrg.id,
+      role: "sales_rep",
+    });
+    const sid = await sessionFor(user.id);
+    const res = await authed(sid)("/api/v1/me", {
+      method: "PATCH",
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("founding beta registration gate", () => {
+  it("fails closed in production, accepts allowlisted founders, and preserves invited-user signup", async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalAllowlist = process.env.BETA_SIGNUP_ALLOWLIST;
+    const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const blockedEmail = `blocked-${suffix}@example.com`;
+    const allowedEmail = `allowed-${suffix}@example.com`;
+    const invitedEmail = `invited-${suffix}@example.com`;
+
+    try {
+      process.env.NODE_ENV = "production";
+      delete process.env.BETA_SIGNUP_ALLOWLIST;
+
+      const blocked = await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: blockedEmail,
+          password: "correct-horse-battery-staple",
+        }),
+      });
+      expect(blocked.status).toBe(403);
+      expect(await blocked.json()).toMatchObject({
+        code: "BETA_INVITE_REQUIRED",
+      });
+
+      process.env.BETA_SIGNUP_ALLOWLIST = ` ${allowedEmail.toUpperCase()} `;
+      const allowed = await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: allowedEmail,
+          password: "correct-horse-battery-staple",
+          firstName: "Allowed",
+        }),
+      });
+      expect(allowed.status).toBe(200);
+      const [allowedUser] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.email, allowedEmail));
+      createdUserIds.push(allowedUser.id);
+
+      const [org] = await db
+        .insert(organizationsTable)
+        .values({
+          name: "Invite Gate Test Co",
+          slug: `invite-gate-${suffix}`,
+        })
+        .returning();
+      createdOrgIds.push(org.id);
+      const invited = await makeUser({
+        id: `invite:${crypto.randomUUID()}`,
+        email: invitedEmail,
+        organizationId: org.id,
+        role: "sales_rep",
+      });
+
+      delete process.env.BETA_SIGNUP_ALLOWLIST;
+      const inviteSignup = await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: invitedEmail,
+          password: "correct-horse-battery-staple",
+          firstName: "Invited",
+        }),
+      });
+      expect(inviteSignup.status).toBe(200);
+
+      const [adopted] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, invited.id));
+      expect(adopted.organizationId).toBe(org.id);
+      expect(adopted.role).toBe("sales_rep");
+    } finally {
+      if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = originalNodeEnv;
+      if (originalAllowlist === undefined) {
+        delete process.env.BETA_SIGNUP_ALLOWLIST;
+      } else {
+        process.env.BETA_SIGNUP_ALLOWLIST = originalAllowlist;
+      }
+    }
+  });
+});
+
 describe("legacy default org keeps its branding", () => {
   it("the legacy org's seeded playbook copy stays roofing-flavored", async () => {
     // Seed path check without touching the real default org: the flavor
