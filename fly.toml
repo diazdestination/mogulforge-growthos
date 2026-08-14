@@ -13,7 +13,7 @@ primary_region = 'iad'
   release_command = "sh -lc 'cd /app && pnpm --filter @workspace/db exec drizzle-kit push --force'"
 
 [env]
-  APP_ORIGIN = 'https://mogulforge.ai'
+  APP_ORIGIN = 'https://app.mogulforge.ai'
   NODE_ENV = 'production'
   OBJECT_STORAGE_PROVIDER = 'postgres'
   PORT = '3001'
