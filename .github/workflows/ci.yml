@@ -17,6 +17,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mogulforge_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mogulforge_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mogulforge_test
+      SESSION_SECRET: ci-only-session-secret-that-is-long-enough-for-validation
+      EMAIL_INGESTION_WEBHOOK_SECRET: ci-only-email-intake-signing-secret
+      EMAIL_INTELLIGENCE_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      OAUTH_TOKEN_ENCRYPTION_KEY: AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -35,6 +58,9 @@ jobs:
 
       - name: Install dependencies from lockfile
         run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Apply test database schema
+        run: pnpm --filter @workspace/db run push-force
 
       - name: Run all test suites
         run: pnpm -r --if-present run test
