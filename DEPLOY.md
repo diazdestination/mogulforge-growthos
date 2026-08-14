@@ -14,12 +14,12 @@ This file is the local / VPS self-host reference.
 ## Local self-host (docker compose)
 
 ```bash
-cp .env.example .env          # set a real SESSION_SECRET
+cp .env.example .env          # set SESSION_SECRET + BETA_SIGNUP_ALLOWLIST
 docker compose up -d db
 docker compose run --rm app sh -lc \
   "cd /app && pnpm --filter @workspace/db exec drizzle-kit push --force"   # one-time schema
 docker compose up -d --build app
-# open http://localhost:8080 → "Create account" (first account = owner)
+# open http://localhost:8080 → register an email listed in BETA_SIGNUP_ALLOWLIST
 ```
 
 `docker compose down` stops it (keeps data); add `-v` to also wipe the DB volume.
@@ -38,7 +38,9 @@ docker compose up -d --build app
 
 - **Login** is self-hosted email/password (`POST /api/auth/register · /login ·
   /logout`) using Node's built-in **scrypt** + the DB-backed session store — no
-  OIDC, no `REPL_ID`. Per-IP brute-force limiting.
+  OIDC, no `REPL_ID`. Per-IP brute-force limiting. Production self-registration
+  is fail-closed behind `BETA_SIGNUP_ALLOWLIST`; pre-provisioned team invites
+  remain valid without an allowlist entry.
 - Replit OIDC routes remain but are dormant without `REPL_ID`.
 - Private image uploads use signed, short-lived URLs backed by Postgres by
   default, so assessment and portal photos work in Docker/Fly without the
@@ -58,6 +60,8 @@ docker compose up -d --build app
   restarts or all sessions invalidate.
 - **Public origin:** set `APP_ORIGIN` to the canonical HTTPS origin. It is used
   for trusted same-origin checks and outbound links.
+- **Beta access:** set `BETA_SIGNUP_ALLOWLIST` to approved new-company owner
+  emails. Invited teammates are approved through the in-app invite flow.
 - **Object storage:** `OBJECT_STORAGE_PROVIDER=postgres` is the zero-service
   default. For larger production media volumes, add a dedicated S3/R2 adapter
   behind the same object-service interface before moving bytes out of Postgres.
