@@ -1,71 +1,55 @@
 # MogulForge — Beta Launch Runbook
 
-Goal: a public HTTPS URL where beta users sign up and each gets their own CRM.
-The app is already **multi-tenant**: the **first account = you** (platform owner
-+ admin, can see every org at `/platform`); every later signup creates **their
-own** organization via the self-serve flow. That's the SaaS beta shape — no code
-changes needed to onboard beta customers.
+GrowthOS production already runs as Fly app `mogulforge-growthos` at
+`https://app.mogulforge.ai`. The founding-owner slot has been claimed.
+
+Production registration is now fail-closed: a new company owner must be listed
+in `BETA_SIGNUP_ALLOWLIST`. Teammates pre-provisioned through the in-app invite
+flow can complete registration without being allowlisted. This gives beta users
+separate accounts and organizations without adding a paid identity provider.
+
+Use [STAGING.md](STAGING.md) for the isolated pre-production environment.
 
 ---
 
-## Fastest path — Fly.io (deploys from your machine, no git repo)
+## Controlled production release
 
-Prereqs: a Fly.io account + `flyctl` installed (`https://fly.io/docs/flyctl/install/`).
-Run all commands from the repo root (`C:\Users\diazd\dev\projects\mogulforge`).
+Run commands from the canonical private repository:
+`C:\Users\diazd\dev\projects\mogulforge`.
 
-```bash
-# 1. Log in
-fly auth login
+1. Confirm the draft PR's tests, TypeScript checks, and production builds pass at
+   the exact commit being released.
+2. Test the same commit in the isolated staging app.
+3. Set production's `BETA_SIGNUP_ALLOWLIST` to the lowercase email addresses of
+   approved new-company owners. Do not put invited teammates in this list.
+4. Confirm the production secret names with `fly secrets list --app
+   mogulforge-growthos`; never print secret values.
+5. Deploy with both identities explicit:
 
-# 2. Create the app from fly.toml (edit `app = ` to a unique name first)
-fly launch --no-deploy --copy-config
-
-# 3. Managed Postgres, attached (this sets the DATABASE_URL secret automatically)
-fly postgres create --name mogulforge-db
-fly postgres attach mogulforge-db
-
-# 4. Session secret (stable — changing it logs everyone out)
-#    NOTE: this $(...) form is bash. On Windows PowerShell use the two-liner in
-#    the "Windows / PowerShell notes" section below — it does NOT work as-is.
-fly secrets set SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-
-# 5. Deploy. The release_command in fly.toml pushes the DB schema automatically.
-fly deploy
-
-# 6. Open it
-fly open
+```powershell
+fly deploy --app mogulforge-growthos --config fly.toml
 ```
 
-Then on the live URL: **Create account** → you're the owner. Share the URL with
-beta users; they each **Create account** → their own org.
+6. Verify cold-start health, login, blocked unknown signup, one allowlisted owner,
+   one invited teammate, and tenant isolation before sending beta invitations.
 
-> If `fly postgres create` isn't available on your plan, use any managed Postgres
-> (Neon, Supabase, RDS) and set `fly secrets set DATABASE_URL=postgres://...`.
+Never use a bare `fly deploy`, and never merge or deploy a commit whose CI run
+belongs to an earlier branch head.
 
 ---
 
-## Launching from the Fly dashboard / GitHub (mobile-friendly)
+## Fly dashboard / GitHub launcher warning
 
-You can launch entirely from a browser — no CLI, no laptop:
+Do not use **Launch from GitHub** for routine releases. That path can regenerate
+configuration, drop the repository's release command, select the wrong origin,
+or create another billable app. The canonical production and staging configs are
+already committed.
 
-1. Fly dashboard → **Launch from GitHub** → pick `mogulforge-crm`
-   (private repo, so grant the Fly GitHub App access to it).
-2. On the config screen, confirm it builds with the **Dockerfile** (not a buildpack).
-3. Add **Postgres** when offered (this is the part that costs money).
-4. **Secrets** — set these BEFORE the first deploy:
-   - `SESSION_SECRET` = a long random hex string (stable; changing it logs everyone out)
-   - `AUTO_MIGRATE` = `true`
-
-**Why `AUTO_MIGRATE`:** the schema is normally applied by `release_command` in
-`fly.toml`. The dashboard launcher regenerates config and can silently drop the
-`[deploy]` section — you'd get a "successful" deploy serving an **empty database**:
-landing page fine, then every API call 500s. `AUTO_MIGRATE=true` makes the app push
-its own schema at startup, so the database is correct on any deploy path. It's
-advisory-locked (safe with multiple machines) and off unless explicitly set.
-
-Once a CLI deploy with our `fly.toml` is working, you can drop `AUTO_MIGRATE` and
-let `release_command` own migrations again — that's the better long-term shape,
-since migrating from inside the serving process isn't what you want with real data.
+If the dashboard launcher is ever required for disaster recovery, verify the app
+name, `APP_ORIGIN`, Dockerfile, database attachment, `min_machines_running`,
+and migration strategy before deploying. `AUTO_MIGRATE=true` is an emergency
+guard for a launcher that drops `[deploy].release_command`; it is not the normal
+production migration path.
 
 ---
 
@@ -135,8 +119,9 @@ one-liner option: it auto-provisions Let's Encrypt certs for your domain.
 - [ ] HTTPS working (green lock); test **Create account → dashboard**
 - [ ] You created your owner account first (so you're platform admin at `/platform`)
 - [ ] Rebrand values reviewed in the two `client.config.ts` (name/color/phone)
-- [ ] (Optional) invite-only: keep the URL private + share directly, or add a
-      signup allowlist later
+- [ ] `BETA_SIGNUP_ALLOWLIST` contains only approved new-company owner emails
+- [ ] Unknown public signup returns `BETA_INVITE_REQUIRED`
+- [ ] Invited teammates can register without being added to the allowlist
 - [ ] (When charging) add Stripe keys — see "Paid plans" below
 
 ---
@@ -168,11 +153,14 @@ users kicking the tires. It's clearable anytime (nothing but the sample rows).
 
 ## What beta users experience
 
-1. Visit the URL → **Create account** (email + password).
-2. They're not in your org, so they hit **Create your company** (self-serve org).
-3. Their org seeds neutral defaults (settings, automations, a starter playbook).
-4. They land in their own CRM: pipeline, contacts, tasks, appointments, capture
-   widget, AI concierge, reports — fully isolated from other tenants.
+1. An approved new-company owner is added to `BETA_SIGNUP_ALLOWLIST`.
+2. They visit the URL, create an account, and create their own company workspace.
+3. Their organization receives neutral defaults, automations, and a starter playbook.
+4. They invite teammates from GrowthOS; those teammates register directly into
+   the correct organization without needing allowlist entries.
+5. Every user can correct their own display name from **My Profile**, while role
+   and status remain administrator-controlled.
+6. Each organization is isolated from every other beta customer's data.
 
 ## Operating the beta (you, as platform admin)
 
