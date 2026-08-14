@@ -2,6 +2,7 @@ import { InviteUserBody, UpdateUserBody } from "@workspace/api-zod";
 import { db, organizationsTable, usersTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
+import { z } from "zod";
 
 import { consumeCooldown } from "../../lib/rateLimit";
 import { requireMember } from "../../middlewares/requireMember";
@@ -10,6 +11,17 @@ import { listMembers } from "../../services/crm";
 import { sendInviteEmail } from "../../services/invite-email";
 
 const router: IRouter = Router();
+
+const UpdateMyProfileBody = z
+  .object({
+    firstName: z.string().trim().max(100).nullable().optional(),
+    lastName: z.string().trim().max(100).nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (value) => value.firstName !== undefined || value.lastName !== undefined,
+    { message: "At least one profile field is required" },
+  );
 
 function memberDto(u: {
   id: string;
@@ -54,6 +66,56 @@ router.get(
           }
         : null,
     });
+  },
+);
+
+router.patch(
+  "/me",
+  requireMember("crm.read"),
+  async (req: Request, res: Response): Promise<void> => {
+    const parsed = UpdateMyProfileBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid profile" });
+      return;
+    }
+
+    const actor = req.member!;
+    const changedFields = [
+      ...(parsed.data.firstName !== undefined ? ["firstName"] : []),
+      ...(parsed.data.lastName !== undefined ? ["lastName"] : []),
+    ];
+    const [updated] = await db
+      .update(usersTable)
+      .set({
+        ...(parsed.data.firstName !== undefined
+          ? { firstName: parsed.data.firstName || null }
+          : {}),
+        ...(parsed.data.lastName !== undefined
+          ? { lastName: parsed.data.lastName || null }
+          : {}),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(usersTable.id, actor.user.id),
+          eq(usersTable.organizationId, actor.organizationId),
+        ),
+      )
+      .returning();
+
+    if (!updated) {
+      res.status(404).json({ error: "Member not found" });
+      return;
+    }
+
+    await recordAudit({
+      organizationId: actor.organizationId,
+      actorUserId: actor.user.id,
+      action: "user.profile_updated",
+      entityType: "user",
+      metadata: { targetUserId: actor.user.id, changedFields },
+    });
+    res.json(memberDto(updated));
   },
 );
 
