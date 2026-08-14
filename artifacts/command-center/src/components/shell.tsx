@@ -28,6 +28,7 @@ import {
   Search,
   Bot,
   FileSearch2,
+  UserRound,
 } from 'lucide-react';
 import { canManageSettings, canViewAuditLog } from '@/lib/permissions';
 import { CLIENT } from '@/lib/client.config';
@@ -60,6 +61,7 @@ const navItems: NavItem[] = [
   { title: 'Lead Capture', href: '/capture', icon: Webhook },
   { title: 'Forms', href: '/forms', icon: ClipboardList, requireSettings: true },
   { title: 'Audit Log', href: '/audit', icon: Shield, requireAudit: true },
+  { title: 'My Profile', href: '/account', icon: UserRound },
   { title: 'Settings', href: '/settings', icon: Settings2, requireSettings: true },
   { title: 'Billing', href: '/billing', icon: CreditCard, requireSettings: true },
 ];
@@ -174,15 +176,19 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
         <div className="p-4 border-t border-sidebar-border mt-auto">
           {profile && (
-            <div className="mb-4 px-2">
+            <Link
+              href="/account"
+              className="mb-4 block rounded-lg px-2 py-1.5 hover:bg-sidebar-accent/50 transition-colors"
+              title="Edit your profile"
+            >
               <div className="flex items-center gap-2 mb-1 text-sidebar-foreground">
                 <Building className="w-3 h-3 opacity-70" />
                 <span className="text-xs font-semibold truncate">{profile.organization?.name || 'Loading Org...'}</span>
               </div>
               <div className="text-[11px] font-mono text-sidebar-foreground/50 truncate">
-                {profile.firstName} {profile.lastName} • {profile.role}
+                {[profile.firstName, profile.lastName].filter(Boolean).join(' ') || profile.email} • {profile.role}
               </div>
-            </div>
+            </Link>
           )}
           <button
             onClick={logout}
