@@ -1,12 +1,21 @@
 import { db, organizationsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 
 import { crmAppUrl, sendInviteEmail } from "./invite-email";
 import { verifyInviteToken } from "./invite-token";
-import { providers } from "./providers";
+import * as providers from "./providers";
 
 let org: { id: string };
 
@@ -60,7 +69,7 @@ describe("crmAppUrl", () => {
 describe("sendInviteEmail", () => {
   it("sends a branded email with inviter, role, and sign-in link", async () => {
     const send = vi
-      .spyOn(providers.email, "send")
+      .spyOn(providers.transactionalEmailProvider, "send")
       .mockResolvedValue({ id: "x", provider: "mock-email" });
     const result = await sendInviteEmail({
       invitedUserId: "invite:newbie",
@@ -80,7 +89,9 @@ describe("sendInviteEmail", () => {
     expect(body).toContain("Ava Admin invited you");
     expect(body).toContain("sales rep");
     expect(body).toContain("expires in 7 days");
-    const invitationUrl = body.split("\n").find((line) => /^https?:\/\//.test(line));
+    const invitationUrl = body
+      .split("\n")
+      .find((line) => /^https?:\/\//.test(line));
     expect(invitationUrl).toBeTruthy();
     const parsedUrl = new URL(invitationUrl!);
     expect(parsedUrl.pathname).toBe("/signup");
@@ -95,7 +106,7 @@ describe("sendInviteEmail", () => {
   });
 
   it("reports failures instead of throwing so the admin sees them", async () => {
-    vi.spyOn(providers.email, "send").mockRejectedValue(
+    vi.spyOn(providers.transactionalEmailProvider, "send").mockRejectedValue(
       new Error("Gmail send failed: 500"),
     );
     const result = await sendInviteEmail({
@@ -110,7 +121,7 @@ describe("sendInviteEmail", () => {
   });
 
   it("rejects unsafe recipient addresses without calling the provider", async () => {
-    const send = vi.spyOn(providers.email, "send");
+    const send = vi.spyOn(providers.transactionalEmailProvider, "send");
     const result = await sendInviteEmail({
       invitedUserId: "invite:unsafe",
       organizationId: org.id,

@@ -5,7 +5,7 @@
  */
 import { logger } from "../lib/logger";
 
-import { isSafeMailbox, providers } from "./providers";
+import { isSafeMailbox, transactionalEmailProvider } from "./providers";
 import { getOrgSettings } from "./settings";
 import { createInviteToken } from "./invite-token";
 
@@ -83,7 +83,7 @@ export async function sendInviteEmail(params: {
       "",
       `— ${businessName}`,
     ].join("\n");
-    await providers.email.send(
+    await transactionalEmailProvider.send(
       params.to,
       `You've been invited to the ${businessName} team`,
       body,

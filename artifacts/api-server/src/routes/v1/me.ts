@@ -9,6 +9,7 @@ import { requireMember } from "../../middlewares/requireMember";
 import { recordAudit } from "../../services/audit";
 import { listMembers } from "../../services/crm";
 import { sendInviteEmail } from "../../services/invite-email";
+import { isTransactionalEmailConfigured } from "../../services/providers";
 
 const router: IRouter = Router();
 
@@ -141,6 +142,17 @@ router.post(
   "/users/invite",
   requireMember("users.manage"),
   async (req: Request, res: Response): Promise<void> => {
+    if (
+      process.env.NODE_ENV === "production" &&
+      !isTransactionalEmailConfigured()
+    ) {
+      res.status(503).json({
+        error:
+          "Team invitations are temporarily unavailable because MogulForge transactional email is not configured.",
+        code: "TRANSACTIONAL_EMAIL_NOT_CONFIGURED",
+      });
+      return;
+    }
     const parsed = InviteUserBody.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid invite" });
@@ -148,7 +160,9 @@ router.post(
     }
     const { email, role, firstName, lastName } = parsed.data;
     if (role === "owner" && req.member!.role !== "owner") {
-      res.status(403).json({ error: "Only the owner can grant the owner role" });
+      res
+        .status(403)
+        .json({ error: "Only the owner can grant the owner role" });
       return;
     }
     const [existing] = await db
@@ -156,7 +170,9 @@ router.post(
       .from(usersTable)
       .where(eq(usersTable.email, email.toLowerCase()));
     if (existing) {
-      res.status(409).json({ error: "A member with this email already exists" });
+      res
+        .status(409)
+        .json({ error: "A member with this email already exists" });
       return;
     }
     const [user] = await db
@@ -169,6 +185,7 @@ router.post(
         lastName: lastName ?? null,
         organizationId: req.member!.organizationId,
         role,
+        emailVerifiedAt: null,
       })
       .returning();
     // Notify the invitee. Failures are surfaced to the admin in the
@@ -206,6 +223,17 @@ router.post(
   "/users/:id/resend-invite",
   requireMember("users.manage"),
   async (req: Request, res: Response): Promise<void> => {
+    if (
+      process.env.NODE_ENV === "production" &&
+      !isTransactionalEmailConfigured()
+    ) {
+      res.status(503).json({
+        error:
+          "Team invitations are temporarily unavailable because MogulForge transactional email is not configured.",
+        code: "TRANSACTIONAL_EMAIL_NOT_CONFIGURED",
+      });
+      return;
+    }
     const actor = req.member!;
     const [target] = await db
       .select()
@@ -242,7 +270,8 @@ router.post(
           String(Math.ceil(cooldown.retryAfterMs / 1000)),
         )
         .json({
-          error: "Invite was just resent. Please wait a minute before trying again.",
+          error:
+            "Invite was just resent. Please wait a minute before trying again.",
         });
       return;
     }
@@ -279,13 +308,18 @@ router.patch(
   requireMember("users.manage"),
   async (req: Request, res: Response): Promise<void> => {
     const parsed = UpdateUserBody.safeParse(req.body);
-    if (!parsed.success || (parsed.data.role === undefined && parsed.data.isActive === undefined)) {
+    if (
+      !parsed.success ||
+      (parsed.data.role === undefined && parsed.data.isActive === undefined)
+    ) {
       res.status(400).json({ error: "Invalid change" });
       return;
     }
     const actor = req.member!;
     if (String(req.params.id) === actor.user.id) {
-      res.status(403).json({ error: "You cannot change your own role or status" });
+      res
+        .status(403)
+        .json({ error: "You cannot change your own role or status" });
       return;
     }
     const [target] = await db
@@ -301,15 +335,22 @@ router.patch(
       res.status(404).json({ error: "Member not found" });
       return;
     }
-    if ((target.role === "owner" || parsed.data.role === "owner") && actor.role !== "owner") {
-      res.status(403).json({ error: "Only the owner can change owner membership" });
+    if (
+      (target.role === "owner" || parsed.data.role === "owner") &&
+      actor.role !== "owner"
+    ) {
+      res
+        .status(403)
+        .json({ error: "Only the owner can change owner membership" });
       return;
     }
     const [updated] = await db
       .update(usersTable)
       .set({
         ...(parsed.data.role !== undefined ? { role: parsed.data.role } : {}),
-        ...(parsed.data.isActive !== undefined ? { isActive: parsed.data.isActive } : {}),
+        ...(parsed.data.isActive !== undefined
+          ? { isActive: parsed.data.isActive }
+          : {}),
       })
       .where(eq(usersTable.id, target.id))
       .returning();
@@ -320,8 +361,12 @@ router.patch(
       entityType: "user",
       metadata: {
         targetUserId: target.id,
-        ...(parsed.data.role !== undefined ? { roleFrom: target.role, roleTo: parsed.data.role } : {}),
-        ...(parsed.data.isActive !== undefined ? { isActive: parsed.data.isActive } : {}),
+        ...(parsed.data.role !== undefined
+          ? { roleFrom: target.role, roleTo: parsed.data.role }
+          : {}),
+        ...(parsed.data.isActive !== undefined
+          ? { isActive: parsed.data.isActive }
+          : {}),
       },
     });
     res.json(memberDto(updated));

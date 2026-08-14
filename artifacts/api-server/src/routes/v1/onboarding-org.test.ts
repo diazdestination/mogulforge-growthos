@@ -11,7 +11,15 @@ import {
   usersTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
 
@@ -20,6 +28,7 @@ import { createSession } from "../../lib/auth";
 import { clearLegacyOrgCache } from "../../lib/orgFlavor";
 import { ensureMembership, getDefaultOrganization } from "../../services/org";
 import { createInviteToken } from "../../services/invite-token";
+import { resendEmailProvider } from "../../services/providers";
 import {
   getAppointmentReminderSettings,
   getConciergeSettings,
@@ -38,7 +47,9 @@ let baseUrl: string;
 const createdOrgIds: string[] = [];
 const createdUserIds: string[] = [];
 
-async function makeUser(overrides: Partial<typeof usersTable.$inferInsert> = {}) {
+async function makeUser(
+  overrides: Partial<typeof usersTable.$inferInsert> = {},
+) {
   const [u] = await db
     .insert(usersTable)
     .values({
@@ -52,7 +63,13 @@ async function makeUser(overrides: Partial<typeof usersTable.$inferInsert> = {})
 
 async function sessionFor(userId: string) {
   return createSession({
-    user: { id: userId, email: null, firstName: null, lastName: null, profileImageUrl: null },
+    user: {
+      id: userId,
+      email: null,
+      firstName: null,
+      lastName: null,
+      profileImageUrl: null,
+    },
     access_token: "test-token",
     expires_at: Math.floor(Date.now() / 1000) + 3600,
   });
@@ -82,7 +99,10 @@ afterAll(async () => {
   server?.close();
   await deleteTestOrgs(...createdOrgIds);
   for (const id of createdUserIds) {
-    await db.delete(usersTable).where(eq(usersTable.id, id)).catch(() => {});
+    await db
+      .delete(usersTable)
+      .where(eq(usersTable.id, id))
+      .catch(() => {});
   }
 });
 
@@ -133,7 +153,10 @@ describe("self-serve org creation", () => {
     expect(body.joined).toBe(true);
     expect(body.organization.slug).toBe("summit-home-services");
 
-    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, u.id));
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, u.id));
     expect(user.organizationId).toBe(body.organization.id);
     expect(user.role).toBe("owner");
 
@@ -147,7 +170,12 @@ describe("self-serve org creation", () => {
       .select()
       .from(playbooksTable)
       .where(eq(playbooksTable.organizationId, orgId));
-    const corpus = JSON.stringify({ settings, concierge, reminder, playbook }).toLowerCase();
+    const corpus = JSON.stringify({
+      settings,
+      concierge,
+      reminder,
+      playbook,
+    }).toLowerCase();
     expect(corpus).not.toContain("roof");
     expect(corpus).not.toContain("painless");
     expect(corpus).not.toContain("canton");
@@ -250,17 +278,24 @@ describe("onboarding wizard state", () => {
   });
 
   it("starts empty, accumulates progress, and persists across reads", async () => {
-    const initial = (await (await authed(sid)("/api/v1/onboarding")).json()) as any;
+    const initial = (await (
+      await authed(sid)("/api/v1/onboarding")
+    ).json()) as any;
     expect(initial.steps).toContain("test-lead");
     expect(initial.state.completedAt ?? null).toBeNull();
 
     const patched = await authed(sid)("/api/v1/onboarding", {
       method: "PATCH",
-      body: JSON.stringify({ completeSteps: ["company", "services"], currentStep: "hours" }),
+      body: JSON.stringify({
+        completeSteps: ["company", "services"],
+        currentStep: "hours",
+      }),
     });
     expect(patched.status).toBe(200);
 
-    const reread = (await (await authed(sid)("/api/v1/onboarding")).json()) as any;
+    const reread = (await (
+      await authed(sid)("/api/v1/onboarding")
+    ).json()) as any;
     expect(reread.state.completedSteps).toEqual(["company", "services"]);
     expect(reread.state.currentStep).toBe("hours");
   });
@@ -294,7 +329,9 @@ describe("onboarding wizard state", () => {
   });
 
   it("invite-team step can be marked complete via PATCH and is persisted", async () => {
-    const before = (await (await authed(sid)("/api/v1/onboarding")).json()) as any;
+    const before = (await (
+      await authed(sid)("/api/v1/onboarding")
+    ).json()) as any;
     const wasComplete = before.state.completedSteps.includes("invite-team");
 
     const res = await authed(sid)("/api/v1/onboarding", {
@@ -306,7 +343,9 @@ describe("onboarding wizard state", () => {
     expect(body.state.completedSteps).toContain("invite-team");
 
     // Persists across a fresh read
-    const reread = (await (await authed(sid)("/api/v1/onboarding")).json()) as any;
+    const reread = (await (
+      await authed(sid)("/api/v1/onboarding")
+    ).json()) as any;
     expect(reread.state.completedSteps).toContain("invite-team");
 
     // Clean up: remove it if it wasn't already there
@@ -337,13 +376,18 @@ describe("onboarding wizard state", () => {
   });
 
   it("guided test lead: creates marked sandbox records with no reachable channels, then cleans up fully", async () => {
-    const created = await authed(sid)("/api/v1/onboarding/test-lead", { method: "POST" });
+    const created = await authed(sid)("/api/v1/onboarding/test-lead", {
+      method: "POST",
+    });
     expect(created.status).toBe(201);
     const body = (await created.json()) as any;
     expect(body.leadId).toBeTruthy();
     expect(body.score).toBeGreaterThan(0);
 
-    const [lead] = await db.select().from(leadsTable).where(eq(leadsTable.id, body.leadId));
+    const [lead] = await db
+      .select()
+      .from(leadsTable)
+      .where(eq(leadsTable.id, body.leadId));
     expect(lead.organizationId).toBe(orgId);
     expect(lead.sourceDetail).toBe("onboarding-test-lead");
     expect(lead.summary).toContain("[TEST]");
@@ -360,10 +404,15 @@ describe("onboarding wizard state", () => {
       .where(eq(activitiesTable.leadId, body.leadId));
     expect(timeline.length).toBeGreaterThanOrEqual(3);
 
-    const cleanup = await authed(sid)("/api/v1/onboarding/test-lead", { method: "DELETE" });
+    const cleanup = await authed(sid)("/api/v1/onboarding/test-lead", {
+      method: "DELETE",
+    });
     const cleanupBody = (await cleanup.json()) as any;
     expect(cleanupBody.removed).toBe(1);
-    const leadsLeft = await db.select().from(leadsTable).where(eq(leadsTable.id, body.leadId));
+    const leadsLeft = await db
+      .select()
+      .from(leadsTable)
+      .where(eq(leadsTable.id, body.leadId));
     expect(leadsLeft).toEqual([]);
     const contactsLeft = await db
       .select()
@@ -427,9 +476,12 @@ describe("member self-service profile", () => {
 });
 
 describe("founding beta registration gate", () => {
-  it("fails closed in production, accepts allowlisted founders, preserves active invites, and blocks revoked invites", async () => {
+  it("fails closed, verifies allowlisted founders, preserves signed invites, and blocks revoked invites", async () => {
     const originalNodeEnv = process.env.NODE_ENV;
     const originalAllowlist = process.env.BETA_SIGNUP_ALLOWLIST;
+    const originalResendKey = process.env.RESEND_API_KEY;
+    const originalResendFrom = process.env.RESEND_FROM_EMAIL;
+    const originalAppOrigin = process.env.APP_ORIGIN;
     const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const blockedEmail = `blocked-${suffix}@example.com`;
     const allowedEmail = `allowed-${suffix}@example.com`;
@@ -438,6 +490,12 @@ describe("founding beta registration gate", () => {
 
     try {
       process.env.NODE_ENV = "production";
+      process.env.RESEND_API_KEY = "test-resend-key";
+      process.env.RESEND_FROM_EMAIL = "MogulForge <account@mogulforge.ai>";
+      process.env.APP_ORIGIN = "https://app.mogulforge.test";
+      const sendVerification = vi
+        .spyOn(resendEmailProvider, "send")
+        .mockResolvedValue({ id: "verification-test", provider: "resend" });
       delete process.env.BETA_SIGNUP_ALLOWLIST;
 
       const blocked = await fetch(`${baseUrl}/api/auth/register`, {
@@ -463,12 +521,65 @@ describe("founding beta registration gate", () => {
           firstName: "Allowed",
         }),
       });
-      expect(allowed.status).toBe(200);
+      expect(allowed.status).toBe(202);
+      expect(await allowed.json()).toMatchObject({
+        verificationRequired: true,
+      });
       const [allowedUser] = await db
         .select()
         .from(usersTable)
         .where(eq(usersTable.email, allowedEmail));
       createdUserIds.push(allowedUser.id);
+      expect(allowedUser.emailVerifiedAt).toBeNull();
+
+      const prematureLogin = await fetch(`${baseUrl}/api/auth/login`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: allowedEmail,
+          password: "correct-horse-battery-staple",
+        }),
+      });
+      expect(prematureLogin.status).toBe(403);
+      expect(await prematureLogin.json()).toMatchObject({
+        code: "EMAIL_VERIFICATION_REQUIRED",
+      });
+
+      const verificationBody = sendVerification.mock.calls.find(
+        ([to]) => to === allowedEmail,
+      )?.[2];
+      const verificationUrl = verificationBody
+        ?.split("\n")
+        .find((line) => line.startsWith("https://"));
+      expect(verificationUrl).toBeTruthy();
+      const verificationToken = new URL(verificationUrl!).searchParams.get(
+        "token",
+      );
+      expect(verificationToken).toBeTruthy();
+
+      const verified = await fetch(`${baseUrl}/api/auth/verify-email`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: verificationToken }),
+      });
+      expect(verified.status).toBe(200);
+      expect(verified.headers.get("set-cookie")).toContain("sid=");
+
+      const verificationReplay = await fetch(
+        `${baseUrl}/api/auth/verify-email`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ token: verificationToken }),
+        },
+      );
+      expect(verificationReplay.status).toBe(400);
+
+      const [verifiedUser] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, allowedUser.id));
+      expect(verifiedUser.emailVerifiedAt).toBeInstanceOf(Date);
 
       const [org] = await db
         .insert(organizationsTable)
@@ -532,6 +643,7 @@ describe("founding beta registration gate", () => {
       expect(adopted.organizationId).toBe(org.id);
       expect(adopted.role).toBe("sales_rep");
       expect(adopted.isActive).toBe(true);
+      expect(adopted.emailVerifiedAt).toBeInstanceOf(Date);
 
       const revokedSignup = await fetch(`${baseUrl}/api/auth/register`, {
         method: "POST",
@@ -559,6 +671,7 @@ describe("founding beta registration gate", () => {
       expect(stillRevoked.id).toBe(revoked.id);
       expect(stillRevoked.isActive).toBe(false);
     } finally {
+      vi.restoreAllMocks();
       if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = originalNodeEnv;
       if (originalAllowlist === undefined) {
@@ -566,6 +679,13 @@ describe("founding beta registration gate", () => {
       } else {
         process.env.BETA_SIGNUP_ALLOWLIST = originalAllowlist;
       }
+      if (originalResendKey === undefined) delete process.env.RESEND_API_KEY;
+      else process.env.RESEND_API_KEY = originalResendKey;
+      if (originalResendFrom === undefined)
+        delete process.env.RESEND_FROM_EMAIL;
+      else process.env.RESEND_FROM_EMAIL = originalResendFrom;
+      if (originalAppOrigin === undefined) delete process.env.APP_ORIGIN;
+      else process.env.APP_ORIGIN = originalAppOrigin;
     }
   });
 });

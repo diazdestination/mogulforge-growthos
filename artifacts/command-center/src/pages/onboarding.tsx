@@ -112,14 +112,20 @@ export default function Onboarding() {
     mutation: {
       onSuccess: (member) => {
         const email = member.email ?? inviteEmail;
+        if (member.inviteEmail?.sent === false) {
+          toast({
+            title: 'Invite created, but delivery failed',
+            description: 'The teammate cannot activate the account yet. Retry the invitation after MogulForge email delivery is restored.',
+            variant: 'destructive',
+          });
+          return;
+        }
         setInvitedEmails((prev) => [...prev, email]);
         setInviteEmail('');
         update.mutate({ data: { completeSteps: ['invite-team'] } });
         toast({
           title: 'Invite sent',
-          description: member.inviteEmail?.sent === false
-            ? `${email} was added but the invite email could not be delivered.`
-            : `${email} will receive a sign-in link shortly.`,
+          description: `${email} will receive a sign-in link shortly.`,
         });
       },
       onError: (err: unknown) => {

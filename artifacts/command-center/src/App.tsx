@@ -36,16 +36,25 @@ import Bie from '@/pages/bie';
 import EvidenceIntelligence from '@/pages/evidence-intelligence';
 import Account from '@/pages/account';
 import { CreateOrgScreen } from '@/components/create-org';
-import { useGetSession, getGetSessionQueryKey } from '@workspace/api-client-react';
+import {
+  useGetSession,
+  getGetSessionQueryKey,
+} from '@workspace/api-client-react';
 
 const queryClient = new QueryClient();
 
 const AUTH_INPUT_CLASS =
   'w-full h-11 px-4 rounded-md border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-shadow';
 
-function LoginScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'register' }) {
+function LoginScreen({
+  initialMode = 'login',
+}: {
+  initialMode?: 'login' | 'register';
+}) {
   const inviteParams =
-    initialMode === 'register' ? new URLSearchParams(window.location.search) : null;
+    initialMode === 'register'
+      ? new URLSearchParams(window.location.search)
+      : null;
   const inviteToken = inviteParams?.get('invite')?.trim() || undefined;
   const invitedEmail = inviteParams?.get('email')?.trim() || '';
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
@@ -54,6 +63,8 @@ function LoginScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'regis
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [canResendVerification, setCanResendVerification] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const brandInitial = (CLIENT.businessShortName || CLIENT.appName || 'M')
@@ -64,6 +75,8 @@ function LoginScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'regis
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
+    setCanResendVerification(false);
     setBusy(true);
     try {
       const path = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
@@ -83,14 +96,62 @@ function LoginScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'regis
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+        message?: string;
+        verificationRequired?: boolean;
+      };
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error || 'Something went wrong. Please try again.');
+        if (data.code === 'EMAIL_VERIFICATION_REQUIRED') {
+          setCanResendVerification(true);
+        }
+        throw new Error(
+          data.error || 'Something went wrong. Please try again.',
+        );
+      }
+      if (data.verificationRequired) {
+        setMode('login');
+        setPassword('');
+        setCanResendVerification(true);
+        setNotice(data.message || 'Check your email to verify your account.');
+        setBusy(false);
+        return;
       }
       // Session cookie is set — reload so useAuth re-fetches the current user.
       window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setBusy(false);
+    }
+  }
+
+  async function resendVerification() {
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+      };
+      if (!res.ok) {
+        throw new Error(
+          data.error || 'Unable to request a verification email.',
+        );
+      }
+      setNotice(
+        data.message ||
+          'If the account is eligible, a verification email is on its way.',
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
       setBusy(false);
     }
   }
@@ -152,16 +213,38 @@ function LoginScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'regis
             type="password"
             required
             minLength={mode === 'register' ? 8 : undefined}
-            placeholder={mode === 'register' ? 'Password (8+ characters)' : 'Password'}
+            placeholder={
+              mode === 'register' ? 'Password (8+ characters)' : 'Password'
+            }
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            autoComplete={
+              mode === 'login' ? 'current-password' : 'new-password'
+            }
           />
 
           {error && (
             <p className="text-sm text-destructive text-center" role="alert">
               {error}
             </p>
+          )}
+          {notice && (
+            <p
+              className="text-sm text-emerald-600 dark:text-emerald-400 text-center"
+              role="status"
+            >
+              {notice}
+            </p>
+          )}
+          {canResendVerification && (
+            <button
+              type="button"
+              disabled={busy || !email}
+              onClick={resendVerification}
+              className="text-sm text-primary hover:underline disabled:opacity-50"
+            >
+              Resend verification email
+            </button>
           )}
 
           <button
@@ -177,10 +260,21 @@ function LoginScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'regis
           </button>
         </form>
 
+        {mode === 'login' && (
+          <Link
+            href="/forgot-password"
+            className="mt-4 text-sm text-primary hover:underline"
+          >
+            Forgot your password?
+          </Link>
+        )}
+
         <button
           onClick={() => {
             setMode(mode === 'login' ? 'register' : 'login');
             setError(null);
+            setNotice(null);
+            setCanResendVerification(false);
           }}
           className="mt-6 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
@@ -194,6 +288,192 @@ function LoginScreen({ initialMode = 'login' }: { initialMode?: 'login' | 'regis
           Authorized Personnel Only
           <div className="h-[1px] w-8 bg-border" />
         </div>
+      </div>
+    </div>
+  );
+}
+
+type IdentityActionKind = 'forgot' | 'reset' | 'verify';
+
+function IdentityActionScreen({ kind }: { kind: IdentityActionKind }) {
+  const token =
+    new URLSearchParams(window.location.search).get('token')?.trim() || '';
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [complete, setComplete] = useState(false);
+
+  const title =
+    kind === 'forgot'
+      ? 'Reset your password'
+      : kind === 'reset'
+        ? 'Choose a new password'
+        : 'Verify your email';
+  const description =
+    kind === 'forgot'
+      ? 'Enter your account email and we will send a secure reset link.'
+      : kind === 'reset'
+        ? 'This single-use link will replace your password and sign out other sessions.'
+        : 'Confirm this single-use link to secure your GrowthOS account.';
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+
+    if (kind === 'reset' && password !== confirmation) {
+      setError('Passwords do not match.');
+      return;
+    }
+    if (kind !== 'forgot' && !token) {
+      setError(
+        `This ${kind === 'verify' ? 'verification' : 'reset'} link is missing its secure token.`,
+      );
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const endpoint =
+        kind === 'forgot'
+          ? '/api/auth/forgot-password'
+          : kind === 'reset'
+            ? '/api/auth/reset-password'
+            : '/api/auth/verify-email';
+      const payload =
+        kind === 'forgot'
+          ? { email }
+          : kind === 'reset'
+            ? { token, password }
+            : { token };
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to complete this request.');
+      }
+      setComplete(true);
+      setNotice(
+        data.message ||
+          (kind === 'verify'
+            ? 'Your email is verified. You are securely signed in.'
+            : kind === 'reset'
+              ? 'Your password has been reset. You can sign in now.'
+              : 'If an eligible account exists, the reset link is on its way.'),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-background text-foreground">
+      <div className="max-w-md w-full px-8 py-12">
+        <Link
+          href="/login"
+          className="inline-block mb-8 text-sm text-muted-foreground hover:text-foreground"
+        >
+          ← Back to sign in
+        </Link>
+        <h1 className="text-3xl font-bold tracking-tight mb-2">{title}</h1>
+        <p className="text-muted-foreground mb-8 text-sm">{description}</p>
+
+        <form onSubmit={submit} className="flex flex-col gap-3">
+          {kind === 'forgot' && (
+            <input
+              className={AUTH_INPUT_CLASS}
+              type="email"
+              required
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+            />
+          )}
+          {kind === 'reset' && !complete && (
+            <>
+              <input
+                className={AUTH_INPUT_CLASS}
+                type="password"
+                required
+                minLength={8}
+                maxLength={200}
+                placeholder="New password (8+ characters)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+              <input
+                className={AUTH_INPUT_CLASS}
+                type="password"
+                required
+                minLength={8}
+                maxLength={200}
+                placeholder="Confirm new password"
+                value={confirmation}
+                onChange={(e) => setConfirmation(e.target.value)}
+                autoComplete="new-password"
+              />
+            </>
+          )}
+
+          {error && (
+            <p className="text-sm text-destructive text-center" role="alert">
+              {error}
+            </p>
+          )}
+          {notice && (
+            <p
+              className="text-sm text-emerald-600 dark:text-emerald-400 text-center"
+              role="status"
+            >
+              {notice}
+            </p>
+          )}
+
+          {!complete && (
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-12 rounded-md font-semibold text-sm tracking-wide transition-all disabled:opacity-60"
+            >
+              {busy
+                ? 'Please wait…'
+                : kind === 'forgot'
+                  ? 'SEND RESET LINK'
+                  : kind === 'reset'
+                    ? 'RESET PASSWORD'
+                    : 'VERIFY EMAIL'}
+            </button>
+          )}
+        </form>
+
+        {complete && (
+          <Link
+            href={kind === 'verify' ? '/' : '/login'}
+            onClick={(event) => {
+              if (kind === 'verify') {
+                event.preventDefault();
+                window.location.replace('/');
+              }
+            }}
+            className="mt-6 flex w-full items-center justify-center bg-primary text-primary-foreground h-12 rounded-md font-semibold text-sm"
+          >
+            {kind === 'verify' ? 'CONTINUE TO GROWTHOS' : 'RETURN TO SIGN IN'}
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -218,6 +498,15 @@ function Router() {
         </Route>
         <Route path="/signup">
           <LoginScreen initialMode="register" />
+        </Route>
+        <Route path="/forgot-password">
+          <IdentityActionScreen kind="forgot" />
+        </Route>
+        <Route path="/reset-password">
+          <IdentityActionScreen kind="reset" />
+        </Route>
+        <Route path="/verify-email">
+          <IdentityActionScreen kind="verify" />
         </Route>
         <Route>
           <LandingPage />
@@ -252,36 +541,45 @@ function AuthedApp() {
     <AccessGate>
       <Shell>
         <Switch>
-        <Route path="/login">
-          <Redirect to="/" replace />
-        </Route>
-        <Route path="/signup">
-          <Redirect to="/" replace />
-        </Route>
-        <Route path="/" component={Bie} />
-        <Route path="/bie" component={Bie} />
-        <Route path="/evidence" component={EvidenceIntelligence} />
-        <Route path="/dashboard" component={Dashboard} />
-        <Route path="/assistant" component={Assistant} />
-        <Route path="/pipeline" component={Pipeline} />
-        <Route path="/insights" component={Insights} />
-        <Route path="/reports" component={Reports} />
-        <Route path="/leads/:id" component={LeadDetail} />
-        <Route path="/contacts" component={Contacts} />
-        <Route path="/properties" component={Properties} />
-        <Route path="/estimates" component={Estimates} />
-        <Route path="/projects" component={Projects} />
-        <Route path="/tasks" component={Tasks} />
-        <Route path="/appointments" component={Appointments} />
-        <Route path="/audit" component={AuditLog} />
-        <Route path="/settings" component={Settings} />
-        <Route path="/account" component={Account} />
-        <Route path="/billing" component={Billing} />
-        <Route path="/forms" component={Forms} />
-        <Route path="/reactivation" component={Reactivation} />
-        <Route path="/capture" component={Capture} />
-        <Route path="/onboarding" component={Onboarding} />
-        <Route path="/platform" component={Platform} />
+          <Route path="/login">
+            <Redirect to="/" replace />
+          </Route>
+          <Route path="/signup">
+            <Redirect to="/" replace />
+          </Route>
+          <Route path="/forgot-password">
+            <Redirect to="/" replace />
+          </Route>
+          <Route path="/reset-password">
+            <Redirect to="/" replace />
+          </Route>
+          <Route path="/verify-email">
+            <Redirect to="/" replace />
+          </Route>
+          <Route path="/" component={Bie} />
+          <Route path="/bie" component={Bie} />
+          <Route path="/evidence" component={EvidenceIntelligence} />
+          <Route path="/dashboard" component={Dashboard} />
+          <Route path="/assistant" component={Assistant} />
+          <Route path="/pipeline" component={Pipeline} />
+          <Route path="/insights" component={Insights} />
+          <Route path="/reports" component={Reports} />
+          <Route path="/leads/:id" component={LeadDetail} />
+          <Route path="/contacts" component={Contacts} />
+          <Route path="/properties" component={Properties} />
+          <Route path="/estimates" component={Estimates} />
+          <Route path="/projects" component={Projects} />
+          <Route path="/tasks" component={Tasks} />
+          <Route path="/appointments" component={Appointments} />
+          <Route path="/audit" component={AuditLog} />
+          <Route path="/settings" component={Settings} />
+          <Route path="/account" component={Account} />
+          <Route path="/billing" component={Billing} />
+          <Route path="/forms" component={Forms} />
+          <Route path="/reactivation" component={Reactivation} />
+          <Route path="/capture" component={Capture} />
+          <Route path="/onboarding" component={Onboarding} />
+          <Route path="/platform" component={Platform} />
           <Route component={NotFound} />
         </Switch>
       </Shell>

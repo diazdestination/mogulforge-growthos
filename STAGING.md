@@ -6,10 +6,10 @@ domain, or OAuth credentials.
 
 ## Fixed identities
 
-| Environment | Fly app | Config | Origin |
-|---|---|---|---|
-| Staging | `mogulforge-growthos-staging` | `fly.staging.toml` | `https://mogulforge-growthos-staging.fly.dev` |
-| Production | `mogulforge-growthos` | `fly.toml` | `https://app.mogulforge.ai` |
+| Environment | Fly app                       | Config             | Origin                                        |
+| ----------- | ----------------------------- | ------------------ | --------------------------------------------- |
+| Staging     | `mogulforge-growthos-staging` | `fly.staging.toml` | `https://mogulforge-growthos-staging.fly.dev` |
+| Production  | `mogulforge-growthos`         | `fly.toml`         | `https://app.mogulforge.ai`                   |
 
 Both configs use `min_machines_running = 0`. Staging should stay stopped when
 it is not being tested.
@@ -28,9 +28,16 @@ approved the estimated cost.
    - `SESSION_SECRET`
    - `BETA_SIGNUP_ALLOWLIST` containing the owner/tester emails permitted to
      create new organizations
+   - `RESEND_API_KEY` for a staging-scoped Resend key
+   - `RESEND_FROM_EMAIL` using a verified MogulForge staging sender
 4. Keep `ENABLE_DEV_LOGIN` unset.
 5. Add provider credentials only when that integration is actively under test.
    Use non-production OAuth clients and Stripe test mode.
+
+The Resend channel above belongs to MogulForge and is used only for account
+verification, password recovery, and invitations. Each beta user connects their
+own Gmail separately for their business outreach. A user's Gmail credential is
+never used as the platform fallback for identity email.
 
 Invited teammates do not need to appear in `BETA_SIGNUP_ALLOWLIST`; an
 organization owner pre-approves them from the in-app invite flow.
@@ -55,9 +62,12 @@ instead of silently selecting another target.
 
 - Health endpoint returns 200 after a cold start.
 - Unknown signup is rejected with `BETA_INVITE_REQUIRED`.
-- An allowlisted beta owner can register and create an organization.
+- An allowlisted beta owner receives a verification email, cannot sign in
+  before verifying, and can create an organization afterward.
 - An invited teammate can register into that organization without being
   allowlisted.
+- Password recovery returns the same response for known and unknown emails;
+  its link works once, expires, and revokes existing sessions after reset.
 - Two organizations cannot read or mutate one another's records.
 - A member can update their own display name but cannot change role or status.
 - Gmail connection, send, disconnect, and revocation use a staging OAuth client.

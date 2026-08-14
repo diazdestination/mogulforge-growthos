@@ -724,7 +724,7 @@ function AutomationsTab() {
             <>Automation emails are sent via Resend from {emailProvider.senderEmail ?? 'the configured address'}.</>
           )}
           {emailProvider.provider === 'mock' && (
-            <>No real email provider is connected — automation emails are only logged, not delivered. Connect Gmail to send real email.</>
+            <>No business-sending provider is connected — automation emails are blocked until this user connects Gmail. Account verification, password recovery, and team invitations use MogulForge's separate transactional email channel.</>
           )}
         </div>
       )}
@@ -1395,7 +1395,7 @@ function TeamTab({ meId, meRole }: { meId: string; meRole: UserRole }) {
         } else {
           toast({
             title: 'Invite created, but the email failed to send',
-            description: `${member.inviteEmail?.error || 'Email could not be delivered'}. Ask them to sign in with their email address.`,
+            description: `${member.inviteEmail?.error || 'Email could not be delivered'}. The invitee cannot activate yet; use Resend email after delivery is restored.`,
             variant: 'destructive',
           });
         }

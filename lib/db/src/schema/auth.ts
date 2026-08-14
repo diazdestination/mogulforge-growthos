@@ -38,6 +38,15 @@ export const usersTable = pgTable("users", {
    * external IdP (e.g. Replit OIDC) instead of a local password.
    */
   passwordHash: varchar("password_hash"),
+  /**
+   * Existing accounts are trusted during the additive migration via the
+   * database default. New local registrations explicitly write null until the
+   * user proves mailbox control; signed team invitations and trusted OIDC
+   * identities write the verification timestamp at acceptance.
+   */
+  emailVerifiedAt: timestamp("email_verified_at", {
+    withTimezone: true,
+  }).defaultNow(),
   organizationId: uuid("organization_id").references(
     () => organizationsTable.id,
   ),

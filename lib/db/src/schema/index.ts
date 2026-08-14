@@ -1,6 +1,7 @@
 export * from "./enums";
 export * from "./organizations";
 export * from "./auth";
+export * from "./identity-tokens";
 export * from "./contacts";
 export * from "./properties";
 export * from "./leads";
