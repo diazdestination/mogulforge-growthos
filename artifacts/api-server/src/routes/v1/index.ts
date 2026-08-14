@@ -35,6 +35,7 @@ import demoRouter from "./demo";
 import bieRouter from "./bie";
 import evidenceIntelligenceRouter from "./evidence-intelligence";
 import gmailIntegrationsRouter from "./gmail-integrations";
+import emailIntelligenceRouter from "./email-intelligence";
 
 const router: IRouter = Router();
 
@@ -43,6 +44,7 @@ router.use(demoRouter);
 router.use(bieRouter);
 router.use(evidenceIntelligenceRouter);
 router.use(gmailIntegrationsRouter);
+router.use(emailIntelligenceRouter);
 router.use(meRouter);
 router.use(contactsRouter);
 router.use(leadsRouter);

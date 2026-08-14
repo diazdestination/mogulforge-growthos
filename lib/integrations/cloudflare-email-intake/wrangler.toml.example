@@ -1,0 +1,10 @@
+name = "mogulforge-email-intake"
+main = "src/index.ts"
+compatibility_date = "2026-08-13"
+
+[vars]
+GROWTHOS_INTAKE_URL = "https://app.mogulforge.ai"
+INTAKE_DOMAIN = "intake.mogulforge.ai"
+
+# Set through `wrangler secret put INTAKE_WEBHOOK_SECRET`.
+# The matching Fly secret is EMAIL_INGESTION_WEBHOOK_SECRET.

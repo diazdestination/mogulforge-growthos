@@ -37,3 +37,4 @@ export * from "./bie";
 export * from "./evidence-intelligence";
 export * from "./object-storage";
 export * from "./gmail-connections";
+export * from "./email-intelligence";

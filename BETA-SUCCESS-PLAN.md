@@ -89,6 +89,7 @@ All P0 gates are required before inviting external testers.
 | Invite-only account and membership | Partial | Owner invites a second user; invite acceptance, role limits, deactivate/reactivate pass. |
 | Tenant isolation | Partial | Two independent organizations cannot read, mutate, search, export, or send from each other's data/connections. |
 | Per-user Gmail | In progress | User connects, sends, refreshes after access-token expiry, disconnects/revokes; second user sends only as their account. |
+| Email Intelligence Inbox | Foundation implemented locally | Tenant intake, authorized forwarders, signed Cloudflare Worker boundary, encrypted seven-day raw retention, redaction, deterministic review facts, purge, and two-tenant tests pass before live routing. |
 | Data onboarding | Partial | CSV preview/map/validate/import handles a representative customer export with error report and rollback. |
 | BIE opportunity detection | Implemented | Seeded and imported stale/dormant cases match documented deterministic rules and amounts. |
 | Approval-first actions | Implemented, provider-blocked | Approve/edit/reject/execute is audited; Gmail email uses the executing user and guardrails block unsafe sends. |

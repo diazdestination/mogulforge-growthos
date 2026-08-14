@@ -17,6 +17,11 @@ GrowthOS will use a phased model:
 4. an optional customer-hosted worker for larger organizations that require raw
    content to remain in their environment.
 
+For the founding beta, the selected inbound transport is Cloudflare Email
+Routing plus a minimal Email Worker on the dedicated `intake.mogulforge.ai`
+subdomain. The root Google Workspace MX is preserved. See
+`EMAIL-INTELLIGENCE-SETUP.md` for the exact boundary and activation gates.
+
 This is a scope-minimization strategy, not an attempt to bypass Google's rules.
 Google classifies `gmail.readonly`, `gmail.metadata`, `gmail.modify`, and broad
 mail access as restricted. If restricted-scope data is stored on or transmitted
@@ -147,9 +152,15 @@ through the user's Gmail sending connection and existing BIE approval controls.
 
 ### Phase 1: founding beta
 
-- Build tenant ingestion addresses, manual forwarding, sender verification,
-  parsing, redaction, short retention, structured extraction, evidence review,
-  deletion, and an owner-controlled source status page.
+- Implemented locally: tenant ingestion addresses, authenticated normalized
+  intake, authorized-forwarder validation, plain-text normalization, redaction,
+  encrypted seven-day raw retention, deterministic structured extraction,
+  evidence review, immediate raw purge, owner-controlled source status, and a
+  synthetic fixture. Live domain/provider routing remains deliberately off.
+- Still required for live delivery: select and implement the inbound provider
+  adapter, validate its native signature before normalizing the event, configure
+  the dedicated intake subdomain, set production secrets, and complete the
+  external two-tenant acceptance test.
 - Start with selected sales/estimate/lead streams, not whole organizations.
 - Run against synthetic fixtures before any founding customer data.
 - Obtain explicit customer authorization and a named data owner.
@@ -184,4 +195,3 @@ through the user's Gmail sending connection and existing BIE approval controls.
   platform-owned mailbox pretending to be the customer.
 - Do not monitor employee mail without documented organizational authority,
   appropriate notice, and counsel-reviewed policy for the relevant jurisdiction.
-

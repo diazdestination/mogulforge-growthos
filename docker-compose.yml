@@ -43,6 +43,11 @@ services:
       # the image.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_EVIDENCE_MODEL: ${OPENAI_EVIDENCE_MODEL:-gpt-5.6-sol}
+      # Email Intelligence remains pending until all three values are supplied.
+      # Raw content uses a dedicated key and attachments stay disabled in code.
+      EMAIL_INGESTION_DOMAIN: ${EMAIL_INGESTION_DOMAIN:-}
+      EMAIL_INGESTION_WEBHOOK_SECRET: ${EMAIL_INGESTION_WEBHOOK_SECRET:-}
+      EMAIL_INTELLIGENCE_ENCRYPTION_KEY: ${EMAIL_INTELLIGENCE_ENCRYPTION_KEY:-}
       # ENABLE_DEV_LOGIN intentionally unset → no-password backdoor is OFF in prod.
     depends_on:
       db:

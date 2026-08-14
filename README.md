@@ -64,7 +64,8 @@ cause otherwise recoverable opportunities to disappear.
 | Current development branch | Under review; not deployed to production |
 | Per-user Gmail sending | Secure application foundation implemented; real production OAuth acceptance remains pending |
 | Google Business Graph | Permission and module foundation implemented; source adapters remain in development |
-| Full Gmail inbox intelligence | Architecture defined; restricted-scope connector intentionally deferred pending verification and security readiness |
+| Email Intelligence Inbox | Secure tenant intake, redaction, retention, review, and synthetic-test foundation implemented; live provider routing remains pending |
+| Full Gmail inbox intelligence | Restricted-scope connector intentionally deferred pending verification and security readiness |
 
 Product documentation does not imply that an unfinished connector is available
 to customers. Release claims must be supported by the exact deployed version and
@@ -114,6 +115,7 @@ For the Windows development workflow and database bootstrap, see
 - [GOOGLE-OAUTH-SETUP.md](GOOGLE-OAUTH-SETUP.md) — per-user Gmail authorization
 - [GOOGLE-BUSINESS-GRAPH.md](GOOGLE-BUSINESS-GRAPH.md) — permissioned Google source strategy
 - [EMAIL-INTELLIGENCE-ARCHITECTURE.md](EMAIL-INTELLIGENCE-ARCHITECTURE.md) — phased email intelligence model
+- [EMAIL-INTELLIGENCE-SETUP.md](EMAIL-INTELLIGENCE-SETUP.md) — Cloudflare intake bridge and activation gates
 - [GROWTHOS-RESUME.md](GROWTHOS-RESUME.md) — verified implementation state and continuation point
 
 ## Repository policy

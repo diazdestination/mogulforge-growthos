@@ -184,6 +184,16 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /integrations/google/modules": "crm.read",
   "POST /integrations/google/modules/:module/connect": "crm.read",
   "PUT /integrations/google/modules/:module": "crm.read",
+  // Email Intelligence source configuration is owner/admin controlled. All
+  // members may inspect tenant facts; writers disposition findings.
+  "GET /email-intelligence": "crm.read",
+  "POST /email-intelligence/source": "settings.manage",
+  "PATCH /email-intelligence/source/:id": "settings.manage",
+  "GET /email-intelligence/messages": "crm.read",
+  "POST /email-intelligence/test": "settings.manage",
+  "POST /email-intelligence/facts/:id/review": "crm.write",
+  "DELETE /email-intelligence/messages/:id/raw": "settings.manage",
+  "DELETE /email-intelligence/messages/:id": "settings.manage",
   "PUT /settings": "settings.manage",
   "GET /installation": "settings.manage",
   "POST /installation/checks": "settings.manage",

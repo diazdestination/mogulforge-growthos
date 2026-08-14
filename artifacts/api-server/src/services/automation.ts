@@ -1023,6 +1023,12 @@ export async function processScheduledWork(organizationId?: string): Promise<voi
     const { cleanupExpiredPortalCredentials } = await import("./portal");
     await cleanupExpiredPortalCredentials();
   });
+  // Enforce Email Intelligence raw-content retention independently of UI reads.
+  // Facts and audit evidence remain; only the encrypted source body is purged.
+  await runStage("email-intelligence-retention", async () => {
+    const { purgeExpiredEmailContent } = await import("./email-intelligence");
+    await purgeExpiredEmailContent();
+  });
   // Email org admins once when an active API key nears its expiry date.
   await runStage("api-key-expiry-reminders", async () => {
     const { processApiKeyExpiryReminders } = await import(

@@ -119,6 +119,9 @@ Implemented locally:
 - local enable/disable state per organization, user, and module;
 - module catalog/status API with maturity and scope disclosures;
 - Gmail send adapter tied to the executing user.
+- Email Intelligence Inbox foundation with a tenant-specific address, signed
+  provider boundary, authorized forwarders, encrypted short-lived raw content,
+  redacted deterministic facts, human review, purge controls, and synthetic test.
 
 Still required before claims:
 

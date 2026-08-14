@@ -5,11 +5,14 @@ import {
   Activity,
   Bot,
   CheckCircle2,
+  Copy,
   CircleAlert,
   Database,
   FileUp,
   FileSearch2,
+  FlaskConical,
   Gauge,
+  MailSearch,
   Loader2,
   Play,
   RefreshCw,
@@ -17,6 +20,7 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
+  Trash2,
   XCircle,
 } from 'lucide-react';
 import { useGetMe, UserRole } from '@workspace/api-client-react';
@@ -84,6 +88,50 @@ interface Proposal {
   estimatedValueCents: number | null;
   executionDetail: string | null;
   createdAt: string;
+}
+
+type EmailSourceStatus = 'pending' | 'active' | 'paused' | 'error';
+type EmailFactStatus = 'needs_review' | 'verified' | 'rejected';
+
+interface EmailIntelligenceSource {
+  id: string;
+  status: EmailSourceStatus;
+  intakeAddress: string;
+  allowedForwarders: string[];
+  retentionDays: number;
+  attachmentsEnabled: boolean;
+  lastReceivedAt: string | null;
+  lastErrorCode: string | null;
+}
+
+interface EmailIntelligenceStatus {
+  source: EmailIntelligenceSource | null;
+  providerConfigured: boolean;
+  messagesAccepted: number;
+  factsAwaitingReview: number;
+  rawMessagesHeld: number;
+}
+
+interface EmailIntelligenceFact {
+  id: string;
+  kind: string;
+  status: EmailFactStatus;
+  statement: string;
+  evidenceExcerpt: string;
+  confidence: number;
+}
+
+interface EmailIntelligenceMessage {
+  id: string;
+  fromEmail: string;
+  forwardedBy: string;
+  redactedSubject: string;
+  status: 'processed' | 'raw_purged';
+  receivedAt: string;
+  rawExpiresAt: string;
+  rawPurgedAt: string | null;
+  rawAvailable: boolean;
+  facts: EmailIntelligenceFact[];
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -236,11 +284,21 @@ export default function Bie() {
     queryKey: ['bie', 'actions'],
     queryFn: () => request<Proposal[]>('/bie/actions'),
   });
+  const emailStatusQuery = useQuery({
+    queryKey: ['email-intelligence', 'status'],
+    queryFn: () => request<EmailIntelligenceStatus>('/email-intelligence'),
+  });
+  const emailMessagesQuery = useQuery({
+    queryKey: ['email-intelligence', 'messages'],
+    queryFn: () => request<EmailIntelligenceMessage[]>('/email-intelligence/messages'),
+    enabled: Boolean(emailStatusQuery.data?.source),
+  });
 
   const refresh = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['bie', 'briefing'] }),
       queryClient.invalidateQueries({ queryKey: ['bie', 'actions'] }),
+      queryClient.invalidateQueries({ queryKey: ['email-intelligence'] }),
     ]);
   };
   const withFeedback = async (operation: () => Promise<unknown>, success: string) => {
@@ -287,10 +345,72 @@ export default function Bie() {
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'BIE could not update the policy.'),
   });
+  const emailSetupMutation = useMutation({
+    mutationFn: async () => {
+      if (!profile?.email) throw new Error('Your GrowthOS account needs an email address before creating an inbox.');
+      return request<EmailIntelligenceStatus>('/email-intelligence/source', {
+        method: 'POST',
+        body: JSON.stringify({ allowedForwarders: [profile.email] }),
+      });
+    },
+    onSuccess: async () => {
+      await refresh();
+      setNotice('A tenant-specific Email Intelligence Inbox was reserved. Live delivery remains off until the provider bridge is configured.');
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'The inbox could not be created.'),
+  });
+  const emailTestMutation = useMutation({
+    mutationFn: () => request<{ factCount: number }>('/email-intelligence/test', { method: 'POST' }),
+    onSuccess: async (result) => {
+      await refresh();
+      setNotice(`Synthetic message processed with ${result.factCount} reviewable fact${result.factCount === 1 ? '' : 's'}.`);
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'The synthetic email test failed.'),
+  });
+  const emailFactMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'verified' | 'rejected' }) => request<EmailIntelligenceFact>(`/email-intelligence/facts/${id}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }),
+    onSuccess: async () => {
+      await refresh();
+      setNotice('Email intelligence finding reviewed.');
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'The finding could not be reviewed.'),
+  });
+  const emailPurgeMutation = useMutation({
+    mutationFn: (id: string) => request<{ success: boolean }>(`/email-intelligence/messages/${id}/raw`, { method: 'DELETE' }),
+    onSuccess: async () => {
+      await refresh();
+      setNotice('Encrypted raw message content was permanently purged. Redacted review facts remain.');
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'Raw message content could not be purged.'),
+  });
+  const emailDeleteMutation = useMutation({
+    mutationFn: (id: string) => request<{ success: boolean }>(`/email-intelligence/messages/${id}`, { method: 'DELETE' }),
+    onSuccess: async () => {
+      await refresh();
+      setNotice('The email record and all of its derived findings were deleted.');
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'The email record could not be deleted.'),
+  });
+  const emailSourceMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'active' | 'paused' }) => request<EmailIntelligenceStatus>(`/email-intelligence/source/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+    onSuccess: async (_, variables) => {
+      await refresh();
+      setNotice(variables.status === 'active' ? 'Live email intake enabled.' : 'Email intake paused.');
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'The email source could not be updated.'),
+  });
 
   const briefing = briefingQuery.data;
   const proposed = useMemo(() => (actionsQuery.data ?? []).filter((action) => action.status === 'proposed'), [actionsQuery.data]);
-  const busy = briefingMutation.isPending || proposalsMutation.isPending || actionMutation.isPending || policyMutation.isPending;
+  const busy = briefingMutation.isPending || proposalsMutation.isPending || actionMutation.isPending || policyMutation.isPending || emailSetupMutation.isPending || emailTestMutation.isPending || emailFactMutation.isPending || emailPurgeMutation.isPending || emailDeleteMutation.isPending || emailSourceMutation.isPending;
+  const emailStatus = emailStatusQuery.data;
+  const emailSource = emailStatus?.source;
 
   if (briefingQuery.isLoading) {
     return <div className="flex min-h-[50vh] items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-primary" /></div>;
@@ -341,6 +461,94 @@ export default function Bie() {
         <MetricCard icon={Gauge} label="Data readiness" value={`${briefing.dataReadiness.score}/100`} detail={`${briefing.dataReadiness.leadsWithKnownValue} of ${briefing.totalLeads} leads have known value.`} />
         <MetricCard icon={Database} label="Google revenue stack" value={`${briefing.dataReadiness.googleSourcesConnected}/${briefing.dataReadiness.totalGoogleSources}`} detail="Connected sources only; no provider metrics are assumed." />
       </div>
+
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+          <div className="max-w-3xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <MailSearch className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Email Intelligence Inbox</h2>
+              <span className={cn(
+                'inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                emailSource?.status === 'active'
+                  ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                  : 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+              )}>
+                {emailSource?.status === 'active' ? 'Live intake' : emailSource ? 'Setup pending' : 'Not configured'}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">Analyze only the business email streams an owner authorizes. Attachments are off, raw content is encrypted and short-lived, and every extracted fact requires review.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {!emailSource && canManage && (
+              <button disabled={busy || !profile?.email} onClick={() => { setError(null); setNotice(null); emailSetupMutation.mutate(); }} className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
+                {emailSetupMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MailSearch className="h-3.5 w-3.5" />} Reserve secure inbox
+              </button>
+            )}
+            {emailSource && canManage && (
+              <button disabled={busy} onClick={() => { setError(null); setNotice(null); emailTestMutation.mutate(); }} className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold hover:bg-muted disabled:opacity-60">
+                {emailTestMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FlaskConical className="h-3.5 w-3.5" />} Run synthetic test
+              </button>
+            )}
+            {emailSource && canManage && emailStatus?.providerConfigured && (
+              <button disabled={busy} onClick={() => { setError(null); setNotice(null); emailSourceMutation.mutate({ id: emailSource.id, status: emailSource.status === 'active' ? 'paused' : 'active' }); }} className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-semibold hover:bg-muted disabled:opacity-60">
+                {emailSource.status === 'active' ? 'Pause live intake' : 'Activate live intake'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {emailStatusQuery.isError && <p className="mt-4 text-sm text-destructive">{emailStatusQuery.error instanceof Error ? emailStatusQuery.error.message : 'Email Intelligence status could not be loaded.'}</p>}
+
+        {emailSource ? (
+          <>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-lg bg-muted/60 p-3 md:col-span-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Reserved intake address</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <code className="break-all text-sm font-semibold text-foreground">{emailSource.intakeAddress}</code>
+                  <button title="Copy address" onClick={() => { void navigator.clipboard?.writeText(emailSource.intakeAddress); setNotice('Inbox address copied.'); }} className="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground"><Copy className="h-3.5 w-3.5" /></button>
+                </div>
+                {!emailStatus?.providerConfigured && <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">Reserved only. The inbound provider bridge and DNS are not configured, so this address cannot receive live mail yet.</p>}
+              </div>
+              <div className="rounded-lg bg-muted/60 p-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Data controls</p><p className="mt-1 text-sm font-medium">{emailSource.retentionDays}-day raw retention</p><p className="mt-1 text-xs text-muted-foreground">Attachments {emailSource.attachmentsEnabled ? 'enabled' : 'disabled'}</p></div>
+              <div className="rounded-lg bg-muted/60 p-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Review queue</p><p className="mt-1 text-sm font-medium">{emailStatus?.factsAwaitingReview ?? 0} finding{emailStatus?.factsAwaitingReview === 1 ? '' : 's'} waiting</p><p className="mt-1 text-xs text-muted-foreground">{emailStatus?.rawMessagesHeld ?? 0} encrypted raw message{emailStatus?.rawMessagesHeld === 1 ? '' : 's'} retained</p></div>
+            </div>
+            <div className="mt-3 rounded-lg border border-border/80 bg-background/40 p-3 text-xs text-muted-foreground">
+              Authorized forwarder{emailSource.allowedForwarders.length === 1 ? '' : 's'}: <span className="font-medium text-foreground">{emailSource.allowedForwarders.join(', ')}</span>. Only authenticated provider events attributed to this list are accepted.
+            </div>
+
+            <div className="mt-4 divide-y divide-border rounded-lg border border-border">
+              {emailMessagesQuery.isLoading && <div className="p-4 text-sm text-muted-foreground">Loading email intelligence evidence…</div>}
+              {!emailMessagesQuery.isLoading && !(emailMessagesQuery.data?.length) && <div className="p-4 text-sm text-muted-foreground">No messages processed. Owners can run the synthetic fixture without connecting a real mailbox.</div>}
+              {(emailMessagesQuery.data ?? []).slice(0, 6).map((message) => (
+                <div key={message.id} className="p-4">
+                  <div className="flex flex-col justify-between gap-2 md:flex-row md:items-start">
+                    <div><p className="text-sm font-semibold">{message.redactedSubject || '(No subject)'}</p><p className="mt-0.5 text-xs text-muted-foreground">From {message.fromEmail} · received {new Date(message.receivedAt).toLocaleString()}</p></div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {message.rawAvailable && canManage ? <button disabled={busy} onClick={() => { setError(null); setNotice(null); emailPurgeMutation.mutate(message.id); }} className="inline-flex h-8 items-center gap-1.5 self-start rounded-md border border-border bg-background px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-60"><Trash2 className="h-3.5 w-3.5" /> Purge raw</button> : <span className="text-xs text-muted-foreground">Raw content purged</span>}
+                      {canManage && <button disabled={busy} onClick={() => { if (window.confirm('Delete this email record and every derived finding? This cannot be undone.')) { setError(null); setNotice(null); emailDeleteMutation.mutate(message.id); } }} className="inline-flex h-8 items-center gap-1.5 self-start rounded-md border border-destructive/30 bg-background px-2.5 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-60"><XCircle className="h-3.5 w-3.5" /> Delete record</button>}
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {message.facts.length === 0 && <p className="text-xs text-muted-foreground">No deterministic beta rule matched this message.</p>}
+                    {message.facts.map((fact) => (
+                      <div key={fact.id} className="rounded-md bg-muted/50 p-3">
+                        <div className="flex flex-col justify-between gap-2 md:flex-row md:items-start">
+                          <div><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-primary">{fact.kind.replaceAll('_', ' ')}</span><span className="text-[10px] font-medium text-muted-foreground">{fact.confidence}% rule confidence</span><span className="text-[10px] font-medium text-muted-foreground">{fact.status.replaceAll('_', ' ')}</span></div><p className="mt-1 text-sm">{fact.statement}</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">“{fact.evidenceExcerpt}”</p></div>
+                          {fact.status === 'needs_review' && <div className="flex shrink-0 gap-1.5"><button disabled={busy} onClick={() => { setError(null); setNotice(null); emailFactMutation.mutate({ id: fact.id, status: 'verified' }); }} className="rounded-md bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60">Verify</button><button disabled={busy} onClick={() => { setError(null); setNotice(null); emailFactMutation.mutate({ id: fact.id, status: 'rejected' }); }} className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-semibold disabled:opacity-60">Reject</button></div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : !emailStatusQuery.isLoading && (
+          <div className="mt-4 rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground">No mailbox access is requested. An owner may reserve an organization-specific inbox and begin with a synthetic fixture; live routing stays disabled until the provider and domain are deliberately configured.</div>
+        )}
+      </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">

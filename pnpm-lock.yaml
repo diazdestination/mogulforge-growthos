@@ -186,7 +186,7 @@ importers:
         version: 2.8.6
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.2(@types/pg@8.20.3)(pg@8.22.0)
+        version: 0.45.2(@cloudflare/workers-types@5.20260810.1)(@types/pg@8.20.3)(pg@8.22.0)
       express:
         specifier: ^5.2.1
         version: 5.2.1
@@ -483,10 +483,10 @@ importers:
     dependencies:
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.2(@types/pg@8.20.3)(pg@8.22.0)
+        version: 0.45.2(@cloudflare/workers-types@5.20260810.1)(@types/pg@8.20.3)(pg@8.22.0)
       drizzle-zod:
         specifier: ^0.8.3
-        version: 0.8.3(drizzle-orm@0.45.2(@types/pg@8.20.3)(pg@8.22.0))(zod@4.4.3)
+        version: 0.8.3(drizzle-orm@0.45.2(@cloudflare/workers-types@5.20260810.1)(@types/pg@8.20.3)(pg@8.22.0))(zod@4.4.3)
       pg:
         specifier: ^8.22.0
         version: 8.22.0
@@ -510,6 +510,25 @@ importers:
         specifier: workspace:*
         version: link:../api-client-react
 
+  lib/integrations/cloudflare-email-intake:
+    dependencies:
+      postal-mime:
+        specifier: 2.7.6
+        version: 2.7.6
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: 5.20260810.1
+        version: 5.20260810.1
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@25.9.5)(esbuild@0.27.3)(jiti@2.7.0)(jsdom@26.1.0)(tsx@4.23.5)(yaml@2.9.0)
+
   lib/replit-auth-web:
     dependencies:
       '@workspace/api-client-react':
@@ -527,7 +546,7 @@ importers:
         version: link:../lib/db
       drizzle-orm:
         specifier: 'catalog:'
-        version: 0.45.2(@types/pg@8.20.3)(pg@8.22.0)
+        version: 0.45.2(@cloudflare/workers-types@5.20260810.1)(@types/pg@8.20.3)(pg@8.22.0)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -630,6 +649,9 @@ packages:
   '@babel/types@7.29.8':
     resolution: {integrity: sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==}
     engines: {node: '>=6.9.0'}
+
+  '@cloudflare/workers-types@5.20260810.1':
+    resolution: {integrity: sha512-aD0hEU6HaiG4wy4hDoPoLXMH963nHD4MsIY566pGkWO2dL/yeYEiMN7SeJ24t+wBmLDnh16yQ7IPos5opGkIoA==}
 
   '@commander-js/extra-typings@15.0.0':
     resolution: {integrity: sha512-yeJlba62xqmkgELUsn7356MEnzLLu/fw2x4lofFqGnXh6YysRdEs2BaLeLtg1+KU0AXvMeqQvTTp+3hBEBK+EA==}
@@ -3420,6 +3442,9 @@ packages:
     resolution: {integrity: sha512-40QW5YalBNfQo5yRYmiw7Yz6TKKVr3h6970B2YE+3fQpsWcrbj1PzJgxeJ19DRQjhMbKPIuMY8rFaXc8moolVw==}
     engines: {node: '>=10.13.0'}
 
+  postal-mime@2.7.6:
+    resolution: {integrity: sha512-UUlyE2KlxmvwMGq060onF/VWU3zD6dVW31FwokQ5v26jWd35fbs2MoTFzh+jXnPwAyV2MULMKXcBInGOl5TO6Q==}
+
   postcss-selector-parser@6.0.10:
     resolution: {integrity: sha512-IQ7TZdoaqbT+LCpShg46jnZVlhWD2w6iQYAcYXfHARZ7X1t/UGhhceQDs5X0cGqKvYlHNOuv7Oa1xmb0oQuA3w==}
     engines: {node: '>=4'}
@@ -4398,6 +4423,8 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
+
+  '@cloudflare/workers-types@5.20260810.1': {}
 
   '@commander-js/extra-typings@15.0.0(commander@15.0.0)':
     dependencies:
@@ -6154,14 +6181,15 @@ snapshots:
       esbuild: 0.27.3
       tsx: 4.23.5
 
-  drizzle-orm@0.45.2(@types/pg@8.20.3)(pg@8.22.0):
+  drizzle-orm@0.45.2(@cloudflare/workers-types@5.20260810.1)(@types/pg@8.20.3)(pg@8.22.0):
     optionalDependencies:
+      '@cloudflare/workers-types': 5.20260810.1
       '@types/pg': 8.20.3
       pg: 8.22.0
 
-  drizzle-zod@0.8.3(drizzle-orm@0.45.2(@types/pg@8.20.3)(pg@8.22.0))(zod@4.4.3):
+  drizzle-zod@0.8.3(drizzle-orm@0.45.2(@cloudflare/workers-types@5.20260810.1)(@types/pg@8.20.3)(pg@8.22.0))(zod@4.4.3):
     dependencies:
-      drizzle-orm: 0.45.2(@types/pg@8.20.3)(pg@8.22.0)
+      drizzle-orm: 0.45.2(@cloudflare/workers-types@5.20260810.1)(@types/pg@8.20.3)(pg@8.22.0)
       zod: 4.4.3
 
   dunder-proto@1.0.1:
@@ -7443,6 +7471,8 @@ snapshots:
     optional: true
 
   pngjs@5.0.0: {}
+
+  postal-mime@2.7.6: {}
 
   postcss-selector-parser@6.0.10:
     dependencies:
