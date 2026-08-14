@@ -1,5 +1,5 @@
 import { useGetDashboardSummary, useGetEmailProviderStatus, useGetMarketingSummary, useGetMe, LeadStatus } from '@workspace/api-client-react';
-import { Loader2, Trello, Calendar, CheckSquare, Activity as ActivityIcon, Globe, Sparkles, MessageSquare, ArrowRight } from 'lucide-react';
+import { Loader2, Trello, Calendar, CheckSquare, Activity as ActivityIcon, Globe, Sparkles, MessageSquare, ArrowRight, Trash2 } from 'lucide-react';
 import { Link } from 'wouter';
 import { format } from 'date-fns';
 import { useState } from 'react';
@@ -45,6 +45,77 @@ function DemoDataBanner() {
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
         {busy ? 'Loading…' : 'Load sample data'}
       </button>
+    </div>
+  );
+}
+
+/**
+ * Owner/admin-only cleanup for the reversible demo seed. The server route is
+ * intentionally narrower than the button label: it deletes only leads tagged
+ * with source=demo-data and contacts at the demo.mogulforge.dev domain.
+ */
+function ClearDemoDataButton() {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function clear() {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await fetch('/api/v1/demo-data', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      window.location.reload();
+    } catch {
+      setBusy(false);
+      setConfirming(false);
+      setError('Sample data could not be cleared. Try again.');
+    }
+  }
+
+  if (confirming) {
+    return (
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <span className="text-xs text-muted-foreground">
+          Remove sample leads only? Real CRM records stay untouched.
+        </span>
+        <button
+          type="button"
+          onClick={() => setConfirming(false)}
+          disabled={busy}
+          className="h-8 px-3 rounded-md border border-border bg-background text-xs font-semibold hover:bg-muted disabled:opacity-60"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={clear}
+          disabled={busy}
+          data-testid="button-confirm-clear-demo-data"
+          className="h-8 px-3 rounded-md bg-destructive text-destructive-foreground text-xs font-semibold hover:bg-destructive/90 disabled:opacity-60 inline-flex items-center gap-1.5"
+        >
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+          {busy ? 'Clearing…' : 'Confirm clear'}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        data-testid="button-clear-demo-data"
+        className="h-8 px-3 rounded-md border border-border bg-background text-xs font-semibold text-muted-foreground hover:text-destructive hover:border-destructive/50 transition-colors inline-flex items-center gap-1.5"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+        Clear sample data
+      </button>
+      {error && <span className="text-xs text-destructive" role="alert">{error}</span>}
     </div>
   );
 }
@@ -95,9 +166,14 @@ export default function Dashboard() {
     <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-background">
       <div className="max-w-6xl mx-auto space-y-6 md:space-y-8 pb-8 md:pb-0">
         
-        <header>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-1 text-foreground">Welcome back, {me?.firstName || 'Agent'}</h1>
-          <p className="text-muted-foreground text-sm">Here's the status of your mission control today.</p>
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-1 text-foreground">Welcome back, {me?.firstName || 'Agent'}</h1>
+            <p className="text-muted-foreground text-sm">Here's the status of your mission control today.</p>
+          </div>
+          {me && canManageSettings(me.role) && (summary?.totalLeads ?? 0) > 0 && (
+            <ClearDemoDataButton />
+          )}
         </header>
 
         {me && canManageSettings(me.role) && <EmailFailureBanner />}
