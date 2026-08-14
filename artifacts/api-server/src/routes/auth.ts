@@ -449,6 +449,21 @@ const LoginBody = z.object({
   password: z.string().min(1).max(200),
 });
 
+function isBetaSelfRegistrationAllowed(email: string): boolean {
+  const allowlist = (process.env.BETA_SIGNUP_ALLOWLIST ?? '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  // Production is invite-only unless an address is explicitly allowlisted.
+  // Development and test remain open so local setup and existing fixtures work.
+  if (allowlist.length === 0) {
+    return process.env.NODE_ENV !== 'production';
+  }
+
+  return allowlist.includes(email);
+}
+
 type SessionUserFields = {
   id: string;
   email: string | null;
@@ -486,21 +501,31 @@ router.post('/auth/register', async (req: Request, res: Response) => {
   }
   const email = parsed.data.email.toLowerCase();
   const { password, firstName, lastName } = parsed.data;
-  const passwordHash = await hashPassword(password);
 
   const [existing] = await db
     .select()
     .from(usersTable)
     .where(eq(usersTable.email, email));
 
+  // Existing accounts keep the same response regardless of beta-gate state.
+  // Pre-provisioned invite rows bypass the allowlist because an organization
+  // owner has already approved their access.
+  if (existing && !existing.id.startsWith('invite:')) {
+    res.status(409).json({ error: 'An account with this email already exists' });
+    return;
+  }
+  if (!existing && !isBetaSelfRegistrationAllowed(email)) {
+    res.status(403).json({
+      error: 'GrowthOS is currently invite-only. Ask your MogulForge administrator for beta access.',
+      code: 'BETA_INVITE_REQUIRED',
+    });
+    return;
+  }
+
+  const passwordHash = await hashPassword(password);
+
   let dbUser;
   if (existing) {
-    // Adopt a pre-provisioned invite row (keeps its org + role); otherwise the
-    // email is genuinely taken.
-    if (!existing.id.startsWith('invite:')) {
-      res.status(409).json({ error: 'An account with this email already exists' });
-      return;
-    }
     const [adopted] = await db
       .update(usersTable)
       .set({
