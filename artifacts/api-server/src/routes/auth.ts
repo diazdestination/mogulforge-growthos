@@ -512,10 +512,18 @@ router.post('/auth/register', async (req: Request, res: Response) => {
     .where(eq(usersTable.email, email));
 
   // Existing accounts keep the same response regardless of beta-gate state.
-  // Pre-provisioned invite rows bypass the allowlist because an organization
-  // owner has already approved their access.
+  // Only active pre-provisioned invite rows bypass the allowlist because an
+  // organization owner has approved their access. Deactivating a pending
+  // invite revokes it and must not be undone by the invitee registering later.
   if (existing && !existing.id.startsWith('invite:')) {
     res.status(409).json({ error: 'An account with this email already exists' });
+    return;
+  }
+  if (existing?.id.startsWith('invite:') && !existing.isActive) {
+    res.status(403).json({
+      error: 'This GrowthOS invitation is no longer active. Ask your MogulForge administrator for a new invitation.',
+      code: 'BETA_INVITE_REVOKED',
+    });
     return;
   }
   if (!existing && !isBetaSelfRegistrationAllowed(email)) {
@@ -542,8 +550,8 @@ router.post('/auth/register', async (req: Request, res: Response) => {
         passwordHash,
         firstName: firstName ?? existing.firstName,
         lastName: lastName ?? existing.lastName,
-        // Invite rows are inactive while pending. Completing password
-        // registration accepts the invite and activates the member.
+        // The invite was confirmed active above. Completing password
+        // registration accepts it and keeps the new member active.
         isActive: true,
         updatedAt: new Date(),
       })

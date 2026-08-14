@@ -426,13 +426,14 @@ describe("member self-service profile", () => {
 });
 
 describe("founding beta registration gate", () => {
-  it("fails closed in production, accepts allowlisted founders, and preserves invited-user signup", async () => {
+  it("fails closed in production, accepts allowlisted founders, preserves active invites, and blocks revoked invites", async () => {
     const originalNodeEnv = process.env.NODE_ENV;
     const originalAllowlist = process.env.BETA_SIGNUP_ALLOWLIST;
     const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const blockedEmail = `blocked-${suffix}@example.com`;
     const allowedEmail = `allowed-${suffix}@example.com`;
     const invitedEmail = `invited-${suffix}@example.com`;
+    const revokedEmail = `revoked-${suffix}@example.com`;
 
     try {
       process.env.NODE_ENV = "production";
@@ -482,6 +483,13 @@ describe("founding beta registration gate", () => {
         organizationId: org.id,
         role: "sales_rep",
       });
+      const revoked = await makeUser({
+        id: `invite:${crypto.randomUUID()}`,
+        email: revokedEmail,
+        organizationId: org.id,
+        role: "sales_rep",
+        isActive: false,
+      });
 
       delete process.env.BETA_SIGNUP_ALLOWLIST;
       const inviteSignup = await fetch(`${baseUrl}/api/auth/register`, {
@@ -505,6 +513,27 @@ describe("founding beta registration gate", () => {
       expect(adopted.organizationId).toBe(org.id);
       expect(adopted.role).toBe("sales_rep");
       expect(adopted.isActive).toBe(true);
+
+      const revokedSignup = await fetch(`${baseUrl}/api/auth/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: revokedEmail,
+          password: "correct-horse-battery-staple",
+          firstName: "Revoked",
+        }),
+      });
+      expect(revokedSignup.status).toBe(403);
+      expect(await revokedSignup.json()).toMatchObject({
+        code: "BETA_INVITE_REVOKED",
+      });
+
+      const [stillRevoked] = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.email, revokedEmail));
+      expect(stillRevoked.id).toBe(revoked.id);
+      expect(stillRevoked.isActive).toBe(false);
     } finally {
       if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = originalNodeEnv;
