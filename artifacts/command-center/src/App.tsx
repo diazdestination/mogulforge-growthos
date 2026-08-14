@@ -34,6 +34,7 @@ import Onboarding from '@/pages/onboarding';
 import Platform from '@/pages/platform';
 import Bie from '@/pages/bie';
 import EvidenceIntelligence from '@/pages/evidence-intelligence';
+import Account from '@/pages/account';
 import { CreateOrgScreen } from '@/components/create-org';
 import { useGetSession, getGetSessionQueryKey } from '@workspace/api-client-react';
 
@@ -260,6 +261,7 @@ function AuthedApp() {
         <Route path="/appointments" component={Appointments} />
         <Route path="/audit" component={AuditLog} />
         <Route path="/settings" component={Settings} />
+        <Route path="/account" component={Account} />
         <Route path="/billing" component={Billing} />
         <Route path="/forms" component={Forms} />
         <Route path="/reactivation" component={Reactivation} />
