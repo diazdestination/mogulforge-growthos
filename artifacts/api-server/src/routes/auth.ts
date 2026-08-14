@@ -174,6 +174,10 @@ async function upsertUser(claims: Record<string, unknown>) {
           firstName: userData.firstName ?? invited.firstName,
           lastName: userData.lastName ?? invited.lastName,
           profileImageUrl: userData.profileImageUrl,
+          // A pending invite is intentionally inactive until the invitee
+          // proves control of the invited email by completing registration.
+          // Successful adoption is the activation boundary.
+          isActive: true,
           updatedAt: new Date(),
         })
         .where(eq(usersTable.id, invited.id))
@@ -532,6 +536,9 @@ router.post('/auth/register', async (req: Request, res: Response) => {
         passwordHash,
         firstName: firstName ?? existing.firstName,
         lastName: lastName ?? existing.lastName,
+        // Invite rows are inactive while pending. Completing password
+        // registration accepts the invite and activates the member.
+        isActive: true,
         updatedAt: new Date(),
       })
       .where(eq(usersTable.id, existing.id))

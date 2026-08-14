@@ -501,6 +501,7 @@ describe("founding beta registration gate", () => {
         .where(eq(usersTable.id, invited.id));
       expect(adopted.organizationId).toBe(org.id);
       expect(adopted.role).toBe("sales_rep");
+      expect(adopted.isActive).toBe(true);
     } finally {
       if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = originalNodeEnv;
