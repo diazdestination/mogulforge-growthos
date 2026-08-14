@@ -24,7 +24,8 @@ BIE remain useful without Google access.
 | Search Console | `webmasters.readonly` | Search demand, visibility losses, and content opportunities | Read-only adapter |
 | Google Ads | `adwords` | Spend-to-lead-to-estimate-to-win accountability | Adapter enforces reads first |
 | Business Profile | `business.manage` | Reviews, locations, visibility, and demand | Google project approval required; adapter reads first |
-| Gmail inbox intelligence | `gmail.readonly` | Commitments, intent, and missed opportunities | Deferred: restricted scope/security assessment |
+| Contextual Gmail intelligence | Gmail add-on current-message scopes | User-initiated thread analysis, commitments, and CRM capture | Planned narrow-scope beta |
+| Gmail inbox intelligence | `gmail.readonly` or the narrowest adequate restricted scope | Continuous commitments, intent, and missed opportunities | Deferred: restricted verification/security assessment |
 
 Do not request broad `drive.readonly` for beta. It is restricted. Use
 `drive.file` and Google Picker so the user selects the exact files GrowthOS may
@@ -32,6 +33,13 @@ access. `drive.file` also supports selected Google Sheets through the Sheets
 API. Do not request `gmail.readonly` until the business case, restricted-scope
 verification, security assessment, retention policy, deletion flow, and
 customer trust materials are ready.
+
+Continuous email intelligence will initially use customer-controlled forwarding
+or Workspace routing into a tenant-specific GrowthOS ingestion address, not a
+restricted Gmail OAuth scope. A contextual Gmail add-on will support explicit
+"Analyze this thread" actions with current-message scopes. Full-mailbox OAuth is
+a later, formally verified tier. See `EMAIL-INTELLIGENCE-ARCHITECTURE.md` for the
+data boundary, retention controls, and release sequence.
 
 ## Experience
 
@@ -120,5 +128,6 @@ Still required before claims:
 - two-account and two-tenant acceptance tests for every module;
 - Google OAuth verification, Business Profile project approval, and any
   restricted-scope security assessment;
-- retention, export, deletion, incident response, and production monitoring.
-
+- retention, export, deletion, incident response, and production monitoring;
+- tenant email ingestion and contextual add-on implementation described in
+  `EMAIL-INTELLIGENCE-ARCHITECTURE.md`.
