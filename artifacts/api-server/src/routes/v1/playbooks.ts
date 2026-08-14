@@ -173,16 +173,11 @@ router.get(
       req.member!.organizationId,
       String(req.params.id),
     );
-    const organizationId = req.member!.organizationId;
-    const updated = await skipEnrollmentStep(
-      req.member!.organizationId,
-      String(req.params.id),
-    );
-    if (!updated) {
-      res.status(404).json({ error: "No paused enrollment to resume" });
+    if (!enrollment) {
+      res.status(404).json({ error: "No enrollment found" });
       return;
     }
-    res.json(updated);
+    res.json(enrollment);
   },
 );
 

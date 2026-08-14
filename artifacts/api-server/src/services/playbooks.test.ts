@@ -6,13 +6,34 @@ import {
   playbooksTable,
   scheduledActionsTable,
   activitiesTable,
+  usersTable,
   DEFAULT_SENDING_HOURS,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import { updateOrgSettings } from "./settings";
+
+const getGmailStatusMock = vi.hoisted(() => vi.fn());
+const sendGmailForUserMock = vi.hoisted(() => vi.fn());
+
+vi.mock("./gmail-oauth", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./gmail-oauth")>();
+  return {
+    ...original,
+    getGmailStatus: getGmailStatusMock,
+    sendGmailForUser: sendGmailForUserMock,
+  };
+});
 
 import { runEvent } from "./automation";
 import * as crm from "./crm";
@@ -28,6 +49,7 @@ import {
 } from "./playbooks";
 
 let org: { id: string };
+let assignedUser: { id: string };
 
 beforeAll(async () => {
   const slug = `test-playbook-${Date.now()}`;
@@ -36,6 +58,15 @@ beforeAll(async () => {
     .values({ name: "Playbook Test Org", slug })
     .returning();
   org = row;
+  const [user] = await db
+    .insert(usersTable)
+    .values({
+      organizationId: org.id,
+      email: `playbook-sender-${Date.now()}@example.com`,
+      role: "sales_rep",
+    })
+    .returning();
+  assignedUser = user;
   // These suites run at any wall-clock time: disable the (default-on)
   // sending window so step execution is deterministic.
   await updateOrgSettings(org.id, {
@@ -43,16 +74,34 @@ beforeAll(async () => {
   });
 });
 
+beforeEach(() => {
+  getGmailStatusMock.mockReset();
+  getGmailStatusMock.mockResolvedValue({ configured: true, connected: true });
+  sendGmailForUserMock.mockReset();
+  sendGmailForUserMock.mockResolvedValue({
+    id: "gmail-playbook-test",
+    provider: "gmail",
+    senderEmail: "assigned-sender@example.com",
+  });
+});
+
 afterAll(async () => {
   await deleteTestOrgs(org.id);
 });
 
-async function makeLead(opts?: { smsGranted?: boolean; email?: string | null }) {
+async function makeLead(opts?: {
+  smsGranted?: boolean;
+  email?: string | null;
+  unassigned?: boolean;
+}) {
   const contact = await crm.createContact(org.id, {
     firstName: "Play",
     lastName: "Book",
     phone: "+15550002222",
-    email: opts?.email === null ? undefined : (opts?.email ?? "playbook@test.example"),
+    email:
+      opts?.email === null
+        ? undefined
+        : (opts?.email ?? "playbook@test.example"),
   });
   await db.insert(consentRecordsTable).values({
     organizationId: org.id,
@@ -61,7 +110,10 @@ async function makeLead(opts?: { smsGranted?: boolean; email?: string | null }) 
     granted: opts?.smsGranted ?? true,
     disclosureVersion: "v1",
   });
-  const lead = await crm.createLead(org.id, { contactId: contact.id });
+  const lead = await crm.createLead(org.id, {
+    contactId: contact.id,
+    ...(opts?.unassigned ? {} : { assignedUserId: assignedUser.id }),
+  });
   return { contact, lead: lead! };
 }
 
@@ -119,6 +171,14 @@ describe("closer engine playbooks", () => {
       stepIndex: 0,
     });
     expect(result.status).toBe("success");
+    expect(sendGmailForUserMock).toHaveBeenCalledOnce();
+    expect(sendGmailForUserMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: org.id,
+        userId: assignedUser.id,
+        to: "playbook@test.example",
+      }),
+    );
 
     const [after] = await db
       .select()
@@ -145,6 +205,57 @@ describe("closer engine playbooks", () => {
       stepIndex: 0,
     });
     expect(rerun.status).toBe("skipped");
+  });
+
+  it("pauses an automated email before claiming it when the lead has no assigned sender", async () => {
+    const { lead } = await makeLead({ unassigned: true });
+    const enrollment = await autoEnrollLead(org.id, lead.id);
+
+    const result = await executePlaybookStep(org.id, {
+      enrollmentId: enrollment!.id,
+      stepIndex: 0,
+    });
+
+    expect(result).toEqual({
+      status: "skipped",
+      detail: "paused: automated_sender_unassigned",
+    });
+    expect(getGmailStatusMock).not.toHaveBeenCalled();
+    expect(sendGmailForUserMock).not.toHaveBeenCalled();
+    const [after] = await db
+      .select()
+      .from(playbookEnrollmentsTable)
+      .where(eq(playbookEnrollmentsTable.id, enrollment!.id));
+    expect(after.status).toBe("paused");
+    expect(after.currentStep).toBe(0);
+    expect(after.pauseReason).toContain("assign this lead");
+  });
+
+  it("pauses an automated email before claiming it when the assigned user has no Gmail connection", async () => {
+    getGmailStatusMock.mockResolvedValue({
+      configured: true,
+      connected: false,
+    });
+    const { lead } = await makeLead();
+    const enrollment = await autoEnrollLead(org.id, lead.id);
+
+    const result = await executePlaybookStep(org.id, {
+      enrollmentId: enrollment!.id,
+      stepIndex: 0,
+    });
+
+    expect(result).toEqual({
+      status: "skipped",
+      detail: "paused: assigned_sender_gmail_not_connected",
+    });
+    expect(sendGmailForUserMock).not.toHaveBeenCalled();
+    const [after] = await db
+      .select()
+      .from(playbookEnrollmentsTable)
+      .where(eq(playbookEnrollmentsTable.id, enrollment!.id));
+    expect(after.status).toBe("paused");
+    expect(after.currentStep).toBe(0);
+    expect(after.pauseReason).toContain("assigned user must connect Gmail");
   });
 
   it("skips an SMS step without consent but still advances", async () => {
@@ -211,9 +322,18 @@ describe("closer engine playbooks", () => {
     const { lead } = await makeLead();
     const enrollment = await autoEnrollLead(org.id, lead.id);
     const results = await Promise.all([
-      executePlaybookStep(org.id, { enrollmentId: enrollment!.id, stepIndex: 0 }),
-      executePlaybookStep(org.id, { enrollmentId: enrollment!.id, stepIndex: 0 }),
-      executePlaybookStep(org.id, { enrollmentId: enrollment!.id, stepIndex: 0 }),
+      executePlaybookStep(org.id, {
+        enrollmentId: enrollment!.id,
+        stepIndex: 0,
+      }),
+      executePlaybookStep(org.id, {
+        enrollmentId: enrollment!.id,
+        stepIndex: 0,
+      }),
+      executePlaybookStep(org.id, {
+        enrollmentId: enrollment!.id,
+        stepIndex: 0,
+      }),
     ]);
     expect(results.filter((r) => r.status === "success")).toHaveLength(1);
 

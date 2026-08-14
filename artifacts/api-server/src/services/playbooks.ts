@@ -22,6 +22,7 @@ import {
   engagementLinkUrl,
   getOrCreateEngagementLink,
 } from "./engagement-links";
+import { getGmailStatus, sendGmailForUser } from "./gmail-oauth";
 import {
   adjustSendTime,
   chooseVariant,
@@ -182,10 +183,7 @@ export async function ensureDefaultPlaybook(
 
 function rulesMatch(playbook: Playbook, lead: Lead): boolean {
   const rules = playbook.enrollmentRules ?? {};
-  if (
-    typeof rules.minScore === "number" &&
-    lead.score < rules.minScore
-  ) {
+  if (typeof rules.minScore === "number" && lead.score < rules.minScore) {
     return false;
   }
   if (rules.urgencies?.length && !rules.urgencies.includes(lead.urgency)) {
@@ -197,7 +195,10 @@ function rulesMatch(playbook: Playbook, lead: Lead): boolean {
   ) {
     return false;
   }
-  if (rules.sources?.length && (!lead.source || !rules.sources.includes(lead.source))) {
+  if (
+    rules.sources?.length &&
+    (!lead.source || !rules.sources.includes(lead.source))
+  ) {
     return false;
   }
   return true;
@@ -244,7 +245,9 @@ export async function autoEnrollLead(
     // stage-behavior hand-offs or dedicated flows.
     const match = playbooks.find(
       (p) =>
-        p.category === "acquisition" && p.steps.length > 0 && rulesMatch(p, lead),
+        p.category === "acquisition" &&
+        p.steps.length > 0 &&
+        rulesMatch(p, lead),
     );
     if (!match) return null;
 
@@ -300,7 +303,9 @@ export async function enrollLead(
     // the cause too.
     const messages = [
       err instanceof Error ? err.message : "",
-      err instanceof Error && err.cause instanceof Error ? err.cause.message : "",
+      err instanceof Error && err.cause instanceof Error
+        ? err.cause.message
+        : "",
     ].join(" ");
     if (/playbook_enrollments_lead_(playbook_)?active_idx/.test(messages)) {
       return null;
@@ -413,7 +418,8 @@ export async function executePlaybookStep(
     const continues =
       behavior.action === "continue" ||
       // An "enroll into this very playbook" stage must not complete itself.
-      (behavior.action === "enroll" && behavior.enrollPlaybookId === playbook.id);
+      (behavior.action === "enroll" &&
+        behavior.enrollPlaybookId === playbook.id);
     if (!continues) {
       if (behavior.action === "pause") {
         await pauseEnrollment(enrollment.id, `lead moved to ${lead.status}`);
@@ -453,6 +459,7 @@ export async function executePlaybookStep(
     sendingHours,
   });
   let gateSkipReason: string | null = null;
+  let emailSenderUserId: string | null = null;
   if (!gate.ok) {
     if (gate.outcome === "deferred") {
       // Quiet hours / frequency cap: pause, never drop. Re-queue the exact
@@ -498,15 +505,71 @@ export async function executePlaybookStep(
       leadId: lead.id,
       contactId: contact.id,
     });
-    if (gate.reason.startsWith("suppressed:") || gate.reason === "do_not_contact") {
+    if (
+      gate.reason.startsWith("suppressed:") ||
+      gate.reason === "do_not_contact"
+    ) {
       // The recipient opted out (or is flagged do-not-contact): exit the
       // whole sequence rather than skipping one step.
-      await finishEnrollment(enrollment.id, "stopped", `send blocked: ${gate.reason}`);
+      await finishEnrollment(
+        enrollment.id,
+        "stopped",
+        `send blocked: ${gate.reason}`,
+      );
       return { status: "skipped", detail: `blocked: ${gate.reason}` };
     }
     // Non-fatal (missing/invalid address, no SMS consent): claim + skip the
     // touch and let the sequence continue on other channels.
     gateSkipReason = gate.reason;
+  }
+
+  // Automated email must have an explicit, user-owned sender. Never fall
+  // back to the organization's generic provider (or a platform mailbox).
+  // Check this before claiming the step so assigning a rep / connecting
+  // Gmail can resume the same touch instead of silently consuming it.
+  if (step.channel === "email" && !gateSkipReason) {
+    if (!lead.assignedUserId) {
+      const reason = "automated_sender_unassigned";
+      await pauseEnrollment(
+        enrollment.id,
+        "Automated email paused: assign this lead to a user with connected Gmail",
+      );
+      await recordBlockedSend({
+        organizationId,
+        channel: "email",
+        reason,
+        outcome: "blocked",
+        source: "playbook",
+        mode: "automated",
+        leadId: lead.id,
+        contactId: contact.id,
+      });
+      return { status: "skipped", detail: `paused: ${reason}` };
+    }
+    const gmail = await getGmailStatus(organizationId, lead.assignedUserId);
+    if (!gmail.configured || !gmail.connected) {
+      const reason = gmail.configured
+        ? "assigned_sender_gmail_not_connected"
+        : "gmail_oauth_not_configured";
+      await pauseEnrollment(
+        enrollment.id,
+        gmail.configured
+          ? "Automated email paused: the assigned user must connect Gmail"
+          : "Automated email paused: Gmail OAuth is not configured",
+      );
+      await recordBlockedSend({
+        organizationId,
+        channel: "email",
+        reason,
+        outcome: "blocked",
+        source: "playbook",
+        mode: "automated",
+        leadId: lead.id,
+        contactId: contact.id,
+      });
+      return { status: "skipped", detail: `paused: ${reason}` };
+    }
+    emailSenderUserId = lead.assignedUserId;
   }
 
   // Atomically CLAIM this step before any external side effect: advance
@@ -522,7 +585,8 @@ export async function executePlaybookStep(
     // Learning loop: nudge the follow-up into the org's best-performing
     // send window once there's enough outcome data (no-op before that).
     const tentative = new Date(Date.now() + nextStep.delayMinutes * 60_000);
-    nextRunAt = (await adjustSendTime(organizationId, tentative, sendingHours)).runAt;
+    nextRunAt = (await adjustSendTime(organizationId, tentative, sendingHours))
+      .runAt;
     // Never schedule the follow-up outside the org's permitted sending
     // window: defer it to the next valid local send time.
     const clamped = nextAllowedSendTime(sendingHours, nextRunAt);
@@ -581,15 +645,23 @@ export async function executePlaybookStep(
   }
 
   // Channel reachability + SMS consent gate.
-  let sendResult: { id: string; provider: string } | null = null;
+  let sendResult: {
+    id: string;
+    provider: string;
+    senderEmail?: string;
+  } | null = null;
   let skipDetail: string | null = null;
   const settings = await getOrgSettings(organizationId);
-  const businessName =
-    await getBusinessName(organizationId);
+  const businessName = await getBusinessName(organizationId);
 
   // Learning loop: bandit-allocated message variant (pinned wins; even
   // split while exploring; Thompson sampling on reply rate afterwards).
-  const variant = await chooseVariant(organizationId, playbook, stepIndex, step);
+  const variant = await chooseVariant(
+    organizationId,
+    playbook,
+    stepIndex,
+    step,
+  );
 
   const draft = await draftOutreachMessage({
     channel: step.channel,
@@ -624,19 +696,29 @@ export async function executePlaybookStep(
   } else {
     try {
       if (step.channel === "email") {
-        sendResult = await providers.email.send(
-          contact.email!,
-          variant.subject ?? step.subject ?? `${businessName} — following up`,
-          draft.body + linkSuffix + unsubscribeFooter(organizationId, contact.id),
-        );
+        sendResult = await sendGmailForUser({
+          organizationId,
+          userId: emailSenderUserId!,
+          to: contact.email!,
+          subject:
+            variant.subject ?? step.subject ?? `${businessName} — following up`,
+          body:
+            draft.body +
+            linkSuffix +
+            unsubscribeFooter(organizationId, contact.id),
+        });
       } else {
-        sendResult = await providers.sms.send(contact.phone!, draft.body + linkSuffix);
+        sendResult = await providers.sms.send(
+          contact.phone!,
+          draft.body + linkSuffix,
+        );
       }
     } catch (err) {
       // Permanently bad address → suppress it and stop the sequence so
       // nothing keeps hammering a dead mailbox/number. Transient/provider
       // config failures rethrow (step is already claimed; no double send).
-      const address = step.channel === "email" ? contact.email! : contact.phone!;
+      const address =
+        step.channel === "email" ? contact.email! : contact.phone!;
       const suppressed = await handleProviderFailure({
         organizationId,
         channel: step.channel,
@@ -692,6 +774,8 @@ export async function executePlaybookStep(
         stepIndex,
         channel: step.channel,
         provider: sendResult.provider,
+        senderUserId: emailSenderUserId,
+        from: sendResult.senderEmail ?? null,
         aiProvider: draft.provider,
       },
     });
@@ -712,6 +796,8 @@ export async function executePlaybookStep(
         stepIndex,
         channel: step.channel,
         provider: sendResult.provider,
+        senderUserId: emailSenderUserId,
+        from: sendResult.senderEmail ?? null,
         mock: sendResult.provider.startsWith("mock-"),
       },
     });
@@ -790,13 +876,19 @@ export async function stopEnrollmentsForLead(
           eq(playbookEnrollmentsTable.leadId, leadId),
           inArray(playbookEnrollmentsTable.status, ["active", "paused"]),
           ...(kind ? [eq(playbookEnrollmentsTable.kind, kind)] : []),
-          ...(category ? [eq(playbookEnrollmentsTable.category, category)] : []),
+          ...(category
+            ? [eq(playbookEnrollmentsTable.category, category)]
+            : []),
         ),
       );
     for (const enrollment of live) {
       await db
         .update(playbookEnrollmentsTable)
-        .set({ status, pauseReason: reason, nextRunAt: status === "paused" ? enrollment.nextRunAt : null })
+        .set({
+          status,
+          pauseReason: reason,
+          nextRunAt: status === "paused" ? enrollment.nextRunAt : null,
+        })
         .where(eq(playbookEnrollmentsTable.id, enrollment.id));
       await appendHistory(enrollment.id, {
         at: new Date().toISOString(),
@@ -882,7 +974,10 @@ export async function skipEnrollmentStep(
         eq(playbookEnrollmentsTable.organizationId, organizationId),
       ),
     );
-  if (!enrollment || (enrollment.status !== "active" && enrollment.status !== "paused")) {
+  if (
+    !enrollment ||
+    (enrollment.status !== "active" && enrollment.status !== "paused")
+  ) {
     return null;
   }
   const [playbook] = await db
@@ -898,7 +993,11 @@ export async function skipEnrollmentStep(
   const nextIndex = enrollment.currentStep + 1;
   const nextStep = playbook.steps[nextIndex];
   if (!nextStep) {
-    await finishEnrollment(enrollment.id, "completed", "skipped past final step");
+    await finishEnrollment(
+      enrollment.id,
+      "completed",
+      "skipped past final step",
+    );
     const [finished] = await db
       .select()
       .from(playbookEnrollmentsTable)
@@ -908,7 +1007,12 @@ export async function skipEnrollmentStep(
   const runAt = new Date(Date.now() + nextStep.delayMinutes * 60_000);
   const [updated] = await db
     .update(playbookEnrollmentsTable)
-    .set({ currentStep: nextIndex, nextRunAt: runAt, status: "active", pauseReason: null })
+    .set({
+      currentStep: nextIndex,
+      nextRunAt: runAt,
+      status: "active",
+      pauseReason: null,
+    })
     .where(eq(playbookEnrollmentsTable.id, enrollment.id))
     .returning();
   await scheduleStep(updated, nextIndex, runAt);
@@ -919,7 +1023,9 @@ export async function skipEnrollmentStep(
 export async function getLeadEnrollment(
   organizationId: string,
   leadId: string,
-): Promise<(PlaybookEnrollment & { playbookName: string; totalSteps: number }) | null> {
+): Promise<
+  (PlaybookEnrollment & { playbookName: string; totalSteps: number }) | null
+> {
   const [row] = await db
     .select({
       enrollment: playbookEnrollmentsTable,
