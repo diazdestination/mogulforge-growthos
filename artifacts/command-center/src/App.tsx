@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { Route, Switch, Router as WouterRouter, Link } from 'wouter';
+import { Route, Switch, Router as WouterRouter, Link, Redirect } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
 import { Shell } from '@/components/shell';
 import { AccessGate } from '@/components/access-gate';
@@ -244,6 +244,12 @@ function AuthedApp() {
     <AccessGate>
       <Shell>
         <Switch>
+        <Route path="/login">
+          <Redirect to="/" replace />
+        </Route>
+        <Route path="/signup">
+          <Redirect to="/" replace />
+        </Route>
         <Route path="/" component={Bie} />
         <Route path="/bie" component={Bie} />
         <Route path="/evidence" component={EvidenceIntelligence} />
