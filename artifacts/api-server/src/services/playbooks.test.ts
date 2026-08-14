@@ -1,4 +1,5 @@
 import {
+  auditEventsTable,
   consentRecordsTable,
   db,
   organizationsTable,
@@ -198,6 +199,33 @@ describe("closer engine playbooks", () => {
         ),
       );
     expect(touches).toHaveLength(1);
+    expect(touches[0].metadata).toEqual(
+      expect.objectContaining({
+        provider: "gmail",
+        providerMessageId: "gmail-playbook-test",
+        senderUserId: assignedUser.id,
+        from: "assigned-sender@example.com",
+      }),
+    );
+
+    const [audit] = await db
+      .select()
+      .from(auditEventsTable)
+      .where(
+        and(
+          eq(auditEventsTable.organizationId, org.id),
+          eq(auditEventsTable.action, "playbook.step_sent"),
+          eq(auditEventsTable.entityId, lead.id),
+        ),
+      );
+    expect(audit.metadata).toEqual(
+      expect.objectContaining({
+        provider: "gmail",
+        providerMessageId: "gmail-playbook-test",
+        senderUserId: assignedUser.id,
+        from: "assigned-sender@example.com",
+      }),
+    );
 
     // Stale re-run of the same step is a no-op.
     const rerun = await executePlaybookStep(org.id, {
