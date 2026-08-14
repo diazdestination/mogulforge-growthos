@@ -73,3 +73,7 @@ jobs:
 
       - name: Build API server
         run: pnpm --filter @workspace/api-server run build
+
+      - name: Run Docker staging-parity gate
+        shell: pwsh
+        run: ./scripts/verify-docker-staging-parity.ps1

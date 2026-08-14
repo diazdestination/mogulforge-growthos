@@ -58,6 +58,26 @@ The duplicate app identity is deliberate. If a config file is edited to point at
 the wrong environment, the explicit `--app` value makes the mismatch visible
 instead of silently selecting another target.
 
+## Fast Docker staging-parity gate
+
+Before publishing a release candidate or deploying to Fly, run the production
+image against a clean, restricted PostgreSQL role:
+
+```powershell
+./scripts/verify-docker-staging-parity.ps1
+```
+
+This isolated gate builds the same Dockerfile used by Fly, creates a
+provider-owned `pg_stat_monitor` view, applies the GrowthOS schema as a
+non-owner application role, starts the production image, and verifies health,
+login, signup, and password-recovery routes. It deletes its containers, network,
+and database volume after the run. Pass `-Keep` only when the failed stack needs
+manual inspection.
+
+The parity gate catches application, schema, permission, and production-image
+failures locally. Real Fly networking, secrets, OAuth callbacks, DNS, Resend,
+and Gmail behavior still require staging acceptance.
+
 ## Acceptance before production
 
 - Health endpoint returns 200 after a cold start.
