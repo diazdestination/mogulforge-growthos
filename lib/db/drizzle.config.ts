@@ -10,10 +10,10 @@ export default defineConfig({
   // backslashes are glob escape chars (would match nothing on Win32).
   schema: path.join(__dirname, "./src/schema/index.ts").replace(/\\/g, "/"),
   dialect: "postgresql",
-  // Fly Postgres installs pg_stat_monitor and owns the views it creates.
-  // Without this filter, drizzle-kit push attempts to manage those provider
-  // objects and aborts before it can reconcile GrowthOS application tables.
-  extensionsFilters: ["pg_stat_monitor"],
+  // Fly Postgres owns the pg_stat_* monitoring objects. Excluding that family
+  // keeps Drizzle focused on application tables while remaining compatible
+  // with ordinary PostgreSQL instances that do not install those extensions.
+  tablesFilter: ["!pg_stat_*"],
   dbCredentials: {
     url: process.env.DATABASE_URL,
   },
