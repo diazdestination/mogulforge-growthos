@@ -104,7 +104,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  sendGmailForUserMock.resetHistory();
+  sendGmailForUserMock.mockReset();
   sendGmailForUserMock.mockResolvedValue({
     id: "gmail-message-route-test",
     provider: "gmail",
