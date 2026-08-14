@@ -110,13 +110,14 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     const error = typeof req.query.error === "string" ? req.query.error : null;
     if (error) {
-      res.redirect(`/settings?gmail=denied&reason=${encodeURIComponent(error)}`);
+      // My Profile is available to every authenticated role, unlike Admin Settings.
+      res.redirect(`/account?gmail=denied&reason=${encodeURIComponent(error)}`);
       return;
     }
     const state = typeof req.query.state === "string" ? req.query.state : "";
     const code = typeof req.query.code === "string" ? req.query.code : "";
     if (!state || !code) {
-      res.redirect("/settings?gmail=failed&reason=missing_response");
+      res.redirect("/account?gmail=failed&reason=missing_response");
       return;
     }
     try {
@@ -143,7 +144,7 @@ router.get(
       res.redirect(`${completed.returnPath}${separator}gmail=connected`);
     } catch (callbackError) {
       const reason = callbackError instanceof Error ? callbackError.message : "connection_failed";
-      res.redirect(`/settings?gmail=failed&reason=${encodeURIComponent(reason.slice(0, 160))}`);
+      res.redirect(`/account?gmail=failed&reason=${encodeURIComponent(reason.slice(0, 160))}`);
     }
   },
 );

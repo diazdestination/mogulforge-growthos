@@ -5,6 +5,7 @@ import { Loader2, UserRound } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { GmailConnectionCard } from '@/components/gmail-connection-card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +17,7 @@ export default function Account() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [saving, setSaving] = useState(false);
+  const gmailReturn = new URLSearchParams(window.location.search).get('gmail');
 
   useEffect(() => {
     if (!profile) return;
@@ -62,11 +64,11 @@ export default function Account() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-6 p-4 md:p-8">
+    <div className="mx-auto w-full max-w-4xl space-y-6 p-4 md:p-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">My Profile</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage the name shown to your team inside GrowthOS.
+          Manage your personal details and the accounts GrowthOS uses on your behalf.
         </p>
       </div>
 
@@ -123,6 +125,16 @@ export default function Account() {
           </form>
         </CardContent>
       </Card>
+
+      <section aria-labelledby="my-connections-heading" className="space-y-4">
+        <div>
+          <h2 id="my-connections-heading" className="text-xl font-semibold tracking-tight">My Connections</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            These connections belong to your user account. They never grant access to organization settings or another team member's mailbox.
+          </p>
+        </div>
+        <GmailConnectionCard callbackState={gmailReturn} returnPath="/account" />
+      </section>
     </div>
   );
 }
