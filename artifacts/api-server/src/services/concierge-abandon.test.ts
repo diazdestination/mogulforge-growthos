@@ -7,6 +7,7 @@ import {
   crmTasksTable,
   db,
   organizationsTable,
+  DEFAULT_SENDING_HOURS,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -40,6 +41,7 @@ import {
 } from "./automation";
 import { markAbandonedConversations } from "./concierge";
 import * as crm from "./crm";
+import { updateOrgSettings } from "./settings";
 
 let org: { id: string };
 
@@ -203,6 +205,9 @@ describe("seeded abandoned-chat follow-up end to end", () => {
       })
       .returning();
     extraOrgIds.push(row.id);
+    await updateOrgSettings(row.id, {
+      sendingHours: { ...DEFAULT_SENDING_HOURS, quietHoursEnabled: false },
+    });
     await ensureDefaultAutomations(row.id);
     const [rule] = await db
       .select()

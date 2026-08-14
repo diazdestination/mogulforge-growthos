@@ -5,6 +5,7 @@ import {
   organizationsTable,
   playbookEnrollmentsTable,
   playbooksTable,
+  DEFAULT_SENDING_HOURS,
   type Playbook,
 } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
@@ -39,8 +40,12 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  // Reset stage-behavior overrides between tests.
-  await updateOrgSettings(org.id, { playbookStageBehaviors: null });
+  // Reset stage-behavior overrides and keep send expectations independent of
+  // the wall clock. Quiet-hours behavior is covered in send-gate.test.ts.
+  await updateOrgSettings(org.id, {
+    playbookStageBehaviors: null,
+    sendingHours: { ...DEFAULT_SENDING_HOURS, quietHoursEnabled: false },
+  });
 });
 
 async function makeLead() {

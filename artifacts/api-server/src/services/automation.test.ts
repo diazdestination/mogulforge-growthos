@@ -213,6 +213,9 @@ describe("default automation seeding", () => {
       })
       .returning();
     extraOrgIds.push(freshOrg.id);
+    await updateOrgSettings(freshOrg.id, {
+      sendingHours: { ...DEFAULT_SENDING_HOURS, quietHoursEnabled: false },
+    });
     await ensureDefaultAutomations(freshOrg.id);
     const [smsTemplate] = await db
       .select()
