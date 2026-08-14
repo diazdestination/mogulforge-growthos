@@ -1,0 +1,30 @@
+# Isolated GrowthOS staging configuration.
+# This file intentionally names a different Fly app and origin than production.
+# Provision the app and its dedicated logical database before the first deploy.
+
+app = 'mogulforge-growthos-staging'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[deploy]
+  release_command = "sh -lc 'cd /app && pnpm --filter @workspace/db exec drizzle-kit push --force'"
+
+[env]
+  APP_ORIGIN = 'https://mogulforge-growthos-staging.fly.dev'
+  NODE_ENV = 'production'
+  OBJECT_STORAGE_PROVIDER = 'postgres'
+  PORT = '3001'
+  STATIC_DIR = '/app/public'
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '1gb'
