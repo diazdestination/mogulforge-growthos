@@ -1,88 +1,126 @@
 # MogulForge GrowthOS
 
-MogulForge GrowthOS is an AI-powered command center for home-services businesses. It combines lead capture, pipeline management, automated follow-up, scheduling, estimates, homeowner communication, attribution, and an AI concierge in one multi-tenant CRM.
+**Revenue Intelligence and Recovery Operating System for home-services businesses.**
 
-This is the product repository. It is separate from the MogulForge marketing website and from the original upstream CRM template.
+[MogulForge](https://mogulforge.ai) helps operators turn fragmented customer,
+pipeline, communication, and operational data into clear next actions. GrowthOS
+combines a multi-tenant CRM with evidence-backed business intelligence,
+approval-first automation, and an expanding permissioned business-data graph.
 
-## Repository identity
+The product is designed for roofing and adjacent home-services businesses where
+slow follow-up, disconnected systems, and incomplete operational visibility can
+cause otherwise recoverable opportunities to disappear.
 
-- **Local checkout:** `C:\Users\diazd\dev\projects\mogulforge`
-- **GitHub:** `diazdestination/mogulforge-crm` (private)
-- **Default branch:** `main`
-- **Do not push to:** `diazdestination/MogulForge-crm-template-`
-- **Marketing website:** `diazdestination/MogulForge` (a separate Next.js codebase)
+## Platform
 
-## What is included
+### Revenue Command Center
 
-- React + Vite command-center UI
-- Express API and PostgreSQL/Drizzle data layer
+- Lead, customer, property, appointment, task, estimate, and pipeline workflows
+- Attribution and operational reporting
+- Organization-aware access and tenant isolation
+- Homeowner communication and lead-capture experiences
+
+### Business Intelligence Engine
+
+- Deterministic opportunity detection grounded in tenant-owned records
+- Evidence-backed explanations with confidence and limitations
+- Reviewable action proposals with approve, edit, reject, and execution states
+- Guardrailed automation policies and immutable activity history
+- Outcome tracking designed to distinguish recovered revenue from pipeline value
+
+### Evidence Intelligence
+
+- Approved, tenant-scoped source artifacts
+- Local redaction and citation-bounded AI drafting
+- Human review before conclusions are finalized
+- Tamper-evident Loss Evidence Certificates
+
+### Permissioned Business Graph
+
+- Per-user Gmail sending foundation with no platform-account fallback
+- Incremental Google module authorization and explicit scope disclosure
+- Planned connectors for Calendar, selected Drive and Sheets assets, Analytics,
+  Search Console, Google Ads, and Business Profile
+- Phased email intelligence architecture that begins with customer-controlled
+  sources and reserves unrestricted mailbox analysis for formal verification
+
+## Trust principles
+
+- Tenant-private by default
+- Least-privilege, incremental authorization
+- Human approval before consequential outbound actions
+- Connected documents and messages treated as untrusted data, never instructions
+- Evidence and provenance retained for material recommendations
+- No shared-model training on customer data by default
+- Clear separation between implemented foundations, verified integrations, and
+  planned capabilities
+
+## Current status
+
+| Surface | Status |
+| --- | --- |
+| Corporate site | Live at [mogulforge.ai](https://mogulforge.ai) |
+| Founding-beta application | Live at [app.mogulforge.ai](https://app.mogulforge.ai) on the approved production baseline |
+| Current development branch | Under review; not deployed to production |
+| Per-user Gmail sending | Secure application foundation implemented; real production OAuth acceptance remains pending |
+| Google Business Graph | Permission and module foundation implemented; source adapters remain in development |
+| Full Gmail inbox intelligence | Architecture defined; restricted-scope connector intentionally deferred pending verification and security readiness |
+
+Product documentation does not imply that an unfinished connector is available
+to customers. Release claims must be supported by the exact deployed version and
+its acceptance evidence.
+
+## Technology
+
+- React, TypeScript, and Vite command center
+- Express API and background services
+- PostgreSQL with Drizzle ORM
 - Self-hosted email/password authentication
-- Multi-tenant organizations and role-aware access
-- Lead pipeline, contacts, properties, tasks, appointments, and estimates
-- AI concierge, automations, next-best actions, and demo-data seeding
-- Evidence Intelligence with approved source artifacts, grounded AI drafts,
-  human review, and tamper-evident Loss Evidence Certificates
-- Stripe-ready billing with an optional enforcement gate
-- Single-container production build plus Docker Compose and Fly.io configuration
+- Optional OpenAI, Google, Stripe, and communications adapters
+- Single-container production build with Docker Compose and Fly.io configuration
 
-## Run locally with Docker
+```text
+artifacts/
+  api-server/       Express API and background services
+  command-center/   React and Vite application
+lib/
+  api-spec/         OpenAPI source
+  api-zod/          Generated request and response schemas
+  api-client-react/ Generated React Query client
+  db/               Drizzle schema and database tooling
+```
 
-Copy `.env.example` to `.env`, provide local-only values, and run:
+## Development
+
+Copy `.env.example` to `.env`, provide development-only values, and start the
+local stack:
 
 ```powershell
 docker compose up -d --build
 ```
 
-Then open `http://localhost:8080`.
+The application is then available at `http://localhost:8080`, with PostgreSQL on
+`localhost:5433`. Never commit `.env` or expose secret values in logs.
 
-The local stack uses:
+For the Windows development workflow and database bootstrap, see
+[DEV-LOCAL.md](DEV-LOCAL.md).
 
-- App: `http://localhost:8080`
-- PostgreSQL: `localhost:5433`
+## Operations and architecture
 
-Do not commit `.env` or print its secret values into logs or chat.
+- [BETA-SUCCESS-PLAN.md](BETA-SUCCESS-PLAN.md) — founding-beta gates and success measures
+- [DEPLOY.md](DEPLOY.md) — container and self-hosting model
+- [BETA-LAUNCH.md](BETA-LAUNCH.md) — Fly.io release checklist
+- [EVIDENCE-INTELLIGENCE.md](EVIDENCE-INTELLIGENCE.md) — evidence architecture and trust gates
+- [GOOGLE-OAUTH-SETUP.md](GOOGLE-OAUTH-SETUP.md) — per-user Gmail authorization
+- [GOOGLE-BUSINESS-GRAPH.md](GOOGLE-BUSINESS-GRAPH.md) — permissioned Google source strategy
+- [EMAIL-INTELLIGENCE-ARCHITECTURE.md](EMAIL-INTELLIGENCE-ARCHITECTURE.md) — phased email intelligence model
+- [GROWTHOS-RESUME.md](GROWTHOS-RESUME.md) — verified implementation state and continuation point
 
-## Run in development mode
+## Repository policy
 
-See [DEV-LOCAL.md](DEV-LOCAL.md) for the Windows setup, database bootstrap, API/frontend processes, and troubleshooting notes.
+This private repository contains the GrowthOS application. The corporate
+marketing site and upstream reference template are maintained separately.
+Changes reach production only after review, validation, and explicit deployment
+authorization.
 
-## Deploy
-
-- [DEPLOY.md](DEPLOY.md) covers the container and self-hosting model.
-- [BETA-LAUNCH.md](BETA-LAUNCH.md) is the Fly.io launch checklist.
-- `fly.toml` includes the production port and schema release command.
-
-Set `SESSION_SECRET` before any public deployment. Stripe and OpenAI integrations remain disabled-safe when their optional keys are absent.
-
-## Architecture
-
-```text
-artifacts/
-  api-server/       Express API and background services
-  command-center/   React + Vite application
-lib/
-  api-spec/         OpenAPI source
-  api-zod/          Generated request/response schemas
-  api-client-react/ Generated React Query client
-  db/               Drizzle schema and database tooling
-```
-
-Client-facing defaults live in both:
-
-- `artifacts/command-center/src/lib/client.config.ts`
-- `artifacts/api-server/src/lib/client.config.ts`
-
-Keep those two files aligned when changing the product name, color, assistant identity, or default organization details.
-
-The standalone Evidence Intelligence architecture, trust gates, verification
-record, and operating instructions are documented in
-[EVIDENCE-INTELLIGENCE.md](EVIDENCE-INTELLIGENCE.md).
-
-For a zero-memory handoff into the remaining source-adapter, executor, and
-deployment work, start with [GROWTHOS-RESUME.md](GROWTHOS-RESUME.md). It records
-the canonical repository, verified baseline, exact implementation seams, and
-the external-account gates that cannot safely be guessed or simulated.
-
-## Product status
-
-The repository is beta-ready and has been validated as a production Docker build. A public Fly.io deployment and the first owner registration are still launch steps, not completed state.
+Copyright © 2026 MogulForge. All rights reserved.
