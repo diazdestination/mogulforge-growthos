@@ -19,6 +19,65 @@ import { isSafeMailbox } from "./providers";
 const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 const IDENTITY_SCOPES = ["openid", "email", "profile"];
 const OAUTH_TTL_MS = 10 * 60 * 1000;
+export const GMAIL_REAUTH_REQUIRED = "gmail_reauthorization_required";
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function errorText(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number") return String(value);
+  return null;
+}
+
+export function classifyGmailProviderError(error: unknown): {
+  code: string;
+  reconnectRequired: boolean;
+} {
+  const root = asRecord(error);
+  const response = asRecord(root?.response);
+  const data = asRecord(response?.data);
+  const providerError = asRecord(data?.error);
+  const fragments = [
+    error instanceof Error ? error.name : null,
+    error instanceof Error ? error.message : null,
+    errorText(root?.code),
+    errorText(response?.status),
+    errorText(data?.error),
+    errorText(data?.error_description),
+    errorText(data?.message),
+    errorText(providerError?.code),
+    errorText(providerError?.status),
+    errorText(providerError?.message),
+  ].filter((value): value is string => Boolean(value));
+  const normalized = fragments.join(" ").toLowerCase();
+  const status = Number(response?.status ?? root?.code ?? providerError?.code);
+  const reconnectRequired =
+    status === 401 ||
+    [
+      "invalid_grant",
+      "invalid_token",
+      "unauthenticated",
+      "insufficient_scope",
+      "insufficientpermissions",
+      "token has been expired or revoked",
+      "token has been revoked",
+      "login required",
+    ].some((marker) => normalized.includes(marker));
+  const providerCode =
+    errorText(data?.error) ??
+    errorText(providerError?.status) ??
+    errorText(root?.code) ??
+    (error instanceof Error ? error.name : null) ??
+    "gmail_send_failed";
+  return {
+    code: reconnectRequired ? GMAIL_REAUTH_REQUIRED : providerCode.slice(0, 120),
+    reconnectRequired,
+  };
+}
 
 function oauthConfig() {
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID?.trim();
@@ -77,11 +136,27 @@ export async function getGmailConnection(
   return connection ?? null;
 }
 
+async function getStoredGmailConnection(
+  organizationId: string,
+  userId: string,
+): Promise<GmailConnection | null> {
+  const [connection] = await db
+    .select()
+    .from(gmailConnectionsTable)
+    .where(
+      and(
+        eq(gmailConnectionsTable.organizationId, organizationId),
+        eq(gmailConnectionsTable.userId, userId),
+      ),
+    );
+  return connection ?? null;
+}
+
 export async function getGmailStatus(organizationId: string, userId: string) {
-  const connection = await getGmailConnection(organizationId, userId);
+  const connection = await getStoredGmailConnection(organizationId, userId);
   return {
     configured: gmailOAuthConfigured(),
-    connected: Boolean(connection?.encryptedRefreshToken),
+    connected: Boolean(connection?.encryptedRefreshToken && !connection.revokedAt),
     email: connection?.email ?? null,
     connectedAt: connection?.connectedAt ?? null,
     lastUsedAt: connection?.lastUsedAt ?? null,
@@ -281,11 +356,25 @@ export async function sendGmailForUser(input: {
       .where(eq(gmailConnectionsTable.id, connection.id));
     return { id: response.data.id, provider: "gmail", senderEmail: connection.email };
   } catch (error) {
-    const code = error instanceof Error ? error.name || "gmail_send_failed" : "gmail_send_failed";
+    const failure = classifyGmailProviderError(error);
+    const failedAt = new Date();
     await db
       .update(gmailConnectionsTable)
-      .set({ lastErrorAt: new Date(), lastErrorCode: code.slice(0, 120) })
+      .set(
+        failure.reconnectRequired
+          ? {
+              encryptedRefreshToken: null,
+              revokedAt: failedAt,
+              lastErrorAt: failedAt,
+              lastErrorCode: failure.code,
+              updatedAt: failedAt,
+            }
+          : { lastErrorAt: failedAt, lastErrorCode: failure.code, updatedAt: failedAt },
+      )
       .where(eq(gmailConnectionsTable.id, connection.id));
+    if (failure.reconnectRequired) {
+      throw new Error("Gmail authorization expired or was revoked. Reconnect Gmail and try again.");
+    }
     throw error;
   }
 }
@@ -315,7 +404,13 @@ export async function disconnectGmail(
   }
   await db
     .update(gmailConnectionsTable)
-    .set({ encryptedRefreshToken: null, revokedAt: new Date(), updatedAt: new Date() })
+    .set({
+      encryptedRefreshToken: null,
+      revokedAt: new Date(),
+      lastErrorAt: null,
+      lastErrorCode: null,
+      updatedAt: new Date(),
+    })
     .where(eq(gmailConnectionsTable.id, connection.id));
   return true;
 }

@@ -12,7 +12,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-function renderSalesRepAccount() {
+function renderSalesRepAccount(gmailStatus: Record<string, unknown> = {}) {
   const fetchMock = mockApi('sales_rep', {
     handler: (method, path) => {
       if (method === 'GET' && path.endsWith('/api/v1/integrations/gmail')) {
@@ -25,6 +25,7 @@ function renderSalesRepAccount() {
           lastErrorAt: null,
           lastErrorCode: null,
           scope: 'https://www.googleapis.com/auth/gmail.send',
+          ...gmailStatus,
         });
       }
       if (method === 'GET' && path.endsWith('/api/v1/integrations/google/modules')) return json([]);
@@ -65,5 +66,20 @@ describe('My Profile connections', () => {
       expect(connectCall).toBeDefined();
       expect(JSON.parse(String(connectCall?.[1]?.body))).toEqual({ returnPath: '/account' });
     });
+  });
+
+  it('fails closed with a clear reconnect action after Google revokes the grant', async () => {
+    renderSalesRepAccount({
+      connected: false,
+      email: 'rep@example.com',
+      connectedAt: '2026-08-14T10:00:00.000Z',
+      lastErrorAt: '2026-08-14T12:00:00.000Z',
+      lastErrorCode: 'gmail_reauthorization_required',
+    });
+
+    expect(await screen.findByText('Reconnect required')).toBeTruthy();
+    expect(screen.getByText('Google access expired or was revoked. Reconnect Gmail before GrowthOS can send.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Reconnect Gmail' })).toBeTruthy();
+    expect(screen.getByText(/GrowthOS will not retry the expired credential/)).toBeTruthy();
   });
 });

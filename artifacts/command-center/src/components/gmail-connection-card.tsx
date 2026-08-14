@@ -41,6 +41,7 @@ export function GmailConnectionCard({ callbackState, returnPath }: GmailConnecti
   const [modules, setModules] = useState<GoogleModuleStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const reconnectRequired = status?.lastErrorCode === 'gmail_reauthorization_required';
 
   const load = async () => {
     setLoading(true);
@@ -124,14 +125,31 @@ export function GmailConnectionCard({ callbackState, returnPath }: GmailConnecti
                 <div>
                   <p className="text-sm font-semibold">{status?.connected ? 'Connected' : 'Not connected'}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {status?.connected ? status.email : status?.configured ? 'Connect Gmail to approve and send BIE emails.' : 'A MogulForge administrator must finish the production Google OAuth configuration.'}
+                    {status?.connected
+                      ? status.email
+                      : reconnectRequired
+                        ? 'Google access expired or was revoked. Reconnect Gmail before GrowthOS can send.'
+                        : status?.configured
+                          ? 'Connect Gmail to approve and send BIE emails.'
+                          : 'A MogulForge administrator must finish the production Google OAuth configuration.'}
                   </p>
                 </div>
-                <Badge variant={status?.connected ? 'default' : 'secondary'}>{status?.connected ? 'Ready to send' : 'Action needed'}</Badge>
+                <Badge variant={status?.connected ? 'default' : reconnectRequired ? 'destructive' : 'secondary'}>
+                  {status?.connected ? 'Ready to send' : reconnectRequired ? 'Reconnect required' : 'Action needed'}
+                </Badge>
               </div>
-              {status?.connectedAt && <p className="mt-3 text-xs text-muted-foreground">Connected {new Date(status.connectedAt).toLocaleString()}</p>}
+              {status?.connected && status.connectedAt && <p className="mt-3 text-xs text-muted-foreground">Connected {new Date(status.connectedAt).toLocaleString()}</p>}
               {status?.lastUsedAt && <p className="mt-1 text-xs text-muted-foreground">Last used {new Date(status.lastUsedAt).toLocaleString()}</p>}
-              {status?.lastErrorAt && <Alert variant="destructive" className="mt-3"><AlertTitle>Most recent Gmail send needs attention</AlertTitle><AlertDescription>{status.lastErrorCode ?? 'Provider error'} · {new Date(status.lastErrorAt).toLocaleString()}</AlertDescription></Alert>}
+              {status?.lastErrorAt && (
+                <Alert variant="destructive" className="mt-3">
+                  <AlertTitle>{reconnectRequired ? 'Reconnect Gmail to resume sending' : 'Most recent Gmail send needs attention'}</AlertTitle>
+                  <AlertDescription>
+                    {reconnectRequired
+                      ? `Google no longer accepts this authorization. Reconnect your account; GrowthOS will not retry the expired credential. · ${new Date(status.lastErrorAt).toLocaleString()}`
+                      : `${status.lastErrorCode ?? 'Provider error'} · ${new Date(status.lastErrorAt).toLocaleString()}`}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
             <Alert>
@@ -153,7 +171,7 @@ export function GmailConnectionCard({ callbackState, returnPath }: GmailConnecti
                 </>
               ) : (
                 <Button onClick={connect} disabled={busy || !status?.configured}>
-                  {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Connect Gmail
+                  {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{reconnectRequired ? 'Reconnect Gmail' : 'Connect Gmail'}
                 </Button>
               )}
               <Button variant="ghost" onClick={() => void load()} disabled={busy || loading}>
