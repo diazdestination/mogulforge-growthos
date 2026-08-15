@@ -85,7 +85,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   const role = profile?.role as UserRole | undefined;
   const brandName = useBrandName();
-  const brandInitial = brandName.charAt(0).toUpperCase();
+  const brandMark = brandName.toLowerCase() === 'mogulforge' ? 'MF' : brandName.charAt(0).toUpperCase();
 
   // Surface the guided setup wizard until the org launches or dismisses it.
   const canSetup = canManageSettings(role);
@@ -122,19 +122,19 @@ export function Shell({ children }: { children: React.ReactNode }) {
   ].filter(Boolean) as NavItem[];
 
   return (
-    <div className="flex min-h-[100dvh] w-full bg-background flex-col md:flex-row">
+    <div className="flex min-h-[100dvh] w-full bg-transparent flex-col md:flex-row">
       <CommandPalette />
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 bg-sidebar border-r border-sidebar-border flex-col shrink-0">
-        <div className="h-16 flex items-center px-6 border-b border-sidebar-border shrink-0">
+      <aside className="hidden md:flex w-[17rem] bg-sidebar/95 backdrop-blur-xl border-r border-sidebar-border flex-col shrink-0">
+        <div className="h-[76px] flex items-center px-6 border-b border-sidebar-border shrink-0">
           <div className="flex items-center gap-3 text-sidebar-foreground">
-            <div className="w-8 h-8 rounded bg-sidebar-primary flex items-center justify-center font-bold text-sidebar-primary-foreground shadow-sm shadow-sidebar-primary/20">
-              {brandInitial}
+            <div className="w-9 h-9 rounded-full border border-sidebar-primary flex items-center justify-center font-mono text-[11px] font-bold text-sidebar-primary shadow-sm shadow-black/30">
+              {brandMark}
             </div>
             <div>
-              <div className="font-bold text-sm tracking-tight leading-none">{brandName}</div>
-              <div className="text-[10px] text-sidebar-foreground/70 uppercase tracking-widest font-mono mt-1">
-                Command Center
+              <div className="font-extrabold text-sm tracking-[-0.02em] leading-none uppercase">{brandName}</div>
+              <div className="text-[9px] text-sidebar-primary uppercase tracking-[0.2em] font-mono mt-1.5">
+                GrowthOS Command
               </div>
             </div>
           </div>
@@ -143,16 +143,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <div className="px-3 pt-3">
           <button
             onClick={() => window.dispatchEvent(new Event('mogulforge:cmdk'))}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-sidebar-border text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 transition-colors text-sm"
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-full border border-sidebar-border bg-sidebar-accent/25 text-sidebar-foreground/55 hover:border-sidebar-primary/35 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors text-sm"
           >
             <Search className="w-4 h-4" />
             <span className="flex-1 text-left">Search…</span>
-            <kbd className="text-[10px] font-mono border border-sidebar-border rounded px-1.5 py-0.5">⌘K</kbd>
+            <kbd className="text-[9px] font-mono border border-sidebar-border rounded-full px-1.5 py-0.5">⌘K</kbd>
           </button>
         </div>
 
         <div className="flex-1 py-4 overflow-y-auto">
-          <nav className="px-3 space-y-1.5">
+          <nav className="px-3 space-y-1">
             {visibleItems.map((item) => {
               const isActive = location === item.href || (item.href !== '/' && location.startsWith(item.href));
               return (
@@ -160,10 +160,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg transition-all font-medium",
-                    isActive 
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm" 
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    "flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl border transition-all font-medium",
+                    isActive
+                      ? "border-sidebar-primary/20 bg-sidebar-primary/10 text-sidebar-accent-foreground shadow-sm shadow-black/10"
+                      : "border-transparent text-sidebar-foreground/62 hover:border-sidebar-border hover:bg-sidebar-accent/45 hover:text-sidebar-foreground"
                   )}
                 >
                   <item.icon className={cn("w-4 h-4", isActive ? "text-sidebar-primary" : "")} />
@@ -201,10 +201,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile Top Bar */}
-      <div className="md:hidden h-14 flex items-center justify-between px-4 border-b border-border bg-card shrink-0 sticky top-0 z-30">
+      <div className="md:hidden h-16 flex items-center justify-between px-4 border-b border-border bg-sidebar/95 backdrop-blur-xl shrink-0 sticky top-0 z-30">
         <div className="flex items-center gap-2 text-foreground">
-          <div className="w-7 h-7 rounded bg-primary flex items-center justify-center font-bold text-primary-foreground shadow-sm shadow-primary/20 text-xs">
-            {brandInitial}
+          <div className="w-8 h-8 rounded-full border border-primary flex items-center justify-center font-mono font-bold text-primary text-[10px]">
+            {brandMark}
           </div>
           <div className="font-bold text-sm tracking-tight leading-none">{brandName}</div>
         </div>
@@ -220,7 +220,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Mobile Bottom Nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-card border-t border-border flex items-center justify-around px-2 pb-safe z-40">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-sidebar/95 backdrop-blur-xl border-t border-border flex items-center justify-around px-2 pb-safe z-40">
         {bottomNavItems.map((item) => {
           const isActive = location === item.href || (item.href !== '/' && location.startsWith(item.href));
           return (
@@ -254,8 +254,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <div className="md:hidden fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4">
           <div className="flex items-center justify-between p-4 border-b border-border bg-card">
             <div className="flex items-center gap-3">
-               <div className="w-8 h-8 rounded bg-primary flex items-center justify-center font-bold text-primary-foreground shadow-sm shadow-primary/20 text-sm">
-                {brandInitial}
+               <div className="w-8 h-8 rounded-full border border-primary flex items-center justify-center font-mono font-bold text-primary text-[10px]">
+                {brandMark}
               </div>
               <div>
                 <div className="font-bold text-sm tracking-tight leading-none text-foreground">{brandName}</div>
