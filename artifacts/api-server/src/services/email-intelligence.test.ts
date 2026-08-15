@@ -97,6 +97,18 @@ describe("email intelligence safety primitives", () => {
     expect(facts.every((fact) => fact.confidence < 100)).toBe(true);
   });
 
+  it("preserves buying signals split by provider MIME line wrapping", () => {
+    const facts = deriveEmailFacts(
+      "Provider-delivered request",
+      "Please send an estimate. We are ready to move\nforward, and I will follow\nup tomorrow.",
+    );
+
+    expect(facts.map((fact) => fact.kind)).toEqual(
+      expect.arrayContaining(["estimate_request", "buying_signal", "follow_up_commitment"]),
+    );
+    expect(facts.every((fact) => !fact.evidenceExcerpt.includes("\n"))).toBe(true);
+  });
+
   it("rejects tampered and stale provider signatures", () => {
     process.env.EMAIL_INGESTION_WEBHOOK_SECRET = "test-webhook-secret";
     const body = Buffer.from('{"message":"safe"}');

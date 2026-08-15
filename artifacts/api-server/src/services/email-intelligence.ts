@@ -170,14 +170,18 @@ function excerptForMatch(text: string, matchIndex: number): string {
 
 export function deriveEmailFacts(subject: string, text: string): DerivedEmailFact[] {
   const redacted = redactEmailText(`${subject}\n${text}`).slice(0, MAX_TEXT_BYTES);
+  // Email providers may insert hard line breaks while decoding MIME bodies.
+  // Classify against whitespace-normalized text so phrases such as
+  // "ready to move\nforward" keep their meaning after transport.
+  const searchable = redacted.replace(/\s+/g, " ").trim();
   const facts: DerivedEmailFact[] = [];
   for (const rule of FACT_RULES) {
-    const match = rule.pattern.exec(redacted);
+    const match = rule.pattern.exec(searchable);
     if (!match || match.index === undefined) continue;
     facts.push({
       kind: rule.kind,
       statement: rule.statement,
-      evidenceExcerpt: excerptForMatch(redacted, match.index),
+      evidenceExcerpt: excerptForMatch(searchable, match.index),
       confidence: rule.confidence,
     });
   }
