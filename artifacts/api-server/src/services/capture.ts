@@ -11,6 +11,7 @@ import {
   type CaptureEndpoint,
   type CaptureFieldMapping,
   type CaptureTargetField,
+  type LeadStatus,
 } from "@workspace/db";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 
@@ -21,7 +22,13 @@ import {
   repeatTouchColumns,
 } from "./attribution";
 
-const OPEN_LEAD_STATUSES = ["new", "contacted", "qualified", "nurture", "follow_up"];
+const OPEN_LEAD_STATUSES = [
+  "new",
+  "ai_qualified",
+  "contact_attempted",
+  "nurture",
+  "follow_up",
+] satisfies LeadStatus[];
 
 // ---------- endpoint CRUD (org-scoped) ----------
 
@@ -349,7 +356,7 @@ async function runCapture(
             and(
               eq(leadsTable.organizationId, organizationId),
               eq(leadsTable.contactId, contactId),
-              inArray(leadsTable.status, OPEN_LEAD_STATUSES as never[]),
+              inArray(leadsTable.status, OPEN_LEAD_STATUSES),
             ),
           )
           .limit(1)
