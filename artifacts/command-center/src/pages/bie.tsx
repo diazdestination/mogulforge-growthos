@@ -221,17 +221,17 @@ function MetricCard({
   emphasis?: boolean;
 }) {
   return (
-    <div className={cn('rounded-xl border p-4 shadow-sm', emphasis ? 'border-primary/30 bg-primary/[0.04]' : 'border-border bg-card')}>
+    <div className={cn('forge-panel rounded-[1.35rem] border p-5', emphasis ? 'border-primary/35 bg-primary/[0.075]' : 'border-border bg-card/92')}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-          <p className={cn('mt-2 text-2xl font-bold tracking-tight', emphasis && 'text-primary')}>{value}</p>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+          <p className={cn('mt-3 font-display text-4xl font-semibold leading-none tracking-[-0.04em]', emphasis && 'text-primary')}>{value}</p>
         </div>
-        <div className={cn('rounded-lg p-2', emphasis ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
+        <div className={cn('rounded-full border p-2.5', emphasis ? 'border-primary/25 bg-primary/10 text-primary' : 'border-border bg-muted/70 text-muted-foreground')}>
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{detail}</p>
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{detail}</p>
     </div>
   );
 }
@@ -423,25 +423,25 @@ export default function Bie() {
   const autopilotState = policy.enabled && !policy.pausedAt ? 'Guardrailed autopilot enabled' : 'Approval-first mode';
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-7">
-      <section className="overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.12] via-card to-card p-5 md:p-7">
+    <div className="bie-command mx-auto w-full max-w-[1500px] space-y-5 p-4 md:p-6 lg:p-8">
+      <section className="forge-grid forge-panel relative overflow-hidden rounded-[2rem] border border-primary/20 bg-card/94 p-6 md:p-8 lg:p-10">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
           <div className="max-w-3xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1 text-xs font-semibold text-primary">
+            <div className="forge-kicker mb-4 inline-flex items-center gap-2">
               <Sparkles className="h-3.5 w-3.5" /> MOGULFORGE BIE · GROWTHOS
             </div>
-            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Revenue Command</h1>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground md:text-base">{briefing.narrative}</p>
+            <h1 className="font-display text-5xl font-semibold leading-[0.86] tracking-[-0.045em] md:text-6xl lg:text-7xl">Revenue <em className="font-normal text-primary">Command</em></h1>
+            <p className="mt-5 max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">{briefing.narrative}</p>
             <p className="mt-3 text-xs text-muted-foreground">Last calculated {new Date(briefing.generatedAt).toLocaleString()}. Pipeline value is not claimed revenue.</p>
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Link href="/evidence" className="inline-flex h-10 items-center gap-2 rounded-md border border-primary/30 bg-background px-4 text-sm font-semibold text-primary shadow-sm hover:bg-primary/5">
+          <div className="flex flex-wrap gap-2 lg:w-[18rem] lg:shrink-0 lg:flex-col">
+            <Link href="/evidence" className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-primary/30 bg-background/75 px-5 text-sm font-semibold text-primary shadow-sm hover:bg-primary/5">
               <FileSearch2 className="h-4 w-4" /> Open Evidence Intelligence
             </Link>
-            <button onClick={() => { setError(null); setNotice(null); briefingMutation.mutate(); }} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-60">
+            <button onClick={() => { setError(null); setNotice(null); briefingMutation.mutate(); }} disabled={busy} className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-extrabold text-primary-foreground shadow-sm hover:-translate-y-0.5 hover:bg-foreground disabled:opacity-60">
               {briefingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Run recovery briefing
             </button>
-            <button onClick={() => { setError(null); setNotice(null); proposalsMutation.mutate(); }} disabled={busy || briefing.opportunityCount === 0} className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60">
+            <button onClick={() => { setError(null); setNotice(null); proposalsMutation.mutate(); }} disabled={busy || briefing.opportunityCount === 0} className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border bg-background/75 px-5 text-sm font-semibold hover:border-primary/35 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">
               <Bot className="h-4 w-4" /> Build action queue
             </button>
           </div>
@@ -455,14 +455,14 @@ export default function Bie() {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={Target} label="Known lead value at risk" value={dollars(briefing.revenueAtRiskCents)} detail="Observed sums for qualifying CRM leads only." emphasis />
         <MetricCard icon={Activity} label="Recovery candidates" value={String(briefing.opportunityCount)} detail="Stalled estimates, claims, and dormant pipeline records." />
         <MetricCard icon={Gauge} label="Data readiness" value={`${briefing.dataReadiness.score}/100`} detail={`${briefing.dataReadiness.leadsWithKnownValue} of ${briefing.totalLeads} leads have known value.`} />
         <MetricCard icon={Database} label="Google revenue stack" value={`${briefing.dataReadiness.googleSourcesConnected}/${briefing.dataReadiness.totalGoogleSources}`} detail="Connected sources only; no provider metrics are assumed." />
       </div>
 
-      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+      <section className="forge-panel rounded-[1.5rem] border border-border bg-card/94 p-5 md:p-6">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
@@ -551,7 +551,7 @@ export default function Bie() {
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-        <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <section className="forge-panel rounded-[1.5rem] border border-border bg-card/94 p-5 md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">Recovery opportunities</h2>
@@ -581,7 +581,7 @@ export default function Bie() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <section className="forge-panel rounded-[1.5rem] border border-border bg-card/94 p-5 md:p-6">
           <div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">Google Revenue Stack</h2><p className="mt-1 text-sm text-muted-foreground">Ads, GA4, Search Console, and Business Profile.</p></div><Database className="h-5 w-5 text-primary" /></div>
           <div className="mt-4 space-y-3">
             {briefing.sources.map((source) => (
@@ -595,7 +595,7 @@ export default function Bie() {
         </section>
       </div>
 
-      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+      <section className="forge-panel rounded-[1.5rem] border border-border bg-card/94 p-5 md:p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold">Expert action queue</h2><StatusPill status={proposed.length ? 'proposed' : 'executed'} /></div><p className="mt-1 text-sm text-muted-foreground">Approve individual actions before execution. Email also checks provider readiness, suppression, quiet hours, and the BIE daily cap.</p></div>
           <div className="rounded-lg border border-border bg-background px-3 py-2 text-right"><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Mode</p><p className="mt-0.5 text-sm font-semibold">{autopilotState}</p></div>
@@ -612,7 +612,7 @@ export default function Bie() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+      <section className="forge-panel rounded-[1.5rem] border border-border bg-card/94 p-5 md:p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center"><div><div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /><h2 className="text-lg font-semibold">Guardrailed autopilot</h2></div><p className="mt-1 max-w-3xl text-sm text-muted-foreground">Default off. Only individually approved actions can run, every execution is audited, and email can never bypass provider, consent, suppression, quiet-hour, or daily-cap checks.</p></div>{canManage && <button disabled={busy} onClick={() => { setError(null); setNotice(null); policyMutation.mutate({ enabled: !policy.enabled, allowedActions: !policy.enabled && policy.allowedActions.length === 0 ? ['create_task', 'change_stage'] : policy.allowedActions }); }} className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-muted disabled:opacity-60">{policy.enabled ? <><XCircle className="h-4 w-4" /> Disable autopilot</> : <><ShieldCheck className="h-4 w-4" /> Enable guardrailed autopilot</>}</button>}</div>
         <div className="mt-4 grid gap-3 md:grid-cols-3"><div className="rounded-lg bg-muted/60 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Allowed actions</p><p className="mt-1 text-sm font-medium">{policy.allowedActions.length ? policy.allowedActions.map((action) => actionNames[action]).join(' · ') : 'None — execution remains off'}</p>{canManage && <div className="mt-3 space-y-2">{(['create_task', 'change_stage', 'send_email'] as ActionType[]).map((action) => <label key={action} className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={policy.allowedActions.includes(action)} disabled={busy} onChange={(event) => { const allowedActions = event.target.checked ? [...new Set([...policy.allowedActions, action])] : policy.allowedActions.filter((item) => item !== action); setError(null); setNotice(null); policyMutation.mutate({ allowedActions }); }} />{actionNames[action]}</label>)}</div>}</div><div className="rounded-lg bg-muted/60 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Daily BIE email cap</p><p className="mt-1 text-sm font-medium">{policy.dailyEmailCap} messages maximum</p></div><div className="rounded-lg bg-muted/60 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Operator control</p><p className="mt-1 text-sm font-medium">{policy.pausedAt ? `Paused: ${policy.pauseReason || 'by operator'}` : 'No active pause'}</p></div></div>
       </section>

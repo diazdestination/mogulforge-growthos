@@ -200,6 +200,49 @@ describe("capture endpoints", () => {
     expect(dupLeads).toHaveLength(1);
   });
 
+  it("merges a repeat submission for the same contact into the open lead", async () => {
+    const first = await fetch(`${baseUrl}/api/v1/public/capture/${token}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-idempotency-key": "evt-repeat-1" },
+      body: JSON.stringify({
+        "your-email": "repeat@example.com",
+        "your-name": "Repeat Visitor",
+        msg: "First request",
+      }),
+    });
+    expect(first.status).toBe(201);
+    const created = await first.json() as any;
+    expect(created.outcome).toBe("created");
+
+    const second = await fetch(`${baseUrl}/api/v1/public/capture/${token}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-idempotency-key": "evt-repeat-2" },
+      body: JSON.stringify({
+        "your-email": "repeat@example.com",
+        "your-name": "Repeat Visitor",
+        msg: "Second request",
+      }),
+    });
+    expect(second.status).toBe(201);
+    const merged = await second.json() as any;
+    expect(merged.outcome).toBe("merged");
+    expect(merged.leadId).toBe(created.leadId);
+
+    const repeatLeads = await db
+      .select()
+      .from(leadsTable)
+      .where(eq(leadsTable.organizationId, org.id));
+    const repeatContactLeadIds: string[] = [];
+    for (const lead of repeatLeads) {
+      const [contact] = await db
+        .select()
+        .from(contactsTable)
+        .where(eq(contactsTable.id, lead.contactId));
+      if (contact?.email === "repeat@example.com") repeatContactLeadIds.push(lead.id);
+    }
+    expect(repeatContactLeadIds).toEqual([created.leadId]);
+  });
+
   it("accepts form-encoded posts (a form's action pointed at us)", async () => {
     const params = new URLSearchParams({
       "your-email": "form-encoded@example.com",

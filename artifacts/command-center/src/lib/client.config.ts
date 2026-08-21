@@ -30,7 +30,7 @@ export const CLIENT = {
    * Brand primary color — hex, for reference / design tools.
    * MogulForge violet.
    */
-  primaryColor: '#6D28D9',
+  primaryColor: '#C9F75D',
 
   /**
    * Brand primary color as an HSL triple (space-separated, no commas),
@@ -38,15 +38,15 @@ export const CLIENT = {
    *
    * Light-mode value. If you change primaryColor above, update this
    * to match. Tip: most design tools show HSL — use the "H S% L%"
-   * values (without the % signs), e.g. "263 70% 50%".
+   * values (without the % signs), e.g. "79 89% 67%".
    */
-  primaryHsl: '263 70% 50%',
+  primaryHsl: '79 89% 67%',
 
   /**
    * Dark-mode variant of the primary color (typically the same hue
    * and saturation, but a higher lightness so it reads on dark bg).
    */
-  primaryHslDark: '263 85% 68%',
+  primaryHslDark: '79 89% 67%',
 
   /** Business phone number (display format, used in message templates) */
   phone: '(555) 010-0000',
