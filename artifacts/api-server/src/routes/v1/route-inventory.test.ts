@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Permission } from "../../lib/permissions";
 import v1Router from "./index";
+import { requirePlatformAdmin } from "./orgs";
 
 /**
  * Route-inventory test: walks the actual mounted Express router and asserts
@@ -18,6 +19,7 @@ interface RouteEntry {
   permissions: Permission[];
   /** Number of handlers on the route (guards + terminal handler). */
   handlerCount: number;
+  platformGuard: boolean;
 }
 
 // Routes that are intentionally reachable without authentication.
@@ -39,6 +41,10 @@ const SESSION_ONLY_ROUTES = new Set([
   "POST /orgs",
   "GET /platform/orgs",
   "PATCH /platform/orgs/:id",
+  "GET /platform/clients/profiles",
+  "POST /platform/clients",
+  "GET /platform/clients/:orgId/readiness",
+  "POST /platform/clients/:orgId/sites/:siteId/key",
 ]);
 
 /**
@@ -56,6 +62,16 @@ const SESSION_ONLY_ROUTES = new Set([
  * - settings.manage — org configuration surfaces (owner/admin)
  */
 const EXPECTED_PERMISSIONS: Record<string, Permission> = {
+  "GET /smart-sites/profiles": "crm.read",
+  "GET /smart-sites": "crm.read",
+  "GET /smart-sites/overview": "crm.read",
+  "POST /smart-sites": "settings.manage",
+  "PATCH /smart-sites/:id": "settings.manage",
+  "POST /smart-sites/:id/rotate-key": "settings.manage",
+  "GET /smart-sites/follow-up": "crm.read",
+  "PATCH /smart-sites/:id/response-target": "settings.manage",
+  "PATCH /smart-sites/leads/:id/owner": "crm.write",
+  "POST /smart-sites/leads/:id/contact-attempts": "crm.write",
   // me / users
   "GET /me": "crm.read",
   "PATCH /me": "crm.read",
@@ -305,7 +321,10 @@ function isTaggedGuard(
 }
 
 /** Recursively collect every route mounted on a router. */
-function collectRoutes(router: unknown, routes: RouteEntry[] = []): RouteEntry[] {
+function collectRoutes(
+  router: unknown,
+  routes: RouteEntry[] = [],
+): RouteEntry[] {
   const stack = (router as { stack?: unknown[] }).stack;
   if (!Array.isArray(stack)) return routes;
   for (const layer of stack as Array<{
@@ -335,6 +354,9 @@ function collectRoutes(router: unknown, routes: RouteEntry[] = []): RouteEntry[]
             path,
             permissions,
             handlerCount: layer.route.stack.length,
+            platformGuard: layer.route.stack.some(
+              (l) => l.handle === requirePlatformAdmin,
+            ),
           });
         }
       }
@@ -360,6 +382,13 @@ const protectedRoutes = routes.filter(
 );
 
 describe("v1 route inventory", () => {
+  it("platform routes carry the fresh session and platform-admin gate", () => {
+    expect(
+      routes
+        .filter((r) => r.path.startsWith("/platform/") && !r.platformGuard)
+        .map(keyOf),
+    ).toEqual([]);
+  });
   it("discovers a non-trivial number of routes (walker sanity check)", () => {
     // If Express internals change and the walker silently finds nothing,
     // every other assertion would vacuously pass. Guard against that.
@@ -371,8 +400,10 @@ describe("v1 route inventory", () => {
     const unguarded = protectedRoutes
       .filter((r) => r.permissions.length === 0)
       .map(keyOf);
-    expect(unguarded, `Routes missing requireMember: ${unguarded.join(", ")}`)
-      .toEqual([]);
+    expect(
+      unguarded,
+      `Routes missing requireMember: ${unguarded.join(", ")}`,
+    ).toEqual([]);
   });
 
   it("every non-public route carries exactly the permission the contract expects", () => {
@@ -399,8 +430,9 @@ describe("v1 route inventory", () => {
     const stale = Object.keys(EXPECTED_PERMISSIONS).filter(
       (key) => !mounted.has(key),
     );
-    expect(stale, `Remove stale contract entries: ${stale.join(", ")}`)
-      .toEqual([]);
+    expect(stale, `Remove stale contract entries: ${stale.join(", ")}`).toEqual(
+      [],
+    );
   });
 
   it("DELETE routes are destructive-grade (crm.delete / settings.manage) unless explicitly exempted", () => {

@@ -163,6 +163,9 @@ production release, DNS, spending, provider-credential or real-message gates.
 Latest local reliability checkpoint: read `SMART-SITES-RECOVERY.md` for encrypted site-side recovery,
 staff owner/target/logging semantics and verified synthetic outage tests. Staff-recorded attempts
 are not independently verified communications. The next build priority is isolated client onboarding
-and connection readiness; hosted recovery scheduling/alerting and public activation remain gated.
+and connection readiness; that local milestone is now complete in `SMART-SITES-ONBOARDING.md`.
+Next build priority: consent-first acquisition events with tenant-scoped lead/outcome joins.
+Client Launchpad setup selection does not change user membership or impersonate another client's CRM.
+Staff invitations, hosted recovery scheduling/alerting and public activation remain gated.
 
 Complete the Q3 execution kernel and turn the roofing/restoration beta into measurable proof that GrowthOS produces more captured opportunities, faster follow-up, better operational visibility, and more won revenue than a traditional CRM.

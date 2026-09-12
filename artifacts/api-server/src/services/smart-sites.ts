@@ -34,6 +34,8 @@ const publicFields = {
   source: smartSitesTable.source,
   isActive: smartSitesTable.isActive,
   responseTargetMinutes: smartSitesTable.responseTargetMinutes,
+  credentialIssuedAt: smartSitesTable.credentialIssuedAt,
+  credentialVersion: smartSitesTable.credentialVersion,
   createdAt: smartSitesTable.createdAt,
 };
 
@@ -61,6 +63,7 @@ export async function createSmartSite(
         organizationId,
         source: input.siteKey,
         keyHash: hash(secret),
+        credentialIssuedAt: new Date(),
       })
       .returning(publicFields);
     await tx.insert(auditEventsTable).values({
@@ -109,20 +112,37 @@ export async function rotateSmartSiteKey(
   organizationId: string,
   actorUserId: string,
   id: string,
+  expectedVersion?: number,
 ) {
   const secret = `ss_${randomBytes(32).toString("hex")}`;
   return db.transaction(async (tx) => {
     const [site] = await tx
       .update(smartSitesTable)
-      .set({ keyHash: hash(secret), isActive: false, updatedAt: new Date() })
+      .set({
+        keyHash: hash(secret),
+        isActive: false,
+        updatedAt: new Date(),
+        credentialIssuedAt: new Date(),
+        credentialCheckedAt: null,
+        credentialVersion: sql`${smartSitesTable.credentialVersion} + 1`,
+      })
       .where(
         and(
           eq(smartSitesTable.organizationId, organizationId),
           eq(smartSitesTable.id, id),
+          ...(expectedVersion === undefined
+            ? []
+            : [eq(smartSitesTable.credentialVersion, expectedVersion)]),
         ),
       )
       .returning(publicFields);
-    if (!site) throw new SmartSiteError("site_not_found", 404);
+    if (!site)
+      throw new SmartSiteError(
+        expectedVersion === undefined
+          ? "site_not_found"
+          : "site_missing_or_credential_changed",
+        expectedVersion === undefined ? 404 : 409,
+      );
     await tx.insert(auditEventsTable).values({
       organizationId,
       actorUserId,

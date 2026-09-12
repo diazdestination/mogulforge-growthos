@@ -2,7 +2,7 @@ import { type LucideIcon } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@workspace/replit-auth-web';
-import { useGetMe, useGetOnboarding, getGetOnboardingQueryKey, UserRole } from '@workspace/api-client-react';
+import { useGetMe, useGetSession, useGetOnboarding, getGetOnboardingQueryKey, UserRole } from '@workspace/api-client-react';
 import {
   LayoutDashboard,
   Trello,
@@ -41,6 +41,7 @@ interface NavItem {
   icon: LucideIcon;
   requireAudit?: boolean;
   requireSettings?: boolean;
+  requirePlatform?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -59,6 +60,7 @@ const navItems: NavItem[] = [
   { title: 'Appointments', href: '/appointments', icon: Calendar },
   { title: 'Win-back', href: '/reactivation', icon: RotateCcw },
   { title: 'Lead Capture', href: '/capture', icon: Webhook },
+  { title: 'Client Launchpad', href: '/platform', icon: Building, requirePlatform: true },
   { title: 'Forms', href: '/forms', icon: ClipboardList, requireSettings: true },
   { title: 'Audit Log', href: '/audit', icon: Shield, requireAudit: true },
   { title: 'My Profile', href: '/account', icon: UserRound },
@@ -75,6 +77,7 @@ function useBrandName(): string {
 export function Shell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { logout } = useAuth();
+  const { data: session } = useGetSession();
   const { data: profile } = useGetMe();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -104,6 +107,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       : []),
     ...navItems,
   ].filter((item) => {
+    if (item.requirePlatform && session?.isPlatformAdmin !== true) return false;
     if (item.requireAudit && !canViewAuditLog(role)) {
       return false;
     }

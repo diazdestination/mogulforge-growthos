@@ -36,6 +36,9 @@ Object.assign(env, {
   AUTO_MIGRATE: "false",
 });
 const tests = [
+  "src/routes/v1/client-onboarding.test.ts",
+  "src/routes/v1/onboarding-org.test.ts",
+  "src/routes/v1/route-inventory.test.ts",
   "src/routes/v1/smart-sites.test.ts",
   "src/routes/v1/capture.test.ts",
   "src/services/tenant-isolation.test.ts",

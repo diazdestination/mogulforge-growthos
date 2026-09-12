@@ -118,9 +118,9 @@ Capacity limits and queue encryption are not a complete public-form abuse/privac
 Key-ring rotation, aged-data deletion, full event history and provider-verified outreach metrics are
 not implemented. Existing untracked `pnpm-workspace.yaml.bak` was not modified.
 
-Next build priority: **repeatable isolated client onboarding and a truthful connection-readiness
-checklist**, before activating any production tenant. Then consented acquisition events, indexable
-service/project pages, provider communications and verified revenue/cash/job-cost joins.
+Next-priority checkpoint: **isolated draft onboarding and connection readiness are now implemented
+locally**; see SMART-SITES-ONBOARDING.md. The next build priority is consented acquisition events,
+then indexable service/project pages, provider communications and verified revenue/cash/job-cost joins.
 
 Implementation references: [Cloudflare D1 prepared statements](https://developers.cloudflare.com/d1/worker-api/prepared-statements/),
 [D1 database operations](https://developers.cloudflare.com/d1/worker-api/d1-database/).

@@ -4,6 +4,12 @@ September 12, 2026. Implemented and locally verified; not a production release.
 
 ## Latest reliability checkpoint
 
+**Latest completed priority:** Client Launchpad and repeatable isolated draft onboarding are now
+locally implemented. Read **SMART-SITES-ONBOARDING.md** and `design/client-onboarding-qa.md` first.
+Verification is now 123 backend + 218 UI + 41 Painless tests. Setup selection does not impersonate
+another client's CRM identity. Staff invitations and production activation remain separate gates.
+The next local build priority is consent-first acquisition events and real lead/outcome joins.
+
 The next priority is now locally implemented: independent encrypted Painless delivery journal,
 automatic local outage recovery, staff ownership, future-only follow-up targets and explicitly
 staff-recorded first-attempt evidence. Read **SMART-SITES-RECOVERY.md** for the current runbook,
@@ -98,7 +104,9 @@ Screenshots: Painless `design/qa-smart-sites-2026-09-12/`. The database contains
 1. **Reliability and staff ownership — local milestone complete:** see SMART-SITES-RECOVERY.md.
    Remaining production readiness includes edge abuse protection, scheduled draining, operator
    alerts, key backup/rotation and retention. Actual staff roster/working-hour policy is not inferred.
-2. **Client onboarding:** authenticated operator organization provisioning/switching, one-page connection health and a repeatable labeled acceptance check. Separate organizations for HVAC, construction and Dawsonville; do not put their customer records into Painless. No one-click production onboarding claim yet.
+2. **Client onboarding — local draft/readiness milestone complete:** see SMART-SITES-ONBOARDING.md.
+   Three labeled browser-created client drafts, platform-only setup selection and credential-only
+   checks are verified. No cross-client CRM impersonation, automatic invitation or one-click launch.
 3. **First-party acquisition measurement:** versioned page/form/voice-to-lead events with consent, retention, opt-out, bot filtering and lead/outcome joins. Add response speed, qualification, appointment and estimate stages. Current counts are not a visitor/conversion-rate dashboard.
 4. **Organic discovery:** indexable service and real project pages, canonical/sitemap/schema/performance, then verified service-area content around the outer Atlanta market. No fabricated local offices, doorway city-page sprawl, guaranteed rankings or synthetic reviews. Search Console/Business Profile access remains unverified.
 5. **Communications and voice:** owner-approved sending identity, recipient roster, consent enforcement, unsubscribe/suppression, provider acceptance and delivery tests; approved agent tool for a structured, consented lead handoff. No automatic forwarding of claim documents or transcripts. Existing voice itself was not modified or re-verified this turn.

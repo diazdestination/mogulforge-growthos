@@ -27,6 +27,14 @@ export const smartSitesTable = pgTable(
     profile: text("profile").notNull(),
     source: text("source").notNull(),
     keyHash: text("key_hash").notNull(),
+    // Null for historical credentials whose issuance was not recorded.
+    credentialIssuedAt: timestamp("credential_issued_at", {
+      withTimezone: true,
+    }),
+    credentialVersion: integer("credential_version").notNull().default(1),
+    credentialCheckedAt: timestamp("credential_checked_at", {
+      withTimezone: true,
+    }),
     isActive: boolean("is_active").notNull().default(false),
     responseTargetMinutes: integer("response_target_minutes")
       .notNull()
@@ -40,6 +48,34 @@ export const smartSitesTable = pgTable(
   },
   (t) => [
     uniqueIndex("smart_sites_org_key_uq").on(t.organizationId, t.siteKey),
+  ],
+);
+
+/** Provisioning receipts contain configuration only, never customer data or keys. */
+export const smartSiteOnboardingsTable = pgTable(
+  "smart_site_onboardings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id),
+    siteId: uuid("site_id")
+      .notNull()
+      .references(() => smartSitesTable.id),
+    actorUserId: varchar("actor_user_id")
+      .notNull()
+      .references(() => usersTable.id),
+    requestId: uuid("request_id").notNull(),
+    payloadHash: text("payload_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("smart_site_onboardings_request_uq").on(
+      t.actorUserId,
+      t.requestId,
+    ),
   ],
 );
 
