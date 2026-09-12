@@ -12,6 +12,7 @@ import {
   propertiesTable,
   smartSiteSubmissionsTable,
   smartSitesTable,
+  smartSiteFollowupsTable,
   usersTable,
 } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
@@ -38,6 +39,10 @@ type Site = { id: string; secret: string; isActive: boolean };
 type Overview = {
   rows: { captured: number; won: number; contractValueCents: number }[];
 };
+type FollowupReport = {
+  summary: { overdue: number; logged: number };
+  pending: { leadId: string }[];
+};
 const json = <T>(response: Response) => response.json() as Promise<T>;
 const receipt = (response: Response) => json<Receipt>(response);
 const body = (overrides: Record<string, unknown> = {}) => ({
@@ -60,6 +65,293 @@ const body = (overrides: Record<string, unknown> = {}) => ({
     policyVersion: "test-inquiry-v1",
   },
   ...overrides,
+});
+
+describe("Smart Site ownership and first-attempt evidence", () => {
+  const newInquiry = async (receivedAt?: string) => {
+    const created = await json<Site>(
+      await auth(
+        "/smart-sites",
+        {
+          name: "Follow-up Test",
+          siteKey: `follow-${randomUUID()}`,
+          profile: "roofing-exteriors",
+        },
+        "POST",
+      ),
+    );
+    await auth(`/smart-sites/${created.id}`, { isActive: true }, "PATCH");
+    const res = await send(
+      body({
+        contact: {
+          name: "Followup Test",
+          email: `${randomUUID()}@example.test`,
+        },
+      }),
+      created,
+      receivedAt ? { "x-smart-site-received-at": receivedAt } : {},
+    );
+    expect(res.status).toBe(201);
+    return { ...(await receipt(res)), siteId: created.id };
+  };
+  const ownerId = async () =>
+    (
+      await db
+        .select()
+        .from(usersTable)
+        .where(
+          and(
+            eq(usersTable.organizationId, orgId),
+            eq(usersTable.role, "admin"),
+          ),
+        )
+    )[0].id;
+
+  it("snapshots elapsed-time targets from the trusted website receipt and never rewrites old deadlines", async () => {
+    const accepted = new Date(Date.now() - 2 * 3600_000).toISOString();
+    const saved = await newInquiry(accepted);
+    const [before] = await db
+      .select()
+      .from(smartSiteSubmissionsTable)
+      .where(eq(smartSiteSubmissionsTable.leadId, saved.leadId));
+    expect(before.siteReceivedAt?.toISOString()).toBe(accepted);
+    expect(before.responseDueAt!.getTime() - Date.parse(accepted)).toBe(
+      60 * 60_000,
+    );
+    expect(
+      (
+        await auth(
+          `/smart-sites/${saved.siteId}/response-target`,
+          { minutes: 15 },
+          "PATCH",
+        )
+      ).status,
+    ).toBe(200);
+    const [after] = await db
+      .select()
+      .from(smartSiteSubmissionsTable)
+      .where(eq(smartSiteSubmissionsTable.leadId, saved.leadId));
+    expect(after.responseDueAt).toEqual(before.responseDueAt);
+    const report = await json<FollowupReport>(
+      await auth("/smart-sites/follow-up"),
+    );
+    expect(report.summary.overdue).toBeGreaterThan(0);
+    expect(
+      report.pending.some((p: { leadId: string }) => p.leadId === saved.leadId),
+    ).toBe(true);
+    expect(
+      (
+        await auth(
+          `/smart-sites/${saved.siteId}/response-target`,
+          { minutes: 0 },
+          "PATCH",
+        )
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await auth(
+          `/smart-sites/${saved.siteId}/response-target`,
+          { minutes: 15 },
+          "PATCH",
+          viewerSid,
+        )
+      ).status,
+    ).toBe(403);
+  });
+  it("claims lead and open task together, detects a concurrent owner change, and respects normal CRM reassignment", async () => {
+    const saved = await newInquiry();
+    const owner = await ownerId();
+    const updates = await Promise.all(
+      [1, 2].map(() =>
+        auth(
+          `/smart-sites/leads/${saved.leadId}/owner`,
+          { assignedUserId: owner, expectedOwnerId: null },
+          "PATCH",
+        ),
+      ),
+    );
+    expect(updates.map((r) => r.status).sort()).toEqual([200, 409]);
+    const [task] = await db
+      .select()
+      .from(crmTasksTable)
+      .where(eq(crmTasksTable.leadId, saved.leadId));
+    expect(task.assignedUserId).toBe(owner);
+    expect(
+      (await auth(`/leads/${saved.leadId}`, { assignedUserId: null }, "PATCH"))
+        .status,
+    ).toBe(200);
+    const [updated] = await db
+      .select()
+      .from(crmTasksTable)
+      .where(eq(crmTasksTable.id, task.id));
+    expect(updated.assignedUserId).toBeNull();
+  });
+  it("rejects cross-tenant, inactive, viewer and unauthorized ownership changes", async () => {
+    const saved = await newInquiry();
+    const [other] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.organizationId, otherOrgId));
+    const [viewer] = await db
+      .select()
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.organizationId, orgId),
+          eq(usersTable.role, "viewer"),
+        ),
+      );
+    const [inactive] = await db
+      .insert(usersTable)
+      .values({ organizationId: orgId, role: "sales_rep", isActive: false })
+      .returning();
+    for (const assignedUserId of [other.id, viewer.id, inactive.id])
+      expect(
+        (
+          await auth(
+            `/smart-sites/leads/${saved.leadId}/owner`,
+            { assignedUserId, expectedOwnerId: null },
+            "PATCH",
+          )
+        ).status,
+      ).toBe(400);
+    expect(
+      (
+        await auth(
+          `/smart-sites/leads/${saved.leadId}/owner`,
+          { assignedUserId: other.id, expectedOwnerId: null },
+          "PATCH",
+          otherSid,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await auth(
+          `/smart-sites/leads/${saved.leadId}/owner`,
+          { assignedUserId: await ownerId(), expectedOwnerId: null },
+          "PATCH",
+          viewerSid,
+        )
+      ).status,
+    ).toBe(403);
+    const otherReport = await json<FollowupReport>(
+      await auth("/smart-sites/follow-up", undefined, "GET", otherSid),
+    );
+    expect(
+      otherReport.pending.some(
+        (p: { leadId: string }) => p.leadId === saved.leadId,
+      ),
+    ).toBe(false);
+  });
+  it("notes and status updates do not count; confirmed contact logging is idempotent and closes only the intake task", async () => {
+    const saved = await newInquiry();
+    await db
+      .insert(activitiesTable)
+      .values({
+        organizationId: orgId,
+        leadId: saved.leadId,
+        actorUserId: await ownerId(),
+        type: "note",
+        title: "Internal planning only",
+      });
+    await auth(`/leads/${saved.leadId}`, { status: "follow_up" }, "PATCH");
+    const [before] = await db
+      .select()
+      .from(smartSiteSubmissionsTable)
+      .where(eq(smartSiteSubmissionsTable.leadId, saved.leadId));
+    expect(before.firstAttemptAt).toBeNull();
+    const input = {
+      requestId: randomUUID(),
+      channel: "phone",
+      outcome: "no_answer",
+      confirmed: true,
+    };
+    expect(
+      (
+        await auth(
+          `/smart-sites/leads/${saved.leadId}/contact-attempts`,
+          { ...input, confirmed: false },
+          "POST",
+        )
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await auth(
+          `/smart-sites/leads/${saved.leadId}/contact-attempts`,
+          input,
+          "POST",
+          viewerSid,
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await auth(
+          `/smart-sites/leads/${saved.leadId}/contact-attempts`,
+          input,
+          "POST",
+          otherSid,
+        )
+      ).status,
+    ).toBe(404);
+    const first = await auth(
+      `/smart-sites/leads/${saved.leadId}/contact-attempts`,
+      input,
+      "POST",
+    );
+    expect(first.status).toBe(201);
+    const again = await auth(
+      `/smart-sites/leads/${saved.leadId}/contact-attempts`,
+      input,
+      "POST",
+    );
+    expect(again.status).toBe(200);
+    expect((await json<{ duplicate: boolean }>(again)).duplicate).toBe(true);
+    expect(
+      (
+        await auth(
+          `/smart-sites/leads/${saved.leadId}/contact-attempts`,
+          { ...input, outcome: "connected" },
+          "POST",
+        )
+      ).status,
+    ).toBe(409);
+    const events = await db
+      .select()
+      .from(smartSiteFollowupsTable)
+      .where(eq(smartSiteFollowupsTable.leadId, saved.leadId));
+    expect(events).toHaveLength(1);
+    const [after] = await db
+      .select()
+      .from(smartSiteSubmissionsTable)
+      .where(eq(smartSiteSubmissionsTable.leadId, saved.leadId));
+    expect(after.firstAttemptAt).toEqual(events[0].recordedAt);
+    const [task] = await db
+      .select()
+      .from(crmTasksTable)
+      .where(eq(crmTasksTable.leadId, saved.leadId));
+    expect(task.status).toBe("done");
+    const audit = await db
+      .select()
+      .from(auditEventsTable)
+      .where(
+        and(
+          eq(auditEventsTable.entityId, saved.leadId),
+          eq(auditEventsTable.action, "smart_site.contact_attempt_recorded"),
+        ),
+      );
+    expect(audit).toHaveLength(1);
+    expect((audit[0].metadata as Record<string, unknown>).evidence).toBe(
+      "staff-recorded",
+    );
+    expect(
+      (await json<FollowupReport>(await auth("/smart-sites/follow-up"))).summary
+        .logged,
+    ).toBeGreaterThan(0);
+  });
 });
 const auth = (path: string, data?: unknown, method = "GET", token = sid) =>
   fetch(`${base}/api/v1${path}`, {

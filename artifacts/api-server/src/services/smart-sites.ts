@@ -33,6 +33,7 @@ const publicFields = {
   profile: smartSitesTable.profile,
   source: smartSitesTable.source,
   isActive: smartSitesTable.isActive,
+  responseTargetMinutes: smartSitesTable.responseTargetMinutes,
   createdAt: smartSitesTable.createdAt,
 };
 
@@ -62,16 +63,14 @@ export async function createSmartSite(
         keyHash: hash(secret),
       })
       .returning(publicFields);
-    await tx
-      .insert(auditEventsTable)
-      .values({
-        organizationId,
-        actorUserId,
-        action: "smart_site.created",
-        entityType: "smart_site",
-        entityId: row.id,
-        metadata: { profile: input.profile, active: false },
-      });
+    await tx.insert(auditEventsTable).values({
+      organizationId,
+      actorUserId,
+      action: "smart_site.created",
+      entityType: "smart_site",
+      entityId: row.id,
+      metadata: { profile: input.profile, active: false },
+    });
     return row;
   });
   return { ...site, secret };
@@ -95,15 +94,13 @@ export async function updateSmartSite(
       )
       .returning(publicFields);
     if (!row) throw new SmartSiteError("site_not_found", 404);
-    await tx
-      .insert(auditEventsTable)
-      .values({
-        organizationId,
-        actorUserId,
-        action: active ? "smart_site.enabled" : "smart_site.disabled",
-        entityType: "smart_site",
-        entityId: id,
-      });
+    await tx.insert(auditEventsTable).values({
+      organizationId,
+      actorUserId,
+      action: active ? "smart_site.enabled" : "smart_site.disabled",
+      entityType: "smart_site",
+      entityId: id,
+    });
     return row;
   });
 }
@@ -126,16 +123,14 @@ export async function rotateSmartSiteKey(
       )
       .returning(publicFields);
     if (!site) throw new SmartSiteError("site_not_found", 404);
-    await tx
-      .insert(auditEventsTable)
-      .values({
-        organizationId,
-        actorUserId,
-        action: "smart_site.key_rotated",
-        entityType: "smart_site",
-        entityId: id,
-        metadata: { active: false },
-      });
+    await tx.insert(auditEventsTable).values({
+      organizationId,
+      actorUserId,
+      action: "smart_site.key_rotated",
+      entityType: "smart_site",
+      entityId: id,
+      metadata: { active: false },
+    });
     return { ...site, secret };
   });
 }
@@ -163,6 +158,7 @@ export async function authenticateSmartSite(id: string, secret: string) {
 export async function captureSmartSiteInquiry(
   site: typeof smartSitesTable.$inferSelect,
   input: SmartSiteIntake,
+  siteReceivedAt?: Date,
 ) {
   const profile = SMART_SITE_PROFILES.find((p) => p.id === site.profile);
   const service = profile?.services.find(
@@ -307,6 +303,10 @@ export async function captureSmartSiteInquiry(
       receivedAt: new Date().toISOString(),
       scope: "respond-to-this-inquiry",
     };
+    const acceptedAt = siteReceivedAt ?? new Date();
+    const responseDueAt = new Date(
+      acceptedAt.getTime() + currentSite.responseTargetMinutes * 60_000,
+    );
     const [saved] = await tx
       .insert(smartSiteSubmissionsTable)
       .values({
@@ -316,6 +316,8 @@ export async function captureSmartSiteInquiry(
         payloadHash,
         leadId: lead.id,
         consent,
+        siteReceivedAt: acceptedAt,
+        responseDueAt,
       })
       .returning();
     const inquiryBody = [
@@ -329,53 +331,48 @@ export async function captureSmartSiteInquiry(
       .filter(Boolean)
       .join("\n");
     // Preserve submitted contact facts without silently overwriting an existing contact.
-    await tx
-      .insert(activitiesTable)
-      .values({
-        organizationId,
-        leadId: lead.id,
-        contactId: contact.id,
-        type: "lead_captured",
-        title: `Inquiry from ${site.name}`,
-        body: inquiryBody,
-        metadata: {
-          smartSiteId: site.id,
-          receiptId: saved.id,
-          serviceCode: p.serviceCode,
-          timing: p.timing,
-          postalCode: p.postalCode,
-          address: p.address,
-          city: p.city,
-          state: p.state,
-          submittedContact: input.contact,
-          consent,
-        },
-      });
-    await tx
-      .insert(crmTasksTable)
-      .values({
-        organizationId,
-        leadId: lead.id,
-        contactId: contact.id,
-        title: `Review ${service[1].toLowerCase()} inquiry`,
-        description:
-          "Contact permission covers this inquiry only. Assign an owner and record the follow-up; no email, SMS, appointment or dispatch has been sent or confirmed.",
-        sourceEvent: "smart_site.lead_saved",
-        priority: urgency,
-      });
-    await tx
-      .insert(auditEventsTable)
-      .values({
-        organizationId,
-        action: "smart_site.lead_saved",
-        entityType: "lead",
-        entityId: lead.id,
-        metadata: {
-          siteId: site.id,
-          receiptId: saved.id,
-          serviceCode: p.serviceCode,
-        },
-      });
+    await tx.insert(activitiesTable).values({
+      organizationId,
+      leadId: lead.id,
+      contactId: contact.id,
+      type: "lead_captured",
+      title: `Inquiry from ${site.name}`,
+      body: inquiryBody,
+      metadata: {
+        smartSiteId: site.id,
+        receiptId: saved.id,
+        serviceCode: p.serviceCode,
+        timing: p.timing,
+        postalCode: p.postalCode,
+        address: p.address,
+        city: p.city,
+        state: p.state,
+        submittedContact: input.contact,
+        consent,
+      },
+    });
+    await tx.insert(crmTasksTable).values({
+      organizationId,
+      leadId: lead.id,
+      contactId: contact.id,
+      title: `Review ${service[1].toLowerCase()} inquiry`,
+      description:
+        "Contact permission covers this inquiry only. Assign an owner and record the follow-up; no email, SMS, appointment or dispatch has been sent or confirmed.",
+      sourceEvent: "smart_site.lead_saved",
+      priority: urgency,
+      dueAt: responseDueAt,
+    });
+    await tx.insert(auditEventsTable).values({
+      organizationId,
+      action: "smart_site.lead_saved",
+      entityType: "lead",
+      entityId: lead.id,
+      metadata: {
+        siteId: site.id,
+        receiptId: saved.id,
+        serviceCode: p.serviceCode,
+      },
+    });
     return {
       status: "saved" as const,
       leadId: lead.id,

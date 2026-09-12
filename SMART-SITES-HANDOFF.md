@@ -2,6 +2,14 @@
 
 September 12, 2026. Implemented and locally verified; not a production release.
 
+## Latest reliability checkpoint
+
+The next priority is now locally implemented: independent encrypted Painless delivery journal,
+automatic local outage recovery, staff ownership, future-only follow-up targets and explicitly
+staff-recorded first-attempt evidence. Read **SMART-SITES-RECOVERY.md** for the current runbook,
+acceptance IDs and launch gates. Latest verification: 85 backend + 208 UI + 41 Painless tests.
+Earlier numbers below document the original capture milestone, not the final fixture size.
+
 ## Approved direction
 
 The user explicitly approved resuming local GrowthOS development as the shared operational core for Painless, an upcoming HVAC site, a commercial construction site, and Dawsonville Nutrition. Keep each branded website and organization separate. This supersedes the earlier pause for this specific integration work, not the publishing/provider gates or the separate MogulForge marketing project.
@@ -44,7 +52,10 @@ Server-only settings: `PAINLESS_GROWTHOS_ENABLED`, `GROWTHOS_API_ORIGIN`, `GROWT
 
 Both planned-project forms and `/api/lead` damage checks use the connector when enabled. Success requires a returned database lead UUID and receipt UUID. A receipt means saved in the staff workspace, not email delivery, a booked appointment, dispatch or a sale.
 
-**Outage limit:** there is no independent durable edge outbox yet. When GrowthOS is unavailable, no receipt is claimed; the open form retains fields for retry and exposes the phone path. Reloading/closing the form loses its unsaved fields and request key. This is deliberately not presented as offline/guaranteed delivery.
+**Current outage boundary:** the optional encrypted D1-compatible journal now retains accepted
+inquiries independently of GrowthOS and returns `queued` rather than CRM success. The local launcher
+enables and verifies automatic recovery; hosted D1/scheduling/alerting are not activated. With the
+outbox disabled, the earlier direct adapter still only retains failed fields in the open form.
 
 ## Repeatable local setup
 
@@ -64,7 +75,9 @@ From the API-server directory, `node scripts/smart-sites-local-run.mjs api` star
 
 From the repository root, run the frontend with `API_PORT=3001` and `pnpm --filter @workspace/command-center exec vite --host 127.0.0.1 --port 5173 --strictPort` (set the environment variable using PowerShell syntax). For an existing fixture, the separate guarded `smart-sites-local-seed.mjs` requires the exact local test `DATABASE_URL` and a running API. It creates/enables only the local test connection and saves its key privately. It does not rotate a missing/lost key silently.
 
-Start Painless by loading only the four named fields from that local connection JSON into the server process environment, then run `npm run dev -- --host 127.0.0.1 --port 4173 --strictPort` in its repository. Existing Painless provider configuration was not edited; no voice session or external evidence upload was used in this acceptance run.
+Start Painless with `node scripts/smart-sites-local-preview.mjs` in its repository to reuse that
+fixture and enable the independent local journal/retry loop. Existing provider settings remain
+untouched; no voice session or external evidence upload was exercised in this checkpoint.
 
 Schema changes are in `lib/db/src/schema/smart-sites.ts`, exported from the schema index. The repository's existing Drizzle push workflow was used only against the fresh isolated database. Before any production deployment, inspect the generated schema plan, take/verify a backup and review an additive migration; do not assume a force push is safe because the local push succeeded.
 
@@ -82,7 +95,9 @@ Screenshots: Painless `design/qa-smart-sites-2026-09-12/`. The database contains
 
 ## Next implementation sequence
 
-1. **Reliability and staff ownership:** durable outage outbox/reconciliation, stronger public-edge spam/rate controls, routing/assignment policy, response-time/overdue measurements, and an unassigned-inquiry escalation surface. Alerting must distinguish queued, accepted, delivered and failed. Agree the actual staff roster, recipients and working hours before live routing.
+1. **Reliability and staff ownership — local milestone complete:** see SMART-SITES-RECOVERY.md.
+   Remaining production readiness includes edge abuse protection, scheduled draining, operator
+   alerts, key backup/rotation and retention. Actual staff roster/working-hour policy is not inferred.
 2. **Client onboarding:** authenticated operator organization provisioning/switching, one-page connection health and a repeatable labeled acceptance check. Separate organizations for HVAC, construction and Dawsonville; do not put their customer records into Painless. No one-click production onboarding claim yet.
 3. **First-party acquisition measurement:** versioned page/form/voice-to-lead events with consent, retention, opt-out, bot filtering and lead/outcome joins. Add response speed, qualification, appointment and estimate stages. Current counts are not a visitor/conversion-rate dashboard.
 4. **Organic discovery:** indexable service and real project pages, canonical/sitemap/schema/performance, then verified service-area content around the outer Atlanta market. No fabricated local offices, doorway city-page sprawl, guaranteed rankings or synthetic reviews. Search Console/Business Profile access remains unverified.

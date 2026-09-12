@@ -21,6 +21,12 @@ import {
   SmartSiteError,
   updateSmartSite,
 } from "../../services/smart-sites";
+import {
+  assignSmartSiteLead,
+  recordSmartSiteAttempt,
+  setResponseTarget,
+  smartSiteFollowup,
+} from "../../services/smart-site-followup";
 
 const router = Router();
 const idSchema = z.uuid();
@@ -43,12 +49,10 @@ const safe =
         return;
       }
       if (err instanceof z.ZodError) {
-        res
-          .status(400)
-          .json({
-            error: "invalid_request",
-            fields: err.issues.map((i) => i.path.join(".")),
-          });
+        res.status(400).json({
+          error: "invalid_request",
+          fields: err.issues.map((i) => i.path.join(".")),
+        });
         return;
       }
       const code =
@@ -143,9 +147,94 @@ router.post(
       idSchema.parse(req.params.id),
       (req.header("authorization") ?? "").replace(/^Bearer /, ""),
     );
+    const rawReceivedAt = req.header("x-smart-site-received-at");
+    let receivedAt: Date | undefined;
+    if (rawReceivedAt) {
+      const value = Date.parse(rawReceivedAt);
+      if (
+        !Number.isFinite(value) ||
+        value < Date.now() - 30 * 86400_000 ||
+        value > Date.now() + 300_000
+      )
+        throw new SmartSiteError("invalid_site_received_at");
+      receivedAt = new Date(Math.min(value, Date.now()));
+    }
     const result = await captureSmartSiteInquiry(
       site,
       normalizeSmartSiteIntake(req.body),
+      receivedAt,
+    );
+    res.status(result.duplicate ? 200 : 201).json(result);
+  }),
+);
+
+router.get(
+  "/smart-sites/follow-up",
+  requireMember("crm.read"),
+  safe(async (req, res) => {
+    res.json(await smartSiteFollowup(req.member!.organizationId));
+  }),
+);
+router.patch(
+  "/smart-sites/:id/response-target",
+  requireMember("settings.manage"),
+  safe(async (req, res) => {
+    const input = z
+      .object({ minutes: z.number().int().min(5).max(10080) })
+      .strict()
+      .parse(req.body);
+    res.json(
+      await setResponseTarget(
+        req.member!.organizationId,
+        req.member!.user.id,
+        idSchema.parse(req.params.id),
+        input.minutes,
+      ),
+    );
+  }),
+);
+router.patch(
+  "/smart-sites/leads/:id/owner",
+  requireMember("crm.write"),
+  safe(async (req, res) => {
+    const input = z
+      .object({
+        assignedUserId: z.string().min(1).max(128).nullable(),
+        expectedOwnerId: z.string().min(1).max(128).nullable(),
+      })
+      .strict()
+      .parse(req.body);
+    res.json(
+      await assignSmartSiteLead(
+        req.member!.organizationId,
+        req.member!.user.id,
+        idSchema.parse(req.params.id),
+        input.assignedUserId,
+        input.expectedOwnerId,
+      ),
+    );
+  }),
+);
+router.post(
+  "/smart-sites/leads/:id/contact-attempts",
+  requireMember("crm.write"),
+  safe(async (req, res) => {
+    if (req.header("x-api-key"))
+      throw new SmartSiteError("staff_session_required", 403);
+    const input = z
+      .object({
+        requestId: z.uuid(),
+        channel: z.enum(["phone", "email", "sms"]),
+        outcome: z.string().max(30),
+        confirmed: z.literal(true),
+      })
+      .strict()
+      .parse(req.body);
+    const result = await recordSmartSiteAttempt(
+      req.member!.organizationId,
+      req.member!.user.id,
+      idSchema.parse(req.params.id),
+      input,
     );
     res.status(result.duplicate ? 200 : 201).json(result);
   }),

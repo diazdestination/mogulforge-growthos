@@ -103,6 +103,7 @@ export async function validateOrgRefs(
           and(
             eq(usersTable.id, refs.assignedUserId),
             eq(usersTable.organizationId, organizationId),
+            eq(usersTable.isActive, true),
           ),
         )
         .then((r) => r.length > 0),
@@ -414,12 +415,25 @@ export async function updateLead(
     assignedUserId: input.assignedUserId,
   });
   if (!ok) return null;
-  const [row] = await db
-    .update(leadsTable)
-    .set(safe)
-    .where(and(eq(leadsTable.id, id), eq(leadsTable.organizationId, organizationId)))
-    .returning();
-  return row ?? null;
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(leadsTable)
+      .set(safe)
+      .where(and(eq(leadsTable.id, id), eq(leadsTable.organizationId, organizationId)))
+      .returning();
+    if (row && input.assignedUserId !== undefined) {
+      await tx
+        .update(crmTasksTable)
+        .set({ assignedUserId: input.assignedUserId })
+        .where(and(
+          eq(crmTasksTable.organizationId, organizationId),
+          eq(crmTasksTable.leadId, id),
+          eq(crmTasksTable.sourceEvent, "smart_site.lead_saved"),
+          inArray(crmTasksTable.status, ["open", "in_progress"]),
+        ));
+    }
+    return row ?? null;
+  });
 }
 
 export async function listEstimates(
@@ -492,17 +506,28 @@ export async function bulkUpdateLeads(
   const set: Record<string, unknown> = {};
   if (patch.status !== undefined) set.status = patch.status;
   if (patch.assignedUserId !== undefined) set.assignedUserId = patch.assignedUserId;
-  const rows = await db
-    .update(leadsTable)
-    .set(set)
-    .where(
-      and(
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .update(leadsTable)
+      .set(set)
+      .where(and(
         eq(leadsTable.organizationId, organizationId),
         inArray(leadsTable.id, leadIds),
-      ),
-    )
-    .returning({ id: leadsTable.id });
-  return rows.map((r) => r.id);
+      ))
+      .returning({ id: leadsTable.id });
+    if (patch.assignedUserId !== undefined && rows.length) {
+      await tx
+        .update(crmTasksTable)
+        .set({ assignedUserId: patch.assignedUserId })
+        .where(and(
+          eq(crmTasksTable.organizationId, organizationId),
+          inArray(crmTasksTable.leadId, rows.map((r) => r.id)),
+          eq(crmTasksTable.sourceEvent, "smart_site.lead_saved"),
+          inArray(crmTasksTable.status, ["open", "in_progress"]),
+        ));
+    }
+    return rows.map((r) => r.id);
+  });
 }
 
 export async function bulkTagLeads(

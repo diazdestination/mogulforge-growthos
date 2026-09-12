@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { SmartSiteFollowup, ResponseTarget } from './smart-site-followup';
 
 type Site = {
   id: string;
@@ -22,6 +23,7 @@ type Site = {
   siteKey: string;
   profile: string;
   isActive: boolean;
+  responseTargetMinutes: number;
 };
 type Profile = { id: string; name: string; services: [string, string][] };
 type Overview = {
@@ -88,6 +90,8 @@ export function SmartSitesControl() {
       key={me.organization.id}
       organizationId={me.organization.id}
       canManage={me.role === 'owner' || me.role === 'admin'}
+      userId={me.id}
+      canWrite={me.role !== 'viewer'}
     />
   );
 }
@@ -95,9 +99,13 @@ export function SmartSitesControl() {
 function SmartSitesWorkspace({
   organizationId,
   canManage,
+  userId,
+  canWrite,
 }: {
   organizationId: string;
   canManage: boolean;
+  userId: string;
+  canWrite: boolean;
 }) {
   const client = useQueryClient();
   const sites = useQuery({
@@ -293,6 +301,11 @@ function SmartSitesWorkspace({
           </CardContent>
         </Card>
       )}
+      <SmartSiteFollowup
+        organizationId={organizationId}
+        userId={userId}
+        canWrite={canWrite}
+      />
       <div className="grid gap-5 xl:grid-cols-2">
         <Card>
           <CardHeader>
@@ -434,6 +447,14 @@ function SmartSitesWorkspace({
                         Replace server key
                       </Button>
                     </div>
+                  )}
+                  {canManage && (
+                    <ResponseTarget
+                      key={`${s.id}:${s.responseTargetMinutes}`}
+                      id={s.id}
+                      minutes={s.responseTargetMinutes ?? 60}
+                      organizationId={organizationId}
+                    />
                   )}
                 </div>
               ))

@@ -51,6 +51,20 @@ function setup(
       if (path.endsWith('/smart-sites/profiles')) return response(profiles);
       if (path.endsWith('/smart-sites/overview'))
         return response(emptyOverview);
+      if (path.endsWith('/smart-sites/follow-up'))
+        return response({
+          serverNow: new Date().toISOString(),
+          summary: {
+            awaitingAttempt: 0,
+            unassigned: 0,
+            overdue: 0,
+            noTarget: 0,
+            logged: 0,
+            medianMinutesToLog: null,
+          },
+          pending: [],
+          members: [],
+        });
       if (path.endsWith('/smart-sites') && method === 'GET')
         return response([site]);
       if (path.endsWith('/smart-sites') && method === 'POST')
