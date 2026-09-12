@@ -17,7 +17,6 @@ import {
   type CaptureEndpoint,
   type CaptureMappingPreview,
 } from '@workspace/api-client-react';
-import { Shell } from '@/components/shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +32,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Copy, Loader2, Plus, Trash2, Webhook } from 'lucide-react';
+import { SmartSitesControl } from '@/components/smart-sites-control';
 
 const TARGET_FIELDS = [
   'firstName',
@@ -157,19 +157,22 @@ export default function Capture() {
   };
 
   return (
-    <Shell>
       <div className="space-y-6 p-4 md:p-6">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <Webhook className="h-6 w-6" aria-hidden="true" /> Lead Capture
           </h1>
           <p className="text-sm text-muted-foreground">
-            Bring leads in from your existing website forms, Zapier, or any outside
-            system — they flow through the same dedupe, scoring, and follow-up as
-            every other lead.
+            Connect branded Smart Sites or existing forms to this organization's
+            lead workspace. Smart Sites saves a consent receipt and follow-up task
+            with each accepted inquiry.
           </p>
         </div>
 
+        <SmartSitesControl />
+
+        <details className="space-y-5 rounded-xl border p-4">
+          <summary className="cursor-pointer font-medium">Advanced: existing forms & developer APIs</summary>
         <Card>
           <CardHeader>
             <CardTitle>New capture endpoint</CardTitle>
@@ -264,7 +267,7 @@ export default function Capture() {
                 value={testPayload}
                 onChange={(e) => setTestPayload(e.target.value)}
               />
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="secondary"
                   data-testid="button-preview-mapping"
@@ -446,7 +449,7 @@ export default function Capture() {
             </p>
           </CardContent>
         </Card>
+        </details>
       </div>
-    </Shell>
   );
 }

@@ -8,6 +8,8 @@ import {
   useGetContact,
   useGetProperty,
   getGetLeadQueryKey,
+  getGetLeadNextActionQueryKey,
+  getListTodayActionsQueryKey,
   getGetContactQueryKey,
   getGetPropertyQueryKey,
   getListLeadActivitiesQueryKey,
@@ -80,6 +82,9 @@ export default function LeadDetail() {
     updateLead.mutate({ id: lead.id, data: { status: newStatus } }, {
       onSuccess: (data) => {
         queryClient.setQueryData(getGetLeadQueryKey(lead.id), (old: any) => old ? { ...old, status: data.status } : old);
+        queryClient.invalidateQueries({ queryKey: getGetLeadNextActionQueryKey(lead.id) });
+        queryClient.invalidateQueries({ queryKey: getListTodayActionsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: ['smart-sites'] });
       },
       onError: (error: unknown) => {
         const serverMessage =
@@ -1042,6 +1047,8 @@ function ActivityComposer({ leadId }: { leadId: string }) {
       onSuccess: () => {
         setBody('');
         queryClient.invalidateQueries({ queryKey: getListLeadActivitiesQueryKey(leadId) });
+        queryClient.invalidateQueries({ queryKey: getGetLeadNextActionQueryKey(leadId) });
+        queryClient.invalidateQueries({ queryKey: getListTodayActionsQueryKey() });
         setIsSubmitting(false);
       },
       onError: (error: unknown) => {

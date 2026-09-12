@@ -29,7 +29,7 @@ async function main(): Promise<void> {
   // traffic against a database whose schema hasn't been applied yet.
   await runAutoMigrate();
 
-  app.listen(port, (err) => {
+  app.listen(port, process.env.HOST || "0.0.0.0", (err) => {
     if (err) {
       logger.error({ err }, "Error listening on port");
       process.exit(1);

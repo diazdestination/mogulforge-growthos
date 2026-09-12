@@ -109,7 +109,8 @@ async function loadSignals(
     db
       .select({
         leadId: activitiesTable.leadId,
-        lastActivityAt: sql<string>`max(${activitiesTable.occurredAt})`,
+        // An intake receipt is not evidence that a staff member followed up.
+        lastActivityAt: sql<string>`max(${activitiesTable.occurredAt}) FILTER (WHERE ${activitiesTable.type} != 'lead_captured')`,
         unread: sql<boolean>`COALESCE(
           max(${activitiesTable.occurredAt}) FILTER (WHERE ${activitiesTable.type} = 'portal_message') >
           COALESCE(max(${activitiesTable.occurredAt}) FILTER (WHERE ${activitiesTable.type} = 'team_message'), '-infinity'::timestamptz),
@@ -224,6 +225,17 @@ function rankLeadCandidates(
     return candidates;
   }
 
+  if (lead.creationMethod === "smart-site" && lead.status === "new" && !signals.lastActivityAt) {
+    candidates.push({
+      ...base,
+      actionType: signals.hasPhone ? "call_now" : "schedule_follow_up",
+      title: "Review and respond to this new inquiry",
+      channel: signals.hasPhone ? "phone" : undefined,
+      reasons: ["Smart Site inquiry saved; no follow-up activity is recorded yet", "Contact permission covers this inquiry only. Assign an owner and confirm the next step."],
+      priority: lead.urgency === "high" || lead.urgency === "emergency" ? 95 : 75,
+    });
+  }
+
   if (lead.status === "estimate_sent" || lead.status === "claim_pending") {
     candidates.push({
       ...base,
@@ -278,7 +290,7 @@ function rankLeadCandidates(
     ...base,
     actionType: "schedule_follow_up",
     title: "Schedule a follow-up",
-    reasons: ["Recently touched — set a reminder so this lead doesn't go cold"],
+    reasons: [signals.lastActivityAt ? "Recent activity recorded — set a reminder for the next step" : "No follow-up activity recorded — review the inquiry and set a reminder"],
     priority: 20 + Math.min(lead.score, 100) / 10,
   });
   return candidates;

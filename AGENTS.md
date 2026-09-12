@@ -153,4 +153,11 @@ A feature is complete only when it includes:
 
 ## Immediate Operating Objective
 
+September 12, 2026 local Smart Sites milestone: the user explicitly approved resuming the shared
+GrowthOS core for Painless and future HVAC, commercial construction and tea-shop clients. Read
+`SMART-SITES-HANDOFF.md` for the implemented tenant-scoped capture/receipt/task/metrics boundary,
+guarded local test runner, acceptance evidence and next work. Do not place different client
+businesses in one organization. This approval does not change the separate marketing repository,
+production release, DNS, spending, provider-credential or real-message gates.
+
 Complete the Q3 execution kernel and turn the roofing/restoration beta into measurable proof that GrowthOS produces more captured opportunities, faster follow-up, better operational visibility, and more won revenue than a traditional CRM.
