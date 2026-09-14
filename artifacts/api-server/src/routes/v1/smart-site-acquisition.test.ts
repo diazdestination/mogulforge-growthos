@@ -302,7 +302,7 @@ describe("consent-first Smart Site acquisition measurement", () => {
             eventId: randomUUID(),
             eventName: "project_form_started",
             occurredAt: new Date().toISOString(),
-            path: "/",
+            path: "/services/siding-services",
             source: "google",
             medium: "organic",
             serviceCode: "siding",
@@ -342,7 +342,7 @@ describe("consent-first Smart Site acquisition measurement", () => {
           attribution: {
             source: "google",
             medium: "organic",
-            landingPath: "/",
+            landingPath: "/services/siding-services",
           },
           measurement: {
             visitorId,
@@ -396,6 +396,12 @@ describe("consent-first Smart Site acquisition measurement", () => {
         visitors: number;
         savedLeads: number;
       }[];
+      content: {
+        path: string;
+        visitors: number;
+        savedLeads: number;
+        wonLeads: number;
+      }[];
     }>(await auth("/smart-sites/acquisition?days=30"));
     expect(report.summary).toMatchObject({
       savedLeads: 1,
@@ -415,6 +421,16 @@ describe("consent-first Smart Site acquisition measurement", () => {
           serviceCode: "Not specified",
           visitors: 1,
           savedLeads: 0,
+        }),
+      ]),
+    );
+    expect(report.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "/services/siding-services",
+          visitors: 1,
+          savedLeads: 1,
+          wonLeads: 1,
         }),
       ]),
     );

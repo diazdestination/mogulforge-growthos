@@ -58,6 +58,7 @@ const emptyAcquisition = {
   events: [],
   sources: [],
   services: [],
+  content: [],
   sites: [site],
   measurement: {
     phoneClicks: 'Telephone-link clicks; not completed or answered calls',
@@ -288,6 +289,14 @@ describe('Smart Sites operator controls', () => {
           services: [
             { serviceCode: 'siding', visitors: 5, savedLeads: 2, wonLeads: 1 },
           ],
+          content: [
+            {
+              path: '/services/siding-services',
+              visitors: 5,
+              savedLeads: 2,
+              wonLeads: 1,
+            },
+          ],
           sites: [measuredSite],
         });
       if (path.endsWith(`/smart-sites/${site.id}/measurement`) && method === 'PATCH')
@@ -302,6 +311,7 @@ describe('Smart Sites operator controls', () => {
     expect(screen.getByText('3 phone-link clicks')).toBeTruthy();
     expect(screen.getByText('google')).toBeTruthy();
     expect(screen.getAllByText('Siding')).toHaveLength(2);
+    expect(screen.getByText('Service Guide · Siding Services')).toBeTruthy();
     fireEvent.click(
       screen.getByRole('button', { name: 'Enable consented measurement' }),
     );

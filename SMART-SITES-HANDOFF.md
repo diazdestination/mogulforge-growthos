@@ -2,6 +2,22 @@
 
 September 12, 2026. Implemented and locally verified; not a production release.
 
+## Latest checkpoint — organic content to recorded inquiry
+
+September 14, 2026. Painless now has 20 evidence-backed, prerendered service, service-area,
+and project routes with canonical/schema/sitemap controls. GrowthOS acquisition reporting adds a
+`Landing content` breakdown based on each consented browser's first recorded path in the report window, joined only to
+real Smart Site receipts and recorded wins. It does not claim rankings, completed calls, cross-device
+identity, cash/profit, or causal uplift.
+
+Final local verification: 1,036 executed API tests passed with 15 intentional skips, 219/219 UI
+tests, 51/51 Painless tests, both builds/type checks/diff checks, desktop/mobile rendering, primary
+interactions, and empty browser consoles. Read `SMART-SITES-MEASUREMENT.md` and the Painless
+`design/organic-acquisition-qa.md` plus `design/organic-content-workflow.md` first. No push,
+deployment, production data/settings, account access, real lead, outbound message, or DNS change.
+
+Next gate is a controlled release package and authorized SEO baseline—not automatic publication.
+
 ## Latest checkpoint — consent-first acquisition measurement
 
 September 14, 2026. The next priority described below is now implemented and locally

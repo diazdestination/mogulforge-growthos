@@ -846,6 +846,41 @@ export async function smartSiteAcquisitionOverview(
     group by vs.service_code
     order by saved_leads desc, visitors desc, service_code asc limit 12
   `);
+  const contentResult = await db.execute(sql`
+    with scoped as (
+      select e.*
+      from analytics_events e
+      join smart_sites s on s.id = e.smart_site_id
+      where e.organization_id = ${organizationId}::uuid
+        and s.organization_id = ${organizationId}::uuid
+        and e.occurred_at >= now() - make_interval(days => least(${days}::int, s.analytics_retention_days))
+        and e.anonymous_id is not null
+    ), ranked_landing as (
+      select e.smart_site_id, e.anonymous_id, coalesce(nullif(e.path, ''), '/') as path,
+        row_number() over (
+          partition by e.smart_site_id, e.anonymous_id
+          order by e.occurred_at asc, e.id asc
+        ) as position
+      from scoped e
+    ), landing as (
+      select smart_site_id, anonymous_id, path
+      from ranked_landing where position = 1
+    ), linked_leads as (
+      select distinct e.smart_site_id, e.anonymous_id, e.lead_id
+      from scoped e
+      where e.event_name = 'lead_saved' and e.lead_id is not null
+    )
+    select landing.path,
+      count(distinct (landing.smart_site_id, landing.anonymous_id))::int as visitors,
+      count(distinct linked_leads.lead_id)::int as saved_leads,
+      count(distinct linked_leads.lead_id) filter (where l.won_at is not null)::int as won_leads
+    from landing
+    left join linked_leads on linked_leads.smart_site_id = landing.smart_site_id
+      and linked_leads.anonymous_id = landing.anonymous_id
+    left join leads l on l.id = linked_leads.lead_id and l.organization_id = ${organizationId}::uuid
+    group by landing.path
+    order by saved_leads desc, visitors desc, landing.path asc limit 20
+  `);
   const sites = await db
     .select(publicFields)
     .from(smartSitesTable)
@@ -888,6 +923,12 @@ export async function smartSiteAcquisitionOverview(
       savedLeads: numberValue(row.saved_leads),
       wonLeads: numberValue(row.won_leads),
     })),
+    content: contentResult.rows.map((row) => ({
+      path: String(row.path),
+      visitors: numberValue(row.visitors),
+      savedLeads: numberValue(row.saved_leads),
+      wonLeads: numberValue(row.won_leads),
+    })),
     sites,
     measurement: {
       visitors: "Distinct consented first-party browser identifiers, not people across devices",
@@ -895,6 +936,7 @@ export async function smartSiteAcquisitionOverview(
       phoneClicks: "Telephone-link clicks; not completed or answered calls",
       medianResponse: "Median time to an explicit staff-recorded attempt; not provider delivery or reply",
       wonValue: "Recorded won contract value; not collected cash, margin, ROI or profit",
+      content: "First recorded path within the report window for each consented browser; returning and cross-device journeys remain incomplete",
       excluded: "No raw URLs, contact details, files, transcripts, full user agents or cross-site advertising IDs",
     },
   };

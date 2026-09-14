@@ -55,6 +55,12 @@ type AcquisitionReport = {
     savedLeads: number;
     wonLeads: number;
   }[];
+  content: {
+    path: string;
+    visitors: number;
+    savedLeads: number;
+    wonLeads: number;
+  }[];
   sites: MeasurementSite[];
   measurement: Record<string, string>;
 };
@@ -86,8 +92,20 @@ const currency = (cents: number) =>
   }).format(cents / 100);
 const label = (value: string) =>
   value
-    .replace(/_/g, ' ')
+    .replace(/[_-]/g, ' ')
     .replace(/\b\w/g, (character) => character.toUpperCase());
+const contentLabel = (path: string) => {
+  if (path === '/') return 'Homepage';
+  const parts = path.split('/').filter(Boolean);
+  const category = parts[0] === 'service-area'
+    ? 'Service Area'
+    : parts[0] === 'services'
+      ? 'Service Guide'
+      : parts[0] === 'projects'
+        ? 'Project Story'
+        : 'Page';
+  return `${category} · ${label(parts.at(-1) ?? path)}`;
+};
 
 export function SmartSiteAcquisition({
   organizationId,
@@ -285,6 +303,18 @@ export function SmartSiteAcquisition({
           }))}
         />
       </div>
+
+      <BreakdownCard
+        title="Landing content"
+        empty="No consented landing-page evidence yet. Search visibility and rankings require separate Search Console evidence."
+        rows={(report.data?.content ?? []).map((row) => ({
+          key: row.path,
+          label: contentLabel(row.path),
+          visitors: row.visitors,
+          leads: row.savedLeads,
+          wins: row.wonLeads,
+        }))}
+      />
 
       <Card>
         <CardHeader>

@@ -3,6 +3,26 @@
 September 14, 2026. Implemented and verified only in the isolated local Smart Sites
 environment. This is not a production release.
 
+## Latest checkpoint — landing-content attribution
+
+The next organic-content milestone is now implemented locally. The acquisition report returns the
+first recorded landing path within the selected window for each consented browser and joins that path to real Smart Site lead
+receipts and recorded wins. The command center labels homepages, service guides, service areas, and
+project stories in a dedicated `Landing content` card. Returning visits and cross-device identity
+remain incomplete by design, and search visibility/rankings still require separate Search Console
+evidence.
+
+Painless now emits 20 evidence-backed, prerendered service/location/project routes with canonical,
+schema, sitemap, and robots controls. Full content and QA details are in
+`C:\Users\diazd\dev\projects\painless-roofing-site\design\organic-acquisition-qa.md` and
+`design\organic-content-workflow.md` in that repository.
+
+Final local verification: 1,036 executed API tests passed with 15 intentional skips; 219/219
+command-center tests; repository type checks/builds; 51/51 Painless tests; desktop/mobile browser
+QA; empty consoles; clean diff checks. Nothing was pushed or deployed, and no measurement setting,
+production database, Search Console/Business Profile account, real customer record, or provider was
+changed.
+
 ## Outcome
 
 GrowthOS can now measure a bounded, first-party Smart Site journey from an explicitly
@@ -90,8 +110,8 @@ or outbound communication was changed by this milestone.
 
 ## Next priority
 
-Build the reusable organic acquisition layer: indexable, evidence-backed service,
-location, and project pages; canonical/schema/sitemap controls; a project publishing
-workflow; and explicit GrowthOS content-to-inquiry attribution. Avoid mass-produced
-doorway pages and do not make local-ranking claims without Search Console and Business
-Profile evidence.
+Prepare the controlled production release and evidence baseline: owner fact/photo approval,
+current-site backup and redirect mapping, reviewed migrations/settings, exact-source public smoke
+tests, one separately approved labeled acceptance inquiry, and authorized Search Console/Business
+Profile baselines. Do not publish, enable measurement, create production data, or touch DNS without
+the applicable explicit approval.
