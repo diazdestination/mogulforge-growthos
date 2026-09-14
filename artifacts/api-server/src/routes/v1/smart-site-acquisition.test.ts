@@ -58,6 +58,24 @@ const publicRequest = (
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
+const enableSite = async (
+  target: { id: string; secret: string },
+  session = adminSession,
+) => {
+  const checked = await publicRequest(
+    "check",
+    target,
+    { schemaVersion: 1 },
+    "POST",
+  );
+  expect(checked.status).toBe(200);
+  return auth(
+    `/smart-sites/${target.id}`,
+    { isActive: true, confirmedLaunch: true },
+    "PATCH",
+    session,
+  );
+};
 
 const eventBatch = (
   visitorId: string,
@@ -90,12 +108,17 @@ beforeAll(async () => {
     !["127.0.0.1", "localhost"].includes(url.hostname) ||
     !url.pathname.endsWith("_test")
   )
-    throw new Error("Smart Site acquisition tests require a local *_test database");
+    throw new Error(
+      "Smart Site acquisition tests require a local *_test database",
+    );
   const [org, otherOrg] = await db
     .insert(organizationsTable)
     .values([
       { name: "Acquisition test", slug: `acquisition-${randomUUID()}` },
-      { name: "Other acquisition test", slug: `other-acquisition-${randomUUID()}` },
+      {
+        name: "Other acquisition test",
+        slug: `other-acquisition-${randomUUID()}`,
+      },
     ])
     .returning();
   orgId = org.id;
@@ -141,7 +164,7 @@ beforeAll(async () => {
       "POST",
     ),
   );
-  await auth(`/smart-sites/${site.id}`, { isActive: true }, "PATCH");
+  expect((await enableSite(site)).status).toBe(200);
 });
 
 afterAll(async () => {
@@ -195,22 +218,17 @@ describe("consent-first Smart Site acquisition measurement", () => {
     const originalBatch = eventBatch(visitorId, eventId);
     expect(
       (
-        await publicRequest(
-          "acquisition-events",
-          site,
-          { ...originalBatch, consent: false },
-        )
+        await publicRequest("acquisition-events", site, {
+          ...originalBatch,
+          consent: false,
+        })
       ).status,
     ).toBe(400);
     expect(
       (
-        await publicRequest(
-          "acquisition-events",
-          site,
-          originalBatch,
-          "POST",
-          { origin: "https://example.test" },
-        )
+        await publicRequest("acquisition-events", site, originalBatch, "POST", {
+          origin: "https://example.test",
+        })
       ).status,
     ).toBe(403);
     const first = await publicRequest(
@@ -229,14 +247,10 @@ describe("consent-first Smart Site acquisition measurement", () => {
     expect(await json(replay)).toMatchObject({ accepted: 0, duplicates: 1 });
     expect(
       (
-        await publicRequest(
-          "acquisition-events",
-          site,
-          {
-            ...originalBatch,
-            events: [{ ...originalBatch.events[0], path: "/changed" }],
-          },
-        )
+        await publicRequest("acquisition-events", site, {
+          ...originalBatch,
+          events: [{ ...originalBatch.events[0], path: "/changed" }],
+        })
       ).status,
     ).toBe(409);
     const [stored] = await db
@@ -250,7 +264,9 @@ describe("consent-first Smart Site acquisition measurement", () => {
       );
     expect(stored.anonymousId).toBe(visitorId);
     expect(stored.referrer).toBe("www.google.com");
-    expect(stored.properties).toEqual({ contract: "smart-sites-acquisition-v1" });
+    expect(stored.properties).toEqual({
+      contract: "smart-sites-acquisition-v1",
+    });
     expect(JSON.stringify(stored)).not.toContain("example.test homeowner");
 
     const otherSite = await json<{ id: string; secret: string }>(
@@ -265,12 +281,7 @@ describe("consent-first Smart Site acquisition measurement", () => {
         otherSession,
       ),
     );
-    await auth(
-      `/smart-sites/${otherSite.id}`,
-      { isActive: true },
-      "PATCH",
-      otherSession,
-    );
+    expect((await enableSite(otherSite, otherSession)).status).toBe(200);
     await auth(
       `/smart-sites/${otherSite.id}/measurement`,
       { enabled: true, retentionDays: 30 },
@@ -291,27 +302,23 @@ describe("consent-first Smart Site acquisition measurement", () => {
   it("joins a consented visitor to a real receipt and preserves the lead when that browser opts out", async () => {
     const visitorId = randomUUID();
     const sessionId = randomUUID();
-    await publicRequest(
-      "acquisition-events",
-      site,
-      {
-        ...eventBatch(visitorId),
-        sessionId,
-        events: [
-          {
-            eventId: randomUUID(),
-            eventName: "project_form_started",
-            occurredAt: new Date().toISOString(),
-            path: "/services/siding-services",
-            source: "google",
-            medium: "organic",
-            serviceCode: "siding",
-            surface: "project-inquiry",
-            step: "details",
-          },
-        ],
-      },
-    );
+    await publicRequest("acquisition-events", site, {
+      ...eventBatch(visitorId),
+      sessionId,
+      events: [
+        {
+          eventId: randomUUID(),
+          eventName: "project_form_started",
+          occurredAt: new Date().toISOString(),
+          path: "/services/siding-services",
+          source: "google",
+          medium: "organic",
+          serviceCode: "siding",
+          surface: "project-inquiry",
+          step: "details",
+        },
+      ],
+    });
     const requestId = randomUUID();
     const intake = await fetch(
       `${base}/api/v1/public/smart-sites/${site.id}/intake`,

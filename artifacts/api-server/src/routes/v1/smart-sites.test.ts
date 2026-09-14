@@ -80,7 +80,7 @@ describe("Smart Site ownership and first-attempt evidence", () => {
         "POST",
       ),
     );
-    await auth(`/smart-sites/${created.id}`, { isActive: true }, "PATCH");
+    expect((await enableSite(created)).status).toBe(200);
     const res = await send(
       body({
         contact: {
@@ -247,15 +247,13 @@ describe("Smart Site ownership and first-attempt evidence", () => {
   });
   it("notes and status updates do not count; confirmed contact logging is idempotent and closes only the intake task", async () => {
     const saved = await newInquiry();
-    await db
-      .insert(activitiesTable)
-      .values({
-        organizationId: orgId,
-        leadId: saved.leadId,
-        actorUserId: await ownerId(),
-        type: "note",
-        title: "Internal planning only",
-      });
+    await db.insert(activitiesTable).values({
+      organizationId: orgId,
+      leadId: saved.leadId,
+      actorUserId: await ownerId(),
+      type: "note",
+      title: "Internal planning only",
+    });
     await auth(`/leads/${saved.leadId}`, { status: "follow_up" }, "PATCH");
     const [before] = await db
       .select()
@@ -376,6 +374,27 @@ const send = (
     },
     body: JSON.stringify(payload),
   });
+const checkCredential = (target: { id: string; secret: string }) =>
+  fetch(`${base}/api/v1/public/smart-sites/${target.id}/check`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${target.secret}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ schemaVersion: 1 }),
+  });
+const enableSite = async (
+  target: { id: string; secret: string },
+  session = sid,
+) => {
+  expect((await checkCredential(target)).status).toBe(200);
+  return auth(
+    `/smart-sites/${target.id}`,
+    { isActive: true, confirmedLaunch: true },
+    "PATCH",
+    session,
+  );
+};
 
 beforeAll(async () => {
   // Do not allow this DB-writing suite to accidentally target a remote or production database.
@@ -482,16 +501,133 @@ describe("reusable Smart Sites capture", () => {
       (
         await auth(
           `/smart-sites/${site.id}`,
-          { isActive: true },
+          { isActive: true, confirmedLaunch: true },
           "PATCH",
           otherSid,
         )
       ).status,
     ).toBe(404);
+    const readinessBefore = await json<{
+      sites: { id: string; ready: boolean; blockers: string[] }[];
+    }>(await auth("/smart-sites/launch-readiness"));
+    expect(
+      readinessBefore.sites.find((row) => row.id === site.id),
+    ).toMatchObject({
+      ready: false,
+      blockers: ["credential_not_verified"],
+    });
     expect(
       (await auth(`/smart-sites/${site.id}`, { isActive: true }, "PATCH"))
         .status,
-    ).toBe(200);
+    ).toBe(409);
+    const blocked = await auth(
+      `/smart-sites/${site.id}`,
+      { isActive: true, confirmedLaunch: true },
+      "PATCH",
+    );
+    expect(blocked.status).toBe(409);
+    expect(await json(blocked)).toMatchObject({
+      error: "smart_site_launch_blocked",
+      blockers: ["credential_not_verified"],
+    });
+    expect((await enableSite(site)).status).toBe(200);
+    const readinessAfter = await json<{
+      sites: { id: string; ready: boolean; blockers: string[] }[];
+    }>(await auth("/smart-sites/launch-readiness"));
+    expect(
+      readinessAfter.sites.find((row) => row.id === site.id),
+    ).toMatchObject({ ready: true, blockers: [] });
+    const [enabledAudit] = await db
+      .select()
+      .from(auditEventsTable)
+      .where(
+        and(
+          eq(auditEventsTable.entityId, site.id),
+          eq(auditEventsTable.action, "smart_site.enabled"),
+        ),
+      )
+      .orderBy(sql`${auditEventsTable.createdAt} desc`)
+      .limit(1);
+    expect(enabledAudit.metadata).toMatchObject({
+      contract: "smart-site-launch-guard-v1",
+      confirmedLaunch: true,
+      operatorAttestation: "staff-owner-contact-policy-and-https-acceptance-v1",
+      activeManagers: 1,
+      activeResponders: 1,
+      credentialVersion: 1,
+    });
+  });
+  it("labels stale credential evidence and rechecks readiness from server time", async () => {
+    await db
+      .update(smartSitesTable)
+      .set({ credentialCheckedAt: new Date(Date.now() - 25 * 3600_000) })
+      .where(eq(smartSitesTable.id, site.id));
+    const stale = await json<{
+      contract: string;
+      credentialCheckMaxAgeHours: number;
+      sites: { id: string; ready: boolean; blockers: string[] }[];
+    }>(await auth("/smart-sites/launch-readiness"));
+    expect(stale.contract).toBe("smart-site-launch-guard-v1");
+    expect(stale.credentialCheckMaxAgeHours).toBe(24);
+    expect(stale.sites.find((row) => row.id === site.id)).toMatchObject({
+      ready: false,
+      blockers: ["credential_check_stale"],
+    });
+    expect((await checkCredential(site)).status).toBe(200);
+    await db
+      .update(smartSitesTable)
+      .set({ credentialIssuedAt: null })
+      .where(eq(smartSitesTable.id, site.id));
+    const historical = await json<{
+      sites: { id: string; ready: boolean; blockers: string[] }[];
+    }>(await auth("/smart-sites/launch-readiness"));
+    expect(historical.sites.find((row) => row.id === site.id)).toMatchObject({
+      ready: true,
+      blockers: [],
+    });
+    await db
+      .update(smartSitesTable)
+      .set({ credentialIssuedAt: new Date() })
+      .where(eq(smartSitesTable.id, site.id));
+  });
+  it("fails closed before saving a new inquiry when every responder is inactive", async () => {
+    const [admin] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(
+        and(eq(usersTable.organizationId, orgId), eq(usersTable.role, "admin")),
+      );
+    await db
+      .update(usersTable)
+      .set({ isActive: false })
+      .where(eq(usersTable.id, admin.id));
+    const requestId = randomUUID();
+    try {
+      const response = await send(
+        body({
+          requestId,
+          contact: {
+            name: "No Responder Test",
+            email: `${randomUUID()}@example.test`,
+          },
+        }),
+      );
+      expect(response.status).toBe(503);
+      expect(await json(response)).toEqual({
+        error: "site_staffing_unavailable",
+      });
+      expect(
+        await db
+          .select()
+          .from(smartSiteSubmissionsTable)
+          .where(eq(smartSiteSubmissionsTable.requestId, requestId)),
+      ).toHaveLength(0);
+    } finally {
+      await db
+        .update(usersTable)
+        .set({ isActive: true })
+        .where(eq(usersTable.id, admin.id));
+    }
   });
   it("rejects bad keys, browser origins, missing consent, unsupported service and tenant injection", async () => {
     expect(
@@ -727,12 +863,7 @@ describe("reusable Smart Sites capture", () => {
         otherSid,
       ),
     );
-    await auth(
-      `/smart-sites/${created.id}`,
-      { isActive: true },
-      "PATCH",
-      otherSid,
-    );
+    expect((await enableSite(created, otherSid)).status).toBe(200);
     const res = await send(
       body({
         contact: { name: "Local Retail Test", email: "retail@example.com" },
@@ -767,12 +898,7 @@ describe("reusable Smart Sites capture", () => {
           otherSid,
         ),
       );
-      await auth(
-        `/smart-sites/${created.id}`,
-        { isActive: true },
-        "PATCH",
-        otherSid,
-      );
+      expect((await enableSite(created, otherSid)).status).toBe(200);
       const res = await send(
         body({
           contact: {

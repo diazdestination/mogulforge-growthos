@@ -153,18 +153,24 @@ A feature is complete only when it includes:
 
 ## Immediate Operating Objective
 
-September 12, 2026 local Smart Sites milestone: the user explicitly approved resuming the shared
-GrowthOS core for Painless and future HVAC, commercial construction and tea-shop clients. Read
-`SMART-SITES-HANDOFF.md` for the implemented tenant-scoped capture/receipt/task/metrics boundary,
-guarded local test runner, acceptance evidence and next work. Do not place different client
-businesses in one organization. This approval does not change the separate marketing repository,
-production release, DNS, spending, provider-credential or real-message gates.
+September 14, 2026 local Smart Sites milestone: read
+`SMART-SITES-LAUNCH-GUARD.md` first, then `SMART-SITES-HANDOFF.md`. Launch Guard
+now requires tenant-scoped response coverage, a recent server credential check,
+and owner/admin attestation before capture can be enabled; new intake fails
+closed if every responder later disappears. Do not treat current readiness as
+historical activation proof, rotate a working historical key solely to fill
+unknown issuance metadata, or place different client businesses in one
+organization. The user approved continued local GrowthOS improvement, not a
+production release, DNS/spending/provider change, real message, or Painless
+activation.
 
-Latest local reliability checkpoint: read `SMART-SITES-RECOVERY.md` for encrypted site-side recovery,
+Earlier local reliability checkpoint: read `SMART-SITES-RECOVERY.md` for encrypted site-side recovery,
 staff owner/target/logging semantics and verified synthetic outage tests. Staff-recorded attempts
 are not independently verified communications. The next build priority is isolated client onboarding
 and connection readiness; that local milestone is now complete in `SMART-SITES-ONBOARDING.md`.
-Next build priority: consent-first acquisition events with tenant-scoped lead/outcome joins.
+Consent-first acquisition events with tenant-scoped lead/outcome joins and
+evidence-backed organic content reporting are now locally implemented; their
+runbooks remain canonical for those subsystems.
 Client Launchpad setup selection does not change user membership or impersonate another client's CRM.
 Staff invitations, hosted recovery scheduling/alerting and public activation remain gated.
 

@@ -20,6 +20,7 @@ import {
   createSmartSite,
   listSmartSites,
   rotateSmartSiteKey,
+  smartSiteLaunchReadiness,
   smartSiteAcquisitionOverview,
   smartSiteMeasurementStatus,
   smartSiteOverview,
@@ -52,7 +53,9 @@ const safe =
       await fn(req, res);
     } catch (err) {
       if (err instanceof SmartSiteError) {
-        res.status(err.status).json({ error: err.code });
+        res
+          .status(err.status)
+          .json({ error: err.code, ...(err.details ?? {}) });
         return;
       }
       if (err instanceof z.ZodError) {
@@ -99,12 +102,23 @@ router.get(
   "/smart-sites/acquisition",
   requireMember("crm.read"),
   safe(async (req, res) => {
-    const days = z.coerce.number().int().min(1).max(365).default(30).parse(
-      req.query.days,
-    );
+    const days = z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(365)
+      .default(30)
+      .parse(req.query.days);
     res.json(
       await smartSiteAcquisitionOverview(req.member!.organizationId, days),
     );
+  }),
+);
+router.get(
+  "/smart-sites/launch-readiness",
+  requireMember("crm.read"),
+  safe(async (req, res) => {
+    res.json(await smartSiteLaunchReadiness(req.member!.organizationId));
   }),
 );
 router.post(
@@ -126,13 +140,20 @@ router.patch(
   "/smart-sites/:id",
   requireMember("settings.manage"),
   safe(async (req, res) => {
-    const body = z.object({ isActive: z.boolean() }).strict().parse(req.body);
+    const body = z
+      .object({
+        isActive: z.boolean(),
+        confirmedLaunch: z.literal(true).optional(),
+      })
+      .strict()
+      .parse(req.body);
     res.json(
       await updateSmartSite(
         req.member!.organizationId,
         req.member!.user.id,
         idSchema.parse(req.params.id),
         body.isActive,
+        body.confirmedLaunch === true,
       ),
     );
   }),
@@ -210,7 +231,11 @@ router.post(
 
 router.get(
   "/public/smart-sites/:id/acquisition-status",
-  rateLimit({ windowMs: 60_000, max: 60, key: "smart-site-acquisition-status" }),
+  rateLimit({
+    windowMs: 60_000,
+    max: 60,
+    key: "smart-site-acquisition-status",
+  }),
   safe(async (req, res) => {
     if (req.headers.origin) {
       res.status(403).json({ error: "server_to_server_only" });

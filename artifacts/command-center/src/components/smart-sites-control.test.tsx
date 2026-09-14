@@ -36,6 +36,24 @@ const site = {
   analyticsRetentionDays: 90,
   analyticsPolicyVersion: 'smart-sites-analytics-v1',
 };
+const launchReadiness = {
+  contract: 'smart-site-launch-guard-v1',
+  serverNow: '2026-09-14T18:00:00.000Z',
+  credentialCheckMaxAgeHours: 24,
+  confirmationRequired: true,
+  staffing: { activeManagers: 1, activeResponders: 1 },
+  sites: [
+    {
+      id: site.id,
+      isActive: false,
+      credentialIssuedAt: '2026-09-14T17:00:00.000Z',
+      credentialCheckedAt: '2026-09-14T17:05:00.000Z',
+      credentialVersion: 1,
+      ready: true,
+      blockers: [],
+    },
+  ],
+};
 const secret = 'ss_' + 'a'.repeat(64); // Synthetic unit-test credential, never a provider key.
 const emptyOverview = { rows: [], recent: [] };
 const emptyAcquisition = {
@@ -80,6 +98,8 @@ function setup(
       if (path.endsWith('/smart-sites/profiles')) return response(profiles);
       if (path.endsWith('/smart-sites/overview'))
         return response(emptyOverview);
+      if (path.endsWith('/smart-sites/launch-readiness'))
+        return response(launchReadiness);
       if (path.includes('/smart-sites/acquisition'))
         return response(emptyAcquisition);
       if (path.endsWith('/smart-sites/follow-up'))
@@ -100,6 +120,8 @@ function setup(
         return response([site]);
       if (path.endsWith('/smart-sites') && method === 'POST')
         return response({ ...site, secret }, 201);
+      if (path.endsWith(`/smart-sites/${site.id}`) && method === 'PATCH')
+        return response({ ...site, isActive: true });
       return undefined;
     },
   });
@@ -159,6 +181,92 @@ describe('Smart Sites operator controls', () => {
     expect(
       screen.queryByRole('button', { name: 'Replace server key' }),
     ).toBeNull();
+  });
+  it('keeps capture locked until readiness passes and an owner confirms the launch evidence', async () => {
+    const calls = setup();
+    renderWithQuery(<SmartSitesControl />);
+    await screen.findByRole('group', {
+      name: 'Test Smart Site launch guard',
+    });
+    const enable = screen.getByRole('button', { name: 'Enable capture' });
+    const confirmation = screen.getByLabelText(
+      /I confirm a real person owns this inbox/,
+    );
+    expect((enable as HTMLButtonElement).disabled).toBe(true);
+    expect((confirmation as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(confirmation);
+    expect((enable as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(enable);
+    await screen.findByText(/Launch Guard passed/);
+    const activation = calls.mock.calls.find(
+      ([path, init]) =>
+        path.endsWith(`/smart-sites/${site.id}`) && init?.method === 'PATCH',
+    );
+    expect(JSON.parse(String(activation?.[1]?.body))).toEqual({
+      isActive: true,
+      confirmedLaunch: true,
+    });
+  });
+  it('explains missing response coverage and refuses the launch acknowledgement', async () => {
+    setup('owner', (_method, path) =>
+      path.endsWith('/smart-sites/launch-readiness')
+        ? response({
+            ...launchReadiness,
+            staffing: { activeManagers: 1, activeResponders: 0 },
+            sites: [
+              {
+                ...launchReadiness.sites[0],
+                ready: false,
+                blockers: ['active_responder_required'],
+              },
+            ],
+          })
+        : undefined,
+    );
+    renderWithQuery(<SmartSitesControl />);
+    expect(
+      await screen.findByText(/1 manager\(s\), 0 responder\(s\)/),
+    ).toBeTruthy();
+    expect(
+      (
+        screen.getByLabelText(
+          /I confirm a real person owns this inbox/,
+        ) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Enable capture',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+  });
+  it('elevates an active connection whose readiness evidence no longer passes', async () => {
+    setup('owner', (method, path) => {
+      if (path.endsWith('/smart-sites/launch-readiness'))
+        return response({
+          ...launchReadiness,
+          sites: [
+            {
+              ...launchReadiness.sites[0],
+              isActive: true,
+              ready: false,
+              blockers: ['credential_check_stale'],
+            },
+          ],
+        });
+      if (path.endsWith('/smart-sites') && method === 'GET')
+        return response([{ ...site, isActive: true }]);
+      return undefined;
+    });
+    renderWithQuery(<SmartSitesControl />);
+    expect(
+      await screen.findByText(
+        /1 active connection no longer has a complete readiness record/,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText(/Recheck the server credential/)).toBeTruthy();
   });
   it('shows unknown rather than invented zero metrics when reporting is unavailable', async () => {
     setup('owner', (_m, p) =>
@@ -299,7 +407,10 @@ describe('Smart Sites operator controls', () => {
           ],
           sites: [measuredSite],
         });
-      if (path.endsWith(`/smart-sites/${site.id}/measurement`) && method === 'PATCH')
+      if (
+        path.endsWith(`/smart-sites/${site.id}/measurement`) &&
+        method === 'PATCH'
+      )
         return response({ ...measuredSite, analyticsEnabled: true });
       if (path.endsWith('/smart-sites') && method === 'GET')
         return response([measuredSite]);
@@ -307,6 +418,12 @@ describe('Smart Sites operator controls', () => {
     });
     renderWithQuery(<SmartSitesControl />);
     await screen.findByText('From attention to actual outcomes');
+    expect(
+      await screen.findByText(
+        /Current staff coverage and server credential checks pass/,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/passed when capture was enabled/)).toBeNull();
     expect(await screen.findByText('$8,500')).toBeTruthy();
     expect(screen.getByText('3 phone-link clicks')).toBeTruthy();
     expect(screen.getByText('google')).toBeTruthy();

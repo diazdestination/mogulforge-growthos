@@ -11,6 +11,7 @@ import {
   propertiesTable,
   smartSitesTable,
   smartSiteSubmissionsTable,
+  usersTable,
 } from "@workspace/db";
 import {
   SMART_SITE_PROFILES,
@@ -18,11 +19,13 @@ import {
   type SmartSiteIntake,
 } from "./smart-site-contract";
 import { buildTouch, leadAttributionColumns } from "./attribution";
+import { hasPermission } from "../lib/permissions";
 
 export class SmartSiteError extends Error {
   constructor(
     public code: string,
     public status = 400,
+    public details?: Record<string, unknown>,
   ) {
     super(code);
   }
@@ -40,9 +43,98 @@ const publicFields = {
   analyticsRetentionDays: smartSitesTable.analyticsRetentionDays,
   analyticsPolicyVersion: smartSitesTable.analyticsPolicyVersion,
   credentialIssuedAt: smartSitesTable.credentialIssuedAt,
+  credentialCheckedAt: smartSitesTable.credentialCheckedAt,
   credentialVersion: smartSitesTable.credentialVersion,
   createdAt: smartSitesTable.createdAt,
 };
+
+const SMART_SITE_CREDENTIAL_CHECK_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+type SmartSiteLaunchBlocker =
+  | "active_manager_required"
+  | "active_responder_required"
+  | "credential_issuance_not_recorded"
+  | "credential_not_verified"
+  | "credential_check_stale";
+type LaunchSite = Pick<
+  typeof smartSitesTable.$inferSelect,
+  | "id"
+  | "isActive"
+  | "credentialIssuedAt"
+  | "credentialCheckedAt"
+  | "credentialVersion"
+>;
+type LaunchStaffing = { activeManagers: number; activeResponders: number };
+
+function evaluateLaunchBlockers(
+  site: LaunchSite,
+  staffing: LaunchStaffing,
+  now: Date,
+): SmartSiteLaunchBlocker[] {
+  const blockers: SmartSiteLaunchBlocker[] = [];
+  if (staffing.activeManagers < 1) blockers.push("active_manager_required");
+  if (staffing.activeResponders < 1) blockers.push("active_responder_required");
+  if (!site.credentialCheckedAt) {
+    blockers.push(
+      site.credentialIssuedAt
+        ? "credential_not_verified"
+        : "credential_issuance_not_recorded",
+    );
+  } else if (
+    site.credentialCheckedAt.getTime() <
+    now.getTime() - SMART_SITE_CREDENTIAL_CHECK_MAX_AGE_MS
+  ) {
+    blockers.push("credential_check_stale");
+  }
+  return blockers;
+}
+
+export async function smartSiteLaunchReadiness(
+  organizationId: string,
+  now = new Date(),
+) {
+  const [members, sites] = await Promise.all([
+    db
+      .select({ role: usersTable.role })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.organizationId, organizationId),
+          eq(usersTable.isActive, true),
+        ),
+      ),
+    db
+      .select({
+        id: smartSitesTable.id,
+        isActive: smartSitesTable.isActive,
+        credentialIssuedAt: smartSitesTable.credentialIssuedAt,
+        credentialCheckedAt: smartSitesTable.credentialCheckedAt,
+        credentialVersion: smartSitesTable.credentialVersion,
+      })
+      .from(smartSitesTable)
+      .where(eq(smartSitesTable.organizationId, organizationId))
+      .orderBy(desc(smartSitesTable.createdAt)),
+  ]);
+  const staffing = {
+    activeManagers: members.filter((member) =>
+      hasPermission(member.role, "settings.manage"),
+    ).length,
+    activeResponders: members.filter((member) =>
+      hasPermission(member.role, "crm.write"),
+    ).length,
+  };
+  return {
+    contract: "smart-site-launch-guard-v1" as const,
+    serverNow: now.toISOString(),
+    credentialCheckMaxAgeHours:
+      SMART_SITE_CREDENTIAL_CHECK_MAX_AGE_MS / 3_600_000,
+    confirmationRequired: true,
+    staffing,
+    sites: sites.map((site) => {
+      const blockers = evaluateLaunchBlockers(site, staffing, now);
+      return { ...site, ready: blockers.length === 0, blockers };
+    }),
+  };
+}
 
 export async function updateSmartSiteMeasurement(
   organizationId: string,
@@ -127,8 +219,60 @@ export async function updateSmartSite(
   actorUserId: string,
   id: string,
   active: boolean,
+  confirmedLaunch = false,
 ) {
   return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(smartSitesTable)
+      .where(
+        and(
+          eq(smartSitesTable.organizationId, organizationId),
+          eq(smartSitesTable.id, id),
+        ),
+      )
+      .for("update");
+    if (!current) throw new SmartSiteError("site_not_found", 404);
+    let launchEvidence: Record<string, unknown> | undefined;
+    if (active) {
+      if (!confirmedLaunch)
+        throw new SmartSiteError("launch_confirmation_required", 409);
+      const members = await tx
+        .select({ role: usersTable.role })
+        .from(usersTable)
+        .where(
+          and(
+            eq(usersTable.organizationId, organizationId),
+            eq(usersTable.isActive, true),
+          ),
+        )
+        .for("share");
+      const staffing = {
+        activeManagers: members.filter((member) =>
+          hasPermission(member.role, "settings.manage"),
+        ).length,
+        activeResponders: members.filter((member) =>
+          hasPermission(member.role, "crm.write"),
+        ).length,
+      };
+      const blockers = evaluateLaunchBlockers(current, staffing, new Date());
+      if (blockers.length)
+        throw new SmartSiteError("smart_site_launch_blocked", 409, {
+          blockers,
+        });
+      launchEvidence = {
+        contract: "smart-site-launch-guard-v1",
+        confirmedLaunch: true,
+        operatorAttestation:
+          "staff-owner-contact-policy-and-https-acceptance-v1",
+        activeManagers: staffing.activeManagers,
+        activeResponders: staffing.activeResponders,
+        credentialVersion: current.credentialVersion,
+        credentialCheckedAt: current.credentialCheckedAt?.toISOString(),
+        credentialCheckMaxAgeHours:
+          SMART_SITE_CREDENTIAL_CHECK_MAX_AGE_MS / 3_600_000,
+      };
+    }
     const [row] = await tx
       .update(smartSitesTable)
       .set({ isActive: active, updatedAt: new Date() })
@@ -139,13 +283,13 @@ export async function updateSmartSite(
         ),
       )
       .returning(publicFields);
-    if (!row) throw new SmartSiteError("site_not_found", 404);
     await tx.insert(auditEventsTable).values({
       organizationId,
       actorUserId,
       action: active ? "smart_site.enabled" : "smart_site.disabled",
       entityType: "smart_site",
       entityId: id,
+      ...(launchEvidence ? { metadata: launchEvidence } : {}),
     });
     return row;
   });
@@ -276,6 +420,21 @@ export async function captureSmartSiteInquiry(
         notification: "staff-inbox" as const,
       };
     }
+    const activeMembers = await tx
+      .select({ id: usersTable.id, role: usersTable.role })
+      .from(usersTable)
+      .where(
+        and(
+          eq(usersTable.organizationId, organizationId),
+          eq(usersTable.isActive, true),
+        ),
+      )
+      .for("share");
+    const activeResponder = activeMembers.find((member) =>
+      hasPermission(member.role, "crm.write"),
+    );
+    if (!activeResponder)
+      throw new SmartSiteError("site_staffing_unavailable", 503);
     const matchers = [];
     if (input.contact.email)
       matchers.push(
@@ -931,13 +1090,18 @@ export async function smartSiteAcquisitionOverview(
     })),
     sites,
     measurement: {
-      visitors: "Distinct consented first-party browser identifiers, not people across devices",
+      visitors:
+        "Distinct consented first-party browser identifiers, not people across devices",
       savedLeads: "GrowthOS receipt-linked inquiries, not submit-button clicks",
       phoneClicks: "Telephone-link clicks; not completed or answered calls",
-      medianResponse: "Median time to an explicit staff-recorded attempt; not provider delivery or reply",
-      wonValue: "Recorded won contract value; not collected cash, margin, ROI or profit",
-      content: "First recorded path within the report window for each consented browser; returning and cross-device journeys remain incomplete",
-      excluded: "No raw URLs, contact details, files, transcripts, full user agents or cross-site advertising IDs",
+      medianResponse:
+        "Median time to an explicit staff-recorded attempt; not provider delivery or reply",
+      wonValue:
+        "Recorded won contract value; not collected cash, margin, ROI or profit",
+      content:
+        "First recorded path within the report window for each consented browser; returning and cross-device journeys remain incomplete",
+      excluded:
+        "No raw URLs, contact details, files, transcripts, full user agents or cross-site advertising IDs",
     },
   };
 }

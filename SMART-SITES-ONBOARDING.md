@@ -146,3 +146,14 @@ server secrets, a reviewed migration, HTTPS/browser acceptance, recovery schedul
 retention/key backup, abuse protection and explicit release approval. This launchpad does not
 provision staff invitations or bypass those gates. No push, deployment, DNS, payment, live email/SMS,
 production tenant mutation, marketing-repo change or Painless website code change occurred.
+
+## Follow-on — enforced launch readiness
+
+The former manual launch boundary is now backed by the local
+`smart-site-launch-guard-v1` contract. Read `SMART-SITES-LAUNCH-GUARD.md` before
+activating any client connection. The server requires active manager/responder
+coverage, a credential check no older than 24 hours, and an explicit operator
+attestation; the public intake path also refuses a new write when response
+coverage has disappeared. This does not provision staff, prove public
+deployment, or grant release approval. The implementation is locally verified
+and remains undeployed.

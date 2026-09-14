@@ -2,6 +2,25 @@
 
 September 12, 2026. Implemented and locally verified; not a production release.
 
+## Latest checkpoint — Launch Guard
+
+September 14, 2026. GrowthOS now blocks Smart Site activation until the tenant
+has active manager and responder coverage, the current server credential has a
+handshake no older than 24 hours, and an owner/admin explicitly attests to the
+real response owner, approved contact policy, and labeled HTTPS acceptance. New
+intake also fails without writing if all responders later disappear.
+
+The API, audit evidence, `/capture` checklist, active-site regression warning,
+tenant isolation, and no-write failure path are implemented locally and covered
+by 128/128 guarded backend tests plus 222/222 command-center tests. Read
+`SMART-SITES-LAUNCH-GUARD.md` first. This checkpoint was not pushed or deployed
+and did not change Painless, production capture, credentials, tenants,
+analytics, messaging, or DNS.
+
+Next gate: obtain the approved real Painless owner/responder email and contact
+policy, establish their access, run owner-visible acceptance, then separately
+approve the GrowthOS release and intentional capture activation.
+
 ## Latest checkpoint — organic content to recorded inquiry
 
 September 14, 2026. Painless now has 20 evidence-backed, prerendered service, service-area,
