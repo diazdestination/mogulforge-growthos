@@ -1,9 +1,4 @@
-import {
-  db,
-  leadsTable,
-  organizationsTable,
-  usersTable,
-} from "@workspace/db";
+import { db, leadsTable, organizationsTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -65,30 +60,55 @@ describe("BIE Revenue Command", () => {
     expect(lead).not.toBeNull();
     await db
       .update(leadsTable)
-      .set({ updatedAt: new Date(Date.now() - 9 * 86_400_000) })
+      .set({
+        createdAt: new Date(Date.now() - 9 * 86_400_000),
+        updatedAt: new Date(),
+        assignedUserId: actorId,
+      })
       .where(eq(leadsTable.id, lead!.id));
 
     const briefing = await buildRevenueRecoveryBriefing(org.id);
     expect(briefing.revenueAtRiskCents).toBe(185_000);
     expect(briefing.opportunities).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ kind: "stalled_estimate", leadIds: [lead!.id] }),
+        expect.objectContaining({
+          kind: "stalled_estimate",
+          leadIds: [lead!.id],
+        }),
       ]),
     );
     expect(briefing.sources).toHaveLength(4);
-    expect(briefing.sources.every((source) => source.status === "not_connected")).toBe(true);
+    expect(
+      briefing.sources.every((source) => source.status === "not_connected"),
+    ).toBe(true);
 
-    const proposals = await generateBieProposals(org.id, actorId);
-    const task = proposals.find((proposal) => proposal.actionType === "create_task");
+    const generations = await Promise.all([
+      generateBieProposals(org.id, actorId),
+      generateBieProposals(org.id, actorId),
+    ]);
+    const proposals = generations.flat();
+    expect(
+      proposals.filter((p) => p.actionType === "create_task"),
+    ).toHaveLength(1);
+    const task = proposals.find(
+      (proposal) => proposal.actionType === "create_task",
+    );
     expect(task).toBeTruthy();
     expect(task?.status).toBe("proposed");
 
-    const approved = await reviewBieProposal(org.id, task!.id, actorId, "approve");
+    const approved = await reviewBieProposal(
+      org.id,
+      task!.id,
+      actorId,
+      "approve",
+    );
     expect(approved?.status).toBe("approved");
     const executed = await executeBieProposal(org.id, task!.id, actorId);
     expect(executed?.status).toBe("executed");
     expect(executed?.executionDetail).toContain("Created task");
-    expect((await crm.listTasks(org.id)).some((item) => item.leadId === lead!.id)).toBe(true);
+    expect(
+      (await crm.listTasks(org.id)).some((item) => item.leadId === lead!.id),
+    ).toBe(true);
   });
 
   it("defaults autopilot off and persists a narrowly-scoped policy", async () => {

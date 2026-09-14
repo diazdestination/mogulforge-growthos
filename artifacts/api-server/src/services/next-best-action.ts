@@ -207,7 +207,7 @@ function rankLeadCandidates(
       channel: signals.hasEmail ? "email" : signals.hasPhone ? "sms" : undefined,
       reasons: [
         "The homeowner sent a message and hasn't heard back yet",
-        "Fast replies are the strongest conversion signal we track",
+        "A customer question is waiting for a human response",
       ],
       priority: 100 + Math.min(lead.score, 100) / 10,
     });

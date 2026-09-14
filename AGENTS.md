@@ -153,6 +153,15 @@ A feature is complete only when it includes:
 
 ## Immediate Operating Objective
 
+September 14, 2026 Revenue Workspace v1: read `REVENUE-WORKSPACE.md`,
+`GROWTHOS-VALUE-BUILD.md` and `design/revenue-workspace-qa.md` before changing the
+shared Revenue Desk, durable BIE/scheduled executions, customer rooms, value
+ledger or client operations. Local acceptance passed 194 backend and 232 UI
+tests plus full builds and desktop/mobile inspection. Keep uncertain executions
+non-retryable until evidence-backed reconciliation, exact saved-payload approval,
+contact-scoped portal access, approved knowledge/version history and truthful
+financial semantics. This is local v1, not provider/accounting/publishing activation.
+
 September 14, 2026 local Smart Sites milestone: read
 `SMART-SITES-LAUNCH-GUARD.md` first, then `SMART-SITES-HANDOFF.md`. Launch Guard
 now requires tenant-scoped response coverage, a recent server credential check,

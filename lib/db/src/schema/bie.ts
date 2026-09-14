@@ -106,7 +106,7 @@ export const bieAgentRunsTable = pgTable(
 );
 
 export type BieActionType = "create_task" | "change_stage" | "send_email";
-export type BieActionStatus = "proposed" | "approved" | "executed" | "blocked" | "rejected" | "failed";
+export type BieActionStatus = "proposed" | "approved" | "processing" | "indeterminate" | "executed" | "blocked" | "rejected" | "failed";
 
 /**
  * Every potentially consequential BIE recommendation is durable, reviewable,

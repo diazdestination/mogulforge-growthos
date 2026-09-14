@@ -8,6 +8,7 @@
  */
 import {
   activitiesTable,
+  auditEventsTable,
   bieActionProposalsTable,
   bieAgentRunsTable,
   bieAutopilotPoliciesTable,
@@ -15,6 +16,9 @@ import {
   contactsTable,
   db,
   leadsTable,
+  usersTable,
+  appointmentsTable,
+  estimatesTable,
   type BieActionProposal,
   type BieActionStatus,
   type BieActionType,
@@ -26,8 +30,11 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import * as crm from "./crm";
 import { recordAudit } from "./audit";
 import { getBusinessName } from "./settings";
-import { sendGmailForUser } from "./gmail-oauth";
+import { sendGmailForUser, getGmailStatus } from "./gmail-oauth";
 import { checkSendEligibility, recordBlockedSend } from "./send-gate";
+import { runDurableAction } from "./durable-execution";
+import { hasPermission } from "../lib/permissions";
+import { isDeepStrictEqual } from "node:util";
 
 const SOURCES: BieSource[] = [
   "google_ads",
@@ -44,7 +51,8 @@ const DEFAULT_POLICY: BieAutopilotPolicy = {
   pauseReason: null,
 };
 
-type BriefingOpportunityKind = "stalled_estimate" | "dormant_pipeline" | "data_quality";
+type BriefingOpportunityKind =
+  "stalled_estimate" | "dormant_pipeline" | "data_quality";
 
 export interface BriefingOpportunity {
   kind: BriefingOpportunityKind;
@@ -124,7 +132,9 @@ export async function listBieSources(organizationId: string) {
   return SOURCES.map((source) => byKind.get(source) ?? defaultSource(source));
 }
 
-export async function getAutopilotPolicy(organizationId: string): Promise<BieAutopilotPolicy> {
+export async function getAutopilotPolicy(
+  organizationId: string,
+): Promise<BieAutopilotPolicy> {
   const [row] = await db
     .select({ policy: bieAutopilotPoliciesTable.policy })
     .from(bieAutopilotPoliciesTable)
@@ -133,7 +143,9 @@ export async function getAutopilotPolicy(organizationId: string): Promise<BieAut
   return {
     ...DEFAULT_POLICY,
     ...row.policy,
-    allowedActions: Array.isArray(row.policy.allowedActions) ? row.policy.allowedActions : [],
+    allowedActions: Array.isArray(row.policy.allowedActions)
+      ? row.policy.allowedActions
+      : [],
   };
 }
 
@@ -152,9 +164,18 @@ export async function updateAutopilotPolicy(
     ...current,
     ...input,
     allowedActions: [...new Set(allowedActions)],
-    dailyEmailCap: Math.min(100, Math.max(1, Math.floor(input.dailyEmailCap ?? current.dailyEmailCap))),
-    pausedAt: input.enabled === true ? null : input.pausedAt ?? current.pausedAt ?? null,
-    pauseReason: input.enabled === true ? null : input.pauseReason ?? current.pauseReason ?? null,
+    dailyEmailCap: Math.min(
+      100,
+      Math.max(1, Math.floor(input.dailyEmailCap ?? current.dailyEmailCap)),
+    ),
+    pausedAt:
+      input.enabled === true
+        ? null
+        : (input.pausedAt ?? current.pausedAt ?? null),
+    pauseReason:
+      input.enabled === true
+        ? null
+        : (input.pauseReason ?? current.pauseReason ?? null),
   };
   await db
     .insert(bieAutopilotPoliciesTable)
@@ -168,7 +189,11 @@ export async function updateAutopilotPolicy(
     actorUserId,
     action: "bie.autopilot_policy_updated",
     entityType: "bie_autopilot_policy",
-    metadata: { enabled: policy.enabled, allowedActions: policy.allowedActions, dailyEmailCap: policy.dailyEmailCap },
+    metadata: {
+      enabled: policy.enabled,
+      allowedActions: policy.allowedActions,
+      dailyEmailCap: policy.dailyEmailCap,
+    },
   });
   return policy;
 }
@@ -214,36 +239,99 @@ export async function buildRevenueRecoveryBriefing(
           and(
             eq(activitiesTable.organizationId, organizationId),
             inArray(activitiesTable.leadId, leadIds),
+            inArray(activitiesTable.type, [
+              "portal_message",
+              "customer_reply",
+              "email_received",
+              "sms_received",
+              "email_sent",
+              "sms_sent",
+              "bie_email_sent",
+              "call_completed",
+              "contact_attempt_logged",
+              "smart_site_contact_attempt",
+            ]),
           ),
         )
         .groupBy(activitiesTable.leadId)
     : [];
-  const latestActivity = new Map(activityRows.map((row) => [row.leadId, row.lastActivityAt]));
+  const latestActivity = new Map(
+    activityRows.map((row) => [row.leadId, row.lastActivityAt]),
+  );
+  const sentEstimates = leadIds.length
+    ? await db
+        .select({
+          leadId: estimatesTable.leadId,
+          sentAt: sql<Date | null>`max(${estimatesTable.sentAt})`,
+        })
+        .from(estimatesTable)
+        .where(
+          and(
+            eq(estimatesTable.organizationId, organizationId),
+            inArray(estimatesTable.leadId, leadIds),
+          ),
+        )
+        .groupBy(estimatesTable.leadId)
+    : [];
+  const lastEstimate = new Map(
+    sentEstimates.map((row) => [row.leadId, row.sentAt]),
+  );
+  const lastCustomerStep = (lead: (typeof leadRows)[number]) => {
+    const dates = [latestActivity.get(lead.id), lastEstimate.get(lead.id)]
+      .filter(Boolean)
+      .map((value) => new Date(value!).getTime());
+    // Assignment, enrichment and internal notes are not customer contact.
+    return dates.length ? new Date(Math.max(...dates)) : lead.createdAt;
+  };
 
-  const activeForRecovery = new Set(["new", "contact_attempted", "follow_up", "nurture", "lost"]);
+  const activeForRecovery = new Set([
+    "new",
+    "contact_attempted",
+    "follow_up",
+    "nurture",
+    "lost",
+  ]);
   const stalledEstimate = leadRows.filter((lead) => {
-    const quietDays = daysSince(latestActivity.get(lead.id) ?? lead.updatedAt ?? lead.createdAt);
-    return ["estimate_sent", "claim_pending"].includes(lead.status) && quietDays >= 7;
+    const quietDays = daysSince(lastCustomerStep(lead));
+    return (
+      ["estimate_sent", "claim_pending"].includes(lead.status) && quietDays >= 7
+    );
   });
   const dormantPipeline = leadRows.filter((lead) => {
-    const quietDays = daysSince(latestActivity.get(lead.id) ?? lead.updatedAt ?? lead.createdAt);
+    const quietDays = daysSince(lastCustomerStep(lead));
     return activeForRecovery.has(lead.status) && quietDays >= 14;
   });
   const valueOf = (rows: typeof leadRows) =>
-    rows.reduce((total, lead) => total + Math.max(0, lead.estimatedValueCents ?? 0), 0);
+    rows.reduce(
+      (total, lead) => total + Math.max(0, lead.estimatedValueCents ?? 0),
+      0,
+    );
   const emailReady = leadRows.filter((lead) => Boolean(lead.email));
-  const knownValue = leadRows.filter((lead) => typeof lead.estimatedValueCents === "number");
-  const importedLeads = leadRows.filter((lead) => lead.creationMethod === "import").length;
+  const knownValue = leadRows.filter(
+    (lead) => typeof lead.estimatedValueCents === "number",
+  );
+  const importedLeads = leadRows.filter(
+    (lead) => lead.creationMethod === "import",
+  ).length;
   const sources = await listBieSources(organizationId);
   const policy = await getAutopilotPolicy(organizationId);
-  const connectedSources = sources.filter((source) => source.status === "connected").length;
+  const connectedSources = sources.filter(
+    (source) => source.status === "connected",
+  ).length;
   const readinessParts = [
     leadRows.length > 0 ? 25 : 0,
-    leadRows.length ? Math.round((emailReady.length / leadRows.length) * 25) : 0,
-    leadRows.length ? Math.round((knownValue.length / leadRows.length) * 30) : 0,
+    leadRows.length
+      ? Math.round((emailReady.length / leadRows.length) * 25)
+      : 0,
+    leadRows.length
+      ? Math.round((knownValue.length / leadRows.length) * 30)
+      : 0,
     Math.round((connectedSources / SOURCES.length) * 20),
   ];
-  const dataReadinessScore = Math.min(100, readinessParts.reduce((a, b) => a + b, 0));
+  const dataReadinessScore = Math.min(
+    100,
+    readinessParts.reduce((a, b) => a + b, 0),
+  );
 
   const opportunities: BriefingOpportunity[] = [];
   if (stalledEstimate.length > 0) {
@@ -253,7 +341,11 @@ export async function buildRevenueRecoveryBriefing(
       detail: `${stalledEstimate.length} records have sat without activity for at least 7 days.`,
       count: stalledEstimate.length,
       estimatedValueCents: valueOf(stalledEstimate),
-      confidence: stalledEstimate.every((lead) => lead.estimatedValueCents != null) ? "observed" : "partial",
+      confidence: stalledEstimate.every(
+        (lead) => lead.estimatedValueCents != null,
+      )
+        ? "observed"
+        : "partial",
       leadIds: stalledEstimate.slice(0, 50).map((lead) => lead.id),
     });
   }
@@ -264,11 +356,17 @@ export async function buildRevenueRecoveryBriefing(
       detail: `${dormantPipeline.length} active or previously lost leads have had no activity for at least 14 days.`,
       count: dormantPipeline.length,
       estimatedValueCents: valueOf(dormantPipeline),
-      confidence: dormantPipeline.every((lead) => lead.estimatedValueCents != null) ? "observed" : "partial",
+      confidence: dormantPipeline.every(
+        (lead) => lead.estimatedValueCents != null,
+      )
+        ? "observed"
+        : "partial",
       leadIds: dormantPipeline.slice(0, 50).map((lead) => lead.id),
     });
   }
-  const missingValue = leadRows.filter((lead) => lead.estimatedValueCents == null).length;
+  const missingValue = leadRows.filter(
+    (lead) => lead.estimatedValueCents == null,
+  ).length;
   if (missingValue > 0) {
     opportunities.push({
       kind: "data_quality",
@@ -277,11 +375,15 @@ export async function buildRevenueRecoveryBriefing(
       count: missingValue,
       estimatedValueCents: 0,
       confidence: "observed",
-      leadIds: leadRows.filter((lead) => lead.estimatedValueCents == null).slice(0, 50).map((lead) => lead.id),
+      leadIds: leadRows
+        .filter((lead) => lead.estimatedValueCents == null)
+        .slice(0, 50)
+        .map((lead) => lead.id),
     });
   }
 
-  const revenueAtRiskCents = valueOf(stalledEstimate) + valueOf(dormantPipeline);
+  const revenueAtRiskCents =
+    valueOf(stalledEstimate) + valueOf(dormantPipeline);
   const narrative =
     opportunities.length === 0
       ? "BIE does not see a qualifying recovery segment yet. Import more historical leads or continue operating the pipeline to build an evidence base."
@@ -293,14 +395,18 @@ export async function buildRevenueRecoveryBriefing(
     importedLeads,
     dataReadiness: {
       score: dataReadinessScore,
-      leadsWithContactMethod: leadRows.filter((lead) => lead.email || lead.phone).length,
+      leadsWithContactMethod: leadRows.filter(
+        (lead) => lead.email || lead.phone,
+      ).length,
       leadsWithKnownValue: knownValue.length,
       googleSourcesConnected: connectedSources,
       totalGoogleSources: SOURCES.length,
     },
     revenueAtRiskCents,
     unknownValueLeadCount: missingValue,
-    opportunityCount: opportunities.filter((item) => item.kind !== "data_quality").reduce((total, item) => total + item.count, 0),
+    opportunityCount: opportunities
+      .filter((item) => item.kind !== "data_quality")
+      .reduce((total, item) => total + item.count, 0),
     opportunities,
     narrative,
     sources,
@@ -340,13 +446,20 @@ export async function runRevenueRecoveryBriefing(
       action: "bie.revenue_briefing_generated",
       entityType: "bie_agent_run",
       entityId: run.id,
-      metadata: { opportunityCount: briefing.opportunityCount, revenueAtRiskCents: briefing.revenueAtRiskCents },
+      metadata: {
+        opportunityCount: briefing.opportunityCount,
+        revenueAtRiskCents: briefing.revenueAtRiskCents,
+      },
     });
     return briefing;
   } catch (error) {
     await db
       .update(bieAgentRunsTable)
-      .set({ status: "failed", summary: error instanceof Error ? error.message : "BIE briefing failed", completedAt: new Date() })
+      .set({
+        status: "failed",
+        summary: error instanceof Error ? error.message : "BIE briefing failed",
+        completedAt: new Date(),
+      })
       .where(eq(bieAgentRunsTable.id, run.id));
     throw error;
   }
@@ -362,13 +475,18 @@ type LeadForProposal = {
   email: string | null;
 };
 
-async function proposalCandidates(organizationId: string, limit: number): Promise<LeadForProposal[]> {
+async function proposalCandidates(
+  organizationId: string,
+  limit: number,
+): Promise<LeadForProposal[]> {
   const briefing = await buildRevenueRecoveryBriefing(organizationId);
-  const ids = [...new Set(
-    briefing.opportunities
-      .filter((opportunity) => opportunity.kind !== "data_quality")
-      .flatMap((opportunity) => opportunity.leadIds),
-  )].slice(0, limit);
+  const ids = [
+    ...new Set(
+      briefing.opportunities
+        .filter((opportunity) => opportunity.kind !== "data_quality")
+        .flatMap((opportunity) => opportunity.leadIds),
+    ),
+  ].slice(0, limit);
   if (ids.length === 0) return [];
   return db
     .select({
@@ -382,7 +500,12 @@ async function proposalCandidates(organizationId: string, limit: number): Promis
     })
     .from(leadsTable)
     .innerJoin(contactsTable, eq(leadsTable.contactId, contactsTable.id))
-    .where(and(eq(leadsTable.organizationId, organizationId), inArray(leadsTable.id, ids)))
+    .where(
+      and(
+        eq(leadsTable.organizationId, organizationId),
+        inArray(leadsTable.id, ids),
+      ),
+    )
     .orderBy(desc(leadsTable.estimatedValueCents));
 }
 
@@ -391,104 +514,152 @@ export async function generateBieProposals(
   organizationId: string,
   actorUserId: string,
 ): Promise<BieActionProposal[]> {
+  // Serialize only this tenant's generators; separate clients never share a queue.
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`bie-proposals:${organizationId}`}, 0))`,
+    );
+    return generateBieProposalsOwned(organizationId, actorUserId);
+  });
+}
+
+async function generateBieProposalsOwned(
+  organizationId: string,
+  actorUserId: string,
+): Promise<BieActionProposal[]> {
   const [run] = await db
     .insert(bieAgentRunsTable)
-    .values({ organizationId, kind: "proposal_generation", status: "running", trigger: "manual", initiatedByUserId: actorUserId })
+    .values({
+      organizationId,
+      kind: "proposal_generation",
+      status: "running",
+      trigger: "manual",
+      initiatedByUserId: actorUserId,
+    })
     .returning({ id: bieAgentRunsTable.id });
   if (!run) throw new Error("Could not create the BIE proposal run.");
   try {
-  const candidates = await proposalCandidates(organizationId, 20);
-  const active = await db
-    .select({ leadId: bieActionProposalsTable.leadId, actionType: bieActionProposalsTable.actionType })
-    .from(bieActionProposalsTable)
-    .where(
-      and(
-        eq(bieActionProposalsTable.organizationId, organizationId),
-        inArray(bieActionProposalsTable.status, ["proposed", "approved"]),
-      ),
+    const candidates = await proposalCandidates(organizationId, 20);
+    const active = await db
+      .select({
+        leadId: bieActionProposalsTable.leadId,
+        actionType: bieActionProposalsTable.actionType,
+      })
+      .from(bieActionProposalsTable)
+      .where(
+        and(
+          eq(bieActionProposalsTable.organizationId, organizationId),
+          inArray(bieActionProposalsTable.status, [
+            "proposed",
+            "approved",
+            "processing",
+            "indeterminate",
+          ]),
+        ),
+      );
+    const activeKeys = new Set(
+      active.map((item) => `${item.leadId}:${item.actionType}`),
     );
-  const activeKeys = new Set(active.map((item) => `${item.leadId}:${item.actionType}`));
-  const businessName = await getBusinessName(organizationId);
-  const inserts: Array<typeof bieActionProposalsTable.$inferInsert> = [];
-  for (const lead of candidates) {
-    const value = lead.estimatedValueCents ?? null;
-    const evidence = {
-      leadStatus: lead.status,
-      knownLeadValueCents: value,
-      leadSummary: lead.summary,
-      source: "bie.revenue_recovery_briefing",
-    };
-    if (lead.email && !activeKeys.has(`${lead.id}:send_email`)) {
-      inserts.push({
-        organizationId,
-        runId: run.id,
-        leadId: lead.id,
-        actionType: "send_email",
-        status: "proposed",
-        title: "Send a recovery check-in",
-        rationale: "This lead is in an evidence-backed stale pipeline segment. The message remains subject to send caps, quiet hours, suppression, and provider readiness.",
-        evidence,
-        payload: {
-          subject: `A quick check-in from ${businessName}`,
-          body: `Hi ${lead.firstName || "there"},\n\nI wanted to check in and see whether you still need help with your project. If timing or priorities have changed, reply here and we will make the next step easy.\n\n— ${businessName}`,
-        },
-        estimatedValueCents: value,
-        createdByUserId: actorUserId,
-      });
+    const businessName = await getBusinessName(organizationId);
+    const inserts: Array<typeof bieActionProposalsTable.$inferInsert> = [];
+    for (const lead of candidates) {
+      const value = lead.estimatedValueCents ?? null;
+      const evidence = {
+        leadStatus: lead.status,
+        knownLeadValueCents: value,
+        leadSummary: lead.summary,
+        source: "bie.revenue_recovery_briefing",
+      };
+      if (lead.email && !activeKeys.has(`${lead.id}:send_email`)) {
+        inserts.push({
+          organizationId,
+          runId: run.id,
+          leadId: lead.id,
+          actionType: "send_email",
+          status: "proposed",
+          title: "Send a recovery check-in",
+          rationale:
+            "This lead is in an evidence-backed stale pipeline segment. The message remains subject to send caps, quiet hours, suppression, and provider readiness.",
+          evidence,
+          payload: {
+            subject: `A quick check-in from ${businessName}`,
+            body: `Hi ${lead.firstName || "there"},\n\nI wanted to check in and see whether you still need help with your project. If timing or priorities have changed, reply here and we will make the next step easy.\n\n— ${businessName}`,
+          },
+          estimatedValueCents: value,
+          createdByUserId: actorUserId,
+        });
+      }
+      if (!activeKeys.has(`${lead.id}:create_task`)) {
+        inserts.push({
+          organizationId,
+          runId: run.id,
+          leadId: lead.id,
+          actionType: "create_task",
+          status: "proposed",
+          title: "Assign a recovery follow-up task",
+          rationale:
+            "A human follow-up preserves momentum when outreach is not ready or the owner prefers a personal call.",
+          evidence,
+          payload: {
+            title: "BIE recovery follow-up",
+            description:
+              "Review the BIE evidence and contact this opportunity.",
+            priority: "high",
+          },
+          estimatedValueCents: value,
+          createdByUserId: actorUserId,
+        });
+      }
+      if (
+        ["new", "contact_attempted", "nurture"].includes(lead.status) &&
+        !activeKeys.has(`${lead.id}:change_stage`)
+      ) {
+        inserts.push({
+          organizationId,
+          runId: run.id,
+          leadId: lead.id,
+          actionType: "change_stage",
+          status: "proposed",
+          title: "Move lead into deliberate follow-up",
+          rationale:
+            "The current stage does not reflect an active recovery sequence. This change is fully auditable and can be rejected.",
+          evidence,
+          payload: { status: "follow_up" },
+          estimatedValueCents: value,
+          createdByUserId: actorUserId,
+        });
+      }
     }
-    if (!activeKeys.has(`${lead.id}:create_task`)) {
-      inserts.push({
-        organizationId,
-        runId: run.id,
-        leadId: lead.id,
-        actionType: "create_task",
-        status: "proposed",
-        title: "Assign a recovery follow-up task",
-        rationale: "A human follow-up preserves momentum when outreach is not ready or the owner prefers a personal call.",
-        evidence,
-        payload: { title: "BIE recovery follow-up", description: "Review the BIE evidence and contact this opportunity.", priority: "high" },
-        estimatedValueCents: value,
-        createdByUserId: actorUserId,
-      });
-    }
-    if (["new", "contact_attempted", "nurture"].includes(lead.status) && !activeKeys.has(`${lead.id}:change_stage`)) {
-      inserts.push({
-        organizationId,
-        runId: run.id,
-        leadId: lead.id,
-        actionType: "change_stage",
-        status: "proposed",
-        title: "Move lead into deliberate follow-up",
-        rationale: "The current stage does not reflect an active recovery sequence. This change is fully auditable and can be rejected.",
-        evidence,
-        payload: { status: "follow_up" },
-        estimatedValueCents: value,
-        createdByUserId: actorUserId,
-      });
-    }
-  }
-  const proposals = inserts.length
-    ? await db.insert(bieActionProposalsTable).values(inserts).returning()
-    : [];
-  await db
-    .update(bieAgentRunsTable)
-    .set({ status: "completed", summary: `${proposals.length} action proposals generated`, result: { proposalCount: proposals.length }, completedAt: new Date() })
-    .where(eq(bieAgentRunsTable.id, run.id));
-  await recordAudit({
-    organizationId,
-    actorUserId,
-    action: "bie.action_proposals_generated",
-    entityType: "bie_agent_run",
-    entityId: run.id,
-    metadata: { proposalCount: proposals.length },
-  });
-  return proposals;
+    const proposals = inserts.length
+      ? await db.insert(bieActionProposalsTable).values(inserts).returning()
+      : [];
+    await db
+      .update(bieAgentRunsTable)
+      .set({
+        status: "completed",
+        summary: `${proposals.length} action proposals generated`,
+        result: { proposalCount: proposals.length },
+        completedAt: new Date(),
+      })
+      .where(eq(bieAgentRunsTable.id, run.id));
+    await recordAudit({
+      organizationId,
+      actorUserId,
+      action: "bie.action_proposals_generated",
+      entityType: "bie_agent_run",
+      entityId: run.id,
+      metadata: { proposalCount: proposals.length },
+    });
+    return proposals;
   } catch (error) {
     await db
       .update(bieAgentRunsTable)
       .set({
         status: "failed",
-        summary: error instanceof Error ? error.message.slice(0, 500) : "BIE proposal generation failed",
+        summary:
+          error instanceof Error
+            ? error.message.slice(0, 500)
+            : "BIE proposal generation failed",
         completedAt: new Date(),
       })
       .where(eq(bieAgentRunsTable.id, run.id));
@@ -509,7 +680,12 @@ async function getProposal(organizationId: string, actionId: string) {
   const [proposal] = await db
     .select()
     .from(bieActionProposalsTable)
-    .where(and(eq(bieActionProposalsTable.id, actionId), eq(bieActionProposalsTable.organizationId, organizationId)));
+    .where(
+      and(
+        eq(bieActionProposalsTable.id, actionId),
+        eq(bieActionProposalsTable.organizationId, organizationId),
+      ),
+    );
   return proposal ?? null;
 }
 
@@ -518,24 +694,43 @@ export async function reviewBieProposal(
   actionId: string,
   actorUserId: string,
   decision: "approve" | "reject",
+  expectedPayload?: Record<string, unknown>,
 ): Promise<BieActionProposal | null> {
   const proposal = await getProposal(organizationId, actionId);
   if (!proposal || proposal.status !== "proposed") return null;
-  const nextStatus: BieActionStatus = decision === "approve" ? "approved" : "rejected";
-  const [updated] = await db
-    .update(bieActionProposalsTable)
-    .set({ status: nextStatus, reviewedByUserId: actorUserId, reviewedAt: new Date() })
-    .where(eq(bieActionProposalsTable.id, proposal.id))
-    .returning();
-  await recordAudit({
-    organizationId,
-    actorUserId,
-    action: decision === "approve" ? "bie.action_approved" : "bie.action_rejected",
-    entityType: "bie_action_proposal",
-    entityId: proposal.id,
-    metadata: { actionType: proposal.actionType, leadId: proposal.leadId },
+  if (expectedPayload && !isDeepStrictEqual(expectedPayload, proposal.payload))
+    return null;
+  const nextStatus: BieActionStatus =
+    decision === "approve" ? "approved" : "rejected";
+  return db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(bieActionProposalsTable)
+      .set({
+        status: nextStatus,
+        reviewedByUserId: actorUserId,
+        reviewedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(bieActionProposalsTable.id, proposal.id),
+          eq(bieActionProposalsTable.organizationId, organizationId),
+          eq(bieActionProposalsTable.status, "proposed"),
+          eq(bieActionProposalsTable.payload, proposal.payload),
+        ),
+      )
+      .returning();
+    if (!updated) return null;
+    await tx.insert(auditEventsTable).values({
+      organizationId,
+      actorUserId,
+      action:
+        decision === "approve" ? "bie.action_approved" : "bie.action_rejected",
+      entityType: "bie_action_proposal",
+      entityId: proposal.id,
+      metadata: { actionType: proposal.actionType, leadId: proposal.leadId },
+    });
+    return updated ?? null;
   });
-  return updated ?? null;
 }
 
 async function markAction(
@@ -545,26 +740,31 @@ async function markAction(
 ): Promise<BieActionProposal | null> {
   const [updated] = await db
     .update(bieActionProposalsTable)
-    .set({ status, executionDetail: detail, executedAt: status === "executed" ? new Date() : null })
+    .set({
+      status,
+      executionDetail: detail,
+      executedAt: status === "executed" ? new Date() : null,
+    })
     .where(eq(bieActionProposalsTable.id, id))
     .returning();
   return updated ?? null;
 }
 
-async function emailCapRemaining(organizationId: string, cap: number): Promise<boolean> {
+async function emailCapRemaining(
+  organizationId: string,
+  cap: number,
+): Promise<boolean> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const [row] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(bieActionProposalsTable)
-    .where(
-      and(
-        eq(bieActionProposalsTable.organizationId, organizationId),
-        eq(bieActionProposalsTable.actionType, "send_email"),
-        eq(bieActionProposalsTable.status, "executed"),
-        gte(bieActionProposalsTable.executedAt, since),
-      ),
-    );
-  return Number(row?.count ?? 0) < cap;
+  // The current durable reservation is included. Pending/unknown effects consume
+  // the allowance, so concurrent actions cannot both use the final slot.
+  const rows = await db.execute(sql`select count(*)::int as count from (
+    select action_key from revenue_executions where organization_id = ${organizationId}
+      and kind = 'send_email' and created_at >= ${since} and state not in ('blocked', 'confirmed_not_performed')
+    union
+    select 'bie:' || id::text from bie_action_proposals where organization_id = ${organizationId}
+      and action_type = 'send_email' and status = 'executed' and executed_at >= ${since}
+  ) reserved`);
+  return Number(rows.rows[0]?.count ?? 0) <= cap;
 }
 
 /** Execute an approved proposal. Manual approval is required unless a later worker invokes this under enabled autopilot. */
@@ -575,13 +775,144 @@ export async function executeBieProposal(
   options: { automated?: boolean } = {},
 ): Promise<BieActionProposal | null> {
   const proposal = await getProposal(organizationId, actionId);
+  if (!proposal) return null;
+  if (proposal.status !== "approved") return proposal;
+  const [actor] = actorUserId
+    ? await db
+        .select()
+        .from(usersTable)
+        .where(
+          and(
+            eq(usersTable.id, actorUserId),
+            eq(usersTable.organizationId, organizationId),
+            eq(usersTable.isActive, true),
+          ),
+        )
+    : [];
+  if (!actor || !hasPermission(actor.role, "crm.write"))
+    return markAction(
+      actionId,
+      "blocked",
+      "An active, authorized responder must own this action.",
+    );
+  const execution = await runDurableAction({
+    organizationId,
+    actionKey: `bie:${actionId}`,
+    kind: proposal.actionType,
+    payload: proposal.payload,
+    actorUserId,
+    execute: async () => {
+      const result = await executeBieProposalEffect(
+        organizationId,
+        actionId,
+        actorUserId,
+        options,
+      );
+      return {
+        state: result?.status === "executed" ? "succeeded" : "blocked",
+        detail:
+          result?.executionDetail ??
+          "The approved action is no longer executable.",
+      };
+    },
+  });
+  if (execution.state === "indeterminate")
+    return markAction(
+      actionId,
+      "indeterminate",
+      execution.detail ??
+        "Reconcile the interrupted action before any new outreach.",
+    );
+  if (execution.state === "processing")
+    return {
+      ...proposal,
+      status: "processing",
+      executionDetail: "Another worker owns this execution.",
+    };
+  return getProposal(organizationId, actionId);
+}
+
+async function executeBieProposalEffect(
+  organizationId: string,
+  actionId: string,
+  actorUserId: string | null,
+  options: { automated?: boolean } = {},
+): Promise<BieActionProposal | null> {
+  const proposal = await getProposal(organizationId, actionId);
   if (!proposal || proposal.status !== "approved") return null;
   const policy = await getAutopilotPolicy(organizationId);
-  if (options.automated && (!policy.enabled || Boolean(policy.pausedAt) || !policy.allowedActions.includes(proposal.actionType))) {
-    return markAction(proposal.id, "blocked", "Autopilot policy does not permit this action.");
+  if (
+    options.automated &&
+    (!policy.enabled ||
+      Boolean(policy.pausedAt) ||
+      !policy.allowedActions.includes(proposal.actionType))
+  ) {
+    return markAction(
+      proposal.id,
+      "blocked",
+      "Autopilot policy does not permit this action.",
+    );
   }
   const lead = await crm.getLead(organizationId, proposal.leadId);
-  if (!lead) return markAction(proposal.id, "failed", "Lead no longer exists in this organization.");
+  if (!lead)
+    return markAction(
+      proposal.id,
+      "failed",
+      "Lead no longer exists in this organization.",
+    );
+  if (
+    [
+      "won",
+      "lost",
+      "scheduled",
+      "inspection_scheduled",
+      "production_scheduled",
+      "in_progress",
+      "completed",
+      "review_requested",
+    ].includes(lead.status)
+  )
+    return markAction(
+      proposal.id,
+      "blocked",
+      "The lead has moved on. Review its current workflow before taking action.",
+    );
+  const [reply] = await db
+    .select({ id: activitiesTable.id })
+    .from(activitiesTable)
+    .where(
+      and(
+        eq(activitiesTable.organizationId, organizationId),
+        eq(activitiesTable.leadId, lead.id),
+        gte(activitiesTable.createdAt, proposal.createdAt),
+        inArray(activitiesTable.type, [
+          "portal_message",
+          "customer_reply",
+          "email_received",
+          "sms_received",
+          "contact_attempt_logged",
+          "smart_site_contact_attempt",
+        ]),
+      ),
+    )
+    .limit(1);
+  const [appointment] = await db
+    .select({ id: appointmentsTable.id })
+    .from(appointmentsTable)
+    .where(
+      and(
+        eq(appointmentsTable.organizationId, organizationId),
+        eq(appointmentsTable.leadId, lead.id),
+        inArray(appointmentsTable.status, ["scheduled", "confirmed"]),
+      ),
+    )
+    .limit(1);
+  if (reply || appointment)
+    return markAction(
+      proposal.id,
+      "blocked",
+      "New customer activity or an appointment needs a human review before this older follow-up.",
+    );
 
   try {
     if (proposal.actionType === "create_task") {
@@ -589,31 +920,91 @@ export async function executeBieProposal(
         leadId: lead.id,
         contactId: lead.contactId,
         assignedUserId: lead.assignedUserId,
-        title: typeof proposal.payload.title === "string" ? proposal.payload.title : "BIE recovery follow-up",
-        description: typeof proposal.payload.description === "string" ? proposal.payload.description : proposal.rationale,
-        priority: proposal.payload.priority === "emergency" ? "emergency" : "high",
+        title:
+          typeof proposal.payload.title === "string"
+            ? proposal.payload.title
+            : "BIE recovery follow-up",
+        description:
+          typeof proposal.payload.description === "string"
+            ? proposal.payload.description
+            : proposal.rationale,
+        priority:
+          proposal.payload.priority === "emergency" ? "emergency" : "high",
         sourceEvent: "bie.revenue_recovery",
       });
-      if (!task) return markAction(proposal.id, "failed", "Could not create a task for this organization.");
-      await recordAudit({ organizationId, actorUserId, action: "bie.task_created", entityType: "bie_action_proposal", entityId: proposal.id, metadata: { taskId: task.id, leadId: lead.id } });
+      if (!task)
+        return markAction(
+          proposal.id,
+          "failed",
+          "Could not create a task for this organization.",
+        );
+      await recordAudit({
+        organizationId,
+        actorUserId,
+        action: "bie.task_created",
+        entityType: "bie_action_proposal",
+        entityId: proposal.id,
+        metadata: { taskId: task.id, leadId: lead.id },
+      });
       return markAction(proposal.id, "executed", `Created task ${task.id}.`);
     }
 
     if (proposal.actionType === "change_stage") {
-      const nextStatus = typeof proposal.payload.status === "string" ? proposal.payload.status : "follow_up";
-      const updated = await crm.updateLead(organizationId, lead.id, { status: nextStatus } as never);
-      if (!updated) return markAction(proposal.id, "failed", "Could not update this lead's stage.");
-      await recordAudit({ organizationId, actorUserId, action: "bie.stage_changed", entityType: "bie_action_proposal", entityId: proposal.id, metadata: { leadId: lead.id, from: lead.status, to: nextStatus } });
-      return markAction(proposal.id, "executed", `Moved lead from ${lead.status} to ${nextStatus}.`);
+      const nextStatus =
+        typeof proposal.payload.status === "string"
+          ? proposal.payload.status
+          : "follow_up";
+      const updated = await crm.updateLead(organizationId, lead.id, {
+        status: nextStatus,
+      } as never);
+      if (!updated)
+        return markAction(
+          proposal.id,
+          "failed",
+          "Could not update this lead's stage.",
+        );
+      await recordAudit({
+        organizationId,
+        actorUserId,
+        action: "bie.stage_changed",
+        entityType: "bie_action_proposal",
+        entityId: proposal.id,
+        metadata: { leadId: lead.id, from: lead.status, to: nextStatus },
+      });
+      return markAction(
+        proposal.id,
+        "executed",
+        `Moved lead from ${lead.status} to ${nextStatus}.`,
+      );
     }
 
     const contact = await crm.getContact(organizationId, lead.contactId);
-    if (!contact?.email) return markAction(proposal.id, "blocked", "The lead has no email address.");
+    if (!contact?.email)
+      return markAction(
+        proposal.id,
+        "blocked",
+        "The lead has no email address.",
+      );
     if (!actorUserId) {
-      return markAction(proposal.id, "blocked", "A connected user must approve and send this email.");
+      return markAction(
+        proposal.id,
+        "blocked",
+        "A connected user must approve and send this email.",
+      );
     }
+    const channel = await getGmailStatus(organizationId, actorUserId);
+    if (!channel.configured || !channel.connected)
+      return markAction(
+        proposal.id,
+        "blocked",
+        "This responder's Gmail sending connection is not ready. Use the manual contact path or configure the approved provider.",
+      );
     if (!(await emailCapRemaining(organizationId, policy.dailyEmailCap))) {
-      return markAction(proposal.id, "blocked", `BIE daily email cap (${policy.dailyEmailCap}) has been reached.`);
+      return markAction(
+        proposal.id,
+        "blocked",
+        `BIE daily email cap (${policy.dailyEmailCap}) has been reached.`,
+      );
     }
     const eligibility = await checkSendEligibility({
       organizationId,
@@ -632,10 +1023,20 @@ export async function executeBieProposal(
         contactId: contact.id,
         resumeAt: "resumeAt" in eligibility ? eligibility.resumeAt : undefined,
       });
-      return markAction(proposal.id, "blocked", `Email ${eligibility.outcome}: ${eligibility.reason}.`);
+      return markAction(
+        proposal.id,
+        "blocked",
+        `Email ${eligibility.outcome}: ${eligibility.reason}.`,
+      );
     }
-    const subject = typeof proposal.payload.subject === "string" ? proposal.payload.subject : "A quick check-in";
-    const body = typeof proposal.payload.body === "string" ? proposal.payload.body : proposal.rationale;
+    const subject =
+      typeof proposal.payload.subject === "string"
+        ? proposal.payload.subject
+        : "A quick check-in";
+    const body =
+      typeof proposal.payload.body === "string"
+        ? proposal.payload.body
+        : proposal.rationale;
     const sent = await sendGmailForUser({
       organizationId,
       userId: actorUserId,
@@ -650,19 +1051,40 @@ export async function executeBieProposal(
       type: "bie_email_sent",
       title: `BIE email sent: ${subject}`,
       body: body.slice(0, 300),
-      metadata: { channel: "email", to: contact.email, from: sent.senderEmail, provider: sent.provider, providerMessageId: sent.id, source: "bie.revenue_recovery" },
+      metadata: {
+        channel: "email",
+        to: contact.email,
+        from: sent.senderEmail,
+        provider: sent.provider,
+        providerMessageId: sent.id,
+        source: "bie.revenue_recovery",
+      },
     });
-    await recordAudit({ organizationId, actorUserId, action: "bie.email_sent", entityType: "bie_action_proposal", entityId: proposal.id, metadata: { leadId: lead.id, provider: sent.provider } });
-    return markAction(proposal.id, "executed", `Email sent through ${sent.provider}.`);
+    await recordAudit({
+      organizationId,
+      actorUserId,
+      action: "bie.email_sent",
+      entityType: "bie_action_proposal",
+      entityId: proposal.id,
+      metadata: { leadId: lead.id, provider: sent.provider },
+    });
+    return markAction(
+      proposal.id,
+      "executed",
+      `Accepted by ${sent.provider}; delivery and reply are not yet confirmed.`,
+    );
   } catch (error) {
-    return markAction(proposal.id, "failed", error instanceof Error ? error.message.slice(0, 500) : "Action failed.");
+    throw error; // Durable executor records uncertainty without an unsafe automatic retry.
   }
 }
 
 /** Execute all currently approved proposals allowed by the enabled org policy. */
-export async function runAutopilot(organizationId: string): Promise<BieActionProposal[]> {
+export async function runAutopilot(
+  organizationId: string,
+): Promise<BieActionProposal[]> {
   const policy = await getAutopilotPolicy(organizationId);
-  if (!policy.enabled || policy.pausedAt || policy.allowedActions.length === 0) return [];
+  if (!policy.enabled || policy.pausedAt || policy.allowedActions.length === 0)
+    return [];
   const approved = await db
     .select({ id: bieActionProposalsTable.id })
     .from(bieActionProposalsTable)

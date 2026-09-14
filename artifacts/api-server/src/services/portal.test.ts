@@ -41,10 +41,14 @@ let leadB: { id: string };
 const EMAIL_A = `portal-a-${Date.now()}@example.com`;
 const EMAIL_B = `portal-b-${Date.now()}@example.com`;
 
-async function insertCode(identifier: string, code: string, opts?: {
-  expiresAt?: Date;
-  attempts?: number;
-}) {
+async function insertCode(
+  identifier: string,
+  code: string,
+  opts?: {
+    expiresAt?: Date;
+    attempts?: number;
+  },
+) {
   const [row] = await db
     .insert(portalLoginCodesTable)
     .values({
@@ -146,7 +150,10 @@ describe("requestLoginCode throttle", () => {
       const ghost = `ghost-${Date.now()}@example.com`;
       for (let i = 0; i < 4; i++) {
         expect(
-          await requestLoginCode({ organizationId: org.id, rawIdentifier: ghost }),
+          await requestLoginCode({
+            organizationId: org.id,
+            rawIdentifier: ghost,
+          }),
         ).toEqual({ ok: true, channel: "email" });
       }
       expect(sendSpy).toHaveBeenCalledTimes(3);
@@ -179,6 +186,43 @@ describe("requestLoginCode throttle", () => {
 });
 
 describe("verifyLoginCode", () => {
+  it("mints only one session when the same code is submitted concurrently", async () => {
+    await insertCode(EMAIL_A, "908172");
+    const attempts = await Promise.all(
+      Array.from({ length: 3 }, () =>
+        verifyLoginCode({
+          organizationId: org.id,
+          rawIdentifier: EMAIL_A,
+          code: "908172",
+        }),
+      ),
+    );
+    expect(attempts.filter(Boolean)).toHaveLength(1);
+  });
+  it("counts concurrent incorrect attempts atomically and locks the code", async () => {
+    const row = await insertCode(EMAIL_A, "817263");
+    await Promise.all(
+      Array.from({ length: 6 }, () =>
+        verifyLoginCode({
+          organizationId: org.id,
+          rawIdentifier: EMAIL_A,
+          code: "000000",
+        }),
+      ),
+    );
+    const [saved] = await db
+      .select()
+      .from(portalLoginCodesTable)
+      .where(eq(portalLoginCodesTable.id, row.id));
+    expect(saved.attempts).toBe(5);
+    expect(
+      await verifyLoginCode({
+        organizationId: org.id,
+        rawIdentifier: EMAIL_A,
+        code: "817263",
+      }),
+    ).toBeNull();
+  });
   it("rejects a wrong code and counts the attempt", async () => {
     const row = await insertCode(EMAIL_A, "777777");
     const result = await verifyLoginCode({
@@ -270,7 +314,7 @@ describe("portal claim isolation", () => {
   }
 
   it("overview only includes the verified identifier's own claims", async () => {
-      const session = await sessionFor(EMAIL_A);
+    const session = await sessionFor(EMAIL_A);
     const overview = await getPortalOverview(session);
     const ids = overview.claims.map((c) => c.id);
     expect(ids).toContain(leadA.id);
@@ -308,7 +352,7 @@ describe("portal claim isolation", () => {
   });
 
   it("cannot message another contact's lead", async () => {
-      const session = await sessionFor(EMAIL_A);
+    const session = await sessionFor(EMAIL_A);
     expect(
       await postPortalMessage({
         session,
@@ -334,7 +378,11 @@ describe("portal claim isolation", () => {
     extraOrgIds.push(otherOrg.id);
     const [foreignContact] = await db
       .insert(contactsTable)
-      .values({ organizationId: otherOrg.id, firstName: "Alia", email: EMAIL_A })
+      .values({
+        organizationId: otherOrg.id,
+        firstName: "Alia",
+        email: EMAIL_A,
+      })
       .returning();
     const [foreignLead] = await db
       .insert(leadsTable)
@@ -342,7 +390,7 @@ describe("portal claim isolation", () => {
       .returning();
 
     // Session minted in org A: overview never includes the other org's lead.
-      const session = await sessionFor(EMAIL_A);
+    const session = await sessionFor(EMAIL_A);
     const overview = await getPortalOverview(session);
     expect(overview.claims.map((c) => c.id)).not.toContain(foreignLead.id);
 

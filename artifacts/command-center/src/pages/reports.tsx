@@ -6,6 +6,7 @@ import {
   type RoiBreakdownRow,
 } from '@workspace/api-client-react';
 import { BadgeDollarSign, Download, Loader2 } from 'lucide-react';
+import { ValueLedger } from '@/components/revenue-workspace';
 
 /**
  * ROI Report — what the platform captured, moved, and won, with HONEST
@@ -105,6 +106,7 @@ function ReportBody({ report }: { report: RoiReport }) {
   const { leads, appointments, responsiveness, outcomes, reviewsAndReferrals, reactivation } = report;
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl">
+      <ValueLedger />
       {/* Headline numbers */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Leads captured" value={String(leads.total)} testId="stat-leads" />

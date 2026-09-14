@@ -14,10 +14,15 @@ import {
   updateAutopilotPolicy,
 } from "../../services/bie";
 import type { BieActionType, BieAutopilotPolicy } from "@workspace/db";
+import { z } from "zod/v4";
 
 const router: IRouter = Router();
 
-const ACTION_TYPES: BieActionType[] = ["create_task", "change_stage", "send_email"];
+const ACTION_TYPES: BieActionType[] = [
+  "create_task",
+  "change_stage",
+  "send_email",
+];
 
 router.get(
   "/bie/briefing",
@@ -31,7 +36,12 @@ router.post(
   "/bie/briefing/run",
   requireMember("crm.read"),
   async (req: Request, res: Response): Promise<void> => {
-    res.json(await runRevenueRecoveryBriefing(req.member!.organizationId, req.member!.user.id));
+    res.json(
+      await runRevenueRecoveryBriefing(
+        req.member!.organizationId,
+        req.member!.user.id,
+      ),
+    );
   },
 );
 
@@ -55,7 +65,14 @@ router.post(
   "/bie/actions/generate",
   requireMember("crm.write"),
   async (req: Request, res: Response): Promise<void> => {
-    res.status(201).json(await generateBieProposals(req.member!.organizationId, req.member!.user.id));
+    res
+      .status(201)
+      .json(
+        await generateBieProposals(
+          req.member!.organizationId,
+          req.member!.user.id,
+        ),
+      );
   },
 );
 
@@ -64,14 +81,32 @@ for (const decision of ["approve", "reject"] as const) {
     `/bie/actions/:id/${decision}`,
     requireMember("crm.write"),
     async (req: Request, res: Response): Promise<void> => {
+      const input = z
+        .object({ expectedPayload: z.record(z.string(), z.unknown()) })
+        .strict()
+        .safeParse(req.body);
+      if (decision === "approve" && !input.success) {
+        res
+          .status(400)
+          .json({
+            error: "Refresh the proposal and approve the exact saved content.",
+          });
+        return;
+      }
       const result = await reviewBieProposal(
         req.member!.organizationId,
         String(req.params.id),
         req.member!.user.id,
         decision,
+        input.success ? input.data.expectedPayload : undefined,
       );
       if (!result) {
-        res.status(404).json({ error: "Action proposal was not found or is no longer awaiting review." });
+        res
+          .status(409)
+          .json({
+            error:
+              "Proposal changed, is unavailable, or was already reviewed. Refresh and review its current content.",
+          });
         return;
       }
       res.json(result);
@@ -89,7 +124,11 @@ router.post(
       req.member!.user.id,
     );
     if (!result) {
-      res.status(404).json({ error: "Action proposal was not found or has not been approved." });
+      res
+        .status(404)
+        .json({
+          error: "Action proposal was not found or has not been approved.",
+        });
       return;
     }
     res.json(result);
@@ -111,18 +150,29 @@ router.put(
     const body = req.body ?? {};
     const patch: Partial<BieAutopilotPolicy> = {};
     if (typeof body.enabled === "boolean") patch.enabled = body.enabled;
-    if (typeof body.dailyEmailCap === "number" && Number.isFinite(body.dailyEmailCap)) {
+    if (
+      typeof body.dailyEmailCap === "number" &&
+      Number.isFinite(body.dailyEmailCap)
+    ) {
       patch.dailyEmailCap = body.dailyEmailCap;
     }
     if (Array.isArray(body.allowedActions)) {
       patch.allowedActions = body.allowedActions.filter(
         (value: unknown): value is BieActionType =>
-          typeof value === "string" && ACTION_TYPES.includes(value as BieActionType),
+          typeof value === "string" &&
+          ACTION_TYPES.includes(value as BieActionType),
       );
     }
-    if (typeof body.pauseReason === "string") patch.pauseReason = body.pauseReason.slice(0, 500);
+    if (typeof body.pauseReason === "string")
+      patch.pauseReason = body.pauseReason.slice(0, 500);
     if (body.pauseReason === null) patch.pauseReason = null;
-    res.json(await updateAutopilotPolicy(req.member!.organizationId, req.member!.user.id, patch));
+    res.json(
+      await updateAutopilotPolicy(
+        req.member!.organizationId,
+        req.member!.user.id,
+        patch,
+      ),
+    );
   },
 );
 

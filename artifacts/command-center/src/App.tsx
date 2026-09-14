@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { Route, Switch, Router as WouterRouter, Link, Redirect } from 'wouter';
+import { Route, Switch, Router as WouterRouter, Link, Redirect, useRoute } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
 import { Shell } from '@/components/shell';
 import { AccessGate } from '@/components/access-gate';
@@ -33,6 +33,7 @@ import Capture from '@/pages/capture';
 import Onboarding from '@/pages/onboarding';
 import Platform from '@/pages/platform';
 import Bie from '@/pages/bie';
+import ProjectRoom from '@/pages/project-room';
 import EvidenceIntelligence from '@/pages/evidence-intelligence';
 import Account from '@/pages/account';
 import { CreateOrgScreen } from '@/components/create-org';
@@ -481,6 +482,8 @@ function IdentityActionScreen({ kind }: { kind: IdentityActionKind }) {
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
+  const [isProjectRoom, projectParams] = useRoute('/project-room/:workspace/:leadId');
+  if (isProjectRoom && projectParams) return <ProjectRoom key={`${projectParams.workspace}:${projectParams.leadId}`} workspace={projectParams.workspace} leadId={projectParams.leadId} />;
 
   if (isLoading) {
     return (

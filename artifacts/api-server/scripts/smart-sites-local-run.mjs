@@ -8,8 +8,10 @@ const apiRoot = path.resolve(
   "..",
 );
 const mode = process.argv[2];
-if (!["api", "test"].includes(mode))
-  throw new Error("Usage: node scripts/smart-sites-local-run.mjs api|test");
+if (!["api", "test", "schema"].includes(mode))
+  throw new Error(
+    "Usage: node scripts/smart-sites-local-run.mjs api|test|schema",
+  );
 const env = {};
 for (const key of [
   "PATH",
@@ -46,11 +48,30 @@ const tests = [
   "src/routes/v1/tenant-list-scoping.test.ts",
   "src/services/attribution.test.ts",
   "src/services/next-best-action.test.ts",
+  "src/services/bie.test.ts",
+  "src/services/durable-execution.test.ts",
+  "src/routes/v1/revenue-workspace.test.ts",
+  "src/services/automation.test.ts",
+  "src/services/automation-dnc.test.ts",
+  "src/services/portal.test.ts",
+  "src/routes/v1/portal-photos.test.ts",
+  "src/routes/v1/portal-photo-stream.test.ts",
+  "src/services/scheduler-stage-isolation.test.ts",
 ];
 const args =
   mode === "api"
     ? ["dist/index.mjs"]
-    : ["node_modules/vitest/vitest.mjs", "run", ...tests];
+    : mode === "schema"
+      ? [
+          path.resolve(
+            apiRoot,
+            "../../lib/db/node_modules/drizzle-kit/bin.cjs",
+          ),
+          "push",
+          "--config",
+          path.resolve(apiRoot, "../../lib/db/drizzle.config.ts"),
+        ]
+      : ["node_modules/vitest/vitest.mjs", "run", ...tests];
 const child = spawn(process.execPath, args, {
   cwd: apiRoot,
   env,

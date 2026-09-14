@@ -19,6 +19,7 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, lte, sql } from "drizzle-orm";
 import { recordAudit } from "./audit";
+import { runDurableAction } from "./durable-execution";
 import { isLegacyDefaultOrg } from "../lib/orgFlavor";
 import {
   applyStageBehaviorToLead,
@@ -938,34 +939,26 @@ async function processDueScheduledActions(organizationId?: string): Promise<void
     )
     .limit(20);
   for (const item of due) {
-    // Atomically CLAIM the row before executing: bump attempts guarded by a
-    // compare-and-set on (status='pending', attempts unchanged). A concurrent
-    // worker or overlapping tick loses the CAS and skips the row, so each
-    // scheduled send executes at most once — no double sends, no duplicate
-    // deferral re-queues, and frequency caps stay accurate.
-    const [claimed] = await db
-      .update(scheduledActionsTable)
-      .set({ attempts: item.attempts + 1 })
-      .where(
-        and(
-          eq(scheduledActionsTable.id, item.id),
-          eq(scheduledActionsTable.status, "pending"),
-          eq(scheduledActionsTable.attempts, item.attempts),
-        ),
-      )
-      .returning({ id: scheduledActionsTable.id });
-    if (!claimed) continue; // another worker took it
     try {
-      await executeAction(
-        item.organizationId,
-        item.action,
-        item.context as EventContext,
-        item.automationId ?? item.id,
-      );
+      const execution = await runDurableAction({
+        organizationId: item.organizationId, actionKey: `scheduled:${item.id}`,
+        kind: item.action.type, payload: { action: item.action, context: item.context },
+        execute: async () => {
+          // Re-read cancellation after acquiring exclusive durable ownership.
+          const [current] = await db.select().from(scheduledActionsTable).where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.organizationId, item.organizationId)));
+          if (!current || current.status !== "pending") return { state: "blocked", detail: "Scheduled action was cancelled or completed." };
+          await db.update(scheduledActionsTable).set({ attempts: item.attempts + 1 }).where(eq(scheduledActionsTable.id, item.id));
+          const result = await executeAction(item.organizationId, item.action, item.context as EventContext, item.automationId ?? item.id);
+          // A returned failure can follow an ambiguous provider response. Never auto-replay it.
+          if (result.status === "failed") throw new Error("Action result needs reconciliation");
+          return { state: result.status === "skipped" ? "blocked" : "succeeded", detail: result.status === "skipped" ? "The action's current eligibility check prevented execution." : "Scheduled action completed; inspect its activity record for provider evidence." };
+        },
+      });
+      if (execution.state === "processing") continue;
       await db
         .update(scheduledActionsTable)
-        .set({ status: "done" })
-        .where(eq(scheduledActionsTable.id, item.id));
+        .set({ status: execution.state === "indeterminate" ? "failed" : "done", lastError: execution.state === "indeterminate" ? "Indeterminate result: reconcile in Revenue Desk; automatic replay blocked." : null })
+        .where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.status, "pending")));
     } catch (err) {
       const attempts = item.attempts + 1;
       await db

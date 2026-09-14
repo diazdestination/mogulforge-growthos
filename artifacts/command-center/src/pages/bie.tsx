@@ -26,10 +26,11 @@ import {
 import { useGetMe, UserRole } from '@workspace/api-client-react';
 import { canManageSettings } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
+import { RevenueWorkspace } from '@/components/revenue-workspace';
 
 type SourceStatus = 'not_connected' | 'pending' | 'connected' | 'error';
 type ActionType = 'create_task' | 'change_stage' | 'send_email';
-type ActionStatus = 'proposed' | 'approved' | 'executed' | 'blocked' | 'rejected' | 'failed';
+type ActionStatus = 'proposed' | 'approved' | 'processing' | 'indeterminate' | 'executed' | 'blocked' | 'rejected' | 'failed';
 
 interface BieSource {
   id: string;
@@ -85,6 +86,7 @@ interface Proposal {
   title: string;
   rationale: string;
   evidence: Record<string, unknown>;
+  payload: Record<string, unknown>;
   estimatedValueCents: number | null;
   executionDetail: string | null;
   createdAt: string;
@@ -173,6 +175,8 @@ function StatusPill({ status }: { status: SourceStatus | ActionStatus }) {
     error: 'Needs attention',
     proposed: 'Needs review',
     approved: 'Approved',
+    processing: 'In progress',
+    indeterminate: 'Needs reconciliation',
     executed: 'Done',
     blocked: 'Blocked safely',
     rejected: 'Rejected',
@@ -330,7 +334,7 @@ export default function Bie() {
     onError: (err) => setError(err instanceof Error ? err.message : 'BIE could not build the action queue.'),
   });
   const actionMutation = useMutation({
-    mutationFn: ({ id, path }: { id: string; path: 'approve' | 'reject' | 'execute' }) => request<Proposal>(`/bie/actions/${id}/${path}`, { method: 'POST' }),
+    mutationFn: ({ id, path }: { id: string; path: 'approve' | 'reject' | 'execute' }) => request<Proposal>(`/bie/actions/${id}/${path}`, { method: 'POST', ...(path === 'approve' ? { body: JSON.stringify({ expectedPayload: actionsQuery.data?.find(p => p.id === id)?.payload }) } : {}) }),
     onSuccess: async () => {
       await refresh();
       setNotice('Action queue updated.');
@@ -425,16 +429,16 @@ export default function Bie() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-7">
       <section className="overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.12] via-card to-card p-5 md:p-7">
-        <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
+        <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-start">
           <div className="max-w-3xl">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1 text-xs font-semibold text-primary">
               <Sparkles className="h-3.5 w-3.5" /> MOGULFORGE BIE · GROWTHOS
             </div>
-            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Revenue Command</h1>
+            <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Revenue Desk</h1>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground md:text-base">{briefing.narrative}</p>
             <p className="mt-3 text-xs text-muted-foreground">Last calculated {new Date(briefing.generatedAt).toLocaleString()}. Pipeline value is not claimed revenue.</p>
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2 xl:max-w-sm xl:justify-end">
             <Link href="/evidence" className="inline-flex h-10 items-center gap-2 rounded-md border border-primary/30 bg-background px-4 text-sm font-semibold text-primary shadow-sm hover:bg-primary/5">
               <FileSearch2 className="h-4 w-4" /> Open Evidence Intelligence
             </Link>
@@ -455,6 +459,9 @@ export default function Bie() {
         </div>
       )}
 
+      <RevenueWorkspace />
+      <details className="space-y-5 rounded-xl border p-4">
+      <summary className="cursor-pointer text-sm font-semibold">Advanced BIE analysis, integrations & policy</summary>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={Target} label="Known lead value at risk" value={dollars(briefing.revenueAtRiskCents)} detail="Observed sums for qualifying CRM leads only." emphasis />
         <MetricCard icon={Activity} label="Recovery candidates" value={String(briefing.opportunityCount)} detail="Stalled estimates, claims, and dormant pipeline records." />
@@ -618,6 +625,7 @@ export default function Bie() {
       </section>
 
       <p className="pb-4 text-center text-xs text-muted-foreground">BIE does not train a shared model on tenant records. Product learning should use de-identified outcome evaluations with beta consent.</p>
+      </details>
     </div>
   );
 }
