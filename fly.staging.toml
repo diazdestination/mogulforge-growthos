@@ -9,7 +9,7 @@ primary_region = 'iad'
   dockerfile = 'Dockerfile'
 
 [deploy]
-  release_command = "sh -lc 'cd /app && pnpm --filter @workspace/db exec drizzle-kit push --force'"
+  release_command = "node /app/scripts/release-schema.mjs"
 
 [env]
   APP_ORIGIN = 'https://mogulforge-growthos-staging.fly.dev'
