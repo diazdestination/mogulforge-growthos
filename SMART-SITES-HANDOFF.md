@@ -2,6 +2,25 @@
 
 September 12, 2026. Implemented and locally verified; not a production release.
 
+## Latest checkpoint — consent-first acquisition measurement
+
+September 14, 2026. The next priority described below is now implemented and locally
+verified. Read **SMART-SITES-MEASUREMENT.md** and the Painless
+`design/acquisition-measurement-qa.md` first. Measurement is disabled by default, requires
+literal browser consent, keeps tenant/site secrets server-side, supports retention and
+browser erasure, and joins bounded first-party events only to real GrowthOS receipts and
+recorded outcomes. It does not collect files/transcripts/contact content or claim that a
+phone-link click is a call.
+
+Latest verification: 126 guarded backend + 219 UI + 46 Painless tests, builds/type checks,
+desktop/mobile rendered checks, empty browser consoles, and a passing loopback event-to-lead
+receipt. The isolated fixture contains three clearly labeled synthetic acquisition QA leads,
+zero real customers, appointments, estimates, wins, or won value. No production migration,
+push, deployment, provider, public-site, DNS, real-message, or spending action occurred.
+
+Next local priority: reusable evidence-backed organic service/location/project pages plus
+canonical/schema/sitemap and content-to-inquiry attribution. Avoid bulk doorway pages.
+
 ## Latest reliability checkpoint
 
 **Latest completed priority:** Client Launchpad and repeatable isolated draft onboarding are now

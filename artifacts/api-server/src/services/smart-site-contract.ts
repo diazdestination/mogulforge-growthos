@@ -57,6 +57,67 @@ const campaign = shortText(100).regex(
   /^[a-zA-Z0-9_. -]*$/,
   "Use a campaign label, not a URL or personal information",
 );
+export const SMART_SITE_EVENT_NAMES = [
+  "page_view",
+  "project_form_opened",
+  "project_form_started",
+  "damage_check_opened",
+  "damage_check_started",
+  "damage_check_details",
+  "voice_assistant_opened",
+  "voice_session_started",
+  "quiet_text_session_started",
+  "phone_link_clicked",
+  "project_gallery_opened",
+  "review_source_opened",
+] as const;
+
+const analyticsLabel = shortText(100).regex(/^[a-zA-Z0-9_. -]+$/);
+export const smartSiteAcquisitionBatchSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    consent: z.literal(true),
+    policyVersion: shortText(80).regex(/^[a-zA-Z0-9._-]+$/),
+    visitorId: z.uuid(),
+    sessionId: z.uuid(),
+    events: z
+      .array(
+        z
+          .object({
+            eventId: z.uuid(),
+            eventName: z.enum(SMART_SITE_EVENT_NAMES),
+            occurredAt: z.iso.datetime({ offset: true }),
+            path: shortText(200).regex(/^\/[a-zA-Z0-9/_-]*$/),
+            source: analyticsLabel.optional(),
+            medium: analyticsLabel.optional(),
+            campaign: analyticsLabel.optional(),
+            referrerHost: shortText(200)
+              .regex(/^[a-zA-Z0-9.-]+$/)
+              .optional(),
+            serviceCode: shortText(60)
+              .regex(/^[a-z0-9-]+$/)
+              .optional(),
+            surface: shortText(60)
+              .regex(/^[a-z0-9-]+$/)
+              .optional(),
+            step: shortText(60)
+              .regex(/^[a-z0-9-]+$/)
+              .optional(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(20),
+  })
+  .strict();
+
+export const smartSiteAnalyticsOptOutSchema = z
+  .object({ schemaVersion: z.literal(1), visitorId: z.uuid() })
+  .strict();
+
+export type SmartSiteAcquisitionBatch = z.infer<
+  typeof smartSiteAcquisitionBatchSchema
+>;
 export const smartSiteIntakeSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -113,6 +174,14 @@ export const smartSiteIntakeSchema = z
       })
       .strict()
       .optional(),
+    measurement: z
+      .object({
+        visitorId: z.uuid(),
+        sessionId: z.uuid().optional(),
+        policyVersion: shortText(80).regex(/^[a-zA-Z0-9._-]+$/),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -128,5 +197,6 @@ export function normalizeSmartSiteIntake(raw: unknown): SmartSiteIntake {
     },
     // Contact consent is not tracking consent. Never infer identity/behavior linkage.
     attribution: value.consent.analytics ? value.attribution : undefined,
+    measurement: value.consent.analytics ? value.measurement : undefined,
   };
 }

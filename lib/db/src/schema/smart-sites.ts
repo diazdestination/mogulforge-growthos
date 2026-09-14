@@ -39,6 +39,14 @@ export const smartSitesTable = pgTable(
     responseTargetMinutes: integer("response_target_minutes")
       .notNull()
       .default(60),
+    /** Off until an operator enables the consent-first site measurement contract. */
+    analyticsEnabled: boolean("analytics_enabled").notNull().default(false),
+    analyticsRetentionDays: integer("analytics_retention_days")
+      .notNull()
+      .default(90),
+    analyticsPolicyVersion: text("analytics_policy_version")
+      .notNull()
+      .default("smart-sites-analytics-v1"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

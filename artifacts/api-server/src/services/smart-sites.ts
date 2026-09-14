@@ -1,7 +1,8 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import {
   activitiesTable,
+  analyticsEventsTable,
   auditEventsTable,
   contactsTable,
   crmTasksTable,
@@ -13,6 +14,7 @@ import {
 } from "@workspace/db";
 import {
   SMART_SITE_PROFILES,
+  type SmartSiteAcquisitionBatch,
   type SmartSiteIntake,
 } from "./smart-site-contract";
 import { buildTouch, leadAttributionColumns } from "./attribution";
@@ -34,10 +36,51 @@ const publicFields = {
   source: smartSitesTable.source,
   isActive: smartSitesTable.isActive,
   responseTargetMinutes: smartSitesTable.responseTargetMinutes,
+  analyticsEnabled: smartSitesTable.analyticsEnabled,
+  analyticsRetentionDays: smartSitesTable.analyticsRetentionDays,
+  analyticsPolicyVersion: smartSitesTable.analyticsPolicyVersion,
   credentialIssuedAt: smartSitesTable.credentialIssuedAt,
   credentialVersion: smartSitesTable.credentialVersion,
   createdAt: smartSitesTable.createdAt,
 };
+
+export async function updateSmartSiteMeasurement(
+  organizationId: string,
+  actorUserId: string,
+  id: string,
+  input: { enabled: boolean; retentionDays: number },
+) {
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(smartSitesTable)
+      .set({
+        analyticsEnabled: input.enabled,
+        analyticsRetentionDays: input.retentionDays,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(smartSitesTable.organizationId, organizationId),
+          eq(smartSitesTable.id, id),
+        ),
+      )
+      .returning(publicFields);
+    if (!row) throw new SmartSiteError("site_not_found", 404);
+    await tx.insert(auditEventsTable).values({
+      organizationId,
+      actorUserId,
+      action: "smart_site.measurement_updated",
+      entityType: "smart_site",
+      entityId: id,
+      metadata: {
+        enabled: input.enabled,
+        retentionDays: input.retentionDays,
+        policyVersion: row.analyticsPolicyVersion,
+      },
+    });
+    return row;
+  });
+}
 
 export async function listSmartSites(organizationId: string) {
   return db
@@ -155,7 +198,11 @@ export async function rotateSmartSiteKey(
   });
 }
 
-export async function authenticateSmartSite(id: string, secret: string) {
+export async function authenticateSmartSite(
+  id: string,
+  secret: string,
+  options: { requireActive?: boolean } = {},
+) {
   if (!/^ss_[a-f0-9]{64}$/.test(secret))
     throw new SmartSiteError("invalid_site_credentials", 401);
   const [site] = await db
@@ -170,7 +217,8 @@ export async function authenticateSmartSite(id: string, secret: string) {
     )
   )
     throw new SmartSiteError("invalid_site_credentials", 401);
-  if (!site.isActive) throw new SmartSiteError("site_capture_disabled", 503);
+  if (options.requireActive !== false && !site.isActive)
+    throw new SmartSiteError("site_capture_disabled", 503);
   return site;
 }
 
@@ -200,6 +248,14 @@ export async function captureSmartSiteInquiry(
       .for("share");
     if (!currentSite?.isActive || currentSite.keyHash !== site.keyHash)
       throw new SmartSiteError("site_capture_disabled", 503);
+    const measurement = input.measurement;
+    if (measurement && !currentSite.analyticsEnabled)
+      throw new SmartSiteError("site_measurement_disabled", 503);
+    if (
+      measurement &&
+      measurement.policyVersion !== currentSite.analyticsPolicyVersion
+    )
+      throw new SmartSiteError("analytics_policy_version_mismatch", 409);
     const [receipt] = await tx
       .select()
       .from(smartSiteSubmissionsTable)
@@ -315,6 +371,7 @@ export async function captureSmartSiteInquiry(
           source: site.source,
           creationMethod: "smart-site",
           touch,
+          anonymousId: measurement?.visitorId,
         }),
       })
       .returning();
@@ -340,6 +397,55 @@ export async function captureSmartSiteInquiry(
         responseDueAt,
       })
       .returning();
+    if (measurement) {
+      await tx
+        .update(analyticsEventsTable)
+        .set({ leadId: lead.id })
+        .where(
+          and(
+            eq(analyticsEventsTable.organizationId, organizationId),
+            eq(analyticsEventsTable.smartSiteId, site.id),
+            eq(analyticsEventsTable.anonymousId, measurement.visitorId),
+          ),
+        );
+      await tx
+        .insert(analyticsEventsTable)
+        .values({
+          organizationId,
+          smartSiteId: site.id,
+          eventId: input.requestId,
+          schemaVersion: 1,
+          leadId: lead.id,
+          consentPolicyVersion: measurement.policyVersion,
+          payloadHash: hash(
+            JSON.stringify({
+              eventName: "lead_saved",
+              visitorId: measurement.visitorId,
+              requestId: input.requestId,
+            }),
+          ),
+          eventName: "lead_saved",
+          anonymousId: measurement.visitorId,
+          sessionId: measurement.sessionId ?? null,
+          path: a?.landingPath ?? null,
+          source: a?.source ?? null,
+          medium: a?.medium ?? null,
+          campaign: a?.campaign ?? null,
+          referrer: a?.referrerHost ?? null,
+          serviceCode: p.serviceCode,
+          surface: [
+            "roof-leak",
+            "storm-damage",
+            "water-damage",
+            "not-sure",
+          ].includes(p.serviceCode)
+            ? "damage-check"
+            : "project-inquiry",
+          step: "saved",
+          properties: { evidence: "growthos-receipt" },
+        })
+        .onConflictDoNothing();
+    }
     const inquiryBody = [
       p.summary,
       `Service: ${service[1]} · Timing: ${p.timing}`,
@@ -401,6 +507,397 @@ export async function captureSmartSiteInquiry(
       notification: "staff-inbox" as const,
     };
   });
+}
+
+const EVENT_BACKLOG_DAYS = 7;
+
+export function smartSiteMeasurementStatus(
+  site: typeof smartSitesTable.$inferSelect,
+) {
+  return {
+    ready: site.isActive && site.analyticsEnabled,
+    policyVersion: site.analyticsPolicyVersion,
+    retentionDays: site.analyticsRetentionDays,
+    contract: "consent-first-first-party-v1",
+  };
+}
+
+/** Store only allowlisted, pseudonymous events after explicit analytics consent. */
+export async function captureSmartSiteAcquisitionEvents(
+  site: typeof smartSitesTable.$inferSelect,
+  input: SmartSiteAcquisitionBatch,
+) {
+  if (!site.analyticsEnabled)
+    throw new SmartSiteError("site_measurement_disabled", 503);
+  if (input.policyVersion !== site.analyticsPolicyVersion)
+    throw new SmartSiteError("analytics_policy_version_mismatch", 409);
+  const profile = SMART_SITE_PROFILES.find((p) => p.id === site.profile);
+  const allowedServices = new Set(profile?.services.map((s) => s[0]) ?? []);
+  const now = Date.now();
+  const oldestAllowed = now - EVENT_BACKLOG_DAYS * 86_400_000;
+  for (const event of input.events) {
+    const occurredAt = Date.parse(event.occurredAt);
+    if (occurredAt < oldestAllowed || occurredAt > now + 300_000)
+      throw new SmartSiteError("event_time_out_of_range");
+    if (event.serviceCode && !allowedServices.has(event.serviceCode as never))
+      throw new SmartSiteError("service_not_allowed");
+  }
+  const retentionCutoff = new Date(
+    now - site.analyticsRetentionDays * 86_400_000,
+  );
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`smart-site-events:${site.id}`}, 0))`,
+    );
+    const [currentSite] = await tx
+      .select()
+      .from(smartSitesTable)
+      .where(eq(smartSitesTable.id, site.id))
+      .for("share");
+    if (!currentSite?.isActive || currentSite.keyHash !== site.keyHash)
+      throw new SmartSiteError("site_capture_disabled", 503);
+    if (!currentSite.analyticsEnabled)
+      throw new SmartSiteError("site_measurement_disabled", 503);
+    if (input.policyVersion !== currentSite.analyticsPolicyVersion)
+      throw new SmartSiteError("analytics_policy_version_mismatch", 409);
+
+    await tx
+      .delete(analyticsEventsTable)
+      .where(
+        and(
+          eq(analyticsEventsTable.smartSiteId, site.id),
+          lt(analyticsEventsTable.occurredAt, retentionCutoff),
+        ),
+      );
+    const ids = input.events.map((event) => event.eventId);
+    const existing = await tx
+      .select({
+        eventId: analyticsEventsTable.eventId,
+        payloadHash: analyticsEventsTable.payloadHash,
+      })
+      .from(analyticsEventsTable)
+      .where(
+        and(
+          eq(analyticsEventsTable.smartSiteId, site.id),
+          inArray(analyticsEventsTable.eventId, ids),
+        ),
+      );
+    const existingById = new Map(
+      existing.map((event) => [event.eventId, event.payloadHash]),
+    );
+    const eventHashes = new Map(
+      input.events.map((event) => [
+        event.eventId,
+        hash(
+          JSON.stringify({
+            schemaVersion: input.schemaVersion,
+            policyVersion: input.policyVersion,
+            visitorId: input.visitorId,
+            sessionId: input.sessionId,
+            event,
+          }),
+        ),
+      ]),
+    );
+    for (const event of input.events) {
+      const prior = existingById.get(event.eventId);
+      if (prior && prior !== eventHashes.get(event.eventId))
+        throw new SmartSiteError("idempotency_conflict", 409);
+    }
+    const [linked] = await tx
+      .select({ leadId: leadsTable.id })
+      .from(smartSiteSubmissionsTable)
+      .innerJoin(
+        leadsTable,
+        and(
+          eq(leadsTable.id, smartSiteSubmissionsTable.leadId),
+          eq(leadsTable.organizationId, site.organizationId),
+          eq(leadsTable.anonymousId, input.visitorId),
+        ),
+      )
+      .where(
+        and(
+          eq(smartSiteSubmissionsTable.organizationId, site.organizationId),
+          eq(smartSiteSubmissionsTable.siteId, site.id),
+        ),
+      )
+      .orderBy(desc(smartSiteSubmissionsTable.createdAt))
+      .limit(1);
+    const fresh = input.events.filter(
+      (event) => !existingById.has(event.eventId),
+    );
+    if (fresh.length) {
+      await tx.insert(analyticsEventsTable).values(
+        fresh.map((event) => ({
+          organizationId: site.organizationId,
+          smartSiteId: site.id,
+          eventId: event.eventId,
+          schemaVersion: input.schemaVersion,
+          leadId: linked?.leadId ?? null,
+          consentPolicyVersion: input.policyVersion,
+          payloadHash: eventHashes.get(event.eventId)!,
+          eventName: event.eventName,
+          anonymousId: input.visitorId,
+          sessionId: input.sessionId,
+          path: event.path,
+          referrer: event.referrerHost ?? null,
+          source: event.source ?? null,
+          medium: event.medium ?? null,
+          campaign: event.campaign ?? null,
+          serviceCode: event.serviceCode ?? null,
+          surface: event.surface ?? null,
+          step: event.step ?? null,
+          properties: { contract: "smart-sites-acquisition-v1" },
+          occurredAt: new Date(event.occurredAt),
+        })),
+      );
+    }
+    return {
+      accepted: fresh.length,
+      duplicates: existing.length,
+      contract: "consent-first-first-party-v1",
+    };
+  });
+}
+
+/** Remove this site's pseudonymous behavior history without deleting operational lead records. */
+export async function optOutSmartSiteVisitor(
+  site: typeof smartSitesTable.$inferSelect,
+  visitorId: string,
+) {
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`smart-site-opt-out:${site.id}:${visitorId}`}, 0))`,
+    );
+    const linkedLeads = await tx
+      .select({ id: leadsTable.id })
+      .from(smartSiteSubmissionsTable)
+      .innerJoin(
+        leadsTable,
+        and(
+          eq(leadsTable.id, smartSiteSubmissionsTable.leadId),
+          eq(leadsTable.organizationId, site.organizationId),
+          eq(leadsTable.anonymousId, visitorId),
+        ),
+      )
+      .where(
+        and(
+          eq(smartSiteSubmissionsTable.organizationId, site.organizationId),
+          eq(smartSiteSubmissionsTable.siteId, site.id),
+        ),
+      );
+    const removed = await tx
+      .delete(analyticsEventsTable)
+      .where(
+        and(
+          eq(analyticsEventsTable.organizationId, site.organizationId),
+          eq(analyticsEventsTable.smartSiteId, site.id),
+          eq(analyticsEventsTable.anonymousId, visitorId),
+        ),
+      )
+      .returning({ id: analyticsEventsTable.id });
+    if (linkedLeads.length) {
+      await tx
+        .update(leadsTable)
+        .set({ anonymousId: null, updatedAt: new Date() })
+        .where(
+          and(
+            eq(leadsTable.organizationId, site.organizationId),
+            inArray(
+              leadsTable.id,
+              linkedLeads.map((lead) => lead.id),
+            ),
+          ),
+        );
+    }
+    await tx.insert(auditEventsTable).values({
+      organizationId: site.organizationId,
+      action: "smart_site.analytics_opt_out",
+      entityType: "smart_site",
+      entityId: site.id,
+      metadata: {
+        removedEvents: removed.length,
+        unlinkedLeads: linkedLeads.length,
+        visitorIdentifierRetained: false,
+      },
+    });
+    return {
+      removedEvents: removed.length,
+      unlinkedLeads: linkedLeads.length,
+      operationalLeadRecordsPreserved: true,
+    };
+  });
+}
+
+const numberValue = (value: unknown) => Number(value ?? 0);
+
+export async function smartSiteAcquisitionOverview(
+  organizationId: string,
+  days: number,
+) {
+  const summaryResult = await db.execute(sql`
+    with scoped as (
+      select e.*
+      from analytics_events e
+      join smart_sites s on s.id = e.smart_site_id
+      where e.organization_id = ${organizationId}::uuid
+        and s.organization_id = ${organizationId}::uuid
+        and e.occurred_at >= now() - make_interval(days => least(${days}::int, s.analytics_retention_days))
+    ), linked as (
+      select distinct lead_id from scoped where lead_id is not null
+    )
+    select
+      (select count(distinct anonymous_id)::int from scoped) as visitors,
+      (select count(distinct session_id)::int from scoped) as sessions,
+      (select count(distinct anonymous_id)::int from scoped where event_name in ('project_form_started','damage_check_started','voice_session_started','quiet_text_session_started')) as started_visitors,
+      (select count(*)::int from scoped where event_name = 'phone_link_clicked') as phone_clicks,
+      (select count(distinct anonymous_id)::int from scoped where event_name in ('voice_session_started','quiet_text_session_started')) as voice_visitors,
+      (select count(*)::int from linked) as saved_leads,
+      (select count(*)::int from linked x join leads l on l.id = x.lead_id where l.status in ('ai_qualified','contact_attempted','inspection_scheduled','inspection_completed','estimate_preparing','estimate_sent','claim_pending','follow_up','won','production_scheduled','in_progress','final_walkthrough','completed','review_requested')) as qualified_leads,
+      (select count(*)::int from linked x where exists (select 1 from appointments a where a.organization_id = ${organizationId}::uuid and a.lead_id = x.lead_id and a.status <> 'cancelled')) as appointment_leads,
+      (select count(*)::int from linked x where exists (select 1 from estimates est where est.organization_id = ${organizationId}::uuid and est.lead_id = x.lead_id and est.status in ('sent','accepted'))) as estimate_leads,
+      (select count(*)::int from linked x join leads l on l.id = x.lead_id where l.won_at is not null) as won_leads,
+      (select coalesce(sum(l.won_revenue_cents),0)::float8 from linked x join leads l on l.id = x.lead_id where l.won_at is not null) as won_value_cents,
+      (select percentile_cont(0.5) within group (order by extract(epoch from (ss.first_attempt_at - ss.site_received_at)) / 60.0)
+        from linked x join smart_site_submissions ss on ss.lead_id = x.lead_id
+        where ss.organization_id = ${organizationId}::uuid and ss.first_attempt_at is not null and ss.site_received_at is not null) as median_minutes_to_staff_log
+  `);
+  const summary = summaryResult.rows[0] as Record<string, unknown>;
+  const eventResult = await db.execute(sql`
+    select e.event_name, count(*)::int as events, count(distinct e.anonymous_id)::int as visitors
+    from analytics_events e
+    join smart_sites s on s.id = e.smart_site_id
+    where e.organization_id = ${organizationId}::uuid
+      and s.organization_id = ${organizationId}::uuid
+      and e.occurred_at >= now() - make_interval(days => least(${days}::int, s.analytics_retention_days))
+    group by e.event_name order by events desc, e.event_name asc
+  `);
+  const sourceResult = await db.execute(sql`
+    with scoped as (
+      select e.*
+      from analytics_events e
+      join smart_sites s on s.id = e.smart_site_id
+      where e.organization_id = ${organizationId}::uuid
+        and s.organization_id = ${organizationId}::uuid
+        and e.occurred_at >= now() - make_interval(days => least(${days}::int, s.analytics_retention_days))
+        and e.anonymous_id is not null
+    ), visitor_source as (
+      select distinct e.smart_site_id, e.anonymous_id, e.source
+      from scoped e where nullif(e.source, '') is not null
+      union all
+      select distinct e.smart_site_id, e.anonymous_id, 'Direct / unknown'
+      from scoped e
+      where not exists (
+        select 1 from scoped x
+        where x.smart_site_id = e.smart_site_id
+          and x.anonymous_id = e.anonymous_id
+          and nullif(x.source, '') is not null
+      )
+    ), lead_source as (
+      select distinct smart_site_id, anonymous_id, lead_id,
+        coalesce(nullif(source, ''), 'Direct / unknown') as source
+      from scoped where event_name = 'lead_saved' and lead_id is not null
+    )
+    select vs.source,
+      count(distinct (vs.smart_site_id, vs.anonymous_id))::int as visitors,
+      count(distinct ls.lead_id)::int as saved_leads,
+      count(distinct ls.lead_id) filter (where l.won_at is not null)::int as won_leads
+    from visitor_source vs
+    left join lead_source ls on ls.smart_site_id = vs.smart_site_id
+      and ls.anonymous_id = vs.anonymous_id and ls.source = vs.source
+    left join leads l on l.id = ls.lead_id and l.organization_id = ${organizationId}::uuid
+    group by vs.source
+    order by saved_leads desc, visitors desc, source asc limit 12
+  `);
+  const serviceResult = await db.execute(sql`
+    with scoped as (
+      select e.*
+      from analytics_events e
+      join smart_sites s on s.id = e.smart_site_id
+      where e.organization_id = ${organizationId}::uuid
+        and s.organization_id = ${organizationId}::uuid
+        and e.occurred_at >= now() - make_interval(days => least(${days}::int, s.analytics_retention_days))
+        and e.anonymous_id is not null
+    ), visitor_service as (
+      select distinct e.smart_site_id, e.anonymous_id, e.service_code
+      from scoped e where nullif(e.service_code, '') is not null
+      union all
+      select distinct e.smart_site_id, e.anonymous_id, 'Not specified'
+      from scoped e
+      where not exists (
+        select 1 from scoped x
+        where x.smart_site_id = e.smart_site_id
+          and x.anonymous_id = e.anonymous_id
+          and nullif(x.service_code, '') is not null
+      )
+    ), lead_service as (
+      select distinct smart_site_id, anonymous_id, lead_id,
+        coalesce(nullif(service_code, ''), 'Not specified') as service_code
+      from scoped where event_name = 'lead_saved' and lead_id is not null
+    )
+    select vs.service_code,
+      count(distinct (vs.smart_site_id, vs.anonymous_id))::int as visitors,
+      count(distinct ls.lead_id)::int as saved_leads,
+      count(distinct ls.lead_id) filter (where l.won_at is not null)::int as won_leads
+    from visitor_service vs
+    left join lead_service ls on ls.smart_site_id = vs.smart_site_id
+      and ls.anonymous_id = vs.anonymous_id and ls.service_code = vs.service_code
+    left join leads l on l.id = ls.lead_id and l.organization_id = ${organizationId}::uuid
+    group by vs.service_code
+    order by saved_leads desc, visitors desc, service_code asc limit 12
+  `);
+  const sites = await db
+    .select(publicFields)
+    .from(smartSitesTable)
+    .where(eq(smartSitesTable.organizationId, organizationId))
+    .orderBy(desc(smartSitesTable.createdAt));
+  return {
+    scope: `Last ${days} days, capped by each site's retention policy`,
+    days,
+    summary: {
+      visitors: numberValue(summary.visitors),
+      sessions: numberValue(summary.sessions),
+      startedVisitors: numberValue(summary.started_visitors),
+      phoneClicks: numberValue(summary.phone_clicks),
+      voiceVisitors: numberValue(summary.voice_visitors),
+      savedLeads: numberValue(summary.saved_leads),
+      qualifiedLeads: numberValue(summary.qualified_leads),
+      appointmentLeads: numberValue(summary.appointment_leads),
+      estimateLeads: numberValue(summary.estimate_leads),
+      wonLeads: numberValue(summary.won_leads),
+      wonValueCents: numberValue(summary.won_value_cents),
+      medianMinutesToStaffLog:
+        summary.median_minutes_to_staff_log === null
+          ? null
+          : numberValue(summary.median_minutes_to_staff_log),
+    },
+    events: eventResult.rows.map((row) => ({
+      eventName: String(row.event_name),
+      events: numberValue(row.events),
+      visitors: numberValue(row.visitors),
+    })),
+    sources: sourceResult.rows.map((row) => ({
+      source: String(row.source),
+      visitors: numberValue(row.visitors),
+      savedLeads: numberValue(row.saved_leads),
+      wonLeads: numberValue(row.won_leads),
+    })),
+    services: serviceResult.rows.map((row) => ({
+      serviceCode: String(row.service_code),
+      visitors: numberValue(row.visitors),
+      savedLeads: numberValue(row.saved_leads),
+      wonLeads: numberValue(row.won_leads),
+    })),
+    sites,
+    measurement: {
+      visitors: "Distinct consented first-party browser identifiers, not people across devices",
+      savedLeads: "GrowthOS receipt-linked inquiries, not submit-button clicks",
+      phoneClicks: "Telephone-link clicks; not completed or answered calls",
+      medianResponse: "Median time to an explicit staff-recorded attempt; not provider delivery or reply",
+      wonValue: "Recorded won contract value; not collected cash, margin, ROI or profit",
+      excluded: "No raw URLs, contact details, files, transcripts, full user agents or cross-site advertising IDs",
+    },
+  };
 }
 
 export async function smartSiteOverview(organizationId: string) {

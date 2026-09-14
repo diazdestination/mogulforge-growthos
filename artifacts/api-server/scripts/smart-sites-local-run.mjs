@@ -40,6 +40,7 @@ const tests = [
   "src/routes/v1/onboarding-org.test.ts",
   "src/routes/v1/route-inventory.test.ts",
   "src/routes/v1/smart-sites.test.ts",
+  "src/routes/v1/smart-site-acquisition.test.ts",
   "src/routes/v1/capture.test.ts",
   "src/services/tenant-isolation.test.ts",
   "src/routes/v1/tenant-list-scoping.test.ts",

@@ -10,16 +10,23 @@ import { rateLimit } from "../../lib/rateLimit";
 import {
   SMART_SITE_PROFILES,
   normalizeSmartSiteIntake,
+  smartSiteAcquisitionBatchSchema,
+  smartSiteAnalyticsOptOutSchema,
 } from "../../services/smart-site-contract";
 import {
   authenticateSmartSite,
+  captureSmartSiteAcquisitionEvents,
   captureSmartSiteInquiry,
   createSmartSite,
   listSmartSites,
   rotateSmartSiteKey,
+  smartSiteAcquisitionOverview,
+  smartSiteMeasurementStatus,
   smartSiteOverview,
   SmartSiteError,
+  optOutSmartSiteVisitor,
   updateSmartSite,
+  updateSmartSiteMeasurement,
 } from "../../services/smart-sites";
 import {
   assignSmartSiteLead,
@@ -88,6 +95,18 @@ router.get(
     res.json(await smartSiteOverview(req.member!.organizationId));
   }),
 );
+router.get(
+  "/smart-sites/acquisition",
+  requireMember("crm.read"),
+  safe(async (req, res) => {
+    const days = z.coerce.number().int().min(1).max(365).default(30).parse(
+      req.query.days,
+    );
+    res.json(
+      await smartSiteAcquisitionOverview(req.member!.organizationId, days),
+    );
+  }),
+);
 router.post(
   "/smart-sites",
   requireMember("settings.manage"),
@@ -114,6 +133,27 @@ router.patch(
         req.member!.user.id,
         idSchema.parse(req.params.id),
         body.isActive,
+      ),
+    );
+  }),
+);
+router.patch(
+  "/smart-sites/:id/measurement",
+  requireMember("settings.manage"),
+  safe(async (req, res) => {
+    const body = z
+      .object({
+        enabled: z.boolean(),
+        retentionDays: z.number().int().min(30).max(365),
+      })
+      .strict()
+      .parse(req.body);
+    res.json(
+      await updateSmartSiteMeasurement(
+        req.member!.organizationId,
+        req.member!.user.id,
+        idSchema.parse(req.params.id),
+        body,
       ),
     );
   }),
@@ -165,6 +205,68 @@ router.post(
       receivedAt,
     );
     res.status(result.duplicate ? 200 : 201).json(result);
+  }),
+);
+
+router.get(
+  "/public/smart-sites/:id/acquisition-status",
+  rateLimit({ windowMs: 60_000, max: 60, key: "smart-site-acquisition-status" }),
+  safe(async (req, res) => {
+    if (req.headers.origin) {
+      res.status(403).json({ error: "server_to_server_only" });
+      return;
+    }
+    const site = await authenticateSmartSite(
+      idSchema.parse(req.params.id),
+      (req.header("authorization") ?? "").replace(/^Bearer /, ""),
+      { requireActive: false },
+    );
+    res.json(smartSiteMeasurementStatus(site));
+  }),
+);
+
+router.post(
+  "/public/smart-sites/:id/acquisition-events",
+  rateLimit({ windowMs: 60_000, max: 120, key: "smart-site-acquisition" }),
+  safe(async (req, res) => {
+    if (req.headers.origin) {
+      res.status(403).json({ error: "server_to_server_only" });
+      return;
+    }
+    if (Buffer.byteLength(JSON.stringify(req.body ?? {})) > 20_000) {
+      res.status(413).json({ error: "request_too_large" });
+      return;
+    }
+    const site = await authenticateSmartSite(
+      idSchema.parse(req.params.id),
+      (req.header("authorization") ?? "").replace(/^Bearer /, ""),
+    );
+    res
+      .status(202)
+      .json(
+        await captureSmartSiteAcquisitionEvents(
+          site,
+          smartSiteAcquisitionBatchSchema.parse(req.body),
+        ),
+      );
+  }),
+);
+
+router.post(
+  "/public/smart-sites/:id/analytics-opt-out",
+  rateLimit({ windowMs: 60_000, max: 30, key: "smart-site-analytics-opt-out" }),
+  safe(async (req, res) => {
+    if (req.headers.origin) {
+      res.status(403).json({ error: "server_to_server_only" });
+      return;
+    }
+    const site = await authenticateSmartSite(
+      idSchema.parse(req.params.id),
+      (req.header("authorization") ?? "").replace(/^Bearer /, ""),
+      { requireActive: false },
+    );
+    const input = smartSiteAnalyticsOptOutSchema.parse(req.body);
+    res.json(await optOutSmartSiteVisitor(site, input.visitorId));
   }),
 );
 

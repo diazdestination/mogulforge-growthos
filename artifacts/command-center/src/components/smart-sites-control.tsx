@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { SmartSiteFollowup, ResponseTarget } from './smart-site-followup';
+import { SmartSiteAcquisition } from './smart-site-acquisition';
 
 type Site = {
   id: string;
@@ -305,6 +306,10 @@ function SmartSitesWorkspace({
         organizationId={organizationId}
         userId={userId}
         canWrite={canWrite}
+      />
+      <SmartSiteAcquisition
+        organizationId={organizationId}
+        canManage={canManage}
       />
       <div className="grid gap-5 xl:grid-cols-2">
         <Card>

@@ -32,9 +32,37 @@ const site = {
   siteKey: 'test-smart-site',
   profile: 'roofing-exteriors',
   isActive: false,
+  analyticsEnabled: false,
+  analyticsRetentionDays: 90,
+  analyticsPolicyVersion: 'smart-sites-analytics-v1',
 };
 const secret = 'ss_' + 'a'.repeat(64); // Synthetic unit-test credential, never a provider key.
 const emptyOverview = { rows: [], recent: [] };
+const emptyAcquisition = {
+  scope: 'Last 30 days, capped by each site retention policy',
+  days: 30,
+  summary: {
+    visitors: 0,
+    sessions: 0,
+    startedVisitors: 0,
+    phoneClicks: 0,
+    voiceVisitors: 0,
+    savedLeads: 0,
+    qualifiedLeads: 0,
+    appointmentLeads: 0,
+    estimateLeads: 0,
+    wonLeads: 0,
+    wonValueCents: 0,
+    medianMinutesToStaffLog: null,
+  },
+  events: [],
+  sources: [],
+  services: [],
+  sites: [site],
+  measurement: {
+    phoneClicks: 'Telephone-link clicks; not completed or answered calls',
+  },
+};
 const response = (v: unknown, status = 200) =>
   new Response(JSON.stringify(v), {
     status,
@@ -51,6 +79,8 @@ function setup(
       if (path.endsWith('/smart-sites/profiles')) return response(profiles);
       if (path.endsWith('/smart-sites/overview'))
         return response(emptyOverview);
+      if (path.includes('/smart-sites/acquisition'))
+        return response(emptyAcquisition);
       if (path.endsWith('/smart-sites/follow-up'))
         return response({
           serverNow: new Date().toISOString(),
@@ -120,7 +150,7 @@ describe('Smart Sites operator controls', () => {
   it('lets a viewer read inquiries without provisioning, activation or key controls', async () => {
     setup('viewer');
     renderWithQuery(<SmartSitesControl />);
-    await screen.findByText('Test Smart Site');
+    await screen.findAllByText('Test Smart Site');
     expect(
       screen.queryByRole('button', { name: 'Create draft connection' }),
     ).toBeNull();
@@ -131,14 +161,17 @@ describe('Smart Sites operator controls', () => {
   });
   it('shows unknown rather than invented zero metrics when reporting is unavailable', async () => {
     setup('owner', (_m, p) =>
-      p.endsWith('/overview')
+      p.endsWith('/overview') || p.includes('/smart-sites/acquisition')
         ? response({ error: 'Reporting unavailable' }, 503)
         : undefined,
     );
     renderWithQuery(<SmartSitesControl />);
-    await screen.findByRole('alert');
-    expect(screen.getAllByText('—')).toHaveLength(4);
-    expect(screen.queryByText('$0')).toBeNull();
+    await screen.findAllByRole('alert');
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(4);
+    const acquisition = screen
+      .getByText('From attention to actual outcomes')
+      .closest('div.rounded-xl');
+    expect(acquisition?.textContent).not.toContain('$0');
   });
   it('links authoritative lead records and labels won value separately from cash', async () => {
     setup('owner', (_m, p) =>
@@ -178,8 +211,8 @@ describe('Smart Sites operator controls', () => {
     );
     renderWithQuery(<SmartSitesControl />);
     await screen.findByText(/Reporting returned an unexpected response/);
-    expect(screen.getAllByText('—')).toHaveLength(4);
-    expect(screen.getByText('Test Smart Site')).toBeTruthy();
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(4);
+    expect(screen.getAllByText('Test Smart Site')).toHaveLength(2);
   });
   it('discards a revealed key when the authenticated organization changes', async () => {
     setup();
@@ -225,5 +258,60 @@ describe('Smart Sites operator controls', () => {
         .getByText('Advanced: existing forms & developer APIs')
         .closest('details')?.open,
     ).toBe(false);
+  });
+  it('shows consented acquisition stages and requires an operator action to enable site measurement', async () => {
+    const measuredSite = {
+      ...site,
+      isActive: true,
+      analyticsEnabled: false,
+      analyticsRetentionDays: 30,
+    };
+    const calls = setup('owner', (method, path) => {
+      if (path.includes('/smart-sites/acquisition'))
+        return response({
+          ...emptyAcquisition,
+          summary: {
+            ...emptyAcquisition.summary,
+            visitors: 12,
+            startedVisitors: 8,
+            phoneClicks: 3,
+            voiceVisitors: 2,
+            savedLeads: 4,
+            appointmentLeads: 2,
+            estimateLeads: 1,
+            wonLeads: 1,
+            wonValueCents: 850000,
+          },
+          sources: [
+            { source: 'google', visitors: 10, savedLeads: 4, wonLeads: 1 },
+          ],
+          services: [
+            { serviceCode: 'siding', visitors: 5, savedLeads: 2, wonLeads: 1 },
+          ],
+          sites: [measuredSite],
+        });
+      if (path.endsWith(`/smart-sites/${site.id}/measurement`) && method === 'PATCH')
+        return response({ ...measuredSite, analyticsEnabled: true });
+      if (path.endsWith('/smart-sites') && method === 'GET')
+        return response([measuredSite]);
+      return undefined;
+    });
+    renderWithQuery(<SmartSitesControl />);
+    await screen.findByText('From attention to actual outcomes');
+    expect(await screen.findByText('$8,500')).toBeTruthy();
+    expect(screen.getByText('3 phone-link clicks')).toBeTruthy();
+    expect(screen.getByText('google')).toBeTruthy();
+    expect(screen.getAllByText('Siding')).toHaveLength(2);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Enable consented measurement' }),
+    );
+    await waitFor(() =>
+      expect(
+        calls.mock.calls.some(([, init]) => {
+          const body = init?.body ? JSON.parse(String(init.body)) : null;
+          return body?.enabled === true && body?.retentionDays === 30;
+        }),
+      ).toBe(true),
+    );
   });
 });
