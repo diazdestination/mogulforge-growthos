@@ -1,5 +1,13 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## Paid-Beta P0 Release Directive
+
+Before any new product implementation, read and follow `PAID-BETA-READINESS-P0.md`.
+
+That document is the current highest-priority execution order and temporarily supersedes lower-priority roadmap work where priorities conflict. The feature freeze remains in effect until the paid-beta P0 gates are satisfied. Start with **P0-1: restore a completely green release gate**. Do not move to a later gate merely because a feature is locally demonstrable.
+
+Production deployment, provider activation, DNS changes, spending, real customer contact, or other externally consequential mutations still require the applicable explicit authorization.
+
 ## Mission
 
 Build GrowthOS into the vertical AI business operating system for service businesses. GrowthOS is the platform; the Business Intelligence Ecosystem (BIE) is its intelligence and orchestration layer; CRM is one module inside the system—not the product.
