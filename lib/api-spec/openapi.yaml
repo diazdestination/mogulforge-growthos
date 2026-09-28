@@ -5693,7 +5693,7 @@ components:
       properties:
         provider:
           type: string
-          enum: [twilio, mock]
+          enum: [twilio, mock, disabled]
         senderPhoneNumber:
           type: string
           nullable: true

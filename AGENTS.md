@@ -154,7 +154,7 @@ A feature is complete only when it includes:
 
 ## Team Alignment
 
-- **Adam Diaz — Founder:** Product vision, commercial priorities, final strategic decisions
+- **Adam Mach — Founder:** Product vision, commercial priorities, final strategic decisions. Legal name supplied by the owner on September 27, 2026; it supersedes older Adam Diaz references. Entity formation and EIN remain unverified.
 - **Gavin — Head of Sales:** Market feedback, sales process, pipeline requirements, customer objections, revenue proof
 - **Taylor — Co-Head of Operations and Technology Development:** Delivery operations, technical execution, platform reliability, implementation standards
 - **Codex:** Principal product-and-engineering operator responsible for translating strategy into scoped, tested, secure, observable work while protecting the roadmap from distraction

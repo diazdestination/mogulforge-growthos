@@ -1145,6 +1145,7 @@ async function sendBookingConfirmation(
     providerResult = await providers.sms.send(
       to,
       `${businessName}: your inspection is confirmed for ${windowLabel} at ${address}. ${reschedule}`,
+      { organizationId, contactId: state.contactId!, purpose: 'appointments', idempotencyKey: `appointment:${state.appointmentId}:confirmation` },
     );
   } else if (emailOk) {
     channel = "email";

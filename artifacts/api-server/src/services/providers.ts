@@ -1,8 +1,8 @@
+import { twilioConfiguration, type SmsSendContext } from './twilio-controls';
 /**
  * Provider adapters. Mocks are clearly labeled and used only when real
- * credentials are absent. Real providers (Gmail via Replit connector,
- * Twilio for SMS, Resend for email) activate automatically when their
- * secrets/connections are present.
+ * credentials are absent in local development. Production SMS requires the
+ * Twilio launch, registration, consent, routing and usage gates as well as keys.
  */
 
 export interface AiProvider {
@@ -26,7 +26,7 @@ export interface AiProvider {
 }
 
 export interface SmsProvider {
-  send(to: string, body: string): Promise<{ id: string; provider: string }>;
+  send(to: string, body: string, context?: SmsSendContext): Promise<{ id: string; provider: string }>;
 }
 
 export interface EmailProvider {
@@ -138,36 +138,9 @@ export const mockEmailProvider: EmailProvider = {
  * silently pretending a message was delivered.
  */
 export const twilioSmsProvider: SmsProvider = {
-  async send(to, body) {
-    const sid = process.env.TWILIO_ACCOUNT_SID;
-    const token = process.env.TWILIO_AUTH_TOKEN;
-    const from = process.env.TWILIO_PHONE_NUMBER;
-    if (!sid || !token || !from) {
-      throw new Error(
-        "Twilio is not configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_PHONE_NUMBER)",
-      );
-    }
-    const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/x-www-form-urlencoded",
-          authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`,
-        },
-        body: new URLSearchParams({
-          To: to,
-          From: from,
-          Body: body,
-        }).toString(),
-      },
-    );
-    if (!res.ok) {
-      throw new Error(`Twilio send failed: ${res.status} ${await res.text()}`);
-    }
-    const data = (await res.json()) as { sid?: string };
-    if (!data.sid) throw new Error("Twilio returned no message SID");
-    return { id: data.sid, provider: "twilio" };
+  async send(to, body, context) {
+    const { sendTwilioSms } = await import('./twilio-delivery');
+    return sendTwilioSms(to, body, context);
   },
 };
 /**
@@ -274,26 +247,20 @@ export async function getEmailProviderStatus(): Promise<{
  * can tell whether customers actually receive texts or sends only hit the
  * dev mock. Checked at call-time so env changes are always reflected.
  */
-export function getSmsProviderStatus(): {
-  provider: "twilio" | "mock";
+export function getSmsProviderStatus(organizationId?: string): {
+  provider: "twilio" | "mock" | "disabled";
   senderPhoneNumber: string | null;
 } {
-  if (isTwilioConfigured()) {
+  if (isTwilioConfigured() && organizationId === twilioConfiguration().organizationId) {
     return {
       provider: "twilio",
       senderPhoneNumber: process.env.TWILIO_PHONE_NUMBER ?? null,
     };
   }
-  return { provider: "mock", senderPhoneNumber: null };
+  return { provider: process.env.NODE_ENV === 'production' || Boolean(process.env.TWILIO_ACCOUNT_SID) ? 'disabled' : 'mock', senderPhoneNumber: null };
 }
 
-export function isTwilioConfigured(): boolean {
-  return Boolean(
-    process.env.TWILIO_ACCOUNT_SID &&
-    process.env.TWILIO_AUTH_TOKEN &&
-    process.env.TWILIO_PHONE_NUMBER,
-  );
-}
+export function isTwilioConfigured(): boolean { return twilioConfiguration().enabled; }
 
 export function isGmailConfigured(): boolean {
   return Boolean(
@@ -596,7 +563,7 @@ export const providers = {
   // OpenAI provider with an explicit fallback.
   ai: mockAiProvider,
   // Twilio activates automatically when its three secrets are set; mock otherwise.
-  sms: twilioConfigured ? twilioSmsProvider : mockSmsProvider,
+  sms: twilioConfigured || process.env.NODE_ENV === "production" || Boolean(process.env.TWILIO_ACCOUNT_SID) ? twilioSmsProvider : mockSmsProvider,
   // Runtime-adaptive: tries Gmail connector → Resend; mock is local/test only.
   email: adaptiveEmailProvider,
   weather: mockWeatherProvider,

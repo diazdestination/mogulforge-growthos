@@ -12,6 +12,7 @@ export * from "./crm-tasks";
 export * from "./appointments";
 export * from "./activities";
 export * from "./consent";
+export * from "./twilio";
 export * from "./conversations";
 export * from "./analytics";
 export * from "./audit";

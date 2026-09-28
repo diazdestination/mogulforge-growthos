@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>MogulForge · Text preferences</title>
+    <link rel="stylesheet" href="/messaging.css" />
+    <script src="/sms-preferences.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <a class="brand" href="/">MOGULFORGE / GROWTHOS</a>
+      <h1>Choose the texts<br />that help you.</h1>
+      <p>
+        Optional text preferences for MogulForge’s own customers. Use the mobile
+        number already attached to your customer record.
+      </p>
+      <p class="notice" id="availability" role="status">
+        Checking whether text enrollment is available…
+      </p>
+      <form id="preferences" class="card">
+        <label
+          >Your own US mobile number<input
+            type="tel"
+            name="phone"
+            autocomplete="tel"
+            placeholder="+1 202 555 0101"
+            required /></label
+        ><label
+          ><input type="checkbox" name="customerCare" />I agree to receive
+          MogulForge customer-care texts about my requests and ongoing support
+          conversations. Message frequency varies with my requests.</label
+        ><label
+          ><input type="checkbox" name="appointments" />I agree to receive
+          MogulForge appointment confirmations and reminders for appointments I
+          book. Message frequency varies with my appointments.</label
+        ><label
+          ><input type="checkbox" name="ownPhone" required />This is my own
+          phone number and I am choosing these preferences for myself.</label
+        >
+        <p class="small">
+          Message and data rates may apply. Reply STOP to opt out or HELP for
+          help. Consent is optional and is not a condition of purchase. These
+          choices do not include promotions or messages from client businesses.
+          <a href="/messaging-terms.html">Messaging terms</a> ·
+          <a href="/messaging-privacy.html">Messaging privacy</a>
+        </p>
+        <button id="submit" type="submit" disabled>
+          Get my confirmation code
+        </button>
+        <p id="result" role="status"></p>
+      </form>
+      <p>
+        Submitting this form alone does not start messages. When enrollment is
+        open, confirm from your own phone by sending the one-time JOIN
+        instruction shown here to the MogulForge number. If you previously sent
+        STOP, send START first, then confirm fresh preferences. Codes expire
+        after 24 hours.
+      </p>
+      <p>
+        To stop texts immediately, reply STOP. Clearing both purpose boxes and
+        confirming the new selection also withdraws both preferences.
+      </p>
+      <footer>
+        <p>
+          Questions: <a href="mailto:Adam@mogulforge.ai">Adam@mogulforge.ai</a>
+        </p>
+        <nav>
+          <a href="/messaging-privacy.html">Messaging privacy</a
+          ><a href="/messaging-terms.html">Messaging terms</a
+          ><a href="/">Back to GrowthOS</a>
+        </nav>
+      </footer>
+    </main>
+  </body>
+</html>

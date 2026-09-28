@@ -12,4 +12,5 @@ export type SmsProviderStatusProvider = typeof SmsProviderStatusProvider[keyof t
 export const SmsProviderStatusProvider = {
   twilio: 'twilio',
   mock: 'mock',
+  disabled: 'disabled',
 } as const;

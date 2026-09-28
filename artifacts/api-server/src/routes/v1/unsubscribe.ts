@@ -5,20 +5,16 @@ import {
   leadsTable,
   playbookEnrollmentsTable,
 } from "@workspace/db";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
-import { createHmac } from "node:crypto";
-
 import { rateLimit } from "../../lib/rateLimit";
 import { recordAudit } from "../../services/audit";
 import { recordContactOptOut } from "../../services/delivery-events";
 import { stopEnrollmentsForLead } from "../../services/playbooks";
 import {
   addSuppression,
-  normalizePhone,
   parseUnsubscribeToken,
   publicBaseUrl,
-  removeSuppression,
 } from "../../services/send-gate";
 
 /**
@@ -26,8 +22,7 @@ import {
  *
  * - GET  /public/unsubscribe/:token  → confirmation landing page
  * - POST /public/unsubscribe/:token  → records the email unsubscribe
- * - POST /public/sms/inbound         → Twilio inbound webhook: STOP keywords
- *                                      suppress the number, START re-enables
+ * SMS consent and signature-validated opt-out routing live in twilio.ts.
  *
  * The unsubscribe token is an HMAC over (org, contact) — unguessable, no DB
  * state, and safe to expose in every outbound email footer.
@@ -123,158 +118,6 @@ router.post(
     );
   },
 );
-
-/** STOP keywords per CTIA guidance; START/UNSTOP re-enables. */
-const STOP_WORDS = new Set(["stop", "stopall", "unsubscribe", "cancel", "end", "quit"]);
-const START_WORDS = new Set(["start", "unstop", "yes"]);
-
-/** Twilio request-signature check (HMAC-SHA1 of URL + sorted form params). */
-export function twilioSignatureValid(req: Request): boolean {
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  if (!token) return true; // dev / mock provider: nothing to validate against
-  const signature = req.headers["x-twilio-signature"];
-  if (typeof signature !== "string") return false;
-  const url = `${publicBaseUrl()}${req.originalUrl}`;
-  const params = req.body as Record<string, string>;
-  const data =
-    url +
-    Object.keys(params)
-      .sort()
-      .map((k) => k + params[k])
-      .join("");
-  const expected = createHmac("sha1", token).update(data, "utf8").digest("base64");
-  return signature === expected;
-}
-
-router.post(
-  "/public/sms/inbound",
-  rateLimit({ windowMs: 60_000, max: 60, key: "sms-inbound" }),
-  async (req: Request, res: Response): Promise<void> => {
-    if (!twilioSignatureValid(req)) {
-      res.status(403).json({ error: "invalid signature" });
-      return;
-    }
-    const from = typeof req.body?.From === "string" ? req.body.From : "";
-    const body = typeof req.body?.Body === "string" ? req.body.Body : "";
-    const keyword = body.trim().toLowerCase();
-    const normalized = normalizePhone(from);
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`;
-    res.setHeader("Content-Type", "text/xml");
-
-    if (normalized.length < 10 || (!STOP_WORDS.has(keyword) && !START_WORDS.has(keyword))) {
-      res.status(200).send(twiml);
-      return;
-    }
-
-    // One Twilio number serves every org, so apply the keyword to each org
-    // that has a contact with this phone number (matched on last 10 digits).
-    const last10 = normalized.slice(-10);
-    const matches = await db
-      .select({
-        id: contactsTable.id,
-        organizationId: contactsTable.organizationId,
-        phone: contactsTable.phone,
-      })
-      .from(contactsTable)
-      .where(
-        sql`regexp_replace(coalesce(${contactsTable.phone}, ''), '\\D', '', 'g') LIKE ${"%" + last10}`,
-      );
-
-    const seenOrgs = new Set<string>();
-    // START: suppression rows are org-scoped, so remember the per-org lift
-    // result — every matched contact in a lifted org must be re-enabled,
-    // not just the first one that happened to remove the row.
-    const orgLifted = new Map<string, boolean>();
-    for (const contact of matches) {
-      if (STOP_WORDS.has(keyword)) {
-        if (!seenOrgs.has(contact.organizationId)) {
-          seenOrgs.add(contact.organizationId);
-          await addSuppression({
-            organizationId: contact.organizationId,
-            channel: "sms",
-            value: from,
-            reason: "stop_keyword",
-            source: "twilio_inbound",
-            detail: keyword,
-          });
-        }
-        // Per-channel DNC flag + touch delivery + timeline entry.
-        await recordContactOptOut({
-          organizationId: contact.organizationId,
-          contactId: contact.id,
-          channel: "sms",
-          source: "twilio_inbound",
-        });
-        await db.insert(consentRecordsTable).values({
-          organizationId: contact.organizationId,
-          contactId: contact.id,
-          channel: "sms",
-          granted: false,
-          disclosureVersion: "sms-stop-v1",
-        });
-        await stopContactEnrollments(
-          contact.organizationId,
-          contact.id,
-          "recipient texted STOP",
-        );
-        await recordAudit({
-          organizationId: contact.organizationId,
-          action: "send.sms_stop",
-          entityType: "contact",
-          entityId: contact.id,
-          metadata: { keyword },
-        });
-      } else {
-        // START/UNSTOP: only lift a suppression the STOP flow created —
-        // an unauthenticated START can't undo an unsubscribe-link or
-        // bounce suppression.
-        let removed = orgLifted.get(contact.organizationId);
-        if (removed === undefined) {
-          removed = await removeSuppressionIfStopKeyword(
-            contact.organizationId,
-            from,
-          );
-          orgLifted.set(contact.organizationId, removed);
-        }
-        if (removed) {
-          // The STOP flow set the per-channel DNC flag; START must clear it
-          // or the send gate keeps blocking SMS forever.
-          await db
-            .update(contactsTable)
-            .set({ doNotContactSms: false })
-            .where(eq(contactsTable.id, contact.id));
-          await db.insert(consentRecordsTable).values({
-            organizationId: contact.organizationId,
-            contactId: contact.id,
-            channel: "sms",
-            granted: true,
-            disclosureVersion: "sms-start-v1",
-          });
-          await recordAudit({
-            organizationId: contact.organizationId,
-            action: "send.sms_start",
-            entityType: "contact",
-            entityId: contact.id,
-            metadata: { keyword },
-          });
-        }
-      }
-    }
-
-    res.status(200).send(twiml);
-  },
-);
-
-/** Remove an SMS suppression only if it came from a STOP keyword. */
-async function removeSuppressionIfStopKeyword(
-  organizationId: string,
-  rawPhone: string,
-): Promise<boolean> {
-  const { getSuppression } = await import("../../services/send-gate");
-  const existing = await getSuppression(organizationId, "sms", rawPhone);
-  if (!existing || existing.reason !== "stop_keyword") return false;
-  return removeSuppression(organizationId, "sms", rawPhone);
-}
 
 /** Stop every live enrollment on every lead belonging to the contact. */
 async function stopContactEnrollments(

@@ -2806,7 +2806,7 @@ export const GetEmailProviderStatusResponse = zod.object({
  * @summary Active outbound SMS provider and sending phone number
  */
 export const GetSmsProviderStatusResponse = zod.object({
-  "provider": zod.enum(['twilio', 'mock']),
+  "provider": zod.enum(['twilio', 'mock', 'disabled']),
   "senderPhoneNumber": zod.string().nullish().describe('Phone number texts are sent from (Twilio number when provider is twilio, null for mock).')
 })
 

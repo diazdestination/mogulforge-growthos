@@ -729,6 +729,7 @@ export async function executePlaybookStep(
         sendResult = await providers.sms.send(
           contact.phone!,
           draft.body + linkSuffix,
+          { organizationId, contactId: contact.id, purpose: 'marketing', idempotencyKey: `playbook:${enrollment.id}:${stepIndex}` },
         );
       }
     } catch (err) {

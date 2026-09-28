@@ -1,3 +1,5 @@
+import { SmsDesk } from '@/components/sms-desk';
+import { VoiceDesk } from '@/components/voice-desk';
 import { useEffect, useRef, useState } from 'react';
 import {
   useGetMe,
@@ -748,11 +750,13 @@ function AutomationsTab() {
               .
             </>
           )}
-          {smsProvider.provider === 'mock' && (
-            <>No real SMS provider is connected — automation texts are only logged, not delivered. Set the Twilio credentials to send real texts.</>
-          )}
+          {smsProvider.provider === 'mock' && <p>Local SMS simulation is active. No texts are delivered.</p>}
+          {smsProvider.provider === 'disabled' && <p>SMS delivery is disabled. This organization needs its own approved sender, verified consent and an authorized usage limit.</p>}
+          <p className="mt-2"><a className="underline" href="/sms-preferences.html" target="_blank" rel="noreferrer">MogulForge text preferences</a> · <a className="underline" href="/messaging-terms.html" target="_blank" rel="noreferrer">Messaging terms</a></p>
         </div>
       )}
+      <SmsDesk />
+      <VoiceDesk />
       <Card>
         <CardHeader>
           <CardTitle>New automation</CardTitle>

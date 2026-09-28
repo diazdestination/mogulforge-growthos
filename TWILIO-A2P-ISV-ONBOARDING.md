@@ -1,8 +1,8 @@
-# Twilio A2P 10DLC — MogulForge ISV + Painless Pilot Registration Packet
+# Historical Twilio ISV onboarding reference — not a submission packet
 
-**Status:** PREPARED — external Twilio Console submission still required  
+**Status:** SUPERSEDED for this rollout by [TWILIO-IMPLEMENTATION.md](TWILIO-IMPLEMENTATION.md) and [TWILIO-REGISTRATION-DRAFT.md](TWILIO-REGISTRATION-DRAFT.md). Do not submit this historical draft.
 **Architecture:** ISV Type #1 — one Twilio subaccount + Messaging Service per contractor customer  
-**First customer:** Painless Roofing and Water Restoration, LLC  
+**Prospective demo only:** Painless Roofing & Water Restoration. Its exact legal name, entity type and authority to send are unverified; registration and communications are not authorized. Any older business claims below are unverified historical draft text.
 **GrowthOS branch:** `agent/mogulforge-growthos-recovery`
 
 ## 1. Architecture decision

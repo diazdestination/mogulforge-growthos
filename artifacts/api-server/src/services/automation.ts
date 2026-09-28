@@ -353,7 +353,7 @@ async function executeAction(
                 rendered.subject ?? `${await getBusinessName(organizationId)} update`,
                 rendered.body + unsubscribeFooter(organizationId, contact.id),
               )
-            : await providers.sms.send(contact.phone!, rendered.body);
+            : await providers.sms.send(contact.phone!, rendered.body, { organizationId, contactId: contact.id, purpose: 'marketing', idempotencyKey: `automation:${automationId}:${context.leadId ?? contact.id}:${JSON.stringify(action.params)}` });
       } catch (err) {
         // Permanently bad address → suppress so nothing retries it.
         const suppressed = await handleProviderFailure({
@@ -721,7 +721,7 @@ async function executeAction(
       const res =
         channel === "email"
           ? await providers.email.send(contact.email!, emailSubject, emailBody)
-          : await providers.sms.send(contact.phone!, smsBody);
+          : await providers.sms.send(contact.phone!, smsBody, { organizationId, contactId: contact.id, purpose: 'appointments', idempotencyKey: `appointment:${appointmentId}:reminder:${appointment.scheduledStart.toISOString()}` });
       if (appointment.leadId) {
         await db.insert(activitiesTable).values({
           organizationId,

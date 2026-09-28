@@ -177,6 +177,7 @@ export async function requestLoginCode(params: {
       await providers.sms.send(
         to,
         `${businessName} sign-in code: ${code}. Expires in 10 minutes.`,
+        { organizationId: params.organizationId, contactId: contacts[0].id, purpose: 'authentication', idempotencyKey: `portal:${sha256(code)}` },
       );
     }
   } catch (err) {
