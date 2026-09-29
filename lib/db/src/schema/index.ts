@@ -42,3 +42,4 @@ export * from "./object-storage";
 export * from "./gmail-connections";
 export * from "./email-intelligence";
 export * from "./revenue-workspace";
+export * from "./scheduler";

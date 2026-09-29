@@ -11,13 +11,15 @@ import {
   leadTagsTable,
   messageTemplatesTable,
   scheduledActionsTable,
+  revenueExecutionsTable,
   tagsTable,
   usersTable,
   type ActionResult,
   type Automation,
   type AutomationAction,
 } from "@workspace/db";
-import { and, desc, eq, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, lte, notExists, sql } from "drizzle-orm";
+import type { SchedulerStage, StageObserver } from "./scheduler-runtime";
 import { recordAudit } from "./audit";
 import { runDurableAction } from "./durable-execution";
 import { isLegacyDefaultOrg } from "../lib/orgFlavor";
@@ -908,23 +910,27 @@ async function renderTemplate(
 
 // ---------- scheduler ----------
 
-let schedulerTimer: NodeJS.Timeout | null = null;
-
 /**
  * Run one scheduler stage in isolation: a failure is logged, never thrown,
  * so one broken stage (e.g. a DB error while querying scheduled actions)
  * can't stop later stages like webhook retry delivery from running.
  */
-async function runStage(name: string, fn: () => Promise<void>): Promise<void> {
+async function runStage(name: SchedulerStage, fn: () => Promise<void>, observe?: StageObserver): Promise<void> {
+  // Persist progress before starting effects; a lost ownership connection stops
+  // the cycle here. Observer failures are deliberately NOT swallowed.
+  await observe?.(name, "running");
+  let failed = false;
   try {
     await fn();
-  } catch (err) {
-    console.error(`[automation] scheduler stage "${name}" failed:`, err);
+  } catch {
+    failed = true;
+    console.error(`[automation] scheduler stage "${name}" failed; inspect runtime health`);
   }
+  await observe?.(name, failed ? "failed" : "succeeded");
 }
 
 /** Stage 1: execute due scheduled automation actions. */
-async function processDueScheduledActions(organizationId?: string): Promise<void> {
+export async function processDueScheduledActions(organizationId?: string): Promise<void> {
   const due = await db
     .select()
     .from(scheduledActionsTable)
@@ -935,8 +941,16 @@ async function processDueScheduledActions(organizationId?: string): Promise<void
         organizationId
           ? eq(scheduledActionsTable.organizationId, organizationId)
           : undefined,
+        // Live owners must not occupy every slot and starve later due work.
+        notExists(db.select({ id: revenueExecutionsTable.id }).from(revenueExecutionsTable).where(and(
+          eq(revenueExecutionsTable.organizationId, scheduledActionsTable.organizationId),
+          sql`${revenueExecutionsTable.actionKey} = 'scheduled:' || ${scheduledActionsTable.id}::text`,
+          eq(revenueExecutionsTable.state, "processing"),
+          sql`${revenueExecutionsTable.expiresAt} >= now()`,
+        ))),
       ),
     )
+    .orderBy(asc(scheduledActionsTable.runAt), asc(scheduledActionsTable.id))
     .limit(20);
   for (const item of due) {
     try {
@@ -947,7 +961,11 @@ async function processDueScheduledActions(organizationId?: string): Promise<void
           // Re-read cancellation after acquiring exclusive durable ownership.
           const [current] = await db.select().from(scheduledActionsTable).where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.organizationId, item.organizationId)));
           if (!current || current.status !== "pending") return { state: "blocked", detail: "Scheduled action was cancelled or completed." };
-          await db.update(scheduledActionsTable).set({ attempts: item.attempts + 1 }).where(eq(scheduledActionsTable.id, item.id));
+          const [claimed] = await db.update(scheduledActionsTable)
+            .set({ attempts: sql`${scheduledActionsTable.attempts} + 1` })
+            .where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.organizationId, item.organizationId), eq(scheduledActionsTable.status, "pending")))
+            .returning({ id: scheduledActionsTable.id });
+          if (!claimed) return { state: "blocked", detail: "Scheduled action was cancelled or completed." };
           const result = await executeAction(item.organizationId, item.action, item.context as EventContext, item.automationId ?? item.id);
           // A returned failure can follow an ambiguous provider response. Never auto-replay it.
           if (result.status === "failed") throw new Error("Action result needs reconciliation");
@@ -959,16 +977,31 @@ async function processDueScheduledActions(organizationId?: string): Promise<void
         .update(scheduledActionsTable)
         .set({ status: execution.state === "indeterminate" ? "failed" : "done", lastError: execution.state === "indeterminate" ? "Indeterminate result: reconcile in Revenue Desk; automatic replay blocked." : null })
         .where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.status, "pending")));
-    } catch (err) {
+    } catch {
+      // A DB error can happen AFTER ownership or even after the effect. Inspect
+      // the receipt first. Existing ownership is never treated as a safe retry.
+      const [receipt] = await db.select({ state: revenueExecutionsTable.state }).from(revenueExecutionsTable)
+        .where(and(eq(revenueExecutionsTable.organizationId, item.organizationId), eq(revenueExecutionsTable.actionKey, `scheduled:${item.id}`)));
+      if (receipt) {
+        await db.update(scheduledActionsTable).set({
+          status: ["succeeded", "blocked", "confirmed_succeeded", "confirmed_not_performed"].includes(receipt.state) ? "done" : "failed",
+          lastError: "Execution receipt exists; inspect that receipt before any new action. Automatic replay is blocked.",
+        }).where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.status, "pending")));
+        // Even a payload conflict cannot spin forever or acquire a new effect.
+        continue;
+      }
       const attempts = item.attempts + 1;
       await db
         .update(scheduledActionsTable)
         .set({
           status: attempts >= 3 ? "failed" : "pending",
-          lastError: err instanceof Error ? err.message : "failed",
-          runAt: new Date(Date.now() + 5 * 60_000),
+          attempts,
+          lastError: attempts >= 3
+            ? "Preparation failed three times before execution ownership. Operator review required."
+            : "Preparation failed before execution ownership. A bounded retry is scheduled.",
+          runAt: new Date(Date.now() + Math.min(30, 5 * 2 ** (attempts - 1)) * 60_000),
         })
-        .where(eq(scheduledActionsTable.id, item.id));
+        .where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.status, "pending"), eq(scheduledActionsTable.attempts, item.attempts)));
     }
   }
 }
@@ -979,18 +1012,19 @@ async function processDueScheduledActions(organizationId?: string): Promise<void
  * one stage never skips the others — in particular, webhook retries and the
  * abandoned-chat sweep still run if executing scheduled actions throws.
  *
- * @param organizationId - When provided, only the scheduled-actions stage runs
- *   and it is restricted to that org. All other global housekeeping stages are
+ * @param organizationId - When provided, actions and reactivation run only for
+ *   that org. All other global housekeeping stages are
  *   skipped. This prevents parallel test workers from stealing each other's
  *   pending actions or processing each other's webhook deliveries.
  */
-export async function processScheduledWork(organizationId?: string): Promise<void> {
-  await runStage("scheduled-actions", () => processDueScheduledActions(organizationId));
+export async function processScheduledWork(organizationId?: string, observe?: StageObserver): Promise<void> {
+  const stage = (name: SchedulerStage, fn: () => Promise<void>) => runStage(name, fn, observe);
+  await stage("scheduled-actions", () => processDueScheduledActions(organizationId));
   // Throttled reactivation campaigns release their next batch of leads into
   // playbook sequences (their first step becomes due on a later tick).
   // Dynamic import avoids a static circular dependency (reactivation →
   // playbooks → automation).
-  await runStage("reactivation-drain", async () => {
+  await stage("reactivation-drain", async () => {
     const { drainReactivationCampaigns } = await import("./reactivation");
     await drainReactivationCampaigns(organizationId);
   });
@@ -998,59 +1032,42 @@ export async function processScheduledWork(organizationId?: string): Promise<voi
   // (i.e. in tests). Those stages are not org-specific and would interfere with
   // parallel test workers that own different portions of the shared database.
   if (organizationId) return;
-  await runStage("webhook-retries", async () => {
+  await stage("webhook-retries", async () => {
     await processPendingDeliveries();
   });
   // Drop encrypted previous webhook secrets whose grace window has elapsed.
-  await runStage("webhook-secret-cleanup", async () => {
+  await stage("webhook-secret-cleanup", async () => {
     await cleanupExpiredPreviousSecrets();
   });
   // Flag concierge chats idle >30 min as abandoned (emits assessment.abandoned).
   // Dynamic import avoids a static circular dependency (concierge → automation).
-  await runStage("abandoned-chat-sweep", async () => {
+  await stage("abandoned-chat-sweep", async () => {
     const { markAbandonedConversations } = await import("./concierge");
     await markAbandonedConversations();
   });
   // Delete expired/consumed portal login codes and expired portal sessions.
-  await runStage("portal-credential-cleanup", async () => {
+  await stage("portal-credential-cleanup", async () => {
     const { cleanupExpiredPortalCredentials } = await import("./portal");
     await cleanupExpiredPortalCredentials();
   });
   // Enforce Email Intelligence raw-content retention independently of UI reads.
   // Facts and audit evidence remain; only the encrypted source body is purged.
-  await runStage("email-intelligence-retention", async () => {
+  await stage("email-intelligence-retention", async () => {
     const { purgeExpiredEmailContent } = await import("./email-intelligence");
     await purgeExpiredEmailContent();
   });
   // Email org admins once when an active API key nears its expiry date.
-  await runStage("api-key-expiry-reminders", async () => {
+  await stage("api-key-expiry-reminders", async () => {
     const { processApiKeyExpiryReminders } = await import(
       "./api-key-expiry-reminder"
     );
     await processApiKeyExpiryReminders();
   });
   // Periodically delete orphaned public photo uploads (runs at most hourly).
-  // maybeCleanupOrphanedUploads already catches its own errors.
-  await maybeCleanupOrphanedUploads();
+  await stage("upload-cleanup", maybeCleanupOrphanedUploads);
 }
 
 const UPLOAD_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
-export function startAutomationScheduler(intervalMs = 60_000): void {
-  if (schedulerTimer) return;
-  schedulerTimer = setInterval(() => {
-    void processScheduledWork().catch((err) =>
-      console.error("[automation] scheduler tick failed:", err),
-    );
-  }, intervalMs);
-  schedulerTimer.unref();
-}
-
-export function stopAutomationScheduler(): void {
-  if (schedulerTimer) {
-    clearInterval(schedulerTimer);
-    schedulerTimer = null;
-  }
-}
 
 /** Display name of the seeded abandoned-chat follow-up rule (editable by admins). */
 export const DEFAULT_ABANDONED_FOLLOWUP_NAME = "Abandoned chat follow-up";
@@ -1445,18 +1462,10 @@ async function maybeCleanupOrphanedUploads(): Promise<void> {
   if (!process.env.PRIVATE_OBJECT_DIR) return;
   const now = Date.now();
   if (now - lastUploadCleanupAt < UPLOAD_CLEANUP_INTERVAL_MS) return;
+  const { cleanupOrphanedUploads } = await import("./upload-cleanup");
+  const result = await cleanupOrphanedUploads();
+  if (result.errors > 0) throw new Error("Upload cleanup needs review.");
   lastUploadCleanupAt = now;
-  try {
-    const { cleanupOrphanedUploads } = await import("./upload-cleanup");
-    const result = await cleanupOrphanedUploads();
-    if (result.deleted > 0 || result.errors > 0) {
-      console.log(
-        `[upload-cleanup] scanned=${result.scanned} deleted=${result.deleted} kept=${result.kept} errors=${result.errors}`,
-      );
-    }
-  } catch (err) {
-    console.error("[upload-cleanup] run failed:", err);
-  }
 }
 
 /**

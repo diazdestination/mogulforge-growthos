@@ -12,6 +12,7 @@ import { Building2, Loader2, Pencil, Plus, ShieldAlert } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ClientLaunchpad } from "@/components/client-launchpad";
 import { ClientOperations } from "@/components/revenue-workspace";
+import { RuntimeHealthPanel } from "@/components/runtime-health";
 
 /**
  * Platform super-admin console (MogulForge operators): list every
@@ -21,6 +22,7 @@ import { ClientOperations } from "@/components/revenue-workspace";
 export default function Platform() {
   return (
     <div className="mx-auto w-full max-w-6xl min-w-0 space-y-6 p-4 md:p-8">
+      <RuntimeHealthPanel />
       <ClientOperations />
       <ClientLaunchpad />
       <details className="rounded-xl border bg-card p-4">

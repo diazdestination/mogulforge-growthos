@@ -4,6 +4,8 @@
 
 app = 'mogulforge-growthos-staging'
 primary_region = 'iad'
+kill_signal = 'SIGTERM'
+kill_timeout = 30
 
 [build]
   dockerfile = 'Dockerfile'
@@ -23,7 +25,8 @@ primary_region = 'iad'
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 0
+  # Exercise the same always-on scheduler topology as the beta candidate.
+  min_machines_running = 1
 
 [[vm]]
   size = 'shared-cpu-1x'

@@ -2,10 +2,12 @@
 
 **Status:** ACTIVE RELEASE DIRECTIVE  
 **Primary branch:** `agent/mogulforge-growthos-recovery`  
-**Current audited head:** `548e6a2b16944df4fe3576de6629a7549034fdfb`  
+**CI-green starting baseline:** `ee7f39cc124dfcfa299b9daa165ba2579166756b` (September 29; [run 36523072054](https://github.com/diazdestination/mogulforge-growthos/actions/runs/36523072054))
 **Product goal:** Turn GrowthOS from a strong local/founding-beta build into a trustworthy, measurable, sellable paid-beta product for roofing/restoration and adjacent home-service companies.
 
 ## Mission
+
+September 29 continuation: non-overlapping/distributed scheduler ownership, durable-action retry and restart checks, secret-free operator health, and always-on configuration are implemented for verification. See [SCHEDULER-OPERATIONS.md](SCHEDULER-OPERATIONS.md) for evidence, operating cost and known legacy failure windows. This is not staging or provider acceptance; P0-2 is not yet declared passed. GrowthOS's local landing copy now uses the BIE identity and separates sample-data exploration from live activation. No pricing package or launch promise is being introduced before the required gates.
 
 GrowthOS is not waiting for more feature invention. The immediate objective is to make the existing Revenue Intelligence + Recovery system boringly reliable in production, prove that it creates measurable customer value, and establish a repeatable paid-beta operating model.
 
@@ -40,7 +42,7 @@ Priority order is:
 
 ## Current known issue
 
-The latest audited branch head has a failed GitHub Actions run. The dominant failures are test-environment guards that accept only `127.0.0.1` while CI supplies `localhost`, plus Revenue Workspace teardown/cleanup instability. Because the test stage fails, TypeScript checks, production builds, and Docker staging parity are skipped.
+The original audited head failed CI on loopback-environment and test-cleanup issues. These were repaired; run 36523072054 passed the complete gate at `ee7f39c`. Every subsequent candidate still needs its own exact-head green result; an older green run does not approve newer code.
 
 ## Required work
 

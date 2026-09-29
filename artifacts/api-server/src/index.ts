@@ -1,11 +1,11 @@
-import { db, organizationsTable } from "@workspace/db";
+import { db, pool, organizationsTable } from "@workspace/db";
 import app from "./app";
 import { runAutoMigrate } from "./lib/auto-migrate";
 import { logger } from "./lib/logger";
 import {
   ensureDefaultAutomations,
-  startAutomationScheduler,
 } from "./services/automation";
+import { startAutomationScheduler, stopAutomationScheduler } from "./services/scheduler";
 import { ensureDefaultServiceAreas, getOrgSettings } from "./services/settings";
 import { ensureInstallation } from "./services/installation";
 import { ensurePlatformAdmins } from "./services/org";
@@ -29,7 +29,7 @@ async function main(): Promise<void> {
   // traffic against a database whose schema hasn't been applied yet.
   await runAutoMigrate();
 
-  app.listen(port, process.env.HOST || "0.0.0.0", (err) => {
+  const server = app.listen(port, process.env.HOST || "0.0.0.0", (err) => {
     if (err) {
       logger.error({ err }, "Error listening on port");
       process.exit(1);
@@ -69,6 +69,29 @@ async function main(): Promise<void> {
       ),
     );
   });
+  let shuttingDown = false;
+  const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info("Draining HTTP requests and background work");
+    // Bound shutdown. An interrupted durable receipt remains held for review;
+    // a replacement process must never blindly replay an uncertain effect.
+    const deadline = setTimeout(() => process.exit(1), 25_000);
+    deadline.unref();
+    try {
+      await Promise.all([
+        new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())),
+        stopAutomationScheduler(),
+      ]);
+      await pool.end();
+      clearTimeout(deadline);
+    } catch {
+      logger.error("Graceful shutdown did not finish; durable actions may need review");
+      process.exit(1);
+    }
+  };
+  process.once("SIGTERM", () => { void shutdown(); });
+  process.once("SIGINT", () => { void shutdown(); });
 }
 
 // Fail fast: a failed schema push means the app would 500 on every request, so

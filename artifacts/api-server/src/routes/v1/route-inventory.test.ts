@@ -43,6 +43,7 @@ const SESSION_ONLY_ROUTES = new Set([
   "PATCH /platform/orgs/:id",
   "GET /platform/clients/profiles",
   "GET /platform/clients/health",
+  "GET /platform/runtime",
   "POST /platform/clients",
   "GET /platform/clients/:orgId/readiness",
   "POST /platform/clients/:orgId/sites/:siteId/key",

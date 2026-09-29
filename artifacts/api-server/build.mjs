@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
 import { rm } from "node:fs/promises";
@@ -10,16 +10,18 @@ globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 
-async function buildAll() {
+export async function buildAll({ entryPoint, outDir } = {}) {
   // API_SERVER_OUT_DIR lets callers (e.g. the smoke check) build into an
   // isolated directory so concurrent builds never clobber the live dist/.
-  const distDir = process.env.API_SERVER_OUT_DIR
-    ? path.resolve(process.env.API_SERVER_OUT_DIR)
-    : path.resolve(artifactDir, "dist");
+  const distDir =
+    outDir ??
+    (process.env.API_SERVER_OUT_DIR
+      ? path.resolve(process.env.API_SERVER_OUT_DIR)
+      : path.resolve(artifactDir, "dist"));
   await rm(distDir, { recursive: true, force: true });
 
   await esbuild({
-    entryPoints: [path.resolve(artifactDir, "src/index.ts")],
+    entryPoints: [entryPoint ?? path.resolve(artifactDir, "src/index.ts")],
     platform: "node",
     bundle: true,
     format: "esm",
@@ -115,7 +117,7 @@ async function buildAll() {
     sourcemap: "linked",
     plugins: [
       // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it
-      esbuildPluginPino({ transports: ["pino-pretty"] })
+      esbuildPluginPino({ transports: ["pino-pretty"] }),
     ],
     // Make sure packages that are cjs only (e.g. express) but are bundled continue to work in our esm output file
     banner: {
@@ -131,7 +133,12 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
   });
 }
 
-buildAll().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
+) {
+  buildAll().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

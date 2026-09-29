@@ -19,6 +19,7 @@ import { and, desc, eq, isNull, inArray } from "drizzle-orm";
 import { requireMember } from "../../middlewares/requireMember";
 import { requirePlatformAdmin } from "./orgs";
 import { rateLimit } from "../../lib/rateLimit";
+import { getSchedulerHealth } from "../../services/scheduler-runtime";
 import {
   getPortalSession,
   requestLoginCode,
@@ -67,6 +68,11 @@ const safe =
       next(error);
     }
   };
+router.get(
+  "/platform/runtime",
+  requirePlatformAdmin,
+  safe(async (_req, res) => res.json(await getSchedulerHealth())),
+);
 router.get(
   "/revenue/desk",
   requireMember("crm.read"),

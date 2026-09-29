@@ -10,7 +10,9 @@
     "typecheck": "tsc -b ../../lib/db ../../lib/api-zod && tsc -p tsconfig.json --noEmit",
     "smoke": "node ./scripts/smoke.mjs",
     "test": "vitest run",
-    "test:twilio": "node scripts/test-twilio-isolated.mjs"
+    "test:twilio": "node scripts/test-twilio-isolated.mjs",
+    "test:scheduler": "node scripts/test-scheduler-isolated.mjs",
+    "preview:scheduler": "node scripts/preview-runtime-isolated.mjs"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.21.0",
