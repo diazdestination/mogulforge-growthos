@@ -68,4 +68,4 @@ docker compose up -d --build app
 - **Image size:** the runtime copies the whole built workspace for simplicity;
   `pnpm deploy --filter @workspace/api-server` can slim it later.
 - **Repository:** this deployment belongs to the private
-  `diazdestination/mogulforge-crm` repository, not the older CRM template.
+  `diazdestination/mogulforge-growthos` repository, not the older CRM template.

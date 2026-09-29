@@ -20,7 +20,7 @@ Audit date: September 27, 2026. Status then: local implementation and synthetic 
 
 | Item | Observation |
 | --- | --- |
-| Repository | `diazdestination/mogulforge-crm`, local `C:/Users/diazd/dev/projects/mogulforge` |
+| Repository | `diazdestination/mogulforge-growthos`, local `C:/Users/diazd/dev/projects/mogulforge` |
 | Working branch | `agent/mogulforge-growthos-recovery`; safely fast-forwarded from `548e6a2` to existing remote `cd3f551` before local changes |
 | Remote main | `debdb73867357e0d0312df7a98aa55ff02bd10a2` at audit |
 | Marketing | `https://mogulforge.ai`, HTTP 200, separate marketing application |

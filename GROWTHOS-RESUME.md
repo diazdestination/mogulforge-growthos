@@ -6,7 +6,7 @@ remembering a chat, a different repository, or a global machine-state file.
 
 ## Canonical identity
 
-- **Product repository:** `diazdestination/mogulforge-crm` (private)
+- **Product repository:** `diazdestination/mogulforge-growthos` (private)
 - **Local checkout:** `C:\Users\diazd\dev\projects\mogulforge`
 - **Working branch:** `agent/mogulforge-growthos-recovery`
 - **Never use for product work:** `MogulForge-crm-template-` or the separate

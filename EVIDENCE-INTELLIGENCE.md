@@ -1,7 +1,7 @@
 # MogulForge Evidence Intelligence
 
 Evidence Intelligence is a standalone GrowthOS capability in the canonical
-`diazdestination/mogulforge-crm` product.
+`diazdestination/mogulforge-growthos` product.
 
 ## Product promise
 

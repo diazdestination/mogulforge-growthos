@@ -1,7 +1,7 @@
 # MogulForge GrowthOS Architecture
 
 This document is the implementation contract for the canonical
-`diazdestination/mogulforge-crm` product. It separates working local software
+`diazdestination/mogulforge-growthos` product. It separates working local software
 from planned infrastructure so product messaging, demos, and patent materials
 never describe a roadmap component as shipped.
 

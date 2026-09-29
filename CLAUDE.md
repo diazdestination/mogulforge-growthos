@@ -8,7 +8,7 @@ repository. Read the imported resume pack before planning or editing.
 ## Identity and scope
 
 - Canonical local checkout: `C:\Users\diazd\dev\projects\mogulforge`
-- Canonical private repository: `diazdestination/mogulforge-crm`
+- Canonical private repository: `diazdestination/mogulforge-growthos`
 - Working branch: `agent/mogulforge-growthos-recovery`
 - `main` stays unchanged until Diego explicitly approves a merge.
 - This is MogulForge GrowthOS. Do not add Jarvis branding or terminology to product
