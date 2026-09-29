@@ -34,7 +34,7 @@ jobs:
 
     env:
       NODE_ENV: test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mogulforge_test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/mogulforge_test
       SESSION_SECRET: ci-only-session-secret-that-is-long-enough-for-validation
       EMAIL_INGESTION_WEBHOOK_SECRET: ci-only-email-intake-signing-secret
       EMAIL_INTELLIGENCE_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=

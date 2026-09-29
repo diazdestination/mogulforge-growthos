@@ -14,17 +14,18 @@ type Receipt = {
   errorCode: string | null;
   createdAt: string;
 };
+type Usage = {
+  operations: number;
+  limit: number;
+  warning: boolean;
+  uncertain: number;
+  failed: number;
+};
 type State = {
   enabled: boolean;
   inbound: Inbox[];
   outbound: Receipt[];
-  usage: {
-    operations: number;
-    limit: number;
-    warning: boolean;
-    uncertain: number;
-    failed: number;
-  };
+  usage?: Usage;
 };
 export function SmsDesk() {
   const [state, setState] = useState<State | null>(null),
@@ -39,7 +40,20 @@ export function SmsDesk() {
         credentials: "include",
       });
       if (!response.ok) throw new Error();
-      setState(await response.json());
+      const raw = await response.json();
+      const data =
+        raw && typeof raw === "object" ? (raw as Partial<State>) : {};
+      setState({
+        enabled: data.enabled === true,
+        inbound: Array.isArray(data.inbound) ? data.inbound : [],
+        outbound: Array.isArray(data.outbound) ? data.outbound : [],
+        usage:
+          data.usage &&
+          typeof data.usage === "object" &&
+          !Array.isArray(data.usage)
+            ? data.usage
+            : undefined,
+      });
     } catch {
       setMessage("The communications inbox could not be loaded.");
     }
@@ -101,7 +115,7 @@ export function SmsDesk() {
           approval must be complete before messages can be sent.
         </p>
       )}
-      {state && (
+      {state?.usage && (
         <p className="text-sm" role={state.usage.warning ? "alert" : undefined}>
           Today: {state.usage.operations} of{" "}
           {state.usage.limit || "unconfigured"} app operations ·{" "}
