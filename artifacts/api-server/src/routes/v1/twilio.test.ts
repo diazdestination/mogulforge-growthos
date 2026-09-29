@@ -122,6 +122,7 @@ beforeAll(async () => {
     }
   }
   const values = {
+    APP_ORIGIN: "https://growth.example",
     TWILIO_PUBLIC_ORIGIN: "https://growth.example",
     TWILIO_ORGANIZATION_ID: orgA,
     TWILIO_ACCOUNT_SID: account,

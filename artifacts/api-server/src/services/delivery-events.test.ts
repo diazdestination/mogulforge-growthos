@@ -299,13 +299,11 @@ describe("webhook routes", () => {
     expect(updated.doNotContactEmail).toBe(true);
   });
 
-  it("Twilio status callback: permanent failure suppresses, transient does not", async () => {
+  it("rejects unsigned legacy Twilio failure callbacks without changing delivery state", async () => {
     const { contact, lead } = await makeContactLead({ phone: "+1 (555) 200-0003" });
     await makeTouch({ leadId: lead.id, channel: "sms", providerMessageId: "SM-perm" });
-    await makeTouch({ leadId: lead.id, channel: "sms", providerMessageId: "SM-trans" });
 
-    // Permanent: landline (30006)
-    let res = await fetch(`${baseUrl}/api/v1/public/sms/status`, {
+    const res = await fetch(`${baseUrl}/api/v1/public/sms/status`, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -315,31 +313,17 @@ describe("webhook routes", () => {
         To: "+15552000003",
       }).toString(),
     });
-    expect(res.status).toBe(204);
-    expect((await getTouch("SM-perm")).delivery).toBe("bounced");
-    let [updated] = await db
+    expect(res.status).toBe(403);
+    expect((await getTouch("SM-perm")).delivery).not.toBe("bounced");
+    const [updated] = await db
       .select()
       .from(contactsTable)
       .where(eq(contactsTable.id, contact.id));
-    expect(updated.doNotContactSms).toBe(true);
-    expect(await getSuppression(org.id, "sms", "+15552000003")).not.toBeNull();
-
-    // Transient failure on another contactless touch: no suppression added
-    res = await fetch(`${baseUrl}/api/v1/public/sms/status`, {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        MessageSid: "SM-trans",
-        MessageStatus: "failed",
-        ErrorCode: "30003",
-        To: "+15552000003",
-      }).toString(),
-    });
-    expect(res.status).toBe(204);
-    expect((await getTouch("SM-trans")).delivery).toBe("bounced");
+    expect(updated.doNotContactSms).toBe(false);
+    expect(await getSuppression(org.id, "sms", "+15552000003")).toBeNull();
   });
 
-  it("Twilio delivered status records delivered", async () => {
+  it("rejects unsigned legacy Twilio delivered callbacks", async () => {
     const { lead } = await makeContactLead({ phone: "+1 (555) 200-0004" });
     await makeTouch({ leadId: lead.id, channel: "sms", providerMessageId: "SM-ok" });
     const res = await fetch(`${baseUrl}/api/v1/public/sms/status`, {
@@ -351,8 +335,8 @@ describe("webhook routes", () => {
         To: "+15552000004",
       }).toString(),
     });
-    expect(res.status).toBe(204);
-    expect((await getTouch("SM-ok")).delivery).toBe("delivered");
+    expect(res.status).toBe(403);
+    expect((await getTouch("SM-ok")).delivery).not.toBe("delivered");
   });
 });
 

@@ -59,6 +59,8 @@ try {
       "src/routes/v1/twilio.test.ts",
       "src/routes/v1/route-inventory.test.ts",
       "src/services/providers.test.ts",
+      "src/services/sms-delivery.test.ts",
+      "src/services/delivery-events.test.ts",
       "src/routes/v1/unsubscribe-flow.test.ts",
     ],
     api,

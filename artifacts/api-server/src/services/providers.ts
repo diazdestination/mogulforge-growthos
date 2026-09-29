@@ -132,10 +132,10 @@ export const mockEmailProvider: EmailProvider = {
 };
 
 /**
- * Real SMS via the Twilio REST API. Selected automatically when
- * TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER are set.
- * Fails loudly (throws) so automation runs record the failure instead of
- * silently pretending a message was delivered.
+ * Real SMS via the Twilio REST API. It activates only after the complete
+ * registration, launch, tenant, sender, key, routing and daily-limit gate is
+ * satisfied. It fails loudly so an unapproved or undelivered message is never
+ * recorded as sent.
  */
 export const twilioSmsProvider: SmsProvider = {
   async send(to, body, context) {
@@ -562,7 +562,8 @@ export const providers = {
   // assessment capture) remain deterministic; the concierge opts into the
   // OpenAI provider with an explicit fallback.
   ai: mockAiProvider,
-  // Twilio activates automatically when its three secrets are set; mock otherwise.
+  // Any Twilio account hint fails closed through the guarded adapter; a fully
+  // absent local/test configuration may use the explicitly labeled mock.
   sms: twilioConfigured || process.env.NODE_ENV === "production" || Boolean(process.env.TWILIO_ACCOUNT_SID) ? twilioSmsProvider : mockSmsProvider,
   // Runtime-adaptive: tries Gmail connector → Resend; mock is local/test only.
   email: adaptiveEmailProvider,
