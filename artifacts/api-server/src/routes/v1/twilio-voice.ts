@@ -16,12 +16,19 @@ export function voiceConfiguration() {
   const config = twilioConfiguration(),
     staff = process.env.TWILIO_STAFF_PHONE ?? "",
     limit = Number(process.env.TWILIO_DAILY_CALL_LIMIT ?? 0);
+  const requestedName = (process.env.TWILIO_VOICE_BUSINESS_NAME ?? "").trim();
+  const businessName =
+    requestedName.length <= 120 && !/[\u0000-\u001f\u007f]/.test(requestedName)
+      ? requestedName
+      : "";
   return {
     ...config,
     staff,
     limit,
+    businessName,
     voiceEnabled:
-      config.configured &&
+      config.voiceConfigured &&
+      Boolean(businessName) &&
       process.env.TWILIO_VOICE_ENABLED === "true" &&
       process.env.TWILIO_VOICE_APPROVED === "true" &&
       process.env.TWILIO_LAUNCH_APPROVED === "true" &&
@@ -36,7 +43,8 @@ export function voiceConfiguration() {
   };
 }
 const validCall = (req: Request) =>
-  twilioRequestValid(req) && /^CA[a-f0-9]{32}$/i.test(req.body.CallSid ?? "");
+  twilioRequestValid(req, "voice") &&
+  /^CA[a-f0-9]{32}$/i.test(req.body.CallSid ?? "");
 const path = (origin: string, id: string, suffix: string) =>
   `${origin}/api/v1/public/voice/${suffix}?operation=${id}`;
 const hangup = () => {
@@ -89,11 +97,9 @@ router.post(
       !config.voiceEnabled ||
       config.organizationId !== req.member!.organizationId
     ) {
-      res
-        .status(409)
-        .json({
-          error: "Calling has not been activated for this organization.",
-        });
+      res.status(409).json({
+        error: "Calling has not been activated for this organization.",
+      });
       return;
     }
     if (!input.success) {
@@ -271,13 +277,11 @@ router.post(
             eq(twilioCallsTable.status, "dispatching"),
           ),
         );
-      res
-        .status(409)
-        .json({
-          id: operation.id,
-          error:
-            "Call was not confirmed. Review this operation before trying another call.",
-        });
+      res.status(409).json({
+        id: operation.id,
+        error:
+          "Call was not confirmed. Review this operation before trying another call.",
+      });
     }
   },
 );
@@ -348,7 +352,9 @@ router.post(
     if (!operation) {
       xml.reject({ reason: "busy" });
     } else {
-      xml.say("Thank you for calling MogulForge. We will try to connect you.");
+      xml.say(
+        `Thank you for calling ${config.businessName}. We will try to connect you.`,
+      );
       xml
         .dial({
           callerId: process.env.TWILIO_PHONE_NUMBER,
@@ -430,7 +436,9 @@ router.post("/public/voice/answer", async (req, res) => {
         action: path(config.origin, op.id, "connect"),
         method: "POST",
       })
-      .say("MogulForge. Press 1 to connect your requested customer call.");
+      .say(
+        `${config.businessName}. Press 1 to connect your requested customer call.`,
+      );
   }
   xml.hangup();
   res.type("text/xml").send(xml.toString());
@@ -515,9 +523,7 @@ router.post("/public/voice/complete", async (req, res) => {
     op.direction === "inbound" &&
     !(status.success && status.data === "completed")
   )
-    xml.say(
-      "We could not connect your call. Please contact us through mogulforge dot ai.",
-    );
+    xml.say("We could not connect your call. Please try again later.");
   xml.hangup();
   res.type("text/xml").send(xml.toString());
 });

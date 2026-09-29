@@ -1,6 +1,20 @@
 # Twilio implementation and access audit
 
-Audit date: September 27, 2026. Status: local implementation and synthetic validation; provider setup blocked by authentication and verified identity. No account/resource creation, number purchase, account upgrade, campaign submission, real SMS, call, push or deployment occurred.
+## September 28 update: Painless readiness and independent voice configuration
+
+Local voice routing and signed voice callbacks no longer require an SMS Messaging Service. SMS still requires its service, registration, consent and launch controls. Voice now requires an explicit bounded `TWILIO_VOICE_BUSINESS_NAME`; both caller and staff prompts use that name with XML escaping, and the missed-call fallback has no platform URL. Missing/invalid names disable voice. The tested [disabled client template](TWILIO-CLIENT-DISABLED.env.example) contains Painless's draft display name, empty account/tenant/credential bindings and all live flags off.
+
+Focused validation: **35 tests passed** in the isolated PGlite runner, including incoming and requested outgoing voice with SMS disabled and no Messaging Service; invalid signatures/account/number, other-tenant access, configurable escaped prompts, the exact disabled template and the voice kill switch remain enforced. API TypeScript passed. These are synthetic results, not carrier acceptance.
+
+The adapter still binds exactly one organization and still contains MogulForge public SMS disclosures. It is not a ready shared Painless connector. Read [TWILIO-CLIENT-READINESS.md](TWILIO-CLIENT-READINESS.md) for the client-account decision, outstanding tenant binding/SMS branding work, staged activation and rollback. The separate paid-beta P0/CI workstream remains authoritative for release; no production deployment or secret changes occurred.
+
+Fresh read-only Fly inspection still shows release v4 with image `mogulforge-growthos-staging:growthos-63a440bf`, digest `sha256:e22d35041e9a8404cc98d460b25655cedc74a95152dec27788d951097fb003fe`, a stopped/autostart machine with minimum zero, and no Twilio secret names. The remote PR head remains `cd3f551` with failed CI. Neither is proof that the new local implementation is deployed.
+
+Earlier September 28 authenticated account evidence is saved at `C:/Users/diazd/dev/jarvis/TWILIO-ACCOUNT-AUDIT-2026-09-28.md`: a paid account exists and its visible Serenity business profile was Draft. Historical personal/Starter verification and the full resource inventory remain unknown. Later in this run, both Chrome and the in-app browser required sign-in; secure sign-in was requested and the Chrome tab retained. A draft business profile does not establish that personal verification never occurred. WillowNote's separate trial account was created earlier; its operator decision is independent of Painless.
+
+## September 27 implementation baseline
+
+Audit date: September 27, 2026. Status then: local implementation and synthetic validation; provider setup blocked by authentication and verified identity. No account/resource creation, number purchase, account upgrade, campaign submission, real SMS, call, push or deployment occurred in that September 27 baseline.
 
 ## Verified inventory
 
@@ -51,13 +65,15 @@ Secrets belong in Fly's secret manager, never client bundles or Git. Use a produ
 | --- | --- |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | Account binding and signature verification |
 | `TWILIO_API_KEY_SID`, `TWILIO_API_KEY_SECRET` | REST authentication; never exposed to browser |
-| `TWILIO_MESSAGING_SERVICE_SID`, `TWILIO_PHONE_NUMBER` | One dedicated, verified SMS-capable sender |
+| `TWILIO_MESSAGING_SERVICE_SID` | Required for SMS only; leave unset for a voice-only stage |
+| `TWILIO_PHONE_NUMBER` | Dedicated sender; voice capability required for calling, registered SMS capability separately required for texting |
 | `TWILIO_ORGANIZATION_ID` | Verified MogulForge organization UUID; not a demo/client tenant |
 | `TWILIO_PUBLIC_ORIGIN` | `https://app.mogulforge.ai` after host/path verification |
 | `TWILIO_SMS_ENABLED`, `TWILIO_REGISTRATION_APPROVED`, `TWILIO_ADVANCED_OPT_OUT` | All explicit `true` only after matching provider setup, approvals and evidence |
 | `TWILIO_LAUNCH_APPROVED`, `TWILIO_GEO_PERMISSIONS_REVIEWED` | Only after operator/policy/support review, publication approval, US geographic permissions and high-risk restrictions verified |
 | `TWILIO_DAILY_SMS_LIMIT` | Explicit integer 1–1000; unset means off; not a spending authorization |
 | `TWILIO_VOICE_ENABLED`, `TWILIO_VOICE_APPROVED` | Separate voice activation approval |
+| `TWILIO_VOICE_BUSINESS_NAME` | Required reviewed public business name for the one configured organization; 1–120 characters, no control characters; no platform-name fallback |
 | `TWILIO_STAFF_PHONE`, `TWILIO_DAILY_CALL_LIMIT` | Specifically authorized staff handset and integer 1–100 call operations/day; unset means off |
 
 Prepared callbacks (POST, source only):

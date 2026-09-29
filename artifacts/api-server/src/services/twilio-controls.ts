@@ -35,14 +35,15 @@ export function twilioConfiguration() {
     /* disabled */
   }
   const organizationId = env.TWILIO_ORGANIZATION_ID ?? "";
-  const configured = Boolean(
+  const voiceConfigured = Boolean(
     origin &&
     /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(organizationId) &&
     sid("AC", env.TWILIO_ACCOUNT_SID) &&
     env.TWILIO_AUTH_TOKEN &&
-    sid("MG", env.TWILIO_MESSAGING_SERVICE_SID) &&
     phoneE164(env.TWILIO_PHONE_NUMBER ?? "") === env.TWILIO_PHONE_NUMBER,
   );
+  const configured =
+    voiceConfigured && sid("MG", env.TWILIO_MESSAGING_SERVICE_SID);
   const dailyLimit = Number(env.TWILIO_DAILY_SMS_LIMIT ?? 0);
   const enabled =
     configured &&
@@ -56,14 +57,24 @@ export function twilioConfiguration() {
     Number.isSafeInteger(dailyLimit) &&
     dailyLimit > 0 &&
     dailyLimit <= 1000;
-  return { origin, organizationId, configured, enabled, dailyLimit };
+  return {
+    origin,
+    organizationId,
+    voiceConfigured,
+    configured,
+    enabled,
+    dailyLimit,
+  };
 }
 
-export function twilioRequestValid(req: Request): boolean {
+export function twilioRequestValid(
+  req: Request,
+  channel: "sms" | "voice" = "sms",
+): boolean {
   const config = twilioConfiguration(),
     body = req.body;
   if (
-    !config.configured ||
+    !(channel === "voice" ? config.voiceConfigured : config.configured) ||
     !req.is("application/x-www-form-urlencoded") ||
     !body ||
     typeof body !== "object" ||
