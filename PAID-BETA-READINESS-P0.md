@@ -7,15 +7,17 @@
 
 ## Mission
 
-**Communications-provider addendum (September 30):** The owner is evaluating a
-move away from Twilio. See [COMMUNICATIONS-PROVIDER-REVIEW-2026-09-30.md](COMMUNICATIONS-PROVIDER-REVIEW-2026-09-30.md).
-This does not waive communications acceptance or authorize a live switch.
-Twilio-specific checks below apply if any Twilio path is enabled in the release;
-any replacement must pass equivalent consent, tenant-routing, send/receive,
-delivery, failure, alerting, and rollback tests on the exact release candidate.
-Message Central VerifyNow is only an OTP candidate, and textbee's published
-events do not supply the missed-call trigger or a voice assistant. Keep
-customer-facing automatic SMS disabled until a complete route is proven.
+**Communications-provider addendum (September 30):** The owner chose to
+continue with Twilio for GrowthOS after reviewing alternatives. The earlier
+[provider review](COMMUNICATIONS-PROVIDER-REVIEW-2026-09-30.md) is retained as
+historical evidence, not an instruction to pause Twilio engineering. This
+decision does not authorize live provider registration, paid resources, phone
+forwarding, deployment or customer traffic. Twilio-specific acceptance below
+remains required. Voice/missed-call handling can be prepared separately from
+SMS registration, but customer-facing automatic SMS stays disabled until that
+client's sender/use-case approval, consent and full release acceptance pass.
+The per-client queue estimate and staged rollout are recorded in
+[TWILIO-CLIENT-ONBOARDING-TIMING-2026-09-30.md](TWILIO-CLIENT-ONBOARDING-TIMING-2026-09-30.md).
 
 September 29 continuation: non-overlapping/distributed scheduler ownership, durable-action retry and restart checks, secret-free operator health, and always-on configuration are implemented for verification. See [SCHEDULER-OPERATIONS.md](SCHEDULER-OPERATIONS.md) for evidence, operating cost and known legacy failure windows. This is not staging or provider acceptance; P0-2 is not yet declared passed. GrowthOS's local landing copy now uses the BIE identity and separates sample-data exploration from live activation. No pricing package or launch promise is being introduced before the required gates.
 

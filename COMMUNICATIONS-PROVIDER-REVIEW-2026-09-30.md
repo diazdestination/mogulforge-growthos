@@ -1,10 +1,12 @@
 # GrowthOS communications-provider review — September 30, 2026
 
-Status: **decision support, not activation**. The owner is considering moving away
-from Twilio for Painless and the HVAC pilot. No provider account, forwarding rule,
+Status: **historical evaluation, superseded by the owner's decision to continue
+with Twilio later on September 30**. The alternatives analysis remains useful
+if provider choice is revisited; its numbered product decision below is no
+longer the current GrowthOS direction. No provider account, forwarding rule,
 SIM, customer message, or production configuration was changed by this review.
-The existing code remains dormant and is not evidence that either client has a
-working missed-call assistant.
+The existing code is not evidence that either client has a working missed-call
+assistant.
 
 ## What the proposed services actually cover
 
