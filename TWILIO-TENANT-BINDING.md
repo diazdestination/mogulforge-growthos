@@ -26,10 +26,21 @@ auth token are no longer used to select a client.
   are per client. `revoked_at` immediately blocks new sends/bridges; signed
   callbacks for already-created operations can still be recorded.
 - Public SMS enrollment requires a client-specific `program` token. The old
-  unscoped `/sms-preferences.html` is **not** an approved contractor opt-in
-  surface; it lacks client-specific branding/disclosures and has no program
-  selector. Keep SMS off until that surface and purpose-specific phone proof
-  are reviewed for each contractor.
+  unscoped `/sms-preferences.html` is **not** a contractor opt-in link. Use
+  `/sms-preferences.html?program=<client-token>`; missing, invalid or unknown
+  selectors keep the form closed with no fallback to another business.
+  The page displays the selected contractor's binding name and number.
+  Enrollment additionally requires explicit HTTPS policy links configured
+  on the server as `TWILIO_CLIENT_<CLIENT>_SMS_PRIVACY_URL` and
+  `TWILIO_CLIENT_<CLIENT>_SMS_TERMS_URL`, using the same `<CLIENT>` prefix as
+  that binding's auth-token secret reference. No URL is inferred from a
+  website or replaced with MogulForge's own draft policies. Missing or invalid
+  links close **new opt-in only**; signed inbound STOP/HELP and the sender
+  number for existing recipients remain available. A URL passing this format
+  gate is not proof that its content or the client campaign is approved.
+  Before opening any contractor program, review the actual linked privacy,
+  terms and purpose copy, sender registration, phone-confirmation path and
+  required release/provider acceptance for that specific contractor.
 - Unknown missed callers produce one staff callback/review task. They do not
   create SMS consent, trigger an automatic text, or create an AI call assistant.
 

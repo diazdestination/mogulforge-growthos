@@ -15,6 +15,7 @@ import {
   twilioClientBindingsTable,
   twilioDispatchesTable,
   twilioConsentProofsTable,
+  twilioInboundEventsTable,
   twilioCallsTable,
   missedCallHandoffsTable,
   crmTasksTable,
@@ -54,7 +55,8 @@ const account = "AC" + "1".repeat(32),
   phone = "+12025550101",
   token = "synthetic-webhook-token",
   tokenB = "synthetic-webhook-token-b",
-  program = "synthetic_twilio_program_a_12345";
+  program = "synthetic_twilio_program_a_12345",
+  programB = "synthetic_twilio_program_b_12345";
 async function webhook(
   path: string,
   fields: Record<string, string>,
@@ -138,6 +140,10 @@ beforeAll(async () => {
     TWILIO_CLIENT_A_API_KEY_SECRET: "synthetic-key",
     TWILIO_CLIENT_B_AUTH_TOKEN: tokenB,
     TWILIO_CLIENT_B_API_KEY_SECRET: "synthetic-key-b",
+    TWILIO_CLIENT_A_SMS_PRIVACY_URL: "https://roofing.example.test/privacy",
+    TWILIO_CLIENT_A_SMS_TERMS_URL: "https://roofing.example.test/messaging-terms",
+    TWILIO_CLIENT_B_SMS_PRIVACY_URL: "https://hvac.example.test/privacy",
+    TWILIO_CLIENT_B_SMS_TERMS_URL: "https://hvac.example.test/messaging-terms",
   };
   for (const [key, value] of Object.entries(values)) vi.stubEnv(key, value);
   await db.insert(twilioClientBindingsTable).values([
@@ -159,6 +165,7 @@ beforeAll(async () => {
       apiKeySecretRef: "TWILIO_CLIENT_B_API_KEY_SECRET",
       publicOrigin: "https://growth.example", businessName: "Synthetic HVAC",
       staffPhone: "+12025550119", smsDisclosureVersion: "synthetic-hvac-v1",
+      publicEnrollmentToken: programB,
       dailySmsLimit: 20, dailyCallLimit: 5,
     },
   ]);
@@ -250,6 +257,81 @@ it("requires authentication and rejects forged, wrong-account and wrong-service 
     (await webhook("/api/v1/public/sms/inbound", { Body: "STOP" })).status,
   ).toBe(403);
   vi.stubEnv("TWILIO_CLIENT_A_AUTH_TOKEN", token);
+});
+it("keeps enrollment closed without client policies while STOP and HELP remain available", async () => {
+  vi.stubEnv("TWILIO_CLIENT_A_SMS_PRIVACY_URL", "");
+  vi.stubEnv("TWILIO_CLIENT_A_SMS_TERMS_URL", "");
+  try {
+    const status = await realFetch(base + `/api/v1/public/sms/program?program=${program}`);
+    const body = await status.json() as { brand: string; available: boolean; sender: string; privacyUrl: null; termsUrl: null };
+    expect(status.headers.get("cache-control")).toBe("no-store");
+    expect(body).toMatchObject({ brand: "Synthetic & Roofing", available: false, sender, privacyUrl: null, termsUrl: null });
+    const enroll = await realFetch(base + `/api/v1/public/sms/enroll?program=${program}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+        phone, customerCare: true, appointments: false, ownPhone: true,
+        disclosureVersion: SMS_DISCLOSURE_VERSION,
+      }),
+    });
+    expect(enroll.status).toBe(503);
+    const priorRecipient = "+12025550103";
+    expect((await webhook("/api/v1/public/sms/inbound", { Body: "STOP", From: priorRecipient })).status).toBe(200);
+    expect(await getSuppression(orgA, "sms", priorRecipient)).not.toBeNull();
+    expect((await webhook("/api/v1/public/sms/inbound", { Body: "HELP", From: priorRecipient })).status).toBe(200);
+    const help = await db.select().from(twilioInboundEventsTable)
+      .where(and(eq(twilioInboundEventsTable.organizationId, orgA), eq(twilioInboundEventsTable.phone, priorRecipient)));
+    expect(help.some((event) => event.eventType === "HELP")).toBe(true);
+    vi.stubEnv("TWILIO_CLIENT_A_SMS_PRIVACY_URL", "http://roofing.example.test/privacy");
+    expect(await (await realFetch(base + `/api/v1/public/sms/program?program=${program}`)).json())
+      .toMatchObject({ available: false });
+  } finally {
+    vi.stubEnv("TWILIO_CLIENT_A_SMS_PRIVACY_URL", "https://roofing.example.test/privacy");
+    vi.stubEnv("TWILIO_CLIENT_A_SMS_TERMS_URL", "https://roofing.example.test/messaging-terms");
+  }
+});
+it("resolves only the selected contractor program and rejects wrong tokens and phones", async () => {
+  const [originalB] = await db.select().from(twilioClientBindingsTable)
+    .where(eq(twilioClientBindingsTable.organizationId, orgB));
+  await db.update(twilioClientBindingsTable).set({
+    launchApproved: true, smsEnabled: true, registrationApproved: true,
+    advancedOptOut: true, geoPermissionsReviewed: true,
+  }).where(eq(twilioClientBindingsTable.organizationId, orgB));
+  try {
+    const roofing = await (await realFetch(base + `/api/v1/public/sms/program?program=${program}`)).json() as Record<string, unknown>;
+    const hvac = await (await realFetch(base + `/api/v1/public/sms/program?program=${programB}`)).json() as Record<string, unknown>;
+    expect(roofing).toMatchObject({
+      brand: "Synthetic & Roofing", sender, available: true,
+      privacyUrl: "https://roofing.example.test/privacy",
+      termsUrl: "https://roofing.example.test/messaging-terms",
+    });
+    expect(hvac).toMatchObject({
+      brand: "Synthetic HVAC", sender: senderB, available: true,
+      privacyUrl: "https://hvac.example.test/privacy",
+      termsUrl: "https://hvac.example.test/messaging-terms",
+    });
+    expect(await (await realFetch(base + "/api/v1/public/sms/program")).json()).toMatchObject({ available: false, brand: null });
+    expect(await (await realFetch(base + "/api/v1/public/sms/program?program=invalid-program-token-1234567")).json()).toMatchObject({ available: false, brand: null });
+    const invalidPhone = await realFetch(base + `/api/v1/public/sms/enroll?program=${programB}`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+        phone: "+10000000000", customerCare: true, appointments: true, ownPhone: true,
+        disclosureVersion: "synthetic-hvac-v1",
+      }),
+    });
+    expect(invalidPhone.status).toBe(400);
+    const wrongToken = await realFetch(base + "/api/v1/public/sms/enroll?program=invalid-program-token-1234567", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+        phone, customerCare: true, appointments: false, ownPhone: true,
+        disclosureVersion: SMS_DISCLOSURE_VERSION,
+      }),
+    });
+    expect(wrongToken.status).toBe(503);
+  } finally {
+    await db.update(twilioClientBindingsTable).set({
+      launchApproved: originalB.launchApproved, smsEnabled: originalB.smsEnabled,
+      registrationApproved: originalB.registrationApproved,
+      advancedOptOut: originalB.advancedOptOut,
+      geoPermissionsReviewed: originalB.geoPermissionsReviewed,
+    }).where(eq(twilioClientBindingsTable.organizationId, orgB));
+  }
 });
 it("records no consent until the correct handset confirms the optional purposes", async () => {
   await expect(

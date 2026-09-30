@@ -86,14 +86,19 @@ export async function runSchedulerCycle(
       if (connectionLost)
         throw new Error("Scheduler ownership connection was lost.");
       if (phase === "failed") failedStages.push(stage);
-      await db
+      const [heartbeat] = await db
         .update(runtime)
         .set({
           heartbeatAt: new Date(),
           currentStage: phase === "running" ? stage : null,
           failedStages: [...failedStages],
         })
-        .where(and(eq(runtime.name, name), eq(runtime.ownerId, ownerId)));
+        .where(and(eq(runtime.name, name), eq(runtime.ownerId, ownerId)))
+        .returning({ name: runtime.name });
+      // A lost/replaced runtime row must stop stage progression at this
+      // observer boundary, even if the lock connection emitted no error.
+      if (!heartbeat)
+        throw new Error("Scheduler runtime ownership was lost.");
     };
     try {
       await work(observe);

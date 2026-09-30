@@ -39,14 +39,39 @@ const stops = new Set([
   "REVOKE",
   "OPTOUT",
 ]);
+/** Public client policies are configured explicitly for each isolated program.
+ * The MogulForge-only draft pages are never a fallback for a contractor. */
+function enrollmentPolicies(authTokenSecretRef: string) {
+  if (!/^TWILIO_CLIENT_[A-Z0-9_]+_AUTH_TOKEN$/.test(authTokenSecretRef)) return null;
+  const prefix = authTokenSecretRef.slice(0, -"AUTH_TOKEN".length);
+  const httpsUrl = (value: string | undefined) => {
+    try {
+      const url = new URL(value ?? "");
+      return url.protocol === "https:" && !url.username && !url.password && !url.hash
+        ? url.href
+        : null;
+    } catch {
+      return null;
+    }
+  };
+  const privacyUrl = httpsUrl(process.env[`${prefix}SMS_PRIVACY_URL`]);
+  const termsUrl = httpsUrl(process.env[`${prefix}SMS_TERMS_URL`]);
+  return privacyUrl && termsUrl ? { privacyUrl, termsUrl } : null;
+}
 router.get("/public/sms/program", async (req, res) => {
   const config = await twilioForPublicProgram(req.query.program);
+  const policies = config ? enrollmentPolicies(config.authTokenSecretRef) : null;
+  const available = Boolean(config?.smsEnabled && policies);
+  res.set("Cache-Control", "no-store");
   res.json({
     brand: config?.businessName ?? null,
-    available: Boolean(config?.smsConfigured && !config.revokedAt),
+    available,
     enabled: Boolean(config?.smsEnabled),
+    // Keep the known sender visible for STOP/HELP even when new enrollment is closed.
     sender: config?.smsConfigured ? config.phoneNumber : null,
-    disclosureVersion: config?.smsDisclosureVersion ?? null,
+    disclosureVersion: available ? config!.smsDisclosureVersion : null,
+    privacyUrl: available ? policies!.privacyUrl : null,
+    termsUrl: available ? policies!.termsUrl : null,
   });
 });
 router.post(
@@ -54,7 +79,7 @@ router.post(
   rateLimit({ windowMs: 60_000, max: 5, key: "sms-enroll" }),
   async (req, res) => {
     const config = await twilioForPublicProgram(req.query.program);
-    if (!config?.smsEnabled) {
+    if (!config?.smsEnabled || !enrollmentPolicies(config.authTokenSecretRef)) {
       res.status(503).json({ error: "Text enrollment is not open yet." });
       return;
     }

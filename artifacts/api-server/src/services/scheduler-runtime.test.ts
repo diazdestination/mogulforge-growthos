@@ -78,6 +78,35 @@ it("records an unexpected interruption without leaking raw errors", async () => 
     spy.mockRestore();
   }
 });
+it("stops before the next stage when its runtime ownership no longer matches", async () => {
+  const name = testName();
+  const effect = vi.fn();
+  const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const result = await runSchedulerCycle(
+      async (observe) => {
+        // Simulate a replacement claiming the runtime row without relying on
+        // a transport error event from the advisory-lock connection.
+        await db
+          .update(runtime)
+          .set({ ownerId: "replacement" })
+          .where(eq(runtime.name, name));
+        await observe("scheduled-actions", "running");
+        effect();
+      },
+      { name, ownerId: "original" },
+    );
+    expect(result).toBe("degraded");
+    expect(effect).not.toHaveBeenCalled();
+    const [saved] = await db
+      .select()
+      .from(runtime)
+      .where(eq(runtime.name, name));
+    expect(saved.ownerId).toBe("replacement");
+  } finally {
+    spy.mockRestore();
+  }
+});
 // PGlite's socket adapter does not provide independent PostgreSQL sessions.
 // This check is mandatory in CI, where the service is real PostgreSQL.
 it.skipIf(process.env.SCHEDULER_TEST_BACKEND === "pglite")(

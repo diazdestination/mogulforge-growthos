@@ -14,6 +14,9 @@ it('represents all eight illustrated profiles with four inspectable tasks each',
   render(<AgentTeam publicMode />);
   expect(screen.getAllByRole('button', { name: /^View / })).toHaveLength(8);
   expect(screen.getByRole('heading', { name: 'Growth OS' })).toBeTruthy();
+  expect(
+    screen.getByRole('link', { name: 'MogulForge GrowthOS home' }).querySelector('img')?.getAttribute('src'),
+  ).toBe('/brand/mogulforge-mark.svg');
 });
 
 it('does not present subscription billing as contractor invoicing', () => {

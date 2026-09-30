@@ -5,7 +5,7 @@
 
 ## Design decision
 
-Use the owner's ink-navy and warm-gold visual system for GrowthOS's platform-owned surfaces. The local `/agent-team` page uses eight individual portraits, the named personas, and the same compact command-center rhythm. The raster mark (including the local favicon) is **provisional**: it was generated from the supplied screenshot because no editable logo master was provided. Get the owner's original SVG/AI/PNG master before calling it the final logo or changing tenant white-label assets.
+Use the owner's ink-navy and warm-gold visual system for GrowthOS's platform-owned surfaces. The local `/agent-team` page uses eight individual portraits, the named personas, and the same compact command-center rhythm. The owner confirmed the poster mark was AI-generated and authorized a similar original mark. The new [brand SVG](artifacts/command-center/public/brand/mogulforge-mark.svg) is a clean vector candidate for platform surfaces; [brand guidance](design/brand/BRAND.md) keeps tenant white-label identity separate. No original master or trademark review is implied.
 
 The roster is a set of bounded workflows, not eight independent AI workers. Each action still runs as the authenticated organization/staff identity or approved service principal, with tenant authorization, deterministic policy checks, human approval for consequential actions, and an audit/run ledger. In particular, do not use an LLM for money arithmetic, warranty dates, routing safety, consent, or legal deadlines.
 
@@ -44,4 +44,4 @@ Every specialty needs: canonical data ownership, tenant/role permission, validat
 
 ## Current boundary
 
-This branch only incorporates the brand direction and a transparent capability map. The local roster links to working staff pages but does not turn on communications, change a provider account, deploy, send a message, charge a customer, or make legal representations. The owner's original logo master and a design approval are still needed before a final cross-platform rebrand.
+This branch incorporates the approved brand direction and a transparent capability map. The local roster links to working staff pages but does not turn on communications, change a provider account, deploy, send a message, charge a customer, or make legal representations. The mark is authorized as a similar GrowthOS platform candidate; applying it to tenant brands or legal identities is a separate decision.

@@ -76,7 +76,7 @@ export default function LandingPage() {
         {/* Nav */}
         <header className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <img src="/agent-profiles/mogulforge-mark-provisional.webp" alt="" className="w-11 h-11 object-contain" />
+            <img src="/brand/mogulforge-mark.svg" alt="" className="w-11 h-11 object-contain" />
             <span className="font-bold uppercase tracking-[0.13em]">
               {CLIENT.businessShortName}
             </span>
@@ -194,7 +194,7 @@ export default function LandingPage() {
         <footer className="border-t border-white/10">
           <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between text-sm text-zinc-500">
             <span className="flex items-center gap-2">
-              <img src="/agent-profiles/mogulforge-mark-provisional.webp" alt="" className="w-5 h-5 object-contain" />
+              <img src="/brand/mogulforge-mark.svg" alt="" className="w-5 h-5 object-contain" />
               {CLIENT.appName}
             </span>
             <span>© {CLIENT.businessShortName}</span>

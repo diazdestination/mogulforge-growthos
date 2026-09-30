@@ -4,22 +4,28 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>MogulForge · Text preferences</title>
+    <title>GrowthOS · Text preferences</title>
     <link rel="stylesheet" href="/messaging.css" />
     <script src="/sms-preferences.js" defer></script>
   </head>
   <body>
     <main>
-      <a class="brand" href="/">MOGULFORGE / GROWTHOS</a>
-      <h1>Choose the texts<br />that help you.</h1>
+      <span class="brand">POWERED BY MOGULFORGE GROWTHOS</span>
+      <h1>Text preferences for <span id="business-name">your business</span></h1>
       <p>
-        Optional text preferences for MogulForge’s own customers. Use the mobile
-        number already attached to your customer record.
+        Use only an enrollment link supplied by this business. Enter your own
+        mobile number already attached to your customer record.
       </p>
       <p class="notice" id="availability" role="status">
-        Checking whether text enrollment is available…
+        Checking this business’s text program…
       </p>
-      <form id="preferences" class="card">
+      <p id="existing-sender" hidden>
+        Already receiving texts from this business? Reply STOP to opt out or
+        HELP for help at <strong id="sender-number"></strong>. These options
+        remain available even when new enrollment is closed.
+      </p>
+      <form id="preferences" class="card" hidden>
+        <p>Texts will come from <strong id="form-sender-number"></strong>.</p>
         <label
           >Your own US mobile number<input
             type="tel"
@@ -29,11 +35,11 @@
             required /></label
         ><label
           ><input type="checkbox" name="customerCare" />I agree to receive
-          MogulForge customer-care texts about my requests and ongoing support
+          <span class="business-name">this business</span> customer-care texts about my requests and ongoing support
           conversations. Message frequency varies with my requests.</label
         ><label
           ><input type="checkbox" name="appointments" />I agree to receive
-          MogulForge appointment confirmations and reminders for appointments I
+          <span class="business-name">this business</span> appointment confirmations and reminders for appointments I
           book. Message frequency varies with my appointments.</label
         ><label
           ><input type="checkbox" name="ownPhone" required />This is my own
@@ -42,9 +48,10 @@
         <p class="small">
           Message and data rates may apply. Reply STOP to opt out or HELP for
           help. Consent is optional and is not a condition of purchase. These
-          choices do not include promotions or messages from client businesses.
-          <a href="/messaging-terms.html">Messaging terms</a> ·
-          <a href="/messaging-privacy.html">Messaging privacy</a>
+          choices do not include promotions or messages from other businesses.
+          Review this business’s approved
+          <a id="terms-link" rel="noopener noreferrer" target="_blank">messaging terms</a> and
+          <a id="privacy-link" rel="noopener noreferrer" target="_blank">privacy policy</a>.
         </p>
         <button id="submit" type="submit" disabled>
           Get my confirmation code
@@ -54,7 +61,7 @@
       <p>
         Submitting this form alone does not start messages. When enrollment is
         open, confirm from your own phone by sending the one-time JOIN
-        instruction shown here to the MogulForge number. If you previously sent
+        instruction shown here to this business’s number. If you previously sent
         STOP, send START first, then confirm fresh preferences. Codes expire
         after 24 hours.
       </p>
@@ -63,14 +70,7 @@
         confirming the new selection also withdraws both preferences.
       </p>
       <footer>
-        <p>
-          Questions: <a href="mailto:Adam@mogulforge.ai">Adam@mogulforge.ai</a>
-        </p>
-        <nav>
-          <a href="/messaging-privacy.html">Messaging privacy</a
-          ><a href="/messaging-terms.html">Messaging terms</a
-          ><a href="/">Back to GrowthOS</a>
-        </nav>
+        <p>New enrollment stays closed until this business has an approved sender and its own privacy and terms links.</p>
       </footer>
     </main>
   </body>
