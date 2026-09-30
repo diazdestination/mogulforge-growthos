@@ -38,6 +38,7 @@ import Bie from '@/pages/bie';
 import ProjectRoom from '@/pages/project-room';
 import EvidenceIntelligence from '@/pages/evidence-intelligence';
 import Account from '@/pages/account';
+import AgentTeam from '@/pages/agent-team';
 import { CreateOrgScreen } from '@/components/create-org';
 import {
   useGetSession,
@@ -513,6 +514,9 @@ function Router() {
         <Route path="/verify-email">
           <IdentityActionScreen kind="verify" />
         </Route>
+        <Route path="/agent-team">
+          <AgentTeam publicMode />
+        </Route>
         <Route>
           <LandingPage />
         </Route>
@@ -563,6 +567,9 @@ function AuthedApp() {
           </Route>
           <Route path="/" component={Bie} />
           <Route path="/bie" component={Bie} />
+          <Route path="/agent-team">
+            <AgentTeam />
+          </Route>
           <Route path="/evidence" component={EvidenceIntelligence} />
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/assistant" component={Assistant} />

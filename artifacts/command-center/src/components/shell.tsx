@@ -48,6 +48,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { title: 'BIE Command', href: '/', icon: Bot },
+  { title: 'Agent team', href: '/agent-team', icon: Users },
   { title: 'Evidence Intelligence', href: '/evidence', icon: FileSearch2 },
   { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { title: 'Assistant', href: '/assistant', icon: Sparkles },
