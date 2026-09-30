@@ -46,6 +46,7 @@ export default function ServiceDesk() {
   const editable = canWrite(me?.role);
   const [rows, setRows] = useState<ServiceRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [contactId, setContactId] = useState('');
@@ -66,7 +67,9 @@ export default function ServiceDesk() {
     setLoading(true);
     try {
       setRows(await jsonRequest<ServiceRow[]>('/api/v1/service-obligations'));
+      setLoadError(false);
     } catch (error) {
+      setLoadError(true);
       setNotice(error instanceof Error ? error.message : 'Service schedule could not be loaded.');
     } finally {
       setLoading(false);
@@ -154,7 +157,7 @@ export default function ServiceDesk() {
       {notice && <p role="status" className="rounded-lg border bg-card p-3 text-sm">{notice}</p>}
       <section className="rounded-xl border bg-card p-4 space-y-3" aria-label="Upcoming service">
         <h2 className="font-semibold">Upcoming service ({active.length})</h2>
-        {loading ? <p>Loading service dates…</p> : active.length === 0 ? <p className="text-sm text-muted-foreground">No active service dates yet.</p> : (
+        {loading ? <p>Loading service dates…</p> : loadError ? <p role="alert" className="text-sm text-muted-foreground">Service dates are unavailable. Try again before deciding what needs follow-up.</p> : active.length === 0 ? <p className="text-sm text-muted-foreground">No active service dates yet.</p> : (
           <ul className="space-y-2">
             {active.map(({ obligation, contact, task }) => (
               <li key={obligation.id} className="rounded-lg border p-3 flex flex-wrap items-center justify-between gap-3 text-sm">
@@ -178,7 +181,7 @@ export default function ServiceDesk() {
           </select></label>
           <label className="block text-sm">Equipment<input required maxLength={160} className="block w-full rounded border p-2" value={equipmentLabel} onChange={event => setEquipmentLabel(event.target.value)} /></label>
           <label className="block text-sm">Service due date<input required type="date" className="block w-full rounded border p-2" value={dueDate} onChange={event => setDueDate(event.target.value)} /></label>
-          <label className="block text-sm">Staff follow-up lead time (days)<input required type="number" min={0} max={365} className="block w-full rounded border p-2" value={noticeDays} onChange={event => setNoticeDays(Number(event.target.value))} /></label>
+          <label className="block text-sm">Staff follow-up lead time (days)<input required type="number" min={0} max={365} className="block w-full rounded border p-2" value={noticeDays} onChange={event => { setNoticeDays(Number(event.target.value)); setPreview(null); }} /></label>
           <button disabled={busy || !contactId} className="rounded bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">Save service date</button>
         </form>
         <section className="rounded-xl border bg-card p-4 space-y-3" aria-label="Import customers">
