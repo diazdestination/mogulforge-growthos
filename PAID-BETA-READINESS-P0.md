@@ -7,6 +7,16 @@
 
 ## Mission
 
+**Communications-provider addendum (September 30):** The owner is evaluating a
+move away from Twilio. See [COMMUNICATIONS-PROVIDER-REVIEW-2026-09-30.md](COMMUNICATIONS-PROVIDER-REVIEW-2026-09-30.md).
+This does not waive communications acceptance or authorize a live switch.
+Twilio-specific checks below apply if any Twilio path is enabled in the release;
+any replacement must pass equivalent consent, tenant-routing, send/receive,
+delivery, failure, alerting, and rollback tests on the exact release candidate.
+Message Central VerifyNow is only an OTP candidate, and textbee's published
+events do not supply the missed-call trigger or a voice assistant. Keep
+customer-facing automatic SMS disabled until a complete route is proven.
+
 September 29 continuation: non-overlapping/distributed scheduler ownership, durable-action retry and restart checks, secret-free operator health, and always-on configuration are implemented for verification. See [SCHEDULER-OPERATIONS.md](SCHEDULER-OPERATIONS.md) for evidence, operating cost and known legacy failure windows. This is not staging or provider acceptance; P0-2 is not yet declared passed. GrowthOS's local landing copy now uses the BIE identity and separates sample-data exploration from live activation. No pricing package or launch promise is being introduced before the required gates.
 
 GrowthOS is not waiting for more feature invention. The immediate objective is to make the existing Revenue Intelligence + Recovery system boringly reliable in production, prove that it creates measurable customer value, and establish a repeatable paid-beta operating model.
@@ -429,7 +439,8 @@ GrowthOS may be called **paid-beta ready** only when:
 - the exact release SHA is green in CI;
 - exact-SHA staging acceptance is green;
 - scheduled execution is reliable while idle;
-- live Gmail/Resend/Twilio/OpenAI/Stripe test flows have evidence;
+- live Gmail/Resend/selected communications provider/OpenAI/Stripe test flows
+  have evidence (including Twilio if any Twilio path is enabled);
 - operators receive meaningful failure alerts;
 - a backup restore has been proven;
 - legal/privacy/data-lifecycle surfaces exist;
