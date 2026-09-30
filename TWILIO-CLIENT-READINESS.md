@@ -4,8 +4,10 @@
 
 The global single-organization account/number fallback described below has
 been replaced in local code with a disabled-by-default, one-organization/
-one-subaccount/one-number binding. Signed inbound events select by exact
-account and number; callbacks bind to the original operation. Two synthetic
+one-dedicated-account/one-number binding. The account can be an approved
+platform-managed subaccount or a client-owned account; the operating/billing
+model remains to be chosen for each client. Signed inbound events select by
+exact account and number; callbacks bind to the original operation. Two synthetic
 tenants and per-client revocation are covered by `test:twilio`. See
 [TWILIO-TENANT-BINDING.md](TWILIO-TENANT-BINDING.md) for the actual contract.
 This is not a migrated deployment or a live Painless/HVAC connection. The

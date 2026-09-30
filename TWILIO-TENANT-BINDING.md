@@ -1,11 +1,13 @@
 # GrowthOS Twilio client binding — local engineering state
 
-One `twilio_client_bindings` row maps one GrowthOS organization to one Twilio
-subaccount SID and one dedicated number. The database has unique constraints on
-organization, account SID and number. Nothing is created by default and every
-launch flag defaults to false. The old global `TWILIO_ORGANIZATION_ID`,
-`TWILIO_ACCOUNT_SID`, `TWILIO_PHONE_NUMBER` and shared auth token are no longer
-used to select a client.
+One `twilio_client_bindings` row maps one GrowthOS organization to one dedicated
+Twilio account SID and one number. That account may be a platform-managed
+subaccount or an approved client-owned account; the ownership/billing model is
+still a client-specific decision, not something the schema selects. The database
+has unique constraints on organization, account SID and number. Nothing is
+created by default and every launch flag defaults to false. The old global
+`TWILIO_ORGANIZATION_ID`, `TWILIO_ACCOUNT_SID`, `TWILIO_PHONE_NUMBER` and shared
+auth token are no longer used to select a client.
 
 ## Safe binding contract
 
