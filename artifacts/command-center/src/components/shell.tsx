@@ -29,6 +29,8 @@ import {
   Bot,
   FileSearch2,
   UserRound,
+  Wrench,
+  PhoneCall,
 } from 'lucide-react';
 import { canManageSettings, canViewAuditLog } from '@/lib/permissions';
 import { CLIENT } from '@/lib/client.config';
@@ -58,6 +60,8 @@ const navItems: NavItem[] = [
   { title: 'Projects', href: '/projects', icon: HardHat },
   { title: 'Tasks', href: '/tasks', icon: CheckSquare },
   { title: 'Appointments', href: '/appointments', icon: Calendar },
+  { title: 'Service Desk', href: '/service', icon: Wrench },
+  { title: 'Calls', href: '/calls', icon: PhoneCall },
   { title: 'Win-back', href: '/reactivation', icon: RotateCcw },
   { title: 'Lead Capture', href: '/capture', icon: Webhook },
   { title: 'Client Launchpad', href: '/platform', icon: Building, requirePlatform: true },

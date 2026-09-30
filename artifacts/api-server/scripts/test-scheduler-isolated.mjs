@@ -7,6 +7,7 @@ import path from "node:path";
 
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const database = path.resolve(api, "../../lib/db");
+const selectedTests = process.argv.slice(2);
 const pg = await PGlite.create();
 const server = new PGLiteSocketServer({
   db: pg,
@@ -57,6 +58,7 @@ try {
       "--maxWorkers",
       "1",
       "--no-file-parallelism",
+      ...(selectedTests.length ? selectedTests : [
       "src/services/scheduler-loop.test.ts",
       "src/services/scheduler-runtime.test.ts",
       "src/services/scheduler-stage-isolation.test.ts",
@@ -65,12 +67,13 @@ try {
       "src/services/durable-execution.test.ts",
       "src/routes/v1/runtime-health.test.ts",
       "src/routes/v1/route-inventory.test.ts",
+      ]),
     ],
     api,
   );
-  console.log(
-    "PASS: synthetic local scheduler checks. Independent-session advisory lock exclusion is checked in CI on PostgreSQL, not by PGlite. No production or provider acceptance is implied.",
-  );
+  console.log(selectedTests.length
+    ? "PASS: selected synthetic isolated API checks. No production or provider acceptance is implied."
+    : "PASS: synthetic local scheduler checks. Independent-session advisory lock exclusion is checked in CI on PostgreSQL, not by PGlite. No production or provider acceptance is implied.");
 } finally {
   await server.stop();
   await pg.close();

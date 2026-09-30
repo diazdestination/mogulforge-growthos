@@ -49,6 +49,7 @@ const received: Received[] = [];
 const responseQueue: number[] = [];
 
 const realFetch = globalThis.fetch;
+let forwardingFetch: typeof fetch;
 
 beforeAll(async () => {
   process.env.SESSION_SECRET ??= "test-session-secret";
@@ -79,6 +80,7 @@ beforeAll(async () => {
     }
     return realFetch(input, init);
   }) as typeof fetch);
+  forwardingFetch = globalThis.fetch;
 
   const slug = `test-webhook-e2e-${Date.now()}`;
   const [row] = await db
@@ -141,6 +143,10 @@ beforeEach(async () => {
   await db
     .delete(webhookEndpointsTable)
     .where(eq(webhookEndpointsTable.organizationId, org.id));
+});
+
+afterEach(() => {
+  vi.stubGlobal("fetch", forwardingFetch);
 });
 
 describe("end-to-end signed webhook delivery", () => {
@@ -316,5 +322,53 @@ describe("retry scheduler (processPendingDeliveries)", () => {
     const again = await processPendingDeliveries();
     expect(again).toBe(0);
     expect(received).toHaveLength(1);
+  });
+
+  it("claims before sending so concurrent workers never deliver twice", async () => {
+    const endpoint = await createEndpoint(org.id, { url: HOOK_URL, events: [] });
+    const seeded = await seedDelivery(endpoint.id);
+    let release: (() => void) | undefined;
+    let calls = 0;
+    vi.stubGlobal("fetch", (async () => {
+      calls++;
+      return new Promise<Response>((resolve) => {
+        release = () => resolve(new Response(null, { status: 200 }));
+      });
+    }) as typeof fetch);
+
+    const first = attemptDelivery(seeded.id);
+    await waitFor(async () => (release ? true : null));
+    const inFlight = await getDelivery(endpoint.id);
+    expect(inFlight.status).toBe("failed");
+    expect(inFlight.lastError).toBe("outcome unconfirmed; review before retry");
+    expect(inFlight.attempts).toBe(2);
+    expect(await processPendingDeliveries()).toBe(0);
+    await attemptDelivery(seeded.id);
+    expect(calls).toBe(1);
+
+    release!();
+    await first;
+    const after = await getDelivery(endpoint.id);
+    expect(after.status).toBe("success");
+    expect(after.attempts).toBe(2);
+  });
+
+  it("holds an ambiguous network failure for review without automatic replay", async () => {
+    const endpoint = await createEndpoint(org.id, { url: HOOK_URL, events: [] });
+    const seeded = await seedDelivery(endpoint.id);
+    let calls = 0;
+    vi.stubGlobal("fetch", (async () => {
+      calls++;
+      throw new Error("connection reset after receiver may have accepted the event");
+    }) as typeof fetch);
+
+    await attemptDelivery(seeded.id);
+    const held = await getDelivery(endpoint.id);
+    expect(held.status).toBe("failed");
+    expect(held.attempts).toBe(2);
+    expect(held.nextAttemptAt).toBeNull();
+    expect(held.lastError).toBe("outcome unconfirmed; review before retry");
+    expect(await processPendingDeliveries()).toBe(0);
+    expect(calls).toBe(1);
   });
 });

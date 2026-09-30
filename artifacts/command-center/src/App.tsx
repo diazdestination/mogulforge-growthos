@@ -29,6 +29,8 @@ import Billing from '@/pages/billing';
 import LandingPage from '@/pages/landing';
 import Forms from '@/pages/forms';
 import Reactivation from '@/pages/reactivation';
+import ServiceDesk from '@/pages/service-desk';
+import Calls from '@/pages/calls';
 import Capture from '@/pages/capture';
 import Onboarding from '@/pages/onboarding';
 import Platform from '@/pages/platform';
@@ -580,6 +582,8 @@ function AuthedApp() {
           <Route path="/billing" component={Billing} />
           <Route path="/forms" component={Forms} />
           <Route path="/reactivation" component={Reactivation} />
+          <Route path="/service" component={ServiceDesk} />
+          <Route path="/calls" component={Calls} />
           <Route path="/capture" component={Capture} />
           <Route path="/onboarding" component={Onboarding} />
           <Route path="/platform" component={Platform} />

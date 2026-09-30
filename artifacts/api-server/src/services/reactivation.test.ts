@@ -8,6 +8,7 @@ import {
   playbooksTable,
   reactivationCampaignLeadsTable,
   reactivationCampaignsTable,
+  scheduledActionsTable,
   suppressionsTable,
 } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
@@ -363,6 +364,19 @@ describe("campaign lifecycle + throttle", () => {
     if ("error" in launched) throw new Error(launched.error);
     await drainReactivationCampaigns(orgId);
 
+    // Same lead can also have a different category sequence; cancelling the
+    // campaign must not stop that independent relationship.
+    const [campaignLead] = await db.select().from(reactivationCampaignLeadsTable)
+      .where(and(eq(reactivationCampaignLeadsTable.campaignId, campaign.id), eq(reactivationCampaignLeadsTable.status, "enrolled")));
+    const [otherPlaybook] = await db.insert(playbooksTable).values({
+      organizationId: orgId, name: "Independent follow-up", category: "estimate_follow_up",
+      steps: [{ channel: "email", delayMinutes: 60, prompt: "Follow up" }],
+    }).returning();
+    const [sameLeadOtherEnrollment] = await db.insert(playbookEnrollmentsTable).values({
+      organizationId: orgId, playbookId: otherPlaybook.id, leadId: campaignLead.leadId,
+      category: "estimate_follow_up", status: "active",
+    }).returning();
+
     const cancelled = await setCampaignStatus(orgId, campaign.id, "cancel");
     if ("error" in cancelled) throw new Error(cancelled.error);
 
@@ -372,6 +386,9 @@ describe("campaign lifecycle + throttle", () => {
       .from(playbookEnrollmentsTable)
       .where(eq(playbookEnrollmentsTable.id, outsideEnrollment.id));
     expect(stillActive.status).toBe("active");
+    const [sameLeadStillActive] = await db.select().from(playbookEnrollmentsTable)
+      .where(eq(playbookEnrollmentsTable.id, sameLeadOtherEnrollment.id));
+    expect(sameLeadStillActive.status).toBe("active");
   });
 
   it("a mid-batch enrollment failure leaves the lead pending and retryable", async () => {
@@ -405,6 +422,12 @@ describe("campaign lifecycle + throttle", () => {
     expect(rows.filter((r) => r.status === "pending").length).toBe(1);
     // No stranded rows: every enrolled row has a real enrollment link.
     expect(rows.filter((r) => r.status === "enrolled" && !r.enrollmentId)).toEqual([]);
+    const firstEnrollmentId = rows.find((r) => r.enrollmentId)?.enrollmentId;
+    const firstSteps = await db
+      .select()
+      .from(scheduledActionsTable)
+      .where(sql`${scheduledActionsTable.action}->'params'->>'enrollmentId' = ${firstEnrollmentId}`);
+    expect(firstSteps).toHaveLength(1);
     // The campaign must NOT be marked completed while a lead awaits retry.
     const [c] = await db
       .select()
@@ -420,6 +443,13 @@ describe("campaign lifecycle + throttle", () => {
       .where(eq(reactivationCampaignLeadsTable.campaignId, campaign.id));
     expect(rows.filter((r) => r.status === "enrolled").length).toBe(2);
     expect(rows.filter((r) => !r.enrollmentId)).toEqual([]);
+    for (const row of rows) {
+      const steps = await db
+        .select()
+        .from(scheduledActionsTable)
+        .where(sql`${scheduledActionsTable.action}->'params'->>'enrollmentId' = ${row.enrollmentId}`);
+      expect(steps).toHaveLength(1);
+    }
   });
 
   it("reports contacted, replies, bookings, and recovered revenue", async () => {

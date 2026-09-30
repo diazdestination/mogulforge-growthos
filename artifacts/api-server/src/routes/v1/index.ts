@@ -41,6 +41,7 @@ import revenueWorkspaceRouter from "./revenue-workspace";
 import evidenceIntelligenceRouter from "./evidence-intelligence";
 import gmailIntegrationsRouter from "./gmail-integrations";
 import emailIntelligenceRouter from "./email-intelligence";
+import serviceObligationsRouter from "./service-obligations";
 
 const router: IRouter = Router();
 
@@ -58,6 +59,7 @@ router.use(estimatesRouter);
 router.use(projectsRouter);
 router.use(tasksRouter);
 router.use(appointmentsRouter);
+router.use(serviceObligationsRouter);
 router.use(dashboardRouter);
 router.use(reportsRouter);
 router.use(assistantRouter);

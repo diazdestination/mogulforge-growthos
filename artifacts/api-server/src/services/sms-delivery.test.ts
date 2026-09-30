@@ -12,6 +12,7 @@ import {
   db,
   organizationsTable,
   DEFAULT_SENDING_HOURS,
+  twilioClientBindingsTable,
   twilioConsentProofsTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -23,15 +24,15 @@ import { updateOrgSettings } from "./settings";
 
 import { createAutomation, runEvent } from "./automation";
 import * as crm from "./crm";
-import { mockSmsProvider, providers, twilioSmsProvider } from "./providers";
+import { providers, twilioSmsProvider } from "./providers";
 import { SMS_DISCLOSURE_VERSION } from "./twilio-controls";
 
-const account = `AC${"1".repeat(32)}`;
-const service = `MG${"2".repeat(32)}`;
+const account = `AC${"a".repeat(32)}`;
+const service = `MG${"b".repeat(32)}`;
 const apiKey = `SK${"3".repeat(32)}`;
 const apiSecret = "synthetic-api-key-secret";
 const authToken = "synthetic-webhook-token";
-const sender = "+15005550006";
+const sender = "+15005550009";
 const recipient = "+15551234567";
 let org: { id: string };
 let contact: { id: string };
@@ -39,20 +40,8 @@ let contact: { id: string };
 function twilioEnv() {
   return {
     APP_ORIGIN: "https://growth.example",
-    TWILIO_PUBLIC_ORIGIN: "https://growth.example",
-    TWILIO_ORGANIZATION_ID: org.id,
-    TWILIO_ACCOUNT_SID: account,
-    TWILIO_AUTH_TOKEN: authToken,
-    TWILIO_MESSAGING_SERVICE_SID: service,
-    TWILIO_PHONE_NUMBER: sender,
-    TWILIO_API_KEY_SID: apiKey,
-    TWILIO_API_KEY_SECRET: apiSecret,
-    TWILIO_SMS_ENABLED: "true",
-    TWILIO_REGISTRATION_APPROVED: "true",
-    TWILIO_ADVANCED_OPT_OUT: "true",
-    TWILIO_LAUNCH_APPROVED: "true",
-    TWILIO_GEO_PERMISSIONS_REVIEWED: "true",
-    TWILIO_DAILY_SMS_LIMIT: "20",
+    TWILIO_CLIENT_SMS_TEST_AUTH_TOKEN: authToken,
+    TWILIO_CLIENT_SMS_TEST_API_KEY_SECRET: apiSecret,
   };
 }
 
@@ -104,6 +93,16 @@ beforeAll(async () => {
     .values({ name: "SMS Delivery Test Org", slug: `test-sms-${randomUUID()}` })
     .returning();
   org = createdOrg;
+  await db.insert(twilioClientBindingsTable).values({
+    organizationId: org.id, accountSid: account, phoneNumber: sender,
+    messagingServiceSid: service, apiKeySid: apiKey,
+    authTokenSecretRef: "TWILIO_CLIENT_SMS_TEST_AUTH_TOKEN",
+    apiKeySecretRef: "TWILIO_CLIENT_SMS_TEST_API_KEY_SECRET",
+    publicOrigin: "https://growth.example", businessName: "Synthetic SMS",
+    smsDisclosureVersion: SMS_DISCLOSURE_VERSION, dailySmsLimit: 20,
+    launchApproved: true, smsEnabled: true, registrationApproved: true,
+    advancedOptOut: true, geoPermissionsReviewed: true,
+  });
   const [createdContact] = await db
     .insert(contactsTable)
     .values({ organizationId: org.id, firstName: "Synthetic", phone: recipient })
@@ -190,19 +189,18 @@ describe("twilioSmsProvider", () => {
 });
 
 describe("SMS provider selection (module load)", () => {
-  it("selects twilioSmsProvider only when the full launch gate is enabled", async () => {
+  it("routes a configured client through the Twilio guard at send time", async () => {
     stubTwilioEnv();
-    vi.resetModules();
-    const fresh = await import("./providers");
-    expect(fresh.providers.sms).toBe(fresh.twilioSmsProvider);
+    const sid = `SM${"b".repeat(32)}`;
+    const calls = stubTwilioFetch({ ok: true, json: { sid } });
+    expect((await providers.sms.send(recipient, "Configured", context())).provider).toBe("twilio");
+    expect(calls).toHaveLength(1);
   });
 
-  it("falls back to mockSmsProvider when no Twilio account is configured", async () => {
-    stubTwilioEnv();
-    vi.stubEnv("TWILIO_ACCOUNT_SID", "");
-    vi.resetModules();
-    const fresh = await import("./providers");
-    expect(fresh.providers.sms).toBe(fresh.mockSmsProvider);
+  it("never falls back to mock for a bound client with a missing secret", async () => {
+    const calls = stubTwilioFetch();
+    await expect(providers.sms.send(recipient, "No secret", context())).rejects.toThrow(/disabled/i);
+    expect(calls).toHaveLength(0);
   });
 });
 
@@ -261,8 +259,7 @@ describe("automation → send_sms → Twilio round-trip", () => {
 
   it("uses the labeled mock provider (no HTTP) when Twilio is not configured", async () => {
     const calls = stubTwilioFetch();
-    // Default in this test env: providers.sms is the mock.
-    expect(providers.sms).toBe(mockSmsProvider);
+    // Without a tenant context in this local test, the router selects the labeled mock.
     const res = await providers.sms.send("+15551112222", "mock check");
     expect(res.provider).toBe("mock-sms");
     expect(calls).toHaveLength(0);

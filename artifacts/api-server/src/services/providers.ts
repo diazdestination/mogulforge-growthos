@@ -1,4 +1,4 @@
-import { twilioConfiguration, type SmsSendContext } from './twilio-controls';
+import { twilioForOrganization, type SmsSendContext } from './twilio-controls';
 /**
  * Provider adapters. Mocks are clearly labeled and used only when real
  * credentials are absent in local development. Production SMS requires the
@@ -247,20 +247,19 @@ export async function getEmailProviderStatus(): Promise<{
  * can tell whether customers actually receive texts or sends only hit the
  * dev mock. Checked at call-time so env changes are always reflected.
  */
-export function getSmsProviderStatus(organizationId?: string): {
+export async function getSmsProviderStatus(organizationId?: string): Promise<{
   provider: "twilio" | "mock" | "disabled";
   senderPhoneNumber: string | null;
-} {
-  if (isTwilioConfigured() && organizationId === twilioConfiguration().organizationId) {
+}> {
+  const binding = organizationId ? await twilioForOrganization(organizationId) : null;
+  if (binding?.smsEnabled) {
     return {
       provider: "twilio",
-      senderPhoneNumber: process.env.TWILIO_PHONE_NUMBER ?? null,
+      senderPhoneNumber: binding.phoneNumber,
     };
   }
-  return { provider: process.env.NODE_ENV === 'production' || Boolean(process.env.TWILIO_ACCOUNT_SID) ? 'disabled' : 'mock', senderPhoneNumber: null };
+  return { provider: process.env.NODE_ENV === 'production' || Boolean(binding) ? 'disabled' : 'mock', senderPhoneNumber: null };
 }
-
-export function isTwilioConfigured(): boolean { return twilioConfiguration().enabled; }
 
 export function isGmailConfigured(): boolean {
   return Boolean(
@@ -555,16 +554,23 @@ export const adaptiveEmailProvider: EmailProvider = {
   },
 };
 
-const twilioConfigured = isTwilioConfigured();
+const tenantAwareSmsProvider: SmsProvider = {
+  async send(to, body, context) {
+    const binding = context?.organizationId ? await twilioForOrganization(context.organizationId) : null;
+    if (binding || process.env.NODE_ENV === "production")
+      return twilioSmsProvider.send(to, body, context);
+    return mockSmsProvider.send(to, body, context);
+  },
+};
 
 export const providers = {
   // Global default stays the mock provider so existing flows (e.g. public
   // assessment capture) remain deterministic; the concierge opts into the
   // OpenAI provider with an explicit fallback.
   ai: mockAiProvider,
-  // Any Twilio account hint fails closed through the guarded adapter; a fully
-  // absent local/test configuration may use the explicitly labeled mock.
-  sms: twilioConfigured || process.env.NODE_ENV === "production" || Boolean(process.env.TWILIO_ACCOUNT_SID) ? twilioSmsProvider : mockSmsProvider,
+  // Resolve at send-time for the authenticated operation's organization.
+  // A present but disabled client binding never falls through to a mock.
+  sms: tenantAwareSmsProvider,
   // Runtime-adaptive: tries Gmail connector → Resend; mock is local/test only.
   email: adaptiveEmailProvider,
   weather: mockWeatherProvider,

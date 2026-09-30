@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import type { Request } from "express";
+import { and, eq } from "drizzle-orm";
 import { validateRequest } from "twilio";
+import { db, twilioClientBindingsTable } from "@workspace/db";
 
 export const SMS_DISCLOSURE_VERSION = "mogulforge-sms-2026-09-27.v1";
 export type SmsPurpose =
@@ -24,79 +26,94 @@ const sid = (prefix: string, value = "") =>
 export const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 
-export function twilioConfiguration() {
-  const env = process.env;
-  let origin = "";
+type Binding = typeof twilioClientBindingsTable.$inferSelect;
+const secretReference = (name: string | null, suffix: string) =>
+  name && new RegExp(`^TWILIO_CLIENT_[A-Z0-9_]+_${suffix}$`).test(name)
+    ? process.env[name] ?? ""
+    : "";
+const validOrigin = (raw: string) => {
   try {
-    const url = new URL(env.TWILIO_PUBLIC_ORIGIN ?? "");
-    if (url.protocol === "https:" && url.origin === env.TWILIO_PUBLIC_ORIGIN)
-      origin = url.origin;
+    const url = new URL(raw);
+    return url.protocol === "https:" && url.origin === raw ? url.origin : "";
   } catch {
-    /* disabled */
+    return "";
   }
-  const organizationId = env.TWILIO_ORGANIZATION_ID ?? "";
+};
+function hydrate(binding: Binding) {
+  const origin = validOrigin(binding.publicOrigin);
+  const authToken = secretReference(binding.authTokenSecretRef, "AUTH_TOKEN");
+  const apiKeySecret = secretReference(binding.apiKeySecretRef, "API_KEY_SECRET");
   const voiceConfigured = Boolean(
-    origin &&
-    /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(organizationId) &&
-    sid("AC", env.TWILIO_ACCOUNT_SID) &&
-    env.TWILIO_AUTH_TOKEN &&
-    phoneE164(env.TWILIO_PHONE_NUMBER ?? "") === env.TWILIO_PHONE_NUMBER,
+    origin && sid("AC", binding.accountSid) && authToken &&
+    phoneE164(binding.phoneNumber) === binding.phoneNumber,
   );
-  const configured =
-    voiceConfigured && sid("MG", env.TWILIO_MESSAGING_SERVICE_SID);
-  const dailyLimit = Number(env.TWILIO_DAILY_SMS_LIMIT ?? 0);
-  const enabled =
-    configured &&
-    env.TWILIO_SMS_ENABLED === "true" &&
-    env.TWILIO_REGISTRATION_APPROVED === "true" &&
-    env.TWILIO_ADVANCED_OPT_OUT === "true" &&
-    env.TWILIO_LAUNCH_APPROVED === "true" &&
-    env.TWILIO_GEO_PERMISSIONS_REVIEWED === "true" &&
-    sid("SK", env.TWILIO_API_KEY_SID) &&
-    Boolean(env.TWILIO_API_KEY_SECRET) &&
-    Number.isSafeInteger(dailyLimit) &&
-    dailyLimit > 0 &&
-    dailyLimit <= 1000;
+  const smsConfigured = Boolean(
+    voiceConfigured && sid("MG", binding.messagingServiceSid ?? "") &&
+    binding.smsDisclosureVersion && binding.smsDisclosureVersion.length <= 120,
+  );
+  const businessName = binding.businessName.trim();
+  const validBusinessName = businessName.length > 0 && businessName.length <= 120 &&
+    !/[\u0000-\u001f\u007f]/.test(businessName);
+  const apiConfigured = Boolean(sid("SK", binding.apiKeySid ?? "") && apiKeySecret);
+  const active = binding.revokedAt === null && binding.launchApproved;
+  const voiceEnabled = Boolean(
+    active && voiceConfigured && apiConfigured && validBusinessName &&
+    binding.voiceEnabled && binding.voiceApproved && binding.geoPermissionsReviewed &&
+    phoneE164(binding.staffPhone ?? "") === binding.staffPhone &&
+    binding.staffPhone !== binding.phoneNumber &&
+    Number.isSafeInteger(binding.dailyCallLimit) &&
+    binding.dailyCallLimit > 0 && binding.dailyCallLimit <= 100,
+  );
+  const smsEnabled = Boolean(
+    active && smsConfigured && apiConfigured && validBusinessName &&
+    binding.smsEnabled && binding.registrationApproved &&
+    binding.advancedOptOut && binding.geoPermissionsReviewed &&
+    Number.isSafeInteger(binding.dailySmsLimit) &&
+    binding.dailySmsLimit > 0 && binding.dailySmsLimit <= 1000,
+  );
   return {
-    origin,
-    organizationId,
-    voiceConfigured,
-    configured,
-    enabled,
-    dailyLimit,
+    ...binding, origin, authToken, apiKeySecret, businessName,
+    voiceConfigured, smsConfigured, voiceEnabled, smsEnabled,
   };
 }
-
+export type TwilioClientBinding = ReturnType<typeof hydrate>;
+export async function twilioForOrganization(organizationId: string): Promise<TwilioClientBinding | null> {
+  const [binding] = await db.select().from(twilioClientBindingsTable)
+    .where(eq(twilioClientBindingsTable.organizationId, organizationId)).limit(1);
+  return binding ? hydrate(binding) : null;
+}
+export async function twilioForInbound(accountSid: string, phoneNumber: string): Promise<TwilioClientBinding | null> {
+  if (!sid("AC", accountSid) || phoneE164(phoneNumber) !== phoneNumber) return null;
+  const [binding] = await db.select().from(twilioClientBindingsTable)
+    .where(and(
+      eq(twilioClientBindingsTable.accountSid, accountSid),
+      eq(twilioClientBindingsTable.phoneNumber, phoneNumber),
+    )).limit(1);
+  return binding ? hydrate(binding) : null;
+}
+export async function twilioForPublicProgram(token: unknown): Promise<TwilioClientBinding | null> {
+  if (typeof token !== "string" || !/^[A-Za-z0-9_-]{24,128}$/.test(token)) return null;
+  const [binding] = await db.select().from(twilioClientBindingsTable)
+    .where(eq(twilioClientBindingsTable.publicEnrollmentToken, token)).limit(1);
+  return binding ? hydrate(binding) : null;
+}
+/** Only a candidate selected by account/number or existing operation is verified. */
 export function twilioRequestValid(
   req: Request,
+  binding: TwilioClientBinding | null,
   channel: "sms" | "voice" = "sms",
 ): boolean {
-  const config = twilioConfiguration(),
-    body = req.body;
+  const body = req.body;
   if (
-    !(channel === "voice" ? config.voiceConfigured : config.configured) ||
-    !req.is("application/x-www-form-urlencoded") ||
-    !body ||
-    typeof body !== "object" ||
-    Array.isArray(body)
-  )
-    return false;
-  if (Object.values(body).some((value) => typeof value !== "string"))
-    return false;
-  if (
-    body.AccountSid !== process.env.TWILIO_ACCOUNT_SID ||
-    (body.MessagingServiceSid &&
-      body.MessagingServiceSid !== process.env.TWILIO_MESSAGING_SERVICE_SID)
-  )
-    return false;
+    !binding || !(channel === "voice" ? binding.voiceConfigured : binding.smsConfigured) ||
+    !req.is("application/x-www-form-urlencoded") || !body ||
+    typeof body !== "object" || Array.isArray(body) ||
+    Object.values(body).some((value) => typeof value !== "string") ||
+    body.AccountSid !== binding.accountSid ||
+    (body.MessagingServiceSid && body.MessagingServiceSid !== binding.messagingServiceSid)
+  ) return false;
   const signature = req.headers["x-twilio-signature"];
-  return (
-    typeof signature === "string" &&
-    validateRequest(
-      process.env.TWILIO_AUTH_TOKEN!,
-      signature,
-      `${config.origin}${req.originalUrl}`,
-      body,
-    )
+  return typeof signature === "string" && validateRequest(
+    binding.authToken, signature, `${binding.origin}${req.originalUrl}`, body,
   );
 }

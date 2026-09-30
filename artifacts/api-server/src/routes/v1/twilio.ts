@@ -17,9 +17,10 @@ import { rateLimit } from "../../lib/rateLimit";
 import {
   digest,
   phoneE164,
-  twilioConfiguration,
+  twilioForInbound,
+  twilioForOrganization,
+  twilioForPublicProgram,
   twilioRequestValid,
-  SMS_DISCLOSURE_VERSION,
 } from "../../services/twilio-controls";
 import { sendTwilioSms } from "../../services/twilio-delivery";
 import { normalizePhone, addSuppression } from "../../services/send-gate";
@@ -38,22 +39,22 @@ const stops = new Set([
   "REVOKE",
   "OPTOUT",
 ]);
-router.get("/public/sms/program", (_req, res) => {
-  const config = twilioConfiguration();
+router.get("/public/sms/program", async (req, res) => {
+  const config = await twilioForPublicProgram(req.query.program);
   res.json({
-    brand: "MogulForge",
-    available: config.configured,
-    enabled: config.enabled,
-    sender: config.configured ? process.env.TWILIO_PHONE_NUMBER : null,
-    disclosureVersion: SMS_DISCLOSURE_VERSION,
+    brand: config?.businessName ?? null,
+    available: Boolean(config?.smsConfigured && !config.revokedAt),
+    enabled: Boolean(config?.smsEnabled),
+    sender: config?.smsConfigured ? config.phoneNumber : null,
+    disclosureVersion: config?.smsDisclosureVersion ?? null,
   });
 });
 router.post(
   "/public/sms/enroll",
   rateLimit({ windowMs: 60_000, max: 5, key: "sms-enroll" }),
   async (req, res) => {
-    const config = twilioConfiguration();
-    if (!config.configured) {
+    const config = await twilioForPublicProgram(req.query.program);
+    if (!config?.smsEnabled) {
       res.status(503).json({ error: "Text enrollment is not open yet." });
       return;
     }
@@ -63,7 +64,7 @@ router.post(
         customerCare: z.boolean(),
         appointments: z.boolean(),
         ownPhone: z.literal(true),
-        disclosureVersion: z.literal(SMS_DISCLOSURE_VERSION),
+        disclosureVersion: z.literal(config.smsDisclosureVersion!),
       })
       .strict()
       .safeParse(req.body);
@@ -85,7 +86,7 @@ router.post(
         organizationId: config.organizationId,
         phone,
         challengeHash: digest(code),
-        disclosureVersion: SMS_DISCLOSURE_VERSION,
+        disclosureVersion: config.smsDisclosureVersion!,
         customerCare: input.data.customerCare,
         appointments: input.data.appointments,
         expiresAt: new Date(Date.now() + 86400000),
@@ -97,7 +98,7 @@ router.post(
         ],
         set: {
           challengeHash: digest(code),
-          disclosureVersion: SMS_DISCLOSURE_VERSION,
+          disclosureVersion: config.smsDisclosureVersion!,
           customerCare: input.data.customerCare,
           appointments: input.data.appointments,
           expiresAt: new Date(Date.now() + 86400000),
@@ -105,7 +106,7 @@ router.post(
       });
     res.json({
       verificationText: `JOIN ${code}`,
-      sender: process.env.TWILIO_PHONE_NUMBER,
+      sender: config.phoneNumber,
     });
   },
 );
@@ -113,10 +114,11 @@ router.post(
   "/public/sms/inbound",
   rateLimit({ windowMs: 60_000, max: 240, key: "twilio-inbound" }),
   async (req, res) => {
-    const config = twilioConfiguration();
+    const config = await twilioForInbound(
+      String(req.body?.AccountSid ?? ""), String(req.body?.To ?? ""),
+    );
     if (
-      !twilioRequestValid(req) ||
-      req.body.To !== process.env.TWILIO_PHONE_NUMBER ||
+      !twilioRequestValid(req, config) ||
       !/^SM[a-f0-9]{32}$/i.test(req.body.MessageSid ?? "")
     ) {
       res.status(403).json({ error: "Invalid Twilio request" });
@@ -139,39 +141,52 @@ router.post(
             : req.body.OptOutType === "HELP" || word === "HELP"
               ? "HELP"
               : "message";
+    let foreignMessageSid = false;
     await db.transaction(async (tx) => {
       await tx.execute(
-        sql`SELECT pg_advisory_xact_lock(hashtext(${`twilio-inbound:${config.organizationId}:${phone}`}))`,
+        sql`SELECT pg_advisory_xact_lock(hashtext(${`twilio-inbound:${config!.organizationId}:${phone}`}))`,
       );
       const [seen] = await tx
         .select()
         .from(twilioInboundEventsTable)
         .where(eq(twilioInboundEventsTable.messageSid, req.body.MessageSid));
-      if (seen) return;
+      if (seen) {
+        foreignMessageSid = seen.organizationId !== config!.organizationId;
+        return;
+      }
       const contacts = await tx
         .select()
         .from(contactsTable)
         .where(
           and(
-            eq(contactsTable.organizationId, config.organizationId),
+            eq(contactsTable.organizationId, config!.organizationId),
             sql`regexp_replace(coalesce(${contactsTable.phone}, ''), '[^0-9]', '', 'g') IN (${phone.slice(1)}, ${phone.slice(2)})`,
           ),
         );
-      await tx
+      const [created] = await tx
         .insert(twilioInboundEventsTable)
         .values({
           messageSid: req.body.MessageSid,
-          organizationId: config.organizationId,
+          organizationId: config!.organizationId,
           phone,
           eventType,
           body: eventType === "message" ? text.slice(0, 1600) : null,
           contactId: contacts.length === 1 ? contacts[0].id : null,
-        });
+        })
+        .onConflictDoNothing()
+        .returning({ organizationId: twilioInboundEventsTable.organizationId });
+      if (!created) {
+        const [claimed] = await tx.select({ organizationId: twilioInboundEventsTable.organizationId })
+          .from(twilioInboundEventsTable)
+          .where(eq(twilioInboundEventsTable.messageSid, req.body.MessageSid));
+        foreignMessageSid = claimed?.organizationId !== config!.organizationId;
+        return;
+      }
       if (eventType === "STOP") {
         await tx
           .insert(suppressionsTable)
           .values({
-            organizationId: config.organizationId,
+            organizationId: config!.organizationId,
             channel: "sms",
             value: normalizePhone(phone),
             reason: "stop_keyword",
@@ -182,7 +197,7 @@ router.post(
           .delete(twilioEnrollmentsTable)
           .where(
             and(
-              eq(twilioEnrollmentsTable.organizationId, config.organizationId),
+              eq(twilioEnrollmentsTable.organizationId, config!.organizationId),
               eq(twilioEnrollmentsTable.phone, phone),
             ),
           );
@@ -194,22 +209,22 @@ router.post(
           await tx
             .insert(consentRecordsTable)
             .values({
-              organizationId: config.organizationId,
+              organizationId: config!.organizationId,
               contactId: contact.id,
               channel: "sms",
               granted: false,
-              disclosureVersion: SMS_DISCLOSURE_VERSION,
+              disclosureVersion: config!.smsDisclosureVersion!,
             });
           for (const purpose of ["customer_care", "appointments"])
             await tx
               .insert(twilioConsentProofsTable)
               .values({
-                organizationId: config.organizationId,
+                  organizationId: config!.organizationId,
                 contactId: contact.id,
                 phone,
                 purpose,
                 granted: false,
-                disclosureVersion: SMS_DISCLOSURE_VERSION,
+                disclosureVersion: config!.smsDisclosureVersion!,
                 source: "twilio:STOP",
               });
         }
@@ -218,20 +233,20 @@ router.post(
           .delete(suppressionsTable)
           .where(
             and(
-              eq(suppressionsTable.organizationId, config.organizationId),
+              eq(suppressionsTable.organizationId, config!.organizationId),
               eq(suppressionsTable.channel, "sms"),
               eq(suppressionsTable.value, normalizePhone(phone)),
               eq(suppressionsTable.reason, "stop_keyword"),
             ),
           );
         // No purpose is re-granted; return to the form for fresh consent.
-      } else if (eventType === "JOIN" && contacts.length === 1) {
+      } else if (eventType === "JOIN" && config!.smsEnabled && contacts.length === 1) {
         const [pending] = await tx
           .select()
           .from(twilioEnrollmentsTable)
           .where(
             and(
-              eq(twilioEnrollmentsTable.organizationId, config.organizationId),
+              eq(twilioEnrollmentsTable.organizationId, config!.organizationId),
               eq(twilioEnrollmentsTable.phone, phone),
             ),
           );
@@ -240,7 +255,7 @@ router.post(
           .from(suppressionsTable)
           .where(
             and(
-              eq(suppressionsTable.organizationId, config.organizationId),
+              eq(suppressionsTable.organizationId, config!.organizationId),
               eq(suppressionsTable.channel, "sms"),
               eq(suppressionsTable.value, normalizePhone(phone)),
             ),
@@ -248,7 +263,7 @@ router.post(
         if (
           !pending ||
           suppressed ||
-          pending.disclosureVersion !== SMS_DISCLOSURE_VERSION ||
+          pending.disclosureVersion !== config!.smsDisclosureVersion ||
           pending.expiresAt.getTime() <= Date.now() ||
           pending.challengeHash !== digest(word.slice(5).trim())
         )
@@ -261,22 +276,22 @@ router.post(
           await tx
             .insert(twilioConsentProofsTable)
             .values({
-              organizationId: config.organizationId,
+              organizationId: config!.organizationId,
               contactId: contact.id,
               phone,
               purpose,
               granted,
-              disclosureVersion: SMS_DISCLOSURE_VERSION,
+              disclosureVersion: config!.smsDisclosureVersion!,
               source: "/sms-preferences.html + twilio:JOIN",
             });
         await tx
           .insert(consentRecordsTable)
           .values({
-            organizationId: config.organizationId,
+            organizationId: config!.organizationId,
             contactId: contact.id,
             channel: "sms",
             granted: pending.customerCare || pending.appointments,
-            disclosureVersion: SMS_DISCLOSURE_VERSION,
+            disclosureVersion: config!.smsDisclosureVersion!,
           });
         await tx
           .update(contactsTable)
@@ -289,6 +304,10 @@ router.post(
           .where(eq(twilioEnrollmentsTable.id, pending.id));
       }
     });
+    if (foreignMessageSid) {
+      res.status(403).end();
+      return;
+    }
     res.type("text/xml").send(xml);
   },
 );
@@ -296,33 +315,27 @@ router.post(
   "/public/sms/status",
   rateLimit({ windowMs: 60_000, max: 240, key: "twilio-status" }),
   async (req, res) => {
-    const config = twilioConfiguration(),
-      id = z.uuid().safeParse(req.query.operation);
-    if (
-      !id.success ||
-      !twilioRequestValid(req) ||
-      req.body.From !== process.env.TWILIO_PHONE_NUMBER
-    ) {
+    const id = z.uuid().safeParse(req.query.operation);
+    if (!id.success) {
       res.status(403).end();
       return;
     }
     const [operation] = await db
       .select()
       .from(twilioDispatchesTable)
-      .where(
-        and(
-          eq(twilioDispatchesTable.id, id.data),
-          eq(twilioDispatchesTable.organizationId, config.organizationId),
-          eq(twilioDispatchesTable.accountSid, req.body.AccountSid),
-        ),
-      );
+      .where(eq(twilioDispatchesTable.id, id.data));
+    const config = operation ? await twilioForOrganization(operation.organizationId) : null;
+    if (!config || config.accountSid !== operation!.accountSid ||
+        config.phoneNumber !== req.body?.From || !twilioRequestValid(req, config)) {
+      res.status(403).end();
+      return;
+    }
     const sid = req.body.MessageSid,
       status = req.body.MessageStatus,
       code = /^\d{4,6}$/.test(req.body.ErrorCode ?? "")
         ? req.body.ErrorCode
         : null;
     if (
-      !operation ||
       operation.phone !== phoneE164(req.body.To ?? "") ||
       !/^SM[a-f0-9]{32}$/i.test(sid ?? "") ||
       (operation.providerSid && operation.providerSid !== sid)
@@ -393,7 +406,7 @@ router.get(
   requireMember("crm.read"),
   async (req, res) => {
     const organizationId = req.member!.organizationId,
-      config = twilioConfiguration();
+      config = await twilioForOrganization(organizationId);
     const inbound = await db
       .select()
       .from(twilioInboundEventsTable)
@@ -422,14 +435,14 @@ router.get(
         ),
       );
     res.json({
-      enabled: config.enabled && config.organizationId === organizationId,
+      enabled: Boolean(config?.smsEnabled),
       inbound,
       outbound,
       usage: {
         ...usage,
-        limit: config.organizationId === organizationId ? config.dailyLimit : 0,
+        limit: config?.dailySmsLimit ?? 0,
         warning:
-          config.dailyLimit > 0 && usage.operations >= config.dailyLimit * 0.8,
+          Boolean(config?.dailySmsLimit && usage.operations >= config.dailySmsLimit * 0.8),
       },
     });
   },

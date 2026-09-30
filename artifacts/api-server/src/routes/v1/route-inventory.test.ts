@@ -215,6 +215,11 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /communications/sms": "crm.read",
   "GET /communications/voice": "crm.read",
   "POST /communications/voice": "crm.write",
+  "POST /communications/voice/:id/review": "crm.write",
+  "GET /service-obligations": "crm.read",
+  "POST /service-obligations": "crm.write",
+  "PATCH /service-obligations/:id": "crm.write",
+  "POST /service-obligations/import": "crm.write",
   "POST /communications/sms": "crm.write",
   // Gmail authorization is personal to the signed-in member, not an org-wide
   // admin credential. Tenant/user binding is enforced again in the service.

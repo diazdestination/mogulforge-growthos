@@ -13,6 +13,7 @@ import {
   type PlaybookCategory,
   type PlaybookEnrollment,
   type PlaybookStep,
+  type SendingHoursSettings,
   type StageBehavior,
 } from "@workspace/db";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
@@ -266,36 +267,67 @@ export async function enrollLead(
   organizationId: string,
   leadId: string,
   playbook: Playbook,
+  options?: {
+    /** Reuse the campaign's transaction so progress and the first step commit together. */
+    transaction?: Parameters<Parameters<typeof db.transaction>[0]>[0];
+    skipAudit?: boolean;
+    sendingHours?: SendingHoursSettings;
+  },
 ): Promise<PlaybookEnrollment | null> {
   const firstStep = playbook.steps[0];
   if (!firstStep) return null;
   let runAt = new Date(Date.now() + firstStep.delayMinutes * 60_000);
   // Never schedule the first touch outside the org's permitted sending
   // window (e.g. a lead captured at 2am waits until 8am local).
-  const sendingHours = await getSendingHours(organizationId);
+  const sendingHours = options?.sendingHours ?? (await getSendingHours(organizationId));
   runAt = nextAllowedSendTime(sendingHours, runAt) ?? runAt;
   try {
-    const [enrollment] = await db
-      .insert(playbookEnrollmentsTable)
-      .values({
+    const create = async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
+      const [enrollment] = await tx
+        .insert(playbookEnrollmentsTable)
+        .values({
+          organizationId,
+          playbookId: playbook.id,
+          leadId,
+          kind: playbook.kind,
+          category: playbook.category,
+          status: "active",
+          currentStep: 0,
+          nextRunAt: runAt,
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (!enrollment) return null;
+      await tx.insert(scheduledActionsTable).values({
         organizationId,
-        playbookId: playbook.id,
-        leadId,
-        kind: playbook.kind,
-        category: playbook.category,
-        status: "active",
-        currentStep: 0,
-        nextRunAt: runAt,
-      })
-      .returning();
-    await scheduleStep(enrollment, 0, runAt);
-    await recordAudit({
-      organizationId,
-      action: "playbook.enrolled",
-      entityType: "lead",
-      entityId: leadId,
-      metadata: { playbookId: playbook.id, playbookName: playbook.name },
-    });
+        action: {
+          type: "playbook_step",
+          params: { enrollmentId: enrollment.id, stepIndex: 0 },
+        },
+        context: { leadId },
+        runAt,
+      });
+      return enrollment;
+    };
+    const enrollment = options?.transaction
+      ? await create(options.transaction)
+      : await db.transaction(create);
+    if (!enrollment) return null;
+    if (!options?.skipAudit) {
+      try {
+        await recordAudit({
+          organizationId,
+          action: "playbook.enrolled",
+          entityType: "lead",
+          entityId: leadId,
+          metadata: { playbookId: playbook.id, playbookName: playbook.name },
+        });
+      } catch (err) {
+        // Audit availability must not make a committed enrollment look failed
+        // to callers and prompt them to create a second sequence.
+        console.error("[playbooks] enrollment audit failed:", err);
+      }
+    }
     return enrollment;
   } catch (err) {
     // Unique partial index: another live enrollment (same category, or same
@@ -919,6 +951,30 @@ export async function stopEnrollmentsForLead(
     }
   } catch (err) {
     console.error("[playbooks] stopEnrollmentsForLead failed:", err);
+  }
+}
+
+/** Stop exactly one linked sequence (for campaign cancellation). */
+export async function stopEnrollmentById(
+  organizationId: string,
+  enrollmentId: string,
+  reason: string,
+): Promise<void> {
+  const [stopped] = await db
+    .update(playbookEnrollmentsTable)
+    .set({ status: "stopped", pauseReason: reason, nextRunAt: null })
+    .where(
+      and(
+        eq(playbookEnrollmentsTable.id, enrollmentId),
+        eq(playbookEnrollmentsTable.organizationId, organizationId),
+        inArray(playbookEnrollmentsTable.status, ["active", "paused"]),
+      ),
+    )
+    .returning({ id: playbookEnrollmentsTable.id });
+  if (stopped) {
+    await appendHistory(enrollmentId, {
+      at: new Date().toISOString(), kind: "stopped", detail: reason,
+    });
   }
 }
 

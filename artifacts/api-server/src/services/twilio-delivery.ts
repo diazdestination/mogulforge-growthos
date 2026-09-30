@@ -9,8 +9,7 @@ import { addSuppression, checkSendEligibility } from "./send-gate";
 import {
   digest,
   phoneE164,
-  twilioConfiguration,
-  SMS_DISCLOSURE_VERSION,
+  twilioForOrganization,
   type SmsSendContext,
 } from "./twilio-controls";
 
@@ -19,21 +18,21 @@ export async function sendTwilioSms(
   body: string,
   context?: SmsSendContext,
 ) {
-  const config = twilioConfiguration(),
-    phone = phoneE164(to);
-  if (!config.enabled)
+  const phone = phoneE164(to);
+  if (!context?.organizationId)
+    throw new Error("Twilio tenant and operation context required");
+  const config = await twilioForOrganization(context.organizationId);
+  if (!config?.smsEnabled)
     throw new Error(
       "Twilio sending is disabled: approved registration, credentials, routing and an explicit daily limit are required",
     );
   if (
-    !context ||
-    context.organizationId !== config.organizationId ||
     !context.contactId ||
     !context.idempotencyKey ||
     context.idempotencyKey.length > 300
   )
     throw new Error("Twilio tenant and operation context required");
-  if (!phone || body.length > 1200)
+  if (!phone || !body.trim() || body.length > 1200)
     throw new Error("SMS phone or message is invalid");
   // Legacy marketing and portal authentication flows require their own reviewed
   // purpose/registration; they cannot borrow customer-care consent.
@@ -63,7 +62,7 @@ export async function sendTwilioSms(
     )
     .orderBy(desc(twilioConsentProofsTable.recordedAt))
     .limit(1);
-  if (!proof?.granted || proof.disclosureVersion !== SMS_DISCLOSURE_VERSION)
+  if (!proof?.granted || proof.disclosureVersion !== config.smsDisclosureVersion)
     throw new Error(
       "Current phone-verified consent for this SMS purpose is required",
     );
@@ -74,13 +73,15 @@ export async function sendTwilioSms(
     kind: "transactional",
   });
   if (!eligibility.ok) throw new Error(`SMS blocked: ${eligibility.reason}`);
-  const message = `MogulForge: ${body.replace(/^MogulForge:\s*/i, "")}\nReply STOP to opt out. HELP for help.`;
+  const message = `${config.businessName}: ${body.trim()}\nReply STOP to opt out. HELP for help.`;
   const payloadHash = digest(
     JSON.stringify({
       phone,
       message,
       purpose: context.purpose,
       contactId: contact.id,
+      accountSid: config.accountSid,
+      sender: config.phoneNumber,
     }),
   );
   const operation = await db.transaction(async (tx) => {
@@ -113,7 +114,7 @@ export async function sendTwilioSms(
           gte(twilioDispatchesTable.createdAt, day),
         ),
       );
-    if (usage.count >= config.dailyLimit)
+    if (usage.count >= config.dailySmsLimit)
       throw new Error("SMS daily operation limit reached");
     const [created] = await tx
       .insert(twilioDispatchesTable)
@@ -124,12 +125,14 @@ export async function sendTwilioSms(
         payloadHash,
         phone,
         purpose: context.purpose,
-        accountSid: process.env.TWILIO_ACCOUNT_SID!,
+        accountSid: config.accountSid,
       })
       .returning();
     return { ...created, owned: true };
   });
   if (!operation.owned) {
+    if (operation.accountSid !== config.accountSid || operation.phone !== phone)
+      throw new Error("SMS operation belongs to a different sender or recipient");
     if (
       operation.providerSid &&
       ["accepted", "queued", "sending", "sent", "delivered"].includes(
@@ -142,6 +145,17 @@ export async function sendTwilioSms(
     );
   }
   try {
+    const current = await twilioForOrganization(context.organizationId);
+    if (!current?.smsEnabled || current.id !== config.id ||
+        current.accountSid !== config.accountSid ||
+        current.phoneNumber !== config.phoneNumber ||
+        current.messagingServiceSid !== config.messagingServiceSid ||
+        current.origin !== config.origin) {
+      await db.update(twilioDispatchesTable)
+        .set({ status: "cancelled", updatedAt: new Date() })
+        .where(eq(twilioDispatchesTable.id, operation.id));
+      throw new Error("SMS cancelled because the client binding is disabled or changed");
+    }
     // Recheck STOP immediately before handing the request to the network.
     const latest = await checkSendEligibility({
       organizationId: context.organizationId,
@@ -157,19 +171,19 @@ export async function sendTwilioSms(
       throw new Error("SMS cancelled by current consent/suppression policy");
     }
     const response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`,
+      `https://api.twilio.com/2010-04-01/Accounts/${current.accountSid}/Messages.json`,
       {
         method: "POST",
         signal: AbortSignal.timeout(10_000),
         headers: {
           "content-type": "application/x-www-form-urlencoded",
-          authorization: `Basic ${Buffer.from(`${process.env.TWILIO_API_KEY_SID}:${process.env.TWILIO_API_KEY_SECRET}`).toString("base64")}`,
+          authorization: `Basic ${Buffer.from(`${current.apiKeySid}:${current.apiKeySecret}`).toString("base64")}`,
         },
         body: new URLSearchParams({
           To: phone,
-          MessagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID!,
+          MessagingServiceSid: current.messagingServiceSid!,
           Body: message,
-          StatusCallback: `${config.origin}/api/v1/public/sms/status?operation=${operation.id}`,
+          StatusCallback: `${current.origin}/api/v1/public/sms/status?operation=${operation.id}`,
         }).toString(),
       },
     );

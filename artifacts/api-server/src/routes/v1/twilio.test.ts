@@ -11,9 +11,14 @@ import {
   organizationsTable,
   usersTable,
   contactsTable,
+  consentRecordsTable,
+  twilioClientBindingsTable,
   twilioDispatchesTable,
   twilioConsentProofsTable,
   twilioCallsTable,
+  missedCallHandoffsTable,
+  crmTasksTable,
+  leadsTable,
 } from "@workspace/db";
 import app from "../../app";
 import { createSession } from "../../lib/auth";
@@ -21,7 +26,7 @@ import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
 import { sendTwilioSms } from "../../services/twilio-delivery";
 import {
   SMS_DISCLOSURE_VERSION,
-  twilioConfiguration,
+  twilioForOrganization,
 } from "../../services/twilio-controls";
 import { getSuppression } from "../../services/send-gate";
 import { voiceConfiguration } from "./twilio-voice";
@@ -35,15 +40,21 @@ let server: Server,
   sessionA: string,
   sessionB: string;
 let sends = 0,
+  sendsB = 0,
   voiceSends = 0,
   serial = 0,
   mode = "ok";
 const realFetch = globalThis.fetch;
 const account = "AC" + "1".repeat(32),
+  accountB = "AC" + "4".repeat(32),
   service = "MG" + "2".repeat(32),
+  serviceB = "MG" + "5".repeat(32),
   sender = "+15005550006",
+  senderB = "+15005550007",
   phone = "+12025550101",
-  token = "synthetic-webhook-token";
+  token = "synthetic-webhook-token",
+  tokenB = "synthetic-webhook-token-b",
+  program = "synthetic_twilio_program_a_12345";
 async function webhook(
   path: string,
   fields: Record<string, string>,
@@ -64,7 +75,7 @@ async function webhook(
       "content-type": "application/x-www-form-urlencoded",
       "x-twilio-signature": signed
         ? getExpectedTwilioSignature(
-            token,
+            params.AccountSid === accountB ? tokenB : token,
             "https://growth.example" + path,
             params,
           )
@@ -123,23 +134,34 @@ beforeAll(async () => {
   }
   const values = {
     APP_ORIGIN: "https://growth.example",
-    TWILIO_PUBLIC_ORIGIN: "https://growth.example",
-    TWILIO_ORGANIZATION_ID: orgA,
-    TWILIO_ACCOUNT_SID: account,
-    TWILIO_AUTH_TOKEN: token,
-    TWILIO_MESSAGING_SERVICE_SID: service,
-    TWILIO_PHONE_NUMBER: sender,
-    TWILIO_API_KEY_SID: "SK" + "3".repeat(32),
-    TWILIO_API_KEY_SECRET: "synthetic-key",
-    TWILIO_SMS_ENABLED: "true",
-    TWILIO_REGISTRATION_APPROVED: "true",
-    TWILIO_ADVANCED_OPT_OUT: "true",
-    TWILIO_DAILY_SMS_LIMIT: "20",
-    TWILIO_VOICE_BUSINESS_NAME: "Synthetic & Roofing",
+    TWILIO_CLIENT_A_AUTH_TOKEN: token,
+    TWILIO_CLIENT_A_API_KEY_SECRET: "synthetic-key",
+    TWILIO_CLIENT_B_AUTH_TOKEN: tokenB,
+    TWILIO_CLIENT_B_API_KEY_SECRET: "synthetic-key-b",
   };
   for (const [key, value] of Object.entries(values)) vi.stubEnv(key, value);
-  vi.stubEnv("TWILIO_LAUNCH_APPROVED", "true");
-  vi.stubEnv("TWILIO_GEO_PERMISSIONS_REVIEWED", "true");
+  await db.insert(twilioClientBindingsTable).values([
+    {
+      organizationId: orgA, accountSid: account, phoneNumber: sender,
+      messagingServiceSid: service, apiKeySid: "SK" + "3".repeat(32),
+      authTokenSecretRef: "TWILIO_CLIENT_A_AUTH_TOKEN",
+      apiKeySecretRef: "TWILIO_CLIENT_A_API_KEY_SECRET",
+      publicOrigin: "https://growth.example", businessName: "Synthetic & Roofing",
+      staffPhone: "+12025550109", smsDisclosureVersion: SMS_DISCLOSURE_VERSION,
+      publicEnrollmentToken: program, dailySmsLimit: 20, dailyCallLimit: 5,
+      launchApproved: true, smsEnabled: true, registrationApproved: true,
+      advancedOptOut: true, geoPermissionsReviewed: true,
+    },
+    {
+      organizationId: orgB, accountSid: accountB, phoneNumber: senderB,
+      messagingServiceSid: serviceB, apiKeySid: "SK" + "6".repeat(32),
+      authTokenSecretRef: "TWILIO_CLIENT_B_AUTH_TOKEN",
+      apiKeySecretRef: "TWILIO_CLIENT_B_API_KEY_SECRET",
+      publicOrigin: "https://growth.example", businessName: "Synthetic HVAC",
+      staffPhone: "+12025550119", smsDisclosureVersion: "synthetic-hvac-v1",
+      dailySmsLimit: 20, dailyCallLimit: 5,
+    },
+  ]);
   server = app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve) => server.once("listening", resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -159,6 +181,16 @@ beforeAll(async () => {
         if (mode === "timeout") throw new Error("Synthetic voice timeout");
         return Response.json(
           { sid: "CA" + (1000 + voiceSends).toString(16).padStart(32, "0") },
+          { status: 201 },
+        );
+      }
+      if (String(url) === `https://api.twilio.com/2010-04-01/Accounts/${accountB}/Messages.json`) {
+        sendsB++;
+        const params = new URLSearchParams(String(init?.body));
+        expect(params.get("MessagingServiceSid")).toBe(serviceB);
+        expect(params.get("Body")).toContain("Synthetic HVAC:");
+        return Response.json(
+          { sid: "SM" + (5000 + sendsB).toString(16).padStart(32, "0") },
           { status: 201 },
         );
       }
@@ -213,17 +245,17 @@ it("requires authentication and rejects forged, wrong-account and wrong-service 
       })
     ).status,
   ).toBe(403);
-  vi.stubEnv("TWILIO_AUTH_TOKEN", "");
+  vi.stubEnv("TWILIO_CLIENT_A_AUTH_TOKEN", "");
   expect(
     (await webhook("/api/v1/public/sms/inbound", { Body: "STOP" })).status,
   ).toBe(403);
-  vi.stubEnv("TWILIO_AUTH_TOKEN", token);
+  vi.stubEnv("TWILIO_CLIENT_A_AUTH_TOKEN", token);
 });
 it("records no consent until the correct handset confirms the optional purposes", async () => {
   await expect(
     sendTwilioSms(phone, "Hello", context("before-consent")),
   ).rejects.toThrow(/consent/);
-  const response = await realFetch(base + "/api/v1/public/sms/enroll", {
+  const response = await realFetch(base + `/api/v1/public/sms/enroll?program=${program}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -267,7 +299,7 @@ it("records no consent until the correct handset confirms the optional purposes"
       organizationId: orgB,
       contactId: contactB,
     }),
-  ).rejects.toThrow(/tenant/);
+  ).rejects.toThrow(/disabled/);
 });
 it("sends one provider request for a stable operation and binds monotonic status to the recipient", async () => {
   const first = await sendTwilioSms(phone, "Hello", context("one"));
@@ -431,13 +463,9 @@ it("gates calls, starts only one staff leg, binds callbacks and prevents replayi
     });
   expect((await makeCall(randomUUID())).status).toBe(409);
   expect(voiceSends).toBe(0);
-  for (const [key, value] of Object.entries({
-    TWILIO_VOICE_ENABLED: "true",
-    TWILIO_VOICE_APPROVED: "true",
-    TWILIO_STAFF_PHONE: "+12025550109",
-    TWILIO_DAILY_CALL_LIMIT: "5",
-  }))
-    vi.stubEnv(key, value);
+  await db.update(twilioClientBindingsTable)
+    .set({ voiceEnabled: true, voiceApproved: true })
+    .where(eq(twilioClientBindingsTable.organizationId, orgA));
   expect((await makeCall(randomUUID(), sessionB, contactB)).status).toBe(409);
   const key = randomUUID(),
     started = await makeCall(key);
@@ -542,7 +570,67 @@ it("routes an inbound call only to the configured staff phone and records a miss
     .where(eq(twilioCallsTable.id, op.id));
   expect(missed.dialStatus).toBe("no-answer");
   expect(missed.status).toBe("completed");
+  const [handoff] = await db
+    .select()
+    .from(missedCallHandoffsTable)
+    .where(eq(missedCallHandoffsTable.callId, op.id));
+  expect(handoff.organizationId).toBe(orgA);
+  const [task] = await db
+    .select()
+    .from(crmTasksTable)
+    .where(eq(crmTasksTable.id, handoff.taskId));
+  expect(task.sourceEvent).toBe("voice.missed_call");
+  expect(task.status).toBe("open");
   expect(sends).toBe(before);
+});
+
+it("hands an unknown missed caller to staff exactly once and never texts or auto-enrolls", async () => {
+  await db.update(twilioClientBindingsTable)
+    .set({ dailyCallLimit: 100 })
+    .where(eq(twilioClientBindingsTable.organizationId, orgA));
+  const caller = "+12025550107";
+  const fields = { From: caller, To: sender, CallSid: "CA" + "c".repeat(32) };
+  const beforeSends = sends;
+  expect((await webhook("/api/v1/public/voice/inbound", fields)).status).toBe(200);
+  const [call] = await db
+    .select()
+    .from(twilioCallsTable)
+    .where(eq(twilioCallsTable.providerSid, fields.CallSid));
+  expect(call.contactId).toBeNull();
+  const completePath = `/api/v1/public/voice/complete?operation=${call.id}`;
+  expect((await webhook(completePath, { ...fields, DialCallStatus: "no-answer" })).status).toBe(200);
+  expect((await webhook(completePath, { ...fields, DialCallStatus: "no-answer" })).status).toBe(200);
+  const handoffs = await db
+    .select()
+    .from(missedCallHandoffsTable)
+    .where(eq(missedCallHandoffsTable.callId, call.id));
+  expect(handoffs).toHaveLength(1);
+  expect(handoffs[0].leadId).toBeNull();
+
+  const requestId = randomUUID();
+  const body = JSON.stringify({ action: "create_opportunity", requestId, firstName: "Caller" });
+  const review = (session: string, payload = body) => realFetch(
+    base + `/api/v1/communications/voice/${call.id}/review`,
+    {
+      method: "POST",
+      headers: { authorization: `Bearer ${session}`, "content-type": "application/json" },
+      body: payload,
+    },
+  );
+  expect((await review(sessionB)).status).toBe(404);
+  const accepted = await review(sessionA);
+  expect(accepted.status).toBe(200);
+  const receipt = await accepted.json() as { handoff: { leadId: string; contactId: string } };
+  expect(receipt.handoff.leadId).toBeTruthy();
+  expect((await review(sessionA)).status).toBe(200);
+  expect((await review(sessionA, JSON.stringify({ action: "create_opportunity", requestId: randomUUID(), firstName: "Caller" }))).status).toBe(409);
+  const [lead] = await db.select().from(leadsTable).where(eq(leadsTable.id, receipt.handoff.leadId));
+  expect(lead.source).toBe("missed-call");
+  expect(lead.creationMethod).toBe("staff_review");
+  const [task] = await db.select().from(crmTasksTable).where(eq(crmTasksTable.id, handoffs[0].taskId));
+  expect(task.leadId).toBe(lead.id);
+  expect(task.assignedUserId).toBeTruthy();
+  expect(sends).toBe(beforeSends);
 });
 
 it("requires an explicit valid voice business name and keeps the client template disabled", async () => {
@@ -555,23 +643,18 @@ it("requires an explicit valid voice business name and keeps the client template
       "utf8",
     ),
   );
-  const previous = Object.fromEntries(
-    Object.keys(template).map((key) => [key, process.env[key]]),
-  );
   const beforeVoice = voiceSends;
   const beforeSms = sends;
   try {
     for (const name of ["", "   ", "a".repeat(121), "Business\nInjected"]) {
-      vi.stubEnv("TWILIO_VOICE_BUSINESS_NAME", name);
-      expect(voiceConfiguration().voiceEnabled).toBe(false);
+      await db.update(twilioClientBindingsTable).set({ businessName: name })
+        .where(eq(twilioClientBindingsTable.organizationId, orgA));
+      expect((await voiceConfiguration(orgA))?.voiceEnabled).toBe(false);
     }
-    for (const [key, value] of Object.entries(template)) vi.stubEnv(key, value);
-    expect(voiceConfiguration().businessName).toBe(
-      "Painless Roofing & Water Restoration",
-    );
-    expect(voiceConfiguration().voiceEnabled).toBe(false);
-    expect(twilioConfiguration().configured).toBe(false);
-    expect(twilioConfiguration().enabled).toBe(false);
+    expect(template.TWILIO_CLIENT_PAINLESS_AUTH_TOKEN).toBe("");
+    expect(template.TWILIO_CLIENT_PAINLESS_API_KEY_SECRET).toBe("");
+    expect((await twilioForOrganization(orgB))?.smsEnabled).toBe(false);
+    expect((await twilioForOrganization(orgB))?.voiceEnabled).toBe(false);
     const blocked = await realFetch(base + "/api/v1/communications/voice", {
       method: "POST",
       headers: {
@@ -589,25 +672,23 @@ it("requires an explicit valid voice business name and keeps the client template
     expect(blocked.status).toBe(409);
     expect(voiceSends).toBe(beforeVoice);
     expect(sends).toBe(beforeSms);
-    expect(
-      (
-        await webhook("/api/v1/public/voice/inbound", {
-          CallSid: "CA" + "d".repeat(32),
-        })
-      ).status,
-    ).toBe(403);
+    const inactive = await webhook("/api/v1/public/voice/inbound", {
+      CallSid: "CA" + "d".repeat(32),
+    });
+    expect(await inactive.text()).toContain("<Reject");
   } finally {
-    for (const [key, value] of Object.entries(previous)) vi.stubEnv(key, value);
+    await db.update(twilioClientBindingsTable)
+      .set({ businessName: "Synthetic & Roofing" })
+      .where(eq(twilioClientBindingsTable.organizationId, orgA));
   }
 });
 
 it("allows approved voice without a Messaging Service while SMS and tenant/account boundaries remain closed", async () => {
   const fields = { From: phone, To: sender, CallSid: "CA" + "b".repeat(32) };
   const before = sends;
-  vi.stubEnv("TWILIO_MESSAGING_SERVICE_SID", "");
-  vi.stubEnv("TWILIO_SMS_ENABLED", "false");
-  vi.stubEnv("TWILIO_REGISTRATION_APPROVED", "false");
-  vi.stubEnv("TWILIO_ADVANCED_OPT_OUT", "false");
+  await db.update(twilioClientBindingsTable)
+    .set({ messagingServiceSid: null, smsEnabled: false, registrationApproved: false, advancedOptOut: false })
+    .where(eq(twilioClientBindingsTable.organizationId, orgA));
   try {
     expect(
       (await webhook("/api/v1/public/voice/inbound", fields, false)).status,
@@ -674,7 +755,8 @@ it("allows approved voice without a Messaging Service while SMS and tenant/accou
       }),
     });
     expect(outbound.status).toBe(202);
-    vi.stubEnv("TWILIO_VOICE_ENABLED", "false");
+    await db.update(twilioClientBindingsTable).set({ voiceEnabled: false })
+      .where(eq(twilioClientBindingsTable.organizationId, orgA));
     const stopped = await webhook("/api/v1/public/voice/inbound", {
       ...fields,
       CallSid: "CA" + "c".repeat(32),
@@ -682,10 +764,109 @@ it("allows approved voice without a Messaging Service while SMS and tenant/accou
     expect(await stopped.text()).toContain("<Reject");
     expect(sends).toBe(before);
   } finally {
-    vi.stubEnv("TWILIO_MESSAGING_SERVICE_SID", service);
-    vi.stubEnv("TWILIO_SMS_ENABLED", "true");
-    vi.stubEnv("TWILIO_REGISTRATION_APPROVED", "true");
-    vi.stubEnv("TWILIO_ADVANCED_OPT_OUT", "true");
-    vi.stubEnv("TWILIO_VOICE_ENABLED", "true");
+    await db.update(twilioClientBindingsTable)
+      .set({ messagingServiceSid: service, smsEnabled: true, registrationApproved: true,
+        advancedOptOut: true, voiceEnabled: true })
+      .where(eq(twilioClientBindingsTable.organizationId, orgA));
   }
+});
+
+it("separates two contractor accounts across inbound, outbound, callback and revocation", async () => {
+  const noSelector = await realFetch(base + "/api/v1/public/sms/program");
+  expect((await noSelector.json() as { enabled: boolean }).enabled).toBe(false);
+  const selected = await realFetch(base + `/api/v1/public/sms/program?program=${program}`);
+  expect((await selected.json() as { brand: string }).brand).toBe("Synthetic & Roofing");
+
+  await db.update(twilioClientBindingsTable).set({
+    launchApproved: true, smsEnabled: true, registrationApproved: true,
+    advancedOptOut: true, voiceEnabled: true, voiceApproved: true,
+    geoPermissionsReviewed: true,
+  }).where(eq(twilioClientBindingsTable.organizationId, orgB));
+  await db.insert(twilioConsentProofsTable).values({
+    organizationId: orgB, contactId: contactB, phone,
+    purpose: "customer_care", granted: true,
+    disclosureVersion: "synthetic-hvac-v1", source: "synthetic B proof",
+  });
+  await db.insert(consentRecordsTable).values({
+    organizationId: orgB, contactId: contactB, channel: "sms", granted: true,
+    disclosureVersion: "synthetic-hvac-v1",
+  });
+  await expect(sendTwilioSms(phone, "Wrong contact", {
+    organizationId: orgB, contactId: contactA,
+    purpose: "customer_care", idempotencyKey: "tenant-b-cross-contact",
+  })).rejects.toThrow(/outside this organization/);
+  const sentB = await sendTwilioSms(phone, "Service follow-up", {
+    organizationId: orgB, contactId: contactB,
+    purpose: "customer_care", idempotencyKey: "tenant-b-send",
+  });
+  expect(sendsB).toBe(1);
+  expect((await sendTwilioSms(phone, "Service follow-up", {
+    organizationId: orgB, contactId: contactB,
+    purpose: "customer_care", idempotencyKey: "tenant-b-send",
+  })).id).toBe(sentB.id);
+  const [smsB] = await db.select().from(twilioDispatchesTable)
+    .where(eq(twilioDispatchesTable.idempotencyKey, "tenant-b-send"));
+  expect(smsB.accountSid).toBe(accountB);
+  expect((await webhook(`/api/v1/public/sms/status?operation=${smsB.id}`, {
+    AccountSid: account, MessagingServiceSid: service, From: sender, To: phone,
+    MessageSid: sentB.id, MessageStatus: "delivered",
+  })).status).toBe(403);
+  expect((await webhook(`/api/v1/public/sms/status?operation=${smsB.id}`, {
+    AccountSid: accountB, MessagingServiceSid: serviceB, From: senderB, To: phone,
+    MessageSid: sentB.id, MessageStatus: "delivered",
+  })).status).toBe(204);
+  expect((await webhook("/api/v1/public/sms/inbound", {
+    AccountSid: accountB, MessagingServiceSid: serviceB,
+    From: phone, To: senderB, Body: "STOP", MessageSid: "SM" + "a".repeat(32),
+  })).status).toBe(403);
+  expect(await getSuppression(orgB, "sms", phone)).toBeNull();
+
+  const callSid = "CA" + "e".repeat(32);
+  const inboundB = { AccountSid: accountB, From: phone, To: senderB, CallSid: callSid };
+  expect((await webhook("/api/v1/public/voice/inbound", inboundB, false)).status).toBe(403);
+  expect((await webhook("/api/v1/public/voice/inbound", { ...inboundB, To: sender })).status).toBe(403);
+  const accepted = await webhook("/api/v1/public/voice/inbound", inboundB);
+  expect(accepted.status).toBe(200);
+  expect(await accepted.text()).toContain("Synthetic HVAC");
+  const [callB] = await db.select().from(twilioCallsTable)
+    .where(eq(twilioCallsTable.providerSid, callSid));
+  expect(callB.organizationId).toBe(orgB);
+  const replayOtherTenant = await webhook("/api/v1/public/voice/inbound", {
+    ...inboundB, AccountSid: account, To: sender,
+  });
+  expect(await replayOtherTenant.text()).toContain("<Reject");
+  expect((await webhook(`/api/v1/public/voice/complete?operation=${callB.id}`, {
+    ...inboundB, AccountSid: account, To: sender, DialCallStatus: "no-answer",
+  })).status).toBe(403);
+  expect((await webhook(`/api/v1/public/voice/complete?operation=${callB.id}`, {
+    ...inboundB, DialCallStatus: "no-answer",
+  })).status).toBe(200);
+  const [handoff] = await db.select().from(missedCallHandoffsTable)
+    .where(eq(missedCallHandoffsTable.callId, callB.id));
+  expect(handoff.organizationId).toBe(orgB);
+
+  expect((await webhook("/api/v1/public/sms/inbound", {
+    AccountSid: accountB, MessagingServiceSid: serviceB,
+    From: phone, To: senderB, Body: "STOP",
+  })).status).toBe(200);
+  expect(await getSuppression(orgB, "sms", phone)).not.toBeNull();
+  expect(await getSuppression(orgA, "sms", phone)).toBeNull();
+  await db.update(twilioClientBindingsTable).set({ revokedAt: new Date() })
+    .where(eq(twilioClientBindingsTable.organizationId, orgB));
+  expect((await webhook(`/api/v1/public/voice/status?operation=${callB.id}`, {
+    ...inboundB, CallStatus: "completed",
+  })).status).toBe(204);
+  const [recordedAfterRevoke] = await db.select().from(twilioCallsTable)
+    .where(eq(twilioCallsTable.id, callB.id));
+  expect(recordedAfterRevoke.status).toBe("completed");
+  await expect(sendTwilioSms(phone, "Blocked after revocation", {
+    organizationId: orgB, contactId: contactB,
+    purpose: "customer_care", idempotencyKey: "tenant-b-revoked",
+  })).rejects.toThrow(/disabled/);
+  const afterRevoke = await webhook("/api/v1/public/voice/inbound", {
+    ...inboundB, CallSid: "CA" + "f".repeat(32),
+  });
+  expect(await afterRevoke.text()).toContain("<Reject");
+  expect((await voiceConfiguration(orgA))?.voiceEnabled).toBe(true);
+  expect((await voiceConfiguration(orgB))?.voiceEnabled).toBe(false);
 });

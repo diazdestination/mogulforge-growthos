@@ -407,7 +407,8 @@ export async function dispatchWebhookEvent(
       })
       .returning();
     queued++;
-    // Attempt immediately, fire-and-forget; retries handled by the scheduler.
+    // Attempt immediately, fire-and-forget; only confirmed HTTP failures
+    // are retryable. An interrupted/ambiguous attempt stays held for review.
     void attemptDelivery(delivery.id, endpoint).catch(() => {});
   }
   return queued;
@@ -421,7 +422,7 @@ export async function attemptDelivery(
     .select()
     .from(webhookDeliveriesTable)
     .where(eq(webhookDeliveriesTable.id, deliveryId));
-  if (!delivery || delivery.status === "success") return;
+  if (!delivery || delivery.status !== "pending") return;
 
   const endpoint =
     endpointHint ??
@@ -435,7 +436,12 @@ export async function attemptDelivery(
     await db
       .update(webhookDeliveriesTable)
       .set({ status: "failed", lastError: "endpoint inactive", nextAttemptAt: null })
-      .where(eq(webhookDeliveriesTable.id, deliveryId));
+      .where(
+        and(
+          eq(webhookDeliveriesTable.id, deliveryId),
+          eq(webhookDeliveriesTable.status, "pending"),
+        ),
+      );
     return;
   }
 
@@ -450,22 +456,48 @@ export async function attemptDelivery(
         lastError: err instanceof Error ? err.message : "blocked URL",
         nextAttemptAt: null,
       })
-      .where(eq(webhookDeliveriesTable.id, deliveryId));
+      .where(
+        and(
+          eq(webhookDeliveriesTable.id, deliveryId),
+          eq(webhookDeliveriesTable.status, "pending"),
+        ),
+      );
     return;
   }
 
-  const attempts = delivery.attempts + 1;
   const body = JSON.stringify(delivery.payload);
   // Re-sign with a fresh timestamp on every attempt so receivers can apply
   // replay-window checks even for retried deliveries.
   const signature = buildSignatureHeader(activeSigningSecrets(endpoint), body);
-  await db
+  // Atomically claim the attempt BEFORE making a network request. `failed`
+  // with this marker is a review hold if the process dies after the claim:
+  // the receiver may have accepted the request even if we never saved its
+  // response. It must not be replayed by the scheduler. This also prevents
+  // an immediate dispatch and a scheduler tick from sending concurrently.
+  const [claimed] = await db
     .update(webhookDeliveriesTable)
-    .set({ signature, signatureVersion: SIGNATURE_VERSION })
-    .where(eq(webhookDeliveriesTable.id, deliveryId));
+    .set({
+      status: "failed",
+      attempts: sql`${webhookDeliveriesTable.attempts} + 1`,
+      signature,
+      signatureVersion: SIGNATURE_VERSION,
+      lastError: "outcome unconfirmed; review before retry",
+      responseStatus: null,
+      nextAttemptAt: null,
+    })
+    .where(
+      and(
+        eq(webhookDeliveriesTable.id, deliveryId),
+        eq(webhookDeliveriesTable.status, "pending"),
+        eq(webhookDeliveriesTable.attempts, delivery.attempts),
+      ),
+    )
+    .returning({ attempts: webhookDeliveriesTable.attempts });
+  if (!claimed) return;
+  const attempts = claimed.attempts;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10_000);
     const res = await fetch(endpoint.url, {
       method: "POST",
       headers: {
@@ -480,7 +512,6 @@ export async function attemptDelivery(
       // Never follow redirects: a safe URL could redirect to an internal target.
       redirect: "manual",
     });
-    clearTimeout(timer);
     if (res.status >= 300 && res.status < 400) {
       await recordFailure(deliveryId, attempts, "redirects not followed", res.status);
       return;
@@ -495,16 +526,22 @@ export async function attemptDelivery(
           deliveredAt: new Date(),
           nextAttemptAt: null,
         })
-        .where(eq(webhookDeliveriesTable.id, deliveryId));
+        .where(
+          and(
+            eq(webhookDeliveriesTable.id, deliveryId),
+            eq(webhookDeliveriesTable.status, "failed"),
+            eq(webhookDeliveriesTable.attempts, attempts),
+          ),
+        );
       return;
     }
     await recordFailure(deliveryId, attempts, `HTTP ${res.status}`, res.status);
-  } catch (err) {
-    await recordFailure(
-      deliveryId,
-      attempts,
-      err instanceof Error ? err.message : "request failed",
-    );
+  } catch {
+    // A timeout, connection reset, or process interruption cannot tell us
+    // whether the receiver committed the event. Leave the claimed row held
+    // for staff reconciliation; never turn it back into an automatic retry.
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -526,7 +563,13 @@ async function recordFailure(
         ? null
         : new Date(Date.now() + (RETRY_DELAY_MS[attempts] ?? 300_000)),
     })
-    .where(eq(webhookDeliveriesTable.id, deliveryId));
+    .where(
+      and(
+        eq(webhookDeliveriesTable.id, deliveryId),
+        eq(webhookDeliveriesTable.status, "failed"),
+        eq(webhookDeliveriesTable.attempts, attempts),
+      ),
+    );
 }
 
 /**

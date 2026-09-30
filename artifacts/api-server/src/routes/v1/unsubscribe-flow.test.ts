@@ -16,6 +16,7 @@ import {
   playbookEnrollmentsTable,
   playbooksTable,
   suppressionsTable,
+  twilioClientBindingsTable,
 } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -42,8 +43,14 @@ beforeAll(async () => {
     .values({ name: "Unsub Flow Test", slug: `test-unsub-${Date.now()}` })
     .returning();
   org = o;
-  for (const [key, value] of Object.entries({ TWILIO_PUBLIC_ORIGIN: 'https://growth.example', TWILIO_ORGANIZATION_ID: org.id,
-    TWILIO_ACCOUNT_SID: 'AC'+'1'.repeat(32), TWILIO_AUTH_TOKEN: 'synthetic-token', TWILIO_MESSAGING_SERVICE_SID: 'MG'+'2'.repeat(32), TWILIO_PHONE_NUMBER: '+15005550006' })) vi.stubEnv(key, value);
+  vi.stubEnv("TWILIO_CLIENT_UNSUB_AUTH_TOKEN", "synthetic-token");
+  await db.insert(twilioClientBindingsTable).values({
+    organizationId: org.id, accountSid: "AC" + "8".repeat(32),
+    phoneNumber: "+15005550008", messagingServiceSid: "MG" + "9".repeat(32),
+    authTokenSecretRef: "TWILIO_CLIENT_UNSUB_AUTH_TOKEN",
+    publicOrigin: "https://growth.example", businessName: "Synthetic Unsub",
+    smsDisclosureVersion: "synthetic-unsub-v1",
+  });
   const [c] = await db
     .insert(contactsTable)
     .values({
@@ -147,7 +154,7 @@ describe("email unsubscribe", () => {
 describe("inbound SMS STOP/START", () => {
   let sequence = 0;
   async function inbound(from: string, body: string) {
-    const params = { From: from, Body: body, To: '+15005550006', AccountSid: 'AC'+'1'.repeat(32), MessagingServiceSid: 'MG'+'2'.repeat(32), MessageSid: 'SM'+(++sequence).toString(16).padStart(32, '0') };
+    const params = { From: from, Body: body, To: '+15005550008', AccountSid: 'AC'+'8'.repeat(32), MessagingServiceSid: 'MG'+'9'.repeat(32), MessageSid: 'SM'+(++sequence).toString(16).padStart(32, '0') };
     return fetch(`${baseUrl}/api/v1/public/sms/inbound`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded", 'x-twilio-signature': getExpectedTwilioSignature('synthetic-token', 'https://growth.example/api/v1/public/sms/inbound', params) },

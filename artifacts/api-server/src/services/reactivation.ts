@@ -14,14 +14,15 @@ import {
   type Playbook,
   type ReactivationCampaign,
   type ReactivationSegment,
+  type SendingHoursSettings,
 } from "@workspace/db";
-import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, notInArray, or, sql } from "drizzle-orm";
 
 import { recordAudit } from "./audit";
-import { OUTREACH_ACTIVE_STATUSES, enrollLead, stopEnrollmentsForLead } from "./playbooks";
+import { OUTREACH_ACTIVE_STATUSES, enrollLead, stopEnrollmentById } from "./playbooks";
 import { draftOutreachMessage } from "./providers";
 import { normalizeAddress } from "./send-gate";
-import { getOrgSettings } from "./settings";
+import { getOrgSettings, getSendingHours } from "./settings";
 
 /**
  * Cold-lead reactivation: CSV lead import, segment building over stale
@@ -563,7 +564,7 @@ export async function setCampaignStatus(
         ),
       );
     const enrolled = await db
-      .select({ leadId: reactivationCampaignLeadsTable.leadId })
+      .select({ enrollmentId: reactivationCampaignLeadsTable.enrollmentId })
       .from(reactivationCampaignLeadsTable)
       .where(
         and(
@@ -572,12 +573,9 @@ export async function setCampaignStatus(
         ),
       );
     for (const row of enrolled) {
-      await stopEnrollmentsForLead(
-        organizationId,
-        row.leadId,
-        "reactivation campaign cancelled",
-        "stopped",
-      );
+      if (row.enrollmentId) {
+        await stopEnrollmentById(organizationId, row.enrollmentId, "reactivation campaign cancelled");
+      }
     }
   }
   await recordAudit({
@@ -660,77 +658,82 @@ async function drainCampaign(campaign: ReactivationCampaign): Promise<void> {
   if (!campaign.launchedAt) return;
   const playbook = await getOrgPlaybook(campaign.organizationId, campaign.playbookId);
   if (!playbook) return;
-
-  // Serialize the target calculation and claim for this campaign. Multiple
-  // scheduler instances can otherwise all observe processed=0 and each claim
-  // a different row, defeating the hourly pacing target.
-  const rows = await db.transaction(async (tx) => {
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtext(${campaign.id}))`,
-    );
-    const [{ processed }] = await tx
-      .select({
-        processed: sql<number>`count(*) FILTER (WHERE ${reactivationCampaignLeadsTable.status} <> 'pending')::int`,
-      })
-      .from(reactivationCampaignLeadsTable)
-      .where(eq(reactivationCampaignLeadsTable.campaignId, campaign.id));
-    const elapsedHours =
-      (Date.now() - campaign.launchedAt!.getTime()) / 3_600_000;
-    // First tick always releases at least one lead so a launch shows progress.
-    const target = Math.min(
-      campaign.totalLeads,
-      Math.max(1, Math.ceil(elapsedHours * campaign.ratePerHour)),
-    );
-    const budget = Math.min(
-      target - Number(processed),
-      MAX_ENROLL_PER_TICK,
-    );
-    if (budget <= 0) return [];
-    const claimed = await tx.execute(sql`
-      UPDATE ${reactivationCampaignLeadsTable} SET status = 'enrolled', enrolled_at = now()
-      WHERE id IN (
-        SELECT id FROM ${reactivationCampaignLeadsTable}
-        WHERE campaign_id = ${campaign.id} AND status = 'pending'
-        ORDER BY created_at
-        LIMIT ${budget}
-        FOR UPDATE SKIP LOCKED
-      )
-      RETURNING id, lead_id
-    `);
-    return claimed.rows as { id: string; lead_id: string }[];
-  });
-
-  for (const row of rows) {
+  const sendingHours = await getSendingHours(campaign.organizationId);
+  const failedThisTick = new Set<string>();
+  // Each lead is its own transaction. The campaign lock serializes pacing,
+  // while enrollment, the first scheduled step, lead status, and campaign
+  // linkage commit together. A crash rolls back the whole lead and leaves
+  // it pending; there is no "enrolled without enrollmentId" window.
+  for (let i = 0; i < MAX_ENROLL_PER_TICK; i++) {
+    let attemptedRowId: string | undefined;
     try {
-      const outcome = await enrollCampaignLead(campaign, playbook, row.lead_id);
-      if (outcome.status === "skipped") {
-        await db
+      const advanced = await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${campaign.id}))`);
+        const [current] = await tx
+          .select()
+          .from(reactivationCampaignsTable)
+          .where(eq(reactivationCampaignsTable.id, campaign.id))
+          .for("update");
+        if (!current || current.status !== "running" || !current.launchedAt) return false;
+        const [{ processed }] = await tx
+          .select({
+            processed: sql<number>`count(*) FILTER (WHERE ${reactivationCampaignLeadsTable.status} <> 'pending')::int`,
+          })
+          .from(reactivationCampaignLeadsTable)
+          .where(eq(reactivationCampaignLeadsTable.campaignId, campaign.id));
+        const elapsedHours = (Date.now() - current.launchedAt.getTime()) / 3_600_000;
+        const target = Math.min(
+          current.totalLeads,
+          Math.max(1, Math.ceil(elapsedHours * current.ratePerHour)),
+        );
+        if (Number(processed) >= target) return false;
+        const [row] = await tx
+          .select({ id: reactivationCampaignLeadsTable.id, leadId: reactivationCampaignLeadsTable.leadId })
+          .from(reactivationCampaignLeadsTable)
+          .where(
+            and(
+              eq(reactivationCampaignLeadsTable.campaignId, campaign.id),
+              eq(reactivationCampaignLeadsTable.status, "pending"),
+              ...(failedThisTick.size
+                ? [notInArray(reactivationCampaignLeadsTable.id, [...failedThisTick])]
+                : []),
+            ),
+          )
+          .orderBy(reactivationCampaignLeadsTable.createdAt)
+          .limit(1)
+          .for("update", { skipLocked: true });
+        if (!row) return false;
+        attemptedRowId = row.id;
+        const outcome = await enrollCampaignLead(campaign, playbook, row.leadId, tx, sendingHours);
+        await tx
           .update(reactivationCampaignLeadsTable)
-          .set({ status: "skipped", detail: outcome.detail, enrollmentId: null })
+          .set(
+            outcome.status === "skipped"
+              ? { status: "skipped", detail: outcome.detail, enrollmentId: null }
+              : {
+                  status: "enrolled",
+                  detail: null,
+                  enrollmentId: outcome.enrollmentId,
+                  enrolledAt: new Date(),
+                },
+          )
           .where(eq(reactivationCampaignLeadsTable.id, row.id));
-      } else {
-        await db
-          .update(reactivationCampaignLeadsTable)
-          .set({ enrollmentId: outcome.enrollmentId })
-          .where(eq(reactivationCampaignLeadsTable.id, row.id));
-      }
+        return true;
+      });
+      if (!advanced) break;
     } catch (err) {
-      // Per-lead isolation: one failed enrollment must not abort the batch
-      // or strand its claimed row. Release the row back to pending so a
-      // later tick retries it (the claim happens before send scheduling, so
-      // a retry can never double-send).
-      console.error(
-        `[reactivation] drain failed for campaign ${campaign.id}:`,
-        err,
-      );
+      console.error(`[reactivation] drain failed for campaign ${campaign.id}:`, err);
+      if (!attemptedRowId) break;
+      failedThisTick.add(attemptedRowId);
       await db
         .update(reactivationCampaignLeadsTable)
-        .set({
-          status: "pending",
-          enrollmentId: null,
-          detail: err instanceof Error ? err.message : "enrollment failed",
-        })
-        .where(eq(reactivationCampaignLeadsTable.id, row.id));
+        .set({ detail: "enrollment failed; retry next cycle" })
+        .where(
+          and(
+            eq(reactivationCampaignLeadsTable.id, attemptedRowId),
+            eq(reactivationCampaignLeadsTable.status, "pending"),
+          ),
+        );
     }
   }
 
@@ -758,8 +761,10 @@ async function enrollCampaignLead(
   campaign: ReactivationCampaign,
   playbook: Playbook,
   leadId: string,
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  sendingHours: SendingHoursSettings,
 ): Promise<{ status: "enrolled"; enrollmentId: string } | { status: "skipped"; detail: string }> {
-  const [lead] = await db
+  const [lead] = await tx
     .select()
     .from(leadsTable)
     .where(and(eq(leadsTable.id, leadId), eq(leadsTable.organizationId, campaign.organizationId)));
@@ -768,14 +773,18 @@ async function enrollCampaignLead(
   // The playbook engine only sends to outreach-active leads; move cold
   // stages (lost, completed, …) back into nurture so the win-back sequence
   // can run. The original stage is kept on the campaign lead row.
+  const enrollment = await enrollLead(campaign.organizationId, lead.id, playbook, {
+    transaction: tx,
+    skipAudit: true,
+    sendingHours,
+  });
+  if (!enrollment) return { status: "skipped", detail: "already in a live sequence" };
   if (!OUTREACH_ACTIVE_STATUSES.includes(lead.status as never)) {
-    await db
+    await tx
       .update(leadsTable)
       .set({ status: "nurture" })
       .where(eq(leadsTable.id, lead.id));
   }
-  const enrollment = await enrollLead(campaign.organizationId, lead.id, playbook);
-  if (!enrollment) return { status: "skipped", detail: "already in a live sequence" };
   return { status: "enrolled", enrollmentId: enrollment.id };
 }
 

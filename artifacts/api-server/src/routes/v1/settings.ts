@@ -80,8 +80,8 @@ router.get(
 router.get(
   "/settings/sms-provider",
   requireMember("settings.manage"),
-  (req: Request, res: Response): void => {
-    res.json(getSmsProviderStatus(req.member!.organizationId));
+  async (req: Request, res: Response): Promise<void> => {
+    res.json(await getSmsProviderStatus(req.member!.organizationId));
   },
 );
 

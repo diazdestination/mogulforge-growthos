@@ -1,5 +1,25 @@
 # Painless Twilio integration readiness — September 28, 2026
 
+## September 30 tenant-binding engineering update (local only)
+
+The global single-organization account/number fallback described below has
+been replaced in local code with a disabled-by-default, one-organization/
+one-subaccount/one-number binding. Signed inbound events select by exact
+account and number; callbacks bind to the original operation. Two synthetic
+tenants and per-client revocation are covered by `test:twilio`. See
+[TWILIO-TENANT-BINDING.md](TWILIO-TENANT-BINDING.md) for the actual contract.
+This is not a migrated deployment or a live Painless/HVAC connection. The
+client-branded public SMS opt-in page, real provider inventory, approved
+numbers/registration, credentials, exact-head release gate, staging and
+real-handset proof remain outstanding. Older statements below are historical
+snapshots, not the current local binding design.
+
+## September 30 local code update (not live)
+
+The existing single-organization voice callback now creates one high-priority staff callback task when a signed inbound call's staff leg returns busy, no-answer, failed or canceled. A tenant-scoped staff review can link an existing contact with a matching phone or explicitly create one opportunity and assign its callback task. It is idempotent by call/review request, audited, and creates no SMS consent, automatic text, playbook enrollment, AI booking or provider call. The Calls screen exposes this review path. Synthetic tests cover callback replay, unknown caller, cross-tenant denial and no SMS. The older statements below describe the prior baseline; do not read them as the current code state.
+
+**Still blocked for both-client operation:** voice configuration and signed inbound routing remain bound to one global organization/account/number. There is no separate Painless/HVAC provider binding, approved numbers, on-call roster, registered SMS sender, tenant-specific disclosure or live missed-call acceptance. Do not activate this code for either client or claim both missed-call automations are functioning in production. The per-client mapping and provider release sequence below still applies.
+
 **Preparation only. Painless is prospective and is not authorized for activation.** Start with client onboarding, then voice routing plus call history, then approved two-way SMS. The local implementation now separates voice configuration from SMS, but shared client routing and release readiness are still blockers. Do not promise service immediately after an onboarding form is completed.
 
 ## Account choice
