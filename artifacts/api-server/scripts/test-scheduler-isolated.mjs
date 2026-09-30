@@ -60,6 +60,7 @@ try {
       "--no-file-parallelism",
       ...(selectedTests.length ? selectedTests : [
       "src/services/scheduler-loop.test.ts",
+      "src/services/scheduler-autostart.test.ts",
       "src/services/scheduler-runtime.test.ts",
       "src/services/scheduler-stage-isolation.test.ts",
       "src/services/scheduled-action-recovery.test.ts",

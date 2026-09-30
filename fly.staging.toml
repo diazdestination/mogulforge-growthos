@@ -18,6 +18,8 @@ kill_timeout = 30
   NODE_ENV = 'production'
   OBJECT_STORAGE_PROVIDER = 'postgres'
   PORT = '3001'
+  # Fail closed until staging data and provider credentials pass preflight.
+  SCHEDULER_AUTOSTART = 'false'
   STATIC_DIR = '/app/public'
 
 [http_service]
@@ -25,7 +27,7 @@ kill_timeout = 30
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  # Exercise the same always-on scheduler topology as the beta candidate.
+  # Reserve the always-on topology; background work is held above for preflight.
   min_machines_running = 1
 
 [[vm]]

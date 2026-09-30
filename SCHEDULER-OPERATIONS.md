@@ -1,6 +1,6 @@
 # GrowthOS background-work operations
 
-Updated: 2026-09-29. Status: implementation and isolated acceptance; **not a deployment or paid-beta approval**.
+Updated: 2026-09-30. Status: implementation and isolated acceptance; **not a deployment or paid-beta approval**.
 
 ## What this release adds
 
@@ -17,6 +17,14 @@ The operator's **Client Launchpad → Follow-up reliability** shows the last pro
 - Use a **direct PostgreSQL connection or session pooling**. Transaction-mode connection pooling is incompatible with the session ownership lock. Validate this before staging; do not silently rely on the lock through a transaction pooler.
 - Apply the additive `scheduler_runtime` table through the normal release schema gate before serving the new application. The existing schema release process and backup/restore gates still apply.
 - No Redis service, separate worker bill or additional provider subscription was introduced. A sleeping/stopped application cannot process follow-up on time; configuration on disk alone does not prove an always-on machine exists.
+
+### Staging scheduler hold and same-SHA enablement
+
+`fly.staging.toml` deliberately sets `SCHEDULER_AUTOSTART='false'`. The web app can start for staging preflight, but it logs that the scheduler is disabled and runs **no background cycles**. An unset value retains the existing production behavior; explicit `true` enables cycles. Any other value fails startup before the HTTP listener opens. The flag does not disable HTTP-triggered actions or other startup work, so it is not a substitute for staging isolation. While held, missing/stale heartbeat is expected and **does not satisfy P0-2**.
+
+Before enabling the same candidate image/SHA, an authorized operator must record the exact release identity, verify the isolated staging database/user and schema/backup, inspect the entire due scheduled-action, reactivation and webhook queues for real recipients/effects, and confirm provider credentials and sender/recipient identities are isolated or explicitly approved for the test. In particular, do not turn on a global scheduler while a transactional-email credential could contact real users through queued reminders. If that preflight fails, keep the hold and resolve the unsafe data/credentials under the applicable approval gate; do not clear work merely to make the check green.
+
+After the preflight and release approval, apply a **configuration-only staging release of that same recorded image/SHA** with `SCHEDULER_AUTOSTART='true'` and `min_machines_running=1`. Record the config/release revision separately from the code SHA. Then prove a fresh heartbeat for at least two idle cycles and run the synthetic restart/concurrency/failure-visibility checks below. The checked-in staging file remains fail-closed for a new deployment; the enabled runtime configuration must be explicitly controlled and audited. This procedure is not an instruction to deploy or activate a provider now.
 
 Fly documents that its minimum applies in the primary region when auto-stop is enabled, and that shutdown timeouts are best-effort: [configuration reference](https://docs.fly.io/reference/configuration/).
 
@@ -55,6 +63,7 @@ LIMIT 100;
 ## Verification and remaining gates
 
 - `pnpm --filter @workspace/api-server run test:scheduler` creates a new in-memory database and excludes inherited database/provider credentials. It covers bounded retries, cancellation, queue fairness, stage isolation, heartbeat, access control and durable receipts.
+- The isolated suite also checks that unset autostart preserves existing behavior, explicit `false` never creates a scheduler loop, and ambiguous values reject application import before HTTP startup.
 - Its real child-process restart fixture stops a worker **after** a synthetic task is committed but **before** the receipt is completed. A replacement process leaves exactly one copy of that task, marks its interrupted receipt indeterminate and completes the other due task. The test advances the 15-minute ownership deadline rather than sleeping for it.
 - Independent-session advisory lock exclusion is **skipped only in the explicit PGlite runner**. The normal CI suite uses PostgreSQL and must pass it without that skip. PGlite's multiplexed connection is not evidence of production PostgreSQL lock semantics.
 - A stage heartbeat now requires an updated row still owned by that worker. A zero-row update stops progression at that stage boundary even if the advisory-lock connection has not emitted an error event. Work already in flight remains governed by durable receipts. The isolated regression deliberately replaces the owner mid-cycle; it proves fail-closed stage progression, not a real PostgreSQL failover.
@@ -67,7 +76,7 @@ LIMIT 100;
 
 1. Record the exact CI-green SHA, schema version and isolated staging identity. Take/verify the applicable backup before migration.
 2. Verify an active machine in `iad`, the approved cost, direct/session-pooled database connectivity, and no production provider keys or customer records in staging.
-3. Confirm a fresh heartbeat without opening client traffic for at least two cycles. Check that failed/uncertain records remain visible.
+3. After the isolated-data/provider preflight and explicit same-SHA scheduler enablement above, confirm a fresh heartbeat without opening client traffic for at least two cycles. Check that failed/uncertain records remain visible. A disabled scheduler's missing heartbeat is not a pass.
 4. Queue synthetic internal tasks; repeat the controlled restart and concurrent-worker test using real PostgreSQL. Do not use real customer messages as crash fixtures.
 5. Verify the owning client can inspect/reconcile uncertain receipts, another client cannot read them, and platform aggregates remain payload-free.
 6. Exercise legacy reactivation and outbound-webhook failure windows separately; record remaining defects instead of marking the whole gate green.
