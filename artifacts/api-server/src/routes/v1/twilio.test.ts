@@ -526,6 +526,32 @@ it("applies STOP only to the routed organization and START does not restore old 
   expect(own.doNotContactSms).toBe(true);
 });
 
+it("blocks staff-requested calls before provider dispatch while staging is held", async () => {
+  const beforeVoice = voiceSends;
+  const requestId = randomUUID();
+  const previousHold = process.env.GROWTHOS_OUTBOUND_HOLD;
+  vi.stubEnv("GROWTHOS_OUTBOUND_HOLD", "true");
+  try {
+    const response = await realFetch(base + "/api/v1/communications/voice", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${sessionA}`,
+        origin: "https://growth.example",
+        "content-type": "application/json",
+        "x-forwarded-for": "192.0.2.89",
+      },
+      body: JSON.stringify({ contactId: contactA, requestId, requestedByContact: true }),
+    });
+    expect(response.status).toBe(503);
+    expect(voiceSends).toBe(beforeVoice);
+    const existing = await db.select({ id: twilioCallsTable.id }).from(twilioCallsTable)
+      .where(eq(twilioCallsTable.requestKey, requestId));
+    expect(existing).toHaveLength(0);
+  } finally {
+    vi.stubEnv("GROWTHOS_OUTBOUND_HOLD", previousHold);
+  }
+});
+
 it("gates calls, starts only one staff leg, binds callbacks and prevents replaying the customer leg", async () => {
   let testIp = "192.0.2.90";
   const makeCall = (

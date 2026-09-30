@@ -15,6 +15,7 @@ import {
   type WebhookEndpoint,
 } from "@workspace/db";
 import { and, eq, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { outboundDeliveryHeld } from "./outbound-hold";
 
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = [0, 60_000, 300_000]; // immediate, 1m, 5m
@@ -418,6 +419,8 @@ export async function attemptDelivery(
   deliveryId: string,
   endpointHint?: WebhookEndpoint,
 ): Promise<void> {
+  // Preserve queued work without claiming an ambiguous network attempt.
+  if (outboundDeliveryHeld()) return;
   const [delivery] = await db
     .select()
     .from(webhookDeliveriesTable)
@@ -596,6 +599,7 @@ export async function cleanupExpiredPreviousSecrets(
 
 /** Retry due pending deliveries. Called by the scheduler tick. */
 export async function processPendingDeliveries(): Promise<number> {
+  if (outboundDeliveryHeld()) return 0;
   const due = await db
     .select({ id: webhookDeliveriesTable.id })
     .from(webhookDeliveriesTable)

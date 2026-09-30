@@ -6,6 +6,7 @@ import { db, contactsTable, missedCallHandoffsTable, twilioCallsTable } from "@w
 import { requireMember } from "../../middlewares/requireMember";
 import { rateLimit } from "../../lib/rateLimit";
 import { ensureMissedCallHandoff, reviewMissedCall } from "../../services/missed-call-handoff";
+import { assertOutboundDeliveryAllowed, outboundDeliveryHeld } from "../../services/outbound-hold";
 import {
   phoneE164,
   twilioForInbound,
@@ -104,6 +105,10 @@ router.post(
       req.header("origin") !== process.env.APP_ORIGIN
     ) {
       res.status(403).end();
+      return;
+    }
+    if (outboundDeliveryHeld()) {
+      res.status(503).json({ error: "Outbound calls are disabled in this environment." });
       return;
     }
     const config = await voiceConfiguration(req.member!.organizationId),
@@ -256,6 +261,7 @@ router.post(
       params.append("StatusCallbackEvent", "ringing");
       params.append("StatusCallbackEvent", "answered");
       params.append("StatusCallbackEvent", "completed");
+      assertOutboundDeliveryAllowed();
       const response = await fetch(
         `https://api.twilio.com/2010-04-01/Accounts/${current.accountSid}/Calls.json`,
         {

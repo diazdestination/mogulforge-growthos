@@ -1,4 +1,5 @@
 import { twilioForOrganization, type SmsSendContext } from './twilio-controls';
+import { assertOutboundDeliveryAllowed } from './outbound-hold';
 /**
  * Provider adapters. Mocks are clearly labeled and used only when real
  * credentials are absent in local development. Production SMS requires the
@@ -151,6 +152,7 @@ export const twilioSmsProvider: SmsProvider = {
  */
 export const gmailEmailProvider: EmailProvider = {
   async send(to, subject, body) {
+    assertOutboundDeliveryAllowed();
     // Header-injection guard: the recipient is interpolated into a raw
     // RFC 2822 header, so reject anything that isn't a plain mailbox.
     if (!isSafeMailbox(to)) {
@@ -275,6 +277,7 @@ export function isGmailConfigured(): boolean {
  */
 export const resendEmailProvider: EmailProvider = {
   async send(to, subject, body) {
+    assertOutboundDeliveryAllowed();
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.RESEND_FROM_EMAIL?.trim();
     if (!apiKey || !from) {
@@ -468,6 +471,7 @@ export function isTransactionalEmailConfigured(): boolean {
 
 export const transactionalEmailProvider: EmailProvider = {
   async send(to, subject, body) {
+    assertOutboundDeliveryAllowed();
     if (isTransactionalEmailConfigured()) {
       return resendEmailProvider.send(to, subject, body);
     }
@@ -500,6 +504,7 @@ export const transactionalEmailProvider: EmailProvider = {
  */
 export const adaptiveEmailProvider: EmailProvider = {
   async send(to, subject, body) {
+    assertOutboundDeliveryAllowed();
     const gmailAvailable = isGmailConfigured();
     // Check Resend availability at call-time (not module-load) so env stubs
     // in tests and runtime changes to RESEND_API_KEY are always honoured.
@@ -556,6 +561,7 @@ export const adaptiveEmailProvider: EmailProvider = {
 
 const tenantAwareSmsProvider: SmsProvider = {
   async send(to, body, context) {
+    assertOutboundDeliveryAllowed();
     const binding = context?.organizationId ? await twilioForOrganization(context.organizationId) : null;
     if (binding || process.env.NODE_ENV === "production")
       return twilioSmsProvider.send(to, body, context);

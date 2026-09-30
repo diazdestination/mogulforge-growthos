@@ -1,6 +1,6 @@
-# Isolated GrowthOS staging configuration.
-# This file intentionally names a different Fly app and origin than production.
-# Provision the app and its dedicated logical database before the first deploy.
+# GrowthOS staging app configuration. A different app, origin and logical
+# database do not establish privilege isolation if they share one MPG cluster.
+# See STAGING-PREFLIGHT-2026-09-30.md before any deployment.
 
 app = 'mogulforge-growthos-staging'
 primary_region = 'iad'
@@ -20,6 +20,12 @@ kill_timeout = 30
   PORT = '3001'
   # Fail closed until staging data and provider credentials pass preflight.
   SCHEDULER_AUTOSTART = 'false'
+  # Keep real email/SMS/webhook dispatch disabled even if a route is invoked.
+  GROWTHOS_OUTBOUND_HOLD = 'true'
+  # A later authorized provider test needs this AND an explicit hold release.
+  STAGING_OUTBOUND_APPROVED = 'false'
+  # The release command must not run drizzle --force without a reviewed delta.
+  STAGING_SCHEMA_PUSH_APPROVED = 'false'
   STATIC_DIR = '/app/public'
 
 [http_service]

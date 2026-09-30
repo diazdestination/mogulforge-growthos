@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { parseStagingTarget } from "./staging-readonly-preflight.mjs";
 
 const ANSI_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]/g;
 
@@ -18,7 +19,21 @@ export function detectSchemaPushFailure(output) {
   return null;
 }
 
+/** Never run drizzle's --force against staging on an ordinary app deploy. */
+export function assertStagingSchemaPushGate(env = process.env) {
+  const staging =
+    env.FLY_APP_NAME === "mogulforge-growthos-staging" ||
+    env.APP_ORIGIN === "https://mogulforge-growthos-staging.fly.dev";
+  if (!staging) return;
+  parseStagingTarget(env.DATABASE_URL, env.FLY_APP_NAME);
+  if (env.GROWTHOS_OUTBOUND_HOLD !== "true")
+    throw new Error("Staging schema push requires the outbound safety hold");
+  if (env.STAGING_SCHEMA_PUSH_APPROVED !== "true")
+    throw new Error("Staging schema push requires reviewed delta and explicit approval");
+}
+
 async function runSchemaPush() {
+  assertStagingSchemaPushGate();
   const scriptDirectory = dirname(fileURLToPath(import.meta.url));
   const dbDirectory = resolve(scriptDirectory, "../lib/db");
   const executable = "pnpm";

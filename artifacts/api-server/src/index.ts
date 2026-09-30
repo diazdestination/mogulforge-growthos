@@ -1,6 +1,7 @@
 import { db, pool, organizationsTable } from "@workspace/db";
 import app from "./app";
 import { runAutoMigrate } from "./lib/auto-migrate";
+import { assertStagingDatabaseIdentity } from "./lib/staging-database-identity";
 import { logger } from "./lib/logger";
 import {
   ensureDefaultAutomations,
@@ -25,6 +26,9 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 async function main(): Promise<void> {
+  // The release command guards schema push separately. Check the actual
+  // session here before startup seeding or a stale secret can touch prod data.
+  await assertStagingDatabaseIdentity(pool);
   // No-op unless AUTO_MIGRATE is set. Awaited before listen so we never serve
   // traffic against a database whose schema hasn't been applied yet.
   await runAutoMigrate();

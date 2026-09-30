@@ -6,6 +6,7 @@ import {
   twilioDispatchesTable,
 } from "@workspace/db";
 import { addSuppression, checkSendEligibility } from "./send-gate";
+import { assertOutboundDeliveryAllowed } from "./outbound-hold";
 import {
   digest,
   phoneE164,
@@ -18,6 +19,7 @@ export async function sendTwilioSms(
   body: string,
   context?: SmsSendContext,
 ) {
+  assertOutboundDeliveryAllowed();
   const phone = phoneE164(to);
   if (!context?.organizationId)
     throw new Error("Twilio tenant and operation context required");

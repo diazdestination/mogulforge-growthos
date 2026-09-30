@@ -16,6 +16,7 @@ import {
   sha256Base64Url,
 } from "../lib/token-encryption";
 import { isSafeMailbox } from "./providers";
+import { assertOutboundDeliveryAllowed } from "./outbound-hold";
 
 const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 const IDENTITY_SCOPES = ["openid", "email", "profile"];
@@ -336,6 +337,7 @@ export async function sendGmailForUser(input: {
   subject: string;
   body: string;
 }): Promise<{ id: string; provider: "gmail"; senderEmail: string }> {
+  assertOutboundDeliveryAllowed();
   if (!isSafeMailbox(input.to)) throw new Error("Refusing to send email: invalid recipient address");
   const [sender] = await db
     .select({ id: usersTable.id })
