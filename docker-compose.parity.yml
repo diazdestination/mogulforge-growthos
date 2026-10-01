@@ -23,6 +23,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GROWTHOS_BUILD_SHA: ${GROWTHOS_BUILD_SHA:-}
     environment:
       DATABASE_URL: postgresql://growthos_app:growthos-parity-password@db:5432/growthos_parity
       NODE_ENV: production
@@ -39,10 +41,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GROWTHOS_BUILD_SHA: ${GROWTHOS_BUILD_SHA:-}
     environment:
       APP_ORIGIN: http://localhost:18080
       BETA_SIGNUP_ALLOWLIST: parity-owner@example.com
       DATABASE_URL: postgresql://growthos_app:growthos-parity-password@db:5432/growthos_parity
+      GROWTHOS_ENVIRONMENT: test
+      GROWTHOS_OUTBOUND_HOLD: "true"
+      STAGING_OUTBOUND_APPROVED: "false"
+      STAGING_EMAIL_RECIPIENT_ALLOWLIST: ""
+      SCHEDULER_AUTOSTART: "false"
+      AUTO_MIGRATE: "false"
       NODE_ENV: production
       OBJECT_STORAGE_PROVIDER: postgres
       OAUTH_TOKEN_ENCRYPTION_KEY: AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
@@ -54,4 +64,3 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:18080:3001"
-

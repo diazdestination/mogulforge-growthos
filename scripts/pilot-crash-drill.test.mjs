@@ -7,7 +7,7 @@ import https from "node:https";
 import { EventEmitter } from "node:events";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { trackPgliteSocketCleanup } from "./test-support/pglite-socket-cleanup.mjs";
-import { RELEASE_SHA, IMAGE_REF } from "./hosted-pilot-drill.mjs";
+import { RELEASE_SHA, IMAGE_REF, RELEASE_FILES } from "./hosted-pilot-drill.mjs";
 import { reviewedSchema } from "./pilot-staging-bootstrap.mjs";
 import { fixtureIds, fixtureRows } from "./restore-drill-fixture.mjs";
 import {
@@ -45,6 +45,22 @@ const env = {
   DATABASE_URL:
     "postgresql://growthos-staging-live:secret-for-test-only@pgbouncer.zp2wjrejd2zodn4q.flympg.net/growthos_staging",
 };
+
+const pinnedIndexRelativePath = "artifacts/api-server/src/index.ts";
+const pinnedIndexPath = fileURLToPath(
+  new URL(`../${pinnedIndexRelativePath}`, import.meta.url),
+);
+const historicalIndexFixturePath = fileURLToPath(
+  new URL("./test-support/fixtures/c050067/index.ts.txt", import.meta.url),
+);
+
+// Historical unit-test input only: exact `git show c050067:.../index.ts` bytes.
+// The current startup evolves independently. Never repin the old hosted image
+// or feed this non-executable fixture to a hosted/runtime attestation reader.
+const historicalSourcePath = (path) =>
+  path === pinnedIndexPath ? historicalIndexFixturePath : path;
+const readHistoricalSource = (path, encoding) =>
+  readFile(historicalSourcePath(path), encoding);
 
 describe("hosted crash probe guards", () => {
   it("requires exact approved source identity, holds and a deterministic nonce", () => {
@@ -148,20 +164,21 @@ describe("hosted crash probe guards", () => {
       crashFailure({ message: "private", code: "ABCDE" }, "private"),
     ).toMatchObject({ sqlstate: null, phase: "unknown" });
   });
-  it("attests actual pinned source before a build without reading an ambient bundle", async () => {
+  it("attests frozen startup and other actual pinned sources without an ambient bundle", async () => {
     const root = fileURLToPath(new URL("../", import.meta.url));
     const bundlePath = fileURLToPath(
       new URL("../artifacts/api-server/dist/index.mjs", import.meta.url),
     );
-    // CI runs scripts tests before the API build. Only bundle bytes are supplied
-    // by this reader seam; every pinned source and helper still comes from disk.
+    // CI runs tests before build: the bundle is synthetic. Only the startup
+    // source comes from its frozen c050067 fixture; all other sources/helpers
+    // remain real disk reads. This is not hosted proof for the current release.
     const bundle = Buffer.from("synthetic-crash-attestation-bundle-v1\n");
     const bundleSha = createHash("sha256").update(bundle).digest("hex");
     const actualSourceReads = [];
     const read = vi.fn(async (path, encoding) => {
       if (path === bundlePath) return bundle;
-      actualSourceReads.push(path);
-      return readFile(path, encoding);
+      actualSourceReads.push(historicalSourcePath(path));
+      return readHistoricalSource(path, encoding);
     });
     const pinnedEnv = {
       ...env,
@@ -172,6 +189,8 @@ describe("hosted crash probe guards", () => {
     expect(evidence.apiBundleSha256).toBe(bundleSha);
     expect(read).toHaveBeenCalledWith(bundlePath);
     expect(actualSourceReads).not.toContain(bundlePath);
+    expect(actualSourceReads).not.toContain(pinnedIndexPath);
+    expect(actualSourceReads).toContain(historicalIndexFixturePath);
     expect(
       actualSourceReads.some((path) => path.endsWith("pilot-crash-runtime.ts")),
     ).toBe(true);
@@ -193,6 +212,40 @@ describe("hosted crash probe guards", () => {
       ),
     ).rejects.toThrow("hosted_release_source_mismatch");
   });
+  it("pins the historical startup fixture and rejects changed current startup bytes", async () => {
+    const frozen = await readFile(historicalIndexFixturePath, "utf8");
+    const sourceSha = (text) =>
+      createHash("sha256").update(text.replace(/\r\n/g, "\n")).digest("hex");
+    expect(sourceSha(frozen)).toBe(RELEASE_FILES[pinnedIndexRelativePath]);
+
+    const current = await readFile(pinnedIndexPath, "utf8");
+    // If this test is cherry-picked onto the old tree, still exercise mismatch
+    // rejection. On an evolved tree, reject its actual startup bytes unchanged.
+    const changed = sourceSha(current) === RELEASE_FILES[pinnedIndexRelativePath]
+      ? `${current}\n// Synthetic historical-attestation mismatch.\n`
+      : current;
+    const root = fileURLToPath(new URL("../", import.meta.url));
+    const bundlePath = fileURLToPath(
+      new URL("../artifacts/api-server/dist/index.mjs", import.meta.url),
+    );
+    const bundle = Buffer.from("synthetic-crash-attestation-bundle-v1\n");
+    await expect(
+      attestCrashSources(
+        root,
+        {
+          ...env,
+          RESTORE_DRILL_EXPECTED_BUNDLE_SHA256: createHash("sha256")
+            .update(bundle)
+            .digest("hex"),
+        },
+        async (path, encoding) => {
+          if (path === bundlePath) return bundle;
+          if (path === pinnedIndexPath) return changed;
+          return readHistoricalSource(path, encoding);
+        },
+      ),
+    ).rejects.toThrow("hosted_release_source_mismatch");
+  });
   it("still requires bundle bytes and rejects a mismatched recorded bundle digest", async () => {
     const root = fileURLToPath(new URL("../", import.meta.url));
     const bundlePath = fileURLToPath(
@@ -204,7 +257,7 @@ describe("hosted crash probe guards", () => {
           throw Object.assign(new Error("Synthetic missing build artifact"), {
             code: "ENOENT",
           });
-        return readFile(path, encoding);
+        return readHistoricalSource(path, encoding);
       }),
     ).rejects.toMatchObject({ code: "ENOENT" });
     await expect(
@@ -214,7 +267,7 @@ describe("hosted crash probe guards", () => {
         async (path, encoding) =>
           path === bundlePath
             ? Buffer.from("synthetic-crash-attestation-bundle-v1\n")
-            : readFile(path, encoding),
+            : readHistoricalSource(path, encoding),
       ),
     ).rejects.toThrow("hosted_release_bundle_mismatch");
   });

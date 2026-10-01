@@ -4,6 +4,7 @@ import { runAutoMigrate } from "./lib/auto-migrate";
 import { assertStagingDatabaseIdentity } from "./lib/staging-database-identity";
 import { assertRestoreDatabaseIdentity } from "./lib/restore-mode";
 import { logger } from "./lib/logger";
+import { observeDatabasePoolErrors } from "./lib/database-pool-errors";
 import { ensureDefaultAutomations } from "./services/automation";
 import {
   startAutomationScheduler,
@@ -28,6 +29,7 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 async function main(): Promise<void> {
+  observeDatabasePoolErrors(pool, logger);
   // The release command guards schema push separately. Check the actual
   // session here before startup seeding or a stale secret can touch prod data.
   await assertStagingDatabaseIdentity(pool);

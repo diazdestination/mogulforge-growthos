@@ -340,9 +340,9 @@ workflow checks are approved.
 
 The final local scripts suite passed **202/202 across 13 files**, including
 real-source timed scheduler and crash-recovery tests. Full workspace TypeScript
-checks passed. These operations-only changes leave application, schema,
-dependencies, Dockerfile and staging config unchanged from `c050067`. The final
-branch head requires its own GitHub CI; the hosted application evidence remains
+checks passed. Those operations-only changes, committed as `a04865e`, leave
+application, schema, dependencies, Dockerfile and staging config unchanged
+from `c050067`. Each later branch head requires its own GitHub CI; the hosted application evidence remains
 explicitly attached to the already-green application candidate, not relabelled
 as a later documentation commit.
 
@@ -371,11 +371,74 @@ changed by these test repairs. The repaired head still requires its own fully
 green CI before sign-off; the prior hosted application acceptance is not
 relabelled as acceptance of a later Git commit.
 
+That repair was committed as `aca6a4a8024d6c7d5560c304fcbffc4a018972eb`.
+[CI run 36814582125](https://github.com/diazdestination/mogulforge-growthos/actions/runs/36814582125)
+then **passed** the complete gate: 1,668 tests passed, 15 skipped, workspace
+TypeScript, both builds and Docker staging parity. A read-only hosted recheck
+at `04:20:25.217Z` also confirmed the original exact staging image, held
+sending/scheduler, health 200, protected-route 401s and only two ready clusters.
+
+## Additive readiness and database-outage repair
+
+The next candidate adds `/api/readyz`: a bounded read-only database check with
+an allowlisted public response and build-time release identity. Existing
+`/api/healthz` remains liveness only. Probe GET/HEAD requests, including Express's
+case and trailing-slash aliases, skip session/OIDC processing without opening
+neighboring or protected routes. A separate client, deadlines, single-flight
+operation and conservative cleanup prevent unbounded pool waits or connection
+creation. Dirty or unverifiable builds report an unknown source SHA.
+
+Startup also observes idle shared-pool errors using a fixed redacted event;
+an expected connection loss must not become an unhandled EventEmitter crash.
+Query errors still reject normally and are not retried or disguised. The Docker
+parity gate now checks ready 200, a stopped **synthetic Compose database** with
+ready 503 / live 200, and recovery to ready 200. It never stops a hosted DB.
+
+Local evidence: 33 focused API tests, the final **220-test scripts suite across
+16 files** (including the actual PowerShell JSON/timestamp-validator regression),
+workspace typechecks and independent review passed. This candidate's own
+exact-head CI remains a release requirement. See
+[readiness operations](../READINESS-OPERATIONS.md) for the contract and limits.
+No new hosted readiness claim is made: staging still runs the recorded
+`c050067` image, and all earlier restore/scheduler results remain pinned to it.
+
+Because startup source changed, the historical crash-attestation unit test now
+uses the exact frozen `c050067` startup fixture, with its pinned hash verified.
+The runtime attestation reader, manifest, source revision and hosted digest
+are unchanged; the fixture cannot authorize a newer image. The test also
+rejects evolved startup content rather than silently repinning old evidence.
+
+## Remaining monitoring and data-lifecycle findings
+
+A bounded independent P0-5/7/8 review distinguished unfinished engineering
+from missing provider/owner inputs. The readiness repair above is implemented
+and locally verified, but has not been accepted on hosted staging. An external
+alert destination, responsible responder and actual alert-delivery evidence
+are still required. Reachability does not prove schema, shared-pool capacity,
+scheduler freshness or provider readiness.
+
+Gmail disconnect, Email Intelligence expiry/purge, individual record deletes
+and ROI CSV exports do not amount to a complete account export/deletion
+workflow. Request verification, whole-account coverage, retention/backup
+exceptions and completion evidence still require implementation/testing and
+owner-reviewed policy decisions. The source-grounded
+[customer-data lifecycle plan](../CUSTOMER-DATA-LIFECYCLE-PILOT.md) records exact
+gaps, safe implementation order and acceptance criteria; it is not an export
+or deletion implementation. Retention is not running automatically while the
+normal scheduler remains held.
+
+The restore test's four cross-tenant read denials are useful evidence, but its
+five blanket restore-mode write/authentication denials are **not** normal-mode
+tenant write-authorization proof. The full hosted two-tenant matrix across
+read, write, delete, search, export, send and provider identities remains open.
+None of these gaps is erased by a green CI run or the successful restore.
+
 ## Remaining live acceptance gates
 
-1. Keep exact-head CI green for subsequent operator-harness/document commits.
-   The application candidate/image and hosted evidence remain explicitly
-   pinned to `c050067`; later operations-only commits are not a new app image.
+1. Keep exact-head CI green for every subsequent candidate. Deploy and accept
+   the readiness repair only in an authorized held-staging window, preserving
+   the new image/commit evidence separately. Existing hosted evidence remains
+   explicitly pinned to `c050067`, not the newer unaccepted application build.
 2. Retain the completed managed-recovery evidence above. Any later schema or
    application change needs its own appropriate recovery/compatibility review.
 3. Preserve the passed hosted scheduler runtime, timed idle/restart and bounded

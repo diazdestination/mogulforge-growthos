@@ -60,6 +60,14 @@ export async function authMiddleware(
     return this.user != null;
   } as Request['isAuthenticated'];
 
+  // Match only the public probe routes, including Express's case/slash aliases.
+  // Keep the initializer above and every protected route's behavior intact.
+  if ((req.method === 'GET' || req.method === 'HEAD') &&
+      /^\/api\/(healthz|readyz)\/?$/i.test(req.path)) {
+    next();
+    return;
+  }
+
   const sid = getSessionId(req);
   if (!sid) {
     next();

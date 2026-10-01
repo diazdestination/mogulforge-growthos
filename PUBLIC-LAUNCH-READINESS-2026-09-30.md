@@ -19,14 +19,14 @@ rehearsal remains distinct from opening a real customer pilot or paid beta.
 
 | P0 gate                    | Current evidence                                                                                                                                                   | Still required                                                                                                                     |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Exact-head CI           | Application candidate `c050067` passed run `36809476022`: 1,537 tests, types, both builds and Docker parity.                                                       | Re-run on every later branch head; operations-only commits do not change the recorded app image.                                   |
+| 1. Exact-head CI           | Hosted application `c050067` passed run `36809476022`; test-harness repair `aca6a4a` passed run `36814582125`: 1,668 tests, types, builds and Docker parity.          | The additive readiness candidate needs its own exact-head CI and held-staging acceptance; older results do not approve it.          |
 | 2. Always-on scheduling    | Hosted Session locks, heartbeats, real timed cycles, graceful worker restart and bounded crash-after-task checks passed; no duplicate task.                        | Remaining legacy/global failure windows, approved normal scheduler enablement, actual provider effects and operator coverage.      |
 | 3. Isolated staging        | Separate cluster, 90-table bootstrap, Writer login and immutable c050067 cutover verified; one started held Machine, minimum one.                                  | Full intended workflow acceptance; keep environment and client sender/test identities separate.                                    |
 | 4. Providers               | Code paths and mocks exist for Gmail, Resend, Twilio, OpenAI and Stripe.                                                                                           | Approved test identities and real provider receipts for the P0-4 matrix. No customer send or production activation is established. |
-| 5. Failure visibility      | Runtime health has local aggregate tests; this batch adds an operator-facing alert for failed background work.                                                     | Owned external alert destination, uptime check, per-client triage and staged failure-injection evidence.                           |
+| 5. Failure visibility      | Runtime/operator alerts exist; bounded DB readiness, build identity and redacted idle-pool error handling now have local tests and independent review.              | Exact-candidate Docker/hosted acceptance, owned external alert destination, actual alert receipt and per-client response coverage.  |
 | 6. Restore                 | Completed managed full backup restored; two-tenant fingerprints/media/decryption and same-image HTTP isolation/read-only checks passed. Temporary cluster deleted. | Preserve evidence and repeat after material changes. Observed synthetic exercise timing is not a production recovery SLA.          |
-| 7. Trust/data lifecycle    | Tenant/auth guards and private-data patterns exist; this batch removes untrusted request-host origins from Stripe and OIDC redirects.                              | Owner-reviewed policies, retention/deletion/export workflow and verified customer-data lifecycle.                                  |
-| 8. Tenant isolation        | Existing local tenancy tests plus this batch's API-key/contact adversarial regression.                                                                             | Full two-tenant staging matrix across read, write, search, export, send and provider identities.                                   |
+| 7. Trust/data lifecycle    | Tenant/auth guards and trusted redirects exist; source-grounded lifecycle inventory/implementation plan is documented. This is not a whole-account export/delete. | Owner-reviewed policies, complete export/retention/deletion implementation and verified customer-data lifecycle.                    |
+| 8. Tenant isolation        | Local tenancy/API-key regressions and four hosted restore-mode cross-tenant read denials passed. Restore-mode 405s are not normal write-isolation evidence.       | Full normal-mode two-tenant staging matrix across read, write, delete, search, export, send and provider identities.                 |
 | 9. Founding-customer proof | Local/synthetic opportunity-to-outcome workflows exist.                                                                                                            | One consented, bounded Painless or HVAC pilot with provider receipts, appointments/outcomes and conservative revenue attribution.  |
 | 10. Repeatable offer       | BIE positioning, Lead Import, Revenue Desk and client operations foundation exist.                                                                                 | Only after gates 1–9: validate 2–3 packages, usage economics and a timed contractor onboarding run.                                |
 
@@ -49,6 +49,10 @@ rehearsal remains distinct from opening a real customer pilot or paid beta.
    and data-import decisions. Prove each intended channel before the first
    bounded founding-customer pilot. Only then decide packaging and public
    claims.
+
+Engineering details: [readiness operations](READINESS-OPERATIONS.md) and
+[customer-data lifecycle plan](CUSTOMER-DATA-LIFECYCLE-PILOT.md). The latter
+describes work still to build, not a completed feature or approved policy.
 
 ## Owner decisions not implied by this ledger
 

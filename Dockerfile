@@ -19,6 +19,7 @@ RUN pnpm install --no-frozen-lockfile --ignore-scripts
 # Explicit production defaults; the Vite config also has portable local
 # defaults so ordinary builds no longer depend on platform-injected variables.
 ENV NODE_ENV=production PORT=3001 BASE_PATH=/
+ARG GROWTHOS_BUILD_SHA
 RUN pnpm --filter @workspace/command-center run build
 RUN pnpm --filter @workspace/api-server run build
 
