@@ -1,4 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { enqueueStaffLeadPush } from "./staff-push";
 import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import {
   activitiesTable,
@@ -534,6 +535,7 @@ export async function captureSmartSiteInquiry(
         }),
       })
       .returning();
+    await enqueueStaffLeadPush(tx, organizationId, lead);
     const consent = {
       ...input.consent,
       receivedAt: new Date().toISOString(),

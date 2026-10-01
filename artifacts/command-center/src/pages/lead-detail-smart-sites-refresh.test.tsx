@@ -20,6 +20,9 @@ it('refreshes next-action evidence after a note and after a stage change', async
   const { hook } = memoryLocation({ path: `/leads/${sampleLead.id}` });
   renderWithQuery(<Router hook={hook}><Route path="/leads/:id"><LeadDetail /></Route></Router>);
   await screen.findByPlaceholderText('Add a note to this lead...');
+  // Mobile uses one scrollable body so the manual-SMS panel and timeline remain
+  // reachable; independent columns are restored only at the desktop breakpoint.
+  expect(screen.getByTestId('lead-detail-scroll-body').className).toContain('overflow-y-auto md:overflow-hidden');
   await waitFor(() => expect(actionReads).toBe(1));
   fireEvent.change(screen.getByPlaceholderText('Add a note to this lead...'), { target: { value: 'Local review only' } });
   fireEvent.click(screen.getByRole('button', { name: 'Post Note' }));

@@ -7,6 +7,7 @@ import https from "node:https";
 import { EventEmitter } from "node:events";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { trackPgliteSocketCleanup } from "./test-support/pglite-socket-cleanup.mjs";
+import { historicalSourcePath, readHistoricalSource, loadHistoricalPilotRuntime } from "./test-support/historical-pilot-source.mjs";
 import { RELEASE_SHA, IMAGE_REF, RELEASE_FILES } from "./hosted-pilot-drill.mjs";
 import { reviewedSchema } from "./pilot-staging-bootstrap.mjs";
 import { fixtureIds, fixtureRows } from "./restore-drill-fixture.mjs";
@@ -53,14 +54,6 @@ const pinnedIndexPath = fileURLToPath(
 const historicalIndexFixturePath = fileURLToPath(
   new URL("./test-support/fixtures/c050067/index.ts.txt", import.meta.url),
 );
-
-// Historical unit-test input only: exact `git show c050067:.../index.ts` bytes.
-// The current startup evolves independently. Never repin the old hosted image
-// or feed this non-executable fixture to a hosted/runtime attestation reader.
-const historicalSourcePath = (path) =>
-  path === pinnedIndexPath ? historicalIndexFixturePath : path;
-const readHistoricalSource = (path, encoding) =>
-  readFile(historicalSourcePath(path), encoding);
 
 describe("hosted crash probe guards", () => {
   it("requires exact approved source identity, holds and a deterministic nonce", () => {
@@ -169,9 +162,9 @@ describe("hosted crash probe guards", () => {
     const bundlePath = fileURLToPath(
       new URL("../artifacts/api-server/dist/index.mjs", import.meta.url),
     );
-    // CI runs tests before build: the bundle is synthetic. Only the startup
-    // source comes from its frozen c050067 fixture; all other sources/helpers
-    // remain real disk reads. This is not hosted proof for the current release.
+    // CI runs tests before build: the bundle is synthetic. Evolved startup and
+    // scheduler sources come from frozen, hash-checked c050067 test fixtures;
+    // unchanged helpers remain real reads. This is not current-release proof.
     const bundle = Buffer.from("synthetic-crash-attestation-bundle-v1\n");
     const bundleSha = createHash("sha256").update(bundle).digest("hex");
     const actualSourceReads = [];
@@ -489,9 +482,7 @@ describe("crash SQL and actual durable/scoped runtime on disposable PostgreSQL",
     socketCleanup = trackPgliteSocketCleanup(server, PGLiteSocketHandler);
     await server.start();
     process.env.DATABASE_URL = `postgresql://postgres:synthetic@${server.getServerConn()}/postgres`;
-    runtime = await loadCrashRuntime(
-      fileURLToPath(new URL("../", import.meta.url)),
-    );
+    runtime = await loadHistoricalPilotRuntime("crash");
     // Test-only identity adapter: all statements execute against the disposable
     // emulator. No hosted connection guard or CLI bypass is added to the harness.
     const query = runtime.pool.query.bind(runtime.pool);

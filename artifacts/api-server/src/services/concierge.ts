@@ -48,6 +48,7 @@ import { stopEnrollmentsForLead } from "./playbooks";
 import { recordLeadOutcome } from "./playbook-learning";
 import { buildKnowledgeFacts, findKnowledgeAnswer } from "./knowledge";
 import { isSafeMailbox, mockAiProvider, openAiProvider, providers, type AiProvider } from "./providers";
+import { emailAcceptanceEvidence } from "./user-email";
 import { getAiInstructions, getConciergeSettings, getInspectionAvailability, getLeadScoring, getOrgSettings } from "./settings";
 
 /** Concierge-scoped provider selection: real OpenAI when a key is present. */
@@ -1130,7 +1131,7 @@ async function sendBookingConfirmation(
 
   let channel: "email" | "sms";
   let to: string;
-  let providerResult: { id: string; provider: string };
+  let providerResult: { id: string | null; provider: string; providerRequestId?: string | null; clientRequestId?: string };
   if (useEmail) {
     channel = "email";
     to = state.email!;
@@ -1174,8 +1175,7 @@ async function sendBookingConfirmation(
         appointmentId: state.appointmentId,
         channel,
         to,
-        provider: providerResult.provider,
-        providerMessageId: providerResult.id,
+        ...(channel === "email" ? emailAcceptanceEvidence(providerResult) : { provider: providerResult.provider, providerMessageId: providerResult.id }),
         mock: providerResult.provider.startsWith("mock"),
       },
     });

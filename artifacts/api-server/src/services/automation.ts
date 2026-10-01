@@ -32,6 +32,7 @@ import {
 import { recordLeadOutcome } from "./playbook-learning";
 import { classifyWonLead, handlePostSaleTransition } from "./post-sale";
 import { providers } from "./providers";
+import { emailAcceptanceEvidence } from "./user-email";
 import {
   checkSendEligibility,
   handleProviderFailure,
@@ -346,7 +347,7 @@ async function executeAction(
           detail: `blocked: ${gate.reason}`,
         };
       }
-      let res: { id: string; provider: string };
+      let res: { id: string | null; provider: string; providerRequestId?: string | null; clientRequestId?: string };
       try {
         res =
           channel === "email"
@@ -391,7 +392,7 @@ async function executeAction(
           contactId: contact.id,
           type: "automation_message_sent",
           title: `Automation ${channel === "email" ? "email" : "text"} sent`,
-          metadata: { automationId, channel, provider: res.provider, providerMessageId: res.id },
+          metadata: { automationId, channel, ...(channel === "email" ? emailAcceptanceEvidence(res) : { provider: res.provider, providerMessageId: res.id }) },
         });
       }
       await audit({
@@ -736,8 +737,7 @@ async function executeAction(
           metadata: {
             appointmentId,
             channel,
-            provider: res.provider,
-            providerMessageId: res.id,
+            ...(channel === "email" ? emailAcceptanceEvidence(res) : { provider: res.provider, providerMessageId: res.id }),
             scheduledStart: appointment.scheduledStart.toISOString(),
           },
         });
@@ -1022,6 +1022,10 @@ export async function processDueScheduledActions(organizationId?: string): Promi
 export async function processScheduledWork(organizationId?: string, observe?: StageObserver): Promise<void> {
   const stage = (name: SchedulerStage, fn: () => Promise<void>) => runStage(name, fn, observe);
   await stage("scheduled-actions", () => processDueScheduledActions(organizationId));
+  await stage("staff-lead-notifications", async () => {
+    const { processStaffLeadPush } = await import("./staff-push");
+    await processStaffLeadPush(organizationId);
+  });
   // Throttled reactivation campaigns release their next batch of leads into
   // playbook sequences (their first step becomes due on a later tick).
   // Dynamic import avoids a static circular dependency (reactivation →

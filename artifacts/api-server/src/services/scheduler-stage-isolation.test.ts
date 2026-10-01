@@ -25,8 +25,18 @@ vi.mock("./reactivation", () => ({
   drainReactivationCampaigns: vi.fn(async () => {}),
 }));
 
+// The notification stage intentionally retires expired subscriptions and
+// abandoned claims even while outbound delivery is held. An unscoped real
+// invocation here could mutate another parallel suite's deliberately stale
+// fixtures. Observe sequencing without running that global housekeeping.
+vi.mock("./staff-push", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./staff-push")>();
+  return { ...actual, processStaffLeadPush: vi.fn(async () => {}) };
+});
+
 import { markAbandonedConversations } from "./concierge";
 import { processScheduledWork } from "./automation";
+import { processStaffLeadPush } from "./staff-push";
 import {
   cleanupExpiredPreviousSecrets,
   processPendingDeliveries,
@@ -82,6 +92,7 @@ describe("scheduler stage isolation", () => {
       "Ownership lost",
     );
     expect(processPendingDeliveries).not.toHaveBeenCalled();
+    expect(processStaffLeadPush).not.toHaveBeenCalled();
   });
   it("still runs webhook retries and later stages when the scheduled-actions stage throws", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -94,6 +105,7 @@ describe("scheduler stage isolation", () => {
     await expect(processScheduledWork()).resolves.toBeUndefined();
 
     expect(processPendingDeliveries).toHaveBeenCalledTimes(1);
+    expect(processStaffLeadPush).toHaveBeenCalledTimes(1);
     expect(cleanupExpiredPreviousSecrets).toHaveBeenCalledTimes(1);
     expect(markAbandonedConversations).toHaveBeenCalledTimes(1);
     expect(
@@ -120,8 +132,24 @@ describe("scheduler stage isolation", () => {
   });
 
   it("completes cleanly when no stage throws", async () => {
-    await expect(processScheduledWork()).resolves.toBeUndefined();
+    const observe = vi.fn(async () => {});
+    await expect(processScheduledWork(undefined, observe)).resolves.toBeUndefined();
+    expect(processStaffLeadPush).toHaveBeenCalledExactlyOnceWith(undefined);
+    expect(observe).toHaveBeenCalledWith("staff-lead-notifications", "running");
+    expect(observe).toHaveBeenCalledWith("staff-lead-notifications", "succeeded");
     expect(processPendingDeliveries).toHaveBeenCalledTimes(1);
     expect(markAbandonedConversations).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a failed notification stage without dropping later stages or exposing its error", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(processStaffLeadPush).mockRejectedValueOnce(new Error("SECRET_PUSH_ENDPOINT"));
+    const observe = vi.fn(async () => {});
+    await expect(processScheduledWork(undefined, observe)).resolves.toBeUndefined();
+    expect(observe).toHaveBeenCalledWith("staff-lead-notifications", "failed");
+    expect(observe).toHaveBeenCalledWith("upload-cleanup", "succeeded");
+    expect(processPendingDeliveries).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("SECRET_PUSH_ENDPOINT");
+    expect(JSON.stringify(observe.mock.calls)).not.toContain("SECRET_PUSH_ENDPOINT");
   });
 });

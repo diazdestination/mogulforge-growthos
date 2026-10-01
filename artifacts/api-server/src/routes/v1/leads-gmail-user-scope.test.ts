@@ -11,23 +11,32 @@ import {
   usersTable,
 } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
 
 const sendGmailForUserMock = vi.hoisted(() => vi.fn());
 
-vi.mock("../../services/gmail-oauth", async (importOriginal) => {
+vi.mock("../../services/user-email", async (importOriginal) => {
   const original =
-    await importOriginal<typeof import("../../services/gmail-oauth")>();
+    await importOriginal<typeof import("../../services/user-email")>();
   return {
     ...original,
-    sendGmailForUser: sendGmailForUserMock,
+    sendEmailForUser: sendGmailForUserMock,
   };
 });
 
 import app from "../../app";
 import { createSession } from "../../lib/auth";
+import { MicrosoftMailError } from "../../services/microsoft-oauth";
 
 let server: Server;
 let baseUrl: string;
@@ -117,7 +126,7 @@ afterAll(async () => {
   await deleteTestOrgs(org.id);
 });
 
-describe("POST /v1/leads/:id/send-email — per-user Gmail", () => {
+describe("POST /v1/leads/:id/send-email — selected per-user email", () => {
   it("sends with the signed-in user's org/user identity and records the sender", async () => {
     const { contact, lead } = await makeLead();
 
@@ -200,5 +209,67 @@ describe("POST /v1/leads/:id/send-email — per-user Gmail", () => {
       reason: "do_not_contact_email",
       source: "crm-compose",
     });
+  });
+
+  it("records Microsoft acceptance with request correlation, not a fabricated message ID or delivery", async () => {
+    sendGmailForUserMock.mockResolvedValue({
+      id: null,
+      provider: "microsoft",
+      senderEmail: "connected-outlook@example.invalid",
+      acceptance: "accepted",
+      providerRequestId: "00000000-0000-4000-8000-000000000001",
+      clientRequestId: "00000000-0000-4000-8000-000000000002",
+    });
+    const { lead } = await makeLead();
+    const response = await sendEmail(lead.id);
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      title: expect.stringContaining("accepted by provider"),
+      metadata: {
+        provider: "microsoft",
+        providerMessageId: null,
+        providerRequestId: "00000000-0000-4000-8000-000000000001",
+        clientRequestId: "00000000-0000-4000-8000-000000000002",
+        acceptance: "accepted",
+        deliveryConfirmed: false,
+      },
+    });
+    expect(sendGmailForUserMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a sanitized uncertainty message without retrying or recording a successful touch", async () => {
+    sendGmailForUserMock.mockRejectedValue(
+      new MicrosoftMailError(
+        "microsoft_send_outcome_unknown",
+        "Synthetic provider detail must not appear",
+        false,
+        true,
+      ),
+    );
+    const { lead } = await makeLead();
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const response = await sendEmail(lead.id);
+      expect(response.status).toBe(502);
+      const body = await response.text();
+      expect(body).toContain("GrowthOS did not retry or switch accounts");
+      expect(body).not.toContain("Synthetic provider detail");
+      expect(log).toHaveBeenCalledWith(
+        "[leads] Selected email provider did not confirm acceptance",
+      );
+      expect(sendGmailForUserMock).toHaveBeenCalledTimes(1);
+      const touches = await db
+        .select()
+        .from(activitiesTable)
+        .where(
+          and(
+            eq(activitiesTable.leadId, lead.id),
+            eq(activitiesTable.type, "lead_email_sent"),
+          ),
+        );
+      expect(touches).toHaveLength(0);
+    } finally {
+      log.mockRestore();
+    }
   });
 });

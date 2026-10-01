@@ -4,10 +4,10 @@ import { hasPermission } from "../lib/permissions";
 import { logger } from "../lib/logger";
 import { recordAudit } from "./audit";
 import {
-  getGmailConnection,
-  getGmailStatus,
-  sendGmailForUser,
-} from "./gmail-oauth";
+  getUserEmailStatus,
+  sendEmailForUser,
+  emailAcceptanceEvidence,
+} from "./user-email";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
 import { getOrgSettings } from "./settings";
 
@@ -15,8 +15,6 @@ export interface CustomerEmailContext {
   organizationId: string;
   leadId?: string | null;
 }
-
-const SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 
 /** An admin may designate only an active, authorized member of this company. */
 export async function assertCustomerEmailSender(
@@ -38,17 +36,11 @@ export async function assertCustomerEmailSender(
       "Customer email sender must be an active staff member of this company with permission to contact customers.",
     );
   }
-  const [status, connection] = await Promise.all([
-    getGmailStatus(organizationId, userId),
-    getGmailConnection(organizationId, userId),
-  ]);
-  if (
-    !status.configured ||
-    !status.connected ||
-    !connection?.grantedScopes.includes(SEND_SCOPE)
-  ) {
+  const status = await getUserEmailStatus(organizationId, userId);
+  if (!status.configured || !status.connected) {
     throw new Error(
-      "The selected customer email sender must connect or reconnect Gmail with permission to send email.",
+      status.reason ??
+        "The selected customer email sender must connect Gmail or Microsoft 365 / Outlook with permission to send email.",
     );
   }
 }
@@ -83,7 +75,7 @@ async function resolveSender(context: CustomerEmailContext) {
       .customerEmailSenderUserId;
   if (!userId)
     throw new Error(
-      "Choose a customer email sender in Settings > Automations, or assign this lead to a staff member with Gmail connected.",
+      "Choose a customer email sender in Settings > Automations, or assign this lead to a staff member with their selected email account connected.",
     );
   await assertCustomerEmailSender(context.organizationId, userId);
   return { userId, source };
@@ -98,13 +90,13 @@ export async function getCustomerEmailStatus(organizationId: string) {
       senderEmail: null,
       senderUserId: null,
       reason:
-        "No company sender selected. Assigned leads use their assigned staff member's Gmail; portal codes and unassigned customer email remain blocked.",
+        "No company sender selected. Assigned leads use their assigned staff member's selected email account; portal codes and unassigned customer email remain blocked.",
     };
   try {
     await assertCustomerEmailSender(organizationId, userId);
-    const status = await getGmailStatus(organizationId, userId);
+    const status = await getUserEmailStatus(organizationId, userId);
     return {
-      provider: "gmail" as const,
+      provider: status.provider!,
       senderEmail: status.email,
       senderUserId: userId,
       reason: null,
@@ -133,7 +125,7 @@ export async function sendCustomerEmail(
   const sender = await resolveSender(input);
   // The lower-level adapter rechecks active org membership and the exact
   // credential at dispatch. Errors propagate; there is no alternate mailbox.
-  const result = await sendGmailForUser({
+  const result = await sendEmailForUser({
     organizationId: input.organizationId,
     userId: sender.userId,
     to: input.to,
@@ -147,8 +139,7 @@ export async function sendCustomerEmail(
     entityType: input.leadId ? "lead" : "organization",
     entityId: input.leadId ?? input.organizationId,
     metadata: {
-      provider: result.provider,
-      providerMessageId: result.id,
+      ...emailAcceptanceEvidence(result),
       senderUserId: sender.userId,
       senderSource: sender.source,
     },

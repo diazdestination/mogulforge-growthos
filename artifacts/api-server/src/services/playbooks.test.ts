@@ -27,16 +27,17 @@ import { updateOrgSettings } from "./settings";
 const getGmailStatusMock = vi.hoisted(() => vi.fn());
 const sendGmailForUserMock = vi.hoisted(() => vi.fn());
 
-vi.mock("./gmail-oauth", async (importOriginal) => {
-  const original = await importOriginal<typeof import("./gmail-oauth")>();
+vi.mock("./user-email", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./user-email")>();
   return {
     ...original,
-    getGmailStatus: getGmailStatusMock,
-    sendGmailForUser: sendGmailForUserMock,
+    getUserEmailStatus: getGmailStatusMock,
+    sendEmailForUser: sendGmailForUserMock,
   };
 });
 
 import { runEvent } from "./automation";
+import { MicrosoftMailError } from "./microsoft-oauth";
 import * as crm from "./crm";
 import {
   autoEnrollLead,
@@ -75,7 +76,7 @@ beforeAll(async () => {
   });
 });
 
-  beforeEach(() => {
+beforeEach(() => {
   getGmailStatusMock.mockReset();
   getGmailStatusMock.mockResolvedValue({
     configured: true,
@@ -263,6 +264,74 @@ describe("closer engine playbooks", () => {
     expect(after.pauseReason).toContain("assign this lead");
   });
 
+  it("keeps Microsoft request correlations distinct from message and delivery receipts", async () => {
+    sendGmailForUserMock.mockResolvedValue({
+      id: null,
+      provider: "microsoft",
+      senderEmail: "selected@example.invalid",
+      acceptance: "accepted",
+      providerRequestId: "00000000-0000-4000-8000-000000000001",
+      clientRequestId: "00000000-0000-4000-8000-000000000002",
+    });
+    const { lead } = await makeLead();
+    const enrollment = await autoEnrollLead(org.id, lead.id);
+    expect(
+      await executePlaybookStep(org.id, {
+        enrollmentId: enrollment!.id,
+        stepIndex: 0,
+      }),
+    ).toMatchObject({ status: "success" });
+    const [touch] = await db
+      .select()
+      .from(activitiesTable)
+      .where(
+        and(
+          eq(activitiesTable.leadId, lead.id),
+          eq(activitiesTable.type, "playbook_touch_sent"),
+        ),
+      );
+    expect(touch.metadata).toMatchObject({
+      provider: "microsoft",
+      providerMessageId: null,
+      providerRequestId: "00000000-0000-4000-8000-000000000001",
+      clientRequestId: "00000000-0000-4000-8000-000000000002",
+      acceptance: "accepted",
+      deliveryConfirmed: false,
+    });
+    expect(sendGmailForUserMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not send a claimed Microsoft step again after an ambiguous provider result", async () => {
+    sendGmailForUserMock.mockRejectedValue(
+      new MicrosoftMailError(
+        "microsoft_send_outcome_unknown",
+        "Outcome unknown; inspect Sent Items.",
+        false,
+        true,
+      ),
+    );
+    const { lead } = await makeLead();
+    const enrollment = await autoEnrollLead(org.id, lead.id);
+    const input = { enrollmentId: enrollment!.id, stepIndex: 0 };
+    await expect(executePlaybookStep(org.id, input)).rejects.toMatchObject({
+      outcomeUnknown: true,
+    });
+    expect(await executePlaybookStep(org.id, input)).toMatchObject({
+      status: "skipped",
+    });
+    expect(sendGmailForUserMock).toHaveBeenCalledTimes(1);
+    const touches = await db
+      .select()
+      .from(activitiesTable)
+      .where(
+        and(
+          eq(activitiesTable.leadId, lead.id),
+          eq(activitiesTable.type, "playbook_touch_sent"),
+        ),
+      );
+    expect(touches).toHaveLength(0);
+  });
+
   it("pauses an automated email before claiming it when the assigned user has no Gmail connection", async () => {
     getGmailStatusMock.mockResolvedValue({
       configured: true,
@@ -279,7 +348,7 @@ describe("closer engine playbooks", () => {
 
     expect(result).toEqual({
       status: "skipped",
-      detail: "paused: assigned_sender_gmail_not_connected",
+      detail: "paused: assigned_sender_email_not_connected",
     });
     expect(sendGmailForUserMock).not.toHaveBeenCalled();
     const [after] = await db
@@ -288,7 +357,9 @@ describe("closer engine playbooks", () => {
       .where(eq(playbookEnrollmentsTable.id, enrollment!.id));
     expect(after.status).toBe("paused");
     expect(after.currentStep).toBe(0);
-    expect(after.pauseReason).toContain("assigned user must connect Gmail");
+    expect(after.pauseReason).toContain(
+      "assigned user must connect their selected email account",
+    );
   });
 
   it("pauses an automated email before claiming it when the assigned user is inactive", async () => {

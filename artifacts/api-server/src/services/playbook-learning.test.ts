@@ -26,12 +26,12 @@ import { updateOrgSettings } from "./settings";
 const getGmailStatusMock = vi.hoisted(() => vi.fn());
 const sendGmailForUserMock = vi.hoisted(() => vi.fn());
 
-vi.mock("./gmail-oauth", async (importOriginal) => {
-  const original = await importOriginal<typeof import("./gmail-oauth")>();
+vi.mock("./user-email", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./user-email")>();
   return {
     ...original,
-    getGmailStatus: getGmailStatusMock,
-    sendGmailForUser: sendGmailForUserMock,
+    getUserEmailStatus: getGmailStatusMock,
+    sendEmailForUser: sendGmailForUserMock,
   };
 });
 

@@ -13,6 +13,7 @@ export const SCHEDULER_NAME = "automation";
 export const SCHEDULER_STALE_MS = 5 * 60_000;
 export const SCHEDULER_STAGES = [
   "scheduled-actions",
+  "staff-lead-notifications",
   "reactivation-drain",
   "webhook-retries",
   "webhook-secret-cleanup",

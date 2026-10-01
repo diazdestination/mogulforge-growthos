@@ -5671,11 +5671,11 @@ components:
       properties:
         provider:
           type: string
-          enum: [gmail, disabled]
+          enum: [gmail, microsoft, disabled]
         senderEmail:
           type: string
           nullable: true
-          description: Gmail address explicitly designated for unassigned customer email and portal sign-in codes. Assigned leads use their assigned member's Gmail.
+          description: Connected mailbox explicitly designated for unassigned customer email and portal sign-in codes. Assigned leads use their assigned member's selected Gmail or Microsoft mailbox.
         senderUserId:
           type: [string, "null"]
           description: Explicit company default sender, if configured.

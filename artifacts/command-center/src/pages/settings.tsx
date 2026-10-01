@@ -1,6 +1,7 @@
 import { SmsDesk } from '@/components/sms-desk';
 import { VoiceDesk } from '@/components/voice-desk';
 import { CustomerEmailSender } from '@/components/customer-email-sender';
+import { LeadAlertRouting } from '@/components/lead-alert-routing';
 import { useEffect, useRef, useState } from 'react';
 import {
   useGetMe,
@@ -98,7 +99,7 @@ import { Redirect } from 'wouter';
 import { Loader2, Settings2, Trash2, Copy, Zap, RefreshCw, Pencil, ShieldAlert } from 'lucide-react';
 import { canManageSettings } from '@/lib/permissions';
 import { toLocalDateInputValue } from '@/lib/date-input';
-import { GmailConnectionCard } from '@/components/gmail-connection-card';
+import { EmailConnectionsCard } from '@/components/email-connections-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -689,16 +690,15 @@ function AutomationsTab() {
           <p className="font-medium">
             Automation emails are failing to send
             {emailProvider.provider === 'gmail' && ' through Gmail'}
-            {emailProvider.provider === 'disabled' && ' (check the selected Gmail sender)'}
+            {emailProvider.provider === 'microsoft' && ' through Microsoft 365 / Outlook'}
+            {emailProvider.provider === 'disabled' && ' (check the selected email sender)'}
             .
           </p>
           <p className="mt-1">
             The last {emailProvider.recentSendFailures === 1 ? 'email send attempt' : `${emailProvider.recentSendFailures} email send attempts`} failed
             {emailProvider.lastSendFailureDetail ? <>: <span className="font-mono text-xs">{emailProvider.lastSendFailureDetail}</span></> : ''}
             {'. '}
-            {emailProvider.provider === 'gmail'
-              ? 'The Gmail connection may have expired — reconnect the selected sender in Account connections.'
-              : 'Check the lead owner or company default Gmail sender to resume sending.'}
+            Check the lead owner or company default sender's selected Gmail or Microsoft account in My Profile. Inspect Sent Items before retrying an uncertain send.
           </p>
         </div>
       )}
@@ -711,9 +711,9 @@ function AutomationsTab() {
           }`}
           data-testid="text-email-provider-note"
         >
-          {emailProvider.provider === 'gmail' && (
+          {(emailProvider.provider === 'gmail' || emailProvider.provider === 'microsoft') && (
             <>
-              Unassigned customer emails use the company default Gmail account
+              Unassigned customer emails use the company default {emailProvider.provider === 'gmail' ? 'Gmail' : 'Microsoft 365 / Outlook'} account
               {emailProvider.senderEmail ? (
                 <> from <span className="font-medium text-foreground">{emailProvider.senderEmail}</span></>
               ) : (
@@ -723,7 +723,7 @@ function AutomationsTab() {
             </>
           )}
           {emailProvider.provider === 'disabled' && (
-            <>{emailProvider.reason ?? 'No default customer email sender is ready. Choose an active staff member with Gmail connected below.'}</>
+            <>{emailProvider.reason ?? 'No default customer email sender is ready. Choose an active staff member with their selected email account connected below.'}</>
           )}
         </div>
       )}
@@ -1107,7 +1107,7 @@ export default function Settings() {
         </div>
       </header>
       <div className="flex-1 overflow-auto p-6 max-w-4xl w-full">
-        <Tabs defaultValue={gmailReturn ? 'integrations' : 'business'}>
+        <Tabs defaultValue={gmailReturn || new URLSearchParams(window.location.search).get('microsoft') ? 'integrations' : 'business'}>
           <TabsList className="mb-4 flex-wrap h-auto">
             <TabsTrigger value="business">Business</TabsTrigger>
             <TabsTrigger value="integrations">Connections</TabsTrigger>
@@ -1127,10 +1127,10 @@ export default function Settings() {
             <TabsTrigger value="reviews">Google Reviews</TabsTrigger>
           </TabsList>
           <TabsContent value="business" className="space-y-6"><BusinessProfileTab /><FallbackInboxTab /></TabsContent>
-          <TabsContent value="integrations"><GmailConnectionCard callbackState={gmailReturn} returnPath="/settings" /></TabsContent>
+          <TabsContent value="integrations"><EmailConnectionsCard callbackState={gmailReturn} returnPath="/settings" /></TabsContent>
           <TabsContent value="team"><TeamTab meId={me.id} meRole={me.role} /></TabsContent>
           <TabsContent value="services"><ServicesTab /></TabsContent>
-          <TabsContent value="scheduling" className="space-y-6"><SchedulingTab /><ReminderTab /></TabsContent>
+          <TabsContent value="scheduling" className="space-y-6"><SchedulingTab /><ReminderTab /><LeadAlertRouting /></TabsContent>
           <TabsContent value="scoring"><ScoringTab /></TabsContent>
           <TabsContent value="ai"><AiTab /></TabsContent>
           <TabsContent value="automations" className="space-y-6"><AutomationsTab /><SendingHoursTab /></TabsContent>

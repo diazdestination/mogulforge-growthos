@@ -11,5 +11,6 @@ export type EmailProviderStatusProvider = typeof EmailProviderStatusProvider[key
 
 export const EmailProviderStatusProvider = {
   gmail: 'gmail',
+  microsoft: 'microsoft',
   disabled: 'disabled',
 } as const;

@@ -49,7 +49,7 @@ export interface CustomerEmailProvider {
     subject: string,
     body: string,
     context: CustomerEmailContext,
-  ): Promise<{ id: string; provider: string }>;
+  ): Promise<{ id: string | null; provider: string; providerRequestId?: string | null; clientRequestId?: string }>;
 }
 
 export interface StormEvent {

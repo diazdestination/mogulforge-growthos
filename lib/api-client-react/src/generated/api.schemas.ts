@@ -1282,12 +1282,13 @@ export type EmailProviderStatusProvider = typeof EmailProviderStatusProvider[key
 
 export const EmailProviderStatusProvider = {
   gmail: 'gmail',
+  microsoft: 'microsoft',
   disabled: 'disabled',
 } as const;
 
 export interface EmailProviderStatus {
   provider: EmailProviderStatusProvider;
-  /** Gmail address explicitly designated for unassigned customer email and portal sign-in codes. Assigned leads use their assigned member's Gmail. */
+  /** Connected mailbox explicitly designated for unassigned customer email and portal sign-in codes. Assigned leads use their assigned member's selected Gmail or Microsoft mailbox. */
   senderEmail?: string | null;
   /**
      * Explicit company default sender, if configured.

@@ -2799,8 +2799,8 @@ export const GetInspectionAvailabilityResponse = zod.object({
  * @summary Active outbound email provider and sending account
  */
 export const GetEmailProviderStatusResponse = zod.object({
-  "provider": zod.enum(['gmail', 'disabled']),
-  "senderEmail": zod.string().nullish().describe('Gmail address explicitly designated for unassigned customer email and portal sign-in codes. Assigned leads use their assigned member\'s Gmail.'),
+  "provider": zod.enum(['gmail', 'microsoft', 'disabled']),
+  "senderEmail": zod.string().nullish().describe('Connected mailbox explicitly designated for unassigned customer email and portal sign-in codes. Assigned leads use their assigned member\'s selected Gmail or Microsoft mailbox.'),
   "senderUserId": zod.string().nullish().describe('Explicit company default sender, if configured.'),
   "reason": zod.string().nullish().describe('Why the default customer sender is unavailable.'),
   "recentSendFailures": zod.int().optional().describe('Number of consecutive failed send_email automation results, newest first, until the last successful send. 0 when the latest send succeeded or no sends were attempted.'),

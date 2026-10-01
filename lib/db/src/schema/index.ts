@@ -41,6 +41,8 @@ export * from "./bie";
 export * from "./evidence-intelligence";
 export * from "./object-storage";
 export * from "./gmail-connections";
+export * from "./microsoft-connections";
+export * from "./staff-push";
 export * from "./email-intelligence";
 export * from "./revenue-workspace";
 export * from "./scheduler";

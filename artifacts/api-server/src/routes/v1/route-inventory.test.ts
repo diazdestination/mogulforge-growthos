@@ -64,6 +64,20 @@ const SESSION_ONLY_ROUTES = new Set([
  * - settings.manage — org configuration surfaces (owner/admin)
  */
 const EXPECTED_PERMISSIONS: Record<string, Permission> = {
+  "GET /staff-push/status": "crm.read",
+  "POST /staff-push/subscriptions": "crm.read",
+  "POST /staff-push/subscriptions/revoke": "crm.read",
+  "GET /staff-push/policy": "settings.manage",
+  "PUT /staff-push/policy": "settings.manage",
+  "GET /staff-push/deliveries": "settings.manage",
+  "GET /integrations/microsoft": "crm.read",
+  "POST /integrations/microsoft/connect": "crm.write",
+  "GET /integrations/microsoft/callback": "crm.write",
+  "DELETE /integrations/microsoft": "crm.write",
+  "GET /integrations/email-sender": "crm.read",
+  "PUT /integrations/email-sender": "crm.write",
+  "GET /leads/:id/manual-sms": "crm.write",
+  "POST /leads/:id/manual-sms/draft-opened": "crm.write",
   "GET /revenue/desk": "crm.read",
   "POST /revenue/leads/:id/claim": "crm.write",
   "GET /revenue/profile": "crm.read",
@@ -326,6 +340,9 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
 // DELETE routes allowed to use something weaker than crm.delete, with the
 // reason. Everything else destructive must be crm.delete or settings.manage.
 const DELETE_EXEMPTIONS: Record<string, Permission> = {
+  // Personal Microsoft authorization only; the explicit session-only gate
+  // forbids API keys and scopes revocation to the caller, never tenant data.
+  "DELETE /integrations/microsoft": "crm.write",
   // Personal, per-user resource — deleting your own saved filter.
   "DELETE /saved-filters/:id": "crm.read",
   // Personal, per-user authorization — revokes only the caller's own Gmail

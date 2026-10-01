@@ -6,7 +6,9 @@ import {
   auditEventsTable,
   contactsTable,
   db,
+  emailSenderPreferencesTable,
   gmailConnectionsTable,
+  microsoftConnectionsTable,
   leadsTable,
   organizationsTable,
   orgSettingsTable,
@@ -26,10 +28,16 @@ import {
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 
 const gmailSend = vi.hoisted(() => vi.fn());
+const microsoftSend = vi.hoisted(() => vi.fn());
 vi.mock("./gmail-oauth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./gmail-oauth")>()),
   sendGmailForUser: gmailSend,
 }));
+vi.mock("./microsoft-oauth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./microsoft-oauth")>()),
+  sendMicrosoftForUser: microsoftSend,
+}));
+import { MicrosoftMailError } from "./microsoft-oauth";
 import { getCustomerEmailStatus, sendCustomerEmail } from "./customer-email";
 import {
   customerEmailProvider,
@@ -149,13 +157,32 @@ beforeAll(async () => {
 beforeEach(async () => {
   vi.stubEnv("GOOGLE_OAUTH_CLIENT_ID", "synthetic-client");
   vi.stubEnv("GOOGLE_OAUTH_CLIENT_SECRET", "synthetic-secret");
-  vi.stubEnv("OAUTH_TOKEN_ENCRYPTION_KEY", "synthetic-test-only");
+  vi.stubEnv("OAUTH_TOKEN_ENCRYPTION_KEY", Buffer.alloc(32, 19).toString("base64"));
+  vi.stubEnv("MICROSOFT_OAUTH_CLIENT_ID", "synthetic-client");
+  vi.stubEnv("MICROSOFT_OAUTH_CLIENT_SECRET", "synthetic-secret");
+  vi.stubEnv("APP_ORIGIN", "https://growthos.example.invalid");
   vi.stubEnv("GROWTHOS_OUTBOUND_HOLD", "false");
   gmailSend.mockReset().mockResolvedValue({
     id: "synthetic-gmail-receipt",
     provider: "gmail",
     senderEmail: "synthetic-sender@example.test",
   });
+  microsoftSend.mockReset().mockResolvedValue({
+    id: null,
+    provider: "microsoft",
+    senderEmail: "outlook@example.invalid",
+    acceptance: "accepted",
+    providerRequestId: "00000000-0000-4000-8000-000000000001",
+    clientRequestId: "00000000-0000-4000-8000-000000000002",
+  });
+  for (const organizationId of [orgA, orgB]) {
+    await db
+      .delete(emailSenderPreferencesTable)
+      .where(eq(emailSenderPreferencesTable.organizationId, organizationId));
+    await db
+      .delete(microsoftConnectionsTable)
+      .where(eq(microsoftConnectionsTable.organizationId, organizationId));
+  }
   await db
     .update(orgSettingsTable)
     .set({
@@ -285,7 +312,7 @@ describe("customer email identity isolation", () => {
       .where(eq(gmailConnectionsTable.userId, userA));
     await expect(
       sendCustomerEmail({ ...content, organizationId: orgA, leadId: leadA }),
-    ).rejects.toThrow(/connect or reconnect Gmail/);
+    ).rejects.toThrow(/Connect or reconnect your selected Gmail/);
     expect(gmailSend).not.toHaveBeenCalled();
   });
 
@@ -314,7 +341,7 @@ describe("customer email identity isolation", () => {
       .where(eq(gmailConnectionsTable.userId, userA));
     await expect(
       sendCustomerEmail({ ...content, organizationId: orgA, leadId: leadA }),
-    ).rejects.toThrow(/permission to send email/);
+    ).rejects.toThrow(/Connect or reconnect your selected Gmail/);
     expect(gmailSend).not.toHaveBeenCalled();
   });
 
@@ -326,6 +353,141 @@ describe("customer email identity isolation", () => {
     ).rejects.toThrow(/revoked/);
     expect(gmailSend).toHaveBeenCalledTimes(1);
     expect(resend).not.toHaveBeenCalled();
+  });
+
+  it("routes two companies through their explicitly selected Microsoft identities and records acceptance without a fabricated message ID", async () => {
+    for (const [organizationId, userId] of [
+      [orgA, userA],
+      [orgB, userB],
+    ]) {
+      await db
+        .insert(microsoftConnectionsTable)
+        .values({
+          organizationId,
+          userId,
+          accountId: userId,
+          email: `${userId}@example.invalid`,
+          encryptedRefreshToken: "synthetic-never-decrypted",
+          grantedScopes: ["mail.send", "user.read"],
+        });
+      await db
+        .insert(emailSenderPreferencesTable)
+        .values({ organizationId, userId, provider: "microsoft" });
+    }
+    await sendCustomerEmail({
+      ...content,
+      organizationId: orgA,
+      leadId: leadA,
+    });
+    await sendCustomerEmail({
+      ...content,
+      organizationId: orgB,
+      leadId: leadB,
+    });
+    expect(microsoftSend).toHaveBeenNthCalledWith(1, {
+      ...content,
+      organizationId: orgA,
+      userId: userA,
+    });
+    expect(microsoftSend).toHaveBeenNthCalledWith(2, {
+      ...content,
+      organizationId: orgB,
+      userId: userB,
+    });
+    expect(gmailSend).not.toHaveBeenCalled();
+    const receipts = await db
+      .select()
+      .from(auditEventsTable)
+      .where(
+        and(
+          eq(auditEventsTable.organizationId, orgA),
+          eq(auditEventsTable.action, "customer_email.provider_accepted"),
+        ),
+      );
+    expect(
+      receipts.some(
+        ({ metadata }) =>
+          metadata?.provider === "microsoft" &&
+          metadata.providerMessageId === null &&
+          metadata.providerRequestId ===
+            "00000000-0000-4000-8000-000000000001" &&
+          metadata.deliveryConfirmed === false,
+      ),
+    ).toBe(true);
+  });
+
+  it("does not fall back from a revoked selected Microsoft sender to their healthy Gmail or company default", async () => {
+    await db
+      .insert(microsoftConnectionsTable)
+      .values({
+        organizationId: orgA,
+        userId: userA,
+        accountId: userA,
+        email: "revoked@example.invalid",
+        encryptedRefreshToken: null,
+        grantedScopes: ["mail.send", "user.read"],
+        revokedAt: new Date(),
+      });
+    await db
+      .insert(emailSenderPreferencesTable)
+      .values({ organizationId: orgA, userId: userA, provider: "microsoft" });
+    const resend = vi.spyOn(resendEmailProvider, "send");
+    await expect(
+      sendCustomerEmail({ ...content, organizationId: orgA, leadId: leadA }),
+    ).rejects.toThrow(/selected Microsoft/);
+    expect(microsoftSend).not.toHaveBeenCalled();
+    expect(gmailSend).not.toHaveBeenCalled();
+    expect(resend).not.toHaveBeenCalled();
+  });
+
+  it("propagates an ambiguous Microsoft send once without changing identities or recording acceptance", async () => {
+    await db
+      .insert(microsoftConnectionsTable)
+      .values({
+        organizationId: orgA,
+        userId: userA,
+        accountId: userA,
+        email: "outlook@example.invalid",
+        encryptedRefreshToken: "synthetic-never-decrypted",
+        grantedScopes: ["mail.send", "user.read"],
+      });
+    await db
+      .insert(emailSenderPreferencesTable)
+      .values({ organizationId: orgA, userId: userA, provider: "microsoft" });
+    const prior = await db
+      .select()
+      .from(auditEventsTable)
+      .where(
+        and(
+          eq(auditEventsTable.organizationId, orgA),
+          eq(auditEventsTable.action, "customer_email.provider_accepted"),
+        ),
+      );
+    microsoftSend.mockRejectedValue(
+      new MicrosoftMailError(
+        "microsoft_send_outcome_unknown",
+        "Outcome unknown; inspect Sent Items.",
+        false,
+        true,
+      ),
+    );
+    const resend = vi.spyOn(resendEmailProvider, "send");
+    await expect(
+      sendCustomerEmail({ ...content, organizationId: orgA, leadId: leadA }),
+    ).rejects.toMatchObject({ outcomeUnknown: true });
+    expect(microsoftSend).toHaveBeenCalledTimes(1);
+    expect(gmailSend).not.toHaveBeenCalled();
+    expect(resend).not.toHaveBeenCalled();
+    const after = await db
+      .select()
+      .from(auditEventsTable)
+      .where(
+        and(
+          eq(auditEventsTable.organizationId, orgA),
+          eq(auditEventsTable.action, "customer_email.provider_accepted"),
+        ),
+      );
+    expect(after).toHaveLength(prior.length);
   });
 });
 
@@ -412,7 +574,9 @@ describe("portal staff notifications use the explicit company default", () => {
     });
     expect(homeowner).toMatchObject({
       sent: false,
-      reason: expect.stringContaining("connect or reconnect Gmail"),
+      reason: expect.stringContaining(
+        "Connect or reconnect your selected Gmail",
+      ),
     });
     expect(gmailSend).not.toHaveBeenCalled();
   });

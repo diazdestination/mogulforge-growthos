@@ -30,7 +30,7 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import * as crm from "./crm";
 import { recordAudit } from "./audit";
 import { getBusinessName } from "./settings";
-import { sendGmailForUser, getGmailStatus } from "./gmail-oauth";
+import { sendEmailForUser, getUserEmailStatus, emailAcceptanceEvidence } from "./user-email";
 import { checkSendEligibility, recordBlockedSend } from "./send-gate";
 import { runDurableAction } from "./durable-execution";
 import { hasPermission } from "../lib/permissions";
@@ -992,12 +992,12 @@ async function executeBieProposalEffect(
         "A connected user must approve and send this email.",
       );
     }
-    const channel = await getGmailStatus(organizationId, actorUserId);
+    const channel = await getUserEmailStatus(organizationId, actorUserId);
     if (!channel.configured || !channel.connected)
       return markAction(
         proposal.id,
         "blocked",
-        "This responder's Gmail sending connection is not ready. Use the manual contact path or configure the approved provider.",
+        "This responder's selected email connection is not ready. Connect and select Gmail or Microsoft 365 / Outlook in My Profile.",
       );
     if (!(await emailCapRemaining(organizationId, policy.dailyEmailCap))) {
       return markAction(
@@ -1037,7 +1037,7 @@ async function executeBieProposalEffect(
       typeof proposal.payload.body === "string"
         ? proposal.payload.body
         : proposal.rationale;
-    const sent = await sendGmailForUser({
+    const sent = await sendEmailForUser({
       organizationId,
       userId: actorUserId,
       to: contact.email,
@@ -1049,14 +1049,13 @@ async function executeBieProposalEffect(
       contactId: contact.id,
       actorUserId,
       type: "bie_email_sent",
-      title: `BIE email sent: ${subject}`,
+      title: `BIE email accepted by provider: ${subject}`,
       body: body.slice(0, 300),
       metadata: {
         channel: "email",
         to: contact.email,
         from: sent.senderEmail,
-        provider: sent.provider,
-        providerMessageId: sent.id,
+        ...emailAcceptanceEvidence(sent),
         source: "bie.revenue_recovery",
       },
     });

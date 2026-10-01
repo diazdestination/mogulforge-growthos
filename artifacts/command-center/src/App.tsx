@@ -9,6 +9,8 @@ import { Shell } from '@/components/shell';
 import { AccessGate } from '@/components/access-gate';
 import { Loader2 } from 'lucide-react';
 import { CLIENT } from '@/lib/client.config';
+import { notificationLeadPath } from '@/lib/mobile-lead';
+import { NotificationLeadGuard, TenantMobileBoundary } from '@/components/mobile-lead-boundary';
 
 // Pages
 import Dashboard from '@/pages/dashboard';
@@ -484,7 +486,7 @@ function IdentityActionScreen({ kind }: { kind: IdentityActionKind }) {
 }
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [isProjectRoom, projectParams] = useRoute('/project-room/:workspace/:leadId');
   if (isProjectRoom && projectParams) return <ProjectRoom key={`${projectParams.workspace}:${projectParams.leadId}`} workspace={projectParams.workspace} leadId={projectParams.leadId} />;
 
@@ -497,6 +499,11 @@ function Router() {
   }
 
   if (!isAuthenticated) {
+    // Keep an exact validated lead URL through a login reload. Do not accept a
+    // general returnTo redirect or save private lead data in browser storage.
+    if (notificationLeadPath(window.location.pathname + window.location.search, window.location.origin)) {
+      return <LoginScreen initialMode="login" />;
+    }
     return (
       <Switch>
         <Route path="/login">
@@ -524,17 +531,18 @@ function Router() {
     );
   }
 
-  return <AuthedApp />;
+  return <AuthedApp key={user!.id} authUserId={user!.id} />;
 }
 
-function AuthedApp() {
+function AuthedApp({ authUserId }: { authUserId: string }) {
   // Session probe works BEFORE the user belongs to an org: users without an
   // organization see the create-company screen instead of the app shell.
-  const { data: session, isLoading: sessionLoading } = useGetSession({
-    query: { queryKey: getGetSessionQueryKey(), retry: 1 },
+  const { data: session, isLoading: sessionLoading, isFetching: sessionRefreshing } = useGetSession({
+    query: { queryKey: [...getGetSessionQueryKey(), authUserId], retry: 1, staleTime: 0, refetchOnMount: 'always' },
+    request: { cache: 'no-store' },
   });
 
-  if (sessionLoading) {
+  if (sessionLoading || sessionRefreshing) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -546,7 +554,12 @@ function AuthedApp() {
     return <CreateOrgScreen />;
   }
 
+  if (!session?.organization || session.id !== authUserId) {
+    return <div role="alert" className="p-6">Your current company could not be verified. Reload or sign in again.</div>;
+  }
+
   return (
+    <TenantMobileBoundary key={`${session.id}:${session.organization.id}`} userId={session.id} organizationId={session.organization.id}>
     <AccessGate>
       <Shell>
         <Switch>
@@ -576,7 +589,7 @@ function AuthedApp() {
           <Route path="/pipeline" component={Pipeline} />
           <Route path="/insights" component={Insights} />
           <Route path="/reports" component={Reports} />
-          <Route path="/leads/:id" component={LeadDetail} />
+          <Route path="/leads/:id"><NotificationLeadGuard organizationId={session.organization.id}><LeadDetail /></NotificationLeadGuard></Route>
           <Route path="/contacts" component={Contacts} />
           <Route path="/properties" component={Properties} />
           <Route path="/estimates" component={Estimates} />
@@ -598,6 +611,7 @@ function AuthedApp() {
         </Switch>
       </Shell>
     </AccessGate>
+    </TenantMobileBoundary>
   );
 }
 

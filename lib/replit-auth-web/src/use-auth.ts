@@ -11,6 +11,13 @@ interface AuthState {
   logout: () => void;
 }
 
+let beforeLogout: (() => Promise<void>) | null = null;
+
+/** The host app may detach local device subscriptions before its session ends. */
+export function setBeforeLogoutHandler(handler: (() => Promise<void>) | null) {
+  beforeLogout = handler;
+}
+
 function getBasePath() {
   // Keep the trailing slash: dev servers with a base path (e.g. /crm/)
   // reject the slashless form with a "did you mean /crm/?" page.
@@ -25,7 +32,7 @@ export function useAuth(): AuthState {
   useEffect(() => {
     let cancelled = false;
 
-    fetch('/api/auth/user', { credentials: 'include' })
+    fetch('/api/auth/user', { credentials: 'include', cache: 'no-store' })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<{ user: AuthUser | null }>;
@@ -57,7 +64,13 @@ export function useAuth(): AuthState {
     const base = getBasePath();
     // Self-hosted logout: clear the DB session server-side, then reload to the
     // base path (which renders the sign-in screen). No OIDC end-session round-trip.
-    void fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    // Device cleanup is bounded; an offline browser must not prevent server
+    // logout. The server also revokes session-bound push delivery authority.
+    const cleanup = beforeLogout ? Promise.race([
+      Promise.resolve().then(beforeLogout),
+      new Promise<void>(resolve => setTimeout(resolve, 3500)),
+    ]) : Promise.resolve();
+    void cleanup.catch(() => {}).then(() => fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }))
       .catch(() => {})
       .finally(() => {
         window.location.href = base;

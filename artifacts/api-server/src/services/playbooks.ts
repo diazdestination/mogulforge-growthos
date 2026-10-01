@@ -23,7 +23,7 @@ import {
   engagementLinkUrl,
   getOrCreateEngagementLink,
 } from "./engagement-links";
-import { getGmailStatus, sendGmailForUser } from "./gmail-oauth";
+import { getUserEmailStatus, sendEmailForUser, emailAcceptanceEvidence } from "./user-email";
 import {
   adjustSendTime,
   chooseVariant,
@@ -564,7 +564,7 @@ export async function executePlaybookStep(
       const reason = "automated_sender_unassigned";
       await pauseEnrollment(
         enrollment.id,
-        "Automated email paused: assign this lead to a user with connected Gmail",
+        "Automated email paused: assign this lead to a user with a connected selected email account",
       );
       await recordBlockedSend({
         organizationId,
@@ -578,7 +578,7 @@ export async function executePlaybookStep(
       });
       return { status: "skipped", detail: `paused: ${reason}` };
     }
-    const gmail = await getGmailStatus(organizationId, lead.assignedUserId);
+    const gmail = await getUserEmailStatus(organizationId, lead.assignedUserId);
     if (!gmail.senderActive) {
       const reason = "assigned_sender_inactive";
       await pauseEnrollment(
@@ -599,13 +599,13 @@ export async function executePlaybookStep(
     }
     if (!gmail.configured || !gmail.connected) {
       const reason = gmail.configured
-        ? "assigned_sender_gmail_not_connected"
-        : "gmail_oauth_not_configured";
+        ? "assigned_sender_email_not_connected"
+        : "email_provider_not_configured";
       await pauseEnrollment(
         enrollment.id,
         gmail.configured
-          ? "Automated email paused: the assigned user must connect Gmail"
-          : "Automated email paused: Gmail OAuth is not configured",
+          ? "Automated email paused: the assigned user must connect their selected email account"
+          : "Automated email paused: the selected email provider is not configured or selected",
       );
       await recordBlockedSend({
         organizationId,
@@ -696,9 +696,11 @@ export async function executePlaybookStep(
 
   // Channel reachability + SMS consent gate.
   let sendResult: {
-    id: string;
+    id: string | null;
     provider: string;
     senderEmail?: string;
+    providerRequestId?: string | null;
+    clientRequestId?: string;
   } | null = null;
   let skipDetail: string | null = null;
   const settings = await getOrgSettings(organizationId);
@@ -746,7 +748,7 @@ export async function executePlaybookStep(
   } else {
     try {
       if (step.channel === "email") {
-        sendResult = await sendGmailForUser({
+        sendResult = await sendEmailForUser({
           organizationId,
           userId: emailSenderUserId!,
           to: contact.email!,
@@ -824,8 +826,7 @@ export async function executePlaybookStep(
         enrollmentId: enrollment.id,
         stepIndex,
         channel: step.channel,
-        provider: sendResult.provider,
-        providerMessageId: sendResult.id,
+        ...(step.channel === "email" ? emailAcceptanceEvidence(sendResult) : { provider: sendResult.provider, providerMessageId: sendResult.id }),
         senderUserId: emailSenderUserId,
         from: sendResult.senderEmail ?? null,
         aiProvider: draft.provider,
@@ -847,8 +848,7 @@ export async function executePlaybookStep(
         playbookId: playbook.id,
         stepIndex,
         channel: step.channel,
-        provider: sendResult.provider,
-        providerMessageId: sendResult.id,
+        ...(step.channel === "email" ? emailAcceptanceEvidence(sendResult) : { provider: sendResult.provider, providerMessageId: sendResult.id }),
         senderUserId: emailSenderUserId,
         from: sendResult.senderEmail ?? null,
         mock: sendResult.provider.startsWith("mock-"),

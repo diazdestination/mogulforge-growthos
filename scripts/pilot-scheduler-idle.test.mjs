@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { reviewedSchema } from "./pilot-staging-bootstrap.mjs";
 import { fixtureIds, fixtureRows } from "./restore-drill-fixture.mjs";
 import { trackPgliteSocketCleanup } from "./test-support/pglite-socket-cleanup.mjs";
+import { readHistoricalSource, loadHistoricalPilotRuntime } from "./test-support/historical-pilot-source.mjs";
 import { IMAGE_REF, RELEASE_SHA } from "./pilot-scheduler-probe.mjs";
 import { IDLE_INTERLOCK, assertInertDefaults, cleanupIdleRuntime, idleChildEnvironment, idleConfiguration,
   idleFailureEvidence, idlePreflight, loadIdleRuntime, readDefaultSeedSpec, runIdleSupervisor,
@@ -47,12 +48,13 @@ describe("actual scheduler acceptance guards and lifecycle", () => {
     expect(() => idleConfiguration({ ...env, DATABASE_URL: env.DATABASE_URL.replace("growthos_staging", "production") })).toThrow();
   });
   it("hash-checks every real scheduler/helper source and parses only pinned default constants", async () => {
-    await expect(verifyIdleSources(root)).resolves.toBeUndefined();
-    const spec = await readDefaultSeedSpec(root);
+    await expect(verifyIdleSources(root, readHistoricalSource)).resolves.toBeUndefined();
+    const spec = await readDefaultSeedSpec(root, readHistoricalSource);
     expect(Object.keys(spec)).toHaveLength(10);
     expect(spec.DEFAULT_ABANDONED_FOLLOWUP_SEED_KEY).toBe("default.assessment_abandoned_followup");
-    await expect(verifyIdleSources(root, (path, encoding) => path.endsWith("scheduler.ts") ? "changed" : readFile(path, encoding)))
+    await expect(verifyIdleSources(root, (path, encoding) => path.endsWith("scheduler.ts") ? "changed" : readHistoricalSource(path, encoding)))
       .rejects.toThrow("pilot_idle_source_mismatch");
+    await expect(verifyIdleSources(root)).rejects.toThrow("pilot_idle_source_mismatch");
   });
   it("passes no provider credentials, storage-cleanup directory, runtime injection or ambient secret to child", () => {
     const child = idleChildEnvironment({ ...env, PATH: "synthetic-path", TWILIO_AUTH_TOKEN: "do-not-copy",
@@ -66,7 +68,7 @@ describe("actual scheduler acceptance guards and lifecycle", () => {
     expect(child.NODE_OPTIONS).toBeUndefined();
   });
   it("allows only complete exact defaults and same-tenant template references", async () => {
-    const spec = await readDefaultSeedSpec(root), a = defaults(spec, orgs[0].id), b = defaults(spec, orgs[1].id);
+    const spec = await readDefaultSeedSpec(root, readHistoricalSource), a = defaults(spec, orgs[0].id), b = defaults(spec, orgs[1].id);
     expect(() => assertInertDefaults(orgs.map((o) => o.id), [...a.rules, ...b.rules], [...a.templates, ...b.templates], spec)).not.toThrow();
     const bad = structuredClone(a.rules); bad[0].actions[0].params.templateId = b.templates[0].id;
     expect(() => assertInertDefaults([orgs[0].id], bad, a.templates, spec)).toThrow("pilot_idle_customized_automation");
@@ -138,7 +140,7 @@ function supervisorFixture(options = {}) {
     });
     return child;
   });
-  return { args: { env, root, createPool: () => pool, forkProcess, emit: (line) => lines.push(line) }, pool, client, lines,
+  return { args: { env, root, read: readHistoricalSource, createPool: () => pool, forkProcess, emit: (line) => lines.push(line) }, pool, client, lines,
     children, queries, forkProcess, currentRecord: () => record, locked: () => interlock };
 }
 
@@ -187,7 +189,7 @@ describe("real schema and source scheduler on disposable local PostgreSQL emulat
       keys.map((key) => json.includes(key) ? JSON.stringify(row[key]) : row[key]));
   };
   beforeAll(async () => {
-    database = await PGlite.create(); await database.exec(await reviewedSchema()); spec = await readDefaultSeedSpec(root);
+    database = await PGlite.create(); await database.exec(await reviewedSchema()); spec = await readDefaultSeedSpec(root, readHistoricalSource);
     for (const slug of slugs) for (const [table, row] of fixtureRows(slug, "synthetic-test-only")) await insert(table, row);
     for (const org of orgs) {
       const rows = defaults(spec, org.id);
@@ -230,7 +232,7 @@ describe("real schema and source scheduler on disposable local PostgreSQL emulat
       await cleanupIdleRuntime(client, owner);
     } finally { await database.query("DELETE FROM scheduler_runtime WHERE name='automation' AND owner_id=$1", [owner]); }
   });
-  it("runs the actual full scheduler twice at its real 60-second interval, then stops without changing tenant state", async () => {
+  it("runs the frozen historical scheduler twice at its real 60-second interval, then stops without changing tenant state", async () => {
     const server = new PGLiteSocketServer({ db: database, host: "127.0.0.1", port: 0, maxConnections: 5 });
     socketCleanup = trackPgliteSocketCleanup(server, PGLiteSocketHandler);
     const previousEnv = { ...process.env }, previousFetch = globalThis.fetch;
@@ -247,7 +249,7 @@ describe("real schema and source scheduler on disposable local PostgreSQL emulat
       const deny = () => { blocked++; throw new Error("Local test forbids provider traffic"); };
       globalThis.fetch = deny; http.request = deny; http.get = deny; https.request = deny; https.get = deny;
       const before = await tenantFingerprint(client, orgs.map((o) => o.id));
-      runtime = await loadIdleRuntime(root);
+      runtime = await loadHistoricalPilotRuntime("idle");
       runtime.startAutomationScheduler();
       const cycles = [], started = Date.now();
       while (cycles.length < 2 && Date.now() - started < 80000) {

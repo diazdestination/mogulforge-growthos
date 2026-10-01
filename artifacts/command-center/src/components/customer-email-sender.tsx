@@ -56,8 +56,9 @@ export function CustomerEmailSender() {
       <CardHeader>
         <CardTitle>Customer email sender</CardTitle>
         <CardDescription>
-          Choose the connected Gmail account for portal sign-in codes and
-          customer messages without an assigned lead owner.
+          Choose the staff member's selected Gmail or Microsoft account for
+          portal sign-in codes and customer messages without an assigned lead
+          owner.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -87,16 +88,17 @@ export function CustomerEmailSender() {
           ))}
         </select>
         <p className="text-sm text-muted-foreground">
-          The selected person must connect Gmail in{" "}
+          The selected person must connect and choose their sending account in{" "}
           <a href="/account" className="underline">
             My Profile
           </a>{" "}
-          first. Messages for assigned leads use that lead owner's Gmail. A
-          disconnected or inactive sender blocks the send until corrected.
+          first. Messages for assigned leads use that lead owner's selected
+          mailbox. A disconnected or inactive sender blocks the send until
+          corrected.
         </p>
         {status && (
           <p role="status" className="text-sm">
-            {status.provider === "gmail"
+            {status.provider === "gmail" || status.provider === "microsoft"
               ? `Connected default: ${status.senderEmail}.`
               : (status.reason ?? "Default customer email is unavailable.")}
           </p>

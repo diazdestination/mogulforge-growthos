@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
+import { readHistoricalSource, verifyHistoricalFixtures } from "./test-support/historical-pilot-source.mjs";
 import { IMAGE_REF, RELEASE_SHA, prepareRuntimePool, probeConfiguration, probeFailureEvidence, probePoolOptions, reserveProbeRuntime, runSchedulerProbe, safeProbeError,
   verifyProbeSources } from "./pilot-scheduler-probe.mjs";
 
@@ -99,7 +100,7 @@ function fixture(options = {}) {
     },
   };
   const lines = [];
-  const args = { env, root, createPool: vi.fn(() => pool), loadRuntime, emit: (line) => lines.push(line) };
+  const args = { env, root, read: readHistoricalSource, createPool: vi.fn(() => pool), loadRuntime, emit: (line) => lines.push(line) };
   return { args, pool, runtimePool, clients, records, locks, queries, loadRuntime, lines, calls: () => runtimeCalls };
 }
 
@@ -139,11 +140,14 @@ describe("bounded staging scheduler probe", () => {
     }
   });
   it("checks canonical source hashes and the complete import helper before loading code", async () => {
-    await expect(verifyProbeSources(root)).resolves.toBeUndefined();
+    await expect(verifyHistoricalFixtures()).resolves.toBeUndefined();
+    await expect(verifyProbeSources(root, readHistoricalSource)).resolves.toBeUndefined();
     for (const replacement of ["scheduler-runtime.ts", "pilot-scheduler-runtime.ts"]) {
-      await expect(verifyProbeSources(root, async (path, encoding) => path.endsWith(replacement) ? "wrong source" : readFile(path, encoding)))
+      await expect(verifyProbeSources(root, async (path, encoding) => path.endsWith(replacement) ? "wrong source" : readHistoricalSource(path, encoding)))
         .rejects.toThrow(/pilot_scheduler_(source_hash_mismatch|helper_mismatch)/);
     }
+    // The production/default reader must reject the actual evolved runtime.
+    await expect(verifyProbeSources(root)).rejects.toThrow("pilot_scheduler_source_hash_mismatch");
   });
   it("proves independent held sessions, actual-runtime choreography, failure visibility and exact cleanup", async () => {
     const f = fixture();

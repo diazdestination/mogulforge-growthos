@@ -173,7 +173,7 @@ export async function getGmailStatus(organizationId: string, userId: string) {
   return {
     configured: gmailOAuthConfigured(),
     connected: Boolean(
-      senderActive && connection?.encryptedRefreshToken && !connection.revokedAt,
+      senderActive && connection?.encryptedRefreshToken && !connection.revokedAt && connection.grantedScopes.includes(GMAIL_SEND_SCOPE),
     ),
     senderActive,
     email: connection?.email ?? null,

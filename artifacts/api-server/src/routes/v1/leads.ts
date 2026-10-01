@@ -32,7 +32,7 @@ import {
   recordActionFeedback,
 } from "../../services/next-best-action";
 import { notifyHomeownerOfTeamReply } from "../../services/portal-message-email";
-import { sendGmailForUser } from "../../services/gmail-oauth";
+import { sendEmailForUser, emailAcceptanceEvidence, type UserEmailResult } from "../../services/user-email";
 import {
   checkSendEligibility,
   handleProviderFailure,
@@ -541,9 +541,9 @@ router.post(
       return;
     }
 
-    let sent: { id: string; provider: "gmail"; senderEmail: string };
+    let sent: UserEmailResult;
     try {
-      sent = await sendGmailForUser({
+      sent = await sendEmailForUser({
         organizationId: req.member!.organizationId,
         userId: req.member!.user.id,
         to: contact.email,
@@ -551,7 +551,7 @@ router.post(
         body,
       });
     } catch (err) {
-      console.error("[leads] Gmail send failed:", err);
+      console.error("[leads] Selected email provider did not confirm acceptance");
       await handleProviderFailure({
         organizationId: req.member!.organizationId,
         channel: "email",
@@ -560,13 +560,13 @@ router.post(
         source: "crm-compose",
       });
       const message = err instanceof Error ? err.message : "";
-      res.status(message.includes("Connect your Gmail account") ? 503 : 502).json({
+      res.status(message.includes("My Profile") ? 503 : 502).json({
         error:
-          message.includes("Connect your Gmail account")
-            ? "Connect your Gmail account in Settings before sending email."
+          message.includes("My Profile")
+            ? "Connect and select Gmail or Microsoft 365 / Outlook in My Profile before sending email."
             : message.includes("invalid recipient")
               ? "The contact's email address is not a valid recipient"
-              : "Sending the email through Gmail failed. Try again in a moment.",
+              : "Email acceptance was not confirmed. Check your selected mailbox before trying again; GrowthOS did not retry or switch accounts.",
       });
       return;
     }
@@ -576,15 +576,14 @@ router.post(
       contactId: lead.contactId,
       actorUserId: req.member!.user.id,
       type: "lead_email_sent",
-      title: `Email sent: ${subject}`,
+      title: `Email accepted by provider: ${subject}`,
       body: body.length > 300 ? `${body.slice(0, 300)}…` : body,
       metadata: {
         channel: "email",
         to: contact.email,
         from: sent.senderEmail,
         subject,
-        provider: sent.provider,
-        providerMessageId: sent.id,
+        ...emailAcceptanceEvidence(sent),
         source: "crm-compose",
       },
     });
@@ -598,8 +597,7 @@ router.post(
         to: contact.email,
         from: sent.senderEmail,
         subject,
-        provider: sent.provider,
-        providerMessageId: sent.id,
+        ...emailAcceptanceEvidence(sent),
       },
     });
     res.status(201).json(activity);

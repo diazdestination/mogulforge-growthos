@@ -1,4 +1,5 @@
 import { dispatchWebhookEvent } from "./webhooks";
+import { enqueueStaffLeadPush } from "./staff-push";
 import {
   activitiesTable,
   analyticsEventsTable,
@@ -389,18 +390,17 @@ export async function createLead(
   });
   if (!ok) return null;
 
-  const [row] = await db
-    .insert(leadsTable)
-    .values({
-      // API-created leads still record how they entered the system and keep
-      // latestSource in sync with the original source by default.
-      creationMethod: "api",
-      latestSource: input.latestSource ?? input.source ?? null,
-      ...input,
-      organizationId,
-    })
-    .returning();
-  return row;
+  return db.transaction(async (tx) => {
+    const [row] = await tx.insert(leadsTable).values({
+        // Import is deliberately excluded to avoid bulk-alerting historical leads.
+        creationMethod: "api",
+        latestSource: input.latestSource ?? input.source ?? null,
+        ...input,
+        organizationId,
+      }).returning();
+    if (row.creationMethod !== "import") await enqueueStaffLeadPush(tx, organizationId, row);
+    return row;
+  });
 }
 
 export async function updateLead(

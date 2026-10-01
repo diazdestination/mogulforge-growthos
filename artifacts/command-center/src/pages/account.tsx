@@ -5,7 +5,8 @@ import { Loader2, UserRound } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { GmailConnectionCard } from '@/components/gmail-connection-card';
+import { EmailConnectionsCard } from '@/components/email-connections-card';
+import { MobileNotificationsCard } from '@/components/mobile-notifications-card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -133,7 +134,8 @@ export default function Account() {
             These connections belong to your user account. They never grant access to organization settings or another team member's mailbox.
           </p>
         </div>
-        <GmailConnectionCard callbackState={gmailReturn} returnPath="/account" />
+        <EmailConnectionsCard callbackState={gmailReturn} returnPath="/account" />
+        <MobileNotificationsCard />
       </section>
     </div>
   );
