@@ -6,6 +6,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { restoreReadOnlyRequests } from "./lib/restore-mode";
 
 const app: Express = express();
 
@@ -35,6 +36,7 @@ app.use(
 );
 app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
+app.use(restoreReadOnlyRequests);
 // The portable object-store adapter accepts a signed, short-lived raw PUT.
 // This must run before the general JSON parser so image bytes are preserved.
 app.use(

@@ -1,8 +1,12 @@
 # P0-6 restore drill: preparation, not acceptance
 
-Date: 2026-09-30 EDT. Status: **prepared only**. No backup was restored, no
-GrowthOS application was started against restored data, no provider was called,
-and no Fly resource was created or changed for this drill.
+Date: 2026-09-30 EDT. Status: **tools tested locally; hosted acceptance still required**.
+The guarded fixture builder, read-only fingerprints, real application credential
+decryption, private-media checks and restore-only startup guard are implemented.
+Disposable PGlite tests insert the fixture using the current generated schema,
+load a separate recovered local copy and exercise actual authenticated application
+reads without changing tenant records. No Fly managed backup or hosted restore
+was performed by this preparation work, and no provider was called.
 
 ## Decision boundary
 
@@ -68,7 +72,33 @@ cluster. [Fly MPG](https://fly.io/mpg/).
    change to calculate observed RPO. Do not print `fly mpg status` unfiltered;
    its output can include a connection credential.
 
-### Minimum fixture recipe (preparation only; no seed run yet)
+### Tested fixture builder (run only on the isolated source)
+
+`scripts/restore-drill-fixture.mjs` now implements the fixture below. It accepts
+only the pinned isolated source cluster, `growthos_staging` database and
+`growthos-staging-live` writer. It checks the SQL session before inserts, takes
+an advisory transaction lock, rejects a database containing nonfixture
+organizations, and verifies the complete fixture before commit. A repeat run
+leaves IDs, timestamps, ciphertext and receipts unchanged. A partial or changed
+fixture fails and rolls back; it does not repair or overwrite existing data.
+
+The script builds 19 connected application records, including a deliberately
+unsent draft estimate and a labelled synthetic decision-room snapshot. The
+snapshot is not current customer-approved scope. The one financial entry is
+a labelled synthetic direct cost, never a recovered-revenue claim. The BIE
+proposal is rejected, execution receipt blocked, service obligation and task
+cancelled, Gmail credential revoked, and contact DNC flags all true. A private
+Postgres object is linked to the lead through a synthetic `photos_attached`
+activity so real application authorization and byte streaming can be tested.
+
+The fake Gmail value is encrypted through the application's actual
+`token-encryption.ts` implementation with the precise
+`<organizationId>:<userId>:gmail` context. A separate
+`scripts/restore-drill-acceptance.mjs` uses an actual Reader login and read-only
+transaction to verify the expected graph, exact stored bytes, successful
+decryption, rejected wrong-key/wrong-user decryption and inert outbound states.
+It emits booleans and target metadata only. It explicitly reports
+`appBootVerified: false`; SQL/application-data acceptance alone is not a boot.
 
 Use a single `restore-drill-...` slug and generated IDs inside one transaction
 on the **new isolated staging database only**, after its schema review and
@@ -85,35 +115,51 @@ staging-only key and context; do not insert plaintext or invent ciphertext.
 | 3     | `contacts`                       | Same organization; `homeowner@example.invalid`, all do-not-contact flags true.                                                                   |
 | 4     | `properties`                     | Same organization; optional `contact_id` from step 3; clearly fake address and postal code.                                                      |
 | 5     | `leads`                          | Required `contact_id` from step 3; `property_id` from step 4; synthetic source, no outreach.                                                     |
-| 6     | `bie_action_proposals`           | Required `lead_id` from step 5; `create_task` proposal in `proposed` state with synthetic rationale. No execution.                               |
+| 6     | `bie_action_proposals`           | Required `lead_id` from step 5; `create_task` proposal in `rejected` state with synthetic rationale. No execution.                               |
 | 7     | `audit_events`                   | Same organization; synthetic actor from step 2 and entity ID from step 5.                                                                        |
 | 8     | `projects`                       | Required `lead_id` from step 5; no estimate dependency if `estimate_id` stays null.                                                              |
 | 9     | `project_stories`                | Required `project_id` from step 8; version 1, synthetic body/source reference, draft state.                                                      |
 | 10    | `stored_objects`                 | Explicit generated UUID, same organization, small deterministic text payload in `bytea`, matching content type and byte length. No real upload.  |
 | 11    | `gmail_connections`              | Same organization and step-2 user; `.invalid` email, **fake** encrypted refresh value, no granted scopes, revoked state. Never authorize Google. |
 
-The read-only verifier requires nonzero rows in the ten tables in steps 2–11;
-`organizations` supplies its scope. This is only the minimum gate against an
-empty restore. For full P0-6 evidence, also seed and check an inert
-`revenue_executions` row with its `revenue_execution_events` trail, a
-`value_entries` row tied to the synthetic lead, and an inert
-`service_obligations` row if its required CRM-task dependency has been
-prepared. `decision_rooms` requires a linked estimate, so include it only
-through the reviewed application workflow; do not fabricate an estimate to
-make counts green. The verifier reports counts for these extra tables but
-does not require them, so a passing fingerprint alone cannot establish
-Revenue Desk or customer-workflow recovery.
+The read-only fingerprint now also requires `estimates`, `crm_tasks`,
+`activities`, `revenue_executions`, `revenue_execution_events`,
+`decision_rooms`, `value_entries` and `service_obligations`. An empty or
+partial Revenue Desk/service fixture cannot pass. Webhook endpoints stay
+empty; this fixture does not need a live webhook, outbound campaign or provider.
 
-No direct seed script is shipped at this point. The fake Gmail ciphertext
-depends on `OAUTH_TOKEN_ENCRYPTION_KEY` plus the precise
-`<organizationId>:<userId>:gmail` context, several rows have FK/enum
-dependencies, and the isolated staging schema is not yet applied. Docker is
-unavailable on this host for an offline PostgreSQL insertion test. A script
-written now would have untested write behavior against a real remote database;
-that is a poor trade for this release gate. Use this recipe during an
-operator-reviewed fixture build after a local/isolated PostgreSQL test is
-available, then record its exact schema SHA and inserted IDs in a private
-evidence location without putting emails, tokens or media into Git.
+Use a staging-only encryption key from a secure environment source. Keep the
+same key for source and target checks; losing it is a failed secret-recovery
+dependency even if the database rows restore. To run the builder after the
+reviewed source schema is applied, set the following nonsecret controls:
+
+```powershell
+$env:RESTORE_DRILL_MODE = 'source'
+$env:RESTORE_DRILL_EXPECTED_LOGIN = 'growthos-staging-live'
+$env:RESTORE_DRILL_SYNTHETIC_SLUG = 'restore-drill-pilot-a'
+$env:RESTORE_DRILL_SEED_APPROVED = 'true'
+$env:RESTORE_DRILL_USE_FLY_PROXY = 'true'
+$env:GROWTHOS_OUTBOUND_HOLD = 'true'
+$env:STAGING_OUTBOUND_APPROVED = 'false'
+$env:SCHEDULER_AUTOSTART = 'false'
+# Securely supply RESTORE_DRILL_DATABASE_URL and OAUTH_TOKEN_ENCRYPTION_KEY.
+# Optional: supply RESTORE_DRILL_SESSION_BEARER as fresh random 64-128 hex
+# characters in secure environment storage, never the terminal transcript.
+node scripts/restore-drill-fixture.mjs
+```
+
+The optional bearer prepares a 48-hour synthetic inspection session before the
+backup, enabling read-only authenticated HTTP acceptance afterward. The builder
+never prints it, never overwrites a colliding session, and never extends its
+expiry on retry. Keep it in the operator's secure evidence location and complete
+the restore inside that interval. A stale session requires a new reviewed
+source fixture session and newer backup; the restored Reader account cannot
+mint one. The no-password synthetic staff account cannot use normal login.
+
+Repeat with a separate `restore-drill-pilot-b` slug and separate inspection
+bearer to prepare a second isolated tenant. Do not use actual contractor data
+for the backup drill. Record the last successful fixture freeze timestamp;
+the completed backup must be newer than both tenants and any prepared session.
 
 Example verifier configuration (the database URL is intentionally omitted):
 
@@ -121,13 +167,25 @@ Example verifier configuration (the database URL is intentionally omitted):
 $env:RESTORE_DRILL_MODE = 'source' # later: logical or managed
 $env:RESTORE_DRILL_EXPECTED_LOGIN = 'growthos-restore-reader'
 $env:RESTORE_DRILL_SYNTHETIC_SLUG = 'restore-drill-fixture-1'
+$env:RESTORE_DRILL_USE_FLY_PROXY = 'true'
 # Supply RESTORE_DRILL_DATABASE_URL through an approved secret channel.
 # For logical/managed targets also set RESTORE_DRILL_EXPECTED_FINGERPRINT
 # to the 64-character fingerprint recorded from the source.
 # For managed mode also set RESTORE_DRILL_EXPECTED_CLUSTER_ID to the exact
 # new cluster ID reported by the authorized Fly restore operation.
 node scripts/restore-drill-readonly.mjs
+# With the same original staging-only encryption key in secure env:
+node scripts/restore-drill-acceptance.mjs
 ```
+
+Keep the canonical `pgbouncer.<cluster>.flympg.net` URL even on the workstation.
+Private DNS is not normally available there. The opt-in proxy helper starts its
+own `fly mpg proxy <validated-cluster>` process bound to `127.0.0.1` on a free
+port, derives the database/login from the guarded canonical URL, and closes its
+proxy on completion. Arbitrary localhost URLs and URL query host overrides are
+rejected. Only the documented TLS `sslmode=require` query is accepted. The
+source/target production-cluster rejection is unchanged. This avoids silently
+trusting whatever an independently started proxy happens to forward to.
 
 ## Rehearsal A: no additional cluster (limited assurance)
 
@@ -183,14 +241,55 @@ synthetic organization, lead, property, BIE, Revenue Desk, audit and project
 room through the application. Record the SHA, image digest, environment,
 start/health timestamps and any database writes made by startup seeding.
 
-**Unresolved safety detail:** the current staging boot guard pins the staging
-app identity to the original isolated staging cluster. A restored cluster
-cannot be started under that same staging identity. An alternate app identity
-would bypass that guard and therefore needs an explicit restore-only identity
-guard and an operator-reviewed, no-send startup configuration before this
-step. The current app also performs idempotent startup seeding; inspect the
-restored data with the read-only verifier **before** boot. Do not claim this
-step passed based on the verifier alone.
+The ordinary staging identity remains pinned to its original isolated cluster.
+A separate restore-only boot path now requires **all** of the following:
+
+```text
+FLY_APP_NAME=mogulforge-growthos-restore-drill
+RESTORE_DRILL_ONLY=true
+RESTORE_DRILL_MODE=managed  # or logical
+RESTORE_DRILL_EXPECTED_CLUSTER_ID=<exact target cluster ID>
+HOST=127.0.0.1
+PORT=3001
+APP_ORIGIN=http://127.0.0.1:3001
+AUTO_MIGRATE=false
+SCHEDULER_AUTOSTART=false
+GROWTHOS_OUTBOUND_HOLD=true
+STAGING_OUTBOUND_APPROVED=false
+OBJECT_STORAGE_PROVIDER=postgres
+```
+
+Supply `DATABASE_URL` for the exact target and the
+`growthos-restore-reader` login plus the original synthetic application key
+references and a separate session secret through the secure environment.
+The guard rejects the production cluster, managed mode aimed at the source,
+wrong database/login, writable table/schema/admin privileges, missing holds,
+public listeners/origins and provider environment credentials. Only original
+application decryption keys and a local session secret are allowed. The server
+skips migration, scheduling, platform-admin grants and every normal startup
+seed specifically under this verified restore mode. Ordinary staging behavior
+and its host pin are unchanged.
+
+Run the same release image as an isolated private process where the canonical
+Fly database hostname resolves (for example an operator-reviewed temporary
+Machine without public service routing). Inspect it through SSH/local port
+forwarding. This is a concrete startup configuration, **not** evidence that a
+hosted app has already booted or authorization to leave extra resources running.
+The private HTTP guard rejects write methods and authentication/provider/public
+intake routes. Use the prepared synthetic session for authenticated GETs of:
+
+- `/api/healthz` and the normal release/readiness surface;
+- `/api/v1/contacts/<fixture contact>`, `/leads/<fixture lead>` and `/projects/<fixture project>`;
+- `/api/v1/revenue/desk`, `/revenue/rooms/<fixture lead>`, `/revenue/value`,
+  `/revenue/evidence/<fixture lead>` and `/revenue/executions/<fixture execution>`;
+- `/api/v1/storage/objects/uploads/<fixture object>` and exact stored-byte comparison.
+
+Use Tenant A's session against Tenant B's record/room/object IDs and require 404. Verify PATCH/POST and login/OAuth/intake routes return 405. Re-run the
+fingerprint before and after acceptance and require no data change. Expired
+sessions must fail; do not broaden the Reader's privileges to accommodate them.
+`restore-app-readonly.test.ts` exercises these real routes locally with two
+synthetic organizations and compares all organization-table digests. It is
+application code/SQL acceptance; the dated same-image hosted boot is still due.
 
 With synthetic ciphertext and secure original key references, prove positive
 decryption with the correct `OAUTH_TOKEN_ENCRYPTION_KEY`/record context and
@@ -215,7 +314,10 @@ secrets; their secure recovery is a separate operator dependency.
 - Operator name, date, failures/remediation, safe cleanup and independent
   review. Any missing line means P0-6 remains open.
 
-`scripts/restore-drill-readonly.test.mjs` covers the parser, production-host
-rejection, target-mode separation, missing/empty fixture, session identity,
-fingerprint comparison and redacted output with a mocked SQL client. It is
-**code/test evidence only**; it does not show an actual database restore.
+The script tests cover parser/production rejection, owned proxy lifecycle,
+target separation, reader/session identity, empty/incomplete fixture,
+transaction rollback, idempotence, redaction, real source-schema insertion,
+two synthetic tenants, a separately recovered PGlite copy, and ciphertext/media
+integrity. Restore-mode/API tests cover guarded startup prerequisites, actual
+authenticated application reads, tenant denials and blocked mutations. These
+are **local code/test evidence**, not a Fly-managed restore or production proof.

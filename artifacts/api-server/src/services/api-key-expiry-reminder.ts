@@ -15,7 +15,7 @@ import { and, eq, gt, inArray, isNull, lte } from "drizzle-orm";
 
 import { logger } from "../lib/logger";
 
-import { isSafeMailbox, providers } from "./providers";
+import { isSafeMailbox, transactionalEmailProvider } from "./providers";
 
 /** How many days before expiry the reminder goes out. */
 export const API_KEY_EXPIRY_REMINDER_DAYS = 7;
@@ -31,7 +31,9 @@ function formatWhenExpires(expiresAt: Date, now: Date): string {
 }
 
 /** Usable email addresses of an org's active owners/admins. */
-export async function orgAdminEmails(organizationId: string): Promise<string[]> {
+export async function orgAdminEmails(
+  organizationId: string,
+): Promise<string[]> {
   const admins = await db
     .select({ email: usersTable.email })
     .from(usersTable)
@@ -78,7 +80,7 @@ async function sendReminderForKey(key: ApiKey, now: Date): Promise<boolean> {
   let delivered = 0;
   for (const to of recipients) {
     try {
-      await providers.email.send(to, subject, body);
+      await transactionalEmailProvider.send(to, subject, body);
       delivered += 1;
     } catch (err) {
       // One bad mailbox must not block the remaining admins.

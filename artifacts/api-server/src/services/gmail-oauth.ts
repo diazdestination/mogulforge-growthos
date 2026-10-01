@@ -337,7 +337,7 @@ export async function sendGmailForUser(input: {
   subject: string;
   body: string;
 }): Promise<{ id: string; provider: "gmail"; senderEmail: string }> {
-  assertOutboundDeliveryAllowed();
+  assertOutboundDeliveryAllowed({ channel: "email", recipient: input.to });
   if (!isSafeMailbox(input.to)) throw new Error("Refusing to send email: invalid recipient address");
   const [sender] = await db
     .select({ id: usersTable.id })

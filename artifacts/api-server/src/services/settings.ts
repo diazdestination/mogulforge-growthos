@@ -200,6 +200,7 @@ export async function updateOrgSettings(
       | "leadScoring"
       | "aiInstructions"
       | "fallbackNotificationInbox"
+      | "customerEmailSenderUserId"
       | "inspectionAvailability"
       | "appointmentReminder"
       | "securityAlertsAcknowledgedAt"

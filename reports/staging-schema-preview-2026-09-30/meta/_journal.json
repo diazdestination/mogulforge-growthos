@@ -8,6 +8,13 @@
       "when": 1790820638553,
       "tag": "0000_isolated-staging-initial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790823621634,
+      "tag": "0001_pilot-email-sender",
+      "breakpoints": true
     }
   ]
 }

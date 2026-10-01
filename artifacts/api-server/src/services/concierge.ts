@@ -1138,6 +1138,7 @@ async function sendBookingConfirmation(
       to,
       `Your inspection is confirmed — ${windowLabel}`,
       bodyLines.join("\n"),
+      { organizationId, leadId: state.leadId },
     );
   } else if (state.phone) {
     channel = "sms";
@@ -1154,6 +1155,7 @@ async function sendBookingConfirmation(
       to,
       `Your inspection is confirmed — ${windowLabel}`,
       bodyLines.join("\n"),
+      { organizationId, leadId: state.leadId },
     );
   } else {
     return null;

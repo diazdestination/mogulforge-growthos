@@ -2,11 +2,13 @@ import { db, pool, organizationsTable } from "@workspace/db";
 import app from "./app";
 import { runAutoMigrate } from "./lib/auto-migrate";
 import { assertStagingDatabaseIdentity } from "./lib/staging-database-identity";
+import { assertRestoreDatabaseIdentity } from "./lib/restore-mode";
 import { logger } from "./lib/logger";
+import { ensureDefaultAutomations } from "./services/automation";
 import {
-  ensureDefaultAutomations,
-} from "./services/automation";
-import { startAutomationScheduler, stopAutomationScheduler } from "./services/scheduler";
+  startAutomationScheduler,
+  stopAutomationScheduler,
+} from "./services/scheduler";
 import { ensureDefaultServiceAreas, getOrgSettings } from "./services/settings";
 import { ensureInstallation } from "./services/installation";
 import { ensurePlatformAdmins } from "./services/org";
@@ -29,9 +31,10 @@ async function main(): Promise<void> {
   // The release command guards schema push separately. Check the actual
   // session here before startup seeding or a stale secret can touch prod data.
   await assertStagingDatabaseIdentity(pool);
+  const restoreOnly = await assertRestoreDatabaseIdentity(pool);
   // No-op unless AUTO_MIGRATE is set. Awaited before listen so we never serve
   // traffic against a database whose schema hasn't been applied yet.
-  await runAutoMigrate();
+  if (!restoreOnly) await runAutoMigrate();
 
   const server = app.listen(port, process.env.HOST || "0.0.0.0", (err) => {
     if (err) {
@@ -40,6 +43,12 @@ async function main(): Promise<void> {
     }
 
     logger.info({ port }, "Server listening");
+    if (restoreOnly) {
+      logger.info(
+        "Restore-only inspection: scheduler and startup seeding are disabled",
+      );
+      return;
+    }
     startAutomationScheduler();
     // One-time (idempotent) grant: default-org owners become platform admins.
     void ensurePlatformAdmins().catch((err: unknown) =>
@@ -84,18 +93,26 @@ async function main(): Promise<void> {
     deadline.unref();
     try {
       await Promise.all([
-        new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve())),
+        new Promise<void>((resolve, reject) =>
+          server.close((error) => (error ? reject(error) : resolve())),
+        ),
         stopAutomationScheduler(),
       ]);
       await pool.end();
       clearTimeout(deadline);
     } catch {
-      logger.error("Graceful shutdown did not finish; durable actions may need review");
+      logger.error(
+        "Graceful shutdown did not finish; durable actions may need review",
+      );
       process.exit(1);
     }
   };
-  process.once("SIGTERM", () => { void shutdown(); });
-  process.once("SIGINT", () => { void shutdown(); });
+  process.once("SIGTERM", () => {
+    void shutdown();
+  });
+  process.once("SIGINT", () => {
+    void shutdown();
+  });
 }
 
 // Fail fast: a failed schema push means the app would 500 on every request, so

@@ -24,6 +24,9 @@ kill_timeout = 30
   GROWTHOS_OUTBOUND_HOLD = 'true'
   # A later authorized provider test needs this AND an explicit hold release.
   STAGING_OUTBOUND_APPROVED = 'false'
+  # Email tests additionally require a comma-separated list of exact approved
+  # inboxes. Configure privately; never use a wildcard or an entire domain.
+  STAGING_EMAIL_RECIPIENT_ALLOWLIST = ''
   # The release command must not run drizzle --force without a reviewed delta.
   STAGING_SCHEMA_PUSH_APPROVED = 'false'
   STATIC_DIR = '/app/public'

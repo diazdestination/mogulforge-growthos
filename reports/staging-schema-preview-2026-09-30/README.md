@@ -1,6 +1,13 @@
 # Isolated staging schema preview — September 30, 2026
 
-Status: **generated preview only; not applied or approved for release**.
+Status: **reviewed initial schema applied to the empty isolated staging
+database during controlled-pilot preparation**. The historical generation
+notes below describe its original preparation. The exact initial SQL plus
+`0001_pilot-email-sender.sql` were applied in one guarded transaction, yielding
+90 tables; the staging app was not started. See
+[`controlled-pilot-2026-09-30.md`](../controlled-pilot-2026-09-30.md) for hashes,
+scope and remaining acceptance. This is not authorization for future force
+pushes against populated databases.
 
 The owner-approved Fly MPG cluster `zp2wjrejd2zodn4q` contains a separate
 `growthos_staging` database. A read-only connection through `fly mpg proxy`

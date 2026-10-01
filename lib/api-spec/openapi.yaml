@@ -5671,11 +5671,17 @@ components:
       properties:
         provider:
           type: string
-          enum: [gmail, resend, mock]
+          enum: [gmail, disabled]
         senderEmail:
           type: string
           nullable: true
-          description: Account/address automation emails are sent from (Gmail account for gmail, from-address for resend).
+          description: Gmail address explicitly designated for unassigned customer email and portal sign-in codes. Assigned leads use their assigned member's Gmail.
+        senderUserId:
+          type: [string, "null"]
+          description: Explicit company default sender, if configured.
+        reason:
+          type: [string, "null"]
+          description: Why the default customer sender is unavailable.
         recentSendFailures:
           type: integer
           description: Number of consecutive failed send_email automation results, newest first, until the last successful send. 0 when the latest send succeeded or no sends were attempted.
@@ -5739,6 +5745,9 @@ components:
         fallbackNotificationInbox:
           type: [string, "null"]
           description: Fallback email address for portal message notifications when the assigned rep has no valid email.
+        customerEmailSenderUserId:
+          type: [string, "null"]
+          description: Active company staff member whose connected Gmail sends unassigned customer email and portal sign-in codes.
         googleReviews:
           oneOf:
             - $ref: "#/components/schemas/GoogleReviewsConfig"
@@ -5790,6 +5799,11 @@ components:
           type: string
           nullable: true
           description: Fallback email address for portal message notifications when the assigned rep has no valid email.
+        customerEmailSenderUserId:
+          type: [string, "null"]
+          minLength: 1
+          maxLength: 255
+          description: Explicit company default Gmail sender; null removes it. Must be an active company member authorized to send and connected with gmail.send.
         googleReviews:
           $ref: "#/components/schemas/GoogleReviewsConfig"
         widget:

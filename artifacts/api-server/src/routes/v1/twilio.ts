@@ -405,11 +405,19 @@ router.post(
         .returning({ id: twilioDispatchesTable.id });
       if (changed.length && status === "delivered")
         await recordTouchDelivery({
+          provider: "twilio",
+          channel: "sms",
+          organizationId: operation.organizationId,
+          address: operation.phone,
           providerMessageId: sid,
           signal: "delivered",
         });
       if (changed.length && ["failed", "undelivered"].includes(status))
         await recordTouchDelivery({
+          provider: "twilio",
+          channel: "sms",
+          organizationId: operation.organizationId,
+          address: operation.phone,
           providerMessageId: sid,
           signal: "bounced",
           detail: code ?? status,

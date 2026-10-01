@@ -13,7 +13,15 @@ import {
   usersTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeEach, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 
@@ -25,19 +33,17 @@ vi.mock("./providers", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./providers")>();
   return {
     ...actual,
-    providers: {
-      ...actual.providers,
-      email: {
-        send: async (to: string, subject: string, body: string) => {
-          sent.push({ to, subject, body });
-          return { id: "mock", provider: "mock" };
-        },
+    transactionalEmailProvider: {
+      send: async (to: string, subject: string, body: string) => {
+        sent.push({ to, subject, body });
+        return { id: "mock", provider: "mock" };
       },
     },
   };
 });
 
-const { reportApiKeyBruteForceBlock, reportCallbackBruteForceBlock } = await import("./security-alerts");
+const { reportApiKeyBruteForceBlock, reportCallbackBruteForceBlock } =
+  await import("./security-alerts");
 
 const stamp = Date.now();
 const adminEmail = `bf-alert-admin-${stamp}@example.com`;
@@ -59,8 +65,18 @@ beforeAll(async () => {
   const users = await db
     .insert(usersTable)
     .values([
-      { id: `bf-admin-${stamp}`, email: adminEmail, organizationId: orgId, role: "admin" },
-      { id: `bf-owner-${stamp}`, email: ownerEmail, organizationId: orgId, role: "owner" },
+      {
+        id: `bf-admin-${stamp}`,
+        email: adminEmail,
+        organizationId: orgId,
+        role: "admin",
+      },
+      {
+        id: `bf-owner-${stamp}`,
+        email: ownerEmail,
+        organizationId: orgId,
+        role: "owner",
+      },
       {
         id: `bf-inactive-${stamp}`,
         email: inactiveEmail,
@@ -68,7 +84,12 @@ beforeAll(async () => {
         role: "admin",
         isActive: false,
       },
-      { id: `bf-rep-${stamp}`, email: repEmail, organizationId: orgId, role: "sales_rep" },
+      {
+        id: `bf-rep-${stamp}`,
+        email: repEmail,
+        organizationId: orgId,
+        role: "sales_rep",
+      },
     ])
     .returning();
   userIds.push(...users.map((u) => u.id));
@@ -102,7 +123,9 @@ describe("brute-force block emails org admins", () => {
       maxFailures: 10,
     });
     const ours = sent.filter((s) => ourEmails.has(s.to));
-    expect(ours.map((s) => s.to).sort()).toEqual([adminEmail, ownerEmail].sort());
+    expect(ours.map((s) => s.to).sort()).toEqual(
+      [adminEmail, ownerEmail].sort(),
+    );
     for (const mail of ours) {
       expect(mail.subject).toMatch(/api key/i);
       expect(mail.body).toContain("203.0.113.77");
@@ -140,7 +163,9 @@ describe("reportCallbackBruteForceBlock emails org admins about login attacks", 
       maxFailures: 10,
     });
     const ours = sent.filter((s) => ourEmails.has(s.to));
-    expect(ours.map((s) => s.to).sort()).toEqual([adminEmail, ownerEmail].sort());
+    expect(ours.map((s) => s.to).sort()).toEqual(
+      [adminEmail, ownerEmail].sort(),
+    );
     for (const mail of ours) {
       expect(mail.subject).toMatch(/login/i);
       expect(mail.body).toContain("203.0.113.90");

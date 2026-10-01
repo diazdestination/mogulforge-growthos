@@ -171,13 +171,19 @@ export async function requestLoginCode(params: {
         identifier,
         `Your ${businessName} sign-in code`,
         body,
+        { organizationId: params.organizationId },
       );
     } else {
       const to = contacts[0].phone ?? identifier;
       await providers.sms.send(
         to,
         `${businessName} sign-in code: ${code}. Expires in 10 minutes.`,
-        { organizationId: params.organizationId, contactId: contacts[0].id, purpose: 'authentication', idempotencyKey: `portal:${sha256(code)}` },
+        {
+          organizationId: params.organizationId,
+          contactId: contacts[0].id,
+          purpose: "authentication",
+          idempotencyKey: `portal:${sha256(code)}`,
+        },
       );
     }
   } catch (err) {

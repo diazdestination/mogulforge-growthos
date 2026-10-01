@@ -1282,14 +1282,23 @@ export type EmailProviderStatusProvider = typeof EmailProviderStatusProvider[key
 
 export const EmailProviderStatusProvider = {
   gmail: 'gmail',
-  resend: 'resend',
-  mock: 'mock',
+  disabled: 'disabled',
 } as const;
 
 export interface EmailProviderStatus {
   provider: EmailProviderStatusProvider;
-  /** Account/address automation emails are sent from (Gmail account for gmail, from-address for resend). */
+  /** Gmail address explicitly designated for unassigned customer email and portal sign-in codes. Assigned leads use their assigned member's Gmail. */
   senderEmail?: string | null;
+  /**
+     * Explicit company default sender, if configured.
+     * @nullable
+     */
+  senderUserId?: string | null;
+  /**
+     * Why the default customer sender is unavailable.
+     * @nullable
+     */
+  reason?: string | null;
   /** Number of consecutive failed send_email automation results, newest first, until the last successful send. 0 when the latest send succeeded or no sends were attempted. */
   recentSendFailures?: number;
   /** When the most recent failed send_email attempt happened (ISO timestamp), if any. */
@@ -1550,6 +1559,11 @@ export interface OrgSettings {
      * @nullable
      */
   fallbackNotificationInbox?: string | null;
+  /**
+     * Active company staff member whose connected Gmail sends unassigned customer email and portal sign-in codes.
+     * @nullable
+     */
+  customerEmailSenderUserId?: string | null;
   googleReviews?: GoogleReviewsConfig | null;
   widget?: WidgetSettings | null;
   concierge?: ConciergeSettings | null;
@@ -1571,6 +1585,13 @@ export interface OrgSettingsInput {
   securityAlertsAcknowledgedAt?: string;
   /** Fallback email address for portal message notifications when the assigned rep has no valid email. */
   fallbackNotificationInbox?: string | null;
+  /**
+     * Explicit company default Gmail sender; null removes it. Must be an active company member authorized to send and connected with gmail.send.
+     * @minLength 1
+     * @maxLength 255
+     * @nullable
+     */
+  customerEmailSenderUserId?: string | null;
   googleReviews?: GoogleReviewsConfig;
   widget?: WidgetSettings;
   concierge?: ConciergeSettings;

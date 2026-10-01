@@ -49,8 +49,8 @@ import {
  * Event-driven automation engine. Events are emitted from CRM flows; rules
  * (automations table) match on event + simple equality conditions and run
  * their configured actions. Every run is recorded; every action is audited.
- * Outbound email/SMS goes through the configured providers (Twilio/Resend
- * when their secrets are set, labeled mocks otherwise).
+ * Customer email requires the tenant's assigned/configured Gmail sender.
+ * SMS goes through the organization's approved Twilio binding.
  */
 
 export type AutomationEventName =
@@ -354,6 +354,7 @@ async function executeAction(
                 contact.email!,
                 rendered.subject ?? `${await getBusinessName(organizationId)} update`,
                 rendered.body + unsubscribeFooter(organizationId, contact.id),
+                { organizationId, leadId: context.leadId },
               )
             : await providers.sms.send(contact.phone!, rendered.body, { organizationId, contactId: contact.id, purpose: 'marketing', idempotencyKey: `automation:${automationId}:${context.leadId ?? contact.id}:${JSON.stringify(action.params)}` });
       } catch (err) {
@@ -390,7 +391,7 @@ async function executeAction(
           contactId: contact.id,
           type: "automation_message_sent",
           title: `Automation ${channel === "email" ? "email" : "text"} sent`,
-          metadata: { automationId, channel, provider: res.provider },
+          metadata: { automationId, channel, provider: res.provider, providerMessageId: res.id },
         });
       }
       await audit({
@@ -722,7 +723,7 @@ async function executeAction(
       }
       const res =
         channel === "email"
-          ? await providers.email.send(contact.email!, emailSubject, emailBody)
+          ? await providers.email.send(contact.email!, emailSubject, emailBody, { organizationId, leadId: appointment.leadId })
           : await providers.sms.send(contact.phone!, smsBody, { organizationId, contactId: contact.id, purpose: 'appointments', idempotencyKey: `appointment:${appointmentId}:reminder:${appointment.scheduledStart.toISOString()}` });
       if (appointment.leadId) {
         await db.insert(activitiesTable).values({
@@ -736,6 +737,7 @@ async function executeAction(
             appointmentId,
             channel,
             provider: res.provider,
+            providerMessageId: res.id,
             scheduledStart: appointment.scheduledStart.toISOString(),
           },
         });

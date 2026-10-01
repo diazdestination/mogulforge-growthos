@@ -41,6 +41,11 @@ export interface OrgSettings {
      * @nullable
      */
   fallbackNotificationInbox?: string | null;
+  /**
+     * Active company staff member whose connected Gmail sends unassigned customer email and portal sign-in codes.
+     * @nullable
+     */
+  customerEmailSenderUserId?: string | null;
   googleReviews?: GoogleReviewsConfig | null;
   widget?: WidgetSettings | null;
   concierge?: ConciergeSettings | null;

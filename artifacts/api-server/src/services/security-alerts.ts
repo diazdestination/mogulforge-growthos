@@ -5,7 +5,7 @@ import { logger } from "../lib/logger";
 
 import { orgAdminEmails } from "./api-key-expiry-reminder";
 import { recordAudit } from "./audit";
-import { providers } from "./providers";
+import { transactionalEmailProvider } from "./providers";
 
 /** Email every active owner/admin of an org about the blocked attack. */
 async function emailOrgAdmins(
@@ -33,10 +33,13 @@ async function emailOrgAdmins(
   ].join("\n");
   for (const to of recipients) {
     try {
-      await providers.email.send(to, subject, body);
+      await transactionalEmailProvider.send(to, subject, body);
     } catch (err) {
       // One bad mailbox must not block the remaining admins.
-      logger.error({ err, to, organizationId }, "brute-force alert: send failed");
+      logger.error(
+        { err, to, organizationId },
+        "brute-force alert: send failed",
+      );
     }
   }
 }
@@ -82,7 +85,10 @@ export async function reportCallbackBruteForceBlock(params: {
       }),
     );
   } catch (err) {
-    console.error("[security] failed to record login brute-force audit event", err);
+    console.error(
+      "[security] failed to record login brute-force audit event",
+      err,
+    );
   }
 }
 
@@ -112,10 +118,13 @@ async function emailOrgAdminsLoginBlock(
   ].join("\n");
   for (const to of recipients) {
     try {
-      await providers.email.send(to, subject, body);
+      await transactionalEmailProvider.send(to, subject, body);
     } catch (err) {
       // One bad mailbox must not block the remaining admins.
-      logger.error({ err, to, organizationId }, "login brute-force alert: send failed");
+      logger.error(
+        { err, to, organizationId },
+        "login brute-force alert: send failed",
+      );
     }
   }
 }
@@ -160,6 +169,9 @@ export async function reportApiKeyBruteForceBlock(params: {
       }),
     );
   } catch (err) {
-    console.error("[security] failed to record API-key brute-force audit event", err);
+    console.error(
+      "[security] failed to record API-key brute-force audit event",
+      err,
+    );
   }
 }

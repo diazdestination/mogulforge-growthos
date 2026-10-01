@@ -1,5 +1,6 @@
-import { twilioForOrganization, type SmsSendContext } from './twilio-controls';
-import { assertOutboundDeliveryAllowed } from './outbound-hold';
+import { twilioForOrganization, type SmsSendContext } from "./twilio-controls";
+import { assertOutboundDeliveryAllowed } from "./outbound-hold";
+import type { CustomerEmailContext } from "./customer-email";
 /**
  * Provider adapters. Mocks are clearly labeled and used only when real
  * credentials are absent in local development. Production SMS requires the
@@ -27,7 +28,11 @@ export interface AiProvider {
 }
 
 export interface SmsProvider {
-  send(to: string, body: string, context?: SmsSendContext): Promise<{ id: string; provider: string }>;
+  send(
+    to: string,
+    body: string,
+    context?: SmsSendContext,
+  ): Promise<{ id: string; provider: string }>;
 }
 
 export interface EmailProvider {
@@ -35,6 +40,15 @@ export interface EmailProvider {
     to: string,
     subject: string,
     body: string,
+  ): Promise<{ id: string; provider: string }>;
+}
+
+export interface CustomerEmailProvider {
+  send(
+    to: string,
+    subject: string,
+    body: string,
+    context: CustomerEmailContext,
   ): Promise<{ id: string; provider: string }>;
 }
 
@@ -140,59 +154,10 @@ export const mockEmailProvider: EmailProvider = {
  */
 export const twilioSmsProvider: SmsProvider = {
   async send(to, body, context) {
-    const { sendTwilioSms } = await import('./twilio-delivery');
+    const { sendTwilioSms } = await import("./twilio-delivery");
     return sendTwilioSms(to, body, context);
   },
 };
-/**
- * Real email provider that sends through the owner's connected Gmail account
- * via the Replit Gmail connector. Used automatically when the connector
- * environment is present (see `emailProvider` below). Errors propagate so a
- * failed send is recorded as a failure — never silently mocked.
- */
-export const gmailEmailProvider: EmailProvider = {
-  async send(to, subject, body) {
-    assertOutboundDeliveryAllowed();
-    // Header-injection guard: the recipient is interpolated into a raw
-    // RFC 2822 header, so reject anything that isn't a plain mailbox.
-    if (!isSafeMailbox(to)) {
-      throw new Error("Refusing to send email: invalid recipient address");
-    }
-    const { ReplitConnectors } = await import("@replit/connectors-sdk");
-    // Never cache the client — tokens expire; the SDK refreshes per instance.
-    const connectors = new ReplitConnectors();
-    // RFC 2822 message. Subject is encoded so punctuation/unicode survive.
-    const message = [
-      `To: ${to}`,
-      `Subject: =?UTF-8?B?${Buffer.from(subject, "utf8").toString("base64")}?=`,
-      "MIME-Version: 1.0",
-      'Content-Type: text/plain; charset="UTF-8"',
-      "",
-      body,
-    ].join("\r\n");
-    const raw = Buffer.from(message, "utf8").toString("base64url");
-    const res = await connectors.proxy(
-      "google-mail",
-      "/gmail/v1/users/me/messages/send",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ raw }),
-      },
-    );
-    if (!res.ok) {
-      throw new Error(`Gmail send failed: ${res.status} ${await res.text()}`);
-    }
-    const data = (await res.json()) as { id?: string };
-    return { id: data.id ?? "unknown", provider: "gmail" };
-  },
-};
-
-/**
- * True when the Gmail connector runtime is available (Replit injects these
- * env vars when a connection is attached). Falls back to the mock provider
- * otherwise so local/dev flows stay deterministic.
- */
 /**
  * Strict single-mailbox check used before interpolating a recipient into a
  * raw RFC 2822 header. Rejects CR/LF, whitespace, commas, and angle brackets
@@ -202,45 +167,10 @@ export function isSafeMailbox(to: string): boolean {
   return /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(to);
 }
 
-/**
- * Reports which email provider automations will use right now, and (for
- * Gmail) which account the messages are sent from. Used by the settings UI
- * so admins can see the actual sending identity. Never throws — a profile
- * lookup failure still reports the active provider with a null sender.
- */
-export async function getEmailProviderStatus(): Promise<{
-  provider: "gmail" | "resend" | "mock";
-  senderEmail: string | null;
-}> {
-  if (isGmailConfigured()) {
-    try {
-      const { ReplitConnectors } = await import("@replit/connectors-sdk");
-      const connectors = new ReplitConnectors();
-      const res = await connectors.proxy(
-        "google-mail",
-        "/gmail/v1/users/me/profile",
-        { method: "GET" },
-      );
-      if (res.ok) {
-        const data = (await res.json()) as { emailAddress?: string };
-        return { provider: "gmail", senderEmail: data.emailAddress ?? null };
-      }
-      console.warn(`[email] Gmail profile lookup failed: ${res.status}`);
-    } catch (err) {
-      console.warn(
-        "[email] Gmail profile lookup failed:",
-        err instanceof Error ? err.message : err,
-      );
-    }
-    return { provider: "gmail", senderEmail: null };
-  }
-  if (isResendConfigured()) {
-    return {
-      provider: "resend",
-      senderEmail: process.env.RESEND_FROM_EMAIL!,
-    };
-  }
-  return { provider: "mock", senderEmail: null };
+/** Reports this company's explicitly designated customer email sender. */
+export async function getEmailProviderStatus(organizationId: string) {
+  const { getCustomerEmailStatus } = await import("./customer-email");
+  return getCustomerEmailStatus(organizationId);
 }
 
 /**
@@ -253,21 +183,22 @@ export async function getSmsProviderStatus(organizationId?: string): Promise<{
   provider: "twilio" | "mock" | "disabled";
   senderPhoneNumber: string | null;
 }> {
-  const binding = organizationId ? await twilioForOrganization(organizationId) : null;
+  const binding = organizationId
+    ? await twilioForOrganization(organizationId)
+    : null;
   if (binding?.smsEnabled) {
     return {
       provider: "twilio",
       senderPhoneNumber: binding.phoneNumber,
     };
   }
-  return { provider: process.env.NODE_ENV === 'production' || Boolean(binding) ? 'disabled' : 'mock', senderPhoneNumber: null };
-}
-
-export function isGmailConfigured(): boolean {
-  return Boolean(
-    process.env.REPLIT_CONNECTORS_HOSTNAME &&
-    (process.env.REPL_IDENTITY || process.env.WEB_REPL_RENEWAL),
-  );
+  return {
+    provider:
+      process.env.NODE_ENV === "production" || Boolean(binding)
+        ? "disabled"
+        : "mock",
+    senderPhoneNumber: null,
+  };
 }
 
 /**
@@ -277,7 +208,9 @@ export function isGmailConfigured(): boolean {
  */
 export const resendEmailProvider: EmailProvider = {
   async send(to, subject, body) {
-    assertOutboundDeliveryAllowed();
+    assertOutboundDeliveryAllowed({ channel: "email", recipient: to });
+    if (!isSafeMailbox(to))
+      throw new Error("Refusing to send email: invalid recipient address");
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.RESEND_FROM_EMAIL?.trim();
     if (!apiKey || !from) {
@@ -471,7 +404,7 @@ export function isTransactionalEmailConfigured(): boolean {
 
 export const transactionalEmailProvider: EmailProvider = {
   async send(to, subject, body) {
-    assertOutboundDeliveryAllowed();
+    assertOutboundDeliveryAllowed({ channel: "email", recipient: to });
     if (isTransactionalEmailConfigured()) {
       return resendEmailProvider.send(to, subject, body);
     }
@@ -487,82 +420,20 @@ export const transactionalEmailProvider: EmailProvider = {
   },
 };
 
-/**
- * Runtime-adaptive email provider. Selection and failure semantics:
- *
- * - If at least one real provider is configured (Gmail connector or Resend),
- *   real delivery is attempted in order: Gmail → Resend. If every configured
- *   real provider fails, the error from the last one is re-thrown so the
- *   automation run records a true failure (no silent mock fallback that makes
- *   undelivered messages look successful).
- * - If NO real provider is configured, the labeled mock is used only outside
- *   production. Production fails closed so an undelivered message can never
- *   be recorded as sent.
- *
- * Provider availability is checked at send-time (not module-load) so
- * connector binding state is always current.
- */
-export const adaptiveEmailProvider: EmailProvider = {
-  async send(to, subject, body) {
-    assertOutboundDeliveryAllowed();
-    const gmailAvailable = isGmailConfigured();
-    // Check Resend availability at call-time (not module-load) so env stubs
-    // in tests and runtime changes to RESEND_API_KEY are always honoured.
-    const anyRealProvider = gmailAvailable || isResendConfigured();
-
-    if (!anyRealProvider) {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error(
-          "Email delivery is not configured (Gmail connector or Resend)",
-        );
-      }
-      // No real provider configured — use labeled mock in local/test only.
-      console.warn(
-        "[email] No real provider configured — using mock. No email was delivered.",
-      );
-      return mockEmailProvider.send(to, subject, body);
-    }
-
-    let lastError: unknown;
-
-    // 1. Gmail via Replit connector
-    if (gmailAvailable) {
-      try {
-        return await gmailEmailProvider.send(to, subject, body);
-      } catch (gmailErr) {
-        lastError = gmailErr;
-        console.warn(
-          "[email] Gmail provider failed, trying Resend:",
-          gmailErr instanceof Error ? gmailErr.message : gmailErr,
-        );
-      }
-    }
-
-    // 2. Resend (check env live so test stubs take effect)
-    if (isResendConfigured()) {
-      try {
-        return await resendEmailProvider.send(to, subject, body);
-      } catch (resendErr) {
-        lastError = resendErr;
-        console.error(
-          "[email] Resend provider also failed:",
-          resendErr instanceof Error ? resendErr.message : resendErr,
-        );
-      }
-    }
-
-    // All configured real providers failed — propagate so the automation run
-    // is marked failed, not silently logged as successful.
-    throw lastError instanceof Error
-      ? lastError
-      : new Error("[email] All configured providers failed to send");
+/** Customer sends require a company and an authorized Gmail identity. */
+export const customerEmailProvider: CustomerEmailProvider = {
+  async send(to, subject, body, context) {
+    const { sendCustomerEmail } = await import("./customer-email");
+    return sendCustomerEmail({ ...context, to, subject, body });
   },
 };
 
 const tenantAwareSmsProvider: SmsProvider = {
   async send(to, body, context) {
     assertOutboundDeliveryAllowed();
-    const binding = context?.organizationId ? await twilioForOrganization(context.organizationId) : null;
+    const binding = context?.organizationId
+      ? await twilioForOrganization(context.organizationId)
+      : null;
     if (binding || process.env.NODE_ENV === "production")
       return twilioSmsProvider.send(to, body, context);
     return mockSmsProvider.send(to, body, context);
@@ -577,7 +448,7 @@ export const providers = {
   // Resolve at send-time for the authenticated operation's organization.
   // A present but disabled client binding never falls through to a mock.
   sms: tenantAwareSmsProvider,
-  // Runtime-adaptive: tries Gmail connector → Resend; mock is local/test only.
-  email: adaptiveEmailProvider,
+  // Customer emails never inherit a global connector or the platform sender.
+  email: customerEmailProvider,
   weather: mockWeatherProvider,
 };

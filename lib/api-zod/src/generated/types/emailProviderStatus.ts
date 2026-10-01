@@ -9,8 +9,18 @@ import type { EmailProviderStatusProvider } from './emailProviderStatusProvider'
 
 export interface EmailProviderStatus {
   provider: EmailProviderStatusProvider;
-  /** Account/address automation emails are sent from (Gmail account for gmail, from-address for resend). */
+  /** Gmail address explicitly designated for unassigned customer email and portal sign-in codes. Assigned leads use their assigned member's Gmail. */
   senderEmail?: string | null;
+  /**
+     * Explicit company default sender, if configured.
+     * @nullable
+     */
+  senderUserId?: string | null;
+  /**
+     * Why the default customer sender is unavailable.
+     * @nullable
+     */
+  reason?: string | null;
   /** Number of consecutive failed send_email automation results, newest first, until the last successful send. 0 when the latest send succeeded or no sends were attempted. */
   recentSendFailures?: number;
   /** When the most recent failed send_email attempt happened (ISO timestamp), if any. */

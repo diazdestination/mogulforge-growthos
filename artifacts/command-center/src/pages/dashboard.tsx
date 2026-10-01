@@ -131,8 +131,7 @@ function EmailFailureBanner() {
       <p className="font-medium">
         Automation emails are failing to send
         {emailProvider.provider === 'gmail' && ' through Gmail'}
-        {emailProvider.provider === 'resend' && ' through Resend'}
-        {emailProvider.provider === 'mock' && ' (no provider connected)'}
+        {emailProvider.provider === 'disabled' && ' (check the selected Gmail sender)'}
         .
       </p>
       <p className="mt-1">
@@ -140,8 +139,8 @@ function EmailFailureBanner() {
         {emailProvider.lastSendFailureDetail ? <>: <span className="font-mono text-xs">{emailProvider.lastSendFailureDetail}</span></> : ''}
         {'. '}
         {emailProvider.provider === 'gmail'
-          ? 'The Gmail connection may have expired — reconnect Gmail or configure Resend to resume sending.'
-          : 'Check the email provider configuration to resume sending.'}{' '}
+          ? 'The Gmail connection may have expired — reconnect the selected sender in Account connections.'
+          : 'Check the lead owner or company default Gmail sender to resume sending.'}{' '}
         <Link href="/settings" className="font-semibold underline">
           Review automation settings
         </Link>

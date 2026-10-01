@@ -173,8 +173,20 @@ export async function notifyAssignedRepOfPortalMessage(params: {
         contactLastName: contactsTable.lastName,
       })
       .from(leadsTable)
-      .innerJoin(contactsTable, eq(leadsTable.contactId, contactsTable.id))
-      .leftJoin(usersTable, eq(leadsTable.assignedUserId, usersTable.id))
+      .innerJoin(
+        contactsTable,
+        and(
+          eq(leadsTable.contactId, contactsTable.id),
+          eq(contactsTable.organizationId, params.organizationId),
+        ),
+      )
+      .leftJoin(
+        usersTable,
+        and(
+          eq(leadsTable.assignedUserId, usersTable.id),
+          eq(usersTable.organizationId, params.organizationId),
+        ),
+      )
       .where(
         and(
           eq(leadsTable.id, params.leadId),
@@ -262,12 +274,17 @@ export async function notifyAssignedRepOfPortalMessage(params: {
       }
     };
 
+    // Staff alerts use the explicitly selected company mailbox. The lead's
+    // assigned person determines the recipient, never the sending credential.
+    // This keeps an inactive or disconnected assignee from silencing the
+    // fallback inbox/admin notification. Lead links and activity claims remain.
     if (!fallbackReason) {
       try {
         await providers.email.send(
           row.repEmail!.trim(),
           subject,
           buildBody(row.repFirstName?.trim() || null),
+          { organizationId: params.organizationId },
         );
       } catch (sendErr) {
         await releaseClaim();
@@ -281,12 +298,17 @@ export async function notifyAssignedRepOfPortalMessage(params: {
     const fallbackInbox = settings.fallbackNotificationInbox?.trim() || null;
     if (fallbackInbox) {
       try {
-        await providers.email.send(fallbackInbox, subject, buildBody(null));
+        await providers.email.send(fallbackInbox, subject, buildBody(null), {
+          organizationId: params.organizationId,
+        });
       } catch (sendErr) {
         await releaseClaim();
         throw sendErr;
       }
-      return { sent: true, reason: `${fallbackReason}; notified fallback inbox` };
+      return {
+        sent: true,
+        reason: `${fallbackReason}; notified fallback inbox`,
+      };
     }
 
     const admins = await orgAdminEmails(params.organizationId);
@@ -301,7 +323,9 @@ export async function notifyAssignedRepOfPortalMessage(params: {
     let delivered = 0;
     for (const to of admins) {
       try {
-        await providers.email.send(to, subject, buildBody(null));
+        await providers.email.send(to, subject, buildBody(null), {
+          organizationId: params.organizationId,
+        });
         delivered += 1;
       } catch (err) {
         // One bad mailbox must not block the remaining admins.
@@ -313,7 +337,10 @@ export async function notifyAssignedRepOfPortalMessage(params: {
     }
     if (delivered === 0) {
       await releaseClaim();
-      return { sent: false, reason: `${fallbackReason}; all admin sends failed` };
+      return {
+        sent: false,
+        reason: `${fallbackReason}; all admin sends failed`,
+      };
     }
     return { sent: true, reason: `${fallbackReason}; notified org admins` };
   } catch (err) {
@@ -351,8 +378,20 @@ export async function notifyAssignedRepOfPortalPhotos(params: {
         contactLastName: contactsTable.lastName,
       })
       .from(leadsTable)
-      .innerJoin(contactsTable, eq(leadsTable.contactId, contactsTable.id))
-      .leftJoin(usersTable, eq(leadsTable.assignedUserId, usersTable.id))
+      .innerJoin(
+        contactsTable,
+        and(
+          eq(leadsTable.contactId, contactsTable.id),
+          eq(contactsTable.organizationId, params.organizationId),
+        ),
+      )
+      .leftJoin(
+        usersTable,
+        and(
+          eq(leadsTable.assignedUserId, usersTable.id),
+          eq(usersTable.organizationId, params.organizationId),
+        ),
+      )
       .where(
         and(
           eq(leadsTable.id, params.leadId),
@@ -407,6 +446,7 @@ export async function notifyAssignedRepOfPortalPhotos(params: {
         row.repEmail!.trim(),
         subject,
         buildBody(row.repFirstName?.trim() || null),
+        { organizationId: params.organizationId },
       );
       return { sent: true, reason: null };
     }
@@ -423,7 +463,9 @@ export async function notifyAssignedRepOfPortalPhotos(params: {
     let delivered = 0;
     for (const to of admins) {
       try {
-        await providers.email.send(to, subject, buildBody(null));
+        await providers.email.send(to, subject, buildBody(null), {
+          organizationId: params.organizationId,
+        });
         delivered += 1;
       } catch (err) {
         // One bad mailbox must not block the remaining admins.
@@ -434,7 +476,10 @@ export async function notifyAssignedRepOfPortalPhotos(params: {
       }
     }
     if (delivered === 0) {
-      return { sent: false, reason: `${fallbackReason}; all admin sends failed` };
+      return {
+        sent: false,
+        reason: `${fallbackReason}; all admin sends failed`,
+      };
     }
     return { sent: true, reason: `${fallbackReason}; notified org admins` };
   } catch (err) {
@@ -576,7 +621,13 @@ export async function notifyHomeownerOfTeamReply(params: {
         contactFirstName: contactsTable.firstName,
       })
       .from(leadsTable)
-      .innerJoin(contactsTable, eq(leadsTable.contactId, contactsTable.id))
+      .innerJoin(
+        contactsTable,
+        and(
+          eq(leadsTable.contactId, contactsTable.id),
+          eq(contactsTable.organizationId, params.organizationId),
+        ),
+      )
       .where(
         and(
           eq(leadsTable.id, params.leadId),
@@ -651,6 +702,7 @@ export async function notifyHomeownerOfTeamReply(params: {
         to,
         `${businessName} replied to your message`,
         body,
+        { organizationId: params.organizationId, leadId: params.leadId },
       );
     } catch (sendErr) {
       await releaseClaim();

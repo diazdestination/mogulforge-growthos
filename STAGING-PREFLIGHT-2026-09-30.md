@@ -1,5 +1,17 @@
 # GrowthOS staging preflight — September 30, 2026
 
+## Latest controlled-pilot update
+
+The owner's subsequent request to finish controlled-pilot preparation
+authorized the isolated bootstrap. The new staging database now has the
+reviewed 90-table source schema, including the additive contractor sender
+field. A pinned, empty-database-only transaction completed successfully while
+the old staging app remained stopped; no customer data or provider was used.
+See [the current pilot evidence ledger](reports/controlled-pilot-2026-09-30.md).
+The older statements below saying no schema was applied describe the earlier
+inspection and are superseded only for that fact. Restore, application
+cutover and live-provider acceptance are separate gates, not implied passes.
+
 Status: **separate staging cluster provisioned; deployment and provider
 activation still blocked**. The original inventory below was read-only against
 the previously green `15d9704507325a98c0fd719d15b9ac841ea68f0b`

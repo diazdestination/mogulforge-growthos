@@ -10,7 +10,15 @@ import {
   usersTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 
@@ -24,22 +32,18 @@ vi.mock("./providers", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./providers")>();
   return {
     ...actual,
-    providers: {
-      ...actual.providers,
-      email: {
-        send: async (to: string, subject: string) => {
-          if (failAllSends) throw new Error("provider outage");
-          sent.push({ to, subject });
-          return { id: "mock", provider: "mock" };
-        },
+    transactionalEmailProvider: {
+      send: async (to: string, subject: string) => {
+        if (failAllSends) throw new Error("provider outage");
+        sent.push({ to, subject });
+        return { id: "mock", provider: "mock" };
       },
     },
   };
 });
 
-const { processApiKeyExpiryReminders } = await import(
-  "./api-key-expiry-reminder"
-);
+const { processApiKeyExpiryReminders } =
+  await import("./api-key-expiry-reminder");
 
 let org: { id: string };
 // Unique per-run emails so assertions can be scoped to this org even when the
@@ -184,7 +188,11 @@ describe("processApiKeyExpiryReminders", () => {
     const retryNow = new Date(now.getTime() + 60 * 1000);
     const retried = await processApiKeyExpiryReminders(7, retryNow);
     expect(retried.map((k) => k.id)).toContain(key.id);
-    expect(mine().map((s) => s.to).sort()).toEqual([adminEmail, ownerEmail]);
+    expect(
+      mine()
+        .map((s) => s.to)
+        .sort(),
+    ).toEqual([adminEmail, ownerEmail]);
 
     // Still at most one successful reminder for this expiry.
     sent.length = 0;

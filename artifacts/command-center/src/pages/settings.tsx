@@ -1,5 +1,6 @@
 import { SmsDesk } from '@/components/sms-desk';
 import { VoiceDesk } from '@/components/voice-desk';
+import { CustomerEmailSender } from '@/components/customer-email-sender';
 import { useEffect, useRef, useState } from 'react';
 import {
   useGetMe,
@@ -688,8 +689,7 @@ function AutomationsTab() {
           <p className="font-medium">
             Automation emails are failing to send
             {emailProvider.provider === 'gmail' && ' through Gmail'}
-            {emailProvider.provider === 'resend' && ' through Resend'}
-            {emailProvider.provider === 'mock' && ' (no provider connected)'}
+            {emailProvider.provider === 'disabled' && ' (check the selected Gmail sender)'}
             .
           </p>
           <p className="mt-1">
@@ -697,15 +697,15 @@ function AutomationsTab() {
             {emailProvider.lastSendFailureDetail ? <>: <span className="font-mono text-xs">{emailProvider.lastSendFailureDetail}</span></> : ''}
             {'. '}
             {emailProvider.provider === 'gmail'
-              ? 'The Gmail connection may have expired — reconnect Gmail or configure Resend to resume sending.'
-              : 'Check the email provider configuration to resume sending.'}
+              ? 'The Gmail connection may have expired — reconnect the selected sender in Account connections.'
+              : 'Check the lead owner or company default Gmail sender to resume sending.'}
           </p>
         </div>
       )}
       {emailProvider && (
         <div
           className={`rounded-md border px-4 py-3 text-sm ${
-            emailProvider.provider === 'mock'
+            emailProvider.provider === 'disabled'
               ? 'border-amber-300 bg-amber-50 text-amber-900'
               : 'border-border bg-muted/50 text-muted-foreground'
           }`}
@@ -713,7 +713,7 @@ function AutomationsTab() {
         >
           {emailProvider.provider === 'gmail' && (
             <>
-              Automation emails are sent through Gmail
+              Unassigned customer emails use the company default Gmail account
               {emailProvider.senderEmail ? (
                 <> from <span className="font-medium text-foreground">{emailProvider.senderEmail}</span></>
               ) : (
@@ -722,11 +722,8 @@ function AutomationsTab() {
               .
             </>
           )}
-          {emailProvider.provider === 'resend' && (
-            <>Automation emails are sent via Resend from {emailProvider.senderEmail ?? 'the configured address'}.</>
-          )}
-          {emailProvider.provider === 'mock' && (
-            <>No business-sending provider is connected — automation emails are blocked until this user connects Gmail. Account verification, password recovery, and team invitations use MogulForge's separate transactional email channel.</>
+          {emailProvider.provider === 'disabled' && (
+            <>{emailProvider.reason ?? 'No default customer email sender is ready. Choose an active staff member with Gmail connected below.'}</>
           )}
         </div>
       )}
@@ -755,6 +752,7 @@ function AutomationsTab() {
           <p className="mt-2"><a className="underline" href="/sms-preferences.html" target="_blank" rel="noreferrer">MogulForge text preferences</a> · <a className="underline" href="/messaging-terms.html" target="_blank" rel="noreferrer">Messaging terms</a></p>
         </div>
       )}
+      <CustomerEmailSender />
       <SmsDesk />
       <VoiceDesk />
       <Card>

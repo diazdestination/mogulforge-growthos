@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { restoreClient } from "./restore-drill-connection.mjs";
 
 const STAGING_CLUSTER = "zp2wjrejd2zodn4q";
 const PRODUCTION_CLUSTER = "kzpwm0j18eg04nv3";
@@ -15,6 +15,8 @@ export const RESTORE_TABLES = [
   "contacts",
   "properties",
   "leads",
+  "estimates",
+  "crm_tasks",
   "bie_action_proposals",
   "revenue_executions",
   "revenue_execution_events",
@@ -24,6 +26,7 @@ export const RESTORE_TABLES = [
   "projects",
   "project_stories",
   "stored_objects",
+  "activities",
   "gmail_connections",
   "webhook_endpoints",
   "service_obligations",
@@ -41,7 +44,15 @@ export const REQUIRED_FIXTURE_TABLES = [
   "projects",
   "project_stories",
   "stored_objects",
+  "activities",
   "gmail_connections",
+  "estimates",
+  "crm_tasks",
+  "revenue_executions",
+  "revenue_execution_events",
+  "decision_rooms",
+  "value_entries",
+  "service_obligations",
 ];
 
 function fail(label) {
@@ -66,6 +77,11 @@ export function parseRestoreDrillTarget(env = process.env) {
   const slug = env.RESTORE_DRILL_SYNTHETIC_SLUG;
   if (
     !["postgres:", "postgresql:"].includes(url.protocol) ||
+    [...url.searchParams].some(
+      ([key, value]) => key !== "sslmode" || value !== "require",
+    ) ||
+    url.hash ||
+    (url.port && url.port !== "5432") ||
     !match ||
     !/^[a-z][a-z0-9_-]{2,62}$/.test(database) ||
     !/^[a-z][a-z0-9_-]{2,62}$/.test(login) ||
@@ -119,20 +135,15 @@ export async function runRestoreDrillReadOnly(
   { createClient, emit = console.log } = {},
 ) {
   const target = parseRestoreDrillTarget(env);
-  if (!createClient) {
-    const requireFromApi = createRequire(
-      new URL("../artifacts/api-server/package.json", import.meta.url),
-    );
-    const { Client } = requireFromApi("pg");
-    createClient = (connectionString) => new Client({ connectionString });
-  }
-  const client = createClient(env.RESTORE_DRILL_DATABASE_URL);
+  const connection = await restoreClient(env, target, { createClient });
+  const { client } = connection;
   let inTransaction = false;
   try {
     await client.connect();
     await client.query("BEGIN TRANSACTION READ ONLY");
     inTransaction = true;
     await client.query("SET LOCAL statement_timeout = '15s'");
+    await client.query("SET LOCAL TIME ZONE 'UTC'");
     const identity = await client.query(
       "SELECT current_database() AS database, session_user AS login",
     );
@@ -213,6 +224,7 @@ export async function runRestoreDrillReadOnly(
   } finally {
     if (inTransaction) await client.query("ROLLBACK").catch(() => {});
     await client.end().catch(() => {});
+    await connection.close();
   }
 }
 
@@ -223,9 +235,11 @@ if (isDirectExecution) {
   runRestoreDrillReadOnly().catch((error) => {
     // Driver errors can include credentials or host details. Only print fixed
     // internal labels or the PostgreSQL error code, never the error message.
-    const label = error.message?.startsWith("restore_")
+    const label = /^restore_[a-z_]+$/.test(error.message || "")
       ? error.message
-      : error.code || "unknown";
+      : /^[A-Z0-9]{5}$/.test(error.code || "")
+        ? error.code
+        : "unknown";
     console.error(`RESTORE_DRILL_READONLY_FAILED:${label}`);
     process.exitCode = 1;
   });

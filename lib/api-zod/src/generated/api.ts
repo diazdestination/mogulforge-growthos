@@ -2512,6 +2512,7 @@ export const GetSettingsResponse = zod.object({
   "aiInstructions": zod.string().nullish().describe('Extra org-specific instructions appended to AI prompts.'),
   "securityAlertsAcknowledgedAt": zod.string().nullish().describe('ISO timestamp; brute-force security alerts recorded at or before this instant are dismissed.'),
   "fallbackNotificationInbox": zod.string().nullish().describe('Fallback email address for portal message notifications when the assigned rep has no valid email.'),
+  "customerEmailSenderUserId": zod.string().nullish().describe('Active company staff member whose connected Gmail sends unassigned customer email and portal sign-in codes.'),
   "googleReviews": zod.union([zod.object({
   "placeId": zod.string().optional().describe('Google Place ID for the business listing (e.g. ChIJ...).'),
   "apiKey": zod.string().optional().describe('Google Places API key with Places Details access.')
@@ -2564,6 +2565,8 @@ export const GetSettingsResponse = zod.object({
  * @summary Update organization settings
  */
 export const updateSettingsBodyAiInstructionsMax = 4000;
+
+export const updateSettingsBodyCustomerEmailSenderUserIdMax = 255;
 
 
 
@@ -2623,6 +2626,7 @@ export const UpdateSettingsBody = zod.object({
   "aiInstructions": zod.string().max(updateSettingsBodyAiInstructionsMax).optional(),
   "securityAlertsAcknowledgedAt": zod.string().optional().describe('ISO timestamp; acknowledges (dismisses) brute-force security alerts recorded at or before this instant.'),
   "fallbackNotificationInbox": zod.string().nullish().describe('Fallback email address for portal message notifications when the assigned rep has no valid email.'),
+  "customerEmailSenderUserId": zod.string().min(1).max(updateSettingsBodyCustomerEmailSenderUserIdMax).nullish().describe('Explicit company default Gmail sender; null removes it. Must be an active company member authorized to send and connected with gmail.send.'),
   "googleReviews": zod.object({
   "placeId": zod.string().optional().describe('Google Place ID for the business listing (e.g. ChIJ...).'),
   "apiKey": zod.string().optional().describe('Google Places API key with Places Details access.')
@@ -2727,6 +2731,7 @@ export const UpdateSettingsResponse = zod.object({
   "aiInstructions": zod.string().nullish().describe('Extra org-specific instructions appended to AI prompts.'),
   "securityAlertsAcknowledgedAt": zod.string().nullish().describe('ISO timestamp; brute-force security alerts recorded at or before this instant are dismissed.'),
   "fallbackNotificationInbox": zod.string().nullish().describe('Fallback email address for portal message notifications when the assigned rep has no valid email.'),
+  "customerEmailSenderUserId": zod.string().nullish().describe('Active company staff member whose connected Gmail sends unassigned customer email and portal sign-in codes.'),
   "googleReviews": zod.union([zod.object({
   "placeId": zod.string().optional().describe('Google Place ID for the business listing (e.g. ChIJ...).'),
   "apiKey": zod.string().optional().describe('Google Places API key with Places Details access.')
@@ -2794,8 +2799,10 @@ export const GetInspectionAvailabilityResponse = zod.object({
  * @summary Active outbound email provider and sending account
  */
 export const GetEmailProviderStatusResponse = zod.object({
-  "provider": zod.enum(['gmail', 'resend', 'mock']),
-  "senderEmail": zod.string().nullish().describe('Account\/address automation emails are sent from (Gmail account for gmail, from-address for resend).'),
+  "provider": zod.enum(['gmail', 'disabled']),
+  "senderEmail": zod.string().nullish().describe('Gmail address explicitly designated for unassigned customer email and portal sign-in codes. Assigned leads use their assigned member\'s Gmail.'),
+  "senderUserId": zod.string().nullish().describe('Explicit company default sender, if configured.'),
+  "reason": zod.string().nullish().describe('Why the default customer sender is unavailable.'),
   "recentSendFailures": zod.int().optional().describe('Number of consecutive failed send_email automation results, newest first, until the last successful send. 0 when the latest send succeeded or no sends were attempted.'),
   "lastSendFailureAt": zod.string().nullish().describe('When the most recent failed send_email attempt happened (ISO timestamp), if any.'),
   "lastSendFailureDetail": zod.string().nullish().describe('Error detail recorded for the most recent failed send_email attempt, if any.')

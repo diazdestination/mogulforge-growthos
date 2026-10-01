@@ -30,6 +30,13 @@ export interface OrgSettingsInput {
   securityAlertsAcknowledgedAt?: string;
   /** Fallback email address for portal message notifications when the assigned rep has no valid email. */
   fallbackNotificationInbox?: string | null;
+  /**
+     * Explicit company default Gmail sender; null removes it. Must be an active company member authorized to send and connected with gmail.send.
+     * @minLength 1
+     * @maxLength 255
+     * @nullable
+     */
+  customerEmailSenderUserId?: string | null;
   googleReviews?: GoogleReviewsConfig;
   widget?: WidgetSettings;
   concierge?: ConciergeSettings;
