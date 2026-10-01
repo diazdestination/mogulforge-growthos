@@ -5,7 +5,7 @@ const env = {
   FLY_APP_NAME: "mogulforge-growthos-staging",
   APP_ORIGIN: "https://mogulforge-growthos-staging.fly.dev",
   DATABASE_URL:
-    "postgresql://growthos-staging-live:private-value@pgbouncer.example.test/growthos_staging",
+    "postgresql://growthos-staging-live:private-value@pgbouncer.zp2wjrejd2zodn4q.flympg.net/growthos_staging",
 };
 const correct = () => ({
   query: vi.fn(async () => ({
@@ -34,6 +34,14 @@ describe("staging startup database identity", () => {
       assertStagingDatabaseIdentity(client, {
         ...env,
         DATABASE_URL: env.DATABASE_URL.replace("growthos_staging", "fly-db"),
+      }),
+    ).rejects.toThrow("required database");
+    expect(client.query).not.toHaveBeenCalled();
+
+    await expect(
+      assertStagingDatabaseIdentity(client, {
+        ...env,
+        DATABASE_URL: env.DATABASE_URL.replace("zp2wjrejd2zodn4q", "kzpwm0j18eg04nv3"),
       }),
     ).rejects.toThrow("required database");
     expect(client.query).not.toHaveBeenCalled();

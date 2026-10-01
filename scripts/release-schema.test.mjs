@@ -33,7 +33,7 @@ describe("staging release schema gate", () => {
     FLY_APP_NAME: "mogulforge-growthos-staging",
     APP_ORIGIN: "https://mogulforge-growthos-staging.fly.dev",
     DATABASE_URL:
-      "postgresql://growthos-staging-live:private-value@pgbouncer.example.test/growthos_staging",
+      "postgresql://growthos-staging-live:private-value@pgbouncer.zp2wjrejd2zodn4q.flympg.net/growthos_staging",
     GROWTHOS_OUTBOUND_HOLD: "true",
   };
 
@@ -52,6 +52,13 @@ describe("staging release schema gate", () => {
         ...env,
         STAGING_SCHEMA_PUSH_APPROVED: "true",
         DATABASE_URL: env.DATABASE_URL.replace("growthos_staging", "fly-db"),
+      }),
+    ).toThrow("staging_database_target_mismatch");
+    expect(() =>
+      assertStagingSchemaPushGate({
+        ...env,
+        STAGING_SCHEMA_PUSH_APPROVED: "true",
+        DATABASE_URL: env.DATABASE_URL.replace("zp2wjrejd2zodn4q", "kzpwm0j18eg04nv3"),
       }),
     ).toThrow("staging_database_target_mismatch");
     expect(() =>

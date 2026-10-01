@@ -4,6 +4,8 @@ type Queryable = {
   }>;
 };
 
+const STAGING_HOST = "pgbouncer.zp2wjrejd2zodn4q.flympg.net";
+
 /** Refuse to boot staging against the production database before any seeding. */
 export async function assertStagingDatabaseIdentity(
   client: Queryable,
@@ -22,8 +24,10 @@ export async function assertStagingDatabaseIdentity(
     throw new Error("Staging database URL is invalid");
   }
   if (
+    !["postgres:", "postgresql:"].includes(url.protocol) ||
     decodeURIComponent(url.pathname.slice(1)) !== "growthos_staging" ||
-    decodeURIComponent(url.username) !== "growthos-staging-live"
+    decodeURIComponent(url.username) !== "growthos-staging-live" ||
+    url.hostname !== STAGING_HOST
   )
     throw new Error("Staging database target does not match the required database");
   const { rows } = await client.query(

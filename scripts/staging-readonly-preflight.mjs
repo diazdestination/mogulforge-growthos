@@ -5,6 +5,9 @@ import { resolve } from "node:path";
 const STAGING_APP = "mogulforge-growthos-staging";
 const STAGING_DATABASE = "growthos_staging";
 const STAGING_LOGIN = "growthos-staging-live";
+// The owner-approved, separate Managed Postgres cluster. The previous shared
+// production/staging cluster must never satisfy this preflight again.
+const STAGING_HOST = "pgbouncer.zp2wjrejd2zodn4q.flympg.net";
 
 /** Return only non-secret connection identity. Never log the full URL. */
 export function parseStagingTarget(connectionString, appName) {
@@ -18,7 +21,12 @@ export function parseStagingTarget(connectionString, appName) {
   }
   const database = decodeURIComponent(url.pathname.slice(1));
   const login = decodeURIComponent(url.username);
-  if (database !== STAGING_DATABASE || login !== STAGING_LOGIN)
+  if (
+    !["postgres:", "postgresql:"].includes(url.protocol) ||
+    database !== STAGING_DATABASE ||
+    login !== STAGING_LOGIN ||
+    url.hostname !== STAGING_HOST
+  )
     throw new Error("staging_database_target_mismatch");
   return { database, login, host: url.hostname, port: url.port || "default" };
 }
