@@ -16,6 +16,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { expect, it } from "vitest";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+import { getSchedulerHealth } from "./scheduler-runtime";
 
 const api = fileURLToPath(new URL("../../", import.meta.url));
 const require = createRequire(import.meta.url);
@@ -198,6 +199,13 @@ it("restarts after a real worker crash without repeating its committed effect an
       .where(eq(actions.id, waiting.id));
     expect(failed.status).toBe("failed");
     expect(done.status).toBe("done");
+    // A crash-held effect must be visible through the same aggregate used by
+    // platform operations, without requiring operators to inspect raw tables
+    // or exposing the synthetic task title in the health response.
+    const health = await getSchedulerHealth();
+    expect(health.queue.failed).toBeGreaterThanOrEqual(1);
+    expect(health.executionsNeedingReview).toBeGreaterThanOrEqual(1);
+    expect(JSON.stringify(health)).not.toContain(name);
   } finally {
     for (const child of children) {
       if (child.exitCode === null && child.signalCode === null)

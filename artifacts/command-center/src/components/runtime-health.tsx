@@ -149,12 +149,47 @@ export function RuntimeHealthPanel() {
               </div>
             ))}
           </dl>
-          {data.executionsNeedingReview > 0 && (
-            <p role="alert" className="text-sm">
-              An action may already have happened. Use Client operations below
-              to identify the workspace, then review its execution evidence in
-              Revenue Desk. Do not send again until the result is reconciled.
-            </p>
+          {(data.executionsNeedingReview > 0 ||
+            data.queue.failed > 0 ||
+            data.failedWebhookDeliveries > 0) && (
+            <div
+              role="alert"
+              className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
+            >
+              <p className="font-medium">
+                Background work needs operator review
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                {data.executionsNeedingReview > 0 && (
+                  <li>
+                    {data.executionsNeedingReview} execution receipt(s) have an
+                    uncertain result. An action may already have happened. Use
+                    Client operations below to identify the workspace, then
+                    review its execution evidence in Revenue Desk.
+                  </li>
+                )}
+                {data.queue.failed > 0 && (
+                  <li>
+                    {data.queue.failed} scheduled action record(s) are failed.
+                    Review the owning client&apos;s automation and execution
+                    evidence before creating replacement work.
+                  </li>
+                )}
+                {data.failedWebhookDeliveries > 0 && (
+                  <li>
+                    {data.failedWebhookDeliveries} webhook delivery record(s)
+                    are failed or have an unconfirmed outcome. Review the
+                    destination and original delivery before creating another
+                    event.
+                  </li>
+                )}
+              </ul>
+              <p className="mt-2">
+                Counts include historical records, not necessarily a current
+                outage. Do not send again until uncertain results are
+                reconciled.
+              </p>
+            </div>
           )}
           <div className="grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
             <p>Last progress: {displayTime(data.heartbeatAt)}</p>

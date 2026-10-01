@@ -45,6 +45,7 @@ it("shows fresh progress separately from business outcomes and delivery proof", 
     screen.getByText("Runtime health is not delivery proof."),
   ).toBeTruthy();
   expect(screen.getByText("Due scheduled actions")).toBeTruthy();
+  expect(screen.queryByRole("alert")).toBeNull();
 });
 it("does not request global runtime health for an ordinary organization owner", async () => {
   const calls = setup(false);
@@ -79,6 +80,27 @@ it("shows execution reconciliation guidance without offering a blind retry", asy
   renderWithQuery(<RuntimeHealthPanel />);
   await screen.findByText("Background work needs attention");
   expect(screen.getByRole("alert").textContent).toContain("Do not send again");
+  expect(screen.queryByRole("button", { name: /retry|send/i })).toBeNull();
+});
+it("warns an operator about failed scheduled and webhook work even with a healthy worker", async () => {
+  setup(true, () =>
+    reply(
+      health({
+        queue: { pending: 0, due: 0, failed: 2, oldestDueAt: null },
+        failedWebhookDeliveries: 1,
+      }),
+    ),
+  );
+  renderWithQuery(<RuntimeHealthPanel />);
+  await screen.findByText("Background work is current");
+  const alert = screen.getByRole("alert");
+  expect(alert.textContent).toContain(
+    "2 scheduled action record(s) are failed",
+  );
+  expect(alert.textContent).toContain("1 webhook delivery record(s)");
+  expect(alert.textContent).toContain("unconfirmed outcome");
+  expect(alert.textContent).toContain("historical records");
+  expect(alert.textContent).toContain("Do not send again");
   expect(screen.queryByRole("button", { name: /retry|send/i })).toBeNull();
 });
 it("hides a previously healthy snapshot after a refresh fails", async () => {
