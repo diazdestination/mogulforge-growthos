@@ -2,7 +2,59 @@
 
 Source review: 2026-10-01. Owner: product owner plus assigned engineering/operator reviewer.
 
-**Status: plan only; P0-7 remains open.** This document implements no export, offboarding, deletion, retention policy, or legal disclosure. It authorizes no purge, provider change, or customer communication. The [P0-7 gate](PAID-BETA-READINESS-P0.md#p0-7--finish-trust-privacy-and-customer-data-lifecycle) requires behavior that is defined, tested, supportable, and accurately disclosed before external paid beta.
+**Status: bounded database-count preview implemented; P0-7 remains open.** No complete inventory, export, offboarding, deletion, retention policy, or legal disclosure is implemented by this work. It authorizes no purge, provider change, or customer communication. The [P0-7 gate](PAID-BETA-READINESS-P0.md#p0-7--finish-trust-privacy-and-customer-data-lifecycle) requires behavior that is defined, tested, supportable, and accurately disclosed before external paid beta.
+
+## Bounded count preview — October 1 source follow-up
+
+An owner/admin can manually use **Settings → Data & privacy → Check data inventory**.
+The session-only `GET /api/v1/data-lifecycle/inventory` takes the organization from
+current membership. API keys, query selectors and body selectors are rejected;
+a platform-admin flag does not select another company. No data is changed, sent,
+decrypted or exported. The screen does not fetch automatically or retain results
+across account changes, and never totals table rows as a customer count.
+
+The explicit catalog classifies all 95 source tables. Live database relation
+kinds, columns/types/nullability, primary/foreign keys and row-level security must
+match before counting; unknown/missing/drifted relations return a blocked result
+without counts. This does not certify defaults, indexes, triggers or record-level
+relationship consistency. Counts use a dedicated `REPEATABLE READ READ ONLY`
+transaction, with at most 10,001 matching rows scanned per table to show a capped
+10,000 lower bound. The inventory query work has a 12-second budget, a five-second
+statement timeout and bounded connection cleanup. Session/current-membership
+authentication has a separate dedicated read-only connection with a two-second
+budget, one-second connection/statement limits, 250 ms cleanup and at most four
+occupied slots. Failed cleanup keeps its slot unavailable rather than leaking
+unlimited replacement clients. No authentication jobs use the shared app pool.
+The UI has a separate 20-second request/body deadline.
+
+The checked-in Docker parity fixture's exact `public.pg_stat_monitor` view is a
+separate, optional metadata-only contract: owner `fly_provider`, reviewed two-column
+shape and normalized view definition must all match. Its records are never read,
+and its fixed contract identifier appears separately in coverage. Arbitrary views,
+same-name drift and other `pg_stat_*` names still block counts. This synthetic
+exception does not establish the shape of actual hosted provider extensions.
+A separate `fly_mpg_pg_stat_monitor_2_3_v1` contract pins the real staging view's
+read-only metadata observed on October 1: extension membership/version 2.3,
+owner `postgres`, 65-column shape, view definition, no primary/foreign keys and
+no RLS. Only that exact optional view is excluded; variant versions or changed
+definitions still block the preview. No monitoring rows or query-statistics
+contents are read. This metadata observation is not a deployed endpoint test.
+
+Direct organization selectors and one reviewed identity-token-to-user join are
+included. Shared sessions, scheduler runtime and rate-limit counters are excluded
+without counting their rows. Authentication on this exact GET/HEAD route reads
+only the session's user projection and expiry: it does not refresh OAuth tokens,
+delete stale sessions or clear cookies. Expired sessions require ordinary sign-in.
+
+Every result explicitly has `complete: false`, `exportReady: false`, and
+`deletionReady: false`. JSON/text references, historical identity ownership,
+unowned/shared/orphaned media and external bytes, provider copies, backups,
+retention, revocation and deletion ordering remain unresolved. There are no export
+or deletion controls. This is only a bounded portion of step 2 below, not its
+completion. Synthetic local tests cover two-company isolation, actual read-only
+transactions, schema drift, exact role/key boundaries and credential/content
+canaries. Hosted acceptance requires the exact new source release; the earlier
+77f6d63 staging deployment does not contain this follow-up.
 
 ## 1. What exists, and what it does not prove
 
@@ -33,7 +85,8 @@ Until these decisions and the tested workflow exist, accept and track a request 
 
 ## 3. Proposed operator workflow and engineering deliverables
 
-Each stage below is **to be built and accepted**, not an instruction to run SQL now.
+Each complete stage below is **still to be built and accepted**; the limited count
+preview above advances only part of step 2. This is not an instruction to run SQL now.
 
 1. **Verify and scope.** Create a restricted request record with a random request ID. Verify the requester through an established account channel and current owner/authorized representative relationship; a matching email, API key, forwarded message, or platform-admin session alone is insufficient. Resolve the exact organization and request type. For a person's request, determine their records within that org; never expand by email across tenants. Record verification outcome, not passwords, tokens, or unnecessary identity documents.
 

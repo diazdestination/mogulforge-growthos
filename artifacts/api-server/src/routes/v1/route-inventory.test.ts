@@ -225,6 +225,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   // read-only effective availability; needed by anyone booking appointments
   "GET /settings/inspection-availability": "crm.read",
   "GET /settings/email-provider": "settings.manage",
+  "GET /data-lifecycle/inventory": "settings.manage",
   "GET /settings/sms-provider": "settings.manage",
   "GET /communications/sms": "crm.read",
   "GET /communications/voice": "crm.read",

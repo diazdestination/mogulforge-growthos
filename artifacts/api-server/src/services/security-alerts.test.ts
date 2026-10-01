@@ -15,6 +15,7 @@ import {
 import { eq } from "drizzle-orm";
 import {
   afterAll,
+  afterEach,
   beforeEach,
   beforeAll,
   describe,
@@ -24,10 +25,13 @@ import {
 } from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+import { logger } from "../lib/logger";
+import { ResendSendError } from "./resend-delivery";
 
 process.env.SESSION_SECRET ??= "test-session-secret";
 
 const sent: { to: string; subject: string; body: string }[] = [];
+let sendFailure: unknown;
 
 vi.mock("./providers", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./providers")>();
@@ -36,6 +40,7 @@ vi.mock("./providers", async (importOriginal) => {
     transactionalEmailProvider: {
       send: async (to: string, subject: string, body: string) => {
         sent.push({ to, subject, body });
+        if (sendFailure !== undefined) throw sendFailure;
         return { id: "mock", provider: "mock" };
       },
     },
@@ -113,6 +118,79 @@ afterAll(async () => {
 
 beforeEach(() => {
   sent.length = 0;
+  sendFailure = undefined;
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("security alert email failures", () => {
+  it.each([
+    ["api_key", "raw"],
+    ["login", "raw"],
+    ["api_key", "Resend"],
+    ["login", "Resend"],
+  ] as const)(
+    "redacts %s %s failures without replaying recipients",
+    async (context, failureKind) => {
+      const privateDetails = `${adminEmail} ${ownerEmail} token=private-token re_private-key private message body`;
+      const rawError = new Error(privateDetails, {
+        cause: { body: privateDetails },
+      });
+      rawError.name = privateDetails;
+      sendFailure =
+        failureKind === "Resend"
+          ? new ResendSendError("unknown", 503)
+          : rawError;
+      const log = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const report =
+        context === "api_key"
+          ? reportApiKeyBruteForceBlock
+          : reportCallbackBruteForceBlock;
+      await expect(
+        report({ ip: "203.0.113.99", windowMs: 900_000, maxFailures: 10 }),
+      ).resolves.toBeUndefined();
+      expect(
+        sent
+          .filter((value) => ourEmails.has(value.to))
+          .map((value) => value.to)
+          .sort(),
+      ).toEqual([adminEmail, ownerEmail].sort());
+      const ownLogs = log.mock.calls.filter(
+        ([entry]) =>
+          typeof entry === "object" &&
+          entry !== null &&
+          "organizationId" in entry &&
+          entry.organizationId === orgId,
+      );
+      expect(ownLogs).toHaveLength(2);
+      for (const [entry, message] of ownLogs) {
+        expect(entry).toEqual({
+          organizationId: orgId,
+          context,
+          errorCode:
+            failureKind === "Resend"
+              ? "resend_send_outcome_unknown"
+              : "security_alert_email_unconfirmed",
+          outcome: "unknown",
+          httpStatus: failureKind === "Resend" ? 503 : undefined,
+        });
+        expect(message).toMatch(
+          /not confirmed; check delivery before another send/,
+        );
+      }
+      const exposed = JSON.stringify(log.mock.calls);
+      for (const privateValue of [
+        adminEmail,
+        ownerEmail,
+        "private-token",
+        "re_private-key",
+        "private message body",
+      ])
+        expect(exposed).not.toContain(privateValue);
+    },
+  );
 });
 
 describe("brute-force block emails org admins", () => {

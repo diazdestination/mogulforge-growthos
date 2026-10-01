@@ -1,5 +1,6 @@
 import { twilioForOrganization, type SmsSendContext } from "./twilio-controls";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
+import { sendResendEmail } from "./resend-delivery";
 import type { CustomerEmailContext } from "./customer-email";
 /**
  * Provider adapters. Mocks are clearly labeled and used only when real
@@ -211,27 +212,14 @@ export const resendEmailProvider: EmailProvider = {
     assertOutboundDeliveryAllowed({ channel: "email", recipient: to });
     if (!isSafeMailbox(to))
       throw new Error("Refusing to send email: invalid recipient address");
-    const apiKey = process.env.RESEND_API_KEY;
+    const apiKey = process.env.RESEND_API_KEY?.trim();
     const from = process.env.RESEND_FROM_EMAIL?.trim();
     if (!apiKey || !from) {
       throw new Error(
         "Transactional email is not configured (RESEND_API_KEY / RESEND_FROM_EMAIL)",
       );
     }
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ from, to: [to], subject, text: body }),
-    });
-    if (!res.ok) {
-      throw new Error(`Resend send failed: ${res.status} ${await res.text()}`);
-    }
-    const data = (await res.json()) as { id?: string };
-    if (!data.id) throw new Error("Resend returned no message id");
-    return { id: data.id, provider: "resend" };
+    return sendResendEmail({ apiKey, from, to, subject, text: body });
   },
 };
 export const mockWeatherProvider: WeatherProvider = {

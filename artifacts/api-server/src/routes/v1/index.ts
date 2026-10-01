@@ -45,6 +45,7 @@ import microsoftIntegrationsRouter from "./microsoft-integrations";
 import staffPushRouter from "./staff-push";
 import emailIntelligenceRouter from "./email-intelligence";
 import serviceObligationsRouter from "./service-obligations";
+import dataLifecycleInventoryRouter from "./data-lifecycle-inventory";
 
 const router: IRouter = Router();
 
@@ -70,6 +71,7 @@ router.use(dashboardRouter);
 router.use(reportsRouter);
 router.use(assistantRouter);
 router.use(settingsRouter);
+router.use(dataLifecycleInventoryRouter);
 router.use(twilioRouter);
 router.use(twilioVoiceRouter);
 router.use(apiKeysRouter);

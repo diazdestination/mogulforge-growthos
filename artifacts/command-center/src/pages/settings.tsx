@@ -2,6 +2,7 @@ import { SmsDesk } from '@/components/sms-desk';
 import { VoiceDesk } from '@/components/voice-desk';
 import { CustomerEmailSender } from '@/components/customer-email-sender';
 import { LeadAlertRouting } from '@/components/lead-alert-routing';
+import { DataLifecycleInventory } from '@/components/data-lifecycle-inventory';
 import { useEffect, useRef, useState } from 'react';
 import {
   useGetMe,
@@ -63,7 +64,6 @@ import {
   type UserRole,
   expireWebhookPreviousSecret as expireWebhookPreviousSecretRequest,
   updateUser as updateUserRequest,
-  resendInvite as resendInviteRequest,
   ApiError,
   type UpdateUserInput,
   type GoogleReviewsConfig,
@@ -1125,6 +1125,7 @@ export default function Settings() {
             <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
             <TabsTrigger value="tags">Tags</TabsTrigger>
             <TabsTrigger value="reviews">Google Reviews</TabsTrigger>
+            <TabsTrigger value="data-privacy">Data & privacy</TabsTrigger>
           </TabsList>
           <TabsContent value="business" className="space-y-6"><BusinessProfileTab /><FallbackInboxTab /></TabsContent>
           <TabsContent value="integrations"><EmailConnectionsCard callbackState={gmailReturn} returnPath="/settings" /></TabsContent>
@@ -1142,6 +1143,10 @@ export default function Settings() {
           <TabsContent value="knowledge"><KnowledgeTab /></TabsContent>
           <TabsContent value="tags"><TagsTab /></TabsContent>
           <TabsContent value="reviews"><GoogleReviewsTab /></TabsContent>
+          <TabsContent value="data-privacy">{me.organization
+            ? <DataLifecycleInventory accountKey={`${me.id}:${me.organization.id}`} />
+            : <p className="text-sm text-muted-foreground">A company membership is required to check a data inventory.</p>}
+          </TabsContent>
         </Tabs>
       </div>
     </div>
@@ -1340,46 +1345,19 @@ function resendCooldownSeconds(error: unknown): number | null {
 
 function showResendCooldownToast(seconds: number) {
   globalToast({
-    title: 'Invite was just resent',
+    title: 'Resend is temporarily limited',
     description:
       seconds > 1
-        ? `To avoid spamming their inbox, you can resend again in about ${seconds} seconds.`
-        : 'To avoid spamming their inbox, you can resend again in a moment.',
+        ? `Wait about ${seconds} seconds, then check the previous email's delivery status before another attempt.`
+        : "Check the previous email's delivery status before another attempt.",
   });
 }
 
-function showResendInviteFailedToast(userId: string, queryClient: QueryClient, error?: string) {
-  const { dismiss } = globalToast({
+function showResendInviteUnconfirmedToast() {
+  globalToast({
     variant: 'destructive',
-    title: 'Could not re-send the invite email',
-    description: `${error || 'Re-sending the invite failed'}. Retry below.`,
-    action: (
-      <ToastAction
-        altText="Retry re-sending the invite"
-        onClick={async () => {
-          try {
-            const result = await resendInviteRequest(userId);
-            if (result.sent) {
-              queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
-              dismiss();
-              globalToast({ title: 'Invite email re-sent' });
-            } else {
-              showResendInviteFailedToast(userId, queryClient, result.error || undefined);
-            }
-          } catch (e) {
-            const cooldown = resendCooldownSeconds(e);
-            if (cooldown !== null) {
-              dismiss();
-              showResendCooldownToast(cooldown);
-            } else {
-              showResendInviteFailedToast(userId, queryClient);
-            }
-          }
-        }}
-      >
-        Retry
-      </ToastAction>
-    ),
+    title: 'Invite email outcome unconfirmed',
+    description: 'The email may already have been accepted. Ask an administrator to check provider delivery records before sending another invitation.',
   });
 }
 
@@ -1392,17 +1370,17 @@ function TeamTab({ meId, meRole }: { meId: string; meRole: UserRole }) {
     mutation: {
       onSuccess: (member) => {
         void invalidate();
-        if (member.inviteEmail?.sent) {
-          toast({ title: 'Invite sent — we emailed them a sign-in link' });
+        if (member.inviteEmail?.sent === true) {
+          toast({ title: 'Invitation email accepted for sending', description: 'Inbox delivery is not yet confirmed.' });
         } else {
           toast({
-            title: 'Invite created, but the email failed to send',
-            description: `${member.inviteEmail?.error || 'Email could not be delivered'}. The invitee cannot activate yet; use Resend email after delivery is restored.`,
+            title: 'Invite created; email outcome unconfirmed',
+            description: 'The email may already have been accepted. Check provider delivery records before sending another invitation.',
             variant: 'destructive',
           });
         }
       },
-      onError: (e) => toast({ title: (e as Error)?.message || 'Could not invite member', variant: 'destructive' }),
+      onError: () => toast({ title: 'Invitation request unconfirmed', description: 'Check the team list and provider delivery records before another attempt.', variant: 'destructive' }),
     },
   });
   const update = useUpdateUser({
@@ -1414,19 +1392,19 @@ function TeamTab({ meId, meRole }: { meId: string; meRole: UserRole }) {
   const [resendingId, setResendingId] = useState<string | null>(null);
   const resend = useResendInvite({
     mutation: {
-      onSuccess: (result, vars) => {
-        if (result.sent) {
-          toast({ title: 'Invite email re-sent' });
+      onSuccess: (result) => {
+        if (result.sent === true) {
+          toast({ title: 'Invitation email accepted for sending', description: 'Inbox delivery is not yet confirmed.' });
         } else {
-          showResendInviteFailedToast(vars.id, queryClient, result.error || undefined);
+          showResendInviteUnconfirmedToast();
         }
       },
-      onError: (e, vars) => {
+      onError: (e) => {
         const cooldown = resendCooldownSeconds(e);
         if (cooldown !== null) {
           showResendCooldownToast(cooldown);
         } else {
-          showResendInviteFailedToast(vars.id, queryClient);
+          showResendInviteUnconfirmedToast();
         }
       },
       onSettled: () => setResendingId(null),

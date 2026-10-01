@@ -8,6 +8,7 @@ import { logger } from "../lib/logger";
 import { isSafeMailbox, transactionalEmailProvider } from "./providers";
 import { getOrgSettings } from "./settings";
 import { createInviteToken } from "./invite-token";
+import { ResendSendError } from "./resend-delivery";
 
 /**
  * Absolute URL of the CRM app the invitee should sign in to.
@@ -90,10 +91,20 @@ export async function sendInviteEmail(params: {
     );
     return { sent: true, error: null };
   } catch (err) {
-    logger.error({ err }, "invite: failed to send invite email");
+    const failure = err instanceof ResendSendError ? err : undefined;
+    logger.error(
+      {
+        errorCode: failure?.code ?? "invite_email_unconfirmed",
+        outcome: failure?.outcome ?? "unknown",
+        httpStatus: failure?.httpStatus,
+      },
+      "invite: email delivery was not confirmed",
+    );
     return {
       sent: false,
-      error: err instanceof Error ? err.message : "Failed to send invite email",
+      error:
+        failure?.message ??
+        "Invitation email was not confirmed. Ask an administrator to check email configuration and delivery status before sending again.",
     };
   }
 }

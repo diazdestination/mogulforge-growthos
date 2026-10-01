@@ -2,8 +2,9 @@
 
 Customer messages require a specific active staff member's selected Gmail or
 Microsoft 365 / Outlook connection within the same organization. Microsoft
-support is part of the October 1 source candidate, not proof of deployed or
-provider-connected support. See `MOBILE-EMAIL-PILOT.md` for rollout requirements.
+support was deployed to isolated, outbound-held staging in source 77f6d63 on
+October 1. That release is not proof of a connected mailbox or live delivery.
+See `MOBILE-EMAIL-PILOT.md` for rollout requirements.
 Platform account email uses MogulForge's separate
 transactional Resend sender. A global Replit Gmail connection and platform Resend
 credentials do not enable contractor messages.
@@ -62,6 +63,51 @@ acceptance is not proof of delivery. Existing automation/notification failure
 surfaces and connection errors remain authoritative when a send is blocked.
 
 ## Controlled acceptance
+
+### Transactional transport safety — source follow-up after 77f6d63
+
+The platform Resend adapter keeps the outbound hold, exact-recipient allowlist
+and sender/configuration checks ahead of network dispatch. Its request and full
+receipt share a ten-second deadline. Redirects are refused; receipts are capped
+at 16 KiB and require a valid UUID message ID. Only fixed redacted error categories
+and numeric HTTP status escape the transport boundary, including invitation
+errors/logs. Provider error bodies, auth links and recipient details are not
+included in these errors.
+
+A successful receipt means **provider accepted**, not delivered. Timeouts,
+connection failures, conflicts, server errors and invalid/missing receipts mean
+**outcome unknown**. There is no automatic retry, fallback sender or fresh
+per-attempt idempotency key. Reconcile with provider records before another send;
+the current interface has no durable logical-event key for safe replay.
+
+Invitation screens now describe successful transport as accepted for sending,
+not inbox delivery. An unconfirmed response or lost request requires review of
+the team list and provider records; it no longer presents an immediate Retry
+toast or claims the recipient cannot activate. The legacy `sent` response field
+still reports provider acceptance, not independent delivery evidence.
+
+API-key expiry reminders retain their atomic claim after any attempted provider
+send, including rejected, partial or uncertain outcomes. Only a proven
+pre-dispatch no-attempt state may release it for a later scheduled check.
+`expiryReminderSentAt` is therefore a legacy-named claim, not delivery proof.
+The existing audit log records `api_key.expiry_reminder.processed` with safe
+outcome/counts, `automaticRetry: false`, and `deliveryVerified: false`; uncertain
+outcomes require reconciliation. Review those counts before any new operator
+send. No per-recipient replay/reconciliation UI or delivery ledger is added by
+this fix. Related security-alert logging also omits raw errors and addresses.
+An audit-write failure preserves the attempted claim, emits sanitized failure
+evidence and allows remaining claimed keys to continue. Saving a key with an
+unchanged expiry preserves that claim atomically; only a true expiry change
+permits a new reminder for the new date.
+
+This narrow hardening does not add a durable platform-email delivery ledger.
+The existing Resend callback correlates supported playbook touches, not all
+verification/reset/invitation flows. Full signed callback correlation, suppression
+handling and end-to-end platform email acceptance remain required; domain/key
+presence alone cannot close them. The follow-up is not in the deployed 77f6d63
+image until separately released and verified.
+
+### Supervised test sequence
 
 1. Apply the reviewed additive schema to isolated staging with the outbound hold
    active. Connect two authorized test users in two distinct test companies using

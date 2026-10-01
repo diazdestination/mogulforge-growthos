@@ -1,6 +1,7 @@
 import type { AuthUser } from '@workspace/api-zod';
 import { type NextFunction, type Request, type Response } from 'express';
 import * as oidc from 'openid-client';
+import { isDataLifecycleInventoryRead } from '../services/data-lifecycle-inventory-session';
 
 import {
   clearSession,
@@ -64,6 +65,13 @@ export async function authMiddleware(
   // Keep the initializer above and every protected route's behavior intact.
   if ((req.method === 'GET' || req.method === 'HEAD') &&
       /^\/api\/(healthz|readyz)\/?$/i.test(req.path)) {
+    next();
+    return;
+  }
+
+  // This exact read surface authenticates through its bounded read-only guard.
+  // It must not use shared-pool session jobs, refresh tokens or clean sessions.
+  if (isDataLifecycleInventoryRead(req)) {
     next();
     return;
   }

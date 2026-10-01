@@ -6,6 +6,25 @@ import { logger } from "../lib/logger";
 import { orgAdminEmails } from "./api-key-expiry-reminder";
 import { recordAudit } from "./audit";
 import { transactionalEmailProvider } from "./providers";
+import { ResendSendError } from "./resend-delivery";
+
+function reportAlertEmailFailure(
+  organizationId: string,
+  context: "api_key" | "login",
+  error: unknown,
+): void {
+  const failure = error instanceof ResendSendError ? error : undefined;
+  logger.error(
+    {
+      organizationId,
+      context,
+      errorCode: failure?.code ?? "security_alert_email_unconfirmed",
+      outcome: failure?.outcome ?? "unknown",
+      httpStatus: failure?.httpStatus,
+    },
+    "security alert: email delivery was not confirmed; check delivery before another send",
+  );
+}
 
 /** Email every active owner/admin of an org about the blocked attack. */
 async function emailOrgAdmins(
@@ -36,10 +55,7 @@ async function emailOrgAdmins(
       await transactionalEmailProvider.send(to, subject, body);
     } catch (err) {
       // One bad mailbox must not block the remaining admins.
-      logger.error(
-        { err, to, organizationId },
-        "brute-force alert: send failed",
-      );
+      reportAlertEmailFailure(organizationId, "api_key", err);
     }
   }
 }
@@ -84,11 +100,8 @@ export async function reportCallbackBruteForceBlock(params: {
         await emailOrgAdminsLoginBlock(o.organizationId, params);
       }),
     );
-  } catch (err) {
-    console.error(
-      "[security] failed to record login brute-force audit event",
-      err,
-    );
+  } catch {
+    console.error("[security] failed to record login brute-force audit event");
   }
 }
 
@@ -121,10 +134,7 @@ async function emailOrgAdminsLoginBlock(
       await transactionalEmailProvider.send(to, subject, body);
     } catch (err) {
       // One bad mailbox must not block the remaining admins.
-      logger.error(
-        { err, to, organizationId },
-        "login brute-force alert: send failed",
-      );
+      reportAlertEmailFailure(organizationId, "login", err);
     }
   }
 }
@@ -168,10 +178,9 @@ export async function reportApiKeyBruteForceBlock(params: {
         await emailOrgAdmins(o.organizationId, params);
       }),
     );
-  } catch (err) {
+  } catch {
     console.error(
       "[security] failed to record API-key brute-force audit event",
-      err,
     );
   }
 }

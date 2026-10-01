@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import { apiKeysTable, db, usersTable, type ApiKey, type UserRole } from "@workspace/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 export function hashApiKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
@@ -59,11 +59,19 @@ export async function updateApiKey(
   if (changes.expiresAt !== undefined) set.expiresAt = changes.expiresAt;
   const [after] = await db
     .update(apiKeysTable)
-    // A changed expiry deserves a fresh pre-expiry reminder: clearing the
-    // sent marker lets the scheduler warn once about the new date.
+    // Compare the currently stored expiry inside the UPDATE, not the earlier
+    // read: a rename/same-expiry save must preserve a concurrent or uncertain
+    // reminder claim. Only an actual expiry change permits a fresh reminder.
     .set(
       changes.expiresAt !== undefined
-        ? { ...set, expiryReminderSentAt: null }
+        ? {
+            ...set,
+            expiryReminderSentAt: sql<Date | null>`case
+              when ${apiKeysTable.expiresAt} is distinct from ${sql.param(changes.expiresAt, apiKeysTable.expiresAt)}
+              then null
+              else ${apiKeysTable.expiryReminderSentAt}
+            end`,
+          }
         : set,
     )
     .where(
