@@ -1,10 +1,12 @@
 import { createRequire } from "node:module";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import http from "node:http";
 import https from "node:https";
 import { EventEmitter } from "node:events";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { trackPgliteSocketCleanup } from "./test-support/pglite-socket-cleanup.mjs";
 import { RELEASE_SHA, IMAGE_REF } from "./hosted-pilot-drill.mjs";
 import { reviewedSchema } from "./pilot-staging-bootstrap.mjs";
 import { fixtureIds, fixtureRows } from "./restore-drill-fixture.mjs";
@@ -146,18 +148,75 @@ describe("hosted crash probe guards", () => {
       crashFailure({ message: "private", code: "ABCDE" }, "private"),
     ).toMatchObject({ sqlstate: null, phase: "unknown" });
   });
-  it("attests the actual pinned source and rejects any changed uploaded helper", async () => {
+  it("attests actual pinned source before a build without reading an ambient bundle", async () => {
     const root = fileURLToPath(new URL("../", import.meta.url));
+    const bundlePath = fileURLToPath(
+      new URL("../artifacts/api-server/dist/index.mjs", import.meta.url),
+    );
+    // CI runs scripts tests before the API build. Only bundle bytes are supplied
+    // by this reader seam; every pinned source and helper still comes from disk.
+    const bundle = Buffer.from("synthetic-crash-attestation-bundle-v1\n");
+    const bundleSha = createHash("sha256").update(bundle).digest("hex");
+    const actualSourceReads = [];
+    const read = vi.fn(async (path, encoding) => {
+      if (path === bundlePath) return bundle;
+      actualSourceReads.push(path);
+      return readFile(path, encoding);
+    });
+    const pinnedEnv = {
+      ...env,
+      RESTORE_DRILL_EXPECTED_BUNDLE_SHA256: bundleSha,
+    };
+    const evidence = await attestCrashSources(root, pinnedEnv, read);
+    expect(evidence.sourceFileManifestVerified).toBe(true);
+    expect(evidence.apiBundleSha256).toBe(bundleSha);
+    expect(read).toHaveBeenCalledWith(bundlePath);
+    expect(actualSourceReads).not.toContain(bundlePath);
     expect(
-      (await attestCrashSources(root, env)).sourceFileManifestVerified,
+      actualSourceReads.some((path) => path.endsWith("pilot-crash-runtime.ts")),
+    ).toBe(true);
+    expect(
+      actualSourceReads.some((path) => path.endsWith("durable-execution.ts")),
     ).toBe(true);
     await expect(
-      attestCrashSources(root, env, async (path, encoding) =>
+      attestCrashSources(root, pinnedEnv, async (path, encoding) =>
         String(path).endsWith("pilot-crash-runtime.ts")
           ? "modified helper"
-          : readFile(path, encoding),
+          : read(path, encoding),
       ),
     ).rejects.toThrow("pilot_crash_helper_mismatch");
+    await expect(
+      attestCrashSources(root, pinnedEnv, async (path, encoding) =>
+        String(path).endsWith("durable-execution.ts")
+          ? "modified source"
+          : read(path, encoding),
+      ),
+    ).rejects.toThrow("hosted_release_source_mismatch");
+  });
+  it("still requires bundle bytes and rejects a mismatched recorded bundle digest", async () => {
+    const root = fileURLToPath(new URL("../", import.meta.url));
+    const bundlePath = fileURLToPath(
+      new URL("../artifacts/api-server/dist/index.mjs", import.meta.url),
+    );
+    await expect(
+      attestCrashSources(root, env, async (path, encoding) => {
+        if (path === bundlePath)
+          throw Object.assign(new Error("Synthetic missing build artifact"), {
+            code: "ENOENT",
+          });
+        return readFile(path, encoding);
+      }),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(
+      attestCrashSources(
+        root,
+        { ...env, RESTORE_DRILL_EXPECTED_BUNDLE_SHA256: "0".repeat(64) },
+        async (path, encoding) =>
+          path === bundlePath
+            ? Buffer.from("synthetic-crash-attestation-bundle-v1\n")
+            : readFile(path, encoding),
+      ),
+    ).rejects.toThrow("hosted_release_bundle_mismatch");
   });
   it("rejects unsafe configuration before connecting and never starts a worker", async () => {
     const connect = vi.fn(),
@@ -340,8 +399,8 @@ describe("crash SQL and actual durable/scoped runtime on disposable PostgreSQL",
     new URL("../artifacts/api-server/package.json", import.meta.url),
   );
   const { PGlite } = requireApi("@electric-sql/pglite");
-  const { PGLiteSocketServer } = requireApi("@electric-sql/pglite-socket");
-  let database, server, runtime, client;
+  const { PGLiteSocketServer, PGLiteSocketHandler } = requireApi("@electric-sql/pglite-socket");
+  let database, server, runtime, client, socketCleanup;
   const ids = crashIdentity(env.PILOT_CRASH_RUN_NONCE);
   const originalUrl = process.env.DATABASE_URL;
   beforeAll(async () => {
@@ -374,6 +433,7 @@ describe("crash SQL and actual durable/scoped runtime on disposable PostgreSQL",
       port: 0,
       maxConnections: 10,
     });
+    socketCleanup = trackPgliteSocketCleanup(server, PGLiteSocketHandler);
     await server.start();
     process.env.DATABASE_URL = `postgresql://postgres:synthetic@${server.getServerConn()}/postgres`;
     runtime = await loadCrashRuntime(
@@ -407,9 +467,7 @@ describe("crash SQL and actual durable/scoped runtime on disposable PostgreSQL",
     if (originalUrl === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = originalUrl;
     if (runtime) await runtime.dispose();
-    await new Promise((done) => setTimeout(done, 25));
-    if (server) await server.stop();
-    await new Promise((done) => setImmediate(done));
+    if (socketCleanup) await socketCleanup.stop();
     if (database) await database.close();
   });
   it("runs every real safety query and rejects a contactable identity without changing it", async () => {

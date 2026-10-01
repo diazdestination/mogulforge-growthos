@@ -346,6 +346,31 @@ branch head requires its own GitHub CI; the hosted application evidence remains
 explicitly attached to the already-green application candidate, not relabelled
 as a later documentation commit.
 
+## Clean-checkout CI repair
+
+Operations commit `a04865edce448d52766d0dc34b48b3cd070fc9be` failed
+[run 36813523858](https://github.com/diazdestination/mogulforge-growthos/actions/runs/36813523858)
+in the scripts test suite. The crash-attestation test incorrectly read a local
+API build although CI runs tests before building. It now uses deterministic
+synthetic bundle bytes through the existing reader seam while still hashing
+actual pinned source/helper files. Missing-bundle, digest-mismatch and tamper
+rejections remain tested; hosted bundle verification is unchanged.
+
+The same run exposed two unhandled PGlite teardown errors after the real
+scheduler assertions passed: socket detach callbacks accessed the emulator
+after it closed. A shared disposable-test adapter now tracks and awaits each
+actual detach promise before database close and rethrows any rejection from
+awaited teardown. Regression coverage includes a disconnected client with a
+deliberately pending transaction rollback, repeated close events, failures and
+timeouts. The previous fixed-delay crash-test workaround is removed.
+The repaired local scripts suite passed **212/212 across 14 files** with no
+unhandled errors, including the real 60-second scheduler interval. Full
+workspace TypeScript checks and independent focused review also passed.
+The application, hosted harness guards and immutable staging image are not
+changed by these test repairs. The repaired head still requires its own fully
+green CI before sign-off; the prior hosted application acceptance is not
+relabelled as acceptance of a later Git commit.
+
 ## Remaining live acceptance gates
 
 1. Keep exact-head CI green for subsequent operator-harness/document commits.

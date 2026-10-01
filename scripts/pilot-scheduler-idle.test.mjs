@@ -8,6 +8,7 @@ import https from "node:https";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { reviewedSchema } from "./pilot-staging-bootstrap.mjs";
 import { fixtureIds, fixtureRows } from "./restore-drill-fixture.mjs";
+import { trackPgliteSocketCleanup } from "./test-support/pglite-socket-cleanup.mjs";
 import { IMAGE_REF, RELEASE_SHA } from "./pilot-scheduler-probe.mjs";
 import { IDLE_INTERLOCK, assertInertDefaults, cleanupIdleRuntime, idleChildEnvironment, idleConfiguration,
   idleFailureEvidence, idlePreflight, loadIdleRuntime, readDefaultSeedSpec, runIdleSupervisor,
@@ -174,8 +175,8 @@ describe("supervisor", () => {
 describe("real schema and source scheduler on disposable local PostgreSQL emulator", () => {
   const requireApi = createRequire(new URL("../artifacts/api-server/package.json", import.meta.url));
   const { PGlite } = requireApi("@electric-sql/pglite");
-  const { PGLiteSocketServer } = requireApi("@electric-sql/pglite-socket");
-  let database, spec;
+  const { PGLiteSocketServer, PGLiteSocketHandler } = requireApi("@electric-sql/pglite-socket");
+  let database, spec, socketCleanup;
   const client = { async query(sql, values) {
     const result = await database.query(sql, values);
     return sql.startsWith("SELECT current_database") ? { rows: [identity] } : result;
@@ -194,7 +195,10 @@ describe("real schema and source scheduler on disposable local PostgreSQL emulat
       for (const row of rows.rules) await insert("automations", row);
     }
   }, 25000);
-  afterAll(async () => { if (database) await database.close(); });
+  afterAll(async () => {
+    if (socketCleanup) await socketCleanup.stop();
+    if (database) await database.close();
+  });
   it("executes the full read-only preflight including known inert boot defaults, without changing tenant data", async () => {
     const before = await tenantFingerprint(client, orgs.map((o) => o.id));
     await expect(idlePreflight(client, spec)).resolves.toMatchObject({ defaultRules: 2, defaultTemplates: 4 });
@@ -228,6 +232,7 @@ describe("real schema and source scheduler on disposable local PostgreSQL emulat
   });
   it("runs the actual full scheduler twice at its real 60-second interval, then stops without changing tenant state", async () => {
     const server = new PGLiteSocketServer({ db: database, host: "127.0.0.1", port: 0, maxConnections: 5 });
+    socketCleanup = trackPgliteSocketCleanup(server, PGLiteSocketHandler);
     const previousEnv = { ...process.env }, previousFetch = globalThis.fetch;
     const original = { httpRequest: http.request, httpGet: http.get, httpsRequest: https.request, httpsGet: https.get };
     let runtime, owner, blocked = 0;
@@ -265,7 +270,7 @@ describe("real schema and source scheduler on disposable local PostgreSQL emulat
       if (runtime) { await runtime.stopAutomationScheduler(); await runtime.dispose(); }
       globalThis.fetch = previousFetch; http.request = original.httpRequest; http.get = original.httpGet; https.request = original.httpsRequest; https.get = original.httpsGet;
       for (const key of Object.keys(process.env)) delete process.env[key]; Object.assign(process.env, previousEnv);
-      await server.stop();
+      await socketCleanup.stop();
       if (owner) await database.query("DELETE FROM scheduler_runtime WHERE name='automation' AND owner_id=$1", [owner]);
     }
   }, 95000);

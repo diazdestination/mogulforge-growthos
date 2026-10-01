@@ -3,13 +3,14 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { reviewedSchema } from "./pilot-staging-bootstrap.mjs";
 import { fixtureRows } from "./restore-drill-fixture.mjs";
+import { trackPgliteSocketCleanup } from "./test-support/pglite-socket-cleanup.mjs";
 import { probeFailureEvidence, probePoolOptions, probePreflight, reserveProbeRuntime } from "./pilot-scheduler-probe.mjs";
 
 const requireApi = createRequire(new URL("../artifacts/api-server/package.json", import.meta.url));
 const { PGlite } = requireApi("@electric-sql/pglite");
-const { PGLiteSocketServer } = requireApi("@electric-sql/pglite-socket");
+const { PGLiteSocketServer, PGLiteSocketHandler } = requireApi("@electric-sql/pglite-socket");
 const { Pool } = requireApi("pg");
-let database;
+let database, socketCleanup;
 beforeAll(async () => {
   database = await PGlite.create();
   await database.exec(await reviewedSchema());
@@ -22,7 +23,10 @@ beforeAll(async () => {
     }
   }
 }, 20000);
-afterAll(async () => { if (database) await database.close(); });
+afterAll(async () => {
+  if (socketCleanup) await socketCleanup.stop();
+  if (database) await database.close();
+});
 
 function fixtureClient({ failQueueSql = false } = {}) {
   return { async query(sql, values) {
@@ -60,6 +64,7 @@ it("reports a real SQL error with only its fixed stage and allowlisted SQLSTATE"
 
 it("reserves the exact synthetic row through node-postgres bindings and a real socket, without replacing collisions", async () => {
   const server = new PGLiteSocketServer({ db: database, host: "127.0.0.1", port: 0, maxConnections: 5 });
+  socketCleanup = trackPgliteSocketCleanup(server, PGLiteSocketHandler);
   let pool, client;
   const name = `pilot-scheduler-probe-${randomUUID()}`, owner = `${name}:reserved`;
   try {
@@ -81,6 +86,6 @@ it("reserves the exact synthetic row through node-postgres bindings and a real s
       client.release(true);
     }
     if (pool) await pool.end();
-    await server.stop();
+    await socketCleanup.stop();
   }
 });
