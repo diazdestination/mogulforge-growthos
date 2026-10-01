@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useGetMe, type UserRole } from "@workspace/api-client-react";
@@ -166,7 +166,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 function Note({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-lg bg-muted/60 p-3 text-xs leading-relaxed text-muted-foreground">
+    <p className="rounded-lg bg-muted/60 p-3 text-xs leading-relaxed text-foreground">
       {children}
     </p>
   );
@@ -228,20 +228,56 @@ export function RevenueWorkspace() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const working = useRef(false);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const stale = desk.isError || refreshFailed;
+  const refreshQueries = async () => {
+    const results = await Promise.allSettled([
+      cache.invalidateQueries(
+        { queryKey: ["revenue"] },
+        { throwOnError: true },
+      ),
+      cache.invalidateQueries({ queryKey: ["bie"] }, { throwOnError: true }),
+    ]);
+    return results.every((result) => result.status === "fulfilled");
+  };
+  const refresh = async () => {
+    if (working.current) return;
+    working.current = true;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const refreshed = await refreshQueries();
+      setRefreshFailed(!refreshed);
+      if (refreshed) setMessage("Workspace refreshed.");
+      else
+        setError(
+          "The workspace could not refresh. Try Refresh workspace again.",
+        );
+    } finally {
+      working.current = false;
+      setBusy(false);
+    }
+  };
   const work = async (
     operation: () => Promise<unknown>,
-    success = "Saved. The workspace has been refreshed.",
+    success = "Action completed.",
   ) => {
+    if (working.current || stale) return;
+    working.current = true;
     setBusy(true);
     setError("");
     setMessage("");
     try {
       await operation();
-      await Promise.all([
-        cache.invalidateQueries({ queryKey: ["revenue"] }),
-        cache.invalidateQueries({ queryKey: ["bie"] }),
-      ]);
       setMessage(success);
+      const refreshed = await refreshQueries();
+      setRefreshFailed(!refreshed);
+      if (!refreshed)
+        setError(
+          "The action completed, but updated data could not be loaded. Refresh the workspace before taking another action.",
+        );
     } catch (e) {
       setError(
         e instanceof Error
@@ -249,10 +285,11 @@ export function RevenueWorkspace() {
           : "The operation could not be completed.",
       );
     } finally {
+      working.current = false;
       setBusy(false);
     }
   };
-  if (desk.isError)
+  if (desk.isError && !desk.data)
     return (
       <section
         className="rounded-xl border border-destructive/30 p-5"
@@ -281,241 +318,252 @@ export function RevenueWorkspace() {
             Your working day, connected.
           </h2>
         </div>
-        <button
-          className={button}
-          disabled={busy}
-          onClick={() => work(() => desk.refetch(), "Workspace refreshed.")}
-        >
+        <button className={button} disabled={busy} onClick={refresh}>
           <RefreshCw className="h-4 w-4" />
           Refresh workspace
         </button>
       </div>
-      <nav aria-label="Revenue Desk views" className="flex flex-wrap gap-2">
-        {[
-          ["today", "Today’s priorities"],
-          ["room", "Customer decision room"],
-          ["value", "Value ledger"],
-          ["growth", "Project stories"],
-          ["profile", "Business knowledge"],
-        ].map(([key, label]) => (
-          <button
-            key={key}
-            aria-pressed={tab === key}
-            className={`${button} ${tab === key ? "border-primary/40 bg-primary/10 text-primary" : ""}`}
-            onClick={() => {
-              setTab(key);
-              setError("");
-              setMessage("");
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-      {error && (
+      {stale && (
         <p
           role="alert"
-          className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive"
+          className="rounded-lg border border-destructive/30 p-3 text-sm"
         >
-          {error}
+          Last loaded data is shown and may be out of date. Actions are paused
+          until Refresh workspace succeeds.
         </p>
       )}
-      {message && (
-        <p
-          role="status"
-          className="rounded-lg border border-emerald-500/30 p-3 text-sm"
-        >
-          {message}
-        </p>
-      )}
-      {tab === "today" && (
-        <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Stat
-              label="Inquiries needing an owner"
-              value={data.followup.summary.unassigned}
-              detail="Smart Site records"
-            />
-            <Stat
-              label="Past first-response target"
-              value={data.followup.summary.overdue}
-              detail="Elapsed internal target, not a promise"
-            />
-            <Stat
-              label="Suggestions to review"
-              value={
-                data.proposals.filter((p) => p.status === "proposed").length
-              }
-              detail="Within the latest 200 proposals"
-            />
-            <Stat
-              label="Execution review"
-              value={
-                data.executions.filter(
-                  (e) =>
-                    e.state === "indeterminate" ||
-                    (e.state === "processing" &&
-                      Date.parse(e.expiresAt) < Date.now()),
-                ).length
-              }
-              detail="Within the latest 100 executions"
-            />
-          </div>
-          <Note>
-            {data.boundary} Recommendations show up to 50 prioritized leads.
-            Financial results and source evidence are available in Value ledger.
-          </Note>
-          {writer && (
+      <fieldset disabled={busy || stale} className="min-w-0 space-y-5">
+        <legend className="sr-only">Revenue Desk controls</legend>
+        <nav aria-label="Revenue Desk views" className="flex flex-wrap gap-2">
+          {[
+            ["today", "Today’s priorities"],
+            ["room", "Customer decision room"],
+            ["value", "Value ledger"],
+            ["growth", "Project stories"],
+            ["profile", "Business knowledge"],
+          ].map(([key, label]) => (
             <button
-              className={button}
-              disabled={busy}
-              onClick={() =>
-                work(
-                  () => revenueRequest("/bie/actions/generate", {}),
-                  "Recovery proposals prepared for review. Nothing was sent.",
-                )
-              }
+              key={key}
+              aria-pressed={tab === key}
+              className={`${button} ${tab === key ? "border-primary/40 bg-primary/10 text-primary" : ""}`}
+              onClick={() => {
+                setTab(key);
+                setError("");
+                setMessage("");
+              }}
             >
-              <Sparkles className="h-4 w-4" />
-              Prepare recovery proposals
+              {label}
             </button>
-          )}
-          {!data.queue.length && (
-            <Note>
-              No current recommendations. New inquiries and eligible follow-ups
-              will appear from your CRM records.
-            </Note>
-          )}
-          <div className="grid gap-3 lg:grid-cols-2">
-            {data.queue.map((item) => {
-              const owner = data.staff.find(
-                (s) => s.id === item.assignedUserId,
-              );
-              const due = data.followup.pending.find(
-                (p) => p.leadId === item.leadId,
-              )?.dueAt;
-              return (
-                <article
-                  aria-label={`Priority for ${item.contactName || "customer"}`}
-                  key={item.leadId}
-                  className="min-w-0 rounded-xl border bg-card p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <Link
-                        className="font-semibold text-primary hover:underline"
-                        href={`/leads/${item.leadId}`}
-                      >
-                        {item.contactName || "Customer inquiry"}
-                      </Link>
-                      <p className="mt-1 text-sm font-medium">{item.title}</p>
-                    </div>
-                    <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  </div>
-                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                    {item.reasons.join(" · ")}
-                  </p>
-                  <p className="mt-3 text-xs">
-                    Owner:{" "}
-                    {owner
-                      ? `${owner.firstName || "Team"} ${owner.lastName || ""}${owner.isActive ? "" : " (inactive)"}`
-                      : "Unassigned"}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Source: {item.source || "Not recorded"} · Received{" "}
-                    {date(item.receivedAt)}
-                  </p>
-                  {due && (
-                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                      First-attempt target: {date(due)}
-                    </p>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {writer && !item.assignedUserId && (
-                      <button
-                        className={button}
-                        disabled={busy}
-                        onClick={() =>
-                          work(
-                            () =>
-                              revenueRequest(
-                                `/revenue/leads/${item.leadId}/claim`,
-                                { confirmed: true },
-                              ),
-                            "You now own this inquiry. No contact attempt was recorded.",
-                          )
-                        }
-                      >
-                        Claim for me
-                      </button>
-                    )}
-                    <Link className={button} href={`/leads/${item.leadId}`}>
-                      Open customer & next step
-                    </Link>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-          <h3 className="text-lg font-semibold">Prepared actions & receipts</h3>
-          {!data.proposals.length && (
-            <Note>
-              No proposals yet. Preparing the queue creates reviewable actions
-              without sending them.
-            </Note>
-          )}
-          <div className="space-y-3">
-            {data.proposals.slice(0, 30).map((p) => (
-              <ProposalCard
-                key={p.id}
-                proposal={p}
-                busy={busy}
-                writer={writer}
-                work={work}
+          ))}
+        </nav>
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg border border-destructive/30 p-3 text-sm text-foreground"
+          >
+            {error}
+          </p>
+        )}
+        {message && (
+          <p
+            role="status"
+            className="rounded-lg border border-emerald-500/30 p-3 text-sm"
+          >
+            {message}
+          </p>
+        )}
+        {tab === "today" && (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Stat
+                label="Inquiries needing an owner"
+                value={data.followup.summary.unassigned}
+                detail="Smart Site records"
               />
-            ))}
-          </div>
-          <ExecutionReview
-            executions={data.executions}
+              <Stat
+                label="Past first-response target"
+                value={data.followup.summary.overdue}
+                detail="Elapsed internal target, not a promise"
+              />
+              <Stat
+                label="Suggestions to review"
+                value={
+                  data.proposals.filter((p) => p.status === "proposed").length
+                }
+                detail="Within the latest 200 proposals"
+              />
+              <Stat
+                label="Execution review"
+                value={
+                  data.executions.filter(
+                    (e) =>
+                      e.state === "indeterminate" ||
+                      (e.state === "processing" &&
+                        Date.parse(e.expiresAt) < Date.now()),
+                  ).length
+                }
+                detail="Within the latest 100 executions"
+              />
+            </div>
+            <Note>
+              {data.boundary} Recommendations show up to 50 prioritized leads.
+              Financial results and source evidence are available in Value
+              ledger.
+            </Note>
+            {writer && (
+              <button
+                className={button}
+                disabled={busy}
+                onClick={() =>
+                  work(
+                    () => revenueRequest("/bie/actions/generate", {}),
+                    "Recovery proposals prepared for review. Nothing was sent.",
+                  )
+                }
+              >
+                <Sparkles className="h-4 w-4" />
+                Prepare recovery proposals
+              </button>
+            )}
+            {!data.queue.length && (
+              <Note>
+                No current recommendations. New inquiries and eligible
+                follow-ups will appear from your CRM records.
+              </Note>
+            )}
+            <div className="grid gap-3 lg:grid-cols-2">
+              {data.queue.map((item) => {
+                const owner = data.staff.find(
+                  (s) => s.id === item.assignedUserId,
+                );
+                const due = data.followup.pending.find(
+                  (p) => p.leadId === item.leadId,
+                )?.dueAt;
+                return (
+                  <article
+                    aria-label={`Priority for ${item.contactName || "customer"}`}
+                    key={item.leadId}
+                    className="min-w-0 rounded-xl border bg-card p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Link
+                          className="font-semibold text-primary hover:underline"
+                          href={`/leads/${item.leadId}`}
+                        >
+                          {item.contactName || "Customer inquiry"}
+                        </Link>
+                        <p className="mt-1 text-sm font-medium">{item.title}</p>
+                      </div>
+                      <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                      {item.reasons.join(" · ")}
+                    </p>
+                    <p className="mt-3 text-xs">
+                      Owner:{" "}
+                      {owner
+                        ? `${owner.firstName || "Team"} ${owner.lastName || ""}${owner.isActive ? "" : " (inactive)"}`
+                        : "Unassigned"}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Source: {item.source || "Not recorded"} · Received{" "}
+                      {date(item.receivedAt)}
+                    </p>
+                    {due && (
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                        First-attempt target: {date(due)}
+                      </p>
+                    )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {writer && !item.assignedUserId && (
+                        <button
+                          className={button}
+                          disabled={busy}
+                          onClick={() =>
+                            work(
+                              () =>
+                                revenueRequest(
+                                  `/revenue/leads/${item.leadId}/claim`,
+                                  { confirmed: true },
+                                ),
+                              "You now own this inquiry. No contact attempt was recorded.",
+                            )
+                          }
+                        >
+                          Claim for me
+                        </button>
+                      )}
+                      <Link className={button} href={`/leads/${item.leadId}`}>
+                        Open customer & next step
+                      </Link>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            <h3 className="text-lg font-semibold">
+              Prepared actions & receipts
+            </h3>
+            {!data.proposals.length && (
+              <Note>
+                No proposals yet. Preparing the queue creates reviewable actions
+                without sending them.
+              </Note>
+            )}
+            <div className="space-y-3">
+              {data.proposals.slice(0, 30).map((p) => (
+                <ProposalCard
+                  key={p.id}
+                  proposal={p}
+                  busy={busy}
+                  writer={writer}
+                  work={work}
+                />
+              ))}
+            </div>
+            <ExecutionReview
+              executions={data.executions}
+              manager={manager}
+              busy={busy}
+              work={work}
+            />
+          </>
+        )}
+        {tab === "room" && (
+          <DecisionRoom
+            records={data.records}
             manager={manager}
             busy={busy}
             work={work}
           />
-        </>
-      )}
-      {tab === "room" && (
-        <DecisionRoom
-          records={data.records}
-          manager={manager}
-          busy={busy}
-          work={work}
-        />
-      )}
-      {tab === "value" && (
-        <ValueLedger
-          records={data.records}
-          manager={manager}
-          busy={busy}
-          work={work}
-        />
-      )}
-      {tab === "growth" && (
-        <ProjectGrowth
-          manager={manager}
-          writer={writer}
-          busy={busy}
-          work={work}
-        />
-      )}
-      {tab === "profile" && (
-        <BusinessProfile
-          key={data.profile?.version ?? 0}
-          profile={data.profile}
-          manager={manager}
-          busy={busy}
-          work={work}
-        />
-      )}
+        )}
+        {tab === "value" && (
+          <ValueLedger
+            records={data.records}
+            manager={manager}
+            busy={busy}
+            work={work}
+          />
+        )}
+        {tab === "growth" && (
+          <ProjectGrowth
+            manager={manager}
+            writer={writer}
+            busy={busy}
+            work={work}
+          />
+        )}
+        {tab === "profile" && (
+          <BusinessProfile
+            key={data.profile?.version ?? 0}
+            profile={data.profile}
+            manager={manager}
+            busy={busy}
+            work={work}
+          />
+        )}
+      </fieldset>
     </section>
   );
 }
@@ -534,8 +582,33 @@ function ProposalCard({
   busy: boolean;
   work: Work;
 }) {
-  const [subject, setSubject] = useState(p.payload.subject || "");
-  const [body, setBody] = useState(p.payload.body || "");
+  // An untouched editor follows the saved payload. Local edits retain the
+  // payload they started from so a refresh cannot silently replace their basis.
+  const [draft, setDraft] = useState<{
+    source: string;
+    subject: string;
+    body: string;
+  } | null>(null);
+  const savedSubject = p.payload.subject || "";
+  const savedBody = p.payload.body || "";
+  const savedPayload = JSON.stringify(p.payload);
+  const subject = draft?.subject ?? savedSubject;
+  const body = draft?.body ?? savedBody;
+  const dirty = subject !== savedSubject || body !== savedBody;
+  // A successful save (or reverting all edits) returns the editor to following
+  // server content. Reset during render to avoid one stale actionable frame.
+  if (draft && !dirty) setDraft(null);
+  const needsReview =
+    !!draft &&
+    dirty &&
+    (draft.source !== savedPayload || p.status !== "proposed");
+  const edit = (change: { subject?: string; body?: string }) =>
+    setDraft({
+      source: draft?.source ?? savedPayload,
+      subject,
+      body,
+      ...change,
+    });
   return (
     <article className="min-w-0 rounded-xl border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -550,6 +623,25 @@ function ProposalCard({
         </span>
       </div>
       <p className="mt-2 text-sm text-muted-foreground">{p.rationale}</p>
+      {needsReview && (
+        <div
+          role="alert"
+          className="mt-3 space-y-3 rounded-lg border border-destructive/30 p-3 text-sm"
+        >
+          <p>
+            The saved action changed while you were editing. Your local text is
+            preserved below. Copy any edits you want to keep, then load the
+            saved message and review it before continuing.
+          </p>
+          <button
+            className={button}
+            disabled={busy}
+            onClick={() => setDraft(null)}
+          >
+            Discard local edits and load saved message
+          </button>
+        </div>
+      )}
       {p.actionType === "send_email" && (
         <details className="mt-3">
           <summary className="cursor-pointer text-sm text-primary">
@@ -560,8 +652,10 @@ function ProposalCard({
               <input
                 className={input}
                 value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                readOnly={!writer || p.status !== "proposed"}
+                onChange={(e) => edit({ subject: e.target.value })}
+                readOnly={
+                  busy || needsReview || !writer || p.status !== "proposed"
+                }
               />
             </Field>
             <Field label="Email body">
@@ -569,17 +663,16 @@ function ProposalCard({
                 className={input}
                 rows={5}
                 value={body}
-                onChange={(e) => setBody(e.target.value)}
-                readOnly={!writer || p.status !== "proposed"}
+                onChange={(e) => edit({ body: e.target.value })}
+                readOnly={
+                  busy || needsReview || !writer || p.status !== "proposed"
+                }
               />
             </Field>
             {writer && p.status === "proposed" && (
               <button
                 className={button}
-                disabled={
-                  busy ||
-                  (subject === p.payload.subject && body === p.payload.body)
-                }
+                disabled={busy || needsReview || !dirty}
                 onClick={() =>
                   work(
                     () =>
@@ -604,11 +697,7 @@ function ProposalCard({
           <>
             <button
               className={button}
-              disabled={
-                busy ||
-                subject !== (p.payload.subject || "") ||
-                body !== (p.payload.body || "")
-              }
+              disabled={busy || needsReview || dirty}
               onClick={() =>
                 work(
                   () =>
@@ -636,7 +725,7 @@ function ProposalCard({
         {writer && p.status === "approved" && (
           <button
             className={button}
-            disabled={busy}
+            disabled={busy || needsReview}
             onClick={() =>
               work(
                 () => revenueRequest(`/bie/actions/${p.id}/execute`, {}),

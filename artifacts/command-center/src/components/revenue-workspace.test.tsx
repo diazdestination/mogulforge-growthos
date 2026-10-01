@@ -1,4 +1,12 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   RevenueWorkspace,
@@ -54,6 +62,295 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe("Revenue Desk workflows", () => {
+  const proposal = () => ({
+    id: "email-one",
+    leadId: "lead-one",
+    title: "Review follow-up",
+    actionType: "send_email",
+    status: "proposed",
+    rationale: "LOCAL QA only",
+    executionDetail: null,
+    payload: { subject: "Original subject", body: "Original message" },
+  });
+  async function openProposal() {
+    const saved = proposal();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const spy = mockApi("owner", {
+      handler: (_method, path) =>
+        path.endsWith("/revenue/desk")
+          ? response({ ...desk(), proposals: [saved] })
+          : undefined,
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <RevenueWorkspace />
+      </QueryClientProvider>,
+    );
+    await screen.findByText("Review follow-up");
+    fireEvent.click(screen.getByText("Review message content"));
+    let revision = 0;
+    return {
+      saved,
+      spy,
+      update: async (next: ReturnType<typeof proposal>) => {
+        const title = `Review follow-up ${++revision}`;
+        act(() =>
+          client.setQueryData(["revenue", "desk"], {
+            ...desk(),
+            proposals: [{ ...next, title }],
+          }),
+        );
+        await screen.findByText(title);
+      },
+    };
+  }
+  it("shows the current approved message after a server refresh", async () => {
+    const { saved, update } = await openProposal();
+    await update({
+      ...saved,
+      status: "approved",
+      payload: { subject: "Approved subject", body: "Approved message" },
+    });
+    expect(
+      (screen.getByLabelText("Email subject") as HTMLInputElement).value,
+    ).toBe("Approved subject");
+    expect(
+      (screen.getByLabelText("Email body") as HTMLTextAreaElement).value,
+    ).toBe("Approved message");
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Send approved email",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+  });
+  it("freezes the reviewed draft while a save is pending and sends it only once", async () => {
+    const { spy } = await openProposal();
+    const original = spy.getMockImplementation()!;
+    let finishSave!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      finishSave = resolve;
+    });
+    spy.mockImplementation(async (url, init) => {
+      if (init?.method === "PATCH") {
+        await pending;
+        return response({ saved: true });
+      }
+      return original(url, init);
+    });
+    fireEvent.change(screen.getByLabelText("Email body"), {
+      target: { value: "Message being saved" },
+    });
+    const save = screen.getByRole("button", { name: "Save draft edits" });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    expect(
+      (screen.getByLabelText("Email subject") as HTMLInputElement).readOnly,
+    ).toBe(true);
+    expect(
+      (screen.getByLabelText("Email body") as HTMLTextAreaElement).readOnly,
+    ).toBe(true);
+    expect(
+      spy.mock.calls.filter(([, init]) => init?.method === "PATCH"),
+    ).toHaveLength(1);
+    await act(async () => finishSave());
+    await screen.findByText("Draft updated. Review it before approval.");
+  });
+  it("preserves conflicting local edits and blocks save and approval until explicitly discarded", async () => {
+    const { saved, update, spy } = await openProposal();
+    fireEvent.change(screen.getByLabelText("Email body"), {
+      target: { value: "My unsaved message" },
+    });
+    await update({
+      ...saved,
+      payload: { subject: "New saved subject", body: "Other operator message" },
+    });
+    expect(
+      (screen.getByLabelText("Email body") as HTMLTextAreaElement).value,
+    ).toBe("My unsaved message");
+    expect(screen.getByRole("alert").textContent).toContain(
+      "saved action changed",
+    );
+    for (const name of ["Save draft edits", "Approve saved action"]) {
+      const control = screen.getByRole("button", { name }) as HTMLButtonElement;
+      expect(control.disabled).toBe(true);
+      fireEvent.click(control);
+    }
+    expect(
+      spy.mock.calls.filter(
+        ([, init]) => init?.method === "POST" || init?.method === "PATCH",
+      ),
+    ).toHaveLength(0);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Discard local edits and load saved message",
+      }),
+    );
+    expect(
+      (screen.getByLabelText("Email body") as HTMLTextAreaElement).value,
+    ).toBe("Other operator message");
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Approve saved action",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+  });
+  it.each([false, true])(
+    "blocks sending when local edits outlive external approval (payload changed: %s)",
+    async (changed) => {
+      const { saved, update, spy } = await openProposal();
+      fireEvent.change(screen.getByLabelText("Email body"), {
+        target: { value: "Unsaved local content" },
+      });
+      await update({
+        ...saved,
+        status: "approved",
+        payload: changed
+          ? { subject: "New approved subject", body: "New approved content" }
+          : saved.payload,
+      });
+      const send = screen.getByRole("button", {
+        name: "Send approved email",
+      }) as HTMLButtonElement;
+      expect(send.disabled).toBe(true);
+      fireEvent.click(send);
+      expect(
+        spy.mock.calls.some(([url]) => String(url).endsWith("/execute")),
+      ).toBe(false);
+      expect(
+        (screen.getByLabelText("Email body") as HTMLTextAreaElement).value,
+      ).toBe("Unsaved local content");
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "Discard local edits and load saved message",
+        }),
+      );
+      expect(
+        (screen.getByLabelText("Email body") as HTMLTextAreaElement).value,
+      ).toBe(changed ? "New approved content" : "Original message");
+      expect(send.disabled).toBe(false);
+    },
+  );
+  it("accepts a saved draft acknowledgement and keeps following later server content", async () => {
+    const { saved, update } = await openProposal();
+    fireEvent.change(screen.getByLabelText("Email body"), {
+      target: { value: "My saved message" },
+    });
+    await update({
+      ...saved,
+      payload: { ...saved.payload, body: "My saved message" },
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Approve saved action",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+    await update({
+      ...saved,
+      status: "approved",
+      payload: { ...saved.payload, body: "Later approved message" },
+    });
+    expect(
+      (screen.getByLabelText("Email body") as HTMLTextAreaElement).value,
+    ).toBe("Later approved message");
+  });
+  it("preserves local edits through refresh failure and never reports a failed refresh as successful", async () => {
+    let offline = false;
+    mockApi("owner", {
+      handler: (_method, path) =>
+        path.endsWith("/revenue/desk")
+          ? response(
+              offline
+                ? { error: "offline" }
+                : { ...desk(), proposals: [proposal()] },
+              offline ? 503 : 200,
+            )
+          : undefined,
+    });
+    renderWithQuery(<RevenueWorkspace />);
+    await screen.findByText("Review follow-up");
+    fireEvent.click(screen.getByText("Review message content"));
+    fireEvent.change(screen.getByLabelText("Email body"), {
+      target: { value: "Keep these edits" },
+    });
+    offline = true;
+    fireEvent.click(screen.getByRole("button", { name: "Refresh workspace" }));
+    await screen.findByText(/Last loaded data is shown/);
+    expect(
+      (screen.getByLabelText("Email body") as HTMLTextAreaElement).value,
+    ).toBe("Keep these edits");
+    expect(screen.queryByText("Workspace refreshed.")).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "Save draft edits" })
+        .matches(":disabled"),
+    ).toBe(true);
+    offline = false;
+    fireEvent.click(screen.getByRole("button", { name: "Refresh workspace" }));
+    await screen.findByText("Workspace refreshed.");
+    expect(
+      (screen.getByLabelText("Email body") as HTMLTextAreaElement).value,
+    ).toBe("Keep these edits");
+    expect(
+      screen
+        .getByRole("button", { name: "Save draft edits" })
+        .matches(":disabled"),
+    ).toBe(false);
+  });
+  it("separates successful action receipts from failed data refreshes and retries only reads", async () => {
+    let claimed = false;
+    let offline = false;
+    const spy = mockApi("owner", {
+      handler: (method, path) => {
+        if (path.endsWith("/claim") && method === "POST") {
+          claimed = true;
+          offline = true;
+          return response({ id: "lead-one" });
+        }
+        if (path.endsWith("/revenue/desk"))
+          return response(
+            offline
+              ? { error: "offline" }
+              : {
+                  ...desk(),
+                  queue: desk().queue.map((item) => ({
+                    ...item,
+                    assignedUserId: claimed ? "u1" : null,
+                  })),
+                },
+            offline ? 503 : 200,
+          );
+        return undefined;
+      },
+    });
+    renderWithQuery(<RevenueWorkspace />);
+    await screen.findByText("Local Customer");
+    fireEvent.click(screen.getByRole("button", { name: "Claim for me" }));
+    await screen.findByText(/The action completed, but/);
+    expect(
+      screen.getByText(
+        "You now own this inquiry. No contact attempt was recorded.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Claim for me" }).matches(":disabled"),
+    ).toBe(true);
+    offline = false;
+    fireEvent.click(screen.getByRole("button", { name: "Refresh workspace" }));
+    await screen.findByText("Workspace refreshed.");
+    expect(screen.queryByRole("button", { name: "Claim for me" })).toBeNull();
+    expect(
+      spy.mock.calls.filter(([, init]) => init?.method === "POST"),
+    ).toHaveLength(1);
+  });
   it("renders recorded context and makes claim ownership an explicit action", async () => {
     const spy = mockApi("owner", {
       handler: (method, path) =>

@@ -1,0 +1,38 @@
+[
+  {
+    "width": 1440,
+    "dark": false,
+    "overflow": false,
+    "writes": 0,
+    "pageErrors": 0,
+    "axeViolations": [],
+    "checks": "conflict blocks send; explicit reload matches saved content; outage preserves draft; refresh retries reads only"
+  },
+  {
+    "width": 390,
+    "dark": false,
+    "overflow": false,
+    "writes": 0,
+    "pageErrors": 0,
+    "axeViolations": [],
+    "checks": "conflict blocks send; explicit reload matches saved content; outage preserves draft; refresh retries reads only"
+  },
+  {
+    "width": 320,
+    "dark": false,
+    "overflow": false,
+    "writes": 0,
+    "pageErrors": 0,
+    "axeViolations": [],
+    "checks": "conflict blocks send; explicit reload matches saved content; outage preserves draft; refresh retries reads only"
+  },
+  {
+    "width": 390,
+    "dark": true,
+    "overflow": false,
+    "writes": 0,
+    "pageErrors": 0,
+    "axeViolations": [],
+    "checks": "conflict blocks send; explicit reload matches saved content; outage preserves draft; refresh retries reads only"
+  }
+]
