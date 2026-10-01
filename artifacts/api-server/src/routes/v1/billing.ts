@@ -12,10 +12,39 @@ import {
 
 const router: IRouter = Router();
 
-function getOrigin(req: Request): string {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host = req.headers['x-forwarded-host'] || req.headers['host'] || 'localhost';
-  return `${Array.isArray(proto) ? proto[0] : proto}://${host}`;
+/** Stripe return URLs must come from trusted deployment config, never Host headers. */
+export function billingReturnUrls(): {
+  successUrl: string;
+  cancelUrl: string;
+  portalUrl: string;
+} {
+  const configured =
+    process.env.APP_ORIGIN?.trim() || process.env.APP_URL?.trim();
+  if (!configured && process.env.NODE_ENV === 'production') {
+    throw new Error('APP_ORIGIN is required for billing return URLs');
+  }
+  let url: URL;
+  try {
+    url = new URL(configured || 'http://localhost:5000');
+  } catch {
+    throw new Error('Billing return origin is invalid');
+  }
+  if (
+    !['https:', 'http:'].includes(url.protocol) ||
+    (process.env.NODE_ENV === 'production' && url.protocol !== 'https:') ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error('Billing return origin is invalid');
+  }
+  const origin = url.origin;
+  return {
+    successUrl: `${origin}/settings?billing=success`,
+    cancelUrl: `${origin}/settings?billing=cancel`,
+    portalUrl: `${origin}/settings`,
+  };
 }
 
 async function loadOrg(orgId: string) {
@@ -54,11 +83,11 @@ router.post(
       res.status(404).json({ error: 'Organization not found' });
       return;
     }
-    const origin = getOrigin(req);
     try {
+      const returnUrls = billingReturnUrls();
       const url = await createCheckoutSession(org, {
-        successUrl: `${origin}/settings?billing=success`,
-        cancelUrl: `${origin}/settings?billing=cancel`,
+        successUrl: returnUrls.successUrl,
+        cancelUrl: returnUrls.cancelUrl,
         trialDays: 14,
       });
       res.json({ url });
@@ -84,7 +113,7 @@ router.post(
       return;
     }
     try {
-      const url = await createPortalSession(org, `${getOrigin(req)}/settings`);
+      const url = await createPortalSession(org, billingReturnUrls().portalUrl);
       res.json({ url });
     } catch (err) {
       req.log?.error({ err }, 'stripe portal session failed');

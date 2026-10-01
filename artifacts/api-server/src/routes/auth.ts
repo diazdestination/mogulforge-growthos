@@ -75,11 +75,46 @@ const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 
 const router: IRouter = Router();
 
-function getOrigin(req: Request): string {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host =
-    req.headers['x-forwarded-host'] || req.headers['host'] || 'localhost';
-  return `${proto}://${host}`;
+/** OIDC redirect URIs must not inherit caller-controlled Host/proxy headers. */
+export function oidcAppOrigin(): string {
+  const explicitOrigin =
+    process.env.APP_ORIGIN?.trim() || process.env.APP_URL?.trim();
+  const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0]?.trim();
+  if (
+    !explicitOrigin &&
+    replitDomain &&
+    !/^[a-z0-9.-]+(?::\d{1,5})?$/i.test(replitDomain)
+  ) {
+    throw new Error('OIDC app origin is invalid');
+  }
+  const configured =
+    explicitOrigin || (replitDomain ? `https://${replitDomain}` : '');
+  if (!configured && process.env.NODE_ENV === 'production') {
+    throw new Error('APP_ORIGIN is required for OIDC redirects');
+  }
+  let url: URL;
+  try {
+    url = new URL(configured || 'http://localhost:5000');
+  } catch {
+    throw new Error('OIDC app origin is invalid');
+  }
+  if (
+    !['https:', 'http:'].includes(url.protocol) ||
+    (process.env.NODE_ENV === 'production' && url.protocol !== 'https:') ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error('OIDC app origin is invalid');
+  }
+  return url.origin;
+}
+
+export function oidcCallbackUrl(requestUrl?: string): URL {
+  const callback = new URL('/api/callback', oidcAppOrigin());
+  if (requestUrl) callback.search = new URL(requestUrl, callback).search;
+  return callback;
 }
 
 function setSessionCookie(res: Response, sid: string) {
@@ -228,7 +263,7 @@ router.get('/auth/user', (req: Request, res: Response) => {
 
 router.get('/login', async (req: Request, res: Response) => {
   const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
+  const callbackUrl = oidcCallbackUrl().href;
 
   const returnTo = getSafeReturnTo(req.query.returnTo);
 
@@ -271,7 +306,7 @@ router.get('/callback', async (req: Request, res: Response) => {
   }
 
   const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
+  const currentUrl = oidcCallbackUrl(req.url);
 
   const codeVerifier = req.cookies?.code_verifier;
   const nonce = req.cookies?.nonce;
@@ -281,10 +316,6 @@ router.get('/callback', async (req: Request, res: Response) => {
     res.redirect('/api/login');
     return;
   }
-
-  const currentUrl = new URL(
-    `${callbackUrl}?${new URL(req.url, `http://${req.headers.host}`).searchParams}`,
-  );
 
   let tokens: oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers;
   try {
@@ -345,7 +376,7 @@ router.get('/callback', async (req: Request, res: Response) => {
 
 router.get('/logout', async (req: Request, res: Response) => {
   const config = await getOidcConfig();
-  const origin = getOrigin(req);
+  const origin = oidcAppOrigin();
   const returnTo = getSafeReturnTo(req.query.returnTo);
   const postLogoutRedirectUrl = new URL(returnTo, `${origin}/`).href;
 
