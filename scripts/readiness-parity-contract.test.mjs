@@ -3,12 +3,16 @@ import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
+// This is a contract assertion, not a PowerShell startup benchmark. Hosted
+// Linux runners cold-start pwsh while API/PGlite suites compete for CPU. Keep
+// a finite process deadline without mistaking that contention for bad JSON.
+const processTimeoutMs = 30_000;
 const available = spawnSync(
   "pwsh",
   ["-NoProfile", "-NonInteractive", "-Command", "exit 0"],
   {
     cwd: root,
-    timeout: 5000,
+    timeout: processTimeoutMs,
     encoding: "utf8",
   },
 );
@@ -49,7 +53,7 @@ it.skipIf(available.error?.code === "ENOENT")(
       ["-NoProfile", "-NonInteractive", "-Command", command],
       {
         cwd: root,
-        timeout: 8000,
+        timeout: processTimeoutMs,
         encoding: "utf8",
       },
     );
@@ -57,4 +61,5 @@ it.skipIf(available.error?.code === "ENOENT")(
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain("PARITY_CONTRACT_VALIDATOR_PASSED");
   },
+  processTimeoutMs + 5_000,
 );

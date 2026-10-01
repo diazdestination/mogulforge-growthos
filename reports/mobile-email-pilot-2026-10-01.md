@@ -43,6 +43,14 @@ single-backend PGlite runner. Exact-head CI with PostgreSQL is still required.
 No native phone composer, real push receipt or Microsoft OAuth acceptance has
 been claimed from Chromium screenshots or mocked network tests.
 
+The first candidate run (36881814715, d3ccc0e) stopped on an existing PowerShell
+contract test's `spawnSync pwsh ETIMEDOUT` at its eight-second deadline. The
+follow-up gives that test process a bounded 30-second budget (35-second test
+budget) for cold start under concurrent CI load. Real validator execution,
+invalid-timestamp and unexpected-public-field rejection assertions remain;
+production readiness timeouts/guards are unchanged. A fresh exact-head run is
+required before calling the release gate passed.
+
 ## Historical evidence preservation
 
 The prior hosted image/schema remains the c050067 release, with its original
