@@ -4,10 +4,11 @@ Status: **separate staging cluster provisioned; deployment and provider
 activation still blocked**. The original inventory below was read-only against
 the previously green `15d9704507325a98c0fd719d15b9ac841ea68f0b`
 candidate. Safety commit `ee903b3f8502e27452bcb22a341a1ea4c07937b0`
-subsequently passed [exact-head CI](https://github.com/diazdestination/mogulforge-growthos/actions/runs/36789655005)
-(1,387 passed, 15 skipped; types, builds and Docker parity green), but no
-staging app was started or accepted. New host-pinning changes after that commit
-must pass their own exact-head CI.
+subsequently passed [exact-head CI](https://github.com/diazdestination/mogulforge-growthos/actions/runs/36789655005).
+Host-pinning commit `3d54f766560e22f8a14ca51d9809064c8801ca11`
+also passed [exact-head CI](https://github.com/diazdestination/mogulforge-growthos/actions/runs/36802652403)
+(1,387 passed, 15 skipped; types, builds and Docker parity green). No staging
+app was started or accepted; subsequent changes require their own exact-head CI.
 
 ## Owner-approved isolated resource — later September 30 update
 
@@ -30,6 +31,12 @@ staging image before the safety and schema gates are satisfied. The stopped
 staging app still has its old shared-cluster secret until a controlled cutover.
 Fly lists an initial full backup as completed; no restore drill has been run,
 and that empty-cluster backup does not prove recovery of GrowthOS data.
+The owner later approved a temporary third cluster **if genuinely necessary**
+for a full managed-backup restore drill. Fly's managed restore creates a new,
+separately billed cluster; doing that now with an empty backup would prove
+little. The staged synthetic-fixture plan and narrower no-third-cluster
+logical rehearsal are in
+[`reports/p0-6-restore-drill-plan-2026-09-30.md`](reports/p0-6-restore-drill-plan-2026-09-30.md).
 
 ## Evidence gathered without starting the staging app
 
@@ -69,15 +76,20 @@ and that empty-cluster backup does not prove recovery of GrowthOS data.
    reaching production data. The new app boot guard and release-command guard
    reject a wrong configured host/database/session, but they are defense in depth,
    not a substitute for database-level isolation. The owner-approved new
-   cluster resolves the *resource* problem, but the app must be safely cut
+   cluster resolves the _resource_ problem, but the app must be safely cut
    over and its new host asserted before a staging release. Do not use
    `fly mpg attach` on the stopped old image as a shortcut.
 2. **No reviewed schema delta or restore proof.** `fly.staging.toml` invokes
    `scripts/release-schema.mjs` on deploy, and that script uses
    `drizzle-kit push --force`. The new `STAGING_SCHEMA_PUSH_APPROVED=false` gate
    deliberately makes an ordinary staging deploy fail before schema changes.
-   Review the exact schema delta, take/verify the backup and demonstrate a
-   restore before an operator explicitly permits a release command. Do not
+   A generated initial-source SQL preview is preserved under
+   `reports/staging-schema-preview-2026-09-30/`: 90 new tables, no destructive
+   statements and no Fly schema change. The installed Drizzle Kit does not
+   support `push --explain`, so this is **not** the verified Fly push delta or
+   approval to apply it. Review the exact schema operation, take/verify the
+   backup and demonstrate a restore before an operator explicitly permits a
+   release command. Do not
    casually persist the approval flag between releases.
 3. **Real recipient and provider risk.** The staging DB contains non-test mail
    domains and a Resend secret is configured. The new
@@ -97,18 +109,20 @@ and that empty-cluster backup does not prove recovery of GrowthOS data.
 
 ## Safe next sequence
 
-1. Complete the new-host guard tests, local builds and exact-head GitHub CI.
-   Keep the draft PR unmerged and the staging app stopped.
+1. Keep the draft PR unmerged and the staging app stopped. Re-run exact-head
+   GitHub CI after each later code or runbook change.
 2. Verify a safe app-secret cutover method that cannot start the old image.
    Do not point a paid-beta staging app at the shared production cluster merely
    because its URL names a different DB.
-3. Review the migration diff and restoration plan with the isolated database;
+3. Review the initial SQL preview and restoration plan with the isolated database;
    verify pool mode and provider-test identities. Keep customer sends and the
    scheduler held during the initial app/health inspection.
 4. Only then request the separate release/provider approvals in
    `PAID-BETA-READINESS-P0.md` and record exact SHA, image and acceptance
-   results. The owner's approval covered the separate Basic staging cluster,
-   not provider sends, production deployment or customer traffic.
+   results. The owner approved the separate Basic staging cluster and a
+   conditional short-lived restore cluster when meaningful backup data exists;
+   this did not approve provider sends, production deployment or customer
+   traffic.
 
 The reusable read-only script is `scripts/staging-readonly-preflight.mjs`. It
 prints counts and non-secret identity only; it does not certify isolation or
