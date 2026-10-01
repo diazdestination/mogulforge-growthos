@@ -15,6 +15,7 @@ vi.mock("node:child_process", async () => {
 
 import {
   pilotCredentials,
+  recoveredPilotReaderCredentials,
   stagePilotSecrets,
 } from "./pilot-staging-connection.mjs";
 
@@ -53,7 +54,9 @@ beforeEach(() => {
   mocks.spawn.mockReset();
   fetchMock.mockReset().mockResolvedValue({
     ok: true,
-    json: async () => ({ data: { username: "growthos-staging-live", password } }),
+    json: async () => ({
+      data: { username: "growthos-staging-live", password },
+    }),
   });
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -128,6 +131,80 @@ describe("pilot database credential transfer", () => {
     expect(new URL(result.connectionString).hostname).toBe(
       "pgbouncer.zp2wjrejd2zodn4q.flympg.net",
     );
+  });
+
+  it("retrieves only the fixed recovered-cluster reader without exposing credentials", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: { username: "growthos-restore-reader", password },
+      }),
+    });
+    const result = await recoveredPilotReaderCredentials();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.fly.io/api/v1/postgresv2/dzx6qo652zg0jpv5/users/growthos-restore-reader/credentials",
+      expect.objectContaining({
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        redirect: "error",
+        signal: expect.any(AbortSignal),
+      }),
+    );
+    const target = new URL(result.connectionString);
+    expect(target.protocol).toBe("postgresql:");
+    expect(target.hostname).toBe("pgbouncer.dzx6qo652zg0jpv5.flympg.net");
+    expect(target.username).toBe("growthos-restore-reader");
+    expect(target.pathname).toBe("/growthos_staging");
+    expect(target.port).toBe("");
+    expect(target.search).toBe("");
+    expect(target.hash).toBe("");
+    expect(decodeURIComponent(target.password)).toBe(password);
+    expect(result.password).toBe(password);
+    expect(log).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+    expect(JSON.stringify(mocks.execute.mock.calls)).not.toContain(token);
+    expect(JSON.stringify(mocks.execute.mock.calls)).not.toContain(password);
+    expect(mocks.spawn).not.toHaveBeenCalled();
+  });
+
+  it("cannot redirect the recovered-reader helper with caller-supplied targets", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: { username: "growthos-restore-reader", password },
+      }),
+    });
+    await recoveredPilotReaderCredentials("kzpwm0j18eg04nv3", "fly-user");
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "https://api.fly.io/api/v1/postgresv2/dzx6qo652zg0jpv5/users/growthos-restore-reader/credentials",
+    );
+  });
+
+  it.each([
+    { username: "growthos-staging-live", password },
+    { username: "fly-user", password },
+    { username: "growthos-restore-reader", password: "" },
+    { username: "growthos-restore-reader", password: null },
+    { username: "growthos-restore-reader", password: { unsafe: "coercion" } },
+  ])("rejects a malformed or non-reader recovered credential", async (data) => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ data }) });
+    await expect(recoveredPilotReaderCredentials()).rejects.toThrow(
+      /^pilot_credential_identity_invalid$/,
+    );
+    expect(mocks.spawn).not.toHaveBeenCalled();
+  });
+
+  it("retains status-only errors for recovered-cluster provider failures", async () => {
+    const readBody = vi.fn(async () => ({ privateToken: token, password }));
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 500, json: readBody });
+    await expect(recoveredPilotReaderCredentials()).rejects.toThrow(
+      /^pilot_credential_lookup_failed_500$/,
+    );
+    expect(readBody).not.toHaveBeenCalled();
   });
 
   it("does not include provider error response text in credential lookup failures", async () => {
@@ -224,6 +301,7 @@ describe("pilot database credential transfer", () => {
     "postgresql://growthos-staging-live:synthetic-password@pgbouncer.zp2wjrejd2zodn4q.flympg.net/growthos_staging";
   it.each([
     approvedUrl.replace("zp2wjrejd2zodn4q", "kzpwm0j18eg04nv3"),
+    approvedUrl.replace("zp2wjrejd2zodn4q", "dzx6qo652zg0jpv5"),
     approvedUrl.replace("growthos-staging-live", "fly-user"),
     approvedUrl.replace("growthos-staging-live", "growthos-restore-reader"),
     approvedUrl.replace("/growthos_staging", "/production"),
@@ -233,6 +311,8 @@ describe("pilot database credential transfer", () => {
     approvedUrl.replace(".net/", ".net:5432/"),
     `${approvedUrl}?host=production.example`,
     `${approvedUrl}#unsafe`,
+    `${approvedUrl}?`,
+    `${approvedUrl}#`,
     "not-a-url",
   ])(
     "rejects any database secret that is not the exact staging target",
@@ -252,6 +332,132 @@ describe("pilot database credential transfer", () => {
       `DATABASE_URL=${approvedUrl}\n`,
     );
     expect(JSON.stringify(mocks.spawn.mock.calls)).not.toContain(approvedUrl);
+  });
+
+  const approvedReaderUrl = approvedUrl.replace(
+    "growthos-staging-live",
+    "growthos-restore-reader",
+  );
+  it.each([
+    approvedReaderUrl.replace("zp2wjrejd2zodn4q", "kzpwm0j18eg04nv3"),
+    approvedReaderUrl.replace("zp2wjrejd2zodn4q", "dzx6qo652zg0jpv5"),
+    approvedReaderUrl.replace("growthos-restore-reader", "fly-user"),
+    approvedUrl,
+    approvedReaderUrl.replace("/growthos_staging", "/production"),
+    approvedReaderUrl.replace("postgresql:", "https:"),
+    approvedReaderUrl.replace(":synthetic-password", ""),
+    approvedReaderUrl.replace("synthetic-password", "broken%credential"),
+    approvedReaderUrl.replace(".net/", ".net:5432/"),
+    `${approvedReaderUrl}?host=production.example`,
+    `${approvedReaderUrl}#unsafe`,
+    `${approvedReaderUrl}?`,
+    `${approvedReaderUrl}#`,
+    "not-a-url",
+  ])(
+    "rejects reader secrets outside the exact staging reader target",
+    async (connectionString) => {
+      await expect(
+        stagePilotSecrets({
+          RESTORE_DRILL_READER_DATABASE_URL: connectionString,
+        }),
+      ).rejects.toThrow("pilot_secret_database_target_invalid");
+      expect(mocks.spawn).not.toHaveBeenCalled();
+    },
+  );
+
+  it("stages separate reader and application credentials only on stdin", async () => {
+    const child = childProcessDouble();
+    mocks.spawn.mockReturnValueOnce(child);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    await stagePilotSecrets({
+      DATABASE_URL: approvedUrl,
+      RESTORE_DRILL_READER_DATABASE_URL: approvedReaderUrl,
+    });
+    expect(child.stdin.end).toHaveBeenCalledWith(
+      `DATABASE_URL=${approvedUrl}\nRESTORE_DRILL_READER_DATABASE_URL=${approvedReaderUrl}\n`,
+    );
+    expect(JSON.stringify(mocks.spawn.mock.calls)).not.toContain(
+      approvedReaderUrl,
+    );
+    expect(JSON.stringify(mocks.spawn.mock.calls)).not.toContain(approvedUrl);
+    expect(log).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  const approvedRecoveredReaderUrl = approvedReaderUrl.replace(
+    "zp2wjrejd2zodn4q",
+    "dzx6qo652zg0jpv5",
+  );
+  it.each([
+    approvedRecoveredReaderUrl.replace("dzx6qo652zg0jpv5", "kzpwm0j18eg04nv3"),
+    approvedReaderUrl,
+    approvedRecoveredReaderUrl.replace("dzx6qo652zg0jpv5", "another-restore"),
+    approvedRecoveredReaderUrl.replace("growthos-restore-reader", "fly-user"),
+    approvedRecoveredReaderUrl.replace(
+      "growthos-restore-reader",
+      "growthos-staging-live",
+    ),
+    approvedRecoveredReaderUrl.replace("/growthos_staging", "/production"),
+    approvedRecoveredReaderUrl.replace("postgresql:", "https:"),
+    approvedRecoveredReaderUrl.replace(":synthetic-password", ""),
+    approvedRecoveredReaderUrl.replace(
+      "synthetic-password",
+      "broken%credential",
+    ),
+    approvedRecoveredReaderUrl.replace(".net/", ".net:5432/"),
+    `${approvedRecoveredReaderUrl}?host=production.example`,
+    `${approvedRecoveredReaderUrl}#unsafe`,
+    `${approvedRecoveredReaderUrl}?`,
+    `${approvedRecoveredReaderUrl}#`,
+    "not-a-url",
+  ])(
+    "rejects recovered reader secrets outside the one temporary target",
+    async (connectionString) => {
+      await expect(
+        stagePilotSecrets({
+          RESTORE_DRILL_RECOVERED_READER_DATABASE_URL: connectionString,
+        }),
+      ).rejects.toThrow("pilot_secret_database_target_invalid");
+      expect(mocks.spawn).not.toHaveBeenCalled();
+    },
+  );
+
+  it("stages the recovered reader alongside source credentials only on stdin", async () => {
+    const child = childProcessDouble();
+    mocks.spawn.mockReturnValueOnce(child);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const values = {
+      DATABASE_URL: approvedUrl,
+      RESTORE_DRILL_READER_DATABASE_URL: approvedReaderUrl,
+      RESTORE_DRILL_RECOVERED_READER_DATABASE_URL: approvedRecoveredReaderUrl,
+    };
+    await stagePilotSecrets(values);
+    expect(mocks.spawn).toHaveBeenCalledWith(
+      "fly",
+      ["secrets", "import", "--stage", "--app", "mogulforge-growthos-staging"],
+      expect.objectContaining({
+        windowsHide: true,
+        stdio: ["pipe", "pipe", "pipe"],
+      }),
+    );
+    expect(child.stdin.end).toHaveBeenCalledWith(
+      `DATABASE_URL=${approvedUrl}\nRESTORE_DRILL_READER_DATABASE_URL=${approvedReaderUrl}\nRESTORE_DRILL_RECOVERED_READER_DATABASE_URL=${approvedRecoveredReaderUrl}\n`,
+    );
+    for (const value of Object.values(values))
+      expect(JSON.stringify(mocks.spawn.mock.calls)).not.toContain(value);
+    expect(child.stdout.resume).toHaveBeenCalledOnce();
+    expect(child.stderr.resume).toHaveBeenCalledOnce();
+    expect(log).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it("does not allow other restore URL setting names through the staging sink", async () => {
+    await expect(
+      stagePilotSecrets({ RESTORE_DRILL_DATABASE_URL: approvedReaderUrl }),
+    ).rejects.toThrow("pilot_secret_input_invalid");
+    expect(mocks.spawn).not.toHaveBeenCalled();
   });
 
   it("terminates the child and redacts a synchronous stdin write failure", async () => {

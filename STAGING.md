@@ -7,6 +7,12 @@ domain, or OAuth credentials.
 Read [the current staging preflight](STAGING-PREFLIGHT-2026-09-30.md) before
 using this runbook. Historical app bindings must not be assumed isolated.
 
+September 30 evening: the reviewed schema, managed restore drill and held
+`c050067` application cutover passed. The temporary recovery cluster was
+deleted. The current exact identities and dated outcomes are in the
+[controlled-pilot ledger](reports/controlled-pilot-2026-09-30.md). Do not rerun
+one-time provisioning merely because its instructions remain below.
+
 ## Fixed identities
 
 | Environment | Fly app                       | Config             | Origin                                        |

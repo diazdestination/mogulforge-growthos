@@ -1,6 +1,6 @@
 # GrowthOS staging preflight — September 30, 2026
 
-## Latest controlled-pilot update
+## Latest controlled-pilot update — September 30 evening (October 1 UTC)
 
 The owner's subsequent request to finish controlled-pilot preparation
 authorized the isolated bootstrap. The new staging database now has the
@@ -8,9 +8,29 @@ reviewed 90-table source schema, including the additive contractor sender
 field. A pinned, empty-database-only transaction completed successfully while
 the old staging app remained stopped; no customer data or provider was used.
 See [the current pilot evidence ledger](reports/controlled-pilot-2026-09-30.md).
-The older statements below saying no schema was applied describe the earlier
-inspection and are superseded only for that fact. Restore, application
-cutover and live-provider acceptance are separate gates, not implied passes.
+Since that bootstrap, the application login was reduced to Writer, a separate
+Reader was used for recovery inspection, and Session pooling plus actual
+independent-session locks were verified. A meaningful full managed backup was
+restored into a temporary cluster; both synthetic tenants, private media,
+credential decryption and same-image authenticated HTTP inspection passed.
+The temporary cluster was deleted and active inventory is back to two clusters.
+
+Candidate `c050067000f3ea1f2d94aa53b3a9c4f71f0d3b41` passed exact-head CI and
+was deployed by immutable image digest to the main staging Machine using the
+new isolated database. A controlled start passed health, anonymous-auth
+denials and unsigned-webhook rejection. The final synthetic scheduler timed
+cycles, graceful restart and scoped crash-after-task exercises also passed.
+After their private consoles were destroyed, the same held application was
+started again; October 1 04:04 UTC inventory confirmed one started Machine,
+autostart and minimum one, exact image, and no extra cluster/console.
+Outbound sending, migrations and normal scheduler autostart remain held.
+No provider acceptance or customer traffic is established.
+
+**The remainder of this document is historical pre-cutover inventory.** Its
+empty-schema, schema-admin, old-secret, unverified-pool and no-restore statements
+are superseded by the current ledger linked above, not current action items.
+
+## Historical pre-cutover inspection
 
 Status: **separate staging cluster provisioned; deployment and provider
 activation still blocked**. The original inventory below was read-only against

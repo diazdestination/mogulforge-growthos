@@ -22,6 +22,8 @@ const allowedUsers = new Set([
   "growthos-staging-live",
   "growthos-restore-reader",
 ]);
+// One short-lived managed-restore drill, never an alternate app database.
+const RECOVERED_PILOT_CLUSTER = "dzx6qo652zg0jpv5";
 export async function flyJson(args) {
   return JSON.parse(
     (
@@ -36,13 +38,24 @@ export async function flyJson(args) {
 
 export async function pilotCredentials(username) {
   if (!allowedUsers.has(username)) throw new Error("pilot_user_forbidden");
+  return credentialsForPinnedUser(PILOT_CLUSTER, username);
+}
+
+export async function recoveredPilotReaderCredentials() {
+  return credentialsForPinnedUser(
+    RECOVERED_PILOT_CLUSTER,
+    "growthos-restore-reader",
+  );
+}
+
+async function credentialsForPinnedUser(cluster, username) {
   // Read only. Token and returned database password never leave this process.
   const { stdout } = await execute("fly", ["auth", "token", "--quiet"], {
     windowsHide: true,
     timeout: 30000,
   });
   const response = await fetch(
-    `https://api.fly.io/api/v1/postgresv2/${PILOT_CLUSTER}/users/${username}/credentials`,
+    `https://api.fly.io/api/v1/postgresv2/${cluster}/users/${username}/credentials`,
     {
       headers: {
         Authorization: `Bearer ${stdout.trim()}`,
@@ -62,7 +75,7 @@ export async function pilotCredentials(username) {
   )
     throw new Error("pilot_credential_identity_invalid");
   const url = new URL(
-    `postgresql://pgbouncer.${PILOT_CLUSTER}.flympg.net/${PILOT_DATABASE}`,
+    `postgresql://pgbouncer.${cluster}.flympg.net/${PILOT_DATABASE}`,
   );
   url.username = username;
   // URL.password preserves a literal percent sign; encode it first so pg can
@@ -78,6 +91,8 @@ export async function pilotCredentials(username) {
 export async function stagePilotSecrets(values) {
   const allowed = new Set([
     "DATABASE_URL",
+    "RESTORE_DRILL_READER_DATABASE_URL",
+    "RESTORE_DRILL_RECOVERED_READER_DATABASE_URL",
     "RESTORE_DRILL_SYNTHETIC_KEY",
     "RESTORE_DRILL_SESSION_BEARER",
     "RESEND_WEBHOOK_SECRET",
@@ -98,23 +113,40 @@ export async function stagePilotSecrets(values) {
     throw new Error("pilot_secret_input_invalid");
   // Pin the sink as well as the source: no reusable caller may stage a
   // production URL, administrative login, or query-string host override.
-  if (Object.hasOwn(values, "DATABASE_URL")) {
+  const databaseSecretTargets = {
+    DATABASE_URL: {
+      cluster: PILOT_CLUSTER,
+      username: "growthos-staging-live",
+    },
+    RESTORE_DRILL_READER_DATABASE_URL: {
+      cluster: PILOT_CLUSTER,
+      username: "growthos-restore-reader",
+    },
+    RESTORE_DRILL_RECOVERED_READER_DATABASE_URL: {
+      cluster: RECOVERED_PILOT_CLUSTER,
+      username: "growthos-restore-reader",
+    },
+  };
+  for (const [key, { cluster, username }] of Object.entries(
+    databaseSecretTargets,
+  )) {
+    if (!Object.hasOwn(values, key)) continue;
     let url;
     try {
-      url = new URL(values.DATABASE_URL);
+      url = new URL(values[key]);
       decodeURIComponent(url.password);
     } catch {
       throw new Error("pilot_secret_database_target_invalid");
     }
     if (
       url.protocol !== "postgresql:" ||
-      url.hostname !== `pgbouncer.${PILOT_CLUSTER}.flympg.net` ||
-      url.username !== "growthos-staging-live" ||
+      url.hostname !== `pgbouncer.${cluster}.flympg.net` ||
+      url.username !== username ||
       !url.password ||
       url.pathname !== `/${PILOT_DATABASE}` ||
       url.port ||
-      url.search ||
-      url.hash
+      url.href.includes("?") ||
+      url.href.includes("#")
     )
       throw new Error("pilot_secret_database_target_invalid");
   }

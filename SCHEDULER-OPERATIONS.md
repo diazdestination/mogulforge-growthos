@@ -2,6 +2,16 @@
 
 Updated: 2026-09-30. Status: implementation and isolated acceptance; **not a deployment or paid-beta approval**.
 
+October 1 held-staging update: application candidate `c050067` now has actual
+Session-pool ownership/heartbeat proof, two real 60-second source-scheduler
+cycles, a graceful replacement worker and a scoped crash-after-task drill on
+isolated PostgreSQL. No duplicate task was created; the uncertain first result
+remained indeterminate and visible. Details and limitations are in the
+[controlled-pilot ledger](reports/controlled-pilot-2026-09-30.md). These checks
+used private code-only supervisors, not real message effects. Staging's normal
+scheduler and customer sending remain disabled. The source scripts and
+operator runbooks preserve the owned-row/process and no-blind-replay guards.
+
 ## What this release adds
 
 GrowthOS's web process also runs the scheduler. It begins one cycle at startup, waits for that cycle to finish, then waits 60 seconds before the next cycle. A PostgreSQL session advisory lock prevents two healthy processes from running global cycles concurrently during a rolling release. Scheduled effects retain their tenant-scoped durable execution receipt; losing a process or database connection never authorizes replay of an uncertain effect.
@@ -34,14 +44,14 @@ Fly's published base pricing shows shared-1x/256 MB at $1.94 per month, with ext
 
 ## Operator response
 
-| State | Meaning | Next action |
-| --- | --- | --- |
-| No worker observed | No runtime row exists | Verify the schema and start the approved application. |
-| Current / processing | Recent progress; cycle finished or is running | Inspect due work and reviews separately. This is not delivery proof. |
-| Heartbeat overdue | No stage progress for over five minutes | Inspect machine, database connectivity, logs and the last stage. A long stage can also trigger this conservative warning. |
-| Needs attention | A stage or cycle failed | Inspect the named stage and its records; resolve the underlying problem. |
-| Worker stopped | Graceful shutdown was recorded | Confirm a replacement is running and produces fresh progress. |
-| Execution review > 0 | An effect is uncertain or ownership expired | Open the owning client's Revenue Desk, inspect the receipt and downstream evidence, then reconcile. Never blindly resend. |
+| State                | Meaning                                       | Next action                                                                                                               |
+| -------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| No worker observed   | No runtime row exists                         | Verify the schema and start the approved application.                                                                     |
+| Current / processing | Recent progress; cycle finished or is running | Inspect due work and reviews separately. This is not delivery proof.                                                      |
+| Heartbeat overdue    | No stage progress for over five minutes       | Inspect machine, database connectivity, logs and the last stage. A long stage can also trigger this conservative warning. |
+| Needs attention      | A stage or cycle failed                       | Inspect the named stage and its records; resolve the underlying problem.                                                  |
+| Worker stopped       | Graceful shutdown was recorded                | Confirm a replacement is running and produces fresh progress.                                                             |
+| Execution review > 0 | An effect is uncertain or ownership expired   | Open the owning client's Revenue Desk, inspect the receipt and downstream evidence, then reconcile. Never blindly resend. |
 
 Failed-record counts include historical records; they are not all currently actionable incidents. Reconciliation records an observed outcome and does not enqueue a resend. If a new action is justified, it needs its own authorization and evidence after reconciliation. A pre-ownership failure has no execution receipt: inspect its safe scheduled record, repair the preparation problem, and prepare a new approved action only after confirming no effect occurred.
 

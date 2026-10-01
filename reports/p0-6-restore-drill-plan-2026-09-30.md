@@ -1,4 +1,32 @@
-# P0-6 restore drill: preparation, not acceptance
+# P0-6 restore drill: plan and dated acceptance
+
+## Hosted outcome — September 30 evening (October 1 UTC)
+
+The planned managed recovery was actually exercised on application candidate
+`c050067`. A completed full backup of two inert synthetic organizations was
+restored into temporary MPG cluster `dzx6qo652zg0jpv5`. Both source/recovered
+fingerprints matched; record graphs, private-file bytes, actual credential
+decryption and wrong-key/context rejection passed. The same compiled API
+booted with a Reader and passed nine authenticated reads, private-file
+retrieval, four cross-tenant denials and five write/authentication denials.
+
+Successful inspection completed at `2026-10-01T03:42:18.499Z`; the full-backup
+start was `03:25:16Z`. That 17-minute 2.499-second exercise window includes
+diagnostic retries and is not a contractual RTO. No frozen fixture data was
+lost; continuous-production RPO is not measured by a frozen sample.
+
+Fly regenerated the Reader password on restore. The recovered credential was
+retrieved securely for that exact target, never reused from the source or
+written to Git. Cleanup was verified: temporary cluster deleted, no attached
+apps, only the original production and isolated staging clusters remain;
+temporary credential/bearer references removed. No provider was called.
+
+See [the current evidence ledger](controlled-pilot-2026-09-30.md) for backup ID,
+image/bundle hashes, fingerprints, failed-attempt diagnosis, cleanup and
+remaining release gates. The original plan below is historical context, not a
+request to repeat provisioning or an assertion that the source is still empty.
+
+## Original preparation record
 
 Date: 2026-09-30 EDT. Status: **tools tested locally; hosted acceptance still required**.
 The guarded fixture builder, read-only fingerprints, real application credential
@@ -11,11 +39,14 @@ was performed by this preparation work, and no provider was called.
 ## Decision boundary
 
 The separate `mogulforge-growthos-staging-db` MPG cluster
-(`zp2wjrejd2zodn4q`) is provisioned but currently contains no GrowthOS schema
-or meaningful synthetic fixture. Its initial backup cannot demonstrate
-GrowthOS recovery. The old, stopped staging app still points at a logical DB
-on the production-shared cluster. Neither is an acceptable source for this
-drill today. See [staging preflight](../STAGING-PREFLIGHT-2026-09-30.md).
+(`zp2wjrejd2zodn4q`) now contains the **90-table reviewed schema**. The app
+writer and Reader have been checked/staged without starting the app. The
+old Machine remains stopped; its staged database change has not yet been
+consumed. A meaningful synthetic fixture, post-fixture backup and completed
+recovery checks are still required before a restore can pass. The initial
+empty backup is not sufficient. See the newest
+[controlled-pilot evidence](controlled-pilot-2026-09-30.md) and
+[staging preflight](../STAGING-PREFLIGHT-2026-09-30.md).
 
 Fly's managed-backup command **always restores into a new, separately billed
 cluster**, leaving the source untouched. A short-lived third cluster is thus
