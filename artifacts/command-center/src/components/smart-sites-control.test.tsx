@@ -133,6 +133,52 @@ afterEach(() => {
 });
 
 describe('Smart Sites operator controls', () => {
+  it("guides both website types through the same draft flow without activating a connection", async () => {
+    const calls = setup();
+    renderWithQuery(<SmartSitesControl />);
+    const existing = await screen.findByRole("radio", {
+      name: "Keep my current website",
+    });
+    expect((existing as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByText("What happens before leads can arrive?"));
+    expect(
+      screen.getByText(/A supported backend or secure relay is required/),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("radio", { name: "Connect a MogulForge Smart Site" }),
+    );
+    expect(screen.getByText(/Have your Smart Site installer/)).toBeTruthy();
+    expect(screen.getByText(/A draft does not enable capture/)).toBeTruthy();
+    expect(
+      calls.mock.calls.filter(
+        ([, init]) => init?.method && init.method !== "GET",
+      ),
+    ).toHaveLength(0);
+    fireEvent.change(screen.getByLabelText("Site name"), {
+      target: { value: "Existing HVAC website" },
+    });
+    fireEvent.change(screen.getByLabelText("Unique source label"), {
+      target: { value: "existing-hvac-website" },
+    });
+    fireEvent.change(screen.getByLabelText("Business intake profile"), {
+      target: { value: "hvac" },
+    });
+    fireEvent.click(existing);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create draft connection" }),
+    );
+    await screen.findByText("Save this server key securely");
+    const writes = calls.mock.calls.filter(
+      ([, init]) => init?.method && init.method !== "GET",
+    );
+    expect(writes).toHaveLength(1);
+    expect(JSON.parse(String(writes[0][1]?.body))).toEqual({
+      name: "Existing HVAC website",
+      siteKey: "existing-hvac-website",
+      profile: "hvac",
+    });
+    expect(screen.getByText("Capture off")).toBeTruthy();
+  });
   it('shows four starter profiles, creates a draft, and dismisses its one-time key', async () => {
     const calls = setup();
     renderWithQuery(<SmartSitesControl />);

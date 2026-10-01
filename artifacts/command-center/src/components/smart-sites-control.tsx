@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SmartSiteFollowup, ResponseTarget } from './smart-site-followup';
 import { SmartSiteAcquisition } from './smart-site-acquisition';
+import { WebsiteConnectionGuide } from './website-connection-guide';
 
 type Site = {
   id: string;
@@ -324,9 +325,9 @@ function SmartSitesWorkspace({
             Your sites. One growth workspace.
           </CardTitle>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Connect the next client experience to real leads, clear ownership
-            and measurable outcomes. Website branding stays independent;
-            customer records stay in this organization.
+            Bring inquiries from your current website or a MogulForge Smart Site
+            into one lead inbox. Give each inquiry an owner and follow its progress.
+            Each company has its own workspace.
           </p>
         </CardHeader>
         <CardContent>
@@ -424,10 +425,10 @@ function SmartSitesWorkspace({
         organizationId={organizationId}
         canManage={canManage}
       />
-      <div className="grid gap-5 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Connect a Smart Site</CardTitle>
+            <CardTitle className="text-lg">Connect your website</CardTitle>
           </CardHeader>
           <CardContent>
             {canManage ? (
@@ -438,6 +439,7 @@ function SmartSitesWorkspace({
                   create.mutate();
                 }}
               >
+                <WebsiteConnectionGuide />
                 <div className="space-y-2">
                   <Label htmlFor="smart-name">Site name</Label>
                   <Input
@@ -496,6 +498,7 @@ function SmartSitesWorkspace({
                 </p>
                 <Button
                   type="submit"
+                  className="dark:text-background"
                   disabled={create.isPending || !profiles.data}
                 >
                   {create.isPending ? (
@@ -515,7 +518,7 @@ function SmartSitesWorkspace({
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex-row items-center justify-between gap-3">
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
             <CardTitle className="text-lg">Connected experiences</CardTitle>
             <Button
               size="sm"

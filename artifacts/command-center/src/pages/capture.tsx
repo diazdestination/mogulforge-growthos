@@ -151,9 +151,19 @@ export default function Capture() {
     previewMapping.mutate({ data: { mapping, payload } });
   };
 
-  const copy = (text: string, label: string) => {
-    void navigator.clipboard?.writeText(text);
-    toast({ title: `${label} copied` });
+  const copy = async (text: string, label: string) => {
+    try {
+      if (!navigator.clipboard?.writeText)
+        throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(text);
+      toast({ title: `${label} copied` });
+    } catch {
+      toast({
+        title: "Could not copy",
+        description: "Select the text and copy it manually.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -163,9 +173,9 @@ export default function Capture() {
             <Webhook className="h-6 w-6" aria-hidden="true" /> Lead Capture
           </h1>
           <p className="text-sm text-muted-foreground">
-            Connect branded Smart Sites or existing forms to this organization's
-            lead workspace. Smart Sites saves a consent receipt and follow-up task
-            with each accepted inquiry.
+            Keep your current website or connect a MogulForge Smart Site.
+            Set up lead delivery, choose who responds, and verify the connection
+            before turning it on.
           </p>
         </div>
 
