@@ -8,6 +8,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { RELEASE_FILES } from "../hosted-pilot-drill.mjs";
 import { IDLE_SOURCE_HASHES } from "../pilot-scheduler-idle.mjs";
+import { CRASH_SOURCE_HASHES } from "../pilot-crash-drill.mjs";
 import { prepareRuntimePool } from "../pilot-scheduler-probe.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -15,13 +16,14 @@ const frozen = new Map([
   [resolve(root, "artifacts/api-server/src/index.ts"), "index.ts"],
   [resolve(root, "artifacts/api-server/src/services/automation.ts"), "automation.ts"],
   [resolve(root, "artifacts/api-server/src/services/scheduler-runtime.ts"), "scheduler-runtime.ts"],
+  [resolve(root, "artifacts/api-server/src/services/reactivation.ts"), "reactivation.ts"],
 ]);
 export const historicalSourcePath = (path) => frozen.has(path)
   ? fileURLToPath(new URL(`./fixtures/c050067/${frozen.get(path)}.txt`, import.meta.url)) : path;
 export const readHistoricalSource = (path, encoding) => readFile(historicalSourcePath(path), encoding);
 
 export async function verifyHistoricalFixtures() {
-  const manifest = { ...RELEASE_FILES, ...IDLE_SOURCE_HASHES };
+  const manifest = { ...RELEASE_FILES, ...IDLE_SOURCE_HASHES, ...CRASH_SOURCE_HASHES };
   for (const [relative, expected] of Object.entries(manifest)) {
     const path = resolve(root, relative);
     if (!frozen.has(path)) continue;

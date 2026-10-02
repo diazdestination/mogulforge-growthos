@@ -8,12 +8,13 @@ import { EventEmitter } from "node:events";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { trackPgliteSocketCleanup } from "./test-support/pglite-socket-cleanup.mjs";
 import { historicalSourcePath, readHistoricalSource, loadHistoricalPilotRuntime } from "./test-support/historical-pilot-source.mjs";
-import { RELEASE_SHA, IMAGE_REF, RELEASE_FILES } from "./hosted-pilot-drill.mjs";
+import { RELEASE_SHA, IMAGE_REF } from "./hosted-pilot-drill.mjs";
 import { reviewedSchema } from "./pilot-staging-bootstrap.mjs";
 import { fixtureIds, fixtureRows } from "./restore-drill-fixture.mjs";
 import {
   advanceSyntheticClock,
   attestCrashSources,
+  CRASH_SOURCE_HASHES,
   crashConfiguration,
   crashFailure,
   crashIdentity,
@@ -53,6 +54,13 @@ const pinnedIndexPath = fileURLToPath(
 );
 const historicalIndexFixturePath = fileURLToPath(
   new URL("./test-support/fixtures/c050067/index.ts.txt", import.meta.url),
+);
+const pinnedReactivationRelativePath = "artifacts/api-server/src/services/reactivation.ts";
+const pinnedReactivationPath = fileURLToPath(
+  new URL(`../${pinnedReactivationRelativePath}`, import.meta.url),
+);
+const historicalReactivationFixturePath = fileURLToPath(
+  new URL("./test-support/fixtures/c050067/reactivation.ts.txt", import.meta.url),
 );
 
 describe("hosted crash probe guards", () => {
@@ -157,13 +165,13 @@ describe("hosted crash probe guards", () => {
       crashFailure({ message: "private", code: "ABCDE" }, "private"),
     ).toMatchObject({ sqlstate: null, phase: "unknown" });
   });
-  it("attests frozen startup and other actual pinned sources without an ambient bundle", async () => {
+  it("attests frozen evolved sources and unchanged pinned sources without an ambient bundle", async () => {
     const root = fileURLToPath(new URL("../", import.meta.url));
     const bundlePath = fileURLToPath(
       new URL("../artifacts/api-server/dist/index.mjs", import.meta.url),
     );
     // CI runs tests before build: the bundle is synthetic. Evolved startup and
-    // scheduler sources come from frozen, hash-checked c050067 test fixtures;
+    // scheduler/reactivation sources come from frozen, hash-checked c050067 test fixtures;
     // unchanged helpers remain real reads. This is not current-release proof.
     const bundle = Buffer.from("synthetic-crash-attestation-bundle-v1\n");
     const bundleSha = createHash("sha256").update(bundle).digest("hex");
@@ -184,6 +192,8 @@ describe("hosted crash probe guards", () => {
     expect(actualSourceReads).not.toContain(bundlePath);
     expect(actualSourceReads).not.toContain(pinnedIndexPath);
     expect(actualSourceReads).toContain(historicalIndexFixturePath);
+    expect(actualSourceReads).not.toContain(pinnedReactivationPath);
+    expect(actualSourceReads).toContain(historicalReactivationFixturePath);
     expect(
       actualSourceReads.some((path) => path.endsWith("pilot-crash-runtime.ts")),
     ).toBe(true);
@@ -205,16 +215,19 @@ describe("hosted crash probe guards", () => {
       ),
     ).rejects.toThrow("hosted_release_source_mismatch");
   });
-  it("pins the historical startup fixture and rejects changed current startup bytes", async () => {
-    const frozen = await readFile(historicalIndexFixturePath, "utf8");
+  it.each([
+    { label: "startup", relativePath: pinnedIndexRelativePath, currentPath: pinnedIndexPath, fixturePath: historicalIndexFixturePath },
+    { label: "reactivation", relativePath: pinnedReactivationRelativePath, currentPath: pinnedReactivationPath, fixturePath: historicalReactivationFixturePath },
+  ])("pins the historical $label fixture and rejects changed current $label bytes", async ({ relativePath, currentPath, fixturePath }) => {
+    const frozen = await readFile(fixturePath, "utf8");
     const sourceSha = (text) =>
       createHash("sha256").update(text.replace(/\r\n/g, "\n")).digest("hex");
-    expect(sourceSha(frozen)).toBe(RELEASE_FILES[pinnedIndexRelativePath]);
+    expect(sourceSha(frozen)).toBe(CRASH_SOURCE_HASHES[relativePath]);
 
-    const current = await readFile(pinnedIndexPath, "utf8");
+    const current = await readFile(currentPath, "utf8");
     // If this test is cherry-picked onto the old tree, still exercise mismatch
-    // rejection. On an evolved tree, reject its actual startup bytes unchanged.
-    const changed = sourceSha(current) === RELEASE_FILES[pinnedIndexRelativePath]
+    // rejection. On an evolved tree, reject its actual current bytes unchanged.
+    const changed = sourceSha(current) === CRASH_SOURCE_HASHES[relativePath]
       ? `${current}\n// Synthetic historical-attestation mismatch.\n`
       : current;
     const root = fileURLToPath(new URL("../", import.meta.url));
@@ -233,7 +246,7 @@ describe("hosted crash probe guards", () => {
         },
         async (path, encoding) => {
           if (path === bundlePath) return bundle;
-          if (path === pinnedIndexPath) return changed;
+          if (path === currentPath) return changed;
           return readHistoricalSource(path, encoding);
         },
       ),

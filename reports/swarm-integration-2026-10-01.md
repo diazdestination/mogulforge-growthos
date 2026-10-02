@@ -74,6 +74,17 @@ both builds and Docker staging parity. The candidate PR records the run URL/SHA
 and result; an earlier branch's green CI is not this candidate's acceptance.
 The coordinator also scans changed files for secrets before committing.
 
+First CI run `36946564027` on `0721433` found two historical crash-drill test
+failures: its immutable source manifest correctly rejected the newly changed
+reactivation source. The test-support reader now freezes that source from the
+original `c050067000f3ea1f2d94aa53b3a9c4f71f0d3b41`, matching the unchanged
+recorded SHA-256. A new negative case rejects the actual current source under
+that old pin. Production attestation harnesses and recorded evidence were not
+changed; this is a test-fixture repair, not fresh hosted release proof. The
+eight focused crash-guard tests and all 60 related crash/idle/probe tests pass,
+including the actual 60-second scheduler spacing check. The new head still
+requires full CI.
+
 Browser evidence is local at
 `C:\Forge\workspace\growthos-swarm-2026-10-01\results.json` with screenshots.
 No browser recording, trace, customer identity or real provider send was used.
