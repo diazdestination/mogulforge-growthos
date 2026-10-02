@@ -1,19 +1,38 @@
 # GrowthOS project state
 
 Updated October 2, 2026. GEEKOM retrieved and independently reviewed WILLOWFORGE's
-`caec65a6f2ffa7821721e9ea97a31a4fafd4afc8` (PR #11). The cumulative integration
-candidate is `agent/integrate-contractor-day-20261002`; its PR and exact-head CI
-are authoritative for integration status. See
+`caec65a6f2ffa7821721e9ea97a31a4fafd4afc8` (PR #11). Cumulative integration PR #12
+merged as main `47aca5beeb06e665bddfff23545640d779de51cc`. Exact-main CI
+[37052487433](https://github.com/diazdestination/mogulforge-growthos/actions/runs/37052487433)
+passed: 2,600 tests, 15 existing API skips, types, both production builds and Docker
+parity. This is source/build evidence, not provider or customer activation. See
 `reports/geekom-contractor-integration-2026-10-02.md` for repairs and release gates.
 The existing Microsoft/mobile source at `2c12ddc` is an ancestor and is preserved.
+Fresh managed recovery evidence is in
+`reports/managed-contractor-recovery-2026-10-02.md`: the restored 95-table backup,
+reviewed 103-table schema rehearsal and 37 exact-image restricted application
+checks passed. All 103 table fingerprints were unchanged during app inspection
+and provider-network attempts were zero. This is synthetic recovery evidence;
+the regular held staging app still runs 77f6d63/95 tables. Production remains
+stopped. Neither contractor is ready for onboarding or old-system cancellation.
 Azure account creation is now user-reported; first sign-in and directory/app
 inventory are explicitly deferred until the owner returns. Do not create another
 account or treat the account as verified, connected, or authorized for sends.
 
 Prior WILLOWFORGE candidate: `agent/growthos-native-contractor-day`,
 stacked on `agent/growthos-contractor-operations` (PR #10), beta PR #9, swarm PR #8, contractor PR #7, Revenue Desk PR #6 and
-recovery PR #1. GitHub main remains the eventual canonical integration target.
-No merge or deployment is implied by a local candidate or green CI.
+recovery PR #1. All seven stack heads are ancestors of the integrated main.
+PR #1 was marked merged; #6–#11 were closed with incorporation notes rather than
+separately merged. Branches and the original Microsoft/mobile work are preserved.
+No production deployment is implied by integration or green CI.
+
+The owner's October 2 requirement is now binding:
+`HOUSECALL-PRO-REPLACEMENT-GATE.md`. Both contractors' actual critical workflows
+must replace their Housecall Pro usage before onboarding/cutover. Neither company
+has passed. Missing customer service-reminder/missed-call loops, invoice delivery,
+agreed collection and reconciled migration remain engineering/acceptance work,
+not merely provider credentials. Payment processor selection is pending the
+owner's answer; platform subscription Stripe is not contractor collection.
 
 Adam's current replacement direction is in `GROWTHOS-CONTRACTOR-OPERATIONS.md`:
 native scheduling, invoices, warranty tracking and clear daily navigation.

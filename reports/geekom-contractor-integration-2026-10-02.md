@@ -90,6 +90,11 @@ cumulative source must not be attributed to this old deployed image.
 
 ## Release gates that remain separate
 
+October 2 follow-up: the temporary managed restore, 95-to-103 rehearsal and
+restricted exact-image app inspection below now have fresh evidence in
+`managed-contractor-recovery-2026-10-02.md`. This does not close the held original
+staging rollout, provider, full native-workday or customer-activation gates.
+
 - Review/rehearse the exact 95-to-103 additive SQL on an approved restored
   target. Verify fresh backup, lock budget, original-column row preservation,
   defaults, constraints, tenant guards and negative Reader/Writer privileges.

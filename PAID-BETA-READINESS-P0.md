@@ -7,6 +7,15 @@
 
 ## Mission
 
+**October 2 replacement acceptance requirement:** the owner requires both
+contractors to be able to replace their actual required Housecall Pro workflows
+before onboarding/cutover. `HOUSECALL-PRO-REPLACEMENT-GATE.md` records the missing
+engineering and separate company acceptance cards. Green CI or a smaller assisted
+pilot does not satisfy that outcome. The approved temporary managed recovery
+exercise is tracked in `reports/managed-contractor-recovery-2026-10-02.md`; it
+does not authorize production, customer sends/charges, a permanent third database,
+or cancellation of either contractor's old subscription.
+
 **October 1 native replacement addendum:** after the complete PR10 gate passed
 at `48c3491`, Adam explicitly authorized finishing the next wave and further
 useful engineering. The invoice/schedule/service and daily-navigation scope in

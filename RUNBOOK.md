@@ -6,7 +6,14 @@ Use an isolated branch, verify identity/target and preserve other agents' work.
 - Product and scope: `GROWTHOS-CONTRACTOR-OPERATIONS.md` and `GROWTHOS-CONTRACTOR-PRODUCT.md`.
 - Current integration: `reports/geekom-contractor-integration-2026-10-02.md`;
   upstream scope: `reports/native-contractor-day-integration.md` and specialist reports.
-- Customer adoption/commercial acceptance: `BETA-CONTRACTOR-SUCCESS.md`.
+- Fresh managed recovery/schema evidence and cleanup status:
+  `reports/managed-contractor-recovery-2026-10-02.md`. One-use private target pins
+  are not a general staging migration command. Never print raw
+  `fly mpg status --json`: it includes credentials; use bounded allowlisted output.
+- Customer adoption/commercial acceptance: `BETA-CONTRACTOR-SUCCESS.md` and
+  `HOUSECALL-PRO-REPLACEMENT-GATE.md`. Required Housecall Pro workflows must be
+  accepted before either company's real onboarding/cutover; recovery proof alone
+  is not replacement readiness.
 - Invoices: `reports/native-contractor-invoices.md`; internal issue is distinct from send/collection.
 - Staff invitations/readiness: `reports/contractor-operations-onboarding.md`.
 - Reply review/holds and trusted normalizer contract: `reports/contractor-operations-replies.md`.
