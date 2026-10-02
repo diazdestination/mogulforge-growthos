@@ -3,8 +3,8 @@
  * deletion order, retention policy, or proof of complete account ownership.
  * Every new table must receive an explicit classification before preview runs.
  */
-export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-01.inventory-v3";
-export const DATA_LIFECYCLE_EXPECTED_TABLES = 99;
+export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-01.inventory-v4";
+export const DATA_LIFECYCLE_EXPECTED_TABLES = 103;
 export const DATA_LIFECYCLE_ROW_LIMIT = 10_000;
 
 export type InventoryCategory =
@@ -74,6 +74,10 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   { table: "identity_tokens", category: "account_access", ownership: "indirect_org", selector: "user_organization" },
   direct("installation_checks", "configuration"),
   direct("installation_keys", "account_access"),
+  direct("invoice_operations", "audit"),
+  direct("invoice_receipt_allocations", "crm"),
+  direct("invoice_sequences", "configuration"),
+  direct("invoices", "crm"),
   direct("knowledge_entries", "intelligence"),
   direct("lead_imports", "acquisition"),
   direct("lead_tags", "crm"),

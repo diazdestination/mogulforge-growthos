@@ -32,4 +32,5 @@ export interface Appointment {
   /** @nullable */
   notes?: string | null;
   createdAt: Date;
+  updatedAt?: Date;
 }

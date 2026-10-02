@@ -32,11 +32,17 @@ platform expansion just to increase a feature count.
 
 ## Customer message
 
-**Turn more inquiries into booked work. Keep the tools your team already uses.**
+**Your contractor workday, clearly organized.**
 
-GrowthOS brings website inquiries, follow-up work and customer history into a
-shared workspace, helps your team act on neglected opportunities, and tracks
-what happens next. Choose a MogulForge Smart Site or connect your existing site.
+Schedule work, prepare invoices, and keep warranty and service follow-ups in one
+workspace. Connect a MogulForge Smart Site or your existing website, then add
+the tested growth automations your team needs. The daily path is Today,
+Customers & Jobs, Schedule, Invoices, and Warranties & Service.
+
+The native-contractor-day candidate implements internal invoice issue/void,
+recorded receipt reconciliation and explicit service recurrence. Email delivery,
+customer payment collection and migrated opening balances require separate
+acceptance. Use this message only alongside the capabilities actually enabled.
 
 Use the headline as positioning, not a guarantee. Before selling, distinguish
 implemented, configured, tested and live capabilities. Describe Housecall Pro
@@ -44,14 +50,14 @@ connectivity as planned until the actual connector passes acceptance. A lead
 receipt is not a booking, provider delivery is not a reply, and a recorded win
 is not collected cash or incremental profit.
 
-### Why pay in addition to Housecall Pro?
+### Why switch, and why pay a premium?
 
-Housecall Pro already has Pipeline automation for leads, estimates and jobs.
-"AI follow-up" alone is a weak premium offer. Our differentiator must be the
-operated system across acquisition, accountable response, source-aware recovery
-and inspectable results, including installation and ongoing optimization within
-clear service limits. A prospect whose existing system already achieves those
-outcomes with little effort may not need GrowthOS.
+The beta buyers described confusing navigation and unreliable daily work.
+Replacing that pain requires observable usability and dependable handoffs.
+"AI follow-up" alone does not establish a premium offer. Validate the daily
+replacement first, then show the value of accountable response, source-aware
+recovery, service retention and a bounded optimization service. Do not require a
+second permanent Housecall Pro subscription as a condition of native operation.
 
 ## Package design
 
@@ -92,10 +98,12 @@ through missing exports, withheld credentials or deliberately difficult cancella
 
 ## Product experience
 
-Contractor-facing destinations: **Today**, **Opportunities**, **Customers**,
-**Results** and **Settings**. Map these to existing Revenue Desk, pipeline,
-customer history and reporting rather than building parallel modules. This is
-a navigation target; it is not all implemented by this change.
+Contractor-facing destinations: **Today**, **Customers & Jobs**, **Schedule**,
+**Invoices**, and **Warranties & Service**. The native-contractor-day candidate
+implements that organization using existing customer/job routes, a read-only
+daily snapshot, and shared role-aware navigation/search. Revenue, growth,
+reports and administration remain secondary destinations. GrowthOS billing is
+labelled Subscription to distinguish it from customer invoices.
 
 - Default to today's actionable work with owner, reason, last real interaction,
   source freshness and a clear next action. Hide developer configuration by default.

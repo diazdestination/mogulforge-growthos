@@ -47,6 +47,8 @@ import emailIntelligenceRouter from "./email-intelligence";
 import serviceObligationsRouter from "./service-obligations";
 import dataLifecycleInventoryRouter from "./data-lifecycle-inventory";
 import customerLifecycleRouter from "./customer-lifecycle";
+import contractorTodayRouter from "./contractor-today";
+import invoicesRouter from "./invoices";
 
 const router: IRouter = Router();
 
@@ -54,6 +56,8 @@ router.use(billingRouter);
 router.use(demoRouter);
 router.use(bieRouter);
 router.use(revenueWorkspaceRouter);
+router.use(contractorTodayRouter);
+router.use(invoicesRouter);
 router.use(evidenceIntelligenceRouter);
 router.use(gmailIntegrationsRouter);
 router.use(microsoftIntegrationsRouter);

@@ -315,6 +315,8 @@ export interface Member {
   lastName: string | null;
   role: UserRole;
   isActive: boolean;
+  /** Active accepted staff with customer-work permission; false for pending invitations. */
+  operationallyEligible?: boolean;
 }
 
 export type InvitedMemberInviteEmail = {
@@ -843,6 +845,8 @@ export interface ProjectUpdate {
   crewUserIds?: string[];
   /** @nullable */
   crewNotes?: string | null;
+  /** Last observed update token; stale edits return 409. */
+  expectedUpdatedAt?: string;
 }
 
 export type ActivityMetadata = { [key: string]: unknown };
@@ -967,6 +971,7 @@ export interface Appointment {
   /** @nullable */
   notes?: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface AppointmentInput {
@@ -997,6 +1002,8 @@ export interface AppointmentUpdate {
   scheduledEnd?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** Last observed update token; stale edits return 409. */
+  expectedUpdatedAt?: string;
 }
 
 export type DashboardSummaryLeadsByStatusItem = {
@@ -3201,6 +3208,739 @@ export interface CustomerReplyDecision {
   releaseNote: string | null;
 }
 
+export interface InvoiceLineInput {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  description: string;
+  /**
+     * Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.
+     * @pattern ^\d{1,6}(?:\.\d{1,3})?$
+     */
+  quantity: string;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  unitPriceCents: number;
+}
+
+export interface InvoiceLine {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  description: string;
+  /**
+     * Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.
+     * @pattern ^\d{1,6}(?:\.\d{1,3})?$
+     */
+  quantity: string;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  unitPriceCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  totalCents: number;
+}
+
+export type InvoiceDocumentInputCurrency = typeof InvoiceDocumentInputCurrency[keyof typeof InvoiceDocumentInputCurrency];
+
+
+export const InvoiceDocumentInputCurrency = {
+  USD: 'USD',
+} as const;
+
+export interface InvoiceDocumentInput {
+  /**
+     * @minLength 1
+     * @maxLength 150
+     */
+  title: string;
+  currency: InvoiceDocumentInputCurrency;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  issuerName: string;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  issuerAddress?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  customerName: string;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  customerAddress?: string | null;
+  /** @nullable */
+  dueDate?: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  notes?: string | null;
+  /** @maxItems 100 */
+  lineItems: InvoiceLineInput[];
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  taxCents: number;
+}
+
+export type InvoiceDocumentCurrency = typeof InvoiceDocumentCurrency[keyof typeof InvoiceDocumentCurrency];
+
+
+export const InvoiceDocumentCurrency = {
+  USD: 'USD',
+} as const;
+
+export interface InvoiceDocument {
+  /**
+     * @minLength 1
+     * @maxLength 150
+     */
+  title: string;
+  currency: InvoiceDocumentCurrency;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  issuerName: string;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  issuerAddress: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  customerName: string;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  customerAddress: string | null;
+  /** @nullable */
+  dueDate: string | null;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  notes: string | null;
+  /** @maxItems 100 */
+  lineItems: InvoiceLine[];
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  taxCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  subtotalCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  totalCents: number;
+}
+
+export type InvoiceSummaryStatus = typeof InvoiceSummaryStatus[keyof typeof InvoiceSummaryStatus];
+
+
+export const InvoiceSummaryStatus = {
+  draft: 'draft',
+  issued: 'issued',
+  void: 'void',
+} as const;
+
+export type InvoiceSummaryCurrency = typeof InvoiceSummaryCurrency[keyof typeof InvoiceSummaryCurrency];
+
+
+export const InvoiceSummaryCurrency = {
+  USD: 'USD',
+} as const;
+
+export type InvoiceSummaryPaymentState = typeof InvoiceSummaryPaymentState[keyof typeof InvoiceSummaryPaymentState];
+
+
+export const InvoiceSummaryPaymentState = {
+  unpaid: 'unpaid',
+  partial: 'partial',
+  paid: 'paid',
+  reconciliation_required: 'reconciliation_required',
+} as const;
+
+export interface InvoiceSummary {
+  id: string;
+  leadId: string;
+  /** @nullable */
+  projectId: string | null;
+  /** @nullable */
+  estimateId: string | null;
+  /** @nullable */
+  invoiceNumber: string | null;
+  status: InvoiceSummaryStatus;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  version: number;
+  title: string;
+  customerName: string;
+  currency: InvoiceSummaryCurrency;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  subtotalCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  taxCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  totalCents: number;
+  /** @nullable */
+  dueDate: string | null;
+  /** @nullable */
+  issuedAt: string | null;
+  /** @nullable */
+  voidedAt: string | null;
+  /** @nullable */
+  voidReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  recordedPaidCents: number;
+  recordedBalanceCents: number;
+  /** @nullable */
+  balanceDueCents: number | null;
+  paymentState: InvoiceSummaryPaymentState;
+  reconciliationRequired: boolean;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  unallocatedRefundCents: number;
+}
+
+export type InvoiceAllocationKind = typeof InvoiceAllocationKind[keyof typeof InvoiceAllocationKind];
+
+
+export const InvoiceAllocationKind = {
+  payment: 'payment',
+  refund: 'refund',
+} as const;
+
+export interface InvoiceAllocation {
+  id: string;
+  valueEntryId: string;
+  kind: InvoiceAllocationKind;
+  sourceReference: string;
+  /**
+     * @minimum 1
+     * @maximum 1000000000
+     */
+  amountCents: number;
+  occurredAt: string;
+  allocatedAt: string;
+  /** @nullable */
+  reversedAt: string | null;
+  /** @nullable */
+  reversalReason: string | null;
+}
+
+export type InvoiceAvailableValueEntryKind = typeof InvoiceAvailableValueEntryKind[keyof typeof InvoiceAvailableValueEntryKind];
+
+
+export const InvoiceAvailableValueEntryKind = {
+  payment: 'payment',
+  refund: 'refund',
+} as const;
+
+export interface InvoiceAvailableValueEntry {
+  id: string;
+  kind: InvoiceAvailableValueEntryKind;
+  sourceReference: string;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  amountCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  availableCents: number;
+  occurredAt: string;
+}
+
+export interface InvoiceEvent {
+  id: string;
+  action: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  version: number;
+  /** @nullable */
+  reason: string | null;
+  createdAt: string;
+}
+
+export type InvoiceDetailStatus = typeof InvoiceDetailStatus[keyof typeof InvoiceDetailStatus];
+
+
+export const InvoiceDetailStatus = {
+  draft: 'draft',
+  issued: 'issued',
+  void: 'void',
+} as const;
+
+export type InvoiceDetailCurrency = typeof InvoiceDetailCurrency[keyof typeof InvoiceDetailCurrency];
+
+
+export const InvoiceDetailCurrency = {
+  USD: 'USD',
+} as const;
+
+export type InvoiceDetailPaymentState = typeof InvoiceDetailPaymentState[keyof typeof InvoiceDetailPaymentState];
+
+
+export const InvoiceDetailPaymentState = {
+  unpaid: 'unpaid',
+  partial: 'partial',
+  paid: 'paid',
+  reconciliation_required: 'reconciliation_required',
+} as const;
+
+export interface InvoiceDetail {
+  id: string;
+  leadId: string;
+  /** @nullable */
+  projectId: string | null;
+  /** @nullable */
+  estimateId: string | null;
+  /** @nullable */
+  invoiceNumber: string | null;
+  status: InvoiceDetailStatus;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  version: number;
+  title: string;
+  customerName: string;
+  currency: InvoiceDetailCurrency;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  subtotalCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  taxCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  totalCents: number;
+  /** @nullable */
+  dueDate: string | null;
+  /** @nullable */
+  issuedAt: string | null;
+  /** @nullable */
+  voidedAt: string | null;
+  /** @nullable */
+  voidReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  recordedPaidCents: number;
+  recordedBalanceCents: number;
+  /** @nullable */
+  balanceDueCents: number | null;
+  paymentState: InvoiceDetailPaymentState;
+  reconciliationRequired: boolean;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  unallocatedRefundCents: number;
+  document: InvoiceDocument;
+  allocations: InvoiceAllocation[];
+  availableValueEntries: InvoiceAvailableValueEntry[];
+  availableValueEntriesTruncated: boolean;
+  events: InvoiceEvent[];
+}
+
+export type InvoiceListPageSize = typeof InvoiceListPageSize[keyof typeof InvoiceListPageSize];
+
+
+export const InvoiceListPageSize = {
+  NUMBER_25: 25,
+} as const;
+
+export interface InvoiceList {
+  /** @maxItems 25 */
+  items: InvoiceSummary[];
+  /** @minimum 0 */
+  total: number;
+  /** @minimum 0 */
+  page: number;
+  pageSize: InvoiceListPageSize;
+}
+
+export interface InvoiceMutation {
+  invoice: InvoiceDetail;
+  duplicate: boolean;
+}
+
+export interface CreateInvoice {
+  requestId: string;
+  leadId: string;
+  /** @nullable */
+  projectId?: string | null;
+  /** @nullable */
+  estimateId?: string | null;
+  document: InvoiceDocumentInput;
+}
+
+export interface UpdateInvoice {
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  expectedVersion: number;
+  document: InvoiceDocumentInput;
+}
+
+export interface IssueInvoice {
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  expectedVersion: number;
+  confirmed: true;
+}
+
+export interface VoidInvoice {
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  expectedVersion: number;
+  confirmed: true;
+  /**
+     * @minLength 10
+     * @maxLength 500
+     */
+  reason: string;
+}
+
+export interface InvoicePayment {
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  expectedVersion: number;
+  confirmed: true;
+  /**
+     * @minimum 1
+     * @maximum 1000000000
+     */
+  amountCents: number;
+  /**
+     * @minLength 5
+     * @maxLength 160
+     */
+  sourceReference: string;
+  /** Actual prior receipt time. Future receipts are rejected. This records cash already received; it does not charge a customer. */
+  occurredAt: string;
+}
+
+export interface InvoiceValueAllocation {
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  expectedVersion: number;
+  confirmed: true;
+  valueEntryId: string;
+  /**
+     * @minimum 1
+     * @maximum 1000000000
+     */
+  amountCents: number;
+}
+
+export interface ReverseInvoiceAllocation {
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  expectedVersion: number;
+  confirmed: true;
+  /**
+     * @minLength 10
+     * @maxLength 500
+     */
+  reason: string;
+}
+
+export interface ContractorDayTask {
+  id: string;
+  title: string;
+  status: string;
+  /** @nullable */
+  dueAt: string | null;
+  /** @nullable */
+  leadId: string | null;
+  /** @nullable */
+  contactId: string | null;
+  /** @nullable */
+  customerLabel: string | null;
+  /** @nullable */
+  assignedUserId: string | null;
+  /** @nullable */
+  assigneeName: string | null;
+  actionPath: string;
+}
+
+export interface ContractorDayAppointment {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  /** @nullable */
+  leadId: string | null;
+  /** @nullable */
+  contactId: string | null;
+  /** @nullable */
+  customerLabel: string | null;
+  /** @nullable */
+  assignedUserId: string | null;
+  /** @nullable */
+  assigneeName: string | null;
+  scheduledStart: string;
+  /** @nullable */
+  scheduledEnd: string | null;
+}
+
+export interface ContractorDayProject {
+  id: string;
+  title: string;
+  status: string;
+  leadId: string;
+  /** @nullable */
+  customerLabel: string | null;
+  crewNames: string[];
+  /** @nullable */
+  scheduledStart: string | null;
+  /** @nullable */
+  scheduledEnd: string | null;
+}
+
+export interface ContractorDayService {
+  id: string;
+  title: string;
+  kind: string;
+  status: string;
+  dueAt: string;
+  contactId: string;
+  /** @nullable */
+  customerLabel: string | null;
+  /** @nullable */
+  assignedUserId: string | null;
+  /** @nullable */
+  assigneeName: string | null;
+  taskId: string;
+}
+
+export type ContractorTodayTimeZoneSource = typeof ContractorTodayTimeZoneSource[keyof typeof ContractorTodayTimeZoneSource];
+
+
+export const ContractorTodayTimeZoneSource = {
+  configured: 'configured',
+  utc_fallback: 'utc_fallback',
+} as const;
+
+export type ContractorTodayScope = typeof ContractorTodayScope[keyof typeof ContractorTodayScope];
+
+
+export const ContractorTodayScope = {
+  mine: 'mine',
+  company: 'company',
+} as const;
+
+export type ContractorTodayTasks = {
+  /** @maxItems 50 */
+  items: ContractorDayTask[];
+  /** @minimum 0 */
+  total: number;
+  truncated: boolean;
+};
+
+export type ContractorTodayAppointments = {
+  /** @maxItems 50 */
+  items: ContractorDayAppointment[];
+  /** @minimum 0 */
+  total: number;
+  truncated: boolean;
+};
+
+export type ContractorTodayProjects = {
+  /** @maxItems 50 */
+  items: ContractorDayProject[];
+  /** @minimum 0 */
+  total: number;
+  truncated: boolean;
+};
+
+export type ContractorTodayServices = {
+  /** @maxItems 50 */
+  items: ContractorDayService[];
+  /** @minimum 0 */
+  total: number;
+  truncated: boolean;
+};
+
+export interface ContractorToday {
+  organizationId: string;
+  generatedAt: string;
+  date: string;
+  timeZone: string;
+  timeZoneSource: ContractorTodayTimeZoneSource;
+  startAt: string;
+  endAt: string;
+  scope: ContractorTodayScope;
+  tasks: ContractorTodayTasks;
+  appointments: ContractorTodayAppointments;
+  projects: ContractorTodayProjects;
+  services: ContractorTodayServices;
+}
+
+export interface ServiceRecurrenceCommand {
+  expectedUpdatedAt: string;
+  /**
+     * Set null to stop future recurrence.
+     * @minimum 1
+     * @maximum 60
+     * @nullable
+     */
+  intervalMonths: number | null;
+  /** @nullable */
+  endDate?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  agreementNote: string;
+}
+
+export type ServiceRecurrenceMode = typeof ServiceRecurrenceMode[keyof typeof ServiceRecurrenceMode];
+
+
+export const ServiceRecurrenceMode = {
+  calendar_months: 'calendar_months',
+} as const;
+
+export interface ServiceRecurrence {
+  mode: ServiceRecurrenceMode;
+  /**
+     * @minimum 1
+     * @maximum 60
+     */
+  intervalMonths: number;
+  anchorDate: string;
+  /** @nullable */
+  endDate: string | null;
+  agreementNote: string;
+  approvedByUserId: string;
+  approvedAt: string;
+}
+
+export type ServiceObligationKind = typeof ServiceObligationKind[keyof typeof ServiceObligationKind];
+
+
+export const ServiceObligationKind = {
+  warranty_check: 'warranty_check',
+  maintenance: 'maintenance',
+  service_plan: 'service_plan',
+} as const;
+
+export type ServiceObligationStatus = typeof ServiceObligationStatus[keyof typeof ServiceObligationStatus];
+
+
+export const ServiceObligationStatus = {
+  active: 'active',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface ServiceObligation {
+  id: string;
+  organizationId: string;
+  contactId: string;
+  /** @nullable */
+  propertyId?: string | null;
+  /** @nullable */
+  appointmentId?: string | null;
+  taskId: string;
+  kind: ServiceObligationKind;
+  equipmentLabel: string;
+  dueAt: string;
+  noticeDays: number;
+  status: ServiceObligationStatus;
+  source: string;
+  /** @nullable */
+  externalRef?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  recurrence?: ServiceRecurrence | null;
+  /** @nullable */
+  predecessorObligationId?: string | null;
+  occurrenceIndex?: number;
+  /** @nullable */
+  coverageStartsOn?: string | null;
+  /** @nullable */
+  coverageEndsOn?: string | null;
+  /** @nullable */
+  coverageEvidence?: string | null;
+  /** @nullable */
+  completionNote?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** @nullable */
+  nextObligationId?: string | null;
+}
+
 /**
  * Opaque session token — `Bearer <sid>`.
  */
@@ -3314,6 +4054,19 @@ assignedUserId?: string;
 
 export type ListAppointmentsParams = {
 leadId?: string;
+/**
+ * Window start; requires to. At most 31 days.
+ */
+from?: string;
+/**
+ * Exclusive window end; requires from.
+ */
+to?: string;
+assignedUserId?: string;
+/**
+ * Filter appointments for an existing customer.
+ */
+contactId?: string;
 };
 
 export type ListAuditEventsParams = {
@@ -3400,5 +4153,38 @@ export type ListCustomerRepliesScope = typeof ListCustomerRepliesScope[keyof typ
 export const ListCustomerRepliesScope = {
   attention: 'attention',
   all: 'all',
+} as const;
+
+export type GetContractorTodayParams = {
+date?: string;
+scope?: GetContractorTodayScope;
+};
+
+export type GetContractorTodayScope = typeof GetContractorTodayScope[keyof typeof GetContractorTodayScope];
+
+
+export const GetContractorTodayScope = {
+  mine: 'mine',
+  company: 'company',
+} as const;
+
+export type ListInvoicesParams = {
+status?: ListInvoicesStatus;
+leadId?: string;
+projectId?: string;
+/**
+ * @minimum 0
+ * @maximum 10000
+ */
+page?: number;
+};
+
+export type ListInvoicesStatus = typeof ListInvoicesStatus[keyof typeof ListInvoicesStatus];
+
+
+export const ListInvoicesStatus = {
+  draft: 'draft',
+  issued: 'issued',
+  void: 'void',
 } as const;
 

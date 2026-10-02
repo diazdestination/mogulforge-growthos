@@ -4,8 +4,11 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { requireMember } from "../../middlewares/requireMember";
 import { emitAutomationEvent } from "../../services/automation";
 import * as crm from "../../services/crm";
+import { z } from "zod";
+import { contractorMutation, contractorScheduleError } from "../../middlewares/contractor-mutation";
 
 const router: IRouter = Router();
+router.use(["/appointments", "/appointments/:id"], contractorMutation);
 
 router.get(
   "/appointments",
@@ -13,7 +16,13 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     const leadId =
       typeof req.query.leadId === "string" ? req.query.leadId : undefined;
-    res.json(await crm.listAppointments(req.member!.organizationId, leadId));
+    const query = z.object({ from: z.iso.datetime().optional(), to: z.iso.datetime().optional(), assignedUserId: z.string().min(1).max(200).optional(), contactId: z.uuid().optional() }).safeParse(req.query);
+    if (!query.success || (Boolean(query.data.from) !== Boolean(query.data.to)) || (query.data.from && query.data.to && (Date.parse(query.data.to) <= Date.parse(query.data.from) || Date.parse(query.data.to) - Date.parse(query.data.from) > 31 * 86_400_000))) {
+      res.status(400).json({ error: "Choose a valid date range of at most 31 days." }); return;
+    }
+    const rows = await crm.listAppointments(req.member!.organizationId, leadId, { from: query.data.from ? new Date(query.data.from) : undefined, to: query.data.to ? new Date(query.data.to) : undefined, assignedUserId: query.data.assignedUserId, contactId: query.data.contactId });
+    res.set("X-Result-Limit-Reached", rows.length >= 200 ? "true" : "false");
+    res.json(rows);
   },
 );
 
@@ -67,7 +76,7 @@ router.patch(
   "/appointments/:id",
   requireMember("crm.write"),
   async (req: Request, res: Response): Promise<void> => {
-    const parsed = UpdateAppointmentBody.safeParse(req.body);
+    const parsed = UpdateAppointmentBody.extend({ expectedUpdatedAt: z.iso.datetime().optional() }).safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid appointment update" });
       return;
@@ -93,4 +102,5 @@ router.patch(
   },
 );
 
+router.use(contractorScheduleError);
 export default router;

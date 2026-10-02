@@ -3,14 +3,23 @@ import { z } from "zod";
 import { requireMember } from "../../middlewares/requireMember";
 import {
   createServiceObligation,
+  approveServiceRecurrence,
   importServiceCustomers,
   listServiceObligations,
   updateServiceObligation,
 } from "../../services/service-obligations";
+import { contractorMutation, contractorScheduleError } from "../../middlewares/contractor-mutation";
 
 const router: IRouter = Router();
+router.use(["/service-obligations", "/service-obligations/:id", "/service-obligations/:id/recurrence"], contractorMutation);
 const kind = z.enum(["warranty_check", "maintenance", "service_plan"]);
 const date = z.string().trim().min(8).max(20);
+const coverageFields = {
+  assignedUserId: z.string().min(1).max(200).nullable().optional(),
+  coverageStartsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  coverageEndsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  coverageEvidence: z.string().trim().max(1000).nullable().optional(),
+};
 const mapping = z.object({
   firstName: z.number().int().min(0).max(200).optional(),
   lastName: z.number().int().min(0).max(200).optional(),
@@ -38,6 +47,7 @@ router.post("/service-obligations", requireMember("crm.write"), async (req, res)
     source: z.string().trim().min(1).max(80).optional(),
     externalRef: z.string().trim().max(160).nullable().optional(),
     notes: z.string().trim().max(500).nullable().optional(),
+    ...coverageFields,
   }).strict().safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid service obligation" });
@@ -57,6 +67,9 @@ router.patch("/service-obligations/:id", requireMember("crm.write"), async (req,
     status: z.enum(["active", "completed", "cancelled"]).optional(),
     dueDate: date.optional(),
     appointmentId: z.uuid().nullable().optional(),
+    expectedUpdatedAt: z.iso.datetime().optional(),
+    completionNote: z.string().trim().max(1000).optional(),
+    ...coverageFields,
   }).strict().refine((value) => Object.keys(value).length > 0).safeParse(req.body);
   if (!id.success || !parsed.success) {
     res.status(400).json({ error: "Invalid service obligation update" });
@@ -67,6 +80,15 @@ router.patch("/service-obligations/:id", requireMember("crm.write"), async (req,
     res.status(result.error === "not_found" ? 404 : 409).json(result);
     return;
   }
+  res.json(result);
+});
+
+router.post("/service-obligations/:id/recurrence", requireMember("crm.write"), async (req, res) => {
+  const id = z.uuid().safeParse(req.params.id);
+  const parsed = z.object({ expectedUpdatedAt: z.iso.datetime(), intervalMonths: z.number().int().min(1).max(60).nullable(), endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), agreementNote: z.string().trim().min(1).max(500) }).strict().safeParse(req.body);
+  if (!id.success || !parsed.success) { res.status(400).json({ error: "Specify the agreed recurrence and evidence." }); return; }
+  const result = await approveServiceRecurrence(req.member!.organizationId, req.member!.user.id, id.data, parsed.data);
+  if ("error" in result) { res.status(result.error === "not_found" ? 404 : 409).json(result); return; }
   res.json(result);
 });
 
@@ -97,4 +119,5 @@ router.post("/service-obligations/import", requireMember("crm.write"), async (re
   res.json(result);
 });
 
+router.use(contractorScheduleError);
 export default router;

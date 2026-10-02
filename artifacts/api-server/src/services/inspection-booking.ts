@@ -6,13 +6,17 @@
  * filled. The transaction takes a per-org+start advisory lock and re-counts
  * overlapping active inspections against the org's configured capacity.
  */
-import { appointmentsTable, db } from "@workspace/db";
+import { appointmentsTable, db, orgSettingsTable, DEFAULT_INSPECTION_AVAILABILITY } from "@workspace/db";
 import { and, eq, gt, inArray, lt, ne, sql } from "drizzle-orm";
 
-import { getInspectionAvailability } from "./settings";
+import { assertOperationalStaff, assertResourceWindow, assertScheduleInterval, lockContractorSchedule, type ScheduleTransaction } from "./contractor-scheduling";
 
 type AppointmentInsert = typeof appointmentsTable.$inferInsert;
 export type AppointmentRow = typeof appointmentsTable.$inferSelect;
+async function inspectionCapacity(tx: ScheduleTransaction, org: string) {
+  const [settings] = await tx.select({ availability: orgSettingsTable.inspectionAvailability }).from(orgSettingsTable).where(eq(orgSettingsTable.organizationId, org));
+  return Math.max(1, Math.floor(settings?.availability?.maxBookingsPerWindow ?? DEFAULT_INSPECTION_AVAILABILITY.maxBookingsPerWindow) || 1);
+}
 
 /**
  * Insert an inspection appointment only if its window still has capacity.
@@ -23,10 +27,20 @@ export type AppointmentRow = typeof appointmentsTable.$inferSelect;
 export async function insertInspectionIfAvailable(
   values: AppointmentInsert & { scheduledStart: Date },
 ): Promise<AppointmentRow | null> {
-  const { maxBookingsPerWindow } = await getInspectionAvailability(values.organizationId);
+  return db.transaction(async (tx) => {
+    await lockContractorSchedule(tx, values.organizationId);
+    return insertInspectionInTransaction(tx, values);
+  });
+}
+
+export async function insertInspectionInTransaction(tx: ScheduleTransaction, values: AppointmentInsert & { scheduledStart: Date }): Promise<AppointmentRow | null> {
+  const maxBookingsPerWindow = await inspectionCapacity(tx, values.organizationId);
   const start = values.scheduledStart;
   const end = values.scheduledEnd ?? new Date(start.getTime() + 2 * 3_600_000);
-  return db.transaction(async (tx) => {
+  assertScheduleInterval(start, end);
+  const staff = values.assignedUserId ? [values.assignedUserId] : [];
+  await assertOperationalStaff(tx, values.organizationId, staff);
+  await assertResourceWindow(tx, values.organizationId, staff, start, end);
     // Serialize all inspection bookings for the org for this transaction.
     // A per-window lock key would miss overlapping windows with different
     // start times, so we take one org-wide lock; inspection bookings are
@@ -62,7 +76,6 @@ export async function insertInspectionIfAvailable(
       .values({ ...values, scheduledEnd: end })
       .returning();
     return row;
-  });
 }
 
 /**
@@ -78,10 +91,17 @@ export async function updateInspectionIfAvailable(
   set: Partial<AppointmentInsert>,
   window: { start: Date; end?: Date | null },
 ): Promise<AppointmentRow | null | "conflict"> {
-  const { maxBookingsPerWindow } = await getInspectionAvailability(organizationId);
+  return db.transaction(async (tx) => {
+    await lockContractorSchedule(tx, organizationId);
+    return updateInspectionInTransaction(tx, organizationId, appointmentId, set, window);
+  });
+}
+
+export async function updateInspectionInTransaction(tx: ScheduleTransaction, organizationId: string, appointmentId: string, set: Partial<AppointmentInsert>, window: { start: Date; end?: Date | null }): Promise<AppointmentRow | null | "conflict"> {
+  const maxBookingsPerWindow = await inspectionCapacity(tx, organizationId);
   const start = window.start;
   const end = window.end ?? new Date(start.getTime() + 2 * 3_600_000);
-  return db.transaction(async (tx) => {
+  assertScheduleInterval(start, end);
     // Same org-wide lock as the insert path so inserts and reschedules
     // serialize against each other.
     await tx.execute(
@@ -118,5 +138,4 @@ export async function updateInspectionIfAvailable(
       )
       .returning();
     return row ?? null;
-  });
 }

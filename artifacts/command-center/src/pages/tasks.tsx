@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Loader2, Plus, CheckSquare, Trash2, Edit, CheckCircle, Link2, X } from 'lucide-react';
-import { Link } from 'wouter';
+import { Link, useLocation, useSearch } from 'wouter';
 import { canWrite, canDelete } from '@/lib/permissions';
 import { useGetMe } from '@workspace/api-client-react';
 import { format } from 'date-fns';
@@ -9,8 +9,17 @@ import { useListTasks, useCreateTask, useUpdateTask, useDeleteTask, getListTasks
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { ToastAction } from '@/components/ui/toast';
 import { useToast, toast as globalToast } from '@/hooks/use-toast';
+import { TaskDeepLink } from '@/components/task-deep-link';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 
 export default function Tasks() {
+  const [, navigate] = useLocation();
+  const search = new URLSearchParams(useSearch());
+  const selectedTaskId = search.get('taskId');
+  const closeSelectedTask = () => {
+    search.delete('taskId');
+    navigate(`/tasks${search.size ? `?${search}` : ''}`, { replace: true });
+  };
   const [statusFilter, setStatusFilter] = useState<TaskStatus | ''>('');
   
   const { data: tasks, isLoading } = useListTasks({ status: statusFilter || undefined });
@@ -30,7 +39,11 @@ export default function Tasks() {
     if (!canEdit) return;
     const newStatus = task.status === 'done' ? 'open' : 'done';
     updateTask.mutate({ id: task.id, data: { status: newStatus } }, {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() }),
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: ['task-detail'] });
+        void queryClient.invalidateQueries({ queryKey: ['contractor-day'] });
+      },
       onError: () => showTaskStatusFailedToast(task.id, newStatus, queryClient),
     });
   };
@@ -62,6 +75,7 @@ export default function Tasks() {
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
           <select 
+            aria-label="Task status"
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value as any)}
             className="flex-1 md:w-48 bg-muted/50 border border-border rounded-xl px-4 py-2.5 md:py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary shadow-sm appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M7%2010L12%2015L17%2010%22%20stroke%3D%22%236B7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%2F%3E%3C%2Fsvg%3E')] bg-[position:right_0.5rem_center] bg-no-repeat pr-10"
@@ -73,7 +87,7 @@ export default function Tasks() {
             <option value="cancelled">Cancelled</option>
           </select>
           {canEdit && (
-            <button data-testid="add-task" onClick={openCreate} className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2.5 md:px-3 md:py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-transform active:scale-95 shrink-0 shadow-sm shadow-primary/20">
+            <button aria-label="Add task" data-testid="add-task" onClick={openCreate} className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2.5 md:px-3 md:py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-transform active:scale-95 shrink-0 shadow-sm shadow-primary/20">
               <Plus className="w-4 h-4" /> <span className="hidden md:inline">Add Task</span>
             </button>
           )}
@@ -207,7 +221,19 @@ export default function Tasks() {
         )}
       </div>
 
-      {isFormOpen && (
+      {selectedTaskId && me?.organization && !isFormOpen && (
+        <TaskDeepLink
+          key={`${me.id}:${me.organization.id}:${selectedTaskId}`}
+          taskId={selectedTaskId}
+          organizationId={me.organization.id}
+          role={me.role}
+          busy={updateTask.isPending}
+          onClose={closeSelectedTask}
+          onEdit={openEdit}
+          onToggle={handleStatusToggle}
+        />
+      )}
+      {isFormOpen && canEdit && (
         <TaskFormModal 
           task={editingTask} 
           onClose={() => setIsFormOpen(false)} 
@@ -234,6 +260,8 @@ function showTaskStatusFailedToast(taskId: string, status: 'open' | 'done', quer
           try {
             await updateTaskRequest(taskId, { status });
             queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
+            queryClient.invalidateQueries({ queryKey: ['task-detail'] });
+            queryClient.invalidateQueries({ queryKey: ['contractor-day'] });
             dismiss();
           } catch {
             showTaskStatusFailedToast(taskId, status, queryClient);
@@ -290,6 +318,8 @@ function TaskFormModal({ task, onClose }: { task?: any, onClose: () => void }) {
       updateTask.mutate({ id: task.id, data }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
+          queryClient.invalidateQueries({ queryKey: ['task-detail'] });
+          queryClient.invalidateQueries({ queryKey: ['contractor-day'] });
           onClose();
         },
         onError: handleSaveError,
@@ -306,29 +336,27 @@ function TaskFormModal({ task, onClose }: { task?: any, onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-card border-t md:border border-border shadow-2xl md:rounded-2xl rounded-t-2xl w-full max-w-md overflow-hidden mt-auto md:my-auto animate-in slide-in-from-bottom-8 md:slide-in-from-bottom-0 md:zoom-in-95 duration-300 pb-safe md:pb-0">
+    <Dialog open onOpenChange={(open) => { if (!open && !isSubmitting) onClose(); }}>
+      <DialogContent className="max-w-md bg-card p-0 text-card-foreground">
         <div className="p-4 md:p-6 border-b border-border flex justify-between items-center bg-muted/20">
-          <h2 className="text-lg font-bold text-foreground">{task ? 'Edit Task' : 'New Task'}</h2>
-          <button onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground active:scale-95 transition-all">
-            <X className="w-4 h-4" />
-          </button>
+          <DialogTitle className="text-lg font-bold text-foreground">{task ? 'Edit Task' : 'New Task'}</DialogTitle>
+          <DialogDescription className="sr-only">Review the task details before saving.</DialogDescription>
         </div>
         <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-4 md:space-y-5">
           <div className="space-y-1.5">
             <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-widest">Title *</label>
-            <input required className="w-full bg-background border border-border rounded-xl px-4 py-3 md:py-2.5 text-base md:text-sm focus:ring-2 focus:ring-primary focus:outline-none shadow-sm transition-all" value={title} onChange={e => setTitle(e.target.value)} />
+            <input aria-label="Title" required className="w-full bg-background border border-border rounded-xl px-4 py-3 md:py-2.5 text-base md:text-sm focus:ring-2 focus:ring-primary focus:outline-none shadow-sm transition-all" value={title} onChange={e => setTitle(e.target.value)} />
           </div>
           
           <div className="space-y-1.5">
             <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-widest">Description</label>
-            <textarea className="w-full bg-background border border-border rounded-xl px-4 py-3 md:py-2.5 text-base md:text-sm focus:ring-2 focus:ring-primary focus:outline-none min-h-[80px] resize-none shadow-sm transition-all" value={desc} onChange={e => setDesc(e.target.value)} />
+            <textarea aria-label="Description" className="w-full bg-background border border-border rounded-xl px-4 py-3 md:py-2.5 text-base md:text-sm focus:ring-2 focus:ring-primary focus:outline-none min-h-[80px] resize-none shadow-sm transition-all" value={desc} onChange={e => setDesc(e.target.value)} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-widest">Priority</label>
-              <select className="w-full bg-background border border-border rounded-xl px-4 py-3 md:py-2.5 text-base md:text-sm focus:ring-2 focus:ring-primary focus:outline-none shadow-sm transition-all appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M7%2010L12%2015L17%2010%22%20stroke%3D%22%236B7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%2F%3E%3C%2Fsvg%3E')] bg-[position:right_0.5rem_center] bg-no-repeat pr-10" value={priority} onChange={e => setPriority(e.target.value as Urgency)}>
+              <select aria-label="Priority" className="w-full bg-background border border-border rounded-xl px-4 py-3 md:py-2.5 text-base md:text-sm focus:ring-2 focus:ring-primary focus:outline-none shadow-sm transition-all appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M7%2010L12%2015L17%2010%22%20stroke%3D%22%236B7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%2F%3E%3C%2Fsvg%3E')] bg-[position:right_0.5rem_center] bg-no-repeat pr-10" value={priority} onChange={e => setPriority(e.target.value as Urgency)}>
                 <option value="low">Low</option>
                 <option value="normal">Normal</option>
                 <option value="high">High</option>
@@ -337,13 +365,13 @@ function TaskFormModal({ task, onClose }: { task?: any, onClose: () => void }) {
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-widest">Due Date</label>
-              <input type="date" className="w-full bg-background border border-border rounded-xl px-4 py-3 md:py-2.5 text-base md:text-sm focus:ring-2 focus:ring-primary focus:outline-none font-mono shadow-sm transition-all" value={dueAt} onChange={e => setDueAt(e.target.value)} />
+              <input aria-label="Due date" type="date" className="w-full bg-background border border-border rounded-xl px-4 py-3 md:py-2.5 text-base md:text-sm focus:ring-2 focus:ring-primary focus:outline-none font-mono shadow-sm transition-all" value={dueAt} onChange={e => setDueAt(e.target.value)} />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-widest">Assignee</label>
-            <select className="w-full bg-background border border-border rounded-xl px-4 py-3 md:py-2.5 text-base md:text-sm focus:ring-2 focus:ring-primary focus:outline-none shadow-sm transition-all appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M7%2010L12%2015L17%2010%22%20stroke%3D%22%236B7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%2F%3E%3C%2Fsvg%3E')] bg-[position:right_0.5rem_center] bg-no-repeat pr-10" value={assigneeId} onChange={e => setAssigneeId(e.target.value)}>
+            <select aria-label="Assignee" className="w-full bg-background border border-border rounded-xl px-4 py-3 md:py-2.5 text-base md:text-sm focus:ring-2 focus:ring-primary focus:outline-none shadow-sm transition-all appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M7%2010L12%2015L17%2010%22%20stroke%3D%22%236B7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%2F%3E%3C%2Fsvg%3E')] bg-[position:right_0.5rem_center] bg-no-repeat pr-10" value={assigneeId} onChange={e => setAssigneeId(e.target.value)}>
               <option value="">-- Unassigned --</option>
               {users?.map(u => (
                 <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
@@ -354,19 +382,19 @@ function TaskFormModal({ task, onClose }: { task?: any, onClose: () => void }) {
           <div className="space-y-1.5">
             <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-widest">Related Lead</label>
             <div className="shadow-sm rounded-xl overflow-hidden border border-border focus-within:ring-2 focus-within:ring-primary focus-within:border-primary transition-all">
-               <LeadSelect value={leadId} onChange={setLeadId} />
+               <LeadSelect label="Related lead" value={leadId} onChange={setLeadId} />
             </div>
           </div>
           
           <div className="pt-6 md:pt-4 flex flex-col-reverse md:flex-row justify-end gap-3">
             <button type="button" onClick={onClose} className="w-full md:w-auto px-4 py-3 md:py-2 text-base md:text-sm font-semibold hover:bg-muted rounded-xl border border-transparent hover:border-border transition-all active:scale-95">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="w-full md:w-auto bg-primary text-primary-foreground px-6 py-3 md:py-2 rounded-xl text-base md:text-sm font-bold shadow-sm shadow-primary/20 hover:shadow-primary/40 hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center min-w-[120px]">
+            <button type="submit" disabled={isSubmitting} className="w-full md:w-auto bg-primary text-primary-foreground dark:text-background px-6 py-3 md:py-2 rounded-xl text-base md:text-sm font-bold shadow-sm shadow-primary/20 hover:shadow-primary/40 hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center min-w-[120px]">
               {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save Task'}
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

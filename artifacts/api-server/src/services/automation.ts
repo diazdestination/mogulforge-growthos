@@ -11,6 +11,8 @@ import {
   leadTagsTable,
   messageTemplatesTable,
   scheduledActionsTable,
+  orgSettingsTable,
+  DEFAULT_APPOINTMENT_REMINDER,
   revenueExecutionsTable,
   tagsTable,
   usersTable,
@@ -18,10 +20,11 @@ import {
   type Automation,
   type AutomationAction,
 } from "@workspace/db";
-import { and, asc, desc, eq, lte, notExists, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, notExists, notInArray, sql } from "drizzle-orm";
 import type { SchedulerStage, StageObserver } from "./scheduler-runtime";
 import { recordAudit } from "./audit";
 import { runDurableAction } from "./durable-execution";
+import { formatAppointmentWindow, lockContractorSchedule, type ScheduleTransaction } from "./contractor-scheduling";
 import { customerWorkAllowedSql, customerWorkHeld } from "./customer-lifecycle-runtime";
 import { isLegacyDefaultOrg } from "../lib/orgFlavor";
 import {
@@ -644,14 +647,11 @@ async function executeAction(
       const businessName =
         await getBusinessName(organizationId);
       const businessPhone = settings.businessProfile.phone ?? "";
-      const windowLabel = new Intl.DateTimeFormat("en-US", {
-        timeZone: process.env.CONCIERGE_TIMEZONE ?? "America/New_York",
-        weekday: "long",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        hour12: true,
-      }).format(appointment.scheduledStart);
+      // Resolve the same company timezone used by Today. Invalid or missing
+      // settings are shown explicitly as UTC, never as a host-wide default.
+      const configuredZone = settings.inspectionAvailability?.timezone;
+      const zones = await db.execute(sql`select name from pg_timezone_names where name=${configuredZone ?? "UTC"} limit 1`);
+      const windowLabel = formatAppointmentWindow(appointment.scheduledStart, zones.rows[0]?.name ?? "UTC");
       const reschedule = businessPhone
         ? `Need to reschedule? Call or text us at ${businessPhone}.`
         : "Need to reschedule? Contact our office and we'll find a time that works.";
@@ -971,6 +971,7 @@ export async function processDueScheduledActions(organizationId?: string): Promi
       const execution = await runDurableAction({
         organizationId: item.organizationId, actionKey: `scheduled:${item.id}`,
         leadId: typeof item.context.leadId === "string" ? item.context.leadId : null,
+        appointmentId: item.action.type === "appointment_reminder" && typeof item.context.appointmentId === "string" ? item.context.appointmentId : null,
         kind: item.action.type, payload: { action: item.action, context: item.context },
         execute: async () => {
           // Re-read cancellation after acquiring exclusive durable ownership.
@@ -1504,13 +1505,27 @@ export async function scheduleAppointmentReminder(
     scheduledStart: Date;
   },
   contactMethod?: string | null,
+  transaction?: ScheduleTransaction,
 ): Promise<boolean> {
+  if (!transaction) return db.transaction(async tx => {
+    await lockContractorSchedule(tx, organizationId);
+    return scheduleAppointmentReminder(organizationId, appointment, contactMethod, tx);
+  });
   const startMs = appointment.scheduledStart.getTime();
   const now = Date.now();
   if (startMs - now <= 2 * 3_600_000) return false;
-  const { leadTimeHours } = await getAppointmentReminderSettings(organizationId);
+  const [settings] = await transaction.select({ reminder: orgSettingsTable.appointmentReminder }).from(orgSettingsTable).where(eq(orgSettingsTable.organizationId, organizationId));
+  const configuredLeadTime = settings?.reminder?.leadTimeHours;
+  const leadTimeHours = typeof configuredLeadTime === "number" && Number.isFinite(configuredLeadTime) ? Math.min(336, Math.max(1, configuredLeadTime)) : DEFAULT_APPOINTMENT_REMINDER.leadTimeHours;
   const runAt = new Date(Math.max(now, startMs - leadTimeHours * 3_600_000));
-  await db.insert(scheduledActionsTable).values({
+  const [existing] = await transaction.select({ id: scheduledActionsTable.id }).from(scheduledActionsTable).where(and(
+    eq(scheduledActionsTable.organizationId, organizationId), inArray(scheduledActionsTable.status, ["pending", "done"]),
+    sql`${scheduledActionsTable.context} ->> 'appointmentId' = ${appointment.id}`,
+    sql`${scheduledActionsTable.context} ->> 'event' = ${APPOINTMENT_REMINDER_EVENT}`,
+    sql`${scheduledActionsTable.context} -> 'fields' ->> 'appointment.scheduledStart' = ${appointment.scheduledStart.toISOString()}`,
+  )).limit(1);
+  if (existing) return false;
+  await transaction.insert(scheduledActionsTable).values({
     organizationId,
     automationId: null,
     action: {
@@ -1538,8 +1553,21 @@ export async function scheduleAppointmentReminder(
 export async function cancelAppointmentReminders(
   organizationId: string,
   appointmentId: string,
+  transaction?: ScheduleTransaction,
 ): Promise<number> {
-  const cancelled = await db
+  if (!transaction) return db.transaction(async tx => {
+    await lockContractorSchedule(tx, organizationId);
+    return cancelAppointmentReminders(organizationId, appointmentId, tx);
+  });
+  const owned = await transaction.select({ actionId: scheduledActionsTable.id, state: revenueExecutionsTable.state }).from(scheduledActionsTable)
+    .innerJoin(revenueExecutionsTable, and(eq(revenueExecutionsTable.organizationId, organizationId), sql`${revenueExecutionsTable.actionKey} = 'scheduled:' || ${scheduledActionsTable.id}::text`))
+    .where(and(eq(scheduledActionsTable.organizationId, organizationId), eq(scheduledActionsTable.status, "pending"), sql`${scheduledActionsTable.context} ->> 'appointmentId' = ${appointmentId}`, sql`${scheduledActionsTable.context} ->> 'event' = ${APPOINTMENT_REMINDER_EVENT}`));
+  for (const receipt of owned.filter(row => ["processing", "indeterminate"].includes(row.state))) {
+    const marker = `appointment.reminder_reconcile:${receipt.actionId}`;
+    const [task] = await transaction.select({ id: crmTasksTable.id }).from(crmTasksTable).where(and(eq(crmTasksTable.organizationId, organizationId), eq(crmTasksTable.sourceEvent, marker))).limit(1);
+    if (!task) await transaction.insert(crmTasksTable).values({ organizationId, sourceEvent: marker, title: "Check an appointment reminder after a schedule change", description: `Appointment ${appointmentId} changed after reminder execution was claimed. Check the execution receipt before any resend.`, dueAt: new Date(), priority: "high" });
+  }
+  const cancelled = await transaction
     .update(scheduledActionsTable)
     .set({ status: "cancelled" })
     .where(
@@ -1548,6 +1576,7 @@ export async function cancelAppointmentReminders(
         eq(scheduledActionsTable.status, "pending"),
         sql`${scheduledActionsTable.context} ->> 'appointmentId' = ${appointmentId}`,
         sql`${scheduledActionsTable.context} ->> 'event' = ${APPOINTMENT_REMINDER_EVENT}`,
+        owned.length ? notInArray(scheduledActionsTable.id, owned.map(row => row.actionId)) : undefined,
       ),
     )
     .returning({ id: scheduledActionsTable.id });

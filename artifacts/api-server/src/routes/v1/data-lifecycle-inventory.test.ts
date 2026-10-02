@@ -115,7 +115,7 @@ describe("read-only lifecycle inventory tenant boundary", () => {
     expect(failures, JSON.stringify(failures)).toEqual([]);
     expect(inventory.status).toBe("bounded_preview");
     expect(readOnly).toBe("on");
-    expect(inventory.coverage).toMatchObject({ classifiedTables: 99, countedTables: 96, excludedTables: 3, deployedSchema: "matched", reasons: [] });
+    expect(inventory.coverage).toMatchObject({ classifiedTables: 103, countedTables: 100, excludedTables: 3, deployedSchema: "matched", reasons: [] });
   });
 
   it("requires active owner/admin membership and does not elevate an unscoped platform session", async () => {

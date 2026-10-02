@@ -2,21 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useGetMe } from '@workspace/api-client-react';
 import ContactSelect from '@/components/contact-select';
 import { canWrite } from '@/lib/permissions';
+import ServiceObligationEditor, { type ServiceRow } from '@/components/service-obligation-editor';
 
 type ServiceKind = 'warranty_check' | 'maintenance' | 'service_plan';
-type ServiceRow = {
-  obligation: {
-    id: string;
-    kind: ServiceKind;
-    equipmentLabel: string;
-    dueAt: string;
-    status: 'active' | 'completed' | 'cancelled';
-    source: string;
-    appointmentId: string | null;
-  };
-  contact: { firstName: string; lastName: string | null; phone: string | null; email: string | null };
-  task: { status: string; dueAt: string | null };
-};
 type ImportResult = { preview: boolean; totalRows: number; imported: number; duplicates: number; skipped: number; errors: string[] };
 
 const fields = [
@@ -61,6 +49,7 @@ export default function ServiceDesk() {
   const [defaultEquipment, setDefaultEquipment] = useState('');
   const [defaultKind, setDefaultKind] = useState<ServiceKind>('maintenance');
   const [preview, setPreview] = useState<ImportResult | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -93,19 +82,6 @@ export default function ServiceDesk() {
     } finally { setBusy(false); }
   }
 
-  async function markCompleted(id: string) {
-    setBusy(true); setNotice('');
-    try {
-      await jsonRequest(`/api/v1/service-obligations/${id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'completed' }),
-      });
-      setNotice('Service marked complete.');
-      await refresh();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Could not update service.');
-    } finally { setBusy(false); }
-  }
 
   async function chooseFile(file: File | undefined) {
     setPreview(null);
@@ -159,16 +135,19 @@ export default function ServiceDesk() {
         <h2 className="font-semibold">Upcoming service ({active.length})</h2>
         {loading ? <p>Loading service dates…</p> : loadError ? <p role="alert" className="text-sm text-muted-foreground">Service dates are unavailable. Try again before deciding what needs follow-up.</p> : active.length === 0 ? <p className="text-sm text-muted-foreground">No active service dates yet.</p> : (
           <ul className="space-y-2">
-            {active.map(({ obligation, contact, task }) => (
+            {active.map(row => { const { obligation, contact, task } = row; return (
               <li key={obligation.id} className="rounded-lg border p-3 flex flex-wrap items-center justify-between gap-3 text-sm">
-                <div>
+                <div className="min-w-0 break-words">
                   <p className="font-medium">{contact.firstName} {contact.lastName ?? ''} · {kindNames[obligation.kind]} · {obligation.equipmentLabel}</p>
                   <p className="text-muted-foreground">Due {obligation.dueAt.slice(0, 10)} · Staff task {task.status} · {obligation.source}</p>
                   {obligation.appointmentId && <p>Appointment linked</p>}
+                  <p className="text-muted-foreground">{obligation.recurrence ? `Agreed every ${obligation.recurrence.intervalMonths} months` : 'One-time service'} · {task.assignedUserId ? 'Staff assigned' : 'Staff assignment needed'}</p>
+                  {(obligation.coverageStartsOn || obligation.coverageEndsOn) && <p className="text-muted-foreground">Recorded coverage: {obligation.coverageStartsOn || 'Start not recorded'} to {obligation.coverageEndsOn || 'End not recorded'}</p>}
                 </div>
-                {editable && <button disabled={busy} className="rounded border px-3 py-2 disabled:opacity-50" onClick={() => void markCompleted(obligation.id)}>Mark serviced</button>}
+                {editable && <button disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setEditingId(editingId === obligation.id ? null : obligation.id)}>Manage service</button>}
+                {editable && editingId === obligation.id && <ServiceObligationEditor key={`${obligation.id}:${obligation.updatedAt}`} row={row} onClose={() => setEditingId(null)} onSaved={async message => { setNotice(message); await refresh(); }} />}
               </li>
-            ))}
+            ); })}
           </ul>
         )}
       </section>
@@ -182,7 +161,7 @@ export default function ServiceDesk() {
           <label className="block text-sm">Equipment<input required maxLength={160} className="block w-full rounded border p-2" value={equipmentLabel} onChange={event => setEquipmentLabel(event.target.value)} /></label>
           <label className="block text-sm">Service due date<input required type="date" className="block w-full rounded border p-2" value={dueDate} onChange={event => setDueDate(event.target.value)} /></label>
           <label className="block text-sm">Staff follow-up lead time (days)<input required type="number" min={0} max={365} className="block w-full rounded border p-2" value={noticeDays} onChange={event => { setNoticeDays(Number(event.target.value)); setPreview(null); }} /></label>
-          <button disabled={busy || !contactId} className="rounded bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">Save service date</button>
+          <button disabled={busy || !contactId} className="min-h-11 rounded bg-primary px-4 py-2 text-primary-foreground dark:text-slate-950 disabled:opacity-50">Save service date</button>
         </form>
         <section className="rounded-xl border bg-card p-4 space-y-3" aria-label="Import customers">
           <h2 className="font-semibold">Import customer service dates</h2>

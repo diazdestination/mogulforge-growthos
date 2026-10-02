@@ -14,6 +14,8 @@ import { NotificationLeadGuard, TenantMobileBoundary } from '@/components/mobile
 
 // Pages
 import Dashboard from '@/pages/dashboard';
+import Today from '@/pages/today';
+import Invoices from '@/pages/invoices';
 import Assistant from '@/pages/assistant';
 import Pipeline from '@/pages/pipeline';
 import Insights from '@/pages/insights';
@@ -578,7 +580,8 @@ function AuthedApp({ authUserId }: { authUserId: string }) {
           <Route path="/verify-email">
             <Redirect to="/" replace />
           </Route>
-          <Route path="/" component={Bie} />
+          <Route path="/" component={Today} />
+          <Route path="/today" component={Today} />
           <Route path="/bie" component={Bie} />
           <Route path="/agent-team">
             <AgentTeam />
@@ -596,6 +599,8 @@ function AuthedApp({ authUserId }: { authUserId: string }) {
           <Route path="/projects" component={Projects} />
           <Route path="/tasks" component={Tasks} />
           <Route path="/appointments" component={Appointments} />
+          <Route path="/invoices/:id" component={Invoices} />
+          <Route path="/invoices" component={Invoices} />
           <Route path="/audit" component={AuditLog} />
           <Route path="/settings" component={Settings} />
           <Route path="/account" component={Account} />

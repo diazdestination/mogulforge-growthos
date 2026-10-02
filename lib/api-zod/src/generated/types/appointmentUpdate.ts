@@ -24,4 +24,6 @@ export interface AppointmentUpdate {
   scheduledEnd?: Date | null;
   /** @nullable */
   notes?: string | null;
+  /** Last observed update token; stale edits return 409. */
+  expectedUpdatedAt?: Date;
 }

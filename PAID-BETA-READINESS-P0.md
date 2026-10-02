@@ -7,6 +7,13 @@
 
 ## Mission
 
+**October 1 native replacement addendum:** after the complete PR10 gate passed
+at `48c3491`, Adam explicitly authorized finishing the next wave and further
+useful engineering. The invoice/schedule/service and daily-navigation scope in
+`reports/native-contractor-day-contract.md` is an owner-approved exception to
+the earlier general module freeze. It changes no staging, provider, financial,
+customer contact, production or public-launch acceptance requirement.
+
 **Communications-provider addendum (September 30):** The owner chose to
 continue with Twilio for GrowthOS after reviewing alternatives. The earlier
 [provider review](COMMUNICATIONS-PROVIDER-REVIEW-2026-09-30.md) is retained as

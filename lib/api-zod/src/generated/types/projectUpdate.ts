@@ -20,4 +20,6 @@ export interface ProjectUpdate {
   crewUserIds?: string[];
   /** @nullable */
   crewNotes?: string | null;
+  /** Last observed update token; stale edits return 409. */
+  expectedUpdatedAt?: Date;
 }

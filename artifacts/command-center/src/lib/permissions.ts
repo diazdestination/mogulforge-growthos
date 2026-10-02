@@ -30,3 +30,11 @@ export function canManageSettings(role?: UserRole | null): boolean {
   if (!role) return false;
   return RoleHierarchy[role] >= RoleHierarchy.admin;
 }
+
+export function canReadInvoices(role?: UserRole | null): boolean {
+  return !!role && ['owner', 'admin', 'office', 'sales_manager'].includes(role);
+}
+
+export function canManageInvoices(role?: UserRole | null): boolean {
+  return !!role && ['owner', 'admin', 'office'].includes(role);
+}

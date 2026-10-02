@@ -15,9 +15,11 @@ release. The swarm foundation reports distinguish local proof from hosted proof.
    approved export/access, measure lead/estimate/win baseline and connect its
    actual website through a supported secure adapter. Keep the companies in
    separate organizations. Record included beta workflow scope explicitly.
-4. Build the native replacement milestones in `GROWTHOS-CONTRACTOR-OPERATIONS.md`:
-   invoice lifecycle/payment reconciliation, an office/field scheduling day,
-   warranty/service recurrence and simpler daily navigation. Housecall Pro is
+4. Accept the native replacement candidate in `reports/native-contractor-day-integration.md`:
+   internal invoice lifecycle/recorded-payment reconciliation, an office/field
+   scheduling day, explicit service recurrence and simpler daily navigation.
+   Finish actual invoice delivery, payment processor/settlement, opening balances
+   and staff rehearsal in `BETA-CONTRACTOR-SUCCESS.md`. Housecall Pro is
    optional migration support. Preserve import holds until approved source
    reconciliation and a documented authoritative-writer/cutover decision.
 5. Repeat the implemented private inquiry-to-owned-response-to-appointment/
@@ -28,9 +30,9 @@ release. The swarm foundation reports distinguish local proof from hosted proof.
 6. Expand the premium tier inventory and trade workflows using those observations;
    measure revenue evidence, staff effort, communication costs and renewal intent.
 
-Current engineering candidate: `agent/growthos-contractor-operations` on PR9.
-Review additive `0005_contractor-operations.sql` after0002–0004. The local synthetic
-90-to99-table upgrade/restore passed with restricted real-app reads; it is not
+Current engineering candidate: `agent/growthos-native-contractor-day` on PR10.
+Review additive `0006_native-contractor-day.sql` after0002–0005. The local synthetic
+90-to103-table upgrade/restore passed with restricted real-app reads; it is not
 a managed production restore. Verify actual staff invitations and trusted incoming
 reply identity with approved recipients/providers. Unsigned legacy evidence and
 uncertain effects remain visible for staff review. Do not cancel Housecall Pro or

@@ -93,6 +93,7 @@ export function requireMember(permission: Permission): RequireMemberGuard {
       if (
         permission === "settings.manage" ||
         permission === "users.manage" ||
+        permission === "invoices.manage" ||
         !hasPermission(resolved.key.role, permission)
       ) {
         res.status(403).json({ error: "API key lacks this permission" });

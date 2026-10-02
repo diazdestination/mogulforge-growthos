@@ -388,7 +388,9 @@ router.post(
       req.member!.user.id,
     );
     if (!result.ok) {
-      if (result.error === "same_lead") {
+      if (result.error === crm.INVOICE_HISTORY_RETAINED) {
+        res.status(409).json({ error: "These customer records have retained invoice history. Keep them separate and ask your operator to review the duplicate.", code: result.error });
+      } else if (result.error === "same_lead") {
         res.status(400).json({ error: "Cannot merge a lead into itself" });
       } else {
         res.status(404).json({ error: "Lead not found" });

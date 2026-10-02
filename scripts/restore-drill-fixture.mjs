@@ -383,7 +383,11 @@ function normal(value, key) {
 }
 
 /** Checks stored app records using SELECT only, with secrets held only in memory. */
-export async function assertFixtureRecords(client, target, codec) {
+export async function assertFixtureRecords(client, target, codec, { reviewedPausedServiceId = null } = {}) {
+  // The local contractor upgrade drill additionally restores one explicitly
+  // reviewed successor. It may remain active only behind a restored company
+  // pause. Ordinary restore acceptance keeps its original zero-active rule.
+  if (reviewedPausedServiceId !== null && (!/^restore-drill-contractor-[ab]$/.test(target.syntheticSlug) || !/^[a-f0-9-]{36}$/.test(reviewedPausedServiceId))) fail("restore_fixture_service_exception_invalid");
   const id = fixtureIds(target.syntheticSlug);
   let ciphertext;
   for (const [table, expected] of fixtureRows(target.syntheticSlug)) {
@@ -426,14 +430,14 @@ export async function assertFixtureRecords(client, target, codec) {
     `SELECT
       (SELECT count(*) FROM scheduled_actions WHERE organization_id = $1 AND status = 'pending') +
       (SELECT count(*) FROM reactivation_campaigns WHERE organization_id = $1 AND status NOT IN ('draft', 'completed', 'cancelled')) +
-      (SELECT count(*) FROM service_obligations WHERE organization_id = $1 AND status = 'active') +
+      (SELECT count(*) FROM service_obligations s WHERE organization_id = $1 AND status = 'active' ${reviewedPausedServiceId ? "AND NOT (s.id=$2::uuid AND EXISTS (SELECT 1 FROM customer_lifecycle cl WHERE cl.organization_id=s.organization_id AND cl.state='paused'))" : ""}) +
       (SELECT count(*) FROM bie_action_proposals WHERE organization_id = $1 AND status IN ('approved', 'processing')) +
       (SELECT count(*) FROM revenue_executions WHERE organization_id = $1 AND state IN ('processing', 'indeterminate')) +
       (SELECT count(*) FROM webhook_endpoints WHERE organization_id = $1 AND is_active = true) +
       (SELECT count(*) FROM gmail_connections WHERE organization_id = $1 AND revoked_at IS NULL) +
       (SELECT count(*) FROM contacts WHERE organization_id = $1 AND (phone IS NOT NULL OR email NOT LIKE '%.invalid' OR do_not_contact = false OR do_not_contact_email = false OR do_not_contact_sms = false)) +
       (SELECT count(*) FROM users WHERE organization_id = $1 AND (email NOT LIKE '%.invalid' OR password_hash IS NOT NULL OR is_platform_admin = true)) AS unsafe_count`,
-    [id.organization],
+    reviewedPausedServiceId ? [id.organization, reviewedPausedServiceId] : [id.organization],
   );
   if (Number(forbidden.rows[0]?.unsafe_count) !== 0)
     fail("restore_fixture_outbound_or_identity_unsafe");

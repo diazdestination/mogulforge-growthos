@@ -22,6 +22,8 @@ export default function LeadSelect({
   noneLabel = '-- None --',
   withStatus = false,
   testId = 'lead-select',
+  id,
+  label = 'Lead',
 }: {
   value: string;
   onChange: (leadId: string) => void;
@@ -31,6 +33,9 @@ export default function LeadSelect({
   /** Append the lead status to each option label. */
   withStatus?: boolean;
   testId?: string;
+  id?: string;
+  /** Accessible name for the selection and its search input. */
+  label?: string;
 }) {
   const [search, setSearch] = useState('');
   // Remember the selected lead's label so it stays visible even when the
@@ -64,6 +69,7 @@ export default function LeadSelect({
       <div className="relative">
         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input
+          aria-label={`Search ${label.toLowerCase()}`}
           type="search"
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -73,6 +79,8 @@ export default function LeadSelect({
         />
       </div>
       <select
+        id={id}
+        aria-label={label}
         required={required}
         value={value}
         onChange={e => handleChange(e.target.value)}

@@ -1,5 +1,21 @@
 # Current delivery decisions
 
+## Native contractor workday continuation - October 1
+
+Adam explicitly authorized completing the next wave after the verified
+contractor-operations foundation. Reused its isolated worktree and started
+`agent/growthos-native-contractor-day` at
+`48c3491c75ea31abf347deee59f8faf17d63136a` (draft PR10). Three scoped agents own
+invoices, scheduling/service, and daily experience, with independent cross-review.
+
+Use one native daily workspace, immutable issued invoices and existing cash
+records, shared scheduling locks, explicitly agreed service recurrence and
+reversible operational controls. Invoice issue does not imply delivery; recorded
+payments do not imply a charge or bank verification. Migration0006 is additive
+and review-only. Keep the $500 beta agreements; $1,500 is a value hypothesis.
+`BETA-CONTRACTOR-SUCCESS.md` defines the adoption and commercial evidence needed.
+No new orchestrator, provider activation, paid action or public launch is implied.
+
 ## Contractor operations clarification - October 1
 
 Adam accepted the autonomous next wave and clarified the goal is to replace

@@ -13,6 +13,7 @@ import { prepareRuntimePool } from "../pilot-scheduler-probe.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const frozen = new Map([
+  [resolve(root, "scripts/restore-drill-fixture.mjs"), "restore-drill-fixture.mjs"],
   [resolve(root, "artifacts/api-server/src/index.ts"), "index.ts"],
   [resolve(root, "artifacts/api-server/src/services/automation.ts"), "automation.ts"],
   [resolve(root, "artifacts/api-server/src/services/scheduler-runtime.ts"), "scheduler-runtime.ts"],

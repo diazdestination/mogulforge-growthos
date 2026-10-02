@@ -40,7 +40,24 @@ clear saved/pending/failed states. Hide advanced configuration from the daily
 path. A customer request stays pending until office confirmation. Measure task
 completion, errors and support requests during actual staff acceptance.
 
-## Native capability inventory at the 8bef3c0 starting candidate
+## Native workday candidate after the foundation
+
+`agent/growthos-native-contractor-day` starts at verified `48c3491` (draft PR10).
+See `reports/native-contractor-day-integration.md` for integrated evidence and
+`BETA-CONTRACTOR-SUCCESS.md` for the staff/customer acceptance path.
+
+Implemented source now includes the five daily destinations, a timezone-aware
+Today snapshot and exact task links, native invoice draft/issue/void and receipt
+reconciliation, accepted-staff scheduling/conflicts/stale-edit checks, and agreed
+calendar-month service recurrence. Customer exports include financial and service
+history; synthetic recovery covers103 tables and restricted real-app reads.
+
+Invoice issue and printing are internal document capabilities. Actual delivery,
+processor collection/settlement, migrated balances, accounting integration and
+real staff adoption remain unaccepted. No claim of complete Housecall Pro
+replacement or production readiness follows from this candidate alone.
+
+## Historical native inventory at the 8bef3c0 starting candidate
 
 | Need | Existing source | Replacement acceptance still required |
 | --- | --- | --- |
@@ -58,7 +75,7 @@ Code anchors: `lib/db/src/schema/projects.ts`, `appointments.ts`, `estimates.ts`
 `services/billing-checkout.ts`. These are source capabilities, not proof of
 field adoption, successful provider delivery or a complete replacement.
 
-## Current approved engineering wave
+## Completed contractor foundation wave
 
 Branch `agent/growthos-contractor-operations` starts from the exact green
 `8bef3c03c481b2f510ee82a3eb302c2e37df59aa` candidate. Current work:
@@ -68,21 +85,21 @@ Branch `agent/growthos-contractor-operations` starts from the exact green
 - Consistent report periods, cohorts and truthful monthly outcome evidence.
 - Integrated release/schema/recovery rehearsals and deployable operating guidance.
 
-These repairs support both native operation and a controlled migration. They
-do not implement the missing invoicing/field-operation scope by implication.
+These foundation repairs support both native operation and a controlled migration.
+The subsequent native-workday scope and remaining limits are described above.
 Implementation and evidence are recorded in the lane reports and final wave
 report. Existing imported-data holds remain in force.
 
-## Replacement milestones after this foundation
+## Remaining replacement acceptance
 
 1. Validate a native office/field day: inquiry, schedule, job, estimate, completion,
    invoice and warranty follow-up. Resolve each missing critical path before
    claiming that the beta can retire Housecall Pro.
-2. Complete native customer invoicing and payment reconciliation through an
-   approved processor; keep accounting exports/integration modular. No banking,
+2. Accept native invoicing and recorded-payment reconciliation, then connect an
+   approved delivery/payment processor; keep accounting exports/integration modular. No banking,
    tax filing, payroll or accounting platform rewrite is implied.
-3. Finish approved warranty/maintenance recurrence and accountable handoffs.
-4. Simplify the daily navigation around the tested tasks and role permissions.
+3. Rehearse implemented warranty/maintenance recurrence against actual agreements.
+4. Observe real staff using the implemented daily navigation and role permissions.
 5. Rehearse an approved migration: contacts/properties, open jobs and estimates,
    appointments, invoice balances, warranty/service obligations, documents and
    consent history. Preserve provenance, original dates and an exception report.

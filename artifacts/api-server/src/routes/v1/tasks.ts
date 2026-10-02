@@ -1,10 +1,19 @@
 import { CreateTaskBody, UpdateTaskBody } from "@workspace/api-zod";
 import { Router, type IRouter, type Request, type Response } from "express";
+import { z } from "zod/v4";
 
 import { requireMember } from "../../middlewares/requireMember";
 import * as crm from "../../services/crm";
 
 const router: IRouter = Router();
+router.get("/tasks/:id", requireMember("crm.read"), async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const id = z.uuid().safeParse(req.params.id);
+  if (!id.success || Object.keys(req.query).length) { res.status(400).json({ error: "Choose a valid task without extra selectors." }); return; }
+  const task = await crm.getTask(req.member!.organizationId, id.data);
+  if (!task) { res.status(404).json({ error: "Task not found in this company." }); return; }
+  res.json(task);
+});
 
 router.get(
   "/tasks",

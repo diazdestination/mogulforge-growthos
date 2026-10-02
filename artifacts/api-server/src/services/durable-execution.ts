@@ -7,6 +7,7 @@ import {
 } from "@workspace/db";
 import { and, eq, lt } from "drizzle-orm";
 import { lockReplyLead } from "./response-correlation";
+import { lockContractorSchedule } from "./contractor-scheduling";
 
 // Sorting makes retries independent of JSON key order. Only the digest is retained.
 function canonical(value: unknown): string {
@@ -26,12 +27,14 @@ export async function runDurableAction(input: {
   payload: unknown;
   actorUserId?: string | null;
   leadId?: string | null;
+  appointmentId?: string | null;
   execute: () => Promise<{ state: "succeeded" | "blocked"; detail: string }>;
 }) {
   const fingerprint = createHash("sha256")
     .update(canonical(input.payload))
     .digest("hex");
   const claimed = await db.transaction(async (tx) => {
+    if (input.appointmentId) await lockContractorSchedule(tx, input.organizationId);
     if (input.leadId) await lockReplyLead(tx, input.organizationId, input.leadId);
     const [row] = await tx
       .insert(executions)

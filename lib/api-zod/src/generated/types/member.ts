@@ -17,4 +17,6 @@ export interface Member {
   lastName: string | null;
   role: UserRole;
   isActive: boolean;
+  /** Active accepted staff with customer-work permission; false for pending invitations. */
+  operationallyEligible?: boolean;
 }

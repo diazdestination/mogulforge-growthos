@@ -1766,6 +1766,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/CrmTask"
   /v1/tasks/{id}:
+    get:
+      operationId: getTask
+      tags: [tasks]
+      summary: Read a task independently of the recent-task list
+      parameters:
+        - $ref: "#/components/parameters/IdPathParam"
+      responses:
+        "200":
+          description: Same-company task with verified linked records; never cached
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CrmTask" }
+        "400": { description: Invalid task ID or unexpected query selector }
+        "401": { description: Authentication required }
+        "403": { description: Active company membership required }
+        "404": { description: Task or a linked record is not available in this company }
     patch:
       operationId: updateTask
       tags: [tasks]
@@ -1815,9 +1831,16 @@ paths:
           schema:
             type: string
             format: uuid
+        - { name: from, in: query, schema: { type: string, format: date-time }, description: Window start; requires to. At most 31 days. }
+        - { name: to, in: query, schema: { type: string, format: date-time }, description: Exclusive window end; requires from. }
+        - { name: assignedUserId, in: query, schema: { type: string } }
+        - { name: contactId, in: query, schema: { type: string, format: uuid }, description: Filter appointments for an existing customer. }
       responses:
         "200":
-          description: Appointments
+          description: Appointments; X-Result-Limit-Reached is true when the 200-record display bound was reached.
+          headers:
+            X-Result-Limit-Reached:
+              schema: { type: string, enum: ["true", "false"] }
           content:
             application/json:
               schema:
@@ -4067,6 +4090,340 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/CustomerReplyDecision" }
+  "/v1/contractor/today":
+    "get":
+      "operationId": "getContractorToday"
+      "tags": ["contractor"]
+      "summary": "Read the company-local workday snapshot"
+      "description": "Read-only snapshot in the configured inspection timezone, falling back to UTC explicitly. Each queue is capped at 50 with exact total/truncated indicators. Tasks include overdue, due today and undated work; company scope requires existing CRM read access. No provider calls or settings initialization."
+      "parameters": [{"name":"date","in":"query","schema":{"type":"string","format":"date"}},{"name":"scope","in":"query","schema":{"type":"string","enum":["mine","company"]}}]
+      "responses":
+        "200":
+          "description": "Success"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ContractorToday"
+        "400":
+          "description": "Invalid fields or unknown selectors."
+        "401":
+          "description": "Authentication required."
+        "403":
+          "description": "Insufficient company role, invalid origin or unsupported API-key mutation."
+        "404":
+          "description": "Record is not available in this company."
+        "409":
+          "description": "Stale version, conflicting retry, immutable issued document or ledger reconciliation required."
+        "503":
+          "description": "Unavailable. Retain the exact request UUID and payload when checking or retrying an uncertain mutation."
+  "/v1/invoices":
+    "get":
+      "operationId": "listInvoices"
+      "tags": ["contractor"]
+      "summary": "List native customer invoices"
+      "description": "Owner, admin, office and sales manager may read. Same-company records only. Financial figures reflect recorded ledger evidence."
+      "parameters": [{"name":"status","in":"query","schema":{"type":"string","enum":["draft","issued","void"]}},{"name":"leadId","in":"query","schema":{"type":"string","format":"uuid"}},{"name":"projectId","in":"query","schema":{"type":"string","format":"uuid"}},{"name":"page","in":"query","schema":{"type":"integer","minimum":0,"maximum":10000,"default":0}}]
+      "responses":
+        "200":
+          "description": "Success"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/InvoiceList"
+        "400":
+          "description": "Invalid fields or unknown selectors."
+        "401":
+          "description": "Authentication required."
+        "403":
+          "description": "Insufficient company role, invalid origin or unsupported API-key mutation."
+        "404":
+          "description": "Record is not available in this company."
+        "409":
+          "description": "Stale version, conflicting retry, immutable issued document or ledger reconciliation required."
+        "503":
+          "description": "Unavailable. Retain the exact request UUID and payload when checking or retrying an uncertain mutation."
+    "post":
+      "operationId": "createInvoice"
+      "tags": ["contractor"]
+      "summary": "Prepare a customer invoice draft"
+      "description": "Session-only owner/admin/office command. requestId is a durable UUID scoped to this company; reuse the identical request after an uncertain result. Does not send, charge or issue."
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/CreateInvoice"
+      "responses":
+        "200":
+          "description": "Success"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/InvoiceMutation"
+        "201":
+          "description": "Created"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/InvoiceMutation"
+        "400":
+          "description": "Invalid fields or unknown selectors."
+        "401":
+          "description": "Authentication required."
+        "403":
+          "description": "Insufficient company role, invalid origin or unsupported API-key mutation."
+        "404":
+          "description": "Record is not available in this company."
+        "409":
+          "description": "Stale version, conflicting retry, immutable issued document or ledger reconciliation required."
+        "503":
+          "description": "Unavailable. Retain the exact request UUID and payload when checking or retrying an uncertain mutation."
+  "/v1/invoices/{id}":
+    "get":
+      "operationId": "getInvoice"
+      "tags": ["contractor"]
+      "summary": "Read an invoice and its recorded receipt history"
+      "parameters": [{"$ref":"#/components/parameters/IdPathParam"}]
+      "responses":
+        "200":
+          "description": "Success"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/InvoiceDetail"
+        "400":
+          "description": "Invalid fields or unknown selectors."
+        "401":
+          "description": "Authentication required."
+        "403":
+          "description": "Insufficient company role, invalid origin or unsupported API-key mutation."
+        "404":
+          "description": "Record is not available in this company."
+        "409":
+          "description": "Stale version, conflicting retry, immutable issued document or ledger reconciliation required."
+        "503":
+          "description": "Unavailable. Retain the exact request UUID and payload when checking or retrying an uncertain mutation."
+    "patch":
+      "operationId": "updateInvoice"
+      "tags": ["contractor"]
+      "summary": "Edit a draft at the expected version"
+      "parameters": [{"$ref":"#/components/parameters/IdPathParam"}]
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/UpdateInvoice"
+      "responses":
+        "200":
+          "description": "Success"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/InvoiceMutation"
+        "400":
+          "description": "Invalid fields or unknown selectors."
+        "401":
+          "description": "Authentication required."
+        "403":
+          "description": "Insufficient company role, invalid origin or unsupported API-key mutation."
+        "404":
+          "description": "Record is not available in this company."
+        "409":
+          "description": "Stale version, conflicting retry, immutable issued document or ledger reconciliation required."
+        "503":
+          "description": "Unavailable. Retain the exact request UUID and payload when checking or retrying an uncertain mutation."
+  "/v1/invoices/{id}/issue":
+    "post":
+      "operationId": "issueInvoice"
+      "tags": ["contractor"]
+      "summary": "Issue an immutable numbered invoice"
+      "description": "Freezes the document and consumes one company-local number atomically. Issuing does not deliver email or collect payment. Tax is an explicit staff-entered amount."
+      "parameters": [{"$ref":"#/components/parameters/IdPathParam"}]
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/IssueInvoice"
+      "responses":
+        "200":
+          "description": "Success"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/InvoiceMutation"
+        "400":
+          "description": "Invalid fields or unknown selectors."
+        "401":
+          "description": "Authentication required."
+        "403":
+          "description": "Insufficient company role, invalid origin or unsupported API-key mutation."
+        "404":
+          "description": "Record is not available in this company."
+        "409":
+          "description": "Stale version, conflicting retry, immutable issued document or ledger reconciliation required."
+        "503":
+          "description": "Unavailable. Retain the exact request UUID and payload when checking or retrying an uncertain mutation."
+  "/v1/invoices/{id}/void":
+    "post":
+      "operationId": "voidInvoice"
+      "tags": ["contractor"]
+      "summary": "Void an invoice with a retained reason"
+      "description": "Preserves document and command history. Does not refund cash."
+      "parameters": [{"$ref":"#/components/parameters/IdPathParam"}]
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/VoidInvoice"
+      "responses":
+        "200":
+          "description": "Success"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/InvoiceMutation"
+        "400":
+          "description": "Invalid fields or unknown selectors."
+        "401":
+          "description": "Authentication required."
+        "403":
+          "description": "Insufficient company role, invalid origin or unsupported API-key mutation."
+        "404":
+          "description": "Record is not available in this company."
+        "409":
+          "description": "Stale version, conflicting retry, immutable issued document or ledger reconciliation required."
+        "503":
+          "description": "Unavailable. Retain the exact request UUID and payload when checking or retrying an uncertain mutation."
+  "/v1/invoices/{id}/payments":
+    "post":
+      "operationId": "recordInvoicePayment"
+      "tags": ["contractor"]
+      "summary": "Record money already received against an issued invoice"
+      "description": "Atomically writes one canonical value entry and one allocation. Never counts the allocation as additional revenue. Does not call a payment provider."
+      "parameters": [{"$ref":"#/components/parameters/IdPathParam"}]
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/InvoicePayment"
+      "responses":
+        "200":
+          "description": "Success"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/InvoiceMutation"
+        "400":
+          "description": "Invalid fields or unknown selectors."
+        "401":
+          "description": "Authentication required."
+        "403":
+          "description": "Insufficient company role, invalid origin or unsupported API-key mutation."
+        "404":
+          "description": "Record is not available in this company."
+        "409":
+          "description": "Stale version, conflicting retry, immutable issued document or ledger reconciliation required."
+        "503":
+          "description": "Unavailable. Retain the exact request UUID and payload when checking or retrying an uncertain mutation."
+  "/v1/invoices/{id}/allocations":
+    "post":
+      "operationId": "allocateInvoiceValue"
+      "tags": ["contractor"]
+      "summary": "Allocate an existing payment or refund receipt"
+      "description": "Does not create another cash entry. Unallocated refunds on the opportunity require reconciliation before a definitive balance is shown."
+      "parameters": [{"$ref":"#/components/parameters/IdPathParam"}]
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/InvoiceValueAllocation"
+      "responses":
+        "200":
+          "description": "Success"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/InvoiceMutation"
+        "400":
+          "description": "Invalid fields or unknown selectors."
+        "401":
+          "description": "Authentication required."
+        "403":
+          "description": "Insufficient company role, invalid origin or unsupported API-key mutation."
+        "404":
+          "description": "Record is not available in this company."
+        "409":
+          "description": "Stale version, conflicting retry, immutable issued document or ledger reconciliation required."
+        "503":
+          "description": "Unavailable. Retain the exact request UUID and payload when checking or retrying an uncertain mutation."
+  "/v1/invoices/{id}/allocations/{allocationId}/reverse":
+    "post":
+      "operationId": "reverseInvoiceAllocation"
+      "tags": ["contractor"]
+      "summary": "Reverse an allocation without refunding cash"
+      "parameters": [{"$ref":"#/components/parameters/IdPathParam"},{"name":"allocationId","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}]
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/ReverseInvoiceAllocation"
+      "responses":
+        "200":
+          "description": "Success"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/InvoiceMutation"
+        "400":
+          "description": "Invalid fields or unknown selectors."
+        "401":
+          "description": "Authentication required."
+        "403":
+          "description": "Insufficient company role, invalid origin or unsupported API-key mutation."
+        "404":
+          "description": "Record is not available in this company."
+        "409":
+          "description": "Stale version, conflicting retry, immutable issued document or ledger reconciliation required."
+        "503":
+          "description": "Unavailable. Retain the exact request UUID and payload when checking or retrying an uncertain mutation."
+  "/v1/service-obligations/{id}/recurrence":
+    "post":
+      "operationId": "setServiceObligationRecurrence"
+      "tags": ["contractor"]
+      "summary": "Record explicitly agreed service recurrence"
+      "description": "Calendar-month recurrence requires agreement evidence and current updatedAt. Completion creates at most one next obligation and staff task. Does not book appointments or send messages."
+      "parameters": [{"$ref":"#/components/parameters/IdPathParam"}]
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "$ref": "#/components/schemas/ServiceRecurrenceCommand"
+      "responses":
+        "200":
+          "description": "Success"
+          "content":
+            "application/json":
+              "schema":
+                "$ref": "#/components/schemas/ServiceObligation"
+        "400":
+          "description": "Invalid fields or unknown selectors."
+        "401":
+          "description": "Authentication required."
+        "403":
+          "description": "Insufficient company role, invalid origin or unsupported API-key mutation."
+        "404":
+          "description": "Record is not available in this company."
+        "409":
+          "description": "Stale version, conflicting retry, immutable issued document or ledger reconciliation required."
+        "503":
+          "description": "Unavailable. Retain the exact request UUID and payload when checking or retrying an uncertain mutation."
 components:
   parameters:
     IdPathParam:
@@ -4489,6 +4846,9 @@ components:
           $ref: "#/components/schemas/UserRole"
         isActive:
           type: boolean
+        operationallyEligible:
+          type: boolean
+          description: Active accepted staff with customer-work permission; false for pending invitations.
     InvitedMember:
       type: object
       required: [id, email, firstName, lastName, role, isActive, inviteEmail]
@@ -5271,6 +5631,10 @@ components:
             type: string
         crewNotes:
           type: [string, "null"]
+        expectedUpdatedAt:
+          type: string
+          format: date-time
+          description: Last observed update token; stale edits return 409.
     Activity:
       type: object
       required: [id, organizationId, type, title, metadata, occurredAt]
@@ -5452,6 +5816,9 @@ components:
         createdAt:
           type: string
           format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     AppointmentInput:
       type: object
       required: [scheduledStart]
@@ -5505,6 +5872,10 @@ components:
           format: date-time
         notes:
           type: [string, "null"]
+        expectedUpdatedAt:
+          type: string
+          format: date-time
+          description: Last observed update token; stale edits return 409.
     DashboardSummary:
       type: object
       required:
@@ -8290,3 +8661,840 @@ components:
         releasedByUserId: { type: [string, "null"] }
         releasedAt: { type: [string, "null"], format: date-time }
         releaseNote: { type: [string, "null"] }
+
+    InvoiceLineInput:
+      "type": "object"
+      "additionalProperties": false
+      "required": ["description","quantity","unitPriceCents"]
+      "properties":
+        "description":
+          "type": "string"
+          "minLength": 1
+          "maxLength": 1000
+        "quantity":
+          "type": "string"
+          "pattern": "^\\d{1,6}(?:\\.\\d{1,3})?$"
+          "description": "Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents."
+        "unitPriceCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+    InvoiceLine:
+      "type": "object"
+      "required": ["description","quantity","unitPriceCents","totalCents"]
+      "properties":
+        "description":
+          "type": "string"
+          "minLength": 1
+          "maxLength": 1000
+        "quantity":
+          "type": "string"
+          "pattern": "^\\d{1,6}(?:\\.\\d{1,3})?$"
+          "description": "Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents."
+        "unitPriceCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+        "totalCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+    InvoiceDocumentInput:
+      "type": "object"
+      "additionalProperties": false
+      "required": ["title","currency","issuerName","customerName","lineItems","taxCents"]
+      "properties":
+        "title":
+          "type": "string"
+          "minLength": 1
+          "maxLength": 150
+        "currency":
+          "type": "string"
+          "enum": ["USD"]
+        "issuerName":
+          "type": "string"
+          "minLength": 1
+          "maxLength": 200
+        "issuerAddress":
+          "type": ["string","null"]
+          "maxLength": 500
+        "customerName":
+          "type": "string"
+          "minLength": 1
+          "maxLength": 200
+        "customerAddress":
+          "type": ["string","null"]
+          "maxLength": 500
+        "dueDate":
+          "type": ["string","null"]
+          "format": "date"
+        "notes":
+          "type": ["string","null"]
+          "maxLength": 2000
+        "lineItems":
+          "type": "array"
+          "maxItems": 100
+          "items":
+            "$ref": "#/components/schemas/InvoiceLineInput"
+        "taxCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+    InvoiceDocument:
+      "type": "object"
+      "required": ["title","currency","issuerName","issuerAddress","customerName","customerAddress","dueDate","notes","lineItems","taxCents","subtotalCents","totalCents"]
+      "properties":
+        "title":
+          "type": "string"
+          "minLength": 1
+          "maxLength": 150
+        "currency":
+          "type": "string"
+          "enum": ["USD"]
+        "issuerName":
+          "type": "string"
+          "minLength": 1
+          "maxLength": 200
+        "issuerAddress":
+          "type": ["string","null"]
+          "maxLength": 500
+        "customerName":
+          "type": "string"
+          "minLength": 1
+          "maxLength": 200
+        "customerAddress":
+          "type": ["string","null"]
+          "maxLength": 500
+        "dueDate":
+          "type": ["string","null"]
+          "format": "date"
+        "notes":
+          "type": ["string","null"]
+          "maxLength": 2000
+        "lineItems":
+          "type": "array"
+          "maxItems": 100
+          "items":
+            "$ref": "#/components/schemas/InvoiceLine"
+        "taxCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+        "subtotalCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+        "totalCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+    InvoiceSummary:
+      "type": "object"
+      "required": ["id","leadId","projectId","estimateId","invoiceNumber","status","version","title","customerName","currency","subtotalCents","taxCents","totalCents","dueDate","issuedAt","voidedAt","voidReason","createdAt","updatedAt","recordedPaidCents","recordedBalanceCents","balanceDueCents","paymentState","reconciliationRequired","unallocatedRefundCents"]
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "leadId":
+          "type": "string"
+          "format": "uuid"
+        "projectId":
+          "type": ["string","null"]
+          "format": "uuid"
+        "estimateId":
+          "type": ["string","null"]
+          "format": "uuid"
+        "invoiceNumber":
+          "type": ["string","null"]
+        "status":
+          "type": "string"
+          "enum": ["draft","issued","void"]
+        "version":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 2147483646
+        "title":
+          "type": "string"
+        "customerName":
+          "type": "string"
+        "currency":
+          "type": "string"
+          "enum": ["USD"]
+        "subtotalCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+        "taxCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+        "totalCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+        "dueDate":
+          "type": ["string","null"]
+          "format": "date"
+        "issuedAt":
+          "type": ["string","null"]
+          "format": "date-time"
+        "voidedAt":
+          "type": ["string","null"]
+          "format": "date-time"
+        "voidReason":
+          "type": ["string","null"]
+        "createdAt":
+          "type": "string"
+          "format": "date-time"
+        "updatedAt":
+          "type": "string"
+          "format": "date-time"
+        "recordedPaidCents":
+          "type": "integer"
+        "recordedBalanceCents":
+          "type": "integer"
+        "balanceDueCents":
+          "type": ["integer","null"]
+        "paymentState":
+          "type": "string"
+          "enum": ["unpaid","partial","paid","reconciliation_required"]
+        "reconciliationRequired":
+          "type": "boolean"
+        "unallocatedRefundCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+    InvoiceAllocation:
+      "type": "object"
+      "required": ["id","valueEntryId","kind","sourceReference","amountCents","occurredAt","allocatedAt","reversedAt","reversalReason"]
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "valueEntryId":
+          "type": "string"
+          "format": "uuid"
+        "kind":
+          "type": "string"
+          "enum": ["payment","refund"]
+        "sourceReference":
+          "type": "string"
+        "amountCents":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 1000000000
+        "occurredAt":
+          "type": "string"
+          "format": "date-time"
+        "allocatedAt":
+          "type": "string"
+          "format": "date-time"
+        "reversedAt":
+          "type": ["string","null"]
+          "format": "date-time"
+        "reversalReason":
+          "type": ["string","null"]
+    InvoiceAvailableValueEntry:
+      "type": "object"
+      "required": ["id","kind","sourceReference","amountCents","availableCents","occurredAt"]
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "kind":
+          "type": "string"
+          "enum": ["payment","refund"]
+        "sourceReference":
+          "type": "string"
+        "amountCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+        "availableCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+        "occurredAt":
+          "type": "string"
+          "format": "date-time"
+    InvoiceEvent:
+      "type": "object"
+      "required": ["id","action","version","reason","createdAt"]
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "action":
+          "type": "string"
+        "version":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 2147483646
+        "reason":
+          "type": ["string","null"]
+        "createdAt":
+          "type": "string"
+          "format": "date-time"
+    InvoiceDetail:
+      "type": "object"
+      "required": ["id","leadId","projectId","estimateId","invoiceNumber","status","version","title","customerName","currency","subtotalCents","taxCents","totalCents","dueDate","issuedAt","voidedAt","voidReason","createdAt","updatedAt","recordedPaidCents","recordedBalanceCents","balanceDueCents","paymentState","reconciliationRequired","unallocatedRefundCents","document","allocations","availableValueEntries","availableValueEntriesTruncated","events"]
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "leadId":
+          "type": "string"
+          "format": "uuid"
+        "projectId":
+          "type": ["string","null"]
+          "format": "uuid"
+        "estimateId":
+          "type": ["string","null"]
+          "format": "uuid"
+        "invoiceNumber":
+          "type": ["string","null"]
+        "status":
+          "type": "string"
+          "enum": ["draft","issued","void"]
+        "version":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 2147483646
+        "title":
+          "type": "string"
+        "customerName":
+          "type": "string"
+        "currency":
+          "type": "string"
+          "enum": ["USD"]
+        "subtotalCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+        "taxCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+        "totalCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+        "dueDate":
+          "type": ["string","null"]
+          "format": "date"
+        "issuedAt":
+          "type": ["string","null"]
+          "format": "date-time"
+        "voidedAt":
+          "type": ["string","null"]
+          "format": "date-time"
+        "voidReason":
+          "type": ["string","null"]
+        "createdAt":
+          "type": "string"
+          "format": "date-time"
+        "updatedAt":
+          "type": "string"
+          "format": "date-time"
+        "recordedPaidCents":
+          "type": "integer"
+        "recordedBalanceCents":
+          "type": "integer"
+        "balanceDueCents":
+          "type": ["integer","null"]
+        "paymentState":
+          "type": "string"
+          "enum": ["unpaid","partial","paid","reconciliation_required"]
+        "reconciliationRequired":
+          "type": "boolean"
+        "unallocatedRefundCents":
+          "type": "integer"
+          "minimum": 0
+          "maximum": 1000000000
+        "document":
+          "$ref": "#/components/schemas/InvoiceDocument"
+        "allocations":
+          "type": "array"
+          "items":
+            "$ref": "#/components/schemas/InvoiceAllocation"
+        "availableValueEntries":
+          "type": "array"
+          "items":
+            "$ref": "#/components/schemas/InvoiceAvailableValueEntry"
+        "availableValueEntriesTruncated":
+          "type": "boolean"
+        "events":
+          "type": "array"
+          "items":
+            "$ref": "#/components/schemas/InvoiceEvent"
+    InvoiceList:
+      "type": "object"
+      "required": ["items","total","page","pageSize"]
+      "properties":
+        "items":
+          "type": "array"
+          "maxItems": 25
+          "items":
+            "$ref": "#/components/schemas/InvoiceSummary"
+        "total":
+          "type": "integer"
+          "minimum": 0
+        "page":
+          "type": "integer"
+          "minimum": 0
+        "pageSize":
+          "type": "integer"
+          "enum": [25]
+    InvoiceMutation:
+      "type": "object"
+      "required": ["invoice","duplicate"]
+      "properties":
+        "invoice":
+          "$ref": "#/components/schemas/InvoiceDetail"
+        "duplicate":
+          "type": "boolean"
+    CreateInvoice:
+      "type": "object"
+      "additionalProperties": false
+      "required": ["requestId","leadId","document"]
+      "properties":
+        "requestId":
+          "type": "string"
+          "format": "uuid"
+        "leadId":
+          "type": "string"
+          "format": "uuid"
+        "projectId":
+          "type": ["string","null"]
+          "format": "uuid"
+        "estimateId":
+          "type": ["string","null"]
+          "format": "uuid"
+        "document":
+          "$ref": "#/components/schemas/InvoiceDocumentInput"
+    UpdateInvoice:
+      "type": "object"
+      "additionalProperties": false
+      "required": ["requestId","expectedVersion","document"]
+      "properties":
+        "requestId":
+          "type": "string"
+          "format": "uuid"
+        "expectedVersion":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 2147483646
+        "document":
+          "$ref": "#/components/schemas/InvoiceDocumentInput"
+    IssueInvoice:
+      "type": "object"
+      "additionalProperties": false
+      "required": ["requestId","expectedVersion","confirmed"]
+      "properties":
+        "requestId":
+          "type": "string"
+          "format": "uuid"
+        "expectedVersion":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 2147483646
+        "confirmed":
+          "type": "boolean"
+          "enum": [true]
+    VoidInvoice:
+      "type": "object"
+      "additionalProperties": false
+      "required": ["requestId","expectedVersion","confirmed","reason"]
+      "properties":
+        "requestId":
+          "type": "string"
+          "format": "uuid"
+        "expectedVersion":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 2147483646
+        "confirmed":
+          "type": "boolean"
+          "enum": [true]
+        "reason":
+          "type": "string"
+          "minLength": 10
+          "maxLength": 500
+    InvoicePayment:
+      "type": "object"
+      "additionalProperties": false
+      "required": ["requestId","expectedVersion","confirmed","amountCents","sourceReference","occurredAt"]
+      "properties":
+        "requestId":
+          "type": "string"
+          "format": "uuid"
+        "expectedVersion":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 2147483646
+        "confirmed":
+          "type": "boolean"
+          "enum": [true]
+        "amountCents":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 1000000000
+        "sourceReference":
+          "type": "string"
+          "minLength": 5
+          "maxLength": 160
+        "occurredAt":
+          "type": "string"
+          "format": "date-time"
+          "description": "Actual prior receipt time. Future receipts are rejected. This records cash already received; it does not charge a customer."
+    InvoiceValueAllocation:
+      "type": "object"
+      "additionalProperties": false
+      "required": ["requestId","expectedVersion","confirmed","valueEntryId","amountCents"]
+      "properties":
+        "requestId":
+          "type": "string"
+          "format": "uuid"
+        "expectedVersion":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 2147483646
+        "confirmed":
+          "type": "boolean"
+          "enum": [true]
+        "valueEntryId":
+          "type": "string"
+          "format": "uuid"
+        "amountCents":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 1000000000
+    ReverseInvoiceAllocation:
+      "type": "object"
+      "additionalProperties": false
+      "required": ["requestId","expectedVersion","confirmed","reason"]
+      "properties":
+        "requestId":
+          "type": "string"
+          "format": "uuid"
+        "expectedVersion":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 2147483646
+        "confirmed":
+          "type": "boolean"
+          "enum": [true]
+        "reason":
+          "type": "string"
+          "minLength": 10
+          "maxLength": 500
+    ContractorDayTask:
+      "type": "object"
+      "required": ["id","title","status","dueAt","leadId","contactId","customerLabel","assignedUserId","assigneeName","actionPath"]
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "title":
+          "type": "string"
+        "status":
+          "type": "string"
+        "dueAt":
+          "type": ["string","null"]
+          "format": "date-time"
+        "leadId":
+          "type": ["string","null"]
+          "format": "uuid"
+        "contactId":
+          "type": ["string","null"]
+          "format": "uuid"
+        "customerLabel":
+          "type": ["string","null"]
+        "assignedUserId":
+          "type": ["string","null"]
+        "assigneeName":
+          "type": ["string","null"]
+        "actionPath":
+          "type": "string"
+    ContractorDayAppointment:
+      "type": "object"
+      "required": ["id","title","type","status","leadId","contactId","customerLabel","assignedUserId","assigneeName","scheduledStart","scheduledEnd"]
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "title":
+          "type": "string"
+        "type":
+          "type": "string"
+        "status":
+          "type": "string"
+        "leadId":
+          "type": ["string","null"]
+          "format": "uuid"
+        "contactId":
+          "type": ["string","null"]
+          "format": "uuid"
+        "customerLabel":
+          "type": ["string","null"]
+        "assignedUserId":
+          "type": ["string","null"]
+        "assigneeName":
+          "type": ["string","null"]
+        "scheduledStart":
+          "type": "string"
+          "format": "date-time"
+        "scheduledEnd":
+          "type": ["string","null"]
+          "format": "date-time"
+    ContractorDayProject:
+      "type": "object"
+      "required": ["id","title","status","leadId","customerLabel","crewNames","scheduledStart","scheduledEnd"]
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "title":
+          "type": "string"
+        "status":
+          "type": "string"
+        "leadId":
+          "type": "string"
+          "format": "uuid"
+        "customerLabel":
+          "type": ["string","null"]
+        "crewNames":
+          "type": "array"
+          "items":
+            "type": "string"
+        "scheduledStart":
+          "type": ["string","null"]
+          "format": "date-time"
+        "scheduledEnd":
+          "type": ["string","null"]
+          "format": "date-time"
+    ContractorDayService:
+      "type": "object"
+      "required": ["id","title","kind","status","dueAt","contactId","customerLabel","assignedUserId","assigneeName","taskId"]
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "title":
+          "type": "string"
+        "kind":
+          "type": "string"
+        "status":
+          "type": "string"
+        "dueAt":
+          "type": "string"
+          "format": "date-time"
+        "contactId":
+          "type": "string"
+          "format": "uuid"
+        "customerLabel":
+          "type": ["string","null"]
+        "assignedUserId":
+          "type": ["string","null"]
+        "assigneeName":
+          "type": ["string","null"]
+        "taskId":
+          "type": "string"
+          "format": "uuid"
+    ContractorToday:
+      "type": "object"
+      "required": ["organizationId","generatedAt","date","timeZone","timeZoneSource","startAt","endAt","scope","tasks","appointments","projects","services"]
+      "properties":
+        "organizationId":
+          "type": "string"
+          "format": "uuid"
+        "generatedAt":
+          "type": "string"
+          "format": "date-time"
+        "date":
+          "type": "string"
+          "format": "date"
+        "timeZone":
+          "type": "string"
+        "timeZoneSource":
+          "type": "string"
+          "enum": ["configured","utc_fallback"]
+        "startAt":
+          "type": "string"
+          "format": "date-time"
+        "endAt":
+          "type": "string"
+          "format": "date-time"
+        "scope":
+          "type": "string"
+          "enum": ["mine","company"]
+        "tasks":
+          "type": "object"
+          "required": ["items","total","truncated"]
+          "properties":
+            "items":
+              "type": "array"
+              "maxItems": 50
+              "items":
+                "$ref": "#/components/schemas/ContractorDayTask"
+            "total":
+              "type": "integer"
+              "minimum": 0
+            "truncated":
+              "type": "boolean"
+        "appointments":
+          "type": "object"
+          "required": ["items","total","truncated"]
+          "properties":
+            "items":
+              "type": "array"
+              "maxItems": 50
+              "items":
+                "$ref": "#/components/schemas/ContractorDayAppointment"
+            "total":
+              "type": "integer"
+              "minimum": 0
+            "truncated":
+              "type": "boolean"
+        "projects":
+          "type": "object"
+          "required": ["items","total","truncated"]
+          "properties":
+            "items":
+              "type": "array"
+              "maxItems": 50
+              "items":
+                "$ref": "#/components/schemas/ContractorDayProject"
+            "total":
+              "type": "integer"
+              "minimum": 0
+            "truncated":
+              "type": "boolean"
+        "services":
+          "type": "object"
+          "required": ["items","total","truncated"]
+          "properties":
+            "items":
+              "type": "array"
+              "maxItems": 50
+              "items":
+                "$ref": "#/components/schemas/ContractorDayService"
+            "total":
+              "type": "integer"
+              "minimum": 0
+            "truncated":
+              "type": "boolean"
+    ServiceRecurrenceCommand:
+      "type": "object"
+      "additionalProperties": false
+      "required": ["expectedUpdatedAt","intervalMonths","agreementNote"]
+      "properties":
+        "expectedUpdatedAt":
+          "type": "string"
+          "format": "date-time"
+        "intervalMonths":
+          "type": ["integer","null"]
+          "minimum": 1
+          "maximum": 60
+          "description": "Set null to stop future recurrence."
+        "endDate":
+          "type": ["string","null"]
+          "format": "date"
+        "agreementNote":
+          "type": "string"
+          "minLength": 1
+          "maxLength": 500
+    ServiceRecurrence:
+      "type": "object"
+      "required": ["mode","intervalMonths","anchorDate","endDate","agreementNote","approvedByUserId","approvedAt"]
+      "properties":
+        "mode":
+          "type": "string"
+          "enum": ["calendar_months"]
+        "intervalMonths":
+          "type": "integer"
+          "minimum": 1
+          "maximum": 60
+        "anchorDate":
+          "type": "string"
+          "format": "date"
+        "endDate":
+          "type": ["string","null"]
+          "format": "date"
+        "agreementNote":
+          "type": "string"
+        "approvedByUserId":
+          "type": "string"
+        "approvedAt":
+          "type": "string"
+          "format": "date-time"
+    ServiceObligation:
+      "type": "object"
+      "required": ["id","organizationId","contactId","taskId","kind","equipmentLabel","dueAt","noticeDays","status","source","createdAt","updatedAt"]
+      "properties":
+        "id":
+          "type": "string"
+          "format": "uuid"
+        "organizationId":
+          "type": "string"
+          "format": "uuid"
+        "contactId":
+          "type": "string"
+          "format": "uuid"
+        "propertyId":
+          "type": ["string","null"]
+          "format": "uuid"
+        "appointmentId":
+          "type": ["string","null"]
+          "format": "uuid"
+        "taskId":
+          "type": "string"
+          "format": "uuid"
+        "kind":
+          "type": "string"
+          "enum": ["warranty_check","maintenance","service_plan"]
+        "equipmentLabel":
+          "type": "string"
+        "dueAt":
+          "type": "string"
+          "format": "date-time"
+        "noticeDays":
+          "type": "integer"
+        "status":
+          "type": "string"
+          "enum": ["active","completed","cancelled"]
+        "source":
+          "type": "string"
+        "externalRef":
+          "type": ["string","null"]
+        "notes":
+          "type": ["string","null"]
+        "recurrence":
+          "anyOf": [{"$ref":"#/components/schemas/ServiceRecurrence"},{"type":"null"}]
+        "predecessorObligationId":
+          "type": ["string","null"]
+          "format": "uuid"
+        "occurrenceIndex":
+          "type": "integer"
+        "coverageStartsOn":
+          "type": ["string","null"]
+          "format": "date"
+        "coverageEndsOn":
+          "type": ["string","null"]
+          "format": "date"
+        "coverageEvidence":
+          "type": ["string","null"]
+        "completionNote":
+          "type": ["string","null"]
+        "completedAt":
+          "type": ["string","null"]
+          "format": "date-time"
+        "createdAt":
+          "type": "string"
+          "format": "date-time"
+        "updatedAt":
+          "type": "string"
+          "format": "date-time"
+        "nextObligationId":
+          "type": ["string","null"]
+          "format": "uuid"

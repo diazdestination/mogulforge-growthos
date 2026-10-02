@@ -72,7 +72,7 @@ describe("normal-mode customer lifecycle ownership", () => {
       expect(encoded).toContain(own.marker);
       for (const canary of [foreign.marker, foreign.org, foreign.contact, foreign.lead, foreign.execution, own.secret, foreign.secret, "SYNTHETIC_SESSION_SECRET", "WITHHELD_"]) expect(encoded).not.toContain(canary);
       expect(result.manifest).toMatchObject({ completeAccountExport: false, deletionPerformed: false, scope: "core_customer_records" });
-      expect(result.manifest.tables).toHaveLength(14);
+      expect(result.manifest.tables).toHaveLength(18);
       expect(result.manifest.tables.find((t) => t.table === "estimates")?.withheldInvalidLinks).toBe(1);
       expect(result.manifest.tables.find((t) => t.table === "projects")?.withheldInvalidLinks).toBe(1);
       expect(result.manifest.tables.find((t) => t.table === "revenue_execution_events")?.withheldInvalidLinks).toBe(1);

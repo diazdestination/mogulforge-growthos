@@ -18,11 +18,11 @@ const exportSchema = z.object({
   generatedAt: z.string(), organization: z.object({ id: z.string().uuid(), name: z.string(), slug: z.string(), created_at: z.string() }),
   manifest: z.object({ scope: z.literal("core_customer_records"), completeAccountExport: z.literal(false), deletionPerformed: z.literal(false),
     rowsPerTableLimit: z.literal(2000), byteLimit: z.literal(10 * 1024 * 1024),
-    tables: z.array(z.object({ table: z.string(), fields: z.array(z.string()), count: z.number().int().min(0).max(2000), withheldInvalidLinks: z.number().int().min(0) })).length(14),
+    tables: z.array(z.object({ table: z.string(), fields: z.array(z.string()), count: z.number().int().min(0).max(2000), withheldInvalidLinks: z.number().int().min(0) })).length(18),
     exclusions: z.array(z.string()), dataSha256: z.string().regex(/^[a-f0-9]{64}$/), followUp: z.string(),
   }), data: z.record(z.string(), z.array(z.record(z.string(), z.unknown()))),
-}).refine(({ data, manifest }) => new Set(manifest.tables.map((table) => table.table)).size === 14 &&
-  Object.keys(data).length === 14 && manifest.tables.every((table) => data[table.table]?.length === table.count &&
+}).refine(({ data, manifest }) => new Set(manifest.tables.map((table) => table.table)).size === 18 &&
+  Object.keys(data).length === 18 && manifest.tables.every((table) => data[table.table]?.length === table.count &&
     data[table.table].every((row) => Object.keys(row).every((field) => table.fields.includes(field)))));
 type Status = z.infer<typeof statusSchema>;
 type Action = "pause" | "resume" | "request_offboarding" | "cancel_offboarding";
@@ -96,7 +96,7 @@ function CompanyControls() {
         URL.revokeObjectURL(url); downloadUrl.current = null;
         const count = data.manifest.tables.reduce((sum, table) => sum + table.count, 0);
         const withheld = data.manifest.tables.reduce((sum, table) => sum + table.withheldInvalidLinks, 0);
-        setNotice(`Download started: ${count.toLocaleString("en-US")} ${count === 1 ? "record" : "records"} across 14 datasets. The file includes its coverage and checksum.${withheld ? ` ${withheld} ${withheld === 1 ? "record was" : "records were"} withheld because related records could not be verified. Ask your operator to review them.` : ""}`);
+        setNotice(`Download started: ${count.toLocaleString("en-US")} ${count === 1 ? "record" : "records"} across ${data.manifest.tables.length} datasets. The file includes its coverage and checksum.${withheld ? ` ${withheld} ${withheld === 1 ? "record was" : "records were"} withheld because related records could not be verified. Ask your operator to review them.` : ""}`);
       } else {
         const next = statusSchema.parse(raw); setStatus(next); setNeedsReview(false);
         if (operation === "transition") {
@@ -125,7 +125,7 @@ function CompanyControls() {
         <details className="text-sm">
           <summary className="cursor-pointer font-medium underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">Included records and limits</summary>
           <div className="max-w-prose space-y-2 pt-3 text-muted-foreground">
-            <p>The 14 datasets cover contacts, properties, leads, estimates, projects, tasks, appointments, activity text, consent, suppressions, value entries, execution receipts and events, and stored-media metadata.</p>
+            <p>The 18 datasets cover contacts, properties, leads, estimates, projects, tasks, appointments, warranty and recurring service records, invoices and their receipt allocations and history, activity text, consent, suppressions, value entries, execution receipts and events, and stored-media metadata.</p>
             <p>Up to 2,000 records per dataset and 10 MB before formatting. Larger exports fail without producing a partial file. Records with unverified relationships are withheld and counted in the file.</p>
             <p>Passwords, tokens, API keys, opaque metadata and staff identities are excluded. Photo files, full email conversations, website submissions, automation queues, provider copies, backups and other account tables need operator review.</p>
             <p>Ask your GrowthOS operator for an expanded export covering any excluded data you need.</p>

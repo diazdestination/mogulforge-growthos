@@ -10,6 +10,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { z } from "zod";
 
 import { consumeCooldown } from "../../lib/rateLimit";
+import { hasPermission } from "../../lib/permissions";
 import { requireMember } from "../../middlewares/requireMember";
 import { recordAudit } from "../../services/audit";
 import { listMembers } from "../../services/crm";
@@ -169,6 +170,7 @@ router.get(
         lastName: m.lastName,
         role: m.role,
         isActive: m.isActive,
+        operationallyEligible: m.isActive && !m.id.startsWith("invite:") && m.emailVerifiedAt !== null && hasPermission(m.role, "crm.write"),
       })),
     );
   },

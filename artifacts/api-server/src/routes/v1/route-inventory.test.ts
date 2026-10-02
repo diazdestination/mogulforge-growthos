@@ -71,6 +71,17 @@ const SESSION_ONLY_ROUTES = new Set([
  * - settings.manage — org configuration surfaces (owner/admin)
  */
 const EXPECTED_PERMISSIONS: Record<string, Permission> = {
+  "GET /contractor/today": "crm.read",
+  "GET /tasks/:id": "crm.read",
+  "GET /invoices": "invoices.read",
+  "GET /invoices/:id": "invoices.read",
+  "POST /invoices": "invoices.manage",
+  "PATCH /invoices/:id": "invoices.manage",
+  "POST /invoices/:id/issue": "invoices.manage",
+  "POST /invoices/:id/void": "invoices.manage",
+  "POST /invoices/:id/payments": "invoices.manage",
+  "POST /invoices/:id/allocations": "invoices.manage",
+  "POST /invoices/:id/allocations/:allocationId/reverse": "invoices.manage",
   "GET /customer-lifecycle": "settings.manage",
   "POST /customer-lifecycle/transition": "settings.manage",
   "GET /customer-lifecycle/export": "settings.manage",
@@ -246,6 +257,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "POST /service-obligations": "crm.write",
   "PATCH /service-obligations/:id": "crm.write",
   "POST /service-obligations/import": "crm.write",
+  "POST /service-obligations/:id/recurrence": "crm.write",
   "POST /communications/sms": "crm.write",
   // Gmail authorization is personal to the signed-in member, not an org-wide
   // admin credential. Tenant/user binding is enforced again in the service.

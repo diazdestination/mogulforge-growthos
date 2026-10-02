@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { basename, dirname, resolve } from 'node:path';
+import { nativeFixtureIds } from './native-contractor-recovery-fixture.mjs';
 
 const target = new URL(process.env.DATABASE_URL ?? '');
 if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.hostname !== '127.0.0.1' || target.pathname !== '/postgres' || process.env.CONTRACTOR_SYNTHETIC_RECOVERY !== 'true' || process.env.NODE_ENV !== 'test') throw new Error('contractor_probe_target_invalid');
@@ -27,14 +28,18 @@ try {
   const origin = `http://127.0.0.1:${server.address().port}`;
   const id = fixtureIds('restore-drill-contractor-a');
   const other = fixtureIds('restore-drill-contractor-b');
+  const native = nativeFixtureIds('restore-drill-contractor-a'), otherNative = nativeFixtureIds('restore-drill-contractor-b');
   const headers = { authorization: `Bearer ${'a'.repeat(64)}` };
-  const good = ['/api/healthz', '/api/auth/user', `/api/v1/contacts/${id.contact}`, `/api/v1/leads/${id.lead}`, `/api/v1/projects/${id.project}`, '/api/v1/revenue/value', '/api/v1/customer-lifecycle', '/api/v1/email-intelligence/replies'];
+  const good = ['/api/healthz', '/api/auth/user', `/api/v1/contacts/${id.contact}`, `/api/v1/leads/${id.lead}`, `/api/v1/projects/${id.project}`, '/api/v1/revenue/value', '/api/v1/customer-lifecycle', '/api/v1/email-intelligence/replies', '/api/v1/contractor/today?date=2026-10-01', '/api/v1/invoices', `/api/v1/invoices/${native.invoice}`, '/api/v1/service-obligations'];
   for (const route of good) {
     check = `read_${good.indexOf(route)}`;
     const response = await fetch(`${origin}${route}`, { headers });
     assert.equal(response.status, 200, route); await response.arrayBuffer();
   }
-  for (const route of [`/api/v1/contacts/${other.contact}`, `/api/v1/leads/${other.lead}`, `/api/v1/projects/${other.project}`]) {
+  const invoice = await (await fetch(`${origin}/api/v1/invoices/${native.invoice}`, { headers })).json();
+  assert.equal(invoice.recordedPaidCents,0); assert.equal(invoice.balanceDueCents,10000);
+  assert.equal(invoice.allocations.length,1); assert.ok(invoice.allocations[0].reversedAt);
+  for (const route of [`/api/v1/contacts/${other.contact}`, `/api/v1/leads/${other.lead}`, `/api/v1/projects/${other.project}`, `/api/v1/invoices/${otherNative.invoice}`]) {
     check = 'tenant_boundary';
     const response = await fetch(`${origin}${route}`, { headers });
     assert.equal(response.status, 404, route); await response.arrayBuffer();

@@ -8,4 +8,17 @@
 
 export type ListAppointmentsParams = {
 leadId?: string;
+/**
+ * Window start; requires to. At most 31 days.
+ */
+from?: Date;
+/**
+ * Exclusive window end; requires from.
+ */
+to?: Date;
+assignedUserId?: string;
+/**
+ * Filter appointments for an existing customer.
+ */
+contactId?: string;
 };

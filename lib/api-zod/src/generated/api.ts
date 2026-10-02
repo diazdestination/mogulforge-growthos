@@ -136,7 +136,8 @@ export const ListUsersResponseItem = zod.object({
   "firstName": zod.string().nullable(),
   "lastName": zod.string().nullable(),
   "role": zod.enum(['owner', 'admin', 'sales_manager', 'sales_rep', 'inspector', 'production', 'office', 'viewer']),
-  "isActive": zod.boolean()
+  "isActive": zod.boolean(),
+  "operationallyEligible": zod.boolean().optional().describe('Active accepted staff with customer-work permission; false for pending invitations.')
 })
 export const ListUsersResponse = zod.array(ListUsersResponseItem)
 
@@ -187,7 +188,8 @@ export const UpdateUserResponse = zod.object({
   "firstName": zod.string().nullable(),
   "lastName": zod.string().nullable(),
   "role": zod.enum(['owner', 'admin', 'sales_manager', 'sales_rep', 'inspector', 'production', 'office', 'viewer']),
-  "isActive": zod.boolean()
+  "isActive": zod.boolean(),
+  "operationallyEligible": zod.boolean().optional().describe('Active accepted staff with customer-work permission; false for pending invitations.')
 })
 
 
@@ -1470,7 +1472,8 @@ export const UpdateProjectBody = zod.object({
   "scheduledStart": zod.coerce.date().nullish(),
   "scheduledEnd": zod.coerce.date().nullish(),
   "crewUserIds": zod.array(zod.string()).optional(),
-  "crewNotes": zod.string().nullish()
+  "crewNotes": zod.string().nullish(),
+  "expectedUpdatedAt": zod.coerce.date().optional().describe('Last observed update token; stale edits return 409.')
 })
 
 export const UpdateProjectResponse = zod.object({
@@ -1705,6 +1708,30 @@ export const CreateTaskResponse = zod.object({
 })
 
 
+/**
+ * @summary Read a task independently of the recent-task list
+ */
+export const GetTaskParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const GetTaskResponse = zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "leadId": zod.uuid().nullish(),
+  "leadLabel": zod.string().nullish().describe('Convenience display name of the linked lead (contact name, falling back to lead summary; list endpoints only).'),
+  "contactId": zod.uuid().nullish(),
+  "assignedUserId": zod.string().nullish(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "status": zod.enum(['open', 'in_progress', 'done', 'cancelled']),
+  "priority": zod.enum(['low', 'normal', 'high', 'emergency']),
+  "dueAt": zod.coerce.date().nullish(),
+  "completedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
 export const UpdateTaskParams = zod.object({
   "id": zod.uuid()
 })
@@ -1748,7 +1775,11 @@ export const DeleteTaskResponse = zod.void()
 
 
 export const ListAppointmentsQueryParams = zod.object({
-  "leadId": zod.uuid().optional()
+  "leadId": zod.uuid().optional(),
+  "from": zod.date().optional().describe('Window start; requires to. At most 31 days.'),
+  "to": zod.date().optional().describe('Exclusive window end; requires from.'),
+  "assignedUserId": zod.coerce.string().optional(),
+  "contactId": zod.uuid().optional().describe('Filter appointments for an existing customer.')
 })
 
 export const ListAppointmentsResponseItem = zod.object({
@@ -1764,7 +1795,8 @@ export const ListAppointmentsResponseItem = zod.object({
   "scheduledStart": zod.coerce.date(),
   "scheduledEnd": zod.coerce.date().nullish(),
   "notes": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date().optional()
 })
 export const ListAppointmentsResponse = zod.array(ListAppointmentsResponseItem)
 
@@ -1794,7 +1826,8 @@ export const CreateAppointmentResponse = zod.object({
   "scheduledStart": zod.coerce.date(),
   "scheduledEnd": zod.coerce.date().nullish(),
   "notes": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date().optional()
 })
 
 
@@ -1811,7 +1844,8 @@ export const UpdateAppointmentBody = zod.object({
   "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']).optional(),
   "scheduledStart": zod.coerce.date().optional(),
   "scheduledEnd": zod.coerce.date().nullish(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "expectedUpdatedAt": zod.coerce.date().optional().describe('Last observed update token; stale edits return 409.')
 })
 
 export const UpdateAppointmentResponse = zod.object({
@@ -1827,7 +1861,8 @@ export const UpdateAppointmentResponse = zod.object({
   "scheduledStart": zod.coerce.date(),
   "scheduledEnd": zod.coerce.date().nullish(),
   "notes": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date().optional()
 })
 
 
@@ -4732,6 +4767,1552 @@ export const ResolveCustomerReplyResponse = zod.object({
   "releasedByUserId": zod.string().nullable(),
   "releasedAt": zod.coerce.date().nullable(),
   "releaseNote": zod.string().nullable()
+})
+
+
+/**
+ * Read-only snapshot in the configured inspection timezone, falling back to UTC explicitly. Each queue is capped at 50 with exact total/truncated indicators. Tasks include overdue, due today and undated work; company scope requires existing CRM read access. No provider calls or settings initialization.
+ * @summary Read the company-local workday snapshot
+ */
+export const GetContractorTodayQueryParams = zod.object({
+  "date": zod.date().optional(),
+  "scope": zod.enum(['mine', 'company']).optional()
+})
+
+export const getContractorTodayResponseTasksItemsMax = 50;
+
+export const getContractorTodayResponseTasksTotalMin = 0;
+
+export const getContractorTodayResponseAppointmentsItemsMax = 50;
+
+export const getContractorTodayResponseAppointmentsTotalMin = 0;
+
+export const getContractorTodayResponseProjectsItemsMax = 50;
+
+export const getContractorTodayResponseProjectsTotalMin = 0;
+
+export const getContractorTodayResponseServicesItemsMax = 50;
+
+export const getContractorTodayResponseServicesTotalMin = 0;
+
+
+
+export const GetContractorTodayResponse = zod.object({
+  "organizationId": zod.uuid(),
+  "generatedAt": zod.coerce.date(),
+  "date": zod.coerce.date(),
+  "timeZone": zod.string(),
+  "timeZoneSource": zod.enum(['configured', 'utc_fallback']),
+  "startAt": zod.coerce.date(),
+  "endAt": zod.coerce.date(),
+  "scope": zod.enum(['mine', 'company']),
+  "tasks": zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "title": zod.string(),
+  "status": zod.string(),
+  "dueAt": zod.coerce.date().nullable(),
+  "leadId": zod.uuid().nullable(),
+  "contactId": zod.uuid().nullable(),
+  "customerLabel": zod.string().nullable(),
+  "assignedUserId": zod.string().nullable(),
+  "assigneeName": zod.string().nullable(),
+  "actionPath": zod.string()
+})).max(getContractorTodayResponseTasksItemsMax),
+  "total": zod.int().min(getContractorTodayResponseTasksTotalMin),
+  "truncated": zod.boolean()
+}),
+  "appointments": zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "title": zod.string(),
+  "type": zod.string(),
+  "status": zod.string(),
+  "leadId": zod.uuid().nullable(),
+  "contactId": zod.uuid().nullable(),
+  "customerLabel": zod.string().nullable(),
+  "assignedUserId": zod.string().nullable(),
+  "assigneeName": zod.string().nullable(),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date().nullable()
+})).max(getContractorTodayResponseAppointmentsItemsMax),
+  "total": zod.int().min(getContractorTodayResponseAppointmentsTotalMin),
+  "truncated": zod.boolean()
+}),
+  "projects": zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "title": zod.string(),
+  "status": zod.string(),
+  "leadId": zod.uuid(),
+  "customerLabel": zod.string().nullable(),
+  "crewNames": zod.array(zod.string()),
+  "scheduledStart": zod.coerce.date().nullable(),
+  "scheduledEnd": zod.coerce.date().nullable()
+})).max(getContractorTodayResponseProjectsItemsMax),
+  "total": zod.int().min(getContractorTodayResponseProjectsTotalMin),
+  "truncated": zod.boolean()
+}),
+  "services": zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "title": zod.string(),
+  "kind": zod.string(),
+  "status": zod.string(),
+  "dueAt": zod.coerce.date(),
+  "contactId": zod.uuid(),
+  "customerLabel": zod.string().nullable(),
+  "assignedUserId": zod.string().nullable(),
+  "assigneeName": zod.string().nullable(),
+  "taskId": zod.uuid()
+})).max(getContractorTodayResponseServicesItemsMax),
+  "total": zod.int().min(getContractorTodayResponseServicesTotalMin),
+  "truncated": zod.boolean()
+})
+})
+
+
+/**
+ * Owner, admin, office and sales manager may read. Same-company records only. Financial figures reflect recorded ledger evidence.
+ * @summary List native customer invoices
+ */
+export const listInvoicesQueryPageDefault = 0;
+export const listInvoicesQueryPageMin = 0;
+export const listInvoicesQueryPageMax = 10000;
+
+
+
+export const ListInvoicesQueryParams = zod.object({
+  "status": zod.enum(['draft', 'issued', 'void']).optional(),
+  "leadId": zod.uuid().optional(),
+  "projectId": zod.uuid().optional(),
+  "page": zod.coerce.number().int().min(listInvoicesQueryPageMin).max(listInvoicesQueryPageMax).default(listInvoicesQueryPageDefault)
+})
+
+export const listInvoicesResponseItemsItemVersionMax = 2147483646;
+
+export const listInvoicesResponseItemsItemSubtotalCentsMin = 0;
+export const listInvoicesResponseItemsItemSubtotalCentsMax = 1000000000;
+
+export const listInvoicesResponseItemsItemTaxCentsMin = 0;
+export const listInvoicesResponseItemsItemTaxCentsMax = 1000000000;
+
+export const listInvoicesResponseItemsItemTotalCentsMin = 0;
+export const listInvoicesResponseItemsItemTotalCentsMax = 1000000000;
+
+export const listInvoicesResponseItemsItemUnallocatedRefundCentsMin = 0;
+export const listInvoicesResponseItemsItemUnallocatedRefundCentsMax = 1000000000;
+
+export const listInvoicesResponseItemsMax = 25;
+
+export const listInvoicesResponseTotalMin = 0;
+
+export const listInvoicesResponsePageMin = 0;
+
+
+
+export const ListInvoicesResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "leadId": zod.uuid(),
+  "projectId": zod.uuid().nullable(),
+  "estimateId": zod.uuid().nullable(),
+  "invoiceNumber": zod.string().nullable(),
+  "status": zod.enum(['draft', 'issued', 'void']),
+  "version": zod.int().min(1).max(listInvoicesResponseItemsItemVersionMax),
+  "title": zod.string(),
+  "customerName": zod.string(),
+  "currency": zod.enum(['USD']),
+  "subtotalCents": zod.int().min(listInvoicesResponseItemsItemSubtotalCentsMin).max(listInvoicesResponseItemsItemSubtotalCentsMax),
+  "taxCents": zod.int().min(listInvoicesResponseItemsItemTaxCentsMin).max(listInvoicesResponseItemsItemTaxCentsMax),
+  "totalCents": zod.int().min(listInvoicesResponseItemsItemTotalCentsMin).max(listInvoicesResponseItemsItemTotalCentsMax),
+  "dueDate": zod.coerce.date().nullable(),
+  "issuedAt": zod.coerce.date().nullable(),
+  "voidedAt": zod.coerce.date().nullable(),
+  "voidReason": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "recordedPaidCents": zod.int(),
+  "recordedBalanceCents": zod.int(),
+  "balanceDueCents": zod.int().nullable(),
+  "paymentState": zod.enum(['unpaid', 'partial', 'paid', 'reconciliation_required']),
+  "reconciliationRequired": zod.boolean(),
+  "unallocatedRefundCents": zod.int().min(listInvoicesResponseItemsItemUnallocatedRefundCentsMin).max(listInvoicesResponseItemsItemUnallocatedRefundCentsMax)
+})).max(listInvoicesResponseItemsMax),
+  "total": zod.int().min(listInvoicesResponseTotalMin),
+  "page": zod.int().min(listInvoicesResponsePageMin),
+  "pageSize": zod.literal(25)
+})
+
+
+/**
+ * Session-only owner/admin/office command. requestId is a durable UUID scoped to this company; reuse the identical request after an uncertain result. Does not send, charge or issue.
+ * @summary Prepare a customer invoice draft
+ */
+export const createInvoiceBodyDocumentTitleMax = 150;
+
+export const createInvoiceBodyDocumentIssuerNameMax = 200;
+
+export const createInvoiceBodyDocumentIssuerAddressMax = 500;
+
+export const createInvoiceBodyDocumentCustomerNameMax = 200;
+
+export const createInvoiceBodyDocumentCustomerAddressMax = 500;
+
+export const createInvoiceBodyDocumentNotesMax = 2000;
+
+export const createInvoiceBodyDocumentLineItemsItemDescriptionMax = 1000;
+
+export const createInvoiceBodyDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const createInvoiceBodyDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const createInvoiceBodyDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const createInvoiceBodyDocumentLineItemsMax = 100;
+
+export const createInvoiceBodyDocumentTaxCentsMin = 0;
+export const createInvoiceBodyDocumentTaxCentsMax = 1000000000;
+
+
+
+export const CreateInvoiceBody = zod.object({
+  "requestId": zod.uuid(),
+  "leadId": zod.uuid(),
+  "projectId": zod.uuid().nullish(),
+  "estimateId": zod.uuid().nullish(),
+  "document": zod.object({
+  "title": zod.string().min(1).max(createInvoiceBodyDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(createInvoiceBodyDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(createInvoiceBodyDocumentIssuerAddressMax).nullish(),
+  "customerName": zod.string().min(1).max(createInvoiceBodyDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(createInvoiceBodyDocumentCustomerAddressMax).nullish(),
+  "dueDate": zod.coerce.date().nullish(),
+  "notes": zod.string().max(createInvoiceBodyDocumentNotesMax).nullish(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(createInvoiceBodyDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(createInvoiceBodyDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(createInvoiceBodyDocumentLineItemsItemUnitPriceCentsMin).max(createInvoiceBodyDocumentLineItemsItemUnitPriceCentsMax)
+})).max(createInvoiceBodyDocumentLineItemsMax),
+  "taxCents": zod.int().min(createInvoiceBodyDocumentTaxCentsMin).max(createInvoiceBodyDocumentTaxCentsMax)
+})
+})
+
+export const createInvoiceResponseInvoiceVersionMax = 2147483646;
+
+export const createInvoiceResponseInvoiceSubtotalCentsMin = 0;
+export const createInvoiceResponseInvoiceSubtotalCentsMax = 1000000000;
+
+export const createInvoiceResponseInvoiceTaxCentsMin = 0;
+export const createInvoiceResponseInvoiceTaxCentsMax = 1000000000;
+
+export const createInvoiceResponseInvoiceTotalCentsMin = 0;
+export const createInvoiceResponseInvoiceTotalCentsMax = 1000000000;
+
+export const createInvoiceResponseInvoiceUnallocatedRefundCentsMin = 0;
+export const createInvoiceResponseInvoiceUnallocatedRefundCentsMax = 1000000000;
+
+export const createInvoiceResponseInvoiceDocumentTitleMax = 150;
+
+export const createInvoiceResponseInvoiceDocumentIssuerNameMax = 200;
+
+export const createInvoiceResponseInvoiceDocumentIssuerAddressMax = 500;
+
+export const createInvoiceResponseInvoiceDocumentCustomerNameMax = 200;
+
+export const createInvoiceResponseInvoiceDocumentCustomerAddressMax = 500;
+
+export const createInvoiceResponseInvoiceDocumentNotesMax = 2000;
+
+export const createInvoiceResponseInvoiceDocumentLineItemsItemDescriptionMax = 1000;
+
+export const createInvoiceResponseInvoiceDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const createInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const createInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const createInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMin = 0;
+export const createInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMax = 1000000000;
+
+export const createInvoiceResponseInvoiceDocumentLineItemsMax = 100;
+
+export const createInvoiceResponseInvoiceDocumentTaxCentsMin = 0;
+export const createInvoiceResponseInvoiceDocumentTaxCentsMax = 1000000000;
+
+export const createInvoiceResponseInvoiceDocumentSubtotalCentsMin = 0;
+export const createInvoiceResponseInvoiceDocumentSubtotalCentsMax = 1000000000;
+
+export const createInvoiceResponseInvoiceDocumentTotalCentsMin = 0;
+export const createInvoiceResponseInvoiceDocumentTotalCentsMax = 1000000000;
+
+export const createInvoiceResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
+
+export const createInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
+export const createInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMax = 1000000000;
+
+export const createInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMin = 0;
+export const createInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMax = 1000000000;
+
+export const createInvoiceResponseInvoiceEventsItemVersionMax = 2147483646;
+
+
+
+export const CreateInvoiceResponse = zod.object({
+  "invoice": zod.object({
+  "id": zod.uuid(),
+  "leadId": zod.uuid(),
+  "projectId": zod.uuid().nullable(),
+  "estimateId": zod.uuid().nullable(),
+  "invoiceNumber": zod.string().nullable(),
+  "status": zod.enum(['draft', 'issued', 'void']),
+  "version": zod.int().min(1).max(createInvoiceResponseInvoiceVersionMax),
+  "title": zod.string(),
+  "customerName": zod.string(),
+  "currency": zod.enum(['USD']),
+  "subtotalCents": zod.int().min(createInvoiceResponseInvoiceSubtotalCentsMin).max(createInvoiceResponseInvoiceSubtotalCentsMax),
+  "taxCents": zod.int().min(createInvoiceResponseInvoiceTaxCentsMin).max(createInvoiceResponseInvoiceTaxCentsMax),
+  "totalCents": zod.int().min(createInvoiceResponseInvoiceTotalCentsMin).max(createInvoiceResponseInvoiceTotalCentsMax),
+  "dueDate": zod.coerce.date().nullable(),
+  "issuedAt": zod.coerce.date().nullable(),
+  "voidedAt": zod.coerce.date().nullable(),
+  "voidReason": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "recordedPaidCents": zod.int(),
+  "recordedBalanceCents": zod.int(),
+  "balanceDueCents": zod.int().nullable(),
+  "paymentState": zod.enum(['unpaid', 'partial', 'paid', 'reconciliation_required']),
+  "reconciliationRequired": zod.boolean(),
+  "unallocatedRefundCents": zod.int().min(createInvoiceResponseInvoiceUnallocatedRefundCentsMin).max(createInvoiceResponseInvoiceUnallocatedRefundCentsMax),
+  "document": zod.object({
+  "title": zod.string().min(1).max(createInvoiceResponseInvoiceDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(createInvoiceResponseInvoiceDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(createInvoiceResponseInvoiceDocumentIssuerAddressMax).nullable(),
+  "customerName": zod.string().min(1).max(createInvoiceResponseInvoiceDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(createInvoiceResponseInvoiceDocumentCustomerAddressMax).nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "notes": zod.string().max(createInvoiceResponseInvoiceDocumentNotesMax).nullable(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(createInvoiceResponseInvoiceDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(createInvoiceResponseInvoiceDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(createInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin).max(createInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(createInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMin).max(createInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMax)
+})).max(createInvoiceResponseInvoiceDocumentLineItemsMax),
+  "taxCents": zod.int().min(createInvoiceResponseInvoiceDocumentTaxCentsMin).max(createInvoiceResponseInvoiceDocumentTaxCentsMax),
+  "subtotalCents": zod.int().min(createInvoiceResponseInvoiceDocumentSubtotalCentsMin).max(createInvoiceResponseInvoiceDocumentSubtotalCentsMax),
+  "totalCents": zod.int().min(createInvoiceResponseInvoiceDocumentTotalCentsMin).max(createInvoiceResponseInvoiceDocumentTotalCentsMax)
+}),
+  "allocations": zod.array(zod.object({
+  "id": zod.uuid(),
+  "valueEntryId": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(1).max(createInvoiceResponseInvoiceAllocationsItemAmountCentsMax),
+  "occurredAt": zod.coerce.date(),
+  "allocatedAt": zod.coerce.date(),
+  "reversedAt": zod.coerce.date().nullable(),
+  "reversalReason": zod.string().nullable()
+})),
+  "availableValueEntries": zod.array(zod.object({
+  "id": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(createInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(createInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
+  "availableCents": zod.int().min(createInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(createInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
+  "occurredAt": zod.coerce.date()
+})),
+  "availableValueEntriesTruncated": zod.boolean(),
+  "events": zod.array(zod.object({
+  "id": zod.uuid(),
+  "action": zod.string(),
+  "version": zod.int().min(1).max(createInvoiceResponseInvoiceEventsItemVersionMax),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+}),
+  "duplicate": zod.boolean()
+})
+
+
+/**
+ * @summary Read an invoice and its recorded receipt history
+ */
+export const GetInvoiceParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const getInvoiceResponseVersionMax = 2147483646;
+
+export const getInvoiceResponseSubtotalCentsMin = 0;
+export const getInvoiceResponseSubtotalCentsMax = 1000000000;
+
+export const getInvoiceResponseTaxCentsMin = 0;
+export const getInvoiceResponseTaxCentsMax = 1000000000;
+
+export const getInvoiceResponseTotalCentsMin = 0;
+export const getInvoiceResponseTotalCentsMax = 1000000000;
+
+export const getInvoiceResponseUnallocatedRefundCentsMin = 0;
+export const getInvoiceResponseUnallocatedRefundCentsMax = 1000000000;
+
+export const getInvoiceResponseDocumentTitleMax = 150;
+
+export const getInvoiceResponseDocumentIssuerNameMax = 200;
+
+export const getInvoiceResponseDocumentIssuerAddressMax = 500;
+
+export const getInvoiceResponseDocumentCustomerNameMax = 200;
+
+export const getInvoiceResponseDocumentCustomerAddressMax = 500;
+
+export const getInvoiceResponseDocumentNotesMax = 2000;
+
+export const getInvoiceResponseDocumentLineItemsItemDescriptionMax = 1000;
+
+export const getInvoiceResponseDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const getInvoiceResponseDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const getInvoiceResponseDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const getInvoiceResponseDocumentLineItemsItemTotalCentsMin = 0;
+export const getInvoiceResponseDocumentLineItemsItemTotalCentsMax = 1000000000;
+
+export const getInvoiceResponseDocumentLineItemsMax = 100;
+
+export const getInvoiceResponseDocumentTaxCentsMin = 0;
+export const getInvoiceResponseDocumentTaxCentsMax = 1000000000;
+
+export const getInvoiceResponseDocumentSubtotalCentsMin = 0;
+export const getInvoiceResponseDocumentSubtotalCentsMax = 1000000000;
+
+export const getInvoiceResponseDocumentTotalCentsMin = 0;
+export const getInvoiceResponseDocumentTotalCentsMax = 1000000000;
+
+export const getInvoiceResponseAllocationsItemAmountCentsMax = 1000000000;
+
+export const getInvoiceResponseAvailableValueEntriesItemAmountCentsMin = 0;
+export const getInvoiceResponseAvailableValueEntriesItemAmountCentsMax = 1000000000;
+
+export const getInvoiceResponseAvailableValueEntriesItemAvailableCentsMin = 0;
+export const getInvoiceResponseAvailableValueEntriesItemAvailableCentsMax = 1000000000;
+
+export const getInvoiceResponseEventsItemVersionMax = 2147483646;
+
+
+
+export const GetInvoiceResponse = zod.object({
+  "id": zod.uuid(),
+  "leadId": zod.uuid(),
+  "projectId": zod.uuid().nullable(),
+  "estimateId": zod.uuid().nullable(),
+  "invoiceNumber": zod.string().nullable(),
+  "status": zod.enum(['draft', 'issued', 'void']),
+  "version": zod.int().min(1).max(getInvoiceResponseVersionMax),
+  "title": zod.string(),
+  "customerName": zod.string(),
+  "currency": zod.enum(['USD']),
+  "subtotalCents": zod.int().min(getInvoiceResponseSubtotalCentsMin).max(getInvoiceResponseSubtotalCentsMax),
+  "taxCents": zod.int().min(getInvoiceResponseTaxCentsMin).max(getInvoiceResponseTaxCentsMax),
+  "totalCents": zod.int().min(getInvoiceResponseTotalCentsMin).max(getInvoiceResponseTotalCentsMax),
+  "dueDate": zod.coerce.date().nullable(),
+  "issuedAt": zod.coerce.date().nullable(),
+  "voidedAt": zod.coerce.date().nullable(),
+  "voidReason": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "recordedPaidCents": zod.int(),
+  "recordedBalanceCents": zod.int(),
+  "balanceDueCents": zod.int().nullable(),
+  "paymentState": zod.enum(['unpaid', 'partial', 'paid', 'reconciliation_required']),
+  "reconciliationRequired": zod.boolean(),
+  "unallocatedRefundCents": zod.int().min(getInvoiceResponseUnallocatedRefundCentsMin).max(getInvoiceResponseUnallocatedRefundCentsMax),
+  "document": zod.object({
+  "title": zod.string().min(1).max(getInvoiceResponseDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(getInvoiceResponseDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(getInvoiceResponseDocumentIssuerAddressMax).nullable(),
+  "customerName": zod.string().min(1).max(getInvoiceResponseDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(getInvoiceResponseDocumentCustomerAddressMax).nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "notes": zod.string().max(getInvoiceResponseDocumentNotesMax).nullable(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(getInvoiceResponseDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(getInvoiceResponseDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(getInvoiceResponseDocumentLineItemsItemUnitPriceCentsMin).max(getInvoiceResponseDocumentLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(getInvoiceResponseDocumentLineItemsItemTotalCentsMin).max(getInvoiceResponseDocumentLineItemsItemTotalCentsMax)
+})).max(getInvoiceResponseDocumentLineItemsMax),
+  "taxCents": zod.int().min(getInvoiceResponseDocumentTaxCentsMin).max(getInvoiceResponseDocumentTaxCentsMax),
+  "subtotalCents": zod.int().min(getInvoiceResponseDocumentSubtotalCentsMin).max(getInvoiceResponseDocumentSubtotalCentsMax),
+  "totalCents": zod.int().min(getInvoiceResponseDocumentTotalCentsMin).max(getInvoiceResponseDocumentTotalCentsMax)
+}),
+  "allocations": zod.array(zod.object({
+  "id": zod.uuid(),
+  "valueEntryId": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(1).max(getInvoiceResponseAllocationsItemAmountCentsMax),
+  "occurredAt": zod.coerce.date(),
+  "allocatedAt": zod.coerce.date(),
+  "reversedAt": zod.coerce.date().nullable(),
+  "reversalReason": zod.string().nullable()
+})),
+  "availableValueEntries": zod.array(zod.object({
+  "id": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(getInvoiceResponseAvailableValueEntriesItemAmountCentsMin).max(getInvoiceResponseAvailableValueEntriesItemAmountCentsMax),
+  "availableCents": zod.int().min(getInvoiceResponseAvailableValueEntriesItemAvailableCentsMin).max(getInvoiceResponseAvailableValueEntriesItemAvailableCentsMax),
+  "occurredAt": zod.coerce.date()
+})),
+  "availableValueEntriesTruncated": zod.boolean(),
+  "events": zod.array(zod.object({
+  "id": zod.uuid(),
+  "action": zod.string(),
+  "version": zod.int().min(1).max(getInvoiceResponseEventsItemVersionMax),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Edit a draft at the expected version
+ */
+export const UpdateInvoiceParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const updateInvoiceBodyExpectedVersionMax = 2147483646;
+
+export const updateInvoiceBodyDocumentTitleMax = 150;
+
+export const updateInvoiceBodyDocumentIssuerNameMax = 200;
+
+export const updateInvoiceBodyDocumentIssuerAddressMax = 500;
+
+export const updateInvoiceBodyDocumentCustomerNameMax = 200;
+
+export const updateInvoiceBodyDocumentCustomerAddressMax = 500;
+
+export const updateInvoiceBodyDocumentNotesMax = 2000;
+
+export const updateInvoiceBodyDocumentLineItemsItemDescriptionMax = 1000;
+
+export const updateInvoiceBodyDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const updateInvoiceBodyDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const updateInvoiceBodyDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const updateInvoiceBodyDocumentLineItemsMax = 100;
+
+export const updateInvoiceBodyDocumentTaxCentsMin = 0;
+export const updateInvoiceBodyDocumentTaxCentsMax = 1000000000;
+
+
+
+export const UpdateInvoiceBody = zod.object({
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(1).max(updateInvoiceBodyExpectedVersionMax),
+  "document": zod.object({
+  "title": zod.string().min(1).max(updateInvoiceBodyDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(updateInvoiceBodyDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(updateInvoiceBodyDocumentIssuerAddressMax).nullish(),
+  "customerName": zod.string().min(1).max(updateInvoiceBodyDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(updateInvoiceBodyDocumentCustomerAddressMax).nullish(),
+  "dueDate": zod.coerce.date().nullish(),
+  "notes": zod.string().max(updateInvoiceBodyDocumentNotesMax).nullish(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(updateInvoiceBodyDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(updateInvoiceBodyDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(updateInvoiceBodyDocumentLineItemsItemUnitPriceCentsMin).max(updateInvoiceBodyDocumentLineItemsItemUnitPriceCentsMax)
+})).max(updateInvoiceBodyDocumentLineItemsMax),
+  "taxCents": zod.int().min(updateInvoiceBodyDocumentTaxCentsMin).max(updateInvoiceBodyDocumentTaxCentsMax)
+})
+})
+
+export const updateInvoiceResponseInvoiceVersionMax = 2147483646;
+
+export const updateInvoiceResponseInvoiceSubtotalCentsMin = 0;
+export const updateInvoiceResponseInvoiceSubtotalCentsMax = 1000000000;
+
+export const updateInvoiceResponseInvoiceTaxCentsMin = 0;
+export const updateInvoiceResponseInvoiceTaxCentsMax = 1000000000;
+
+export const updateInvoiceResponseInvoiceTotalCentsMin = 0;
+export const updateInvoiceResponseInvoiceTotalCentsMax = 1000000000;
+
+export const updateInvoiceResponseInvoiceUnallocatedRefundCentsMin = 0;
+export const updateInvoiceResponseInvoiceUnallocatedRefundCentsMax = 1000000000;
+
+export const updateInvoiceResponseInvoiceDocumentTitleMax = 150;
+
+export const updateInvoiceResponseInvoiceDocumentIssuerNameMax = 200;
+
+export const updateInvoiceResponseInvoiceDocumentIssuerAddressMax = 500;
+
+export const updateInvoiceResponseInvoiceDocumentCustomerNameMax = 200;
+
+export const updateInvoiceResponseInvoiceDocumentCustomerAddressMax = 500;
+
+export const updateInvoiceResponseInvoiceDocumentNotesMax = 2000;
+
+export const updateInvoiceResponseInvoiceDocumentLineItemsItemDescriptionMax = 1000;
+
+export const updateInvoiceResponseInvoiceDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const updateInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const updateInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const updateInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMin = 0;
+export const updateInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMax = 1000000000;
+
+export const updateInvoiceResponseInvoiceDocumentLineItemsMax = 100;
+
+export const updateInvoiceResponseInvoiceDocumentTaxCentsMin = 0;
+export const updateInvoiceResponseInvoiceDocumentTaxCentsMax = 1000000000;
+
+export const updateInvoiceResponseInvoiceDocumentSubtotalCentsMin = 0;
+export const updateInvoiceResponseInvoiceDocumentSubtotalCentsMax = 1000000000;
+
+export const updateInvoiceResponseInvoiceDocumentTotalCentsMin = 0;
+export const updateInvoiceResponseInvoiceDocumentTotalCentsMax = 1000000000;
+
+export const updateInvoiceResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
+
+export const updateInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
+export const updateInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMax = 1000000000;
+
+export const updateInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMin = 0;
+export const updateInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMax = 1000000000;
+
+export const updateInvoiceResponseInvoiceEventsItemVersionMax = 2147483646;
+
+
+
+export const UpdateInvoiceResponse = zod.object({
+  "invoice": zod.object({
+  "id": zod.uuid(),
+  "leadId": zod.uuid(),
+  "projectId": zod.uuid().nullable(),
+  "estimateId": zod.uuid().nullable(),
+  "invoiceNumber": zod.string().nullable(),
+  "status": zod.enum(['draft', 'issued', 'void']),
+  "version": zod.int().min(1).max(updateInvoiceResponseInvoiceVersionMax),
+  "title": zod.string(),
+  "customerName": zod.string(),
+  "currency": zod.enum(['USD']),
+  "subtotalCents": zod.int().min(updateInvoiceResponseInvoiceSubtotalCentsMin).max(updateInvoiceResponseInvoiceSubtotalCentsMax),
+  "taxCents": zod.int().min(updateInvoiceResponseInvoiceTaxCentsMin).max(updateInvoiceResponseInvoiceTaxCentsMax),
+  "totalCents": zod.int().min(updateInvoiceResponseInvoiceTotalCentsMin).max(updateInvoiceResponseInvoiceTotalCentsMax),
+  "dueDate": zod.coerce.date().nullable(),
+  "issuedAt": zod.coerce.date().nullable(),
+  "voidedAt": zod.coerce.date().nullable(),
+  "voidReason": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "recordedPaidCents": zod.int(),
+  "recordedBalanceCents": zod.int(),
+  "balanceDueCents": zod.int().nullable(),
+  "paymentState": zod.enum(['unpaid', 'partial', 'paid', 'reconciliation_required']),
+  "reconciliationRequired": zod.boolean(),
+  "unallocatedRefundCents": zod.int().min(updateInvoiceResponseInvoiceUnallocatedRefundCentsMin).max(updateInvoiceResponseInvoiceUnallocatedRefundCentsMax),
+  "document": zod.object({
+  "title": zod.string().min(1).max(updateInvoiceResponseInvoiceDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(updateInvoiceResponseInvoiceDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(updateInvoiceResponseInvoiceDocumentIssuerAddressMax).nullable(),
+  "customerName": zod.string().min(1).max(updateInvoiceResponseInvoiceDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(updateInvoiceResponseInvoiceDocumentCustomerAddressMax).nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "notes": zod.string().max(updateInvoiceResponseInvoiceDocumentNotesMax).nullable(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(updateInvoiceResponseInvoiceDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(updateInvoiceResponseInvoiceDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(updateInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin).max(updateInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(updateInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMin).max(updateInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMax)
+})).max(updateInvoiceResponseInvoiceDocumentLineItemsMax),
+  "taxCents": zod.int().min(updateInvoiceResponseInvoiceDocumentTaxCentsMin).max(updateInvoiceResponseInvoiceDocumentTaxCentsMax),
+  "subtotalCents": zod.int().min(updateInvoiceResponseInvoiceDocumentSubtotalCentsMin).max(updateInvoiceResponseInvoiceDocumentSubtotalCentsMax),
+  "totalCents": zod.int().min(updateInvoiceResponseInvoiceDocumentTotalCentsMin).max(updateInvoiceResponseInvoiceDocumentTotalCentsMax)
+}),
+  "allocations": zod.array(zod.object({
+  "id": zod.uuid(),
+  "valueEntryId": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(1).max(updateInvoiceResponseInvoiceAllocationsItemAmountCentsMax),
+  "occurredAt": zod.coerce.date(),
+  "allocatedAt": zod.coerce.date(),
+  "reversedAt": zod.coerce.date().nullable(),
+  "reversalReason": zod.string().nullable()
+})),
+  "availableValueEntries": zod.array(zod.object({
+  "id": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(updateInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(updateInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
+  "availableCents": zod.int().min(updateInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(updateInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
+  "occurredAt": zod.coerce.date()
+})),
+  "availableValueEntriesTruncated": zod.boolean(),
+  "events": zod.array(zod.object({
+  "id": zod.uuid(),
+  "action": zod.string(),
+  "version": zod.int().min(1).max(updateInvoiceResponseInvoiceEventsItemVersionMax),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+}),
+  "duplicate": zod.boolean()
+})
+
+
+/**
+ * Freezes the document and consumes one company-local number atomically. Issuing does not deliver email or collect payment. Tax is an explicit staff-entered amount.
+ * @summary Issue an immutable numbered invoice
+ */
+export const IssueInvoiceParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const issueInvoiceBodyExpectedVersionMax = 2147483646;
+
+
+
+export const IssueInvoiceBody = zod.object({
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(1).max(issueInvoiceBodyExpectedVersionMax),
+  "confirmed": zod.literal(true)
+})
+
+export const issueInvoiceResponseInvoiceVersionMax = 2147483646;
+
+export const issueInvoiceResponseInvoiceSubtotalCentsMin = 0;
+export const issueInvoiceResponseInvoiceSubtotalCentsMax = 1000000000;
+
+export const issueInvoiceResponseInvoiceTaxCentsMin = 0;
+export const issueInvoiceResponseInvoiceTaxCentsMax = 1000000000;
+
+export const issueInvoiceResponseInvoiceTotalCentsMin = 0;
+export const issueInvoiceResponseInvoiceTotalCentsMax = 1000000000;
+
+export const issueInvoiceResponseInvoiceUnallocatedRefundCentsMin = 0;
+export const issueInvoiceResponseInvoiceUnallocatedRefundCentsMax = 1000000000;
+
+export const issueInvoiceResponseInvoiceDocumentTitleMax = 150;
+
+export const issueInvoiceResponseInvoiceDocumentIssuerNameMax = 200;
+
+export const issueInvoiceResponseInvoiceDocumentIssuerAddressMax = 500;
+
+export const issueInvoiceResponseInvoiceDocumentCustomerNameMax = 200;
+
+export const issueInvoiceResponseInvoiceDocumentCustomerAddressMax = 500;
+
+export const issueInvoiceResponseInvoiceDocumentNotesMax = 2000;
+
+export const issueInvoiceResponseInvoiceDocumentLineItemsItemDescriptionMax = 1000;
+
+export const issueInvoiceResponseInvoiceDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const issueInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const issueInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const issueInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMin = 0;
+export const issueInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMax = 1000000000;
+
+export const issueInvoiceResponseInvoiceDocumentLineItemsMax = 100;
+
+export const issueInvoiceResponseInvoiceDocumentTaxCentsMin = 0;
+export const issueInvoiceResponseInvoiceDocumentTaxCentsMax = 1000000000;
+
+export const issueInvoiceResponseInvoiceDocumentSubtotalCentsMin = 0;
+export const issueInvoiceResponseInvoiceDocumentSubtotalCentsMax = 1000000000;
+
+export const issueInvoiceResponseInvoiceDocumentTotalCentsMin = 0;
+export const issueInvoiceResponseInvoiceDocumentTotalCentsMax = 1000000000;
+
+export const issueInvoiceResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
+
+export const issueInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
+export const issueInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMax = 1000000000;
+
+export const issueInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMin = 0;
+export const issueInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMax = 1000000000;
+
+export const issueInvoiceResponseInvoiceEventsItemVersionMax = 2147483646;
+
+
+
+export const IssueInvoiceResponse = zod.object({
+  "invoice": zod.object({
+  "id": zod.uuid(),
+  "leadId": zod.uuid(),
+  "projectId": zod.uuid().nullable(),
+  "estimateId": zod.uuid().nullable(),
+  "invoiceNumber": zod.string().nullable(),
+  "status": zod.enum(['draft', 'issued', 'void']),
+  "version": zod.int().min(1).max(issueInvoiceResponseInvoiceVersionMax),
+  "title": zod.string(),
+  "customerName": zod.string(),
+  "currency": zod.enum(['USD']),
+  "subtotalCents": zod.int().min(issueInvoiceResponseInvoiceSubtotalCentsMin).max(issueInvoiceResponseInvoiceSubtotalCentsMax),
+  "taxCents": zod.int().min(issueInvoiceResponseInvoiceTaxCentsMin).max(issueInvoiceResponseInvoiceTaxCentsMax),
+  "totalCents": zod.int().min(issueInvoiceResponseInvoiceTotalCentsMin).max(issueInvoiceResponseInvoiceTotalCentsMax),
+  "dueDate": zod.coerce.date().nullable(),
+  "issuedAt": zod.coerce.date().nullable(),
+  "voidedAt": zod.coerce.date().nullable(),
+  "voidReason": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "recordedPaidCents": zod.int(),
+  "recordedBalanceCents": zod.int(),
+  "balanceDueCents": zod.int().nullable(),
+  "paymentState": zod.enum(['unpaid', 'partial', 'paid', 'reconciliation_required']),
+  "reconciliationRequired": zod.boolean(),
+  "unallocatedRefundCents": zod.int().min(issueInvoiceResponseInvoiceUnallocatedRefundCentsMin).max(issueInvoiceResponseInvoiceUnallocatedRefundCentsMax),
+  "document": zod.object({
+  "title": zod.string().min(1).max(issueInvoiceResponseInvoiceDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(issueInvoiceResponseInvoiceDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(issueInvoiceResponseInvoiceDocumentIssuerAddressMax).nullable(),
+  "customerName": zod.string().min(1).max(issueInvoiceResponseInvoiceDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(issueInvoiceResponseInvoiceDocumentCustomerAddressMax).nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "notes": zod.string().max(issueInvoiceResponseInvoiceDocumentNotesMax).nullable(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(issueInvoiceResponseInvoiceDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(issueInvoiceResponseInvoiceDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(issueInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin).max(issueInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(issueInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMin).max(issueInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMax)
+})).max(issueInvoiceResponseInvoiceDocumentLineItemsMax),
+  "taxCents": zod.int().min(issueInvoiceResponseInvoiceDocumentTaxCentsMin).max(issueInvoiceResponseInvoiceDocumentTaxCentsMax),
+  "subtotalCents": zod.int().min(issueInvoiceResponseInvoiceDocumentSubtotalCentsMin).max(issueInvoiceResponseInvoiceDocumentSubtotalCentsMax),
+  "totalCents": zod.int().min(issueInvoiceResponseInvoiceDocumentTotalCentsMin).max(issueInvoiceResponseInvoiceDocumentTotalCentsMax)
+}),
+  "allocations": zod.array(zod.object({
+  "id": zod.uuid(),
+  "valueEntryId": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(1).max(issueInvoiceResponseInvoiceAllocationsItemAmountCentsMax),
+  "occurredAt": zod.coerce.date(),
+  "allocatedAt": zod.coerce.date(),
+  "reversedAt": zod.coerce.date().nullable(),
+  "reversalReason": zod.string().nullable()
+})),
+  "availableValueEntries": zod.array(zod.object({
+  "id": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(issueInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(issueInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
+  "availableCents": zod.int().min(issueInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(issueInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
+  "occurredAt": zod.coerce.date()
+})),
+  "availableValueEntriesTruncated": zod.boolean(),
+  "events": zod.array(zod.object({
+  "id": zod.uuid(),
+  "action": zod.string(),
+  "version": zod.int().min(1).max(issueInvoiceResponseInvoiceEventsItemVersionMax),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+}),
+  "duplicate": zod.boolean()
+})
+
+
+/**
+ * Preserves document and command history. Does not refund cash.
+ * @summary Void an invoice with a retained reason
+ */
+export const VoidInvoiceParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const voidInvoiceBodyExpectedVersionMax = 2147483646;
+
+export const voidInvoiceBodyReasonMin = 10;
+export const voidInvoiceBodyReasonMax = 500;
+
+
+
+export const VoidInvoiceBody = zod.object({
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(1).max(voidInvoiceBodyExpectedVersionMax),
+  "confirmed": zod.literal(true),
+  "reason": zod.string().min(voidInvoiceBodyReasonMin).max(voidInvoiceBodyReasonMax)
+})
+
+export const voidInvoiceResponseInvoiceVersionMax = 2147483646;
+
+export const voidInvoiceResponseInvoiceSubtotalCentsMin = 0;
+export const voidInvoiceResponseInvoiceSubtotalCentsMax = 1000000000;
+
+export const voidInvoiceResponseInvoiceTaxCentsMin = 0;
+export const voidInvoiceResponseInvoiceTaxCentsMax = 1000000000;
+
+export const voidInvoiceResponseInvoiceTotalCentsMin = 0;
+export const voidInvoiceResponseInvoiceTotalCentsMax = 1000000000;
+
+export const voidInvoiceResponseInvoiceUnallocatedRefundCentsMin = 0;
+export const voidInvoiceResponseInvoiceUnallocatedRefundCentsMax = 1000000000;
+
+export const voidInvoiceResponseInvoiceDocumentTitleMax = 150;
+
+export const voidInvoiceResponseInvoiceDocumentIssuerNameMax = 200;
+
+export const voidInvoiceResponseInvoiceDocumentIssuerAddressMax = 500;
+
+export const voidInvoiceResponseInvoiceDocumentCustomerNameMax = 200;
+
+export const voidInvoiceResponseInvoiceDocumentCustomerAddressMax = 500;
+
+export const voidInvoiceResponseInvoiceDocumentNotesMax = 2000;
+
+export const voidInvoiceResponseInvoiceDocumentLineItemsItemDescriptionMax = 1000;
+
+export const voidInvoiceResponseInvoiceDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const voidInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const voidInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const voidInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMin = 0;
+export const voidInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMax = 1000000000;
+
+export const voidInvoiceResponseInvoiceDocumentLineItemsMax = 100;
+
+export const voidInvoiceResponseInvoiceDocumentTaxCentsMin = 0;
+export const voidInvoiceResponseInvoiceDocumentTaxCentsMax = 1000000000;
+
+export const voidInvoiceResponseInvoiceDocumentSubtotalCentsMin = 0;
+export const voidInvoiceResponseInvoiceDocumentSubtotalCentsMax = 1000000000;
+
+export const voidInvoiceResponseInvoiceDocumentTotalCentsMin = 0;
+export const voidInvoiceResponseInvoiceDocumentTotalCentsMax = 1000000000;
+
+export const voidInvoiceResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
+
+export const voidInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
+export const voidInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMax = 1000000000;
+
+export const voidInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMin = 0;
+export const voidInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMax = 1000000000;
+
+export const voidInvoiceResponseInvoiceEventsItemVersionMax = 2147483646;
+
+
+
+export const VoidInvoiceResponse = zod.object({
+  "invoice": zod.object({
+  "id": zod.uuid(),
+  "leadId": zod.uuid(),
+  "projectId": zod.uuid().nullable(),
+  "estimateId": zod.uuid().nullable(),
+  "invoiceNumber": zod.string().nullable(),
+  "status": zod.enum(['draft', 'issued', 'void']),
+  "version": zod.int().min(1).max(voidInvoiceResponseInvoiceVersionMax),
+  "title": zod.string(),
+  "customerName": zod.string(),
+  "currency": zod.enum(['USD']),
+  "subtotalCents": zod.int().min(voidInvoiceResponseInvoiceSubtotalCentsMin).max(voidInvoiceResponseInvoiceSubtotalCentsMax),
+  "taxCents": zod.int().min(voidInvoiceResponseInvoiceTaxCentsMin).max(voidInvoiceResponseInvoiceTaxCentsMax),
+  "totalCents": zod.int().min(voidInvoiceResponseInvoiceTotalCentsMin).max(voidInvoiceResponseInvoiceTotalCentsMax),
+  "dueDate": zod.coerce.date().nullable(),
+  "issuedAt": zod.coerce.date().nullable(),
+  "voidedAt": zod.coerce.date().nullable(),
+  "voidReason": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "recordedPaidCents": zod.int(),
+  "recordedBalanceCents": zod.int(),
+  "balanceDueCents": zod.int().nullable(),
+  "paymentState": zod.enum(['unpaid', 'partial', 'paid', 'reconciliation_required']),
+  "reconciliationRequired": zod.boolean(),
+  "unallocatedRefundCents": zod.int().min(voidInvoiceResponseInvoiceUnallocatedRefundCentsMin).max(voidInvoiceResponseInvoiceUnallocatedRefundCentsMax),
+  "document": zod.object({
+  "title": zod.string().min(1).max(voidInvoiceResponseInvoiceDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(voidInvoiceResponseInvoiceDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(voidInvoiceResponseInvoiceDocumentIssuerAddressMax).nullable(),
+  "customerName": zod.string().min(1).max(voidInvoiceResponseInvoiceDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(voidInvoiceResponseInvoiceDocumentCustomerAddressMax).nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "notes": zod.string().max(voidInvoiceResponseInvoiceDocumentNotesMax).nullable(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(voidInvoiceResponseInvoiceDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(voidInvoiceResponseInvoiceDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(voidInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin).max(voidInvoiceResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(voidInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMin).max(voidInvoiceResponseInvoiceDocumentLineItemsItemTotalCentsMax)
+})).max(voidInvoiceResponseInvoiceDocumentLineItemsMax),
+  "taxCents": zod.int().min(voidInvoiceResponseInvoiceDocumentTaxCentsMin).max(voidInvoiceResponseInvoiceDocumentTaxCentsMax),
+  "subtotalCents": zod.int().min(voidInvoiceResponseInvoiceDocumentSubtotalCentsMin).max(voidInvoiceResponseInvoiceDocumentSubtotalCentsMax),
+  "totalCents": zod.int().min(voidInvoiceResponseInvoiceDocumentTotalCentsMin).max(voidInvoiceResponseInvoiceDocumentTotalCentsMax)
+}),
+  "allocations": zod.array(zod.object({
+  "id": zod.uuid(),
+  "valueEntryId": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(1).max(voidInvoiceResponseInvoiceAllocationsItemAmountCentsMax),
+  "occurredAt": zod.coerce.date(),
+  "allocatedAt": zod.coerce.date(),
+  "reversedAt": zod.coerce.date().nullable(),
+  "reversalReason": zod.string().nullable()
+})),
+  "availableValueEntries": zod.array(zod.object({
+  "id": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(voidInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(voidInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
+  "availableCents": zod.int().min(voidInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(voidInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
+  "occurredAt": zod.coerce.date()
+})),
+  "availableValueEntriesTruncated": zod.boolean(),
+  "events": zod.array(zod.object({
+  "id": zod.uuid(),
+  "action": zod.string(),
+  "version": zod.int().min(1).max(voidInvoiceResponseInvoiceEventsItemVersionMax),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+}),
+  "duplicate": zod.boolean()
+})
+
+
+/**
+ * Atomically writes one canonical value entry and one allocation. Never counts the allocation as additional revenue. Does not call a payment provider.
+ * @summary Record money already received against an issued invoice
+ */
+export const RecordInvoicePaymentParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const recordInvoicePaymentBodyExpectedVersionMax = 2147483646;
+
+export const recordInvoicePaymentBodyAmountCentsMax = 1000000000;
+
+export const recordInvoicePaymentBodySourceReferenceMin = 5;
+export const recordInvoicePaymentBodySourceReferenceMax = 160;
+
+
+
+export const RecordInvoicePaymentBody = zod.object({
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(1).max(recordInvoicePaymentBodyExpectedVersionMax),
+  "confirmed": zod.literal(true),
+  "amountCents": zod.int().min(1).max(recordInvoicePaymentBodyAmountCentsMax),
+  "sourceReference": zod.string().min(recordInvoicePaymentBodySourceReferenceMin).max(recordInvoicePaymentBodySourceReferenceMax),
+  "occurredAt": zod.coerce.date().describe('Actual prior receipt time. Future receipts are rejected. This records cash already received; it does not charge a customer.')
+})
+
+export const recordInvoicePaymentResponseInvoiceVersionMax = 2147483646;
+
+export const recordInvoicePaymentResponseInvoiceSubtotalCentsMin = 0;
+export const recordInvoicePaymentResponseInvoiceSubtotalCentsMax = 1000000000;
+
+export const recordInvoicePaymentResponseInvoiceTaxCentsMin = 0;
+export const recordInvoicePaymentResponseInvoiceTaxCentsMax = 1000000000;
+
+export const recordInvoicePaymentResponseInvoiceTotalCentsMin = 0;
+export const recordInvoicePaymentResponseInvoiceTotalCentsMax = 1000000000;
+
+export const recordInvoicePaymentResponseInvoiceUnallocatedRefundCentsMin = 0;
+export const recordInvoicePaymentResponseInvoiceUnallocatedRefundCentsMax = 1000000000;
+
+export const recordInvoicePaymentResponseInvoiceDocumentTitleMax = 150;
+
+export const recordInvoicePaymentResponseInvoiceDocumentIssuerNameMax = 200;
+
+export const recordInvoicePaymentResponseInvoiceDocumentIssuerAddressMax = 500;
+
+export const recordInvoicePaymentResponseInvoiceDocumentCustomerNameMax = 200;
+
+export const recordInvoicePaymentResponseInvoiceDocumentCustomerAddressMax = 500;
+
+export const recordInvoicePaymentResponseInvoiceDocumentNotesMax = 2000;
+
+export const recordInvoicePaymentResponseInvoiceDocumentLineItemsItemDescriptionMax = 1000;
+
+export const recordInvoicePaymentResponseInvoiceDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const recordInvoicePaymentResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const recordInvoicePaymentResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const recordInvoicePaymentResponseInvoiceDocumentLineItemsItemTotalCentsMin = 0;
+export const recordInvoicePaymentResponseInvoiceDocumentLineItemsItemTotalCentsMax = 1000000000;
+
+export const recordInvoicePaymentResponseInvoiceDocumentLineItemsMax = 100;
+
+export const recordInvoicePaymentResponseInvoiceDocumentTaxCentsMin = 0;
+export const recordInvoicePaymentResponseInvoiceDocumentTaxCentsMax = 1000000000;
+
+export const recordInvoicePaymentResponseInvoiceDocumentSubtotalCentsMin = 0;
+export const recordInvoicePaymentResponseInvoiceDocumentSubtotalCentsMax = 1000000000;
+
+export const recordInvoicePaymentResponseInvoiceDocumentTotalCentsMin = 0;
+export const recordInvoicePaymentResponseInvoiceDocumentTotalCentsMax = 1000000000;
+
+export const recordInvoicePaymentResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
+
+export const recordInvoicePaymentResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
+export const recordInvoicePaymentResponseInvoiceAvailableValueEntriesItemAmountCentsMax = 1000000000;
+
+export const recordInvoicePaymentResponseInvoiceAvailableValueEntriesItemAvailableCentsMin = 0;
+export const recordInvoicePaymentResponseInvoiceAvailableValueEntriesItemAvailableCentsMax = 1000000000;
+
+export const recordInvoicePaymentResponseInvoiceEventsItemVersionMax = 2147483646;
+
+
+
+export const RecordInvoicePaymentResponse = zod.object({
+  "invoice": zod.object({
+  "id": zod.uuid(),
+  "leadId": zod.uuid(),
+  "projectId": zod.uuid().nullable(),
+  "estimateId": zod.uuid().nullable(),
+  "invoiceNumber": zod.string().nullable(),
+  "status": zod.enum(['draft', 'issued', 'void']),
+  "version": zod.int().min(1).max(recordInvoicePaymentResponseInvoiceVersionMax),
+  "title": zod.string(),
+  "customerName": zod.string(),
+  "currency": zod.enum(['USD']),
+  "subtotalCents": zod.int().min(recordInvoicePaymentResponseInvoiceSubtotalCentsMin).max(recordInvoicePaymentResponseInvoiceSubtotalCentsMax),
+  "taxCents": zod.int().min(recordInvoicePaymentResponseInvoiceTaxCentsMin).max(recordInvoicePaymentResponseInvoiceTaxCentsMax),
+  "totalCents": zod.int().min(recordInvoicePaymentResponseInvoiceTotalCentsMin).max(recordInvoicePaymentResponseInvoiceTotalCentsMax),
+  "dueDate": zod.coerce.date().nullable(),
+  "issuedAt": zod.coerce.date().nullable(),
+  "voidedAt": zod.coerce.date().nullable(),
+  "voidReason": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "recordedPaidCents": zod.int(),
+  "recordedBalanceCents": zod.int(),
+  "balanceDueCents": zod.int().nullable(),
+  "paymentState": zod.enum(['unpaid', 'partial', 'paid', 'reconciliation_required']),
+  "reconciliationRequired": zod.boolean(),
+  "unallocatedRefundCents": zod.int().min(recordInvoicePaymentResponseInvoiceUnallocatedRefundCentsMin).max(recordInvoicePaymentResponseInvoiceUnallocatedRefundCentsMax),
+  "document": zod.object({
+  "title": zod.string().min(1).max(recordInvoicePaymentResponseInvoiceDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(recordInvoicePaymentResponseInvoiceDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(recordInvoicePaymentResponseInvoiceDocumentIssuerAddressMax).nullable(),
+  "customerName": zod.string().min(1).max(recordInvoicePaymentResponseInvoiceDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(recordInvoicePaymentResponseInvoiceDocumentCustomerAddressMax).nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "notes": zod.string().max(recordInvoicePaymentResponseInvoiceDocumentNotesMax).nullable(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(recordInvoicePaymentResponseInvoiceDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(recordInvoicePaymentResponseInvoiceDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(recordInvoicePaymentResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin).max(recordInvoicePaymentResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(recordInvoicePaymentResponseInvoiceDocumentLineItemsItemTotalCentsMin).max(recordInvoicePaymentResponseInvoiceDocumentLineItemsItemTotalCentsMax)
+})).max(recordInvoicePaymentResponseInvoiceDocumentLineItemsMax),
+  "taxCents": zod.int().min(recordInvoicePaymentResponseInvoiceDocumentTaxCentsMin).max(recordInvoicePaymentResponseInvoiceDocumentTaxCentsMax),
+  "subtotalCents": zod.int().min(recordInvoicePaymentResponseInvoiceDocumentSubtotalCentsMin).max(recordInvoicePaymentResponseInvoiceDocumentSubtotalCentsMax),
+  "totalCents": zod.int().min(recordInvoicePaymentResponseInvoiceDocumentTotalCentsMin).max(recordInvoicePaymentResponseInvoiceDocumentTotalCentsMax)
+}),
+  "allocations": zod.array(zod.object({
+  "id": zod.uuid(),
+  "valueEntryId": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(1).max(recordInvoicePaymentResponseInvoiceAllocationsItemAmountCentsMax),
+  "occurredAt": zod.coerce.date(),
+  "allocatedAt": zod.coerce.date(),
+  "reversedAt": zod.coerce.date().nullable(),
+  "reversalReason": zod.string().nullable()
+})),
+  "availableValueEntries": zod.array(zod.object({
+  "id": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(recordInvoicePaymentResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(recordInvoicePaymentResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
+  "availableCents": zod.int().min(recordInvoicePaymentResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(recordInvoicePaymentResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
+  "occurredAt": zod.coerce.date()
+})),
+  "availableValueEntriesTruncated": zod.boolean(),
+  "events": zod.array(zod.object({
+  "id": zod.uuid(),
+  "action": zod.string(),
+  "version": zod.int().min(1).max(recordInvoicePaymentResponseInvoiceEventsItemVersionMax),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+}),
+  "duplicate": zod.boolean()
+})
+
+
+/**
+ * Does not create another cash entry. Unallocated refunds on the opportunity require reconciliation before a definitive balance is shown.
+ * @summary Allocate an existing payment or refund receipt
+ */
+export const AllocateInvoiceValueParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const allocateInvoiceValueBodyExpectedVersionMax = 2147483646;
+
+export const allocateInvoiceValueBodyAmountCentsMax = 1000000000;
+
+
+
+export const AllocateInvoiceValueBody = zod.object({
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(1).max(allocateInvoiceValueBodyExpectedVersionMax),
+  "confirmed": zod.literal(true),
+  "valueEntryId": zod.uuid(),
+  "amountCents": zod.int().min(1).max(allocateInvoiceValueBodyAmountCentsMax)
+})
+
+export const allocateInvoiceValueResponseInvoiceVersionMax = 2147483646;
+
+export const allocateInvoiceValueResponseInvoiceSubtotalCentsMin = 0;
+export const allocateInvoiceValueResponseInvoiceSubtotalCentsMax = 1000000000;
+
+export const allocateInvoiceValueResponseInvoiceTaxCentsMin = 0;
+export const allocateInvoiceValueResponseInvoiceTaxCentsMax = 1000000000;
+
+export const allocateInvoiceValueResponseInvoiceTotalCentsMin = 0;
+export const allocateInvoiceValueResponseInvoiceTotalCentsMax = 1000000000;
+
+export const allocateInvoiceValueResponseInvoiceUnallocatedRefundCentsMin = 0;
+export const allocateInvoiceValueResponseInvoiceUnallocatedRefundCentsMax = 1000000000;
+
+export const allocateInvoiceValueResponseInvoiceDocumentTitleMax = 150;
+
+export const allocateInvoiceValueResponseInvoiceDocumentIssuerNameMax = 200;
+
+export const allocateInvoiceValueResponseInvoiceDocumentIssuerAddressMax = 500;
+
+export const allocateInvoiceValueResponseInvoiceDocumentCustomerNameMax = 200;
+
+export const allocateInvoiceValueResponseInvoiceDocumentCustomerAddressMax = 500;
+
+export const allocateInvoiceValueResponseInvoiceDocumentNotesMax = 2000;
+
+export const allocateInvoiceValueResponseInvoiceDocumentLineItemsItemDescriptionMax = 1000;
+
+export const allocateInvoiceValueResponseInvoiceDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const allocateInvoiceValueResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const allocateInvoiceValueResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const allocateInvoiceValueResponseInvoiceDocumentLineItemsItemTotalCentsMin = 0;
+export const allocateInvoiceValueResponseInvoiceDocumentLineItemsItemTotalCentsMax = 1000000000;
+
+export const allocateInvoiceValueResponseInvoiceDocumentLineItemsMax = 100;
+
+export const allocateInvoiceValueResponseInvoiceDocumentTaxCentsMin = 0;
+export const allocateInvoiceValueResponseInvoiceDocumentTaxCentsMax = 1000000000;
+
+export const allocateInvoiceValueResponseInvoiceDocumentSubtotalCentsMin = 0;
+export const allocateInvoiceValueResponseInvoiceDocumentSubtotalCentsMax = 1000000000;
+
+export const allocateInvoiceValueResponseInvoiceDocumentTotalCentsMin = 0;
+export const allocateInvoiceValueResponseInvoiceDocumentTotalCentsMax = 1000000000;
+
+export const allocateInvoiceValueResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
+
+export const allocateInvoiceValueResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
+export const allocateInvoiceValueResponseInvoiceAvailableValueEntriesItemAmountCentsMax = 1000000000;
+
+export const allocateInvoiceValueResponseInvoiceAvailableValueEntriesItemAvailableCentsMin = 0;
+export const allocateInvoiceValueResponseInvoiceAvailableValueEntriesItemAvailableCentsMax = 1000000000;
+
+export const allocateInvoiceValueResponseInvoiceEventsItemVersionMax = 2147483646;
+
+
+
+export const AllocateInvoiceValueResponse = zod.object({
+  "invoice": zod.object({
+  "id": zod.uuid(),
+  "leadId": zod.uuid(),
+  "projectId": zod.uuid().nullable(),
+  "estimateId": zod.uuid().nullable(),
+  "invoiceNumber": zod.string().nullable(),
+  "status": zod.enum(['draft', 'issued', 'void']),
+  "version": zod.int().min(1).max(allocateInvoiceValueResponseInvoiceVersionMax),
+  "title": zod.string(),
+  "customerName": zod.string(),
+  "currency": zod.enum(['USD']),
+  "subtotalCents": zod.int().min(allocateInvoiceValueResponseInvoiceSubtotalCentsMin).max(allocateInvoiceValueResponseInvoiceSubtotalCentsMax),
+  "taxCents": zod.int().min(allocateInvoiceValueResponseInvoiceTaxCentsMin).max(allocateInvoiceValueResponseInvoiceTaxCentsMax),
+  "totalCents": zod.int().min(allocateInvoiceValueResponseInvoiceTotalCentsMin).max(allocateInvoiceValueResponseInvoiceTotalCentsMax),
+  "dueDate": zod.coerce.date().nullable(),
+  "issuedAt": zod.coerce.date().nullable(),
+  "voidedAt": zod.coerce.date().nullable(),
+  "voidReason": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "recordedPaidCents": zod.int(),
+  "recordedBalanceCents": zod.int(),
+  "balanceDueCents": zod.int().nullable(),
+  "paymentState": zod.enum(['unpaid', 'partial', 'paid', 'reconciliation_required']),
+  "reconciliationRequired": zod.boolean(),
+  "unallocatedRefundCents": zod.int().min(allocateInvoiceValueResponseInvoiceUnallocatedRefundCentsMin).max(allocateInvoiceValueResponseInvoiceUnallocatedRefundCentsMax),
+  "document": zod.object({
+  "title": zod.string().min(1).max(allocateInvoiceValueResponseInvoiceDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(allocateInvoiceValueResponseInvoiceDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(allocateInvoiceValueResponseInvoiceDocumentIssuerAddressMax).nullable(),
+  "customerName": zod.string().min(1).max(allocateInvoiceValueResponseInvoiceDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(allocateInvoiceValueResponseInvoiceDocumentCustomerAddressMax).nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "notes": zod.string().max(allocateInvoiceValueResponseInvoiceDocumentNotesMax).nullable(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(allocateInvoiceValueResponseInvoiceDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(allocateInvoiceValueResponseInvoiceDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(allocateInvoiceValueResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin).max(allocateInvoiceValueResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(allocateInvoiceValueResponseInvoiceDocumentLineItemsItemTotalCentsMin).max(allocateInvoiceValueResponseInvoiceDocumentLineItemsItemTotalCentsMax)
+})).max(allocateInvoiceValueResponseInvoiceDocumentLineItemsMax),
+  "taxCents": zod.int().min(allocateInvoiceValueResponseInvoiceDocumentTaxCentsMin).max(allocateInvoiceValueResponseInvoiceDocumentTaxCentsMax),
+  "subtotalCents": zod.int().min(allocateInvoiceValueResponseInvoiceDocumentSubtotalCentsMin).max(allocateInvoiceValueResponseInvoiceDocumentSubtotalCentsMax),
+  "totalCents": zod.int().min(allocateInvoiceValueResponseInvoiceDocumentTotalCentsMin).max(allocateInvoiceValueResponseInvoiceDocumentTotalCentsMax)
+}),
+  "allocations": zod.array(zod.object({
+  "id": zod.uuid(),
+  "valueEntryId": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(1).max(allocateInvoiceValueResponseInvoiceAllocationsItemAmountCentsMax),
+  "occurredAt": zod.coerce.date(),
+  "allocatedAt": zod.coerce.date(),
+  "reversedAt": zod.coerce.date().nullable(),
+  "reversalReason": zod.string().nullable()
+})),
+  "availableValueEntries": zod.array(zod.object({
+  "id": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(allocateInvoiceValueResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(allocateInvoiceValueResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
+  "availableCents": zod.int().min(allocateInvoiceValueResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(allocateInvoiceValueResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
+  "occurredAt": zod.coerce.date()
+})),
+  "availableValueEntriesTruncated": zod.boolean(),
+  "events": zod.array(zod.object({
+  "id": zod.uuid(),
+  "action": zod.string(),
+  "version": zod.int().min(1).max(allocateInvoiceValueResponseInvoiceEventsItemVersionMax),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+}),
+  "duplicate": zod.boolean()
+})
+
+
+/**
+ * @summary Reverse an allocation without refunding cash
+ */
+export const ReverseInvoiceAllocationParams = zod.object({
+  "id": zod.uuid(),
+  "allocationId": zod.uuid()
+})
+
+export const reverseInvoiceAllocationBodyExpectedVersionMax = 2147483646;
+
+export const reverseInvoiceAllocationBodyReasonMin = 10;
+export const reverseInvoiceAllocationBodyReasonMax = 500;
+
+
+
+export const ReverseInvoiceAllocationBody = zod.object({
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(1).max(reverseInvoiceAllocationBodyExpectedVersionMax),
+  "confirmed": zod.literal(true),
+  "reason": zod.string().min(reverseInvoiceAllocationBodyReasonMin).max(reverseInvoiceAllocationBodyReasonMax)
+})
+
+export const reverseInvoiceAllocationResponseInvoiceVersionMax = 2147483646;
+
+export const reverseInvoiceAllocationResponseInvoiceSubtotalCentsMin = 0;
+export const reverseInvoiceAllocationResponseInvoiceSubtotalCentsMax = 1000000000;
+
+export const reverseInvoiceAllocationResponseInvoiceTaxCentsMin = 0;
+export const reverseInvoiceAllocationResponseInvoiceTaxCentsMax = 1000000000;
+
+export const reverseInvoiceAllocationResponseInvoiceTotalCentsMin = 0;
+export const reverseInvoiceAllocationResponseInvoiceTotalCentsMax = 1000000000;
+
+export const reverseInvoiceAllocationResponseInvoiceUnallocatedRefundCentsMin = 0;
+export const reverseInvoiceAllocationResponseInvoiceUnallocatedRefundCentsMax = 1000000000;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentTitleMax = 150;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentIssuerNameMax = 200;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentIssuerAddressMax = 500;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentCustomerNameMax = 200;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentCustomerAddressMax = 500;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentNotesMax = 2000;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentLineItemsItemDescriptionMax = 1000;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const reverseInvoiceAllocationResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const reverseInvoiceAllocationResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentLineItemsItemTotalCentsMin = 0;
+export const reverseInvoiceAllocationResponseInvoiceDocumentLineItemsItemTotalCentsMax = 1000000000;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentLineItemsMax = 100;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentTaxCentsMin = 0;
+export const reverseInvoiceAllocationResponseInvoiceDocumentTaxCentsMax = 1000000000;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentSubtotalCentsMin = 0;
+export const reverseInvoiceAllocationResponseInvoiceDocumentSubtotalCentsMax = 1000000000;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentTotalCentsMin = 0;
+export const reverseInvoiceAllocationResponseInvoiceDocumentTotalCentsMax = 1000000000;
+
+export const reverseInvoiceAllocationResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
+
+export const reverseInvoiceAllocationResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
+export const reverseInvoiceAllocationResponseInvoiceAvailableValueEntriesItemAmountCentsMax = 1000000000;
+
+export const reverseInvoiceAllocationResponseInvoiceAvailableValueEntriesItemAvailableCentsMin = 0;
+export const reverseInvoiceAllocationResponseInvoiceAvailableValueEntriesItemAvailableCentsMax = 1000000000;
+
+export const reverseInvoiceAllocationResponseInvoiceEventsItemVersionMax = 2147483646;
+
+
+
+export const ReverseInvoiceAllocationResponse = zod.object({
+  "invoice": zod.object({
+  "id": zod.uuid(),
+  "leadId": zod.uuid(),
+  "projectId": zod.uuid().nullable(),
+  "estimateId": zod.uuid().nullable(),
+  "invoiceNumber": zod.string().nullable(),
+  "status": zod.enum(['draft', 'issued', 'void']),
+  "version": zod.int().min(1).max(reverseInvoiceAllocationResponseInvoiceVersionMax),
+  "title": zod.string(),
+  "customerName": zod.string(),
+  "currency": zod.enum(['USD']),
+  "subtotalCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceSubtotalCentsMin).max(reverseInvoiceAllocationResponseInvoiceSubtotalCentsMax),
+  "taxCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceTaxCentsMin).max(reverseInvoiceAllocationResponseInvoiceTaxCentsMax),
+  "totalCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceTotalCentsMin).max(reverseInvoiceAllocationResponseInvoiceTotalCentsMax),
+  "dueDate": zod.coerce.date().nullable(),
+  "issuedAt": zod.coerce.date().nullable(),
+  "voidedAt": zod.coerce.date().nullable(),
+  "voidReason": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "recordedPaidCents": zod.int(),
+  "recordedBalanceCents": zod.int(),
+  "balanceDueCents": zod.int().nullable(),
+  "paymentState": zod.enum(['unpaid', 'partial', 'paid', 'reconciliation_required']),
+  "reconciliationRequired": zod.boolean(),
+  "unallocatedRefundCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceUnallocatedRefundCentsMin).max(reverseInvoiceAllocationResponseInvoiceUnallocatedRefundCentsMax),
+  "document": zod.object({
+  "title": zod.string().min(1).max(reverseInvoiceAllocationResponseInvoiceDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(reverseInvoiceAllocationResponseInvoiceDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(reverseInvoiceAllocationResponseInvoiceDocumentIssuerAddressMax).nullable(),
+  "customerName": zod.string().min(1).max(reverseInvoiceAllocationResponseInvoiceDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(reverseInvoiceAllocationResponseInvoiceDocumentCustomerAddressMax).nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "notes": zod.string().max(reverseInvoiceAllocationResponseInvoiceDocumentNotesMax).nullable(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(reverseInvoiceAllocationResponseInvoiceDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(reverseInvoiceAllocationResponseInvoiceDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin).max(reverseInvoiceAllocationResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceDocumentLineItemsItemTotalCentsMin).max(reverseInvoiceAllocationResponseInvoiceDocumentLineItemsItemTotalCentsMax)
+})).max(reverseInvoiceAllocationResponseInvoiceDocumentLineItemsMax),
+  "taxCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceDocumentTaxCentsMin).max(reverseInvoiceAllocationResponseInvoiceDocumentTaxCentsMax),
+  "subtotalCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceDocumentSubtotalCentsMin).max(reverseInvoiceAllocationResponseInvoiceDocumentSubtotalCentsMax),
+  "totalCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceDocumentTotalCentsMin).max(reverseInvoiceAllocationResponseInvoiceDocumentTotalCentsMax)
+}),
+  "allocations": zod.array(zod.object({
+  "id": zod.uuid(),
+  "valueEntryId": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(1).max(reverseInvoiceAllocationResponseInvoiceAllocationsItemAmountCentsMax),
+  "occurredAt": zod.coerce.date(),
+  "allocatedAt": zod.coerce.date(),
+  "reversedAt": zod.coerce.date().nullable(),
+  "reversalReason": zod.string().nullable()
+})),
+  "availableValueEntries": zod.array(zod.object({
+  "id": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(reverseInvoiceAllocationResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
+  "availableCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(reverseInvoiceAllocationResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
+  "occurredAt": zod.coerce.date()
+})),
+  "availableValueEntriesTruncated": zod.boolean(),
+  "events": zod.array(zod.object({
+  "id": zod.uuid(),
+  "action": zod.string(),
+  "version": zod.int().min(1).max(reverseInvoiceAllocationResponseInvoiceEventsItemVersionMax),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+}),
+  "duplicate": zod.boolean()
+})
+
+
+/**
+ * Calendar-month recurrence requires agreement evidence and current updatedAt. Completion creates at most one next obligation and staff task. Does not book appointments or send messages.
+ * @summary Record explicitly agreed service recurrence
+ */
+export const SetServiceObligationRecurrenceParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const setServiceObligationRecurrenceBodyIntervalMonthsMax = 60;
+
+export const setServiceObligationRecurrenceBodyAgreementNoteMax = 500;
+
+
+
+export const SetServiceObligationRecurrenceBody = zod.object({
+  "expectedUpdatedAt": zod.coerce.date(),
+  "intervalMonths": zod.int().min(1).max(setServiceObligationRecurrenceBodyIntervalMonthsMax).nullable().describe('Set null to stop future recurrence.'),
+  "endDate": zod.coerce.date().nullish(),
+  "agreementNote": zod.string().min(1).max(setServiceObligationRecurrenceBodyAgreementNoteMax)
+})
+
+export const setServiceObligationRecurrenceResponseRecurrenceOneIntervalMonthsMax = 60;
+
+
+
+export const SetServiceObligationRecurrenceResponse = zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "propertyId": zod.uuid().nullish(),
+  "appointmentId": zod.uuid().nullish(),
+  "taskId": zod.uuid(),
+  "kind": zod.enum(['warranty_check', 'maintenance', 'service_plan']),
+  "equipmentLabel": zod.string(),
+  "dueAt": zod.coerce.date(),
+  "noticeDays": zod.int(),
+  "status": zod.enum(['active', 'completed', 'cancelled']),
+  "source": zod.string(),
+  "externalRef": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "recurrence": zod.union([zod.object({
+  "mode": zod.enum(['calendar_months']),
+  "intervalMonths": zod.int().min(1).max(setServiceObligationRecurrenceResponseRecurrenceOneIntervalMonthsMax),
+  "anchorDate": zod.coerce.date(),
+  "endDate": zod.coerce.date().nullable(),
+  "agreementNote": zod.string(),
+  "approvedByUserId": zod.string(),
+  "approvedAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "predecessorObligationId": zod.uuid().nullish(),
+  "occurrenceIndex": zod.int().optional(),
+  "coverageStartsOn": zod.coerce.date().nullish(),
+  "coverageEndsOn": zod.coerce.date().nullish(),
+  "coverageEvidence": zod.string().nullish(),
+  "completionNote": zod.string().nullish(),
+  "completedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "nextObligationId": zod.uuid().nullish()
 })
 
 

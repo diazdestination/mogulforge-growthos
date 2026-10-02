@@ -2,6 +2,12 @@
 
 ## October 1 contractor product direction
 
+Adam explicitly authorized continuing with the next native replacement wave
+after PR10 passed. Read `reports/native-contractor-day-contract.md` for active
+ownership and contracts. This specifically authorizes invoice/schedule/service
+and daily-navigation implementation while preserving every required release and
+live activation gate in the P0 directive.
+
 Latest clarification: Adam wants GrowthOS to replace Housecall Pro, specifically
 prioritizing scheduling, invoices, warranty tracking and clear navigation.
 Read `GROWTHOS-CONTRACTOR-OPERATIONS.md` before assuming an ongoing Housecall Pro

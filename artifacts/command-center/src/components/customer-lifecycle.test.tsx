@@ -8,7 +8,7 @@ const status = (state: "active" | "paused" | "offboarding_requested" = "active",
   requestedAt: state === "offboarding_requested" ? "2026-10-01T10:00:00.000Z" : null, updatedAt: null, reason: null, deletionPerformed: false, billingChanged: false,
 });
 const exported = () => {
-  const tables = ["contacts", "properties", "leads", "estimates", "projects", "crm_tasks", "appointments", "activities", "consent_records", "suppressions", "value_entries", "revenue_executions", "revenue_execution_events", "stored_objects"];
+  const tables = ["contacts", "properties", "leads", "estimates", "projects", "crm_tasks", "appointments", "activities", "consent_records", "suppressions", "value_entries", "revenue_executions", "revenue_execution_events", "stored_objects", "service_obligations", "invoices", "invoice_receipt_allocations", "invoice_operations"];
   return {
     format: "growthos-core-customer-export", version: 1, exportId: "eec65dde-1d8c-4e04-b0a0-437cfb62c742", generatedAt: "2026-10-01T10:00:00.000Z",
     organization: { id: "919c9194-5267-4871-aed5-7470b0a7251b", name: "Synthetic company", slug: "synthetic-company", created_at: "2026-10-01T10:00:00.000Z" },
@@ -49,7 +49,7 @@ it("downloads a manually requested validated core export with coverage and witho
   const download = downloads(), fetch = vi.fn().mockResolvedValue(json(exported())); vi.stubGlobal("fetch", fetch);
   render(<CustomerLifecycle accountKey="owner:company-a" />);
   fireEvent.click(screen.getByRole("button", { name: "Download core records" }));
-  expect((await screen.findByRole("status")).textContent).toContain("1 record across 14 datasets");
+  expect((await screen.findByRole("status")).textContent).toContain("1 record across 18 datasets");
   expect(screen.getByRole("status").textContent).toContain("1 record was withheld");
   expect(fetch.mock.calls[0][0]).toBe("/api/v1/customer-lifecycle/export");
   expect(download.createObjectURL).toHaveBeenCalledTimes(1);
