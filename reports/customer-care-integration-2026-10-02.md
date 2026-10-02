@@ -136,6 +136,15 @@ coverage; all **34 tests across those five suites pass** in the combined isolate
 rerun. It does not disable or skip those tests. Bounded independent reviews
 found no concrete invoice/service transaction leak or concurrency deadlock.
 
+The second [CI37071917213](https://github.com/diazdestination/mogulforge-growthos/actions/runs/37071917213)
+on `d8439c3` passed all **1,990 API tests** (15 existing skips), then exposed one
+asynchronous UI test race. The test retained an alert paragraph across the late
+company-identity refresh while React reused that element for the loading state.
+The correction re-queries within the assertion and adds a deterministic deferred-
+response test: failure -> company refresh/loading -> failure, never an empty
+schedule. It changes no runtime behavior or timeout, and skips no check. The full
+local UI suite now passes **478 tests / 78 files**, with its typecheck passing.
+
 All test/type/build/Docker checks still must pass on the actual candidate head.
 The workflow has no push trigger; explicitly dispatch an exact-main run after
 integration. Record its actual SHA/run in the PR and private Jarvis checkpoint;
