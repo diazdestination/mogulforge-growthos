@@ -1,5 +1,9 @@
 import { z } from "zod/v4";
-import type { InvoiceDocument, InvoiceState } from "@workspace/db";
+import type {
+  HistoricalInvoiceSource,
+  InvoiceDocument,
+  InvoiceState,
+} from "@workspace/db";
 
 export const MAX_INVOICE_CENTS = 1_000_000_000;
 export class InvoiceError extends Error {
@@ -169,6 +173,10 @@ export interface InvoiceSummary {
   paymentState: "unpaid" | "partial" | "paid" | "reconciliation_required";
   reconciliationRequired: boolean;
   unallocatedRefundCents: number;
+  balanceBasis: "full_history" | "opening_receivable";
+  openingReceivableCents: number | null;
+  openingAsOf: string | null;
+  historicalSource: HistoricalInvoiceSource | null;
 }
 export interface InvoiceAllocation {
   id: string;

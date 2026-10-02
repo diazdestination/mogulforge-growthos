@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { manualSmsHref, notificationContext, notificationLeadPath, singleSmsPhone } from './mobile-lead';
+import { manualSmsHref, notificationContext, notificationLeadPath, notificationServicePath, singleSmsPhone } from './mobile-lead';
 
 const lead = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const org = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -20,6 +20,18 @@ describe('mobile lead URL boundary', () => {
     `/leads/${lead}?organizationId=%252F`, `/leads/${lead}/?organizationId=${org}`,
   ])('rejects an ambiguous or off-site notification link: %s', value => {
     expect(notificationLeadPath(value, origin)).toBeNull();
+  });
+});
+
+describe('service notification sign-in boundary', () => {
+  const servicePath = `/service?serviceObligationId=${lead}&organizationId=${org}`;
+  it('preserves only the typed service route without interpreting it as a lead', () => {
+    expect(notificationServicePath(servicePath, origin)).toBe(servicePath);
+    expect(notificationLeadPath(servicePath, origin)).toBeNull();
+    expect(notificationServicePath(path, origin)).toBeNull();
+  });
+  it.each([`${servicePath}&next=/logout`, `${servicePath}&organizationId=${org}`, `${servicePath}#secret`, `//evil.test${servicePath}`, `/service?organizationId=${org}`, `/service?serviceObligationId=bad&organizationId=${org}`])('rejects ambiguous service links %s', candidate => {
+    expect(notificationServicePath(candidate, origin)).toBeNull();
   });
 });
 

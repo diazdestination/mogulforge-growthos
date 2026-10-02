@@ -8,6 +8,7 @@ const userIds = z.array(z.string().min(1).max(128).regex(/^[A-Za-z0-9_-]+$/)).mi
 const time = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
 export const staffPushPolicySchema = z.object({
   enabled: z.boolean(),
+  serviceAlertsEnabled: z.boolean().default(false),
   timezone: z.string().min(1).max(80).refine((value) => {
     try { new Intl.DateTimeFormat("en-US", { timeZone: value }); return true; } catch { return false; }
   }, "Valid IANA time zone required"),
@@ -102,4 +103,10 @@ export type DevicePushSubscription = z.infer<typeof pushSubscriptionSchema>;
 export function staffLeadPayload(organizationId: string, leadId: string) {
   return { title: "GrowthOS", body: "A new lead is ready for your team.", organizationId, leadId,
     url: `/leads/${leadId}?organizationId=${organizationId}`, tag: `lead-${leadId}` };
+}
+
+/** Service work is not an acquisition lead; never manufacture a lead to notify staff. */
+export function staffServicePayload(organizationId: string, serviceObligationId: string) {
+  return { title: "GrowthOS", body: "A service follow-up needs your attention.", organizationId, serviceObligationId,
+    url: `/service?serviceObligationId=${serviceObligationId}&organizationId=${organizationId}`, tag: `service-${serviceObligationId}` };
 }

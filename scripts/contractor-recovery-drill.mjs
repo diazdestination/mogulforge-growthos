@@ -12,6 +12,7 @@ import { buildAll } from '../artifacts/api-server/build.mjs';
 import { fixtureRows, fixtureIds, credentialCodec, FAKE_REFRESH_TOKEN, assertFixtureRecords } from './restore-drill-fixture.mjs';
 import { nativeFixtureRows, nativeFixtureIds, sealNativeFixture, assertNativeFixture } from './native-contractor-recovery-fixture.mjs';
 import { careFixtureRows, careFixtureIds, assertCareFixture, assertCareTenantKeys } from './customer-care-recovery-fixture.mjs';
+import { operationsFixtureRows, sealOperationsFixture, assertOperationsFixture, assertOperationsTenantKeys } from './operations-wave-recovery-fixture.mjs';
 
 const requireApi = createRequire(new URL('../artifacts/api-server/package.json', import.meta.url));
 const requireDb = createRequire(new URL('../lib/db/package.json', import.meta.url));
@@ -21,12 +22,12 @@ const { generateDrizzleJson } = requireDb('drizzle-kit/api');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const identifier = (name) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('contractor_identifier_invalid'); return `"${name}"`; };
-const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot']);
-const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql'];
+const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot', 'reasons', 'snapshot', 'settings', 'result', 'historical_source', 'policy']);
+const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql'];
 
 async function insert(database, table, row) {
   const fields = Object.keys(row);
-  await database.query(`INSERT INTO ${identifier(table)} (${fields.map(identifier).join(',')}) VALUES (${fields.map((_, i) => `$${i + 1}`).join(',')})`, fields.map((field) => jsonFields.has(field) ? JSON.stringify(row[field]) : row[field]));
+  await database.query(`INSERT INTO ${identifier(table)} (${fields.map(identifier).join(',')}) VALUES (${fields.map((_, i) => `$${i + 1}`).join(',')})`, fields.map((field) => jsonFields.has(field) && (field !== 'evidence' || typeof row[field] !== 'string') ? JSON.stringify(row[field]) : row[field]));
 }
 
 async function fingerprints(database) {
@@ -57,15 +58,19 @@ async function probeApp(database) {
     CONTRACTOR_RECOVERY_APP: join(output, 'contractor-recovery-entry.mjs'),
   });
     return await new Promise((done, reject) => {
-      let output = '', diagnostic = '';
+      let output = '', diagnostic = '', failureCode = '';
       const child = spawn(process.execPath, [fileURLToPath(new URL('./contractor-recovery-app-probe.mjs', import.meta.url))], { cwd: root, env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
       const timer = setTimeout(() => { child.kill(); reject(new Error('contractor_app_probe_timeout')); }, 45_000);
       child.stdout.on('data', (chunk) => { output += chunk; if (output.length > 16_000) child.kill(); });
-      child.stderr.on('data', (chunk) => { diagnostic = (diagnostic + chunk).slice(-2000); });
+      child.stderr.on('data', (chunk) => {
+        diagnostic = (diagnostic + chunk).slice(-4000);
+        const code = diagnostic.match(/CONTRACTOR_APP_PROBE_FAILED:[a-z_0-9]+:(?:assertion|unavailable)(?::status_\d+)?/);
+        if (code) failureCode = code[0];
+      });
       child.once('error', (error) => { clearTimeout(timer); reject(error); });
       child.once('exit', (code) => {
         clearTimeout(timer);
-        if (code !== 0) return reject(new Error(`contractor_app_probe_failed${diagnostic.includes('assertion') ? '_assertion' : ''}`, { cause: diagnostic }));
+        if (code !== 0) return reject(new Error(`contractor_app_probe_failed${failureCode.includes('assertion') ? '_assertion' : ''}`, { cause: failureCode || 'contractor_probe_child_unavailable' }));
         try { const lines = output.trim().split('\n'); done(JSON.parse(lines.at(-1))); } catch { reject(new Error('contractor_app_probe_result_invalid')); }
       });
     });
@@ -109,6 +114,9 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       await assertNativeFixture(source,slug);
       for (const [table, row] of careFixtureRows(slug)) await insert(source, table, row);
       await assertCareFixture(source, slug);
+      for (const [table,row] of operationsFixtureRows(slug)) await insert(source,table,row);
+      await sealOperationsFixture(source,slug);
+      await assertOperationsFixture(source,slug);
       const id = fixtureIds(slug), emailSource = randomUUID();
       await insert(source, 'billing_checkouts', { organization_id: id.organization, intent: 'initial', state: 'reconcile', price_id: 'price_synthetic', plan_id: 'beta', success_url: 'https://example.invalid/success', cancel_url: 'https://example.invalid/cancel', provider_configuration_hash: sha('synthetic-provider'), recovery_reason: 'synthetic_acknowledgement_unknown' });
       await insert(source, 'customer_lifecycle', { organization_id: id.organization, state: 'paused', version: 2, reason: 'Synthetic recovery hold', updated_by_user_id: id.user });
@@ -120,6 +128,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     await source.exec('CREATE ROLE contractor_recovery_reader; GRANT USAGE ON SCHEMA public TO contractor_recovery_reader; GRANT SELECT ON ALL TABLES IN SCHEMA public TO contractor_recovery_reader;');
     const careBaseline = await fingerprints(source);
     await assertCareTenantKeys(source, slugs[0], slugs[1]);
+    const operationsTenantChecks = await assertOperationsTenantKeys(source, slugs[0], slugs[1]);
     assert.deepEqual(await fingerprints(source), careBaseline);
     // Prove the reviewed active-service exception cannot mask an unpaused
     // company or another active obligation. These transactions always roll back.
@@ -162,6 +171,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     for (const slug of slugs) await assertFixtureRecords({ query: (sql, values) => restored.query(sql, values) }, { syntheticSlug: slug }, codec, { reviewedPausedServiceId: nativeFixtureIds(slug).nextService, reviewedPausedCareExecutionId: careFixtureIds(slug).execution });
     for (const slug of slugs) await assertNativeFixture(restored,slug);
     for (const slug of slugs) await assertCareFixture(restored,slug);
+    for (const slug of slugs) await assertOperationsFixture(restored,slug);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM billing_checkouts WHERE state='reconcile'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM customer_lifecycle WHERE state='paused'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM staff_invitations WHERE state='pending' AND delivery_state='unconfirmed'")).rows[0].n, 2);
@@ -183,6 +193,8 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       issuedInvoiceSnapshotPreserved: true, invoiceNumberingPreserved: true, receiptReversalPreservesCash: true, recurringServiceSuccessorPreserved: true,
       pausedServiceExceptionVerified: true,
       missedCallUncertaintyPreserved: true, careTenantForeignKeysVerified: true, disabledCarePoliciesPreserved: true,
+      operationsTenantChecks, heldServiceWatchPreserved: true, revokedSourceAdoptionPreserved: true, permanentSourceReservationPreserved: true,
+      noncashOpeningReceivablePreserved: true, typedPushUncertaintyPreserved: true,
       ...app, restoreVerificationMs: Date.now() - restoreStartedAt, elapsedMs: Date.now() - startedAt,
       providerCalls: 0, managedBackupRestoreVerified: false, productionRpoRtoEstablished: false,
     };

@@ -15,6 +15,20 @@ export function notificationLeadPath(input: string, origin: string): string | nu
   } catch { return null; }
 }
 
+/** A second fixed route family, not an arbitrary redirect or tenant switch. */
+export function notificationServicePath(input: string, origin: string): string | null {
+  if (!input.startsWith('/') || input.startsWith('//') || input.includes('\\')) return null;
+  try {
+    const url = new URL(input, origin);
+    if (url.origin !== origin || url.pathname !== '/service' || url.hash) return null;
+    const keys = [...url.searchParams.keys()];
+    const organizationId = url.searchParams.get('organizationId');
+    const serviceId = url.searchParams.get('serviceObligationId');
+    if (keys.length !== 2 || new Set(keys).size !== 2 || !organizationId || !serviceId || !ID.test(organizationId) || !ID.test(serviceId)) return null;
+    return `/service?serviceObligationId=${serviceId}&organizationId=${organizationId}`;
+  } catch { return null; }
+}
+
 export function notificationContext(input: string, origin: string, organizationId?: string | null) {
   const url = new URL(input, origin);
   if (!url.searchParams.has('organizationId')) return 'ordinary' as const;

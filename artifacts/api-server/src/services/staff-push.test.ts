@@ -5,7 +5,7 @@ import { db, contactsTable, leadsTable, organizationsTable, usersTable, sessions
   staffPushSubscriptionsTable as subscriptions, smartSitesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("./staff-push-transport", () => ({ sendStaffPush: vi.fn(async () => 201) }));
+vi.mock("./staff-push-transport", async original => ({ ...await original<typeof import("./staff-push-transport")>(), sendStaffPush: vi.fn(async () => 201) }));
 // The capture contract under test is its durable lead/device transaction.
 // Do not run unrelated fire-and-forget playbook/webhook enrollment against
 // the single-session PGlite backend while its next capture transaction starts.

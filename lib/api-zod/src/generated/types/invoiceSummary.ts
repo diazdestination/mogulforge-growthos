@@ -5,11 +5,24 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+import type { HistoricalInvoiceSource } from './historicalInvoiceSource';
+import type { InvoiceSummaryBalanceBasis } from './invoiceSummaryBalanceBasis';
 import type { InvoiceSummaryCurrency } from './invoiceSummaryCurrency';
 import type { InvoiceSummaryPaymentState } from './invoiceSummaryPaymentState';
 import type { InvoiceSummaryStatus } from './invoiceSummaryStatus';
 
 export interface InvoiceSummary {
+  /** Opening receivables are non-cash cutoff balances, not proof of money received. */
+  balanceBasis: InvoiceSummaryBalanceBasis;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     * @nullable
+     */
+  openingReceivableCents: number | null;
+  /** @nullable */
+  openingAsOf: Date | null;
+  historicalSource: HistoricalInvoiceSource | null;
   id: string;
   leadId: string;
   /** @nullable */

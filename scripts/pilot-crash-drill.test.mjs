@@ -68,6 +68,12 @@ const historicalDurableFixturePath = fileURLToPath(new URL("./test-support/fixtu
 const pinnedAutomationSchemaRelativePath = "lib/db/src/schema/automations.ts";
 const pinnedAutomationSchemaPath = fileURLToPath(new URL(`../${pinnedAutomationSchemaRelativePath}`, import.meta.url));
 const historicalAutomationSchemaFixturePath = fileURLToPath(new URL("./test-support/fixtures/c050067/schema-automations.ts.txt", import.meta.url));
+const pinnedAppRelativePath = "artifacts/api-server/src/app.ts";
+const pinnedAppPath = fileURLToPath(new URL(`../${pinnedAppRelativePath}`, import.meta.url));
+const historicalAppFixturePath = fileURLToPath(new URL("./test-support/fixtures/c050067/app.ts.txt", import.meta.url));
+const pinnedRevenueSchemaRelativePath = "lib/db/src/schema/revenue-workspace.ts";
+const pinnedRevenueSchemaPath = fileURLToPath(new URL(`../${pinnedRevenueSchemaRelativePath}`, import.meta.url));
+const historicalRevenueSchemaFixturePath = fileURLToPath(new URL("./test-support/fixtures/c050067/schema-revenue-workspace.ts.txt", import.meta.url));
 
 describe("hosted crash probe guards", () => {
   it("requires exact approved source identity, holds and a deterministic nonce", () => {
@@ -177,7 +183,7 @@ describe("hosted crash probe guards", () => {
       new URL("../artifacts/api-server/dist/index.mjs", import.meta.url),
     );
     // CI runs tests before build: the bundle is synthetic. Evolved startup and
-    // scheduler/reactivation sources come from frozen, hash-checked c050067 test fixtures;
+    // scheduler/reactivation/app/schema sources use frozen, hash-checked c050067 fixtures;
     // unchanged helpers remain real reads. This is not current-release proof.
     const bundle = Buffer.from("synthetic-crash-attestation-bundle-v1\n");
     const bundleSha = createHash("sha256").update(bundle).digest("hex");
@@ -202,6 +208,10 @@ describe("hosted crash probe guards", () => {
     expect(actualSourceReads).toContain(historicalReactivationFixturePath);
     expect(actualSourceReads).not.toContain(pinnedAutomationSchemaPath);
     expect(actualSourceReads).toContain(historicalAutomationSchemaFixturePath);
+    expect(actualSourceReads).not.toContain(pinnedAppPath);
+    expect(actualSourceReads).toContain(historicalAppFixturePath);
+    expect(actualSourceReads).not.toContain(pinnedRevenueSchemaPath);
+    expect(actualSourceReads).toContain(historicalRevenueSchemaFixturePath);
     expect(
       actualSourceReads.some((path) => path.endsWith("pilot-crash-runtime.ts")),
     ).toBe(true);
@@ -228,6 +238,8 @@ describe("hosted crash probe guards", () => {
     { label: "reactivation", relativePath: pinnedReactivationRelativePath, currentPath: pinnedReactivationPath, fixturePath: historicalReactivationFixturePath },
     { label: "durable execution", relativePath: pinnedDurableRelativePath, currentPath: pinnedDurablePath, fixturePath: historicalDurableFixturePath },
     { label: "automation schema", relativePath: pinnedAutomationSchemaRelativePath, currentPath: pinnedAutomationSchemaPath, fixturePath: historicalAutomationSchemaFixturePath },
+    { label: "app middleware", relativePath: pinnedAppRelativePath, currentPath: pinnedAppPath, fixturePath: historicalAppFixturePath },
+    { label: "revenue schema", relativePath: pinnedRevenueSchemaRelativePath, currentPath: pinnedRevenueSchemaPath, fixturePath: historicalRevenueSchemaFixturePath },
   ])("pins the historical $label fixture and rejects changed current $label bytes", async ({ relativePath, currentPath, fixturePath }) => {
     const frozen = await readFile(fixturePath, "utf8");
     const sourceSha = (text) =>

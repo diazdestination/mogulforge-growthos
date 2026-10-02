@@ -9,13 +9,14 @@ import { Shell } from '@/components/shell';
 import { AccessGate } from '@/components/access-gate';
 import { Loader2 } from 'lucide-react';
 import { CLIENT } from '@/lib/client.config';
-import { notificationLeadPath } from '@/lib/mobile-lead';
+import { notificationLeadPath, notificationServicePath } from '@/lib/mobile-lead';
 import { NotificationLeadGuard, TenantMobileBoundary } from '@/components/mobile-lead-boundary';
 
 // Pages
 import Dashboard from '@/pages/dashboard';
 import Today from '@/pages/today';
 import Invoices from '@/pages/invoices';
+import FinancialMigrations from '@/pages/financial-migrations';
 import Assistant from '@/pages/assistant';
 import Pipeline from '@/pages/pipeline';
 import Insights from '@/pages/insights';
@@ -501,9 +502,9 @@ function Router() {
   }
 
   if (!isAuthenticated) {
-    // Keep an exact validated lead URL through a login reload. Do not accept a
+    // Keep an exact validated lead/service URL through a login reload. Do not accept a
     // general returnTo redirect or save private lead data in browser storage.
-    if (notificationLeadPath(window.location.pathname + window.location.search, window.location.origin)) {
+    if (notificationLeadPath(window.location.pathname + window.location.search, window.location.origin) || notificationServicePath(window.location.pathname + window.location.search, window.location.origin)) {
       return <LoginScreen initialMode="login" />;
     }
     return (
@@ -601,6 +602,7 @@ function AuthedApp({ authUserId }: { authUserId: string }) {
           <Route path="/appointments" component={Appointments} />
           <Route path="/invoices/:id" component={Invoices} />
           <Route path="/invoices" component={Invoices} />
+          <Route path="/financial-migrations" component={FinancialMigrations} />
           <Route path="/audit" component={AuditLog} />
           <Route path="/settings" component={Settings} />
           <Route path="/account" component={Account} />

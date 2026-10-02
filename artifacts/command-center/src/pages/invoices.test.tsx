@@ -107,6 +107,27 @@ afterEach(() => {
 });
 
 describe("Customer invoices", () => {
+  it.each(["owner", "admin"])(
+    "gives %s a reviewed history import entry point",
+    async (role) => {
+      server(role);
+      renderInvoices("/invoices");
+      expect(
+        (await screen.findByRole("link", { name: "Import invoice history" })).getAttribute("href"),
+      ).toBe("/financial-migrations");
+    },
+  );
+  it.each(["office", "sales_manager"])(
+    "does not offer financial migration to %s",
+    async (role) => {
+      server(role);
+      renderInvoices("/invoices");
+      await screen.findByRole("heading", { name: "Invoices" });
+      expect(
+        screen.queryByRole("link", { name: "Import invoice history" }),
+      ).toBeNull();
+    },
+  );
   it("retains an earlier unconfirmed request when reconciliation is denied after access changes", async () => {
     const key = invoiceRequestStorageKey("u1", "o1", invoiceId);
     const saved = {
@@ -276,12 +297,14 @@ describe("Customer invoices", () => {
       document: {
         ...sampleInvoice().document,
         title: "Office revision",
-        lineItems: [{
-          description: "Office-approved replacement scope",
-          quantity: "1",
-          unitPriceCents: 25000,
-          totalCents: 25000,
-        }],
+        lineItems: [
+          {
+            description: "Office-approved replacement scope",
+            quantity: "1",
+            unitPriceCents: 25000,
+            totalCents: 25000,
+          },
+        ],
         subtotalCents: 25000,
         totalCents: 25000,
       },
@@ -337,9 +360,11 @@ describe("Customer invoices", () => {
     ).toBe("100.00");
     fireEvent.submit(screen.getByRole("form", { name: "Invoice draft" }));
     expect(writes(api.requests)).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", {
-      name: "Discard my edits and load latest version",
-    }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Discard my edits and load latest version",
+      }),
+    );
     expect(
       (screen.getByLabelText("Invoice title") as HTMLInputElement).value,
     ).toBe("Office revision");
@@ -354,8 +379,12 @@ describe("Customer invoices", () => {
     expect(
       writes(api.requests).map((request) => request.body.expectedVersion),
     ).toEqual([1, 2]);
-    expect((writes(api.requests)[1].body.document as InvoiceDraft).lineItems[0])
-      .toMatchObject({ unitPriceCents: 25000, description: "Office-approved replacement scope" });
+    expect(
+      (writes(api.requests)[1].body.document as InvoiceDraft).lineItems[0],
+    ).toMatchObject({
+      unitPriceCents: 25000,
+      description: "Office-approved replacement scope",
+    });
   });
 
   it("does not adopt a refreshed version number for an unsaved older document", async () => {
@@ -365,23 +394,25 @@ describe("Customer invoices", () => {
     fireEvent.change(screen.getByLabelText("Invoice title"), {
       target: { value: "My unsaved invoice" },
     });
-    api.set(sampleInvoice({
-      version: 2,
-      document: {
-        ...sampleInvoice().document,
-        customerName: "Corrected customer name",
-        taxCents: 2000,
-        totalCents: 12000,
-      },
-    }));
+    api.set(
+      sampleInvoice({
+        version: 2,
+        document: {
+          ...sampleInvoice().document,
+          customerName: "Corrected customer name",
+          taxCents: 2000,
+          totalCents: 12000,
+        },
+      }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Refresh invoice" }));
     await screen.findByText(/The saved invoice changed from version 1 to 2/);
     expect(
       (screen.getByLabelText("Invoice title") as HTMLInputElement).value,
     ).toBe("My unsaved invoice");
-    expect(
-      (screen.getByLabelText("Bill to") as HTMLInputElement).value,
-    ).toBe("Synthetic Customer");
+    expect((screen.getByLabelText("Bill to") as HTMLInputElement).value).toBe(
+      "Synthetic Customer",
+    );
     expect(
       screen.getByRole("button", { name: "Save draft" }).matches(":disabled"),
     ).toBe(true);
@@ -389,11 +420,12 @@ describe("Customer invoices", () => {
     expect(writes(api.requests)).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Cancel editing" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit draft" }));
+    expect((screen.getByLabelText("Bill to") as HTMLInputElement).value).toBe(
+      "Corrected customer name",
+    );
     expect(
-      (screen.getByLabelText("Bill to") as HTMLInputElement).value,
-    ).toBe("Corrected customer name");
-    expect(
-      (screen.getByLabelText("Approved tax amount (USD)") as HTMLInputElement).value,
+      (screen.getByLabelText("Approved tax amount (USD)") as HTMLInputElement)
+        .value,
     ).toBe("20.00");
   });
 
@@ -404,7 +436,14 @@ describe("Customer invoices", () => {
     fireEvent.change(screen.getByLabelText("Invoice title"), {
       target: { value: "Unsaved scope clarification" },
     });
-    api.set(sampleInvoice({ status: "issued", version: 2, invoiceNumber: "INV-000001", issuedAt: "2026-10-01T13:00:00Z" }));
+    api.set(
+      sampleInvoice({
+        status: "issued",
+        version: 2,
+        invoiceNumber: "INV-000001",
+        issuedAt: "2026-10-01T13:00:00Z",
+      }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Refresh invoice" }));
     await screen.findByText(/This invoice is now issued/);
     expect(
@@ -413,7 +452,11 @@ describe("Customer invoices", () => {
     expect(
       screen.getByRole("button", { name: "Save draft" }).matches(":disabled"),
     ).toBe(true);
-    expect(screen.queryByRole("button", { name: "Discard my edits and load latest version" })).toBeNull();
+    expect(
+      screen.queryByRole("button", {
+        name: "Discard my edits and load latest version",
+      }),
+    ).toBeNull();
     fireEvent.submit(screen.getByRole("form", { name: "Invoice draft" }));
     expect(writes(api.requests)).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Cancel editing" }));

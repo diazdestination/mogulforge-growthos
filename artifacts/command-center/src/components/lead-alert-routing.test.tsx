@@ -33,7 +33,7 @@ it('requires explicit active recipients and saves exact daytime and after-hours 
   await waitFor(() => expect(calls.mock.calls.some(([url, init]) => String(url).endsWith('/staff-push/policy') && init?.method === 'PUT')).toBe(true));
   const saved = calls.mock.calls.find(([, init]) => init?.method === 'PUT')![1];
   expect(JSON.parse(saved?.body as string)).toEqual({
-    enabled: true, timezone: 'America/New_York', days: [1, 2, 3, 4, 5, 6], opensAt: '09:00', closesAt: '18:00',
+    enabled: true, serviceAlertsEnabled: false, timezone: 'America/New_York', days: [1, 2, 3, 4, 5, 6], opensAt: '09:00', closesAt: '18:00',
     businessHoursUserIds: ['staff-a', 'staff-b'], afterHoursUserIds: ['staff-a'],
   });
   expect(saved?.credentials).toBe('include');

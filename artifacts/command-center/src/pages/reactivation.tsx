@@ -27,7 +27,9 @@ import {
   type ReactivationSegment,
   type ReactivationSegmentPreset,
   type ReactivationCampaign,
+  useGetMe,
 } from '@workspace/api-client-react';
+import { SourceAdoptionPanel } from '@/components/source-adoption-panel';
 import { Shell } from '@/components/shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -661,6 +663,7 @@ function CampaignList() {
 }
 
 export default function Reactivation() {
+  const { data: me } = useGetMe();
   return (
     <Shell>
       <div className="space-y-6">
@@ -671,6 +674,7 @@ export default function Reactivation() {
           </p>
         </div>
         <ImportCard />
+        {me?.organization && <SourceAdoptionPanel key={me.organization.id} organizationId={me.organization.id} businessName={me.organization.name} timezone={me.organization.timezone || 'America/New_York'} canManage={Boolean(me.isActive && ['owner', 'admin'].includes(me.role ?? ''))} />}
         <CampaignBuilder />
         <CampaignList />
       </div>

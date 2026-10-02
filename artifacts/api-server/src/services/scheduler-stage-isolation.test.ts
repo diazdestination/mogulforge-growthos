@@ -29,6 +29,7 @@ vi.mock("./reactivation", () => ({
 vi.mock("./missed-call-care", () => ({
   processMissedCallCare: vi.fn(async () => {}),
 }));
+vi.mock("./service-watch", () => ({ processServiceWatch: vi.fn(async () => {}) }));
 
 // The notification stage intentionally retires expired subscriptions and
 // abandoned claims even while outbound delivery is held. An unscoped real
@@ -43,6 +44,7 @@ import { markAbandonedConversations } from "./concierge";
 import { processScheduledWork } from "./automation";
 import { processStaffLeadPush } from "./staff-push";
 import { processMissedCallCare } from "./missed-call-care";
+import { processServiceWatch } from "./service-watch";
 import {
   cleanupExpiredPreviousSecrets,
   processPendingDeliveries,
@@ -99,6 +101,7 @@ describe("scheduler stage isolation", () => {
     );
     expect(processPendingDeliveries).not.toHaveBeenCalled();
     expect(processMissedCallCare).not.toHaveBeenCalled();
+    expect(processServiceWatch).not.toHaveBeenCalled();
     expect(processStaffLeadPush).not.toHaveBeenCalled();
   });
   it("still runs webhook retries and later stages when the scheduled-actions stage throws", async () => {
@@ -172,5 +175,16 @@ describe("scheduler stage isolation", () => {
     expect(observe).toHaveBeenCalledWith("upload-cleanup", "succeeded");
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("SECRET_CALLER_NUMBER");
     expect(JSON.stringify(observe.mock.calls)).not.toContain("SECRET_CALLER_NUMBER");
+  });
+  it("isolates service-watch failure and still dispatches other staff work without raw source details", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(processServiceWatch).mockRejectedValueOnce(new Error("PRIVATE_SERVICE_EVIDENCE"));
+    const observe = vi.fn(async () => {});
+    await processScheduledWork(undefined, observe);
+    expect(processServiceWatch).toHaveBeenCalledExactlyOnceWith(undefined);
+    expect(observe).toHaveBeenCalledWith("service-watch", "failed");
+    expect(processStaffLeadPush).toHaveBeenCalledExactlyOnceWith(undefined);
+    expect(observe).toHaveBeenCalledWith("upload-cleanup", "succeeded");
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("PRIVATE_SERVICE_EVIDENCE");
   });
 });

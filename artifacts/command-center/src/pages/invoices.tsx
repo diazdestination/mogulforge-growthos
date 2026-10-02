@@ -40,6 +40,7 @@ type Actor = {
   organizationId: string;
   organizationName: string;
   manage: boolean;
+  migrate: boolean;
 };
 type Command = ReturnType<typeof useInvoiceCommand>;
 
@@ -122,6 +123,7 @@ export default function Invoices() {
     organizationId: me.organization.id,
     organizationName: me.organization.name,
     manage: canManageInvoices(me.role),
+    migrate: me.role === "owner" || me.role === "admin",
   };
   return params?.id ? (
     <InvoiceWorkspace
@@ -178,15 +180,22 @@ function InvoiceIndex({ actor }: { actor: Actor }) {
               Prepare customer invoices and reconcile recorded payments.
             </p>
           </div>
-          {actor.manage && !creating && (
-            <button
-              className={invoicePrimary}
-              onClick={() => setCreating(true)}
-            >
-              <Plus className="h-4 w-4" aria-hidden />
-              New invoice
-            </button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {actor.migrate && (
+              <Link href="/financial-migrations" className={invoiceButton}>
+                Import invoice history
+              </Link>
+            )}
+            {actor.manage && !creating && (
+              <button
+                className={invoicePrimary}
+                onClick={() => setCreating(true)}
+              >
+                <Plus className="h-4 w-4" aria-hidden />
+                New invoice
+              </button>
+            )}
+          </div>
         </header>
         {projectId && (
           <p className="text-sm text-muted-foreground">
@@ -690,7 +699,32 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
                 <InvoiceDraftEditor invoice={invoice} command={command} />
               </section>
             ) : (
-              <InvoiceDocumentView invoice={invoice} />
+              <>
+                <InvoiceDocumentView invoice={invoice} />
+                {invoice.historicalSource && (
+                  <aside
+                    className="rounded-lg border p-4 text-sm"
+                    aria-label="Historical invoice basis"
+                  >
+                    <p>
+                      Historical invoice from{" "}
+                      {invoice.historicalSource.sourceSystem}. Original
+                      document, number and issue date retained. Import did not
+                      send or collect money.
+                    </p>
+                    {invoice.balanceBasis === "opening_receivable" && (
+                      <p className="mt-2">
+                        Opening receivable:{" "}
+                        {money(invoice.openingReceivableCents ?? 0)} as of{" "}
+                        {invoice.openingAsOf}. Historical payments are unknown.
+                        Recorded receipts below include only later evidenced
+                        payments/refunds; the difference from the original total
+                        is not cash.
+                      </p>
+                    )}
+                  </aside>
+                )}
+              </>
             )}
             {!editing && (
               <section
@@ -711,7 +745,9 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
                   </div>
                   <div>
                     <dt className="text-sm text-muted-foreground">
-                      Recorded net receipts
+                      {invoice.balanceBasis === "opening_receivable"
+                        ? "Recorded receipts after cutoff"
+                        : "Recorded net receipts"}
                     </dt>
                     <dd className="mt-1 text-lg font-semibold tabular-nums">
                       {money(invoice.recordedPaidCents)}

@@ -1,4 +1,4 @@
-import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { appointmentsTable } from "./appointments";
 import { contactsTable } from "./contacts";
@@ -50,6 +50,7 @@ export const serviceObligationsTable = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
   },
   (table) => [
+    unique("service_obligations_org_id_uq").on(table.organizationId, table.id),
     index("service_obligations_org_due_idx").on(table.organizationId, table.status, table.dueAt),
     uniqueIndex("service_obligations_org_external_uq")
       .on(table.organizationId, table.source, table.externalRef)

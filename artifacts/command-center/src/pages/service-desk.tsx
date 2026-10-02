@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSearch } from 'wouter';
 import { useGetMe } from '@workspace/api-client-react';
 import ContactSelect from '@/components/contact-select';
 import { canWrite } from '@/lib/permissions';
 import ServiceObligationEditor, { type ServiceRow } from '@/components/service-obligation-editor';
 import ServiceCarePanel from '@/components/service-care-panel';
+import { ServiceWatchPanel, ServiceWatchQueue } from '@/components/service-watch-panel';
 
 type ServiceKind = 'warranty_check' | 'maintenance' | 'service_plan';
 type ServiceStatus = 'active' | 'completed' | 'cancelled';
@@ -58,6 +60,14 @@ export default function ServiceDesk() {
   const [preview, setPreview] = useState<ImportResult | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [careId, setCareId] = useState<string | null>(null);
+  const [watchId, setWatchId] = useState<string | null>(null), [watchCare, setWatchCare] = useState(false), [watchRevision, setWatchRevision] = useState(0);
+  const search = new URLSearchParams(useSearch());
+  const linkedService = search.get('serviceObligationId'), linkedOrganization = search.get('organizationId');
+  const linkInvalid = !!linkedService && (!/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(linkedService) || !linkedOrganization || (!!me?.organization?.id && linkedOrganization !== me.organization.id));
+  useEffect(() => {
+    setWatchCare(false);
+    setWatchId(me?.organization?.id && linkedService && !linkInvalid ? linkedService : null);
+  }, [me?.organization?.id, linkedService, linkedOrganization, linkInvalid]);
   const fileRef = useRef<HTMLInputElement>(null);
   const loadSequence = useRef(0);
   const viewKey = `${me?.organization?.id ?? ''}:${recordStatus}:${offset}`;
@@ -166,6 +176,7 @@ export default function ServiceDesk() {
     (mapping.email !== undefined || mapping.phone !== undefined) &&
     (mapping.equipmentLabel !== undefined || !!defaultEquipment);
   const visible = rows.filter(row => row.obligation.status === recordStatus);
+  async function refreshOfficeWork() { await refresh(); setWatchRevision(value => value + 1); }
   return (
     <div className="h-full w-full min-w-0 overflow-auto p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
       <header>
@@ -173,6 +184,11 @@ export default function ServiceDesk() {
         <p className="text-sm text-muted-foreground">Warranty checks, maintenance, and plan visits stay with customers—not in the new-lead pipeline.</p>
       </header>
       {notice && <p role="status" className="rounded-lg border bg-card p-3 text-sm">{notice}</p>}
+      {linkedService && !me?.organization?.id && <p>Confirming company access before opening the service notification…</p>}
+      {me?.organization?.id && linkInvalid && <p role="alert">This service link is invalid or belongs to another company. Sign in to the correct company; no account was switched and no linked service was opened.</p>}
+      {me?.organization?.id && <ServiceWatchQueue key={me.organization.id} organizationId={me.organization.id} revision={watchRevision} onOpen={id => { setWatchId(id); setWatchCare(false); }} />}
+      {me?.organization?.id && watchId && <ServiceWatchPanel key={`${me.organization.id}:${watchId}:${watchRevision}`} obligationId={watchId} editable={editable} onChanged={refreshOfficeWork} onClose={() => { setWatchId(null); setWatchCare(false); }} onOpenCare={() => setWatchCare(true)} />}
+      {me?.organization?.id && watchId && watchCare && <ServiceCarePanel key={`watch-care:${me.organization.id}:${watchId}`} obligationId={watchId} editable={editable} onChanged={refreshOfficeWork} onClose={() => setWatchCare(false)} />}
       <section className="rounded-xl border bg-card p-4 space-y-3" aria-label="Service records">
         <h2 className="font-semibold">{recordStatus === 'active' ? 'Upcoming service' : 'Service history'}</h2>
         <div className="flex flex-wrap items-end gap-3">
@@ -199,6 +215,7 @@ export default function ServiceDesk() {
                 </div>
                 {editable && recordStatus === 'active' && <button disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setEditingId(editingId === obligation.id ? null : obligation.id)}>Manage service</button>}
                 <button type="button" disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setCareId(careId === obligation.id ? null : obligation.id)}>Customer care & booking</button>
+                <button type="button" disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => { setWatchId(obligation.id); setWatchCare(false); }}>Review service watch</button>
                 {careId === obligation.id && <ServiceCarePanel key={`${me?.organization?.id}:${obligation.id}`} obligationId={obligation.id} editable={editable} onClose={() => setCareId(null)} onChanged={refresh} />}
                 {editable && recordStatus === 'active' && editingId === obligation.id && <ServiceObligationEditor key={`${obligation.id}:${obligation.updatedAt}`} row={row} onClose={() => setEditingId(null)} onSaved={async message => { setNotice(message); await refresh(); }} />}
                 {editable && recordStatus === 'cancelled' && <button type="button" disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setReopening(row)}>Review reopening</button>}

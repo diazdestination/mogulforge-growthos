@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
   varchar,
@@ -39,6 +40,13 @@ export interface InvoiceDocument {
   totalCents: number;
 }
 export type InvoiceState = "draft" | "issued" | "void";
+export interface HistoricalInvoiceSource {
+  sourceSystem: string;
+  sourceAccount: string;
+  externalId: string;
+  cutoffAt: string;
+  recordSha256: string;
+}
 
 export const invoicesTable = pgTable(
   "invoices",
@@ -59,6 +67,14 @@ export const invoicesTable = pgTable(
     issuedDocument: jsonb("issued_document").$type<InvoiceDocument>(),
     issuedDocumentSha256: text("issued_document_sha256"),
     issuedAt: timestamp("issued_at", { withTimezone: true }),
+    balanceBasis: text("balance_basis")
+      .$type<"full_history" | "opening_receivable">()
+      .notNull()
+      .default("full_history"),
+    openingReceivableCents: integer("opening_receivable_cents"),
+    openingAsOf: timestamp("opening_as_of", { withTimezone: true }),
+    historicalSource:
+      jsonb("historical_source").$type<HistoricalInvoiceSource>(),
     voidedAt: timestamp("voided_at", { withTimezone: true }),
     voidReason: text("void_reason"),
     createdByUserId: varchar("created_by_user_id")
@@ -72,6 +88,7 @@ export const invoicesTable = pgTable(
       .defaultNow(),
   },
   (t) => [
+    unique("invoice_org_id").on(t.organizationId, t.id),
     uniqueIndex("invoice_org_number_unique").on(
       t.organizationId,
       t.invoiceNumber,
@@ -88,6 +105,10 @@ export const invoicesTable = pgTable(
       sql`${t.status} in ('draft', 'issued', 'void')`,
     ),
     check("invoice_version_positive", sql`${t.version} > 0`),
+    check(
+      "invoice_balance_basis_valid",
+      sql`(${t.balanceBasis} = 'full_history' and ${t.openingReceivableCents} is null and ${t.openingAsOf} is null) or (${t.balanceBasis} = 'opening_receivable' and ${t.openingReceivableCents} is not null and ${t.openingReceivableCents} >= 0 and ${t.openingReceivableCents} <= 1000000000 and ${t.openingAsOf} is not null and ${t.historicalSource} is not null)`,
+    ),
     check(
       "invoice_issued_snapshot_present",
       sql`${t.status} <> 'issued' or (${t.invoiceNumber} is not null and ${t.issuedDocument} is not null and ${t.issuedDocumentSha256} is not null and ${t.issuedAt} is not null)`,

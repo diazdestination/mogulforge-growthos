@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 export interface LeadAlertPolicy {
   enabled: boolean;
+  serviceAlertsEnabled?: boolean;
   timezone: string;
   days: number[];
   opensAt: string;
@@ -17,7 +18,7 @@ export interface LeadAlertPolicy {
 }
 const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const emptyPolicy: LeadAlertPolicy = {
-  enabled: false, timezone: 'America/New_York', days: [1, 2, 3, 4, 5], opensAt: '09:00', closesAt: '18:00',
+  enabled: false, serviceAlertsEnabled: false, timezone: 'America/New_York', days: [1, 2, 3, 4, 5], opensAt: '09:00', closesAt: '18:00',
   businessHoursUserIds: [], afterHoursUserIds: [],
 };
 const inputClass = 'w-full rounded-md border bg-background px-3 py-2 text-sm';
@@ -87,6 +88,10 @@ export function LeadAlertRouting() {
           ] as const).map(([field, title]) => <fieldset key={field} className="space-y-2 rounded-lg border p-3"><legend className="px-1 text-sm font-medium">{title}</legend>{users.length === 0 && <p className="text-sm">Add an active responder in Team first.</p>}{users.map((user) => <label key={user.id} className="flex items-center gap-2 text-sm"><input type="checkbox" aria-label={`${title}: ${[user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || 'Staff member'}`} checked={policy[field].includes(user.id)} onChange={(e) => toggleUser(field, user.id, e.target.checked)} />{[user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || 'Staff member'}</label>)}</fieldset>)}</div>
           {unavailable && <div className="text-sm" role="alert">A saved responder is no longer active or available. <button type="button" className="underline" onClick={() => setPolicy({ ...policy, businessHoursUserIds: policy.businessHoursUserIds.filter((id) => users.some((u) => u.id === id)), afterHoursUserIds: policy.afterHoursUserIds.filter((id) => users.some((u) => u.id === id)) })}>Remove unavailable responders</button>, then choose current staff.</div>}
           {!complete && ready && <p className="text-sm">Select at least one business day and an active responder for both time windows. Closing time must follow opening time.</p>}
+          <div className="rounded-lg border p-3 space-y-2">
+            <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={policy.serviceAlertsEnabled === true} onChange={(e) => setPolicy({ ...policy, serviceAlertsEnabled: e.target.checked })} /> Notify assigned service owners about follow-up exceptions</label>
+            <p className="text-xs text-muted-foreground">Separate from new-lead routing. An opted-in service owner can receive an alert at any time when work opens, escalates or is reassigned to them. Acknowledged, resolved or held issues do not send. Unassigned work stays in Service Desk for the office; it is never broadcast to an assumed owner.</p>
+          </div>
           <Button type="submit" disabled={!ready || !complete || !dirty || saving}>{saving ? 'Saving…' : 'Save lead-alert routing'}</Button>
         </fieldset>
       </form>

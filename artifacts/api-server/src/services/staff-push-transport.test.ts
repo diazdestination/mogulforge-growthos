@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ lookup: vi.fn(), request: vi.fn() }));
 vi.mock("node:dns/promises", () => ({ lookup: mocks.lookup }));
 vi.mock("node:https", () => ({ request: mocks.request }));
-import { isPublicPushAddress, sendStaffPush } from "./staff-push-transport";
+import { isPublicPushAddress, sendStaffPush, StaffPushDispatchBlockedError } from "./staff-push-transport";
 
 const key = createECDH("prime256v1"); key.generateKeys();
 const device = { endpoint: `https://web.push.apple.com/${"a".repeat(32)}`, keys: {
@@ -75,6 +75,54 @@ describe("bounded push transport (all DNS and HTTPS mocked)", () => {
   it("rejects unsupported endpoints without DNS or HTTPS", async () => {
     await expect(sendStaffPush({ ...device, endpoint: "https://127.0.0.1/" }, "generic alert", "staff-user")).rejects.toThrow();
     expect(mocks.lookup).not.toHaveBeenCalled(); expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it("checks current business authorization after DNS and never sends a superseded alert", async () => {
+    let authorized = true;
+    mocks.lookup.mockImplementationOnce(async () => {
+      authorized = false;
+      return [{ address: "17.57.144.1", family: 4 }];
+    });
+    const guard = vi.fn(async () => authorized);
+    await expect(sendStaffPush(device, "generic service alert", "staff-user", guard)).rejects.toThrow("push_authorization_changed_before_dispatch");
+    expect(guard).toHaveBeenCalledOnce();
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it.each(["resolve", "reject"] as const)("bounds a stuck final authorization within the original deadline and safely consumes its late %s", async (lateOutcome) => {
+    vi.useFakeTimers();
+    let resolveDns!: (value: unknown) => void;
+    let finishGuard!: () => void;
+    mocks.lookup.mockImplementationOnce(() => new Promise(resolve => { resolveDns = resolve; }));
+    const guard = vi.fn(() => new Promise<boolean>((resolve, reject) => {
+      finishGuard = () => lateOutcome === "resolve" ? resolve(true) : reject(new Error("late private authorization failure"));
+    }));
+    let settled = false, error: unknown;
+    const completion = sendStaffPush(device, "generic service alert", "staff-user", guard).then(
+      () => { settled = true; },
+      failure => { settled = true; error = failure; },
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(4_000);
+      resolveDns([{ address: "17.57.144.1", family: 4 }]);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(guard).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(settled).toBe(true);
+      expect(error).toBeInstanceOf(StaffPushDispatchBlockedError);
+      expect(mocks.request).not.toHaveBeenCalled();
+    } finally {
+      finishGuard();
+      await completion;
+      await vi.advanceTimersByTimeAsync(0);
+    }
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it("rechecks the global hold after an asynchronous business guard", async () => {
+    await expect(sendStaffPush(device, "generic service alert", "staff-user", async () => {
+      vi.stubEnv("GROWTHOS_OUTBOUND_HOLD", "true"); return true;
+    })).rejects.toThrow("push_authorization_changed_before_dispatch");
+    expect(mocks.request).not.toHaveBeenCalled();
   });
   it("enforces the kill switch at the actual transport, including a change during DNS", async () => {
     vi.stubEnv("GROWTHOS_OUTBOUND_HOLD", "true");

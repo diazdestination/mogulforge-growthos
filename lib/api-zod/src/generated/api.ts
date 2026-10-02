@@ -4889,6 +4889,10 @@ export const ListInvoicesQueryParams = zod.object({
   "page": zod.coerce.number().int().min(listInvoicesQueryPageMin).max(listInvoicesQueryPageMax).default(listInvoicesQueryPageDefault)
 })
 
+export const listInvoicesResponseItemsItemOpeningReceivableCentsMin = 0;
+export const listInvoicesResponseItemsItemOpeningReceivableCentsMax = 1000000000;
+
+export const listInvoicesResponseItemsItemHistoricalSourceOneRecordSha256RegExp = new RegExp('^[a-f0-9]{64}$');
 export const listInvoicesResponseItemsItemVersionMax = 2147483646;
 
 export const listInvoicesResponseItemsItemSubtotalCentsMin = 0;
@@ -4913,6 +4917,16 @@ export const listInvoicesResponsePageMin = 0;
 
 export const ListInvoicesResponse = zod.object({
   "items": zod.array(zod.object({
+  "balanceBasis": zod.enum(['full_history', 'opening_receivable']).describe('Opening receivables are non-cash cutoff balances, not proof of money received.'),
+  "openingReceivableCents": zod.int().min(listInvoicesResponseItemsItemOpeningReceivableCentsMin).max(listInvoicesResponseItemsItemOpeningReceivableCentsMax).nullable(),
+  "openingAsOf": zod.coerce.date().nullable(),
+  "historicalSource": zod.union([zod.object({
+  "sourceSystem": zod.string(),
+  "sourceAccount": zod.string(),
+  "externalId": zod.string(),
+  "cutoffAt": zod.coerce.date(),
+  "recordSha256": zod.string().regex(listInvoicesResponseItemsItemHistoricalSourceOneRecordSha256RegExp)
+}),zod.null()]),
   "id": zod.uuid(),
   "leadId": zod.uuid(),
   "projectId": zod.uuid().nullable(),
@@ -4997,6 +5011,10 @@ export const CreateInvoiceBody = zod.object({
 })
 })
 
+export const createInvoiceResponseInvoiceOpeningReceivableCentsMin = 0;
+export const createInvoiceResponseInvoiceOpeningReceivableCentsMax = 1000000000;
+
+export const createInvoiceResponseInvoiceHistoricalSourceOneRecordSha256RegExp = new RegExp('^[a-f0-9]{64}$');
 export const createInvoiceResponseInvoiceVersionMax = 2147483646;
 
 export const createInvoiceResponseInvoiceSubtotalCentsMin = 0;
@@ -5057,6 +5075,16 @@ export const createInvoiceResponseInvoiceEventsItemVersionMax = 2147483646;
 
 export const CreateInvoiceResponse = zod.object({
   "invoice": zod.object({
+  "balanceBasis": zod.enum(['full_history', 'opening_receivable']).describe('Opening receivables are non-cash cutoff balances, not proof of money received.'),
+  "openingReceivableCents": zod.int().min(createInvoiceResponseInvoiceOpeningReceivableCentsMin).max(createInvoiceResponseInvoiceOpeningReceivableCentsMax).nullable(),
+  "openingAsOf": zod.coerce.date().nullable(),
+  "historicalSource": zod.union([zod.object({
+  "sourceSystem": zod.string(),
+  "sourceAccount": zod.string(),
+  "externalId": zod.string(),
+  "cutoffAt": zod.coerce.date(),
+  "recordSha256": zod.string().regex(createInvoiceResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
+}),zod.null()]),
   "id": zod.uuid(),
   "leadId": zod.uuid(),
   "projectId": zod.uuid().nullable(),
@@ -5140,6 +5168,10 @@ export const GetInvoiceParams = zod.object({
   "id": zod.uuid()
 })
 
+export const getInvoiceResponseOpeningReceivableCentsMin = 0;
+export const getInvoiceResponseOpeningReceivableCentsMax = 1000000000;
+
+export const getInvoiceResponseHistoricalSourceOneRecordSha256RegExp = new RegExp('^[a-f0-9]{64}$');
 export const getInvoiceResponseVersionMax = 2147483646;
 
 export const getInvoiceResponseSubtotalCentsMin = 0;
@@ -5199,6 +5231,16 @@ export const getInvoiceResponseEventsItemVersionMax = 2147483646;
 
 
 export const GetInvoiceResponse = zod.object({
+  "balanceBasis": zod.enum(['full_history', 'opening_receivable']).describe('Opening receivables are non-cash cutoff balances, not proof of money received.'),
+  "openingReceivableCents": zod.int().min(getInvoiceResponseOpeningReceivableCentsMin).max(getInvoiceResponseOpeningReceivableCentsMax).nullable(),
+  "openingAsOf": zod.coerce.date().nullable(),
+  "historicalSource": zod.union([zod.object({
+  "sourceSystem": zod.string(),
+  "sourceAccount": zod.string(),
+  "externalId": zod.string(),
+  "cutoffAt": zod.coerce.date(),
+  "recordSha256": zod.string().regex(getInvoiceResponseHistoricalSourceOneRecordSha256RegExp)
+}),zod.null()]),
   "id": zod.uuid(),
   "leadId": zod.uuid(),
   "projectId": zod.uuid().nullable(),
@@ -5328,6 +5370,10 @@ export const UpdateInvoiceBody = zod.object({
 })
 })
 
+export const updateInvoiceResponseInvoiceOpeningReceivableCentsMin = 0;
+export const updateInvoiceResponseInvoiceOpeningReceivableCentsMax = 1000000000;
+
+export const updateInvoiceResponseInvoiceHistoricalSourceOneRecordSha256RegExp = new RegExp('^[a-f0-9]{64}$');
 export const updateInvoiceResponseInvoiceVersionMax = 2147483646;
 
 export const updateInvoiceResponseInvoiceSubtotalCentsMin = 0;
@@ -5388,6 +5434,16 @@ export const updateInvoiceResponseInvoiceEventsItemVersionMax = 2147483646;
 
 export const UpdateInvoiceResponse = zod.object({
   "invoice": zod.object({
+  "balanceBasis": zod.enum(['full_history', 'opening_receivable']).describe('Opening receivables are non-cash cutoff balances, not proof of money received.'),
+  "openingReceivableCents": zod.int().min(updateInvoiceResponseInvoiceOpeningReceivableCentsMin).max(updateInvoiceResponseInvoiceOpeningReceivableCentsMax).nullable(),
+  "openingAsOf": zod.coerce.date().nullable(),
+  "historicalSource": zod.union([zod.object({
+  "sourceSystem": zod.string(),
+  "sourceAccount": zod.string(),
+  "externalId": zod.string(),
+  "cutoffAt": zod.coerce.date(),
+  "recordSha256": zod.string().regex(updateInvoiceResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
+}),zod.null()]),
   "id": zod.uuid(),
   "leadId": zod.uuid(),
   "projectId": zod.uuid().nullable(),
@@ -5482,6 +5538,10 @@ export const IssueInvoiceBody = zod.object({
   "confirmed": zod.literal(true)
 })
 
+export const issueInvoiceResponseInvoiceOpeningReceivableCentsMin = 0;
+export const issueInvoiceResponseInvoiceOpeningReceivableCentsMax = 1000000000;
+
+export const issueInvoiceResponseInvoiceHistoricalSourceOneRecordSha256RegExp = new RegExp('^[a-f0-9]{64}$');
 export const issueInvoiceResponseInvoiceVersionMax = 2147483646;
 
 export const issueInvoiceResponseInvoiceSubtotalCentsMin = 0;
@@ -5542,6 +5602,16 @@ export const issueInvoiceResponseInvoiceEventsItemVersionMax = 2147483646;
 
 export const IssueInvoiceResponse = zod.object({
   "invoice": zod.object({
+  "balanceBasis": zod.enum(['full_history', 'opening_receivable']).describe('Opening receivables are non-cash cutoff balances, not proof of money received.'),
+  "openingReceivableCents": zod.int().min(issueInvoiceResponseInvoiceOpeningReceivableCentsMin).max(issueInvoiceResponseInvoiceOpeningReceivableCentsMax).nullable(),
+  "openingAsOf": zod.coerce.date().nullable(),
+  "historicalSource": zod.union([zod.object({
+  "sourceSystem": zod.string(),
+  "sourceAccount": zod.string(),
+  "externalId": zod.string(),
+  "cutoffAt": zod.coerce.date(),
+  "recordSha256": zod.string().regex(issueInvoiceResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
+}),zod.null()]),
   "id": zod.uuid(),
   "leadId": zod.uuid(),
   "projectId": zod.uuid().nullable(),
@@ -5640,6 +5710,10 @@ export const VoidInvoiceBody = zod.object({
   "reason": zod.string().min(voidInvoiceBodyReasonMin).max(voidInvoiceBodyReasonMax)
 })
 
+export const voidInvoiceResponseInvoiceOpeningReceivableCentsMin = 0;
+export const voidInvoiceResponseInvoiceOpeningReceivableCentsMax = 1000000000;
+
+export const voidInvoiceResponseInvoiceHistoricalSourceOneRecordSha256RegExp = new RegExp('^[a-f0-9]{64}$');
 export const voidInvoiceResponseInvoiceVersionMax = 2147483646;
 
 export const voidInvoiceResponseInvoiceSubtotalCentsMin = 0;
@@ -5700,6 +5774,16 @@ export const voidInvoiceResponseInvoiceEventsItemVersionMax = 2147483646;
 
 export const VoidInvoiceResponse = zod.object({
   "invoice": zod.object({
+  "balanceBasis": zod.enum(['full_history', 'opening_receivable']).describe('Opening receivables are non-cash cutoff balances, not proof of money received.'),
+  "openingReceivableCents": zod.int().min(voidInvoiceResponseInvoiceOpeningReceivableCentsMin).max(voidInvoiceResponseInvoiceOpeningReceivableCentsMax).nullable(),
+  "openingAsOf": zod.coerce.date().nullable(),
+  "historicalSource": zod.union([zod.object({
+  "sourceSystem": zod.string(),
+  "sourceAccount": zod.string(),
+  "externalId": zod.string(),
+  "cutoffAt": zod.coerce.date(),
+  "recordSha256": zod.string().regex(voidInvoiceResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
+}),zod.null()]),
   "id": zod.uuid(),
   "leadId": zod.uuid(),
   "projectId": zod.uuid().nullable(),
@@ -5802,6 +5886,10 @@ export const RecordInvoicePaymentBody = zod.object({
   "occurredAt": zod.coerce.date().describe('Actual prior receipt time. Future receipts are rejected. This records cash already received; it does not charge a customer.')
 })
 
+export const recordInvoicePaymentResponseInvoiceOpeningReceivableCentsMin = 0;
+export const recordInvoicePaymentResponseInvoiceOpeningReceivableCentsMax = 1000000000;
+
+export const recordInvoicePaymentResponseInvoiceHistoricalSourceOneRecordSha256RegExp = new RegExp('^[a-f0-9]{64}$');
 export const recordInvoicePaymentResponseInvoiceVersionMax = 2147483646;
 
 export const recordInvoicePaymentResponseInvoiceSubtotalCentsMin = 0;
@@ -5862,6 +5950,16 @@ export const recordInvoicePaymentResponseInvoiceEventsItemVersionMax = 214748364
 
 export const RecordInvoicePaymentResponse = zod.object({
   "invoice": zod.object({
+  "balanceBasis": zod.enum(['full_history', 'opening_receivable']).describe('Opening receivables are non-cash cutoff balances, not proof of money received.'),
+  "openingReceivableCents": zod.int().min(recordInvoicePaymentResponseInvoiceOpeningReceivableCentsMin).max(recordInvoicePaymentResponseInvoiceOpeningReceivableCentsMax).nullable(),
+  "openingAsOf": zod.coerce.date().nullable(),
+  "historicalSource": zod.union([zod.object({
+  "sourceSystem": zod.string(),
+  "sourceAccount": zod.string(),
+  "externalId": zod.string(),
+  "cutoffAt": zod.coerce.date(),
+  "recordSha256": zod.string().regex(recordInvoicePaymentResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
+}),zod.null()]),
   "id": zod.uuid(),
   "leadId": zod.uuid(),
   "projectId": zod.uuid().nullable(),
@@ -5960,6 +6058,10 @@ export const AllocateInvoiceValueBody = zod.object({
   "amountCents": zod.int().min(1).max(allocateInvoiceValueBodyAmountCentsMax)
 })
 
+export const allocateInvoiceValueResponseInvoiceOpeningReceivableCentsMin = 0;
+export const allocateInvoiceValueResponseInvoiceOpeningReceivableCentsMax = 1000000000;
+
+export const allocateInvoiceValueResponseInvoiceHistoricalSourceOneRecordSha256RegExp = new RegExp('^[a-f0-9]{64}$');
 export const allocateInvoiceValueResponseInvoiceVersionMax = 2147483646;
 
 export const allocateInvoiceValueResponseInvoiceSubtotalCentsMin = 0;
@@ -6020,6 +6122,16 @@ export const allocateInvoiceValueResponseInvoiceEventsItemVersionMax = 214748364
 
 export const AllocateInvoiceValueResponse = zod.object({
   "invoice": zod.object({
+  "balanceBasis": zod.enum(['full_history', 'opening_receivable']).describe('Opening receivables are non-cash cutoff balances, not proof of money received.'),
+  "openingReceivableCents": zod.int().min(allocateInvoiceValueResponseInvoiceOpeningReceivableCentsMin).max(allocateInvoiceValueResponseInvoiceOpeningReceivableCentsMax).nullable(),
+  "openingAsOf": zod.coerce.date().nullable(),
+  "historicalSource": zod.union([zod.object({
+  "sourceSystem": zod.string(),
+  "sourceAccount": zod.string(),
+  "externalId": zod.string(),
+  "cutoffAt": zod.coerce.date(),
+  "recordSha256": zod.string().regex(allocateInvoiceValueResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
+}),zod.null()]),
   "id": zod.uuid(),
   "leadId": zod.uuid(),
   "projectId": zod.uuid().nullable(),
@@ -6118,6 +6230,10 @@ export const ReverseInvoiceAllocationBody = zod.object({
   "reason": zod.string().min(reverseInvoiceAllocationBodyReasonMin).max(reverseInvoiceAllocationBodyReasonMax)
 })
 
+export const reverseInvoiceAllocationResponseInvoiceOpeningReceivableCentsMin = 0;
+export const reverseInvoiceAllocationResponseInvoiceOpeningReceivableCentsMax = 1000000000;
+
+export const reverseInvoiceAllocationResponseInvoiceHistoricalSourceOneRecordSha256RegExp = new RegExp('^[a-f0-9]{64}$');
 export const reverseInvoiceAllocationResponseInvoiceVersionMax = 2147483646;
 
 export const reverseInvoiceAllocationResponseInvoiceSubtotalCentsMin = 0;
@@ -6178,6 +6294,16 @@ export const reverseInvoiceAllocationResponseInvoiceEventsItemVersionMax = 21474
 
 export const ReverseInvoiceAllocationResponse = zod.object({
   "invoice": zod.object({
+  "balanceBasis": zod.enum(['full_history', 'opening_receivable']).describe('Opening receivables are non-cash cutoff balances, not proof of money received.'),
+  "openingReceivableCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceOpeningReceivableCentsMin).max(reverseInvoiceAllocationResponseInvoiceOpeningReceivableCentsMax).nullable(),
+  "openingAsOf": zod.coerce.date().nullable(),
+  "historicalSource": zod.union([zod.object({
+  "sourceSystem": zod.string(),
+  "sourceAccount": zod.string(),
+  "externalId": zod.string(),
+  "cutoffAt": zod.coerce.date(),
+  "recordSha256": zod.string().regex(reverseInvoiceAllocationResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
+}),zod.null()]),
   "id": zod.uuid(),
   "leadId": zod.uuid(),
   "projectId": zod.uuid().nullable(),
@@ -6251,6 +6377,1901 @@ export const ReverseInvoiceAllocationResponse = zod.object({
 }))
 }),
   "duplicate": zod.boolean()
+})
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary List accountable service exceptions
+ */
+export const listServiceWatchQueryScopeDefault = `attention`;
+export const listServiceWatchQueryOffsetDefault = 0;
+export const listServiceWatchQueryOffsetMin = 0;
+export const listServiceWatchQueryOffsetMax = 100000;
+
+
+
+export const ListServiceWatchQueryParams = zod.object({
+  "scope": zod.enum(['attention', 'history', 'all']).default(listServiceWatchQueryScopeDefault),
+  "offset": zod.coerce.number().int().min(listServiceWatchQueryOffsetMin).max(listServiceWatchQueryOffsetMax).default(listServiceWatchQueryOffsetDefault)
+})
+
+export const listServiceWatchResponseItemsItemVersionMax = 2147483646;
+
+export const listServiceWatchResponseItemsItemReasonsMax = 11;
+
+export const listServiceWatchResponseItemsItemEpisodeMin = 0;
+export const listServiceWatchResponseItemsItemEpisodeMax = 2147483646;
+
+export const listServiceWatchResponseItemsItemNoticeRevisionMin = 0;
+export const listServiceWatchResponseItemsItemNoticeRevisionMax = 2147483646;
+
+export const listServiceWatchResponseItemsMax = 50;
+
+export const listServiceWatchResponseOffsetMin = 0;
+export const listServiceWatchResponseOffsetMax = 100000;
+
+export const listServiceWatchResponseLimitMin = 50;
+export const listServiceWatchResponseLimitMax = 50;
+
+export const listServiceWatchResponseUnmonitoredCountMin = 0;
+export const listServiceWatchResponseUnmonitoredCountMax = 2147483646;
+
+
+
+export const ListServiceWatchResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "serviceObligationId": zod.uuid(),
+  "version": zod.int().min(1).max(listServiceWatchResponseItemsItemVersionMax),
+  "state": zod.enum(['clear', 'open', 'acknowledged', 'resolved', 'held']),
+  "reasons": zod.array(zod.enum(['reminder_needs_review', 'no_response_recorded', 'reminder_blocked', 'send_unknown', 'visit_cancelled', 'visit_no_show', 'service_overdue', 'response_needs_action', 'next_action_overdue', 'owner_required', 'source_review_required'])).max(listServiceWatchResponseItemsItemReasonsMax),
+  "observedFingerprint": zod.string(),
+  "episode": zod.int().min(listServiceWatchResponseItemsItemEpisodeMin).max(listServiceWatchResponseItemsItemEpisodeMax),
+  "assignedUserId": zod.string().nullable(),
+  "acknowledgedByUserId": zod.string().nullable(),
+  "acknowledgedAt": zod.coerce.date().nullable(),
+  "nextAction": zod.string().nullable(),
+  "nextActionAt": zod.coerce.date().nullable(),
+  "resolvedAt": zod.coerce.date().nullable(),
+  "noticeRevision": zod.int().min(listServiceWatchResponseItemsItemNoticeRevisionMin).max(listServiceWatchResponseItemsItemNoticeRevisionMax),
+  "lastEvaluatedAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "equipmentLabel": zod.string(),
+  "customerLabel": zod.string(),
+  "dueDate": zod.coerce.date()
+})).max(listServiceWatchResponseItemsMax),
+  "hasMore": zod.boolean(),
+  "offset": zod.int().min(listServiceWatchResponseOffsetMin).max(listServiceWatchResponseOffsetMax),
+  "limit": zod.int().min(listServiceWatchResponseLimitMin).max(listServiceWatchResponseLimitMax),
+  "unmonitoredCount": zod.int().min(listServiceWatchResponseUnmonitoredCountMin).max(listServiceWatchResponseUnmonitoredCountMax),
+  "held": zod.boolean()
+})
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Review current service exception and office history
+ */
+export const GetServiceWatchParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const getServiceWatchResponseExpectedVersionMin = 0;
+export const getServiceWatchResponseExpectedVersionMax = 2147483646;
+
+export const getServiceWatchResponseExpectedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getServiceWatchResponseReasonsMax = 11;
+
+export const getServiceWatchResponseHistoryMax = 50;
+
+
+
+export const GetServiceWatchResponse = zod.object({
+  "obligationId": zod.uuid(),
+  "customerLabel": zod.string(),
+  "equipmentLabel": zod.string(),
+  "serviceStatus": zod.enum(['active', 'completed', 'cancelled']),
+  "dueDate": zod.coerce.date(),
+  "taskId": zod.uuid(),
+  "expectedVersion": zod.int().min(getServiceWatchResponseExpectedVersionMin).max(getServiceWatchResponseExpectedVersionMax),
+  "expectedFingerprint": zod.string().regex(getServiceWatchResponseExpectedFingerprintRegExp),
+  "state": zod.enum(['clear', 'open', 'acknowledged', 'resolved', 'held']),
+  "reasons": zod.array(zod.enum(['reminder_needs_review', 'no_response_recorded', 'reminder_blocked', 'send_unknown', 'visit_cancelled', 'visit_no_show', 'service_overdue', 'response_needs_action', 'next_action_overdue', 'owner_required', 'source_review_required'])).max(getServiceWatchResponseReasonsMax),
+  "recordedState": zod.string().nullable(),
+  "monitorPending": zod.boolean(),
+  "assignedUserId": zod.string().nullable(),
+  "ownerValid": zod.boolean(),
+  "held": zod.boolean(),
+  "nextAction": zod.string().nullable(),
+  "nextActionAt": zod.coerce.date().nullable(),
+  "acknowledgedAt": zod.coerce.date().nullable(),
+  "lastEvaluatedAt": zod.coerce.date().nullable(),
+  "history": zod.array(zod.object({
+  "id": zod.uuid(),
+  "action": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "metadata": zod.record(zod.string(), zod.unknown())
+})).max(getServiceWatchResponseHistoryMax),
+  "historyHasMore": zod.boolean(),
+  "today": zod.coerce.date(),
+  "timezone": zod.string(),
+  "timezoneFallback": zod.boolean()
+})
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Assign or acknowledge an exception with a dated office plan
+ */
+export const UpdateServiceWatchParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const updateServiceWatchBodyOneExpectedVersionMin = 0;
+export const updateServiceWatchBodyOneExpectedVersionMax = 2147483646;
+
+export const updateServiceWatchBodyOneExpectedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateServiceWatchBodyOneNoteMin = 10;
+export const updateServiceWatchBodyOneNoteMax = 1000;
+
+export const updateServiceWatchBodyTwoExpectedVersionMin = 0;
+export const updateServiceWatchBodyTwoExpectedVersionMax = 2147483646;
+
+export const updateServiceWatchBodyTwoExpectedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateServiceWatchBodyTwoNoteMin = 10;
+export const updateServiceWatchBodyTwoNoteMax = 1000;
+
+
+
+export const UpdateServiceWatchBody = zod.union([zod.object({
+  "action": zod.enum(['assign']),
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(updateServiceWatchBodyOneExpectedVersionMin).max(updateServiceWatchBodyOneExpectedVersionMax),
+  "expectedFingerprint": zod.string().regex(updateServiceWatchBodyOneExpectedFingerprintRegExp),
+  "assignedUserId": zod.string(),
+  "note": zod.string().min(updateServiceWatchBodyOneNoteMin).max(updateServiceWatchBodyOneNoteMax)
+}),zod.object({
+  "action": zod.enum(['acknowledge']),
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(updateServiceWatchBodyTwoExpectedVersionMin).max(updateServiceWatchBodyTwoExpectedVersionMax),
+  "expectedFingerprint": zod.string().regex(updateServiceWatchBodyTwoExpectedFingerprintRegExp),
+  "assignedUserId": zod.string(),
+  "note": zod.string().min(updateServiceWatchBodyTwoNoteMin).max(updateServiceWatchBodyTwoNoteMax),
+  "nextActionAt": zod.coerce.date(),
+  "reviewed": zod.literal(true)
+})])
+
+export const updateServiceWatchResponseVersionMax = 2147483646;
+
+
+
+export const UpdateServiceWatchResponse = zod.object({
+  "caseId": zod.uuid(),
+  "version": zod.int().min(1).max(updateServiceWatchResponseVersionMax),
+  "replayed": zod.boolean()
+})
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary List imported opportunity reviews and bounded email batches
+ */
+export const listSourceAdoptionsQueryPageDefault = 0;
+export const listSourceAdoptionsQueryPageMin = 0;
+export const listSourceAdoptionsQueryPageMax = 100000;
+
+export const listSourceAdoptionsQueryCampaignPageDefault = 0;
+export const listSourceAdoptionsQueryCampaignPageMin = 0;
+export const listSourceAdoptionsQueryCampaignPageMax = 100000;
+
+
+
+export const ListSourceAdoptionsQueryParams = zod.object({
+  "page": zod.coerce.number().int().min(listSourceAdoptionsQueryPageMin).max(listSourceAdoptionsQueryPageMax).default(listSourceAdoptionsQueryPageDefault),
+  "campaignPage": zod.coerce.number().int().min(listSourceAdoptionsQueryCampaignPageMin).max(listSourceAdoptionsQueryCampaignPageMax).default(listSourceAdoptionsQueryCampaignPageDefault)
+})
+
+export const listSourceAdoptionsResponseCandidatesMax = 100;
+
+export const listSourceAdoptionsResponseCampaignsItemVersionMax = 2147483646;
+
+export const listSourceAdoptionsResponseCampaignsItemSettingsBusinessNameMin = 2;
+export const listSourceAdoptionsResponseCampaignsItemSettingsBusinessNameMax = 150;
+
+export const listSourceAdoptionsResponseCampaignsItemSettingsMailingAddressMin = 10;
+export const listSourceAdoptionsResponseCampaignsItemSettingsMailingAddressMax = 400;
+
+export const listSourceAdoptionsResponseCampaignsItemSettingsSubjectMin = 3;
+export const listSourceAdoptionsResponseCampaignsItemSettingsSubjectMax = 180;
+
+export const listSourceAdoptionsResponseCampaignsItemSettingsBodyMin = 10;
+export const listSourceAdoptionsResponseCampaignsItemSettingsBodyMax = 4000;
+
+export const listSourceAdoptionsResponseCampaignsItemSettingsDaysMax = 7;
+
+export const listSourceAdoptionsResponseCampaignsItemSettingsStartHourMin = 8;
+export const listSourceAdoptionsResponseCampaignsItemSettingsStartHourMax = 19;
+
+export const listSourceAdoptionsResponseCampaignsItemSettingsEndHourMin = 9;
+export const listSourceAdoptionsResponseCampaignsItemSettingsEndHourMax = 20;
+
+export const listSourceAdoptionsResponseCampaignsItemSettingsDailyLimitMax = 25;
+
+export const listSourceAdoptionsResponseCampaignsItemPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const listSourceAdoptionsResponseCampaignsMax = 25;
+
+export const listSourceAdoptionsResponseLimitsCohortMin = 10;
+export const listSourceAdoptionsResponseLimitsCohortMax = 10;
+
+export const listSourceAdoptionsResponseLimitsRollingCompanyLimitMin = 25;
+export const listSourceAdoptionsResponseLimitsRollingCompanyLimitMax = 25;
+
+export const listSourceAdoptionsResponsePageMin = 0;
+export const listSourceAdoptionsResponsePageMax = 100000;
+
+export const listSourceAdoptionsResponseCampaignPageMin = 0;
+export const listSourceAdoptionsResponseCampaignPageMax = 100000;
+
+
+
+export const ListSourceAdoptionsResponse = zod.object({
+  "candidates": zod.array(zod.object({
+  "id": zod.uuid(),
+  "status": zod.string(),
+  "importSourceKey": zod.string().nullable(),
+  "externalOpportunityId": zod.string().nullable()
+})).max(listSourceAdoptionsResponseCandidatesMax),
+  "campaigns": zod.array(zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "version": zod.int().min(1).max(listSourceAdoptionsResponseCampaignsItemVersionMax),
+  "state": zod.enum(['draft', 'approved', 'revoked']),
+  "settings": zod.object({
+  "businessName": zod.string().min(listSourceAdoptionsResponseCampaignsItemSettingsBusinessNameMin).max(listSourceAdoptionsResponseCampaignsItemSettingsBusinessNameMax),
+  "mailingAddress": zod.string().min(listSourceAdoptionsResponseCampaignsItemSettingsMailingAddressMin).max(listSourceAdoptionsResponseCampaignsItemSettingsMailingAddressMax),
+  "subject": zod.string().min(listSourceAdoptionsResponseCampaignsItemSettingsSubjectMin).max(listSourceAdoptionsResponseCampaignsItemSettingsSubjectMax),
+  "body": zod.string().min(listSourceAdoptionsResponseCampaignsItemSettingsBodyMin).max(listSourceAdoptionsResponseCampaignsItemSettingsBodyMax),
+  "timezone": zod.string(),
+  "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])).max(listSourceAdoptionsResponseCampaignsItemSettingsDaysMax),
+  "startHour": zod.int().min(listSourceAdoptionsResponseCampaignsItemSettingsStartHourMin).max(listSourceAdoptionsResponseCampaignsItemSettingsStartHourMax),
+  "endHour": zod.int().min(listSourceAdoptionsResponseCampaignsItemSettingsEndHourMin).max(listSourceAdoptionsResponseCampaignsItemSettingsEndHourMax),
+  "dailyLimit": zod.int().min(1).max(listSourceAdoptionsResponseCampaignsItemSettingsDailyLimitMax)
+}),
+  "payloadSha256": zod.string().regex(listSourceAdoptionsResponseCampaignsItemPayloadSha256RegExp),
+  "createdByUserId": zod.string(),
+  "approvedByUserId": zod.string().nullable(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "previewExpiresAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "revokedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})).max(listSourceAdoptionsResponseCampaignsMax),
+  "limits": zod.object({
+  "cohort": zod.int().min(listSourceAdoptionsResponseLimitsCohortMin).max(listSourceAdoptionsResponseLimitsCohortMax),
+  "rollingCompanyLimit": zod.int().min(listSourceAdoptionsResponseLimitsRollingCompanyLimitMin).max(listSourceAdoptionsResponseLimitsRollingCompanyLimitMax),
+  "oneAddressLifetimeTouch": zod.literal(true)
+}),
+  "detail": zod.string(),
+  "page": zod.int().min(listSourceAdoptionsResponsePageMin).max(listSourceAdoptionsResponsePageMax),
+  "campaignPage": zod.int().min(listSourceAdoptionsResponseCampaignPageMin).max(listSourceAdoptionsResponseCampaignPageMax),
+  "hasMore": zod.boolean(),
+  "hasMoreCampaigns": zod.boolean()
+})
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Review unchanged import provenance and independent email permission
+ */
+export const GetSourceAdoptionParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const getSourceAdoptionResponseOneSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceAdoptionResponseOneOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceAdoptionResponseTwoAdoptionOneVersionMax = 2147483646;
+
+export const getSourceAdoptionResponseTwoAdoptionOneSnapshotSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceAdoptionResponseTwoAdoptionOneSnapshotOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceAdoptionResponseTwoAdoptionOneEvidenceMin = 20;
+export const getSourceAdoptionResponseTwoAdoptionOneEvidenceMax = 2000;
+
+
+
+export const GetSourceAdoptionResponse = zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(getSourceAdoptionResponseOneSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(getSourceAdoptionResponseOneOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}).and(zod.object({
+  "name": zod.string(),
+  "status": zod.string(),
+  "adoption": zod.union([zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "version": zod.int().min(1).max(getSourceAdoptionResponseTwoAdoptionOneVersionMax),
+  "state": zod.enum(['active', 'revoked']),
+  "snapshot": zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(getSourceAdoptionResponseTwoAdoptionOneSnapshotSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(getSourceAdoptionResponseTwoAdoptionOneSnapshotOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}),
+  "sourceAsOf": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "evidence": zod.string().min(getSourceAdoptionResponseTwoAdoptionOneEvidenceMin).max(getSourceAdoptionResponseTwoAdoptionOneEvidenceMax),
+  "approvedByUserId": zod.string(),
+  "approvedAt": zod.coerce.date(),
+  "revokedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]),
+  "consentId": zod.uuid().nullable(),
+  "marketingPermission": zod.boolean(),
+  "current": zod.boolean(),
+  "permissionEvidenceType": zod.enum(['staff_recorded_not_provider_verified'])
+}))
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Prepare actor-bound management adoption review
+ */
+export const PreviewSourceAdoptionParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const previewSourceAdoptionBodyExpectedVersionMin = 0;
+export const previewSourceAdoptionBodyExpectedVersionMax = 2147483646;
+
+export const previewSourceAdoptionBodyEvidenceMin = 20;
+export const previewSourceAdoptionBodyEvidenceMax = 2000;
+
+
+
+export const PreviewSourceAdoptionBody = zod.object({
+  "expectedVersion": zod.int().min(previewSourceAdoptionBodyExpectedVersionMin).max(previewSourceAdoptionBodyExpectedVersionMax),
+  "sourceAsOf": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "evidence": zod.string().min(previewSourceAdoptionBodyEvidenceMin).max(previewSourceAdoptionBodyEvidenceMax),
+  "sourceWriterStopped": zod.literal(true),
+  "currentStatusVerified": zod.literal(true),
+  "noUnreviewedReplies": zod.literal(true)
+})
+
+export const previewSourceAdoptionResponsePayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceAdoptionResponseSnapshotSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceAdoptionResponseSnapshotOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceAdoptionResponseInputExpectedVersionMin = 0;
+export const previewSourceAdoptionResponseInputExpectedVersionMax = 2147483646;
+
+export const previewSourceAdoptionResponseInputEvidenceMin = 20;
+export const previewSourceAdoptionResponseInputEvidenceMax = 2000;
+
+
+
+export const PreviewSourceAdoptionResponse = zod.object({
+  "previewId": zod.uuid(),
+  "payloadSha256": zod.string().regex(previewSourceAdoptionResponsePayloadSha256RegExp),
+  "expiresAt": zod.coerce.date(),
+  "snapshot": zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(previewSourceAdoptionResponseSnapshotSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(previewSourceAdoptionResponseSnapshotOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}),
+  "input": zod.object({
+  "expectedVersion": zod.int().min(previewSourceAdoptionResponseInputExpectedVersionMin).max(previewSourceAdoptionResponseInputExpectedVersionMax),
+  "sourceAsOf": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "evidence": zod.string().min(previewSourceAdoptionResponseInputEvidenceMin).max(previewSourceAdoptionResponseInputEvidenceMax),
+  "sourceWriterStopped": zod.literal(true),
+  "currentStatusVerified": zod.literal(true),
+  "noUnreviewedReplies": zod.literal(true)
+}),
+  "detail": zod.string()
+})
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Approve exact versioned source adoption without sending
+ */
+export const ApproveSourceAdoptionParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const approveSourceAdoptionBodyPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const ApproveSourceAdoptionBody = zod.object({
+  "previewId": zod.uuid(),
+  "payloadSha256": zod.string().regex(approveSourceAdoptionBodyPayloadSha256RegExp),
+  "confirmed": zod.literal(true)
+})
+
+export const approveSourceAdoptionResponseOneSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceAdoptionResponseOneOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceAdoptionResponseTwoAdoptionOneVersionMax = 2147483646;
+
+export const approveSourceAdoptionResponseTwoAdoptionOneSnapshotSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceAdoptionResponseTwoAdoptionOneSnapshotOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceAdoptionResponseTwoAdoptionOneEvidenceMin = 20;
+export const approveSourceAdoptionResponseTwoAdoptionOneEvidenceMax = 2000;
+
+
+
+export const ApproveSourceAdoptionResponse = zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(approveSourceAdoptionResponseOneSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(approveSourceAdoptionResponseOneOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}).and(zod.object({
+  "name": zod.string(),
+  "status": zod.string(),
+  "adoption": zod.union([zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "version": zod.int().min(1).max(approveSourceAdoptionResponseTwoAdoptionOneVersionMax),
+  "state": zod.enum(['active', 'revoked']),
+  "snapshot": zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(approveSourceAdoptionResponseTwoAdoptionOneSnapshotSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(approveSourceAdoptionResponseTwoAdoptionOneSnapshotOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}),
+  "sourceAsOf": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "evidence": zod.string().min(approveSourceAdoptionResponseTwoAdoptionOneEvidenceMin).max(approveSourceAdoptionResponseTwoAdoptionOneEvidenceMax),
+  "approvedByUserId": zod.string(),
+  "approvedAt": zod.coerce.date(),
+  "revokedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]),
+  "consentId": zod.uuid().nullable(),
+  "marketingPermission": zod.boolean(),
+  "current": zod.boolean(),
+  "permissionEvidenceType": zod.enum(['staff_recorded_not_provider_verified'])
+}))
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Revoke source adoption and retain history
+ */
+export const RevokeSourceAdoptionParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const revokeSourceAdoptionBodyExpectedVersionMin = 0;
+export const revokeSourceAdoptionBodyExpectedVersionMax = 2147483646;
+
+export const revokeSourceAdoptionBodyReasonMin = 20;
+export const revokeSourceAdoptionBodyReasonMax = 2000;
+
+
+
+export const RevokeSourceAdoptionBody = zod.object({
+  "expectedVersion": zod.int().min(revokeSourceAdoptionBodyExpectedVersionMin).max(revokeSourceAdoptionBodyExpectedVersionMax),
+  "reason": zod.string().min(revokeSourceAdoptionBodyReasonMin).max(revokeSourceAdoptionBodyReasonMax)
+})
+
+export const revokeSourceAdoptionResponseOneSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const revokeSourceAdoptionResponseOneOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const revokeSourceAdoptionResponseTwoAdoptionOneVersionMax = 2147483646;
+
+export const revokeSourceAdoptionResponseTwoAdoptionOneSnapshotSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const revokeSourceAdoptionResponseTwoAdoptionOneSnapshotOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const revokeSourceAdoptionResponseTwoAdoptionOneEvidenceMin = 20;
+export const revokeSourceAdoptionResponseTwoAdoptionOneEvidenceMax = 2000;
+
+
+
+export const RevokeSourceAdoptionResponse = zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(revokeSourceAdoptionResponseOneSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(revokeSourceAdoptionResponseOneOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}).and(zod.object({
+  "name": zod.string(),
+  "status": zod.string(),
+  "adoption": zod.union([zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "version": zod.int().min(1).max(revokeSourceAdoptionResponseTwoAdoptionOneVersionMax),
+  "state": zod.enum(['active', 'revoked']),
+  "snapshot": zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(revokeSourceAdoptionResponseTwoAdoptionOneSnapshotSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(revokeSourceAdoptionResponseTwoAdoptionOneSnapshotOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}),
+  "sourceAsOf": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "evidence": zod.string().min(revokeSourceAdoptionResponseTwoAdoptionOneEvidenceMin).max(revokeSourceAdoptionResponseTwoAdoptionOneEvidenceMax),
+  "approvedByUserId": zod.string(),
+  "approvedAt": zod.coerce.date(),
+  "revokedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]),
+  "consentId": zod.uuid().nullable(),
+  "marketingPermission": zod.boolean(),
+  "current": zod.boolean(),
+  "permissionEvidenceType": zod.enum(['staff_recorded_not_provider_verified'])
+}))
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Record separately evidenced address-specific email-marketing permission
+ */
+export const RecordSourceEmailPermissionParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const recordSourceEmailPermissionBodyExpectedSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const recordSourceEmailPermissionBodyEvidenceMin = 20;
+export const recordSourceEmailPermissionBodyEvidenceMax = 2000;
+
+
+
+export const RecordSourceEmailPermissionBody = zod.object({
+  "expectedSourceSha256": zod.string().regex(recordSourceEmailPermissionBodyExpectedSourceSha256RegExp),
+  "expectedRecipient": zod.email(),
+  "expectedConsentId": zod.uuid().nullable(),
+  "granted": zod.boolean(),
+  "observedAt": zod.coerce.date(),
+  "evidence": zod.string().min(recordSourceEmailPermissionBodyEvidenceMin).max(recordSourceEmailPermissionBodyEvidenceMax),
+  "marketingPermissionConfirmed": zod.literal(true)
+})
+
+export const recordSourceEmailPermissionResponseOneSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const recordSourceEmailPermissionResponseOneOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const recordSourceEmailPermissionResponseTwoAdoptionOneVersionMax = 2147483646;
+
+export const recordSourceEmailPermissionResponseTwoAdoptionOneSnapshotSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const recordSourceEmailPermissionResponseTwoAdoptionOneSnapshotOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const recordSourceEmailPermissionResponseTwoAdoptionOneEvidenceMin = 20;
+export const recordSourceEmailPermissionResponseTwoAdoptionOneEvidenceMax = 2000;
+
+
+
+export const RecordSourceEmailPermissionResponse = zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(recordSourceEmailPermissionResponseOneSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(recordSourceEmailPermissionResponseOneOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}).and(zod.object({
+  "name": zod.string(),
+  "status": zod.string(),
+  "adoption": zod.union([zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "version": zod.int().min(1).max(recordSourceEmailPermissionResponseTwoAdoptionOneVersionMax),
+  "state": zod.enum(['active', 'revoked']),
+  "snapshot": zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(recordSourceEmailPermissionResponseTwoAdoptionOneSnapshotSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(recordSourceEmailPermissionResponseTwoAdoptionOneSnapshotOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}),
+  "sourceAsOf": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "evidence": zod.string().min(recordSourceEmailPermissionResponseTwoAdoptionOneEvidenceMin).max(recordSourceEmailPermissionResponseTwoAdoptionOneEvidenceMax),
+  "approvedByUserId": zod.string(),
+  "approvedAt": zod.coerce.date(),
+  "revokedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]),
+  "consentId": zod.uuid().nullable(),
+  "marketingPermission": zod.boolean(),
+  "current": zod.boolean(),
+  "permissionEvidenceType": zod.enum(['staff_recorded_not_provider_verified'])
+}))
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Freeze exact copy, sender, recipients, window and cap
+ */
+export const previewSourceOutreachBodyBusinessNameMin = 2;
+export const previewSourceOutreachBodyBusinessNameMax = 150;
+
+export const previewSourceOutreachBodyMailingAddressMin = 10;
+export const previewSourceOutreachBodyMailingAddressMax = 400;
+
+export const previewSourceOutreachBodySubjectMin = 3;
+export const previewSourceOutreachBodySubjectMax = 180;
+
+export const previewSourceOutreachBodyBodyMin = 10;
+export const previewSourceOutreachBodyBodyMax = 4000;
+
+export const previewSourceOutreachBodyDaysMax = 7;
+
+export const previewSourceOutreachBodyStartHourMin = 8;
+export const previewSourceOutreachBodyStartHourMax = 19;
+
+export const previewSourceOutreachBodyEndHourMin = 9;
+export const previewSourceOutreachBodyEndHourMax = 20;
+
+export const previewSourceOutreachBodyDailyLimitMax = 25;
+
+export const previewSourceOutreachBodyLeadIdsMax = 10;
+
+
+
+export const PreviewSourceOutreachBody = zod.object({
+  "businessName": zod.string().min(previewSourceOutreachBodyBusinessNameMin).max(previewSourceOutreachBodyBusinessNameMax),
+  "mailingAddress": zod.string().min(previewSourceOutreachBodyMailingAddressMin).max(previewSourceOutreachBodyMailingAddressMax),
+  "subject": zod.string().min(previewSourceOutreachBodySubjectMin).max(previewSourceOutreachBodySubjectMax),
+  "body": zod.string().min(previewSourceOutreachBodyBodyMin).max(previewSourceOutreachBodyBodyMax),
+  "timezone": zod.string(),
+  "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])).max(previewSourceOutreachBodyDaysMax),
+  "startHour": zod.int().min(previewSourceOutreachBodyStartHourMin).max(previewSourceOutreachBodyStartHourMax),
+  "endHour": zod.int().min(previewSourceOutreachBodyEndHourMin).max(previewSourceOutreachBodyEndHourMax),
+  "dailyLimit": zod.int().min(1).max(previewSourceOutreachBodyDailyLimitMax),
+  "leadIds": zod.array(zod.uuid()).min(1).max(previewSourceOutreachBodyLeadIdsMax),
+  "expiresAt": zod.coerce.date()
+})
+
+export const previewSourceOutreachResponseOneVersionMax = 2147483646;
+
+export const previewSourceOutreachResponseOneSettingsBusinessNameMin = 2;
+export const previewSourceOutreachResponseOneSettingsBusinessNameMax = 150;
+
+export const previewSourceOutreachResponseOneSettingsMailingAddressMin = 10;
+export const previewSourceOutreachResponseOneSettingsMailingAddressMax = 400;
+
+export const previewSourceOutreachResponseOneSettingsSubjectMin = 3;
+export const previewSourceOutreachResponseOneSettingsSubjectMax = 180;
+
+export const previewSourceOutreachResponseOneSettingsBodyMin = 10;
+export const previewSourceOutreachResponseOneSettingsBodyMax = 4000;
+
+export const previewSourceOutreachResponseOneSettingsDaysMax = 7;
+
+export const previewSourceOutreachResponseOneSettingsStartHourMin = 8;
+export const previewSourceOutreachResponseOneSettingsStartHourMax = 19;
+
+export const previewSourceOutreachResponseOneSettingsEndHourMin = 9;
+export const previewSourceOutreachResponseOneSettingsEndHourMax = 20;
+
+export const previewSourceOutreachResponseOneSettingsDailyLimitMax = 25;
+
+export const previewSourceOutreachResponseOnePayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceOutreachResponseTwoItemsItemSnapshotVersionMax = 1;
+
+export const previewSourceOutreachResponseTwoItemsItemSnapshotAdoptionVersionMax = 2147483646;
+
+export const previewSourceOutreachResponseTwoItemsItemSnapshotAdoptionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceOutreachResponseTwoItemsItemSnapshotAdoptionSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceOutreachResponseTwoItemsItemSnapshotAdoptionOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceOutreachResponseTwoItemsMax = 10;
+
+
+
+export const PreviewSourceOutreachResponse = zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "version": zod.int().min(1).max(previewSourceOutreachResponseOneVersionMax),
+  "state": zod.enum(['draft', 'approved', 'revoked']),
+  "settings": zod.object({
+  "businessName": zod.string().min(previewSourceOutreachResponseOneSettingsBusinessNameMin).max(previewSourceOutreachResponseOneSettingsBusinessNameMax),
+  "mailingAddress": zod.string().min(previewSourceOutreachResponseOneSettingsMailingAddressMin).max(previewSourceOutreachResponseOneSettingsMailingAddressMax),
+  "subject": zod.string().min(previewSourceOutreachResponseOneSettingsSubjectMin).max(previewSourceOutreachResponseOneSettingsSubjectMax),
+  "body": zod.string().min(previewSourceOutreachResponseOneSettingsBodyMin).max(previewSourceOutreachResponseOneSettingsBodyMax),
+  "timezone": zod.string(),
+  "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])).max(previewSourceOutreachResponseOneSettingsDaysMax),
+  "startHour": zod.int().min(previewSourceOutreachResponseOneSettingsStartHourMin).max(previewSourceOutreachResponseOneSettingsStartHourMax),
+  "endHour": zod.int().min(previewSourceOutreachResponseOneSettingsEndHourMin).max(previewSourceOutreachResponseOneSettingsEndHourMax),
+  "dailyLimit": zod.int().min(1).max(previewSourceOutreachResponseOneSettingsDailyLimitMax)
+}),
+  "payloadSha256": zod.string().regex(previewSourceOutreachResponseOnePayloadSha256RegExp),
+  "createdByUserId": zod.string(),
+  "approvedByUserId": zod.string().nullable(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "previewExpiresAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "revokedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+}).and(zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "batchId": zod.uuid(),
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "adoptionId": zod.uuid(),
+  "recipient": zod.email(),
+  "snapshot": zod.object({
+  "version": zod.int().min(1).max(previewSourceOutreachResponseTwoItemsItemSnapshotVersionMax),
+  "adoptionId": zod.uuid(),
+  "adoptionVersion": zod.int().min(1).max(previewSourceOutreachResponseTwoItemsItemSnapshotAdoptionVersionMax),
+  "adoptionSha256": zod.string().regex(previewSourceOutreachResponseTwoItemsItemSnapshotAdoptionSha256RegExp),
+  "adoption": zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(previewSourceOutreachResponseTwoItemsItemSnapshotAdoptionSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(previewSourceOutreachResponseTwoItemsItemSnapshotAdoptionOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}),
+  "permissionRecordId": zod.uuid(),
+  "sender": zod.object({
+  "userId": zod.string(),
+  "source": zod.enum(['lead_assignee', 'company_default']),
+  "provider": zod.enum(['gmail', 'microsoft']),
+  "senderEmail": zod.email()
+}),
+  "subject": zod.string(),
+  "body": zod.string()
+}),
+  "claimedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "delivery": zod.object({
+  "state": zod.enum(['not_sent', 'uncertain', 'processing', 'held', 'accepted', 'reconciled']),
+  "executionId": zod.uuid().nullable(),
+  "detail": zod.string(),
+  "deliveryConfirmed": zod.literal(false)
+})
+})).max(previewSourceOutreachResponseTwoItemsMax),
+  "detail": zod.string()
+}))
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Read immutable reviewed batch and uncertain or accepted receipts
+ */
+export const GetSourceOutreachParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const getSourceOutreachResponseOneVersionMax = 2147483646;
+
+export const getSourceOutreachResponseOneSettingsBusinessNameMin = 2;
+export const getSourceOutreachResponseOneSettingsBusinessNameMax = 150;
+
+export const getSourceOutreachResponseOneSettingsMailingAddressMin = 10;
+export const getSourceOutreachResponseOneSettingsMailingAddressMax = 400;
+
+export const getSourceOutreachResponseOneSettingsSubjectMin = 3;
+export const getSourceOutreachResponseOneSettingsSubjectMax = 180;
+
+export const getSourceOutreachResponseOneSettingsBodyMin = 10;
+export const getSourceOutreachResponseOneSettingsBodyMax = 4000;
+
+export const getSourceOutreachResponseOneSettingsDaysMax = 7;
+
+export const getSourceOutreachResponseOneSettingsStartHourMin = 8;
+export const getSourceOutreachResponseOneSettingsStartHourMax = 19;
+
+export const getSourceOutreachResponseOneSettingsEndHourMin = 9;
+export const getSourceOutreachResponseOneSettingsEndHourMax = 20;
+
+export const getSourceOutreachResponseOneSettingsDailyLimitMax = 25;
+
+export const getSourceOutreachResponseOnePayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceOutreachResponseTwoItemsItemSnapshotVersionMax = 1;
+
+export const getSourceOutreachResponseTwoItemsItemSnapshotAdoptionVersionMax = 2147483646;
+
+export const getSourceOutreachResponseTwoItemsItemSnapshotAdoptionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceOutreachResponseTwoItemsItemSnapshotAdoptionSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceOutreachResponseTwoItemsItemSnapshotAdoptionOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceOutreachResponseTwoItemsMax = 10;
+
+
+
+export const GetSourceOutreachResponse = zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "version": zod.int().min(1).max(getSourceOutreachResponseOneVersionMax),
+  "state": zod.enum(['draft', 'approved', 'revoked']),
+  "settings": zod.object({
+  "businessName": zod.string().min(getSourceOutreachResponseOneSettingsBusinessNameMin).max(getSourceOutreachResponseOneSettingsBusinessNameMax),
+  "mailingAddress": zod.string().min(getSourceOutreachResponseOneSettingsMailingAddressMin).max(getSourceOutreachResponseOneSettingsMailingAddressMax),
+  "subject": zod.string().min(getSourceOutreachResponseOneSettingsSubjectMin).max(getSourceOutreachResponseOneSettingsSubjectMax),
+  "body": zod.string().min(getSourceOutreachResponseOneSettingsBodyMin).max(getSourceOutreachResponseOneSettingsBodyMax),
+  "timezone": zod.string(),
+  "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])).max(getSourceOutreachResponseOneSettingsDaysMax),
+  "startHour": zod.int().min(getSourceOutreachResponseOneSettingsStartHourMin).max(getSourceOutreachResponseOneSettingsStartHourMax),
+  "endHour": zod.int().min(getSourceOutreachResponseOneSettingsEndHourMin).max(getSourceOutreachResponseOneSettingsEndHourMax),
+  "dailyLimit": zod.int().min(1).max(getSourceOutreachResponseOneSettingsDailyLimitMax)
+}),
+  "payloadSha256": zod.string().regex(getSourceOutreachResponseOnePayloadSha256RegExp),
+  "createdByUserId": zod.string(),
+  "approvedByUserId": zod.string().nullable(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "previewExpiresAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "revokedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+}).and(zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "batchId": zod.uuid(),
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "adoptionId": zod.uuid(),
+  "recipient": zod.email(),
+  "snapshot": zod.object({
+  "version": zod.int().min(1).max(getSourceOutreachResponseTwoItemsItemSnapshotVersionMax),
+  "adoptionId": zod.uuid(),
+  "adoptionVersion": zod.int().min(1).max(getSourceOutreachResponseTwoItemsItemSnapshotAdoptionVersionMax),
+  "adoptionSha256": zod.string().regex(getSourceOutreachResponseTwoItemsItemSnapshotAdoptionSha256RegExp),
+  "adoption": zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(getSourceOutreachResponseTwoItemsItemSnapshotAdoptionSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(getSourceOutreachResponseTwoItemsItemSnapshotAdoptionOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}),
+  "permissionRecordId": zod.uuid(),
+  "sender": zod.object({
+  "userId": zod.string(),
+  "source": zod.enum(['lead_assignee', 'company_default']),
+  "provider": zod.enum(['gmail', 'microsoft']),
+  "senderEmail": zod.email()
+}),
+  "subject": zod.string(),
+  "body": zod.string()
+}),
+  "claimedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "delivery": zod.object({
+  "state": zod.enum(['not_sent', 'uncertain', 'processing', 'held', 'accepted', 'reconciled']),
+  "executionId": zod.uuid().nullable(),
+  "detail": zod.string(),
+  "deliveryConfirmed": zod.literal(false)
+})
+})).max(getSourceOutreachResponseTwoItemsMax),
+  "detail": zod.string()
+}))
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Approve exact bounded one-touch email batch without dispatch
+ */
+export const ApproveSourceOutreachParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const approveSourceOutreachBodyExpectedVersionMin = 0;
+export const approveSourceOutreachBodyExpectedVersionMax = 2147483646;
+
+export const approveSourceOutreachBodyPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const ApproveSourceOutreachBody = zod.object({
+  "expectedVersion": zod.int().min(approveSourceOutreachBodyExpectedVersionMin).max(approveSourceOutreachBodyExpectedVersionMax),
+  "payloadSha256": zod.string().regex(approveSourceOutreachBodyPayloadSha256RegExp),
+  "confirmed": zod.literal(true)
+})
+
+export const approveSourceOutreachResponseOneVersionMax = 2147483646;
+
+export const approveSourceOutreachResponseOneSettingsBusinessNameMin = 2;
+export const approveSourceOutreachResponseOneSettingsBusinessNameMax = 150;
+
+export const approveSourceOutreachResponseOneSettingsMailingAddressMin = 10;
+export const approveSourceOutreachResponseOneSettingsMailingAddressMax = 400;
+
+export const approveSourceOutreachResponseOneSettingsSubjectMin = 3;
+export const approveSourceOutreachResponseOneSettingsSubjectMax = 180;
+
+export const approveSourceOutreachResponseOneSettingsBodyMin = 10;
+export const approveSourceOutreachResponseOneSettingsBodyMax = 4000;
+
+export const approveSourceOutreachResponseOneSettingsDaysMax = 7;
+
+export const approveSourceOutreachResponseOneSettingsStartHourMin = 8;
+export const approveSourceOutreachResponseOneSettingsStartHourMax = 19;
+
+export const approveSourceOutreachResponseOneSettingsEndHourMin = 9;
+export const approveSourceOutreachResponseOneSettingsEndHourMax = 20;
+
+export const approveSourceOutreachResponseOneSettingsDailyLimitMax = 25;
+
+export const approveSourceOutreachResponseOnePayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceOutreachResponseTwoItemsItemSnapshotVersionMax = 1;
+
+export const approveSourceOutreachResponseTwoItemsItemSnapshotAdoptionVersionMax = 2147483646;
+
+export const approveSourceOutreachResponseTwoItemsItemSnapshotAdoptionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceOutreachResponseTwoItemsItemSnapshotAdoptionSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceOutreachResponseTwoItemsItemSnapshotAdoptionOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceOutreachResponseTwoItemsMax = 10;
+
+
+
+export const ApproveSourceOutreachResponse = zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "version": zod.int().min(1).max(approveSourceOutreachResponseOneVersionMax),
+  "state": zod.enum(['draft', 'approved', 'revoked']),
+  "settings": zod.object({
+  "businessName": zod.string().min(approveSourceOutreachResponseOneSettingsBusinessNameMin).max(approveSourceOutreachResponseOneSettingsBusinessNameMax),
+  "mailingAddress": zod.string().min(approveSourceOutreachResponseOneSettingsMailingAddressMin).max(approveSourceOutreachResponseOneSettingsMailingAddressMax),
+  "subject": zod.string().min(approveSourceOutreachResponseOneSettingsSubjectMin).max(approveSourceOutreachResponseOneSettingsSubjectMax),
+  "body": zod.string().min(approveSourceOutreachResponseOneSettingsBodyMin).max(approveSourceOutreachResponseOneSettingsBodyMax),
+  "timezone": zod.string(),
+  "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])).max(approveSourceOutreachResponseOneSettingsDaysMax),
+  "startHour": zod.int().min(approveSourceOutreachResponseOneSettingsStartHourMin).max(approveSourceOutreachResponseOneSettingsStartHourMax),
+  "endHour": zod.int().min(approveSourceOutreachResponseOneSettingsEndHourMin).max(approveSourceOutreachResponseOneSettingsEndHourMax),
+  "dailyLimit": zod.int().min(1).max(approveSourceOutreachResponseOneSettingsDailyLimitMax)
+}),
+  "payloadSha256": zod.string().regex(approveSourceOutreachResponseOnePayloadSha256RegExp),
+  "createdByUserId": zod.string(),
+  "approvedByUserId": zod.string().nullable(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "previewExpiresAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "revokedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+}).and(zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "batchId": zod.uuid(),
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "adoptionId": zod.uuid(),
+  "recipient": zod.email(),
+  "snapshot": zod.object({
+  "version": zod.int().min(1).max(approveSourceOutreachResponseTwoItemsItemSnapshotVersionMax),
+  "adoptionId": zod.uuid(),
+  "adoptionVersion": zod.int().min(1).max(approveSourceOutreachResponseTwoItemsItemSnapshotAdoptionVersionMax),
+  "adoptionSha256": zod.string().regex(approveSourceOutreachResponseTwoItemsItemSnapshotAdoptionSha256RegExp),
+  "adoption": zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(approveSourceOutreachResponseTwoItemsItemSnapshotAdoptionSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(approveSourceOutreachResponseTwoItemsItemSnapshotAdoptionOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}),
+  "permissionRecordId": zod.uuid(),
+  "sender": zod.object({
+  "userId": zod.string(),
+  "source": zod.enum(['lead_assignee', 'company_default']),
+  "provider": zod.enum(['gmail', 'microsoft']),
+  "senderEmail": zod.email()
+}),
+  "subject": zod.string(),
+  "body": zod.string()
+}),
+  "claimedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "delivery": zod.object({
+  "state": zod.enum(['not_sent', 'uncertain', 'processing', 'held', 'accepted', 'reconciled']),
+  "executionId": zod.uuid().nullable(),
+  "detail": zod.string(),
+  "deliveryConfirmed": zod.literal(false)
+})
+})).max(approveSourceOutreachResponseTwoItemsMax),
+  "detail": zod.string()
+}))
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Revoke unclaimed outreach without releasing send reservations
+ */
+export const RevokeSourceOutreachParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const revokeSourceOutreachBodyExpectedVersionMin = 0;
+export const revokeSourceOutreachBodyExpectedVersionMax = 2147483646;
+
+export const revokeSourceOutreachBodyReasonMin = 20;
+export const revokeSourceOutreachBodyReasonMax = 2000;
+
+
+
+export const RevokeSourceOutreachBody = zod.object({
+  "expectedVersion": zod.int().min(revokeSourceOutreachBodyExpectedVersionMin).max(revokeSourceOutreachBodyExpectedVersionMax),
+  "reason": zod.string().min(revokeSourceOutreachBodyReasonMin).max(revokeSourceOutreachBodyReasonMax)
+})
+
+export const revokeSourceOutreachResponseOneVersionMax = 2147483646;
+
+export const revokeSourceOutreachResponseOneSettingsBusinessNameMin = 2;
+export const revokeSourceOutreachResponseOneSettingsBusinessNameMax = 150;
+
+export const revokeSourceOutreachResponseOneSettingsMailingAddressMin = 10;
+export const revokeSourceOutreachResponseOneSettingsMailingAddressMax = 400;
+
+export const revokeSourceOutreachResponseOneSettingsSubjectMin = 3;
+export const revokeSourceOutreachResponseOneSettingsSubjectMax = 180;
+
+export const revokeSourceOutreachResponseOneSettingsBodyMin = 10;
+export const revokeSourceOutreachResponseOneSettingsBodyMax = 4000;
+
+export const revokeSourceOutreachResponseOneSettingsDaysMax = 7;
+
+export const revokeSourceOutreachResponseOneSettingsStartHourMin = 8;
+export const revokeSourceOutreachResponseOneSettingsStartHourMax = 19;
+
+export const revokeSourceOutreachResponseOneSettingsEndHourMin = 9;
+export const revokeSourceOutreachResponseOneSettingsEndHourMax = 20;
+
+export const revokeSourceOutreachResponseOneSettingsDailyLimitMax = 25;
+
+export const revokeSourceOutreachResponseOnePayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const revokeSourceOutreachResponseTwoItemsItemSnapshotVersionMax = 1;
+
+export const revokeSourceOutreachResponseTwoItemsItemSnapshotAdoptionVersionMax = 2147483646;
+
+export const revokeSourceOutreachResponseTwoItemsItemSnapshotAdoptionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const revokeSourceOutreachResponseTwoItemsItemSnapshotAdoptionSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const revokeSourceOutreachResponseTwoItemsItemSnapshotAdoptionOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const revokeSourceOutreachResponseTwoItemsMax = 10;
+
+
+
+export const RevokeSourceOutreachResponse = zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "version": zod.int().min(1).max(revokeSourceOutreachResponseOneVersionMax),
+  "state": zod.enum(['draft', 'approved', 'revoked']),
+  "settings": zod.object({
+  "businessName": zod.string().min(revokeSourceOutreachResponseOneSettingsBusinessNameMin).max(revokeSourceOutreachResponseOneSettingsBusinessNameMax),
+  "mailingAddress": zod.string().min(revokeSourceOutreachResponseOneSettingsMailingAddressMin).max(revokeSourceOutreachResponseOneSettingsMailingAddressMax),
+  "subject": zod.string().min(revokeSourceOutreachResponseOneSettingsSubjectMin).max(revokeSourceOutreachResponseOneSettingsSubjectMax),
+  "body": zod.string().min(revokeSourceOutreachResponseOneSettingsBodyMin).max(revokeSourceOutreachResponseOneSettingsBodyMax),
+  "timezone": zod.string(),
+  "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])).max(revokeSourceOutreachResponseOneSettingsDaysMax),
+  "startHour": zod.int().min(revokeSourceOutreachResponseOneSettingsStartHourMin).max(revokeSourceOutreachResponseOneSettingsStartHourMax),
+  "endHour": zod.int().min(revokeSourceOutreachResponseOneSettingsEndHourMin).max(revokeSourceOutreachResponseOneSettingsEndHourMax),
+  "dailyLimit": zod.int().min(1).max(revokeSourceOutreachResponseOneSettingsDailyLimitMax)
+}),
+  "payloadSha256": zod.string().regex(revokeSourceOutreachResponseOnePayloadSha256RegExp),
+  "createdByUserId": zod.string(),
+  "approvedByUserId": zod.string().nullable(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "previewExpiresAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "revokedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+}).and(zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "batchId": zod.uuid(),
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "adoptionId": zod.uuid(),
+  "recipient": zod.email(),
+  "snapshot": zod.object({
+  "version": zod.int().min(1).max(revokeSourceOutreachResponseTwoItemsItemSnapshotVersionMax),
+  "adoptionId": zod.uuid(),
+  "adoptionVersion": zod.int().min(1).max(revokeSourceOutreachResponseTwoItemsItemSnapshotAdoptionVersionMax),
+  "adoptionSha256": zod.string().regex(revokeSourceOutreachResponseTwoItemsItemSnapshotAdoptionSha256RegExp),
+  "adoption": zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(revokeSourceOutreachResponseTwoItemsItemSnapshotAdoptionSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(revokeSourceOutreachResponseTwoItemsItemSnapshotAdoptionOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}),
+  "permissionRecordId": zod.uuid(),
+  "sender": zod.object({
+  "userId": zod.string(),
+  "source": zod.enum(['lead_assignee', 'company_default']),
+  "provider": zod.enum(['gmail', 'microsoft']),
+  "senderEmail": zod.email()
+}),
+  "subject": zod.string(),
+  "body": zod.string()
+}),
+  "claimedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "delivery": zod.object({
+  "state": zod.enum(['not_sent', 'uncertain', 'processing', 'held', 'accepted', 'reconciled']),
+  "executionId": zod.uuid().nullable(),
+  "detail": zod.string(),
+  "deliveryConfirmed": zod.literal(false)
+})
+})).max(revokeSourceOutreachResponseTwoItemsMax),
+  "detail": zod.string()
+}))
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Explicitly dispatch at most ten independently eligible reviewed emails
+ */
+export const SendSourceOutreachParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const sendSourceOutreachBodyExpectedVersionMin = 0;
+export const sendSourceOutreachBodyExpectedVersionMax = 2147483646;
+
+export const sendSourceOutreachBodyPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const SendSourceOutreachBody = zod.object({
+  "expectedVersion": zod.int().min(sendSourceOutreachBodyExpectedVersionMin).max(sendSourceOutreachBodyExpectedVersionMax),
+  "payloadSha256": zod.string().regex(sendSourceOutreachBodyPayloadSha256RegExp),
+  "confirmed": zod.literal(true)
+})
+
+export const sendSourceOutreachResponseOneVersionMax = 2147483646;
+
+export const sendSourceOutreachResponseOneSettingsBusinessNameMin = 2;
+export const sendSourceOutreachResponseOneSettingsBusinessNameMax = 150;
+
+export const sendSourceOutreachResponseOneSettingsMailingAddressMin = 10;
+export const sendSourceOutreachResponseOneSettingsMailingAddressMax = 400;
+
+export const sendSourceOutreachResponseOneSettingsSubjectMin = 3;
+export const sendSourceOutreachResponseOneSettingsSubjectMax = 180;
+
+export const sendSourceOutreachResponseOneSettingsBodyMin = 10;
+export const sendSourceOutreachResponseOneSettingsBodyMax = 4000;
+
+export const sendSourceOutreachResponseOneSettingsDaysMax = 7;
+
+export const sendSourceOutreachResponseOneSettingsStartHourMin = 8;
+export const sendSourceOutreachResponseOneSettingsStartHourMax = 19;
+
+export const sendSourceOutreachResponseOneSettingsEndHourMin = 9;
+export const sendSourceOutreachResponseOneSettingsEndHourMax = 20;
+
+export const sendSourceOutreachResponseOneSettingsDailyLimitMax = 25;
+
+export const sendSourceOutreachResponseOnePayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const sendSourceOutreachResponseTwoItemsItemSnapshotVersionMax = 1;
+
+export const sendSourceOutreachResponseTwoItemsItemSnapshotAdoptionVersionMax = 2147483646;
+
+export const sendSourceOutreachResponseTwoItemsItemSnapshotAdoptionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const sendSourceOutreachResponseTwoItemsItemSnapshotAdoptionSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const sendSourceOutreachResponseTwoItemsItemSnapshotAdoptionOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const sendSourceOutreachResponseTwoItemsMax = 10;
+
+
+
+export const SendSourceOutreachResponse = zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "version": zod.int().min(1).max(sendSourceOutreachResponseOneVersionMax),
+  "state": zod.enum(['draft', 'approved', 'revoked']),
+  "settings": zod.object({
+  "businessName": zod.string().min(sendSourceOutreachResponseOneSettingsBusinessNameMin).max(sendSourceOutreachResponseOneSettingsBusinessNameMax),
+  "mailingAddress": zod.string().min(sendSourceOutreachResponseOneSettingsMailingAddressMin).max(sendSourceOutreachResponseOneSettingsMailingAddressMax),
+  "subject": zod.string().min(sendSourceOutreachResponseOneSettingsSubjectMin).max(sendSourceOutreachResponseOneSettingsSubjectMax),
+  "body": zod.string().min(sendSourceOutreachResponseOneSettingsBodyMin).max(sendSourceOutreachResponseOneSettingsBodyMax),
+  "timezone": zod.string(),
+  "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])).max(sendSourceOutreachResponseOneSettingsDaysMax),
+  "startHour": zod.int().min(sendSourceOutreachResponseOneSettingsStartHourMin).max(sendSourceOutreachResponseOneSettingsStartHourMax),
+  "endHour": zod.int().min(sendSourceOutreachResponseOneSettingsEndHourMin).max(sendSourceOutreachResponseOneSettingsEndHourMax),
+  "dailyLimit": zod.int().min(1).max(sendSourceOutreachResponseOneSettingsDailyLimitMax)
+}),
+  "payloadSha256": zod.string().regex(sendSourceOutreachResponseOnePayloadSha256RegExp),
+  "createdByUserId": zod.string(),
+  "approvedByUserId": zod.string().nullable(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "previewExpiresAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "revokedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+}).and(zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "batchId": zod.uuid(),
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "adoptionId": zod.uuid(),
+  "recipient": zod.email(),
+  "snapshot": zod.object({
+  "version": zod.int().min(1).max(sendSourceOutreachResponseTwoItemsItemSnapshotVersionMax),
+  "adoptionId": zod.uuid(),
+  "adoptionVersion": zod.int().min(1).max(sendSourceOutreachResponseTwoItemsItemSnapshotAdoptionVersionMax),
+  "adoptionSha256": zod.string().regex(sendSourceOutreachResponseTwoItemsItemSnapshotAdoptionSha256RegExp),
+  "adoption": zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "sourceSha256": zod.string().regex(sendSourceOutreachResponseTwoItemsItemSnapshotAdoptionSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(sendSourceOutreachResponseTwoItemsItemSnapshotAdoptionOperationalSha256RegExp),
+  "recipient": zod.email(),
+  "importedHistory": zod.looseObject({
+
+}).describe('Original strict CSV snapshot including both original\/applied fingerprints; adoption does not change it.')
+}),
+  "permissionRecordId": zod.uuid(),
+  "sender": zod.object({
+  "userId": zod.string(),
+  "source": zod.enum(['lead_assignee', 'company_default']),
+  "provider": zod.enum(['gmail', 'microsoft']),
+  "senderEmail": zod.email()
+}),
+  "subject": zod.string(),
+  "body": zod.string()
+}),
+  "claimedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "delivery": zod.object({
+  "state": zod.enum(['not_sent', 'uncertain', 'processing', 'held', 'accepted', 'reconciled']),
+  "executionId": zod.uuid().nullable(),
+  "detail": zod.string(),
+  "deliveryConfirmed": zod.literal(false)
+})
+})).max(sendSourceOutreachResponseTwoItemsMax),
+  "detail": zod.string()
+}))
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary List this owner's financial migration reviews
+ */
+export const listFinancialMigrationsResponseItemsItemDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const listFinancialMigrationsResponseItemsMax = 30;
+
+export const listFinancialMigrationsResponseLimitMin = 30;
+export const listFinancialMigrationsResponseLimitMax = 30;
+
+
+
+export const ListFinancialMigrationsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "state": zod.enum(['review', 'committed']),
+  "digest": zod.string().regex(listFinancialMigrationsResponseItemsItemDigestRegExp),
+  "createdAt": zod.coerce.date(),
+  "committedAt": zod.coerce.date().nullable()
+})).max(listFinancialMigrationsResponseItemsMax),
+  "limit": zod.int().min(listFinancialMigrationsResponseLimitMin).max(listFinancialMigrationsResponseLimitMax)
+})
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Reconcile strict normalized historical financial source
+ */
+export const previewFinancialMigrationBodySourceJsonMin = 2;
+export const previewFinancialMigrationBodySourceJsonMax = 512000;
+
+
+
+export const PreviewFinancialMigrationBody = zod.object({
+  "sourceJson": zod.string().min(previewFinancialMigrationBodySourceJsonMin).max(previewFinancialMigrationBodySourceJsonMax).describe('Strict normalized JSON v1, at most 512,000 UTF-8 bytes. Vendor CSV\/PDF and unsupported credits are rejected, never guessed.')
+})
+
+export const previewFinancialMigrationResponseOneIssuesMax = 30;
+
+export const previewFinancialMigrationResponseTwoReviewDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewFinancialMigrationResponseTwoReviewRawSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewFinancialMigrationResponseTwoReviewSourceVersionMax = 1;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemBalanceAtCutoffCentsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemBalanceAtCutoffCentsMax = 1000000000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTitleMax = 150;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentIssuerNameMax = 200;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentIssuerAddressMax = 500;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentCustomerNameMax = 200;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentCustomerAddressMax = 500;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentNotesMax = 2000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsItemDescriptionMax = 1000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsItemTotalCentsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsItemTotalCentsMax = 1000000000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsMax = 100;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTaxCentsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTaxCentsMax = 1000000000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentSubtotalCentsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentSubtotalCentsMax = 1000000000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTotalCentsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTotalCentsMax = 1000000000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesMax = 50;
+
+export const previewFinancialMigrationResponseTwoReviewSourceReceiptsItemAmountCentsMax = 1000000000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceReceiptsItemEvidenceMin = 10;
+export const previewFinancialMigrationResponseTwoReviewSourceReceiptsItemEvidenceMax = 500;
+
+export const previewFinancialMigrationResponseTwoReviewSourceReceiptsItemAllocationsItemAmountCentsMax = 1000000000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceReceiptsItemAllocationsMax = 50;
+
+export const previewFinancialMigrationResponseTwoReviewSourceReceiptsMax = 200;
+
+export const previewFinancialMigrationResponseTwoReviewSourceControlTotalsInvoiceCountMax = 50;
+
+export const previewFinancialMigrationResponseTwoReviewSourceControlTotalsDocumentTotalCentsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewSourceControlTotalsDocumentTotalCentsMax = 50000000000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceControlTotalsOpeningReceivableCentsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewSourceControlTotalsOpeningReceivableCentsMax = 50000000000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceControlTotalsBalanceDueCentsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewSourceControlTotalsBalanceDueCentsMax = 50000000000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceControlTotalsPaymentCentsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewSourceControlTotalsPaymentCentsMax = 200000000000;
+
+export const previewFinancialMigrationResponseTwoReviewSourceControlTotalsRefundCentsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewSourceControlTotalsRefundCentsMax = 200000000000;
+
+export const previewFinancialMigrationResponseTwoReviewDuplicateInvoicesMin = 0;
+export const previewFinancialMigrationResponseTwoReviewDuplicateInvoicesMax = 2147483646;
+
+export const previewFinancialMigrationResponseTwoReviewDuplicateReceiptsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewDuplicateReceiptsMax = 2147483646;
+
+export const previewFinancialMigrationResponseTwoReviewResultOneImportedInvoicesMin = 0;
+export const previewFinancialMigrationResponseTwoReviewResultOneImportedInvoicesMax = 2147483646;
+
+export const previewFinancialMigrationResponseTwoReviewResultOneImportedReceiptsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewResultOneImportedReceiptsMax = 2147483646;
+
+export const previewFinancialMigrationResponseTwoReviewResultOneDuplicateInvoicesMin = 0;
+export const previewFinancialMigrationResponseTwoReviewResultOneDuplicateInvoicesMax = 2147483646;
+
+export const previewFinancialMigrationResponseTwoReviewResultOneDuplicateReceiptsMin = 0;
+export const previewFinancialMigrationResponseTwoReviewResultOneDuplicateReceiptsMax = 2147483646;
+
+
+
+export const PreviewFinancialMigrationResponse = zod.union([zod.object({
+  "valid": zod.literal(false),
+  "issues": zod.array(zod.object({
+  "path": zod.string(),
+  "message": zod.string()
+})).max(previewFinancialMigrationResponseOneIssuesMax)
+}),zod.object({
+  "valid": zod.literal(true),
+  "review": zod.object({
+  "id": zod.uuid(),
+  "digest": zod.string().regex(previewFinancialMigrationResponseTwoReviewDigestRegExp),
+  "rawSha256": zod.string().regex(previewFinancialMigrationResponseTwoReviewRawSha256RegExp),
+  "state": zod.enum(['review', 'committed']),
+  "source": zod.object({
+  "format": zod.enum(['growthos-financial-migration']),
+  "version": zod.int().min(1).max(previewFinancialMigrationResponseTwoReviewSourceVersionMax),
+  "sourceSystem": zod.string(),
+  "sourceAccount": zod.string(),
+  "cutoffAt": zod.coerce.date(),
+  "invoices": zod.array(zod.object({
+  "externalId": zod.string(),
+  "invoiceNumber": zod.string(),
+  "leadId": zod.uuid(),
+  "issuedAt": zod.coerce.date(),
+  "basis": zod.enum(['full_history', 'opening_receivable']),
+  "balanceAtCutoffCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemBalanceAtCutoffCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemBalanceAtCutoffCentsMax),
+  "document": zod.object({
+  "title": zod.string().min(1).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentIssuerAddressMax).nullable(),
+  "customerName": zod.string().min(1).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentCustomerAddressMax).nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "notes": zod.string().max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentNotesMax).nullable(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsItemUnitPriceCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsItemTotalCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsItemTotalCentsMax)
+})).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsMax),
+  "taxCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTaxCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTaxCentsMax),
+  "subtotalCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentSubtotalCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentSubtotalCentsMax),
+  "totalCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTotalCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTotalCentsMax)
+})
+})).min(1).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesMax),
+  "receipts": zod.array(zod.object({
+  "externalId": zod.string(),
+  "leadId": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "amountCents": zod.int().min(1).max(previewFinancialMigrationResponseTwoReviewSourceReceiptsItemAmountCentsMax),
+  "occurredAt": zod.coerce.date(),
+  "evidence": zod.string().min(previewFinancialMigrationResponseTwoReviewSourceReceiptsItemEvidenceMin).max(previewFinancialMigrationResponseTwoReviewSourceReceiptsItemEvidenceMax),
+  "allocations": zod.array(zod.object({
+  "externalInvoiceId": zod.string(),
+  "amountCents": zod.int().min(1).max(previewFinancialMigrationResponseTwoReviewSourceReceiptsItemAllocationsItemAmountCentsMax)
+})).max(previewFinancialMigrationResponseTwoReviewSourceReceiptsItemAllocationsMax)
+})).max(previewFinancialMigrationResponseTwoReviewSourceReceiptsMax),
+  "controlTotals": zod.object({
+  "invoiceCount": zod.int().min(1).max(previewFinancialMigrationResponseTwoReviewSourceControlTotalsInvoiceCountMax),
+  "documentTotalCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceControlTotalsDocumentTotalCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceControlTotalsDocumentTotalCentsMax),
+  "openingReceivableCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceControlTotalsOpeningReceivableCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceControlTotalsOpeningReceivableCentsMax),
+  "balanceDueCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceControlTotalsBalanceDueCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceControlTotalsBalanceDueCentsMax),
+  "paymentCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceControlTotalsPaymentCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceControlTotalsPaymentCentsMax),
+  "refundCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceControlTotalsRefundCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceControlTotalsRefundCentsMax)
+})
+}),
+  "mappings": zod.array(zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "customerName": zod.string()
+})),
+  "duplicateInvoices": zod.int().min(previewFinancialMigrationResponseTwoReviewDuplicateInvoicesMin).max(previewFinancialMigrationResponseTwoReviewDuplicateInvoicesMax),
+  "duplicateReceipts": zod.int().min(previewFinancialMigrationResponseTwoReviewDuplicateReceiptsMin).max(previewFinancialMigrationResponseTwoReviewDuplicateReceiptsMax),
+  "expiresAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date(),
+  "committedAt": zod.coerce.date().nullable(),
+  "result": zod.union([zod.object({
+  "importedInvoices": zod.int().min(previewFinancialMigrationResponseTwoReviewResultOneImportedInvoicesMin).max(previewFinancialMigrationResponseTwoReviewResultOneImportedInvoicesMax),
+  "importedReceipts": zod.int().min(previewFinancialMigrationResponseTwoReviewResultOneImportedReceiptsMin).max(previewFinancialMigrationResponseTwoReviewResultOneImportedReceiptsMax),
+  "duplicateInvoices": zod.int().min(previewFinancialMigrationResponseTwoReviewResultOneDuplicateInvoicesMin).max(previewFinancialMigrationResponseTwoReviewResultOneDuplicateInvoicesMax),
+  "duplicateReceipts": zod.int().min(previewFinancialMigrationResponseTwoReviewResultOneDuplicateReceiptsMin).max(previewFinancialMigrationResponseTwoReviewResultOneDuplicateReceiptsMax),
+  "invoiceIds": zod.array(zod.uuid())
+}),zod.null()])
+})
+})])
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Read exact original invoice and receipt migration review
+ */
+export const GetFinancialMigrationParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const getFinancialMigrationResponseDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getFinancialMigrationResponseRawSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getFinancialMigrationResponseSourceVersionMax = 1;
+
+export const getFinancialMigrationResponseSourceInvoicesItemBalanceAtCutoffCentsMin = 0;
+export const getFinancialMigrationResponseSourceInvoicesItemBalanceAtCutoffCentsMax = 1000000000;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentTitleMax = 150;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentIssuerNameMax = 200;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentIssuerAddressMax = 500;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentCustomerNameMax = 200;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentCustomerAddressMax = 500;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentNotesMax = 2000;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemDescriptionMax = 1000;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemTotalCentsMin = 0;
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemTotalCentsMax = 1000000000;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsMax = 100;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentTaxCentsMin = 0;
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentTaxCentsMax = 1000000000;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalCentsMin = 0;
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalCentsMax = 1000000000;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMin = 0;
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMax = 1000000000;
+
+export const getFinancialMigrationResponseSourceInvoicesMax = 50;
+
+export const getFinancialMigrationResponseSourceReceiptsItemAmountCentsMax = 1000000000;
+
+export const getFinancialMigrationResponseSourceReceiptsItemEvidenceMin = 10;
+export const getFinancialMigrationResponseSourceReceiptsItemEvidenceMax = 500;
+
+export const getFinancialMigrationResponseSourceReceiptsItemAllocationsItemAmountCentsMax = 1000000000;
+
+export const getFinancialMigrationResponseSourceReceiptsItemAllocationsMax = 50;
+
+export const getFinancialMigrationResponseSourceReceiptsMax = 200;
+
+export const getFinancialMigrationResponseSourceControlTotalsInvoiceCountMax = 50;
+
+export const getFinancialMigrationResponseSourceControlTotalsDocumentTotalCentsMin = 0;
+export const getFinancialMigrationResponseSourceControlTotalsDocumentTotalCentsMax = 50000000000;
+
+export const getFinancialMigrationResponseSourceControlTotalsOpeningReceivableCentsMin = 0;
+export const getFinancialMigrationResponseSourceControlTotalsOpeningReceivableCentsMax = 50000000000;
+
+export const getFinancialMigrationResponseSourceControlTotalsBalanceDueCentsMin = 0;
+export const getFinancialMigrationResponseSourceControlTotalsBalanceDueCentsMax = 50000000000;
+
+export const getFinancialMigrationResponseSourceControlTotalsPaymentCentsMin = 0;
+export const getFinancialMigrationResponseSourceControlTotalsPaymentCentsMax = 200000000000;
+
+export const getFinancialMigrationResponseSourceControlTotalsRefundCentsMin = 0;
+export const getFinancialMigrationResponseSourceControlTotalsRefundCentsMax = 200000000000;
+
+export const getFinancialMigrationResponseDuplicateInvoicesMin = 0;
+export const getFinancialMigrationResponseDuplicateInvoicesMax = 2147483646;
+
+export const getFinancialMigrationResponseDuplicateReceiptsMin = 0;
+export const getFinancialMigrationResponseDuplicateReceiptsMax = 2147483646;
+
+export const getFinancialMigrationResponseResultOneImportedInvoicesMin = 0;
+export const getFinancialMigrationResponseResultOneImportedInvoicesMax = 2147483646;
+
+export const getFinancialMigrationResponseResultOneImportedReceiptsMin = 0;
+export const getFinancialMigrationResponseResultOneImportedReceiptsMax = 2147483646;
+
+export const getFinancialMigrationResponseResultOneDuplicateInvoicesMin = 0;
+export const getFinancialMigrationResponseResultOneDuplicateInvoicesMax = 2147483646;
+
+export const getFinancialMigrationResponseResultOneDuplicateReceiptsMin = 0;
+export const getFinancialMigrationResponseResultOneDuplicateReceiptsMax = 2147483646;
+
+
+
+export const GetFinancialMigrationResponse = zod.object({
+  "id": zod.uuid(),
+  "digest": zod.string().regex(getFinancialMigrationResponseDigestRegExp),
+  "rawSha256": zod.string().regex(getFinancialMigrationResponseRawSha256RegExp),
+  "state": zod.enum(['review', 'committed']),
+  "source": zod.object({
+  "format": zod.enum(['growthos-financial-migration']),
+  "version": zod.int().min(1).max(getFinancialMigrationResponseSourceVersionMax),
+  "sourceSystem": zod.string(),
+  "sourceAccount": zod.string(),
+  "cutoffAt": zod.coerce.date(),
+  "invoices": zod.array(zod.object({
+  "externalId": zod.string(),
+  "invoiceNumber": zod.string(),
+  "leadId": zod.uuid(),
+  "issuedAt": zod.coerce.date(),
+  "basis": zod.enum(['full_history', 'opening_receivable']),
+  "balanceAtCutoffCents": zod.int().min(getFinancialMigrationResponseSourceInvoicesItemBalanceAtCutoffCentsMin).max(getFinancialMigrationResponseSourceInvoicesItemBalanceAtCutoffCentsMax),
+  "document": zod.object({
+  "title": zod.string().min(1).max(getFinancialMigrationResponseSourceInvoicesItemDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(getFinancialMigrationResponseSourceInvoicesItemDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(getFinancialMigrationResponseSourceInvoicesItemDocumentIssuerAddressMax).nullable(),
+  "customerName": zod.string().min(1).max(getFinancialMigrationResponseSourceInvoicesItemDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(getFinancialMigrationResponseSourceInvoicesItemDocumentCustomerAddressMax).nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "notes": zod.string().max(getFinancialMigrationResponseSourceInvoicesItemDocumentNotesMax).nullable(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemUnitPriceCentsMin).max(getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemTotalCentsMin).max(getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemTotalCentsMax)
+})).max(getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsMax),
+  "taxCents": zod.int().min(getFinancialMigrationResponseSourceInvoicesItemDocumentTaxCentsMin).max(getFinancialMigrationResponseSourceInvoicesItemDocumentTaxCentsMax),
+  "subtotalCents": zod.int().min(getFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalCentsMin).max(getFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalCentsMax),
+  "totalCents": zod.int().min(getFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMin).max(getFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMax)
+})
+})).min(1).max(getFinancialMigrationResponseSourceInvoicesMax),
+  "receipts": zod.array(zod.object({
+  "externalId": zod.string(),
+  "leadId": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "amountCents": zod.int().min(1).max(getFinancialMigrationResponseSourceReceiptsItemAmountCentsMax),
+  "occurredAt": zod.coerce.date(),
+  "evidence": zod.string().min(getFinancialMigrationResponseSourceReceiptsItemEvidenceMin).max(getFinancialMigrationResponseSourceReceiptsItemEvidenceMax),
+  "allocations": zod.array(zod.object({
+  "externalInvoiceId": zod.string(),
+  "amountCents": zod.int().min(1).max(getFinancialMigrationResponseSourceReceiptsItemAllocationsItemAmountCentsMax)
+})).max(getFinancialMigrationResponseSourceReceiptsItemAllocationsMax)
+})).max(getFinancialMigrationResponseSourceReceiptsMax),
+  "controlTotals": zod.object({
+  "invoiceCount": zod.int().min(1).max(getFinancialMigrationResponseSourceControlTotalsInvoiceCountMax),
+  "documentTotalCents": zod.int().min(getFinancialMigrationResponseSourceControlTotalsDocumentTotalCentsMin).max(getFinancialMigrationResponseSourceControlTotalsDocumentTotalCentsMax),
+  "openingReceivableCents": zod.int().min(getFinancialMigrationResponseSourceControlTotalsOpeningReceivableCentsMin).max(getFinancialMigrationResponseSourceControlTotalsOpeningReceivableCentsMax),
+  "balanceDueCents": zod.int().min(getFinancialMigrationResponseSourceControlTotalsBalanceDueCentsMin).max(getFinancialMigrationResponseSourceControlTotalsBalanceDueCentsMax),
+  "paymentCents": zod.int().min(getFinancialMigrationResponseSourceControlTotalsPaymentCentsMin).max(getFinancialMigrationResponseSourceControlTotalsPaymentCentsMax),
+  "refundCents": zod.int().min(getFinancialMigrationResponseSourceControlTotalsRefundCentsMin).max(getFinancialMigrationResponseSourceControlTotalsRefundCentsMax)
+})
+}),
+  "mappings": zod.array(zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "customerName": zod.string()
+})),
+  "duplicateInvoices": zod.int().min(getFinancialMigrationResponseDuplicateInvoicesMin).max(getFinancialMigrationResponseDuplicateInvoicesMax),
+  "duplicateReceipts": zod.int().min(getFinancialMigrationResponseDuplicateReceiptsMin).max(getFinancialMigrationResponseDuplicateReceiptsMax),
+  "expiresAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date(),
+  "committedAt": zod.coerce.date().nullable(),
+  "result": zod.union([zod.object({
+  "importedInvoices": zod.int().min(getFinancialMigrationResponseResultOneImportedInvoicesMin).max(getFinancialMigrationResponseResultOneImportedInvoicesMax),
+  "importedReceipts": zod.int().min(getFinancialMigrationResponseResultOneImportedReceiptsMin).max(getFinancialMigrationResponseResultOneImportedReceiptsMax),
+  "duplicateInvoices": zod.int().min(getFinancialMigrationResponseResultOneDuplicateInvoicesMin).max(getFinancialMigrationResponseResultOneDuplicateInvoicesMax),
+  "duplicateReceipts": zod.int().min(getFinancialMigrationResponseResultOneDuplicateReceiptsMin).max(getFinancialMigrationResponseResultOneDuplicateReceiptsMax),
+  "invoiceIds": zod.array(zod.uuid())
+}),zod.null()])
+})
+
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Atomically import reconciled history or non-cash opening receivables
+ */
+export const CommitFinancialMigrationParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const commitFinancialMigrationBodyExpectedDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const CommitFinancialMigrationBody = zod.object({
+  "expectedDigest": zod.string().regex(commitFinancialMigrationBodyExpectedDigestRegExp),
+  "confirmed": zod.literal(true),
+  "sourceFrozen": zod.literal(true)
+})
+
+export const commitFinancialMigrationResponseDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const commitFinancialMigrationResponseRawSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const commitFinancialMigrationResponseSourceVersionMax = 1;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemBalanceAtCutoffCentsMin = 0;
+export const commitFinancialMigrationResponseSourceInvoicesItemBalanceAtCutoffCentsMax = 1000000000;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentTitleMax = 150;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentIssuerNameMax = 200;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentIssuerAddressMax = 500;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentCustomerNameMax = 200;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentCustomerAddressMax = 500;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentNotesMax = 2000;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemDescriptionMax = 1000;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemTotalCentsMin = 0;
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemTotalCentsMax = 1000000000;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsMax = 100;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentTaxCentsMin = 0;
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentTaxCentsMax = 1000000000;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalCentsMin = 0;
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalCentsMax = 1000000000;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMin = 0;
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMax = 1000000000;
+
+export const commitFinancialMigrationResponseSourceInvoicesMax = 50;
+
+export const commitFinancialMigrationResponseSourceReceiptsItemAmountCentsMax = 1000000000;
+
+export const commitFinancialMigrationResponseSourceReceiptsItemEvidenceMin = 10;
+export const commitFinancialMigrationResponseSourceReceiptsItemEvidenceMax = 500;
+
+export const commitFinancialMigrationResponseSourceReceiptsItemAllocationsItemAmountCentsMax = 1000000000;
+
+export const commitFinancialMigrationResponseSourceReceiptsItemAllocationsMax = 50;
+
+export const commitFinancialMigrationResponseSourceReceiptsMax = 200;
+
+export const commitFinancialMigrationResponseSourceControlTotalsInvoiceCountMax = 50;
+
+export const commitFinancialMigrationResponseSourceControlTotalsDocumentTotalCentsMin = 0;
+export const commitFinancialMigrationResponseSourceControlTotalsDocumentTotalCentsMax = 50000000000;
+
+export const commitFinancialMigrationResponseSourceControlTotalsOpeningReceivableCentsMin = 0;
+export const commitFinancialMigrationResponseSourceControlTotalsOpeningReceivableCentsMax = 50000000000;
+
+export const commitFinancialMigrationResponseSourceControlTotalsBalanceDueCentsMin = 0;
+export const commitFinancialMigrationResponseSourceControlTotalsBalanceDueCentsMax = 50000000000;
+
+export const commitFinancialMigrationResponseSourceControlTotalsPaymentCentsMin = 0;
+export const commitFinancialMigrationResponseSourceControlTotalsPaymentCentsMax = 200000000000;
+
+export const commitFinancialMigrationResponseSourceControlTotalsRefundCentsMin = 0;
+export const commitFinancialMigrationResponseSourceControlTotalsRefundCentsMax = 200000000000;
+
+export const commitFinancialMigrationResponseDuplicateInvoicesMin = 0;
+export const commitFinancialMigrationResponseDuplicateInvoicesMax = 2147483646;
+
+export const commitFinancialMigrationResponseDuplicateReceiptsMin = 0;
+export const commitFinancialMigrationResponseDuplicateReceiptsMax = 2147483646;
+
+export const commitFinancialMigrationResponseResultOneImportedInvoicesMin = 0;
+export const commitFinancialMigrationResponseResultOneImportedInvoicesMax = 2147483646;
+
+export const commitFinancialMigrationResponseResultOneImportedReceiptsMin = 0;
+export const commitFinancialMigrationResponseResultOneImportedReceiptsMax = 2147483646;
+
+export const commitFinancialMigrationResponseResultOneDuplicateInvoicesMin = 0;
+export const commitFinancialMigrationResponseResultOneDuplicateInvoicesMax = 2147483646;
+
+export const commitFinancialMigrationResponseResultOneDuplicateReceiptsMin = 0;
+export const commitFinancialMigrationResponseResultOneDuplicateReceiptsMax = 2147483646;
+
+
+
+export const CommitFinancialMigrationResponse = zod.object({
+  "id": zod.uuid(),
+  "digest": zod.string().regex(commitFinancialMigrationResponseDigestRegExp),
+  "rawSha256": zod.string().regex(commitFinancialMigrationResponseRawSha256RegExp),
+  "state": zod.enum(['review', 'committed']),
+  "source": zod.object({
+  "format": zod.enum(['growthos-financial-migration']),
+  "version": zod.int().min(1).max(commitFinancialMigrationResponseSourceVersionMax),
+  "sourceSystem": zod.string(),
+  "sourceAccount": zod.string(),
+  "cutoffAt": zod.coerce.date(),
+  "invoices": zod.array(zod.object({
+  "externalId": zod.string(),
+  "invoiceNumber": zod.string(),
+  "leadId": zod.uuid(),
+  "issuedAt": zod.coerce.date(),
+  "basis": zod.enum(['full_history', 'opening_receivable']),
+  "balanceAtCutoffCents": zod.int().min(commitFinancialMigrationResponseSourceInvoicesItemBalanceAtCutoffCentsMin).max(commitFinancialMigrationResponseSourceInvoicesItemBalanceAtCutoffCentsMax),
+  "document": zod.object({
+  "title": zod.string().min(1).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(commitFinancialMigrationResponseSourceInvoicesItemDocumentIssuerAddressMax).nullable(),
+  "customerName": zod.string().min(1).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(commitFinancialMigrationResponseSourceInvoicesItemDocumentCustomerAddressMax).nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "notes": zod.string().max(commitFinancialMigrationResponseSourceInvoicesItemDocumentNotesMax).nullable(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemUnitPriceCentsMin).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemTotalCentsMin).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsItemTotalCentsMax)
+})).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsMax),
+  "taxCents": zod.int().min(commitFinancialMigrationResponseSourceInvoicesItemDocumentTaxCentsMin).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentTaxCentsMax),
+  "subtotalCents": zod.int().min(commitFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalCentsMin).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalCentsMax),
+  "totalCents": zod.int().min(commitFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMin).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMax)
+})
+})).min(1).max(commitFinancialMigrationResponseSourceInvoicesMax),
+  "receipts": zod.array(zod.object({
+  "externalId": zod.string(),
+  "leadId": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "amountCents": zod.int().min(1).max(commitFinancialMigrationResponseSourceReceiptsItemAmountCentsMax),
+  "occurredAt": zod.coerce.date(),
+  "evidence": zod.string().min(commitFinancialMigrationResponseSourceReceiptsItemEvidenceMin).max(commitFinancialMigrationResponseSourceReceiptsItemEvidenceMax),
+  "allocations": zod.array(zod.object({
+  "externalInvoiceId": zod.string(),
+  "amountCents": zod.int().min(1).max(commitFinancialMigrationResponseSourceReceiptsItemAllocationsItemAmountCentsMax)
+})).max(commitFinancialMigrationResponseSourceReceiptsItemAllocationsMax)
+})).max(commitFinancialMigrationResponseSourceReceiptsMax),
+  "controlTotals": zod.object({
+  "invoiceCount": zod.int().min(1).max(commitFinancialMigrationResponseSourceControlTotalsInvoiceCountMax),
+  "documentTotalCents": zod.int().min(commitFinancialMigrationResponseSourceControlTotalsDocumentTotalCentsMin).max(commitFinancialMigrationResponseSourceControlTotalsDocumentTotalCentsMax),
+  "openingReceivableCents": zod.int().min(commitFinancialMigrationResponseSourceControlTotalsOpeningReceivableCentsMin).max(commitFinancialMigrationResponseSourceControlTotalsOpeningReceivableCentsMax),
+  "balanceDueCents": zod.int().min(commitFinancialMigrationResponseSourceControlTotalsBalanceDueCentsMin).max(commitFinancialMigrationResponseSourceControlTotalsBalanceDueCentsMax),
+  "paymentCents": zod.int().min(commitFinancialMigrationResponseSourceControlTotalsPaymentCentsMin).max(commitFinancialMigrationResponseSourceControlTotalsPaymentCentsMax),
+  "refundCents": zod.int().min(commitFinancialMigrationResponseSourceControlTotalsRefundCentsMin).max(commitFinancialMigrationResponseSourceControlTotalsRefundCentsMax)
+})
+}),
+  "mappings": zod.array(zod.object({
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "customerName": zod.string()
+})),
+  "duplicateInvoices": zod.int().min(commitFinancialMigrationResponseDuplicateInvoicesMin).max(commitFinancialMigrationResponseDuplicateInvoicesMax),
+  "duplicateReceipts": zod.int().min(commitFinancialMigrationResponseDuplicateReceiptsMin).max(commitFinancialMigrationResponseDuplicateReceiptsMax),
+  "expiresAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date(),
+  "committedAt": zod.coerce.date().nullable(),
+  "result": zod.union([zod.object({
+  "importedInvoices": zod.int().min(commitFinancialMigrationResponseResultOneImportedInvoicesMin).max(commitFinancialMigrationResponseResultOneImportedInvoicesMax),
+  "importedReceipts": zod.int().min(commitFinancialMigrationResponseResultOneImportedReceiptsMin).max(commitFinancialMigrationResponseResultOneImportedReceiptsMax),
+  "duplicateInvoices": zod.int().min(commitFinancialMigrationResponseResultOneDuplicateInvoicesMin).max(commitFinancialMigrationResponseResultOneDuplicateInvoicesMax),
+  "duplicateReceipts": zod.int().min(commitFinancialMigrationResponseResultOneDuplicateReceiptsMin).max(commitFinancialMigrationResponseResultOneDuplicateReceiptsMax),
+  "invoiceIds": zod.array(zod.uuid())
+}),zod.null()])
 })
 
 

@@ -92,6 +92,11 @@ import type {
   EstimateInput,
   EstimateUpdate,
   ExportRoiReportParams,
+  FinancialMigrationCommitInput,
+  FinancialMigrationList,
+  FinancialMigrationPreview,
+  FinancialMigrationPreviewInput,
+  FinancialMigrationReview,
   FormShareAssets,
   FormSubmissionRecord,
   GetContractorTodayParams,
@@ -142,6 +147,8 @@ import type {
   ListProjectsParams,
   ListPropertiesParams,
   ListServiceObligationsParams,
+  ListServiceWatchParams,
+  ListSourceAdoptionsParams,
   ListTasksParams,
   ListTodayActionsParams,
   ListWebhookDeliveriesParams,
@@ -212,11 +219,25 @@ import type {
   ServiceObligation,
   ServiceObligationListItem,
   ServiceRecurrenceCommand,
+  ServiceWatchCommand,
+  ServiceWatchCommandResult,
+  ServiceWatchDetail,
+  ServiceWatchList,
   SessionProfile,
   SmartForm,
   SmartFormInput,
   SmartFormPatch,
   SmsProviderStatus,
+  SourceAdoptionApprovalInput,
+  SourceAdoptionDetail,
+  SourceAdoptionList,
+  SourceAdoptionReview,
+  SourceAdoptionReviewInput,
+  SourceAdoptionRevokeInput,
+  SourceEmailPermissionInput,
+  SourceOutreachApproval,
+  SourceOutreachDetail,
+  SourceOutreachDraft,
   StormCheckRequest,
   StormCheckResult,
   SubmitFormBody,
@@ -14184,6 +14205,1367 @@ export const useReverseInvoiceAllocation = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getReverseInvoiceAllocationMutationOptions(options));
+    }
+
+export const getListServiceWatchUrl = (params?: ListServiceWatchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/service-watch?${stringifiedParams}` : `/api/v1/service-watch`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary List accountable service exceptions
+ */
+export const listServiceWatch = async (params?: ListServiceWatchParams, options?: Parameters<typeof customFetch>[1]): Promise<ServiceWatchList> => {
+
+  return customFetch<ServiceWatchList>(getListServiceWatchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListServiceWatchQueryKey = (params?: ListServiceWatchParams,) => {
+    return [
+    `/api/v1/service-watch`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListServiceWatchQueryOptions = <TData = Awaited<ReturnType<typeof listServiceWatch>>, TError = ErrorType<void>>(params?: ListServiceWatchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceWatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListServiceWatchQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listServiceWatch>>> = ({ signal }) => listServiceWatch(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listServiceWatch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListServiceWatchQueryResult = NonNullable<Awaited<ReturnType<typeof listServiceWatch>>>
+export type ListServiceWatchQueryError = ErrorType<void>
+
+
+/**
+ * @summary List accountable service exceptions
+ */
+
+export function useListServiceWatch<TData = Awaited<ReturnType<typeof listServiceWatch>>, TError = ErrorType<void>>(
+ params?: ListServiceWatchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceWatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListServiceWatchQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetServiceWatchUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/service-obligations/${id}/watch`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Review current service exception and office history
+ */
+export const getServiceWatch = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<ServiceWatchDetail> => {
+
+  return customFetch<ServiceWatchDetail>(getGetServiceWatchUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetServiceWatchQueryKey = (id: string,) => {
+    return [
+    `/api/v1/service-obligations/${id}/watch`
+    ] as const;
+    }
+
+
+export const getGetServiceWatchQueryOptions = <TData = Awaited<ReturnType<typeof getServiceWatch>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getServiceWatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetServiceWatchQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getServiceWatch>>> = ({ signal }) => getServiceWatch(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getServiceWatch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetServiceWatchQueryResult = NonNullable<Awaited<ReturnType<typeof getServiceWatch>>>
+export type GetServiceWatchQueryError = ErrorType<void>
+
+
+/**
+ * @summary Review current service exception and office history
+ */
+
+export function useGetServiceWatch<TData = Awaited<ReturnType<typeof getServiceWatch>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getServiceWatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetServiceWatchQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateServiceWatchUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/service-obligations/${id}/watch`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Assign or acknowledge an exception with a dated office plan
+ */
+export const updateServiceWatch = async (id: string,
+    serviceWatchCommand: ServiceWatchCommand, options?: Parameters<typeof customFetch>[1]): Promise<ServiceWatchCommandResult> => {
+
+  return customFetch<ServiceWatchCommandResult>(getUpdateServiceWatchUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(serviceWatchCommand)
+  }
+);}
+
+
+
+
+
+export const getUpdateServiceWatchMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateServiceWatch>>, TError,{id: string;data: BodyType<ServiceWatchCommand>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateServiceWatch>>, TError,{id: string;data: BodyType<ServiceWatchCommand>}, TContext> => {
+
+const mutationKey = ['updateServiceWatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateServiceWatch>>, {id: string;data: BodyType<ServiceWatchCommand>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateServiceWatch(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateServiceWatchMutationResult = NonNullable<Awaited<ReturnType<typeof updateServiceWatch>>>
+    export type UpdateServiceWatchMutationBody = BodyType<ServiceWatchCommand>
+    export type UpdateServiceWatchMutationError = ErrorType<void>
+
+    /**
+ * @summary Assign or acknowledge an exception with a dated office plan
+ */
+export const useUpdateServiceWatch = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateServiceWatch>>, TError,{id: string;data: BodyType<ServiceWatchCommand>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateServiceWatch>>,
+        TError,
+        {id: string;data: BodyType<ServiceWatchCommand>},
+        TContext
+      > => {
+      return useMutation(getUpdateServiceWatchMutationOptions(options));
+    }
+
+export const getListSourceAdoptionsUrl = (params?: ListSourceAdoptionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/source-adoption?${stringifiedParams}` : `/api/v1/source-adoption`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary List imported opportunity reviews and bounded email batches
+ */
+export const listSourceAdoptions = async (params?: ListSourceAdoptionsParams, options?: Parameters<typeof customFetch>[1]): Promise<SourceAdoptionList> => {
+
+  return customFetch<SourceAdoptionList>(getListSourceAdoptionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSourceAdoptionsQueryKey = (params?: ListSourceAdoptionsParams,) => {
+    return [
+    `/api/v1/source-adoption`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSourceAdoptionsQueryOptions = <TData = Awaited<ReturnType<typeof listSourceAdoptions>>, TError = ErrorType<void>>(params?: ListSourceAdoptionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSourceAdoptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSourceAdoptionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSourceAdoptions>>> = ({ signal }) => listSourceAdoptions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSourceAdoptions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSourceAdoptionsQueryResult = NonNullable<Awaited<ReturnType<typeof listSourceAdoptions>>>
+export type ListSourceAdoptionsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List imported opportunity reviews and bounded email batches
+ */
+
+export function useListSourceAdoptions<TData = Awaited<ReturnType<typeof listSourceAdoptions>>, TError = ErrorType<void>>(
+ params?: ListSourceAdoptionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSourceAdoptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSourceAdoptionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetSourceAdoptionUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/source-adoption/leads/${id}`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Review unchanged import provenance and independent email permission
+ */
+export const getSourceAdoption = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<SourceAdoptionDetail> => {
+
+  return customFetch<SourceAdoptionDetail>(getGetSourceAdoptionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSourceAdoptionQueryKey = (id: string,) => {
+    return [
+    `/api/v1/source-adoption/leads/${id}`
+    ] as const;
+    }
+
+
+export const getGetSourceAdoptionQueryOptions = <TData = Awaited<ReturnType<typeof getSourceAdoption>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSourceAdoption>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSourceAdoptionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSourceAdoption>>> = ({ signal }) => getSourceAdoption(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSourceAdoption>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSourceAdoptionQueryResult = NonNullable<Awaited<ReturnType<typeof getSourceAdoption>>>
+export type GetSourceAdoptionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Review unchanged import provenance and independent email permission
+ */
+
+export function useGetSourceAdoption<TData = Awaited<ReturnType<typeof getSourceAdoption>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSourceAdoption>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSourceAdoptionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPreviewSourceAdoptionUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/source-adoption/leads/${id}/preview`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Prepare actor-bound management adoption review
+ */
+export const previewSourceAdoption = async (id: string,
+    sourceAdoptionReviewInput: SourceAdoptionReviewInput, options?: Parameters<typeof customFetch>[1]): Promise<SourceAdoptionReview> => {
+
+  return customFetch<SourceAdoptionReview>(getPreviewSourceAdoptionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceAdoptionReviewInput)
+  }
+);}
+
+
+
+
+
+export const getPreviewSourceAdoptionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewSourceAdoption>>, TError,{id: string;data: BodyType<SourceAdoptionReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewSourceAdoption>>, TError,{id: string;data: BodyType<SourceAdoptionReviewInput>}, TContext> => {
+
+const mutationKey = ['previewSourceAdoption'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewSourceAdoption>>, {id: string;data: BodyType<SourceAdoptionReviewInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  previewSourceAdoption(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewSourceAdoptionMutationResult = NonNullable<Awaited<ReturnType<typeof previewSourceAdoption>>>
+    export type PreviewSourceAdoptionMutationBody = BodyType<SourceAdoptionReviewInput>
+    export type PreviewSourceAdoptionMutationError = ErrorType<void>
+
+    /**
+ * @summary Prepare actor-bound management adoption review
+ */
+export const usePreviewSourceAdoption = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewSourceAdoption>>, TError,{id: string;data: BodyType<SourceAdoptionReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewSourceAdoption>>,
+        TError,
+        {id: string;data: BodyType<SourceAdoptionReviewInput>},
+        TContext
+      > => {
+      return useMutation(getPreviewSourceAdoptionMutationOptions(options));
+    }
+
+export const getApproveSourceAdoptionUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/source-adoption/leads/${id}/approve`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Approve exact versioned source adoption without sending
+ */
+export const approveSourceAdoption = async (id: string,
+    sourceAdoptionApprovalInput: SourceAdoptionApprovalInput, options?: Parameters<typeof customFetch>[1]): Promise<SourceAdoptionDetail> => {
+
+  return customFetch<SourceAdoptionDetail>(getApproveSourceAdoptionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceAdoptionApprovalInput)
+  }
+);}
+
+
+
+
+
+export const getApproveSourceAdoptionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveSourceAdoption>>, TError,{id: string;data: BodyType<SourceAdoptionApprovalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveSourceAdoption>>, TError,{id: string;data: BodyType<SourceAdoptionApprovalInput>}, TContext> => {
+
+const mutationKey = ['approveSourceAdoption'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveSourceAdoption>>, {id: string;data: BodyType<SourceAdoptionApprovalInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  approveSourceAdoption(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveSourceAdoptionMutationResult = NonNullable<Awaited<ReturnType<typeof approveSourceAdoption>>>
+    export type ApproveSourceAdoptionMutationBody = BodyType<SourceAdoptionApprovalInput>
+    export type ApproveSourceAdoptionMutationError = ErrorType<void>
+
+    /**
+ * @summary Approve exact versioned source adoption without sending
+ */
+export const useApproveSourceAdoption = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveSourceAdoption>>, TError,{id: string;data: BodyType<SourceAdoptionApprovalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveSourceAdoption>>,
+        TError,
+        {id: string;data: BodyType<SourceAdoptionApprovalInput>},
+        TContext
+      > => {
+      return useMutation(getApproveSourceAdoptionMutationOptions(options));
+    }
+
+export const getRevokeSourceAdoptionUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/source-adoption/leads/${id}/revoke`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Revoke source adoption and retain history
+ */
+export const revokeSourceAdoption = async (id: string,
+    sourceAdoptionRevokeInput: SourceAdoptionRevokeInput, options?: Parameters<typeof customFetch>[1]): Promise<SourceAdoptionDetail> => {
+
+  return customFetch<SourceAdoptionDetail>(getRevokeSourceAdoptionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceAdoptionRevokeInput)
+  }
+);}
+
+
+
+
+
+export const getRevokeSourceAdoptionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeSourceAdoption>>, TError,{id: string;data: BodyType<SourceAdoptionRevokeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeSourceAdoption>>, TError,{id: string;data: BodyType<SourceAdoptionRevokeInput>}, TContext> => {
+
+const mutationKey = ['revokeSourceAdoption'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeSourceAdoption>>, {id: string;data: BodyType<SourceAdoptionRevokeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  revokeSourceAdoption(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeSourceAdoptionMutationResult = NonNullable<Awaited<ReturnType<typeof revokeSourceAdoption>>>
+    export type RevokeSourceAdoptionMutationBody = BodyType<SourceAdoptionRevokeInput>
+    export type RevokeSourceAdoptionMutationError = ErrorType<void>
+
+    /**
+ * @summary Revoke source adoption and retain history
+ */
+export const useRevokeSourceAdoption = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeSourceAdoption>>, TError,{id: string;data: BodyType<SourceAdoptionRevokeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeSourceAdoption>>,
+        TError,
+        {id: string;data: BodyType<SourceAdoptionRevokeInput>},
+        TContext
+      > => {
+      return useMutation(getRevokeSourceAdoptionMutationOptions(options));
+    }
+
+export const getRecordSourceEmailPermissionUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/source-adoption/leads/${id}/email-permission`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Record separately evidenced address-specific email-marketing permission
+ */
+export const recordSourceEmailPermission = async (id: string,
+    sourceEmailPermissionInput: SourceEmailPermissionInput, options?: Parameters<typeof customFetch>[1]): Promise<SourceAdoptionDetail> => {
+
+  return customFetch<SourceAdoptionDetail>(getRecordSourceEmailPermissionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceEmailPermissionInput)
+  }
+);}
+
+
+
+
+
+export const getRecordSourceEmailPermissionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordSourceEmailPermission>>, TError,{id: string;data: BodyType<SourceEmailPermissionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordSourceEmailPermission>>, TError,{id: string;data: BodyType<SourceEmailPermissionInput>}, TContext> => {
+
+const mutationKey = ['recordSourceEmailPermission'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordSourceEmailPermission>>, {id: string;data: BodyType<SourceEmailPermissionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  recordSourceEmailPermission(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordSourceEmailPermissionMutationResult = NonNullable<Awaited<ReturnType<typeof recordSourceEmailPermission>>>
+    export type RecordSourceEmailPermissionMutationBody = BodyType<SourceEmailPermissionInput>
+    export type RecordSourceEmailPermissionMutationError = ErrorType<void>
+
+    /**
+ * @summary Record separately evidenced address-specific email-marketing permission
+ */
+export const useRecordSourceEmailPermission = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordSourceEmailPermission>>, TError,{id: string;data: BodyType<SourceEmailPermissionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordSourceEmailPermission>>,
+        TError,
+        {id: string;data: BodyType<SourceEmailPermissionInput>},
+        TContext
+      > => {
+      return useMutation(getRecordSourceEmailPermissionMutationOptions(options));
+    }
+
+export const getPreviewSourceOutreachUrl = () => {
+
+
+
+
+  return `/api/v1/source-adoption/outreach/preview`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Freeze exact copy, sender, recipients, window and cap
+ */
+export const previewSourceOutreach = async (sourceOutreachDraft: SourceOutreachDraft, options?: Parameters<typeof customFetch>[1]): Promise<SourceOutreachDetail> => {
+
+  return customFetch<SourceOutreachDetail>(getPreviewSourceOutreachUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceOutreachDraft)
+  }
+);}
+
+
+
+
+
+export const getPreviewSourceOutreachMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewSourceOutreach>>, TError,{data: BodyType<SourceOutreachDraft>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewSourceOutreach>>, TError,{data: BodyType<SourceOutreachDraft>}, TContext> => {
+
+const mutationKey = ['previewSourceOutreach'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewSourceOutreach>>, {data: BodyType<SourceOutreachDraft>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewSourceOutreach(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewSourceOutreachMutationResult = NonNullable<Awaited<ReturnType<typeof previewSourceOutreach>>>
+    export type PreviewSourceOutreachMutationBody = BodyType<SourceOutreachDraft>
+    export type PreviewSourceOutreachMutationError = ErrorType<void>
+
+    /**
+ * @summary Freeze exact copy, sender, recipients, window and cap
+ */
+export const usePreviewSourceOutreach = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewSourceOutreach>>, TError,{data: BodyType<SourceOutreachDraft>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewSourceOutreach>>,
+        TError,
+        {data: BodyType<SourceOutreachDraft>},
+        TContext
+      > => {
+      return useMutation(getPreviewSourceOutreachMutationOptions(options));
+    }
+
+export const getGetSourceOutreachUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/source-adoption/outreach/${id}`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Read immutable reviewed batch and uncertain or accepted receipts
+ */
+export const getSourceOutreach = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<SourceOutreachDetail> => {
+
+  return customFetch<SourceOutreachDetail>(getGetSourceOutreachUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSourceOutreachQueryKey = (id: string,) => {
+    return [
+    `/api/v1/source-adoption/outreach/${id}`
+    ] as const;
+    }
+
+
+export const getGetSourceOutreachQueryOptions = <TData = Awaited<ReturnType<typeof getSourceOutreach>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSourceOutreach>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSourceOutreachQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSourceOutreach>>> = ({ signal }) => getSourceOutreach(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSourceOutreach>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSourceOutreachQueryResult = NonNullable<Awaited<ReturnType<typeof getSourceOutreach>>>
+export type GetSourceOutreachQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read immutable reviewed batch and uncertain or accepted receipts
+ */
+
+export function useGetSourceOutreach<TData = Awaited<ReturnType<typeof getSourceOutreach>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSourceOutreach>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSourceOutreachQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getApproveSourceOutreachUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/source-adoption/outreach/${id}/approve`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Approve exact bounded one-touch email batch without dispatch
+ */
+export const approveSourceOutreach = async (id: string,
+    sourceOutreachApproval: SourceOutreachApproval, options?: Parameters<typeof customFetch>[1]): Promise<SourceOutreachDetail> => {
+
+  return customFetch<SourceOutreachDetail>(getApproveSourceOutreachUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceOutreachApproval)
+  }
+);}
+
+
+
+
+
+export const getApproveSourceOutreachMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveSourceOutreach>>, TError,{id: string;data: BodyType<SourceOutreachApproval>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveSourceOutreach>>, TError,{id: string;data: BodyType<SourceOutreachApproval>}, TContext> => {
+
+const mutationKey = ['approveSourceOutreach'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveSourceOutreach>>, {id: string;data: BodyType<SourceOutreachApproval>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  approveSourceOutreach(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveSourceOutreachMutationResult = NonNullable<Awaited<ReturnType<typeof approveSourceOutreach>>>
+    export type ApproveSourceOutreachMutationBody = BodyType<SourceOutreachApproval>
+    export type ApproveSourceOutreachMutationError = ErrorType<void>
+
+    /**
+ * @summary Approve exact bounded one-touch email batch without dispatch
+ */
+export const useApproveSourceOutreach = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveSourceOutreach>>, TError,{id: string;data: BodyType<SourceOutreachApproval>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveSourceOutreach>>,
+        TError,
+        {id: string;data: BodyType<SourceOutreachApproval>},
+        TContext
+      > => {
+      return useMutation(getApproveSourceOutreachMutationOptions(options));
+    }
+
+export const getRevokeSourceOutreachUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/source-adoption/outreach/${id}/revoke`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Revoke unclaimed outreach without releasing send reservations
+ */
+export const revokeSourceOutreach = async (id: string,
+    sourceAdoptionRevokeInput: SourceAdoptionRevokeInput, options?: Parameters<typeof customFetch>[1]): Promise<SourceOutreachDetail> => {
+
+  return customFetch<SourceOutreachDetail>(getRevokeSourceOutreachUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceAdoptionRevokeInput)
+  }
+);}
+
+
+
+
+
+export const getRevokeSourceOutreachMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeSourceOutreach>>, TError,{id: string;data: BodyType<SourceAdoptionRevokeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeSourceOutreach>>, TError,{id: string;data: BodyType<SourceAdoptionRevokeInput>}, TContext> => {
+
+const mutationKey = ['revokeSourceOutreach'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeSourceOutreach>>, {id: string;data: BodyType<SourceAdoptionRevokeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  revokeSourceOutreach(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeSourceOutreachMutationResult = NonNullable<Awaited<ReturnType<typeof revokeSourceOutreach>>>
+    export type RevokeSourceOutreachMutationBody = BodyType<SourceAdoptionRevokeInput>
+    export type RevokeSourceOutreachMutationError = ErrorType<void>
+
+    /**
+ * @summary Revoke unclaimed outreach without releasing send reservations
+ */
+export const useRevokeSourceOutreach = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeSourceOutreach>>, TError,{id: string;data: BodyType<SourceAdoptionRevokeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeSourceOutreach>>,
+        TError,
+        {id: string;data: BodyType<SourceAdoptionRevokeInput>},
+        TContext
+      > => {
+      return useMutation(getRevokeSourceOutreachMutationOptions(options));
+    }
+
+export const getSendSourceOutreachUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/source-adoption/outreach/${id}/send`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Explicitly dispatch at most ten independently eligible reviewed emails
+ */
+export const sendSourceOutreach = async (id: string,
+    sourceOutreachApproval: SourceOutreachApproval, options?: Parameters<typeof customFetch>[1]): Promise<SourceOutreachDetail> => {
+
+  return customFetch<SourceOutreachDetail>(getSendSourceOutreachUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceOutreachApproval)
+  }
+);}
+
+
+
+
+
+export const getSendSourceOutreachMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendSourceOutreach>>, TError,{id: string;data: BodyType<SourceOutreachApproval>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendSourceOutreach>>, TError,{id: string;data: BodyType<SourceOutreachApproval>}, TContext> => {
+
+const mutationKey = ['sendSourceOutreach'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendSourceOutreach>>, {id: string;data: BodyType<SourceOutreachApproval>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  sendSourceOutreach(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendSourceOutreachMutationResult = NonNullable<Awaited<ReturnType<typeof sendSourceOutreach>>>
+    export type SendSourceOutreachMutationBody = BodyType<SourceOutreachApproval>
+    export type SendSourceOutreachMutationError = ErrorType<void>
+
+    /**
+ * @summary Explicitly dispatch at most ten independently eligible reviewed emails
+ */
+export const useSendSourceOutreach = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendSourceOutreach>>, TError,{id: string;data: BodyType<SourceOutreachApproval>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendSourceOutreach>>,
+        TError,
+        {id: string;data: BodyType<SourceOutreachApproval>},
+        TContext
+      > => {
+      return useMutation(getSendSourceOutreachMutationOptions(options));
+    }
+
+export const getListFinancialMigrationsUrl = () => {
+
+
+
+
+  return `/api/v1/financial-migrations`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary List this owner's financial migration reviews
+ */
+export const listFinancialMigrations = async ( options?: Parameters<typeof customFetch>[1]): Promise<FinancialMigrationList> => {
+
+  return customFetch<FinancialMigrationList>(getListFinancialMigrationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFinancialMigrationsQueryKey = () => {
+    return [
+    `/api/v1/financial-migrations`
+    ] as const;
+    }
+
+
+export const getListFinancialMigrationsQueryOptions = <TData = Awaited<ReturnType<typeof listFinancialMigrations>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFinancialMigrations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFinancialMigrationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFinancialMigrations>>> = ({ signal }) => listFinancialMigrations({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFinancialMigrations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFinancialMigrationsQueryResult = NonNullable<Awaited<ReturnType<typeof listFinancialMigrations>>>
+export type ListFinancialMigrationsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List this owner's financial migration reviews
+ */
+
+export function useListFinancialMigrations<TData = Awaited<ReturnType<typeof listFinancialMigrations>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFinancialMigrations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFinancialMigrationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPreviewFinancialMigrationUrl = () => {
+
+
+
+
+  return `/api/v1/financial-migrations/preview`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Reconcile strict normalized historical financial source
+ */
+export const previewFinancialMigration = async (financialMigrationPreviewInput: FinancialMigrationPreviewInput, options?: Parameters<typeof customFetch>[1]): Promise<FinancialMigrationPreview> => {
+
+  return customFetch<FinancialMigrationPreview>(getPreviewFinancialMigrationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(financialMigrationPreviewInput)
+  }
+);}
+
+
+
+
+
+export const getPreviewFinancialMigrationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewFinancialMigration>>, TError,{data: BodyType<FinancialMigrationPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewFinancialMigration>>, TError,{data: BodyType<FinancialMigrationPreviewInput>}, TContext> => {
+
+const mutationKey = ['previewFinancialMigration'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewFinancialMigration>>, {data: BodyType<FinancialMigrationPreviewInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewFinancialMigration(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewFinancialMigrationMutationResult = NonNullable<Awaited<ReturnType<typeof previewFinancialMigration>>>
+    export type PreviewFinancialMigrationMutationBody = BodyType<FinancialMigrationPreviewInput>
+    export type PreviewFinancialMigrationMutationError = ErrorType<void>
+
+    /**
+ * @summary Reconcile strict normalized historical financial source
+ */
+export const usePreviewFinancialMigration = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewFinancialMigration>>, TError,{data: BodyType<FinancialMigrationPreviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewFinancialMigration>>,
+        TError,
+        {data: BodyType<FinancialMigrationPreviewInput>},
+        TContext
+      > => {
+      return useMutation(getPreviewFinancialMigrationMutationOptions(options));
+    }
+
+export const getGetFinancialMigrationUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/financial-migrations/${id}`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Read exact original invoice and receipt migration review
+ */
+export const getFinancialMigration = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<FinancialMigrationReview> => {
+
+  return customFetch<FinancialMigrationReview>(getGetFinancialMigrationUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFinancialMigrationQueryKey = (id: string,) => {
+    return [
+    `/api/v1/financial-migrations/${id}`
+    ] as const;
+    }
+
+
+export const getGetFinancialMigrationQueryOptions = <TData = Awaited<ReturnType<typeof getFinancialMigration>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFinancialMigration>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFinancialMigrationQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFinancialMigration>>> = ({ signal }) => getFinancialMigration(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFinancialMigration>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFinancialMigrationQueryResult = NonNullable<Awaited<ReturnType<typeof getFinancialMigration>>>
+export type GetFinancialMigrationQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read exact original invoice and receipt migration review
+ */
+
+export function useGetFinancialMigration<TData = Awaited<ReturnType<typeof getFinancialMigration>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFinancialMigration>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFinancialMigrationQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCommitFinancialMigrationUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/financial-migrations/${id}/commit`
+}
+
+/**
+ * Reviewed contractor operations. Human writes require active accepted staff, trusted origin or bearer session, JSON and exact saved version/digest. Imports/adoption are not consent; provider acceptance is not delivery. Payment collection remains out of scope.
+ * @summary Atomically import reconciled history or non-cash opening receivables
+ */
+export const commitFinancialMigration = async (id: string,
+    financialMigrationCommitInput: FinancialMigrationCommitInput, options?: Parameters<typeof customFetch>[1]): Promise<FinancialMigrationReview> => {
+
+  return customFetch<FinancialMigrationReview>(getCommitFinancialMigrationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(financialMigrationCommitInput)
+  }
+);}
+
+
+
+
+
+export const getCommitFinancialMigrationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commitFinancialMigration>>, TError,{id: string;data: BodyType<FinancialMigrationCommitInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof commitFinancialMigration>>, TError,{id: string;data: BodyType<FinancialMigrationCommitInput>}, TContext> => {
+
+const mutationKey = ['commitFinancialMigration'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof commitFinancialMigration>>, {id: string;data: BodyType<FinancialMigrationCommitInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  commitFinancialMigration(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CommitFinancialMigrationMutationResult = NonNullable<Awaited<ReturnType<typeof commitFinancialMigration>>>
+    export type CommitFinancialMigrationMutationBody = BodyType<FinancialMigrationCommitInput>
+    export type CommitFinancialMigrationMutationError = ErrorType<void>
+
+    /**
+ * @summary Atomically import reconciled history or non-cash opening receivables
+ */
+export const useCommitFinancialMigration = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commitFinancialMigration>>, TError,{id: string;data: BodyType<FinancialMigrationCommitInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof commitFinancialMigration>>,
+        TError,
+        {id: string;data: BodyType<FinancialMigrationCommitInput>},
+        TContext
+      > => {
+      return useMutation(getCommitFinancialMigrationMutationOptions(options));
     }
 
 export const getListServiceObligationsUrl = (params?: ListServiceObligationsParams,) => {

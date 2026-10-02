@@ -3634,6 +3634,913 @@ export interface InvoiceDocument {
   totalCents: number;
 }
 
+export type ServiceWatchItemState = typeof ServiceWatchItemState[keyof typeof ServiceWatchItemState];
+
+
+export const ServiceWatchItemState = {
+  clear: 'clear',
+  open: 'open',
+  acknowledged: 'acknowledged',
+  resolved: 'resolved',
+  held: 'held',
+} as const;
+
+export type ServiceWatchItemReasonsItem = typeof ServiceWatchItemReasonsItem[keyof typeof ServiceWatchItemReasonsItem];
+
+
+export const ServiceWatchItemReasonsItem = {
+  reminder_needs_review: 'reminder_needs_review',
+  no_response_recorded: 'no_response_recorded',
+  reminder_blocked: 'reminder_blocked',
+  send_unknown: 'send_unknown',
+  visit_cancelled: 'visit_cancelled',
+  visit_no_show: 'visit_no_show',
+  service_overdue: 'service_overdue',
+  response_needs_action: 'response_needs_action',
+  next_action_overdue: 'next_action_overdue',
+  owner_required: 'owner_required',
+  source_review_required: 'source_review_required',
+} as const;
+
+export interface ServiceWatchItem {
+  id: string;
+  organizationId: string;
+  serviceObligationId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  version: number;
+  state: ServiceWatchItemState;
+  /** @maxItems 11 */
+  reasons: ServiceWatchItemReasonsItem[];
+  observedFingerprint: string;
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  episode: number;
+  /** @nullable */
+  assignedUserId: string | null;
+  /** @nullable */
+  acknowledgedByUserId: string | null;
+  /** @nullable */
+  acknowledgedAt: string | null;
+  /** @nullable */
+  nextAction: string | null;
+  /** @nullable */
+  nextActionAt: string | null;
+  /** @nullable */
+  resolvedAt: string | null;
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  noticeRevision: number;
+  lastEvaluatedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  equipmentLabel: string;
+  customerLabel: string;
+  dueDate: string;
+}
+
+export interface ServiceWatchList {
+  /** @maxItems 50 */
+  items: ServiceWatchItem[];
+  hasMore: boolean;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     */
+  offset: number;
+  /**
+     * @minimum 50
+     * @maximum 50
+     */
+  limit: number;
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  unmonitoredCount: number;
+  held: boolean;
+}
+
+export type ServiceWatchDetailServiceStatus = typeof ServiceWatchDetailServiceStatus[keyof typeof ServiceWatchDetailServiceStatus];
+
+
+export const ServiceWatchDetailServiceStatus = {
+  active: 'active',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export type ServiceWatchDetailState = typeof ServiceWatchDetailState[keyof typeof ServiceWatchDetailState];
+
+
+export const ServiceWatchDetailState = {
+  clear: 'clear',
+  open: 'open',
+  acknowledged: 'acknowledged',
+  resolved: 'resolved',
+  held: 'held',
+} as const;
+
+export type ServiceWatchDetailReasonsItem = typeof ServiceWatchDetailReasonsItem[keyof typeof ServiceWatchDetailReasonsItem];
+
+
+export const ServiceWatchDetailReasonsItem = {
+  reminder_needs_review: 'reminder_needs_review',
+  no_response_recorded: 'no_response_recorded',
+  reminder_blocked: 'reminder_blocked',
+  send_unknown: 'send_unknown',
+  visit_cancelled: 'visit_cancelled',
+  visit_no_show: 'visit_no_show',
+  service_overdue: 'service_overdue',
+  response_needs_action: 'response_needs_action',
+  next_action_overdue: 'next_action_overdue',
+  owner_required: 'owner_required',
+  source_review_required: 'source_review_required',
+} as const;
+
+export type ServiceWatchDetailHistoryItemMetadata = {[key: string]: unknown};
+
+export type ServiceWatchDetailHistoryItem = {
+  id: string;
+  action: string;
+  createdAt: string;
+  metadata: ServiceWatchDetailHistoryItemMetadata;
+};
+
+export interface ServiceWatchDetail {
+  obligationId: string;
+  customerLabel: string;
+  equipmentLabel: string;
+  serviceStatus: ServiceWatchDetailServiceStatus;
+  dueDate: string;
+  taskId: string;
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  expectedVersion: number;
+  /** @pattern ^[a-f0-9]{64}$ */
+  expectedFingerprint: string;
+  state: ServiceWatchDetailState;
+  /** @maxItems 11 */
+  reasons: ServiceWatchDetailReasonsItem[];
+  /** @nullable */
+  recordedState: string | null;
+  monitorPending: boolean;
+  /** @nullable */
+  assignedUserId: string | null;
+  ownerValid: boolean;
+  held: boolean;
+  /** @nullable */
+  nextAction: string | null;
+  /** @nullable */
+  nextActionAt: string | null;
+  /** @nullable */
+  acknowledgedAt: string | null;
+  /** @nullable */
+  lastEvaluatedAt: string | null;
+  /** @maxItems 50 */
+  history: ServiceWatchDetailHistoryItem[];
+  historyHasMore: boolean;
+  today: string;
+  timezone: string;
+  timezoneFallback: boolean;
+}
+
+export type ServiceWatchCommand = {
+  action: 'assign';
+  requestId: string;
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  expectedVersion: number;
+  /** @pattern ^[a-f0-9]{64}$ */
+  expectedFingerprint: string;
+  assignedUserId: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  note: string;
+} | {
+  action: 'acknowledge';
+  requestId: string;
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  expectedVersion: number;
+  /** @pattern ^[a-f0-9]{64}$ */
+  expectedFingerprint: string;
+  assignedUserId: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  note: string;
+  nextActionAt: string;
+  reviewed: true;
+};
+
+export interface ServiceWatchCommandResult {
+  caseId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  version: number;
+  replayed: boolean;
+}
+
+export interface SourceAdoptionReviewInput {
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  expectedVersion: number;
+  sourceAsOf: string;
+  cutoverAt: string;
+  expiresAt: string;
+  /**
+     * @minLength 20
+     * @maxLength 2000
+     */
+  evidence: string;
+  sourceWriterStopped: true;
+  currentStatusVerified: true;
+  noUnreviewedReplies: true;
+}
+
+export interface SourceAdoptionApprovalInput {
+  previewId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  confirmed: true;
+}
+
+export interface SourceAdoptionRevokeInput {
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  expectedVersion: number;
+  /**
+     * @minLength 20
+     * @maxLength 2000
+     */
+  reason: string;
+}
+
+export interface SourceEmailPermissionInput {
+  /** @pattern ^[a-f0-9]{64}$ */
+  expectedSourceSha256: string;
+  expectedRecipient: string;
+  /** @nullable */
+  expectedConsentId: string | null;
+  granted: boolean;
+  observedAt: string;
+  /**
+     * @minLength 20
+     * @maxLength 2000
+     */
+  evidence: string;
+  marketingPermissionConfirmed: true;
+}
+
+/**
+ * Original strict CSV snapshot including both original/applied fingerprints; adoption does not change it.
+ */
+export type SourceAdoptionSnapshotImportedHistory = { [key: string]: unknown };
+
+export interface SourceAdoptionSnapshot {
+  leadId: string;
+  contactId: string;
+  importSourceKey: string;
+  externalOpportunityId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  sourceSha256: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  operationalSha256: string;
+  recipient: string;
+  /** Original strict CSV snapshot including both original/applied fingerprints; adoption does not change it. */
+  importedHistory: SourceAdoptionSnapshotImportedHistory;
+}
+
+export interface SourceAdoptionReview {
+  previewId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  expiresAt: string;
+  snapshot: SourceAdoptionSnapshot;
+  input: SourceAdoptionReviewInput;
+  detail: string;
+}
+
+export type SourceAdoptionDecisionState = typeof SourceAdoptionDecisionState[keyof typeof SourceAdoptionDecisionState];
+
+
+export const SourceAdoptionDecisionState = {
+  active: 'active',
+  revoked: 'revoked',
+} as const;
+
+export interface SourceAdoptionDecision {
+  id: string;
+  organizationId: string;
+  leadId: string;
+  contactId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  version: number;
+  state: SourceAdoptionDecisionState;
+  snapshot: SourceAdoptionSnapshot;
+  sourceAsOf: string;
+  cutoverAt: string;
+  expiresAt: string;
+  /**
+     * @minLength 20
+     * @maxLength 2000
+     */
+  evidence: string;
+  approvedByUserId: string;
+  approvedAt: string;
+  /** @nullable */
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+export type SourceAdoptionDetailPermissionEvidenceType = typeof SourceAdoptionDetailPermissionEvidenceType[keyof typeof SourceAdoptionDetailPermissionEvidenceType];
+
+
+export const SourceAdoptionDetailPermissionEvidenceType = {
+  staff_recorded_not_provider_verified: 'staff_recorded_not_provider_verified',
+} as const;
+
+export type SourceAdoptionDetail = SourceAdoptionSnapshot & ({
+  name: string;
+  status: string;
+  adoption: SourceAdoptionDecision | null;
+  /** @nullable */
+  consentId: string | null;
+  marketingPermission: boolean;
+  current: boolean;
+  permissionEvidenceType: SourceAdoptionDetailPermissionEvidenceType;
+});
+
+export type SourceOutreachSettingsDaysItem = typeof SourceOutreachSettingsDaysItem[keyof typeof SourceOutreachSettingsDaysItem];
+
+
+export const SourceOutreachSettingsDaysItem = {
+  Mon: 'Mon',
+  Tue: 'Tue',
+  Wed: 'Wed',
+  Thu: 'Thu',
+  Fri: 'Fri',
+  Sat: 'Sat',
+  Sun: 'Sun',
+} as const;
+
+export interface SourceOutreachSettings {
+  /**
+     * @minLength 2
+     * @maxLength 150
+     */
+  businessName: string;
+  /**
+     * @minLength 10
+     * @maxLength 400
+     */
+  mailingAddress: string;
+  /**
+     * @minLength 3
+     * @maxLength 180
+     */
+  subject: string;
+  /**
+     * @minLength 10
+     * @maxLength 4000
+     */
+  body: string;
+  timezone: string;
+  /** @maxItems 7 */
+  days: SourceOutreachSettingsDaysItem[];
+  /**
+     * @minimum 8
+     * @maximum 19
+     */
+  startHour: number;
+  /**
+     * @minimum 9
+     * @maximum 20
+     */
+  endHour: number;
+  /**
+     * @minimum 1
+     * @maximum 25
+     */
+  dailyLimit: number;
+}
+
+export type SourceOutreachDraftDaysItem = typeof SourceOutreachDraftDaysItem[keyof typeof SourceOutreachDraftDaysItem];
+
+
+export const SourceOutreachDraftDaysItem = {
+  Mon: 'Mon',
+  Tue: 'Tue',
+  Wed: 'Wed',
+  Thu: 'Thu',
+  Fri: 'Fri',
+  Sat: 'Sat',
+  Sun: 'Sun',
+} as const;
+
+export interface SourceOutreachDraft {
+  /**
+     * @minLength 2
+     * @maxLength 150
+     */
+  businessName: string;
+  /**
+     * @minLength 10
+     * @maxLength 400
+     */
+  mailingAddress: string;
+  /**
+     * @minLength 3
+     * @maxLength 180
+     */
+  subject: string;
+  /**
+     * @minLength 10
+     * @maxLength 4000
+     */
+  body: string;
+  timezone: string;
+  /** @maxItems 7 */
+  days: SourceOutreachDraftDaysItem[];
+  /**
+     * @minimum 8
+     * @maximum 19
+     */
+  startHour: number;
+  /**
+     * @minimum 9
+     * @maximum 20
+     */
+  endHour: number;
+  /**
+     * @minimum 1
+     * @maximum 25
+     */
+  dailyLimit: number;
+  /**
+     * @minItems 1
+     * @maxItems 10
+     */
+  leadIds: string[];
+  expiresAt: string;
+}
+
+export interface SourceOutreachApproval {
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  expectedVersion: number;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  confirmed: true;
+}
+
+export type SourceOutreachBatchState = typeof SourceOutreachBatchState[keyof typeof SourceOutreachBatchState];
+
+
+export const SourceOutreachBatchState = {
+  draft: 'draft',
+  approved: 'approved',
+  revoked: 'revoked',
+} as const;
+
+export interface SourceOutreachBatch {
+  id: string;
+  organizationId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  version: number;
+  state: SourceOutreachBatchState;
+  settings: SourceOutreachSettings;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  createdByUserId: string;
+  /** @nullable */
+  approvedByUserId: string | null;
+  /** @nullable */
+  approvedAt: string | null;
+  previewExpiresAt: string;
+  expiresAt: string;
+  /** @nullable */
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+export type SourceOutreachItemSnapshotSenderSource = typeof SourceOutreachItemSnapshotSenderSource[keyof typeof SourceOutreachItemSnapshotSenderSource];
+
+
+export const SourceOutreachItemSnapshotSenderSource = {
+  lead_assignee: 'lead_assignee',
+  company_default: 'company_default',
+} as const;
+
+export type SourceOutreachItemSnapshotSenderProvider = typeof SourceOutreachItemSnapshotSenderProvider[keyof typeof SourceOutreachItemSnapshotSenderProvider];
+
+
+export const SourceOutreachItemSnapshotSenderProvider = {
+  gmail: 'gmail',
+  microsoft: 'microsoft',
+} as const;
+
+export type SourceOutreachItemSnapshotSender = {
+  userId: string;
+  source: SourceOutreachItemSnapshotSenderSource;
+  provider: SourceOutreachItemSnapshotSenderProvider;
+  senderEmail: string;
+};
+
+export type SourceOutreachItemSnapshot = {
+  /**
+     * @minimum 1
+     * @maximum 1
+     */
+  version: number;
+  adoptionId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  adoptionVersion: number;
+  /** @pattern ^[a-f0-9]{64}$ */
+  adoptionSha256: string;
+  adoption: SourceAdoptionSnapshot;
+  permissionRecordId: string;
+  sender: SourceOutreachItemSnapshotSender;
+  subject: string;
+  body: string;
+};
+
+export type SourceOutreachItemDeliveryState = typeof SourceOutreachItemDeliveryState[keyof typeof SourceOutreachItemDeliveryState];
+
+
+export const SourceOutreachItemDeliveryState = {
+  not_sent: 'not_sent',
+  uncertain: 'uncertain',
+  processing: 'processing',
+  held: 'held',
+  accepted: 'accepted',
+  reconciled: 'reconciled',
+} as const;
+
+export type SourceOutreachItemDelivery = {
+  state: SourceOutreachItemDeliveryState;
+  /** @nullable */
+  executionId: string | null;
+  detail: string;
+  deliveryConfirmed: false;
+};
+
+export interface SourceOutreachItem {
+  id: string;
+  organizationId: string;
+  batchId: string;
+  leadId: string;
+  contactId: string;
+  adoptionId: string;
+  recipient: string;
+  snapshot: SourceOutreachItemSnapshot;
+  /** @nullable */
+  claimedAt: string | null;
+  createdAt: string;
+  delivery: SourceOutreachItemDelivery;
+}
+
+export type SourceOutreachDetail = SourceOutreachBatch & {
+  /** @maxItems 10 */
+  items: SourceOutreachItem[];
+  detail: string;
+};
+
+export type SourceAdoptionListCandidatesItem = {
+  id: string;
+  status: string;
+  /** @nullable */
+  importSourceKey: string | null;
+  /** @nullable */
+  externalOpportunityId: string | null;
+};
+
+export type SourceAdoptionListLimits = {
+  /**
+     * @minimum 10
+     * @maximum 10
+     */
+  cohort: number;
+  /**
+     * @minimum 25
+     * @maximum 25
+     */
+  rollingCompanyLimit: number;
+  oneAddressLifetimeTouch: true;
+};
+
+export interface SourceAdoptionList {
+  /** @maxItems 100 */
+  candidates: SourceAdoptionListCandidatesItem[];
+  /** @maxItems 25 */
+  campaigns: SourceOutreachBatch[];
+  limits: SourceAdoptionListLimits;
+  detail: string;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     */
+  page: number;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     */
+  campaignPage: number;
+  hasMore: boolean;
+  hasMoreCampaigns: boolean;
+}
+
+export interface HistoricalInvoiceSource {
+  sourceSystem: string;
+  sourceAccount: string;
+  externalId: string;
+  cutoffAt: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  recordSha256: string;
+}
+
+export type FinancialMigrationSourceFormat = typeof FinancialMigrationSourceFormat[keyof typeof FinancialMigrationSourceFormat];
+
+
+export const FinancialMigrationSourceFormat = {
+  'growthos-financial-migration': 'growthos-financial-migration',
+} as const;
+
+export type FinancialMigrationSourceInvoicesItemBasis = typeof FinancialMigrationSourceInvoicesItemBasis[keyof typeof FinancialMigrationSourceInvoicesItemBasis];
+
+
+export const FinancialMigrationSourceInvoicesItemBasis = {
+  full_history: 'full_history',
+  opening_receivable: 'opening_receivable',
+} as const;
+
+export type FinancialMigrationSourceInvoicesItem = {
+  externalId: string;
+  invoiceNumber: string;
+  leadId: string;
+  issuedAt: string;
+  basis: FinancialMigrationSourceInvoicesItemBasis;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  balanceAtCutoffCents: number;
+  document: InvoiceDocument;
+};
+
+export type FinancialMigrationSourceReceiptsItemKind = typeof FinancialMigrationSourceReceiptsItemKind[keyof typeof FinancialMigrationSourceReceiptsItemKind];
+
+
+export const FinancialMigrationSourceReceiptsItemKind = {
+  payment: 'payment',
+  refund: 'refund',
+} as const;
+
+export type FinancialMigrationSourceReceiptsItemAllocationsItem = {
+  externalInvoiceId: string;
+  /**
+     * @minimum 1
+     * @maximum 1000000000
+     */
+  amountCents: number;
+};
+
+export type FinancialMigrationSourceReceiptsItem = {
+  externalId: string;
+  leadId: string;
+  kind: FinancialMigrationSourceReceiptsItemKind;
+  /**
+     * @minimum 1
+     * @maximum 1000000000
+     */
+  amountCents: number;
+  occurredAt: string;
+  /**
+     * @minLength 10
+     * @maxLength 500
+     */
+  evidence: string;
+  /** @maxItems 50 */
+  allocations: FinancialMigrationSourceReceiptsItemAllocationsItem[];
+};
+
+export type FinancialMigrationSourceControlTotals = {
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
+  invoiceCount: number;
+  /**
+     * @minimum 0
+     * @maximum 50000000000
+     */
+  documentTotalCents: number;
+  /**
+     * @minimum 0
+     * @maximum 50000000000
+     */
+  openingReceivableCents: number;
+  /**
+     * @minimum 0
+     * @maximum 50000000000
+     */
+  balanceDueCents: number;
+  /**
+     * @minimum 0
+     * @maximum 200000000000
+     */
+  paymentCents: number;
+  /**
+     * @minimum 0
+     * @maximum 200000000000
+     */
+  refundCents: number;
+};
+
+export interface FinancialMigrationSource {
+  format: FinancialMigrationSourceFormat;
+  /**
+     * @minimum 1
+     * @maximum 1
+     */
+  version: number;
+  sourceSystem: string;
+  sourceAccount: string;
+  cutoffAt: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  invoices: FinancialMigrationSourceInvoicesItem[];
+  /** @maxItems 200 */
+  receipts: FinancialMigrationSourceReceiptsItem[];
+  controlTotals: FinancialMigrationSourceControlTotals;
+}
+
+export type FinancialMigrationReviewState = typeof FinancialMigrationReviewState[keyof typeof FinancialMigrationReviewState];
+
+
+export const FinancialMigrationReviewState = {
+  review: 'review',
+  committed: 'committed',
+} as const;
+
+export type FinancialMigrationReviewMappingsItem = {
+  leadId: string;
+  contactId: string;
+  customerName: string;
+};
+
+export type FinancialMigrationReviewResult = {
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  importedInvoices: number;
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  importedReceipts: number;
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  duplicateInvoices: number;
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  duplicateReceipts: number;
+  invoiceIds: string[];
+} | null;
+
+export interface FinancialMigrationReview {
+  id: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  digest: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  rawSha256: string;
+  state: FinancialMigrationReviewState;
+  source: FinancialMigrationSource;
+  mappings: FinancialMigrationReviewMappingsItem[];
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  duplicateInvoices: number;
+  /**
+     * @minimum 0
+     * @maximum 2147483646
+     */
+  duplicateReceipts: number;
+  expiresAt: string;
+  createdAt: string;
+  /** @nullable */
+  committedAt: string | null;
+  result: FinancialMigrationReviewResult;
+}
+
+export interface FinancialMigrationPreviewInput {
+  /**
+     * Strict normalized JSON v1, at most 512,000 UTF-8 bytes. Vendor CSV/PDF and unsupported credits are rejected, never guessed.
+     * @minLength 2
+     * @maxLength 512000
+     */
+  sourceJson: string;
+}
+
+export type FinancialMigrationPreview = {
+  valid: false;
+  /** @maxItems 30 */
+  issues: {
+  path: string;
+  message: string;
+}[];
+} | {
+  valid: true;
+  review: FinancialMigrationReview;
+};
+
+export interface FinancialMigrationCommitInput {
+  /** @pattern ^[a-f0-9]{64}$ */
+  expectedDigest: string;
+  confirmed: true;
+  sourceFrozen: true;
+}
+
+export type FinancialMigrationListItemsItemState = typeof FinancialMigrationListItemsItemState[keyof typeof FinancialMigrationListItemsItemState];
+
+
+export const FinancialMigrationListItemsItemState = {
+  review: 'review',
+  committed: 'committed',
+} as const;
+
+export type FinancialMigrationListItemsItem = {
+  id: string;
+  state: FinancialMigrationListItemsItemState;
+  /** @pattern ^[a-f0-9]{64}$ */
+  digest: string;
+  createdAt: string;
+  /** @nullable */
+  committedAt: string | null;
+};
+
+export interface FinancialMigrationList {
+  /** @maxItems 30 */
+  items: FinancialMigrationListItemsItem[];
+  /**
+     * @minimum 30
+     * @maximum 30
+     */
+  limit: number;
+}
+
+/**
+ * Opening receivables are non-cash cutoff balances, not proof of money received.
+ */
+export type InvoiceSummaryBalanceBasis = typeof InvoiceSummaryBalanceBasis[keyof typeof InvoiceSummaryBalanceBasis];
+
+
+export const InvoiceSummaryBalanceBasis = {
+  full_history: 'full_history',
+  opening_receivable: 'opening_receivable',
+} as const;
+
 export type InvoiceSummaryStatus = typeof InvoiceSummaryStatus[keyof typeof InvoiceSummaryStatus];
 
 
@@ -3661,6 +4568,17 @@ export const InvoiceSummaryPaymentState = {
 } as const;
 
 export interface InvoiceSummary {
+  /** Opening receivables are non-cash cutoff balances, not proof of money received. */
+  balanceBasis: InvoiceSummaryBalanceBasis;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     * @nullable
+     */
+  openingReceivableCents: number | null;
+  /** @nullable */
+  openingAsOf: string | null;
+  historicalSource: HistoricalInvoiceSource | null;
   id: string;
   leadId: string;
   /** @nullable */
@@ -3780,6 +4698,17 @@ export interface InvoiceEvent {
   createdAt: string;
 }
 
+/**
+ * Opening receivables are non-cash cutoff balances, not proof of money received.
+ */
+export type InvoiceDetailBalanceBasis = typeof InvoiceDetailBalanceBasis[keyof typeof InvoiceDetailBalanceBasis];
+
+
+export const InvoiceDetailBalanceBasis = {
+  full_history: 'full_history',
+  opening_receivable: 'opening_receivable',
+} as const;
+
 export type InvoiceDetailStatus = typeof InvoiceDetailStatus[keyof typeof InvoiceDetailStatus];
 
 
@@ -3807,6 +4736,17 @@ export const InvoiceDetailPaymentState = {
 } as const;
 
 export interface InvoiceDetail {
+  /** Opening receivables are non-cash cutoff balances, not proof of money received. */
+  balanceBasis: InvoiceDetailBalanceBasis;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     * @nullable
+     */
+  openingReceivableCents: number | null;
+  /** @nullable */
+  openingAsOf: string | null;
+  historicalSource: HistoricalInvoiceSource | null;
   id: string;
   leadId: string;
   /** @nullable */
@@ -4468,6 +5408,37 @@ export const ListInvoicesStatus = {
   issued: 'issued',
   void: 'void',
 } as const;
+
+export type ListServiceWatchParams = {
+scope?: ListServiceWatchScope;
+/**
+ * @minimum 0
+ * @maximum 100000
+ */
+offset?: number;
+};
+
+export type ListServiceWatchScope = typeof ListServiceWatchScope[keyof typeof ListServiceWatchScope];
+
+
+export const ListServiceWatchScope = {
+  attention: 'attention',
+  history: 'history',
+  all: 'all',
+} as const;
+
+export type ListSourceAdoptionsParams = {
+/**
+ * @minimum 0
+ * @maximum 100000
+ */
+page?: number;
+/**
+ * @minimum 0
+ * @maximum 100000
+ */
+campaignPage?: number;
+};
 
 export type ListServiceObligationsParams = {
 status?: ListServiceObligationsStatus;

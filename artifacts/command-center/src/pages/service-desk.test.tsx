@@ -3,13 +3,14 @@ import { act, cleanup, screen, waitFor } from '@testing-library/react';
 import ServiceDesk from '@/pages/service-desk';
 import { renderWithQuery } from '@/test/render';
 import { mockApi, sampleMe } from '@/test/mock-api';
+const emptyWatch = () => Response.json({ items: [], hasMore: false, unmonitoredCount: 0, held: false });
 
 describe('customer service desk status', () => {
   afterEach(cleanup);
 
   it('shows unavailable, not an empty schedule, when service dates fail to load', async () => {
     mockApi('admin', {
-      handler: (_method, path) => path.endsWith('/api/v1/service-obligations')
+      handler: (_method, path) => path.endsWith('/api/v1/service-watch') ? emptyWatch() : path.endsWith('/api/v1/service-obligations')
         ? Response.json({ error: 'service_unavailable' }, { status: 503 })
         : undefined,
     });
@@ -27,7 +28,7 @@ describe('customer service desk status', () => {
     let resolveCompanySchedule!: (response: Response) => void;
     const identityResponse = new Promise<Response>(resolve => { resolveIdentity = resolve; });
     const companyScheduleResponse = new Promise<Response>(resolve => { resolveCompanySchedule = resolve; });
-    const fetchMock = mockApi('admin');
+    const fetchMock = mockApi('admin', { handler: (_method, path) => path.endsWith('/api/v1/service-watch') ? emptyWatch() : undefined });
     const fallback = fetchMock.getMockImplementation()!;
     let scheduleRequests = 0;
     fetchMock.mockImplementation(async (input, init) => {
@@ -64,7 +65,7 @@ describe('customer service desk status', () => {
 
   it('shows an empty schedule only after a successful response', async () => {
     mockApi('admin', {
-      handler: (_method, path) => path.endsWith('/api/v1/service-obligations')
+      handler: (_method, path) => path.endsWith('/api/v1/service-watch') ? emptyWatch() : path.endsWith('/api/v1/service-obligations')
         ? Response.json([])
         : undefined,
     });

@@ -14,6 +14,7 @@ export const SCHEDULER_STALE_MS = 5 * 60_000;
 export const SCHEDULER_STAGES = [
   "scheduled-actions",
   "missed-call-care",
+  "service-watch",
   "staff-lead-notifications",
   "reactivation-drain",
   "webhook-retries",

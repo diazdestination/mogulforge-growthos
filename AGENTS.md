@@ -211,6 +211,18 @@ A feature is complete only when it includes:
 
 ## Immediate Operating Objective
 
+October 2 operations-wave continuation: the owner explicitly requested the next
+big wave after green customer-care PR14/main602131d. Read
+`reports/operations-wave-contract-2026-10-02.md`, its integration report and
+operator guide before touching service watch/typed push, source adoption/reviewed
+outreach or normalized financial migration. These three bounded slices are the
+authorized feature-freeze exception; they do not grant hosted or provider access.
+Current schema111tables requires reviewed `0008` after `0007`. Preserve canonical
+service records, source snapshots, exact review/version gates, separate marketing
+permission, permanent uncertain-send reservations, and non-cash opening balances.
+Payment collection is deferred. Both contractor cutover cards, Azure first sign-in
+and pending held-staging/credential-rotation approval remain open.
+
 September 14, 2026 Revenue Workspace v1: read `REVENUE-WORKSPACE.md`,
 `GROWTHOS-VALUE-BUILD.md` and `design/revenue-workspace-qa.md` before changing the
 shared Revenue Desk, durable BIE/scheduled executions, customer rooms, value

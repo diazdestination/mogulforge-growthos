@@ -4,6 +4,11 @@ import { isIP } from "node:net";
 import webpush from "web-push";
 import { isPushEndpointAllowed, pushConfiguration, staffPushAllowed, type DevicePushSubscription } from "./staff-push-policy";
 
+/** Only thrown before the HTTPS request exists. An uncertain network attempt is different. */
+export class StaffPushDispatchBlockedError extends Error {
+  constructor() { super("push_authorization_changed_before_dispatch"); }
+}
+
 /** A deliberately stricter public-address policy than a generic webhook client. */
 export function isPublicPushAddress(address: string): boolean {
   if (isIP(address) === 4) {
@@ -27,7 +32,7 @@ export function isPublicPushAddress(address: string): boolean {
  * This bounded HTTPS transport pins a vetted DNS address, verifies TLS for the
  * original hostname, refuses redirects/proxies and discards response content.
  */
-export async function sendStaffPush(subscription: DevicePushSubscription, payload: string, userId: string): Promise<number> {
+export async function sendStaffPush(subscription: DevicePushSubscription, payload: string, userId: string, beforeDispatch?: () => Promise<boolean>): Promise<number> {
   const config = pushConfiguration();
   if (!userId || !config || !staffPushAllowed(userId) || !isPushEndpointAllowed(subscription.endpoint)) throw new Error("push_configuration_unavailable");
   const details = webpush.generateRequestDetails(subscription, payload, {
@@ -38,6 +43,7 @@ export async function sendStaffPush(subscription: DevicePushSubscription, payloa
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), 5_000);
   let abortListener: (() => void) | undefined;
+  let authorizationAbortListener: (() => void) | undefined;
   try {
     const records = await Promise.race([
       lookup(endpoint.hostname, { all: true, verbatim: true }),
@@ -49,6 +55,23 @@ export async function sendStaffPush(subscription: DevicePushSubscription, payloa
     if (abort.signal.aborted || !staffPushAllowed(userId) || records.length === 0 || records.some((r) => !isPublicPushAddress(r.address))) {
       throw new Error("push_destination_unavailable");
     }
+    // DNS can take seconds. Recheck current owner, case, device and membership
+    // after it completes; a stale alert must not escape through that gap.
+    if (beforeDispatch) {
+      // Share the original deadline: a stalled authorization lookup must not
+      // hold the scheduler indefinitely. Promise.race also observes a late
+      // callback rejection after timeout; it cannot resume the HTTPS path.
+      const authorized = await Promise.race([
+        Promise.resolve().then(beforeDispatch),
+        new Promise<never>((_, reject) => {
+          authorizationAbortListener = () => reject(new StaffPushDispatchBlockedError());
+          abort.signal.addEventListener("abort", authorizationAbortListener, { once: true });
+          if (abort.signal.aborted) authorizationAbortListener();
+        }),
+      ]);
+      if (!authorized) throw new StaffPushDispatchBlockedError();
+    }
+    if (abort.signal.aborted || !staffPushAllowed(userId)) throw new StaffPushDispatchBlockedError();
     return await new Promise<number>((resolve, reject) => {
       const req = request({
         protocol: "https:", hostname: records[0].address, servername: endpoint.hostname,
@@ -69,5 +92,6 @@ export async function sendStaffPush(subscription: DevicePushSubscription, payloa
   } finally {
     clearTimeout(timer);
     if (abortListener) abort.signal.removeEventListener("abort", abortListener);
+    if (authorizationAbortListener) abort.signal.removeEventListener("abort", authorizationAbortListener);
   }
 }
