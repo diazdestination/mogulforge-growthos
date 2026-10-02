@@ -5,6 +5,7 @@ import { getGmailStatus, sendGmailForUser } from "./gmail-oauth";
 import { getMicrosoftStatus, sendMicrosoftForUser } from "./microsoft-oauth";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
 import { signOutboundReplyEvidence, type OutboundReplyContext } from "./reply-evidence";
+import { EmailDispatchBlockedError, type EmailDispatchIdentity, type EmailDispatchGuard } from "./email-dispatch-guard";
 
 export type UserEmailProvider = "gmail" | "microsoft";
 export interface UserEmailResult {
@@ -122,6 +123,8 @@ export async function sendEmailForUser(input: {
   to: string;
   subject: string;
   body: string;
+  expectedSender?: EmailDispatchIdentity;
+  beforeDispatch?: () => Promise<void>;
 }): Promise<UserEmailResult> {
   const { assertCustomerLifecycleActive } = await import("./customer-lifecycle");
   await assertCustomerLifecycleActive(input.organizationId);
@@ -131,9 +134,24 @@ export async function sendEmailForUser(input: {
     throw new Error(
       status.reason ?? "The selected email sender is unavailable.",
     );
+  const expected = input.expectedSender ?? { provider: status.provider, senderEmail: status.email! };
+  const matches = (identity: EmailDispatchIdentity) => identity.provider === expected.provider &&
+    identity.senderEmail.trim().toLowerCase() === expected.senderEmail.trim().toLowerCase();
+  if (!status.email || !matches({ provider: status.provider, senderEmail: status.email }))
+    throw new EmailDispatchBlockedError();
+  const beforeDispatch: EmailDispatchGuard = async (actual) => {
+    await input.beforeDispatch?.();
+    const current = await getUserEmailStatus(input.organizationId, input.userId);
+    if (!matches(actual) || !current.connected || !current.configured || !current.provider ||
+        !current.email || !matches({ provider: current.provider, senderEmail: current.email }))
+      throw new EmailDispatchBlockedError();
+    await assertCustomerLifecycleActive(input.organizationId);
+    assertOutboundDeliveryAllowed({ channel: "email", recipient: input.to });
+  };
+  const dispatch = { ...input, beforeDispatch };
   await assertCustomerLifecycleActive(input.organizationId);
-  if (status.provider === "microsoft") return sendMicrosoftForUser(input);
-  return { ...(await sendGmailForUser(input)), acceptance: "accepted" };
+  if (status.provider === "microsoft") return sendMicrosoftForUser(dispatch);
+  return { ...(await sendGmailForUser(dispatch)), acceptance: "accepted" };
 }
 
 /** Correlation IDs are not mailbox message IDs and never imply delivery. */

@@ -10,6 +10,8 @@ import {
 } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
 import { phoneE164 } from "./twilio-controls";
+import { enqueueStaffLeadPush } from "./staff-push";
+import { ensureMissedCallCareCase } from "./missed-call-care";
 
 const MISSED_STATUSES = new Set(["busy", "no-answer", "failed", "canceled"]);
 
@@ -19,7 +21,7 @@ const MISSED_STATUSES = new Set(["busy", "no-answer", "failed", "canceled"]);
  * remains in call history even when no matching contact exists.
  */
 export async function ensureMissedCallHandoff(organizationId: string, callId: string) {
-  return db.transaction(async (tx) => {
+  const handoff = await db.transaction(async (tx) => {
     const [call] = await tx
       .select()
       .from(twilioCallsTable)
@@ -59,6 +61,8 @@ export async function ensureMissedCallHandoff(organizationId: string, callId: st
     });
     return handoff;
   });
+  if (handoff) await ensureMissedCallCareCase(organizationId, callId);
+  return handoff;
 }
 
 export type MissedCallReviewInput =
@@ -166,8 +170,11 @@ export async function reviewMissedCall(
           creationMethod: "staff_review",
           summary: "Staff-reviewed missed inbound call; follow-up required.",
         })
-        .returning({ id: leadsTable.id });
+        .returning({ id: leadsTable.id, createdAt: leadsTable.createdAt });
       leadId = lead.id;
+      // Canonical internal new-lead notice only. This does not emit lead.created
+      // or authorize customer outreach; retries return before this transaction.
+      await enqueueStaffLeadPush(tx, organizationId, lead);
     }
     await tx
       .update(twilioCallsTable)

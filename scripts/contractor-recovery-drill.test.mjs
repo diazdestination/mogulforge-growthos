@@ -4,7 +4,7 @@ import { runContractorRecoveryDrill } from './contractor-recovery-drill.mjs';
 it('upgrades the full prior schema, restores both synthetic companies, boots a read-only real app and preserves uncertainty/holds', async () => {
   const result = await runContractorRecoveryDrill({ emit: () => {} });
   expect(result.previousTableCount).toBe(90);
-  expect(result.tableCount).toBe(103);
+  expect(result.tableCount).toBe(105);
   expect(result.sourceFingerprint).toBe(result.restoredFingerprint);
   expect(result.appBootVerified).toBe(true);
   expect(result.readOnlyDatabaseVerified).toBe(true);
@@ -15,7 +15,12 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.tableCounts.staff_invitations).toBe(2);
   expect(result.tableCounts.invoices).toBe(2);
   expect(result.tableCounts.invoice_receipt_allocations).toBe(4);
-  expect(result.readChecks).toBe(12);
+  expect(result.readChecks).toBe(15);
+  expect(result.tableCounts.missed_call_care_cases).toBe(2);
+  expect(result.tableCounts.missed_call_care_policies).toBe(2);
+  expect(result.missedCallUncertaintyPreserved).toBe(true);
+  expect(result.careTenantForeignKeysVerified).toBe(true);
+  expect(result.disabledCarePoliciesPreserved).toBe(true);
   expect(result.issuedInvoiceSnapshotPreserved).toBe(true);
   expect(result.invoiceNumberingPreserved).toBe(true);
   expect(result.receiptReversalPreservesCash).toBe(true);

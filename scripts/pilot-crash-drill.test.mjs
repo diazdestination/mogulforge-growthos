@@ -65,6 +65,9 @@ const historicalReactivationFixturePath = fileURLToPath(
 const pinnedDurableRelativePath = "artifacts/api-server/src/services/durable-execution.ts";
 const pinnedDurablePath = fileURLToPath(new URL(`../${pinnedDurableRelativePath}`, import.meta.url));
 const historicalDurableFixturePath = fileURLToPath(new URL("./test-support/fixtures/c050067/durable-execution.ts.txt", import.meta.url));
+const pinnedAutomationSchemaRelativePath = "lib/db/src/schema/automations.ts";
+const pinnedAutomationSchemaPath = fileURLToPath(new URL(`../${pinnedAutomationSchemaRelativePath}`, import.meta.url));
+const historicalAutomationSchemaFixturePath = fileURLToPath(new URL("./test-support/fixtures/c050067/schema-automations.ts.txt", import.meta.url));
 
 describe("hosted crash probe guards", () => {
   it("requires exact approved source identity, holds and a deterministic nonce", () => {
@@ -197,6 +200,8 @@ describe("hosted crash probe guards", () => {
     expect(actualSourceReads).toContain(historicalIndexFixturePath);
     expect(actualSourceReads).not.toContain(pinnedReactivationPath);
     expect(actualSourceReads).toContain(historicalReactivationFixturePath);
+    expect(actualSourceReads).not.toContain(pinnedAutomationSchemaPath);
+    expect(actualSourceReads).toContain(historicalAutomationSchemaFixturePath);
     expect(
       actualSourceReads.some((path) => path.endsWith("pilot-crash-runtime.ts")),
     ).toBe(true);
@@ -222,6 +227,7 @@ describe("hosted crash probe guards", () => {
     { label: "startup", relativePath: pinnedIndexRelativePath, currentPath: pinnedIndexPath, fixturePath: historicalIndexFixturePath },
     { label: "reactivation", relativePath: pinnedReactivationRelativePath, currentPath: pinnedReactivationPath, fixturePath: historicalReactivationFixturePath },
     { label: "durable execution", relativePath: pinnedDurableRelativePath, currentPath: pinnedDurablePath, fixturePath: historicalDurableFixturePath },
+    { label: "automation schema", relativePath: pinnedAutomationSchemaRelativePath, currentPath: pinnedAutomationSchemaPath, fixturePath: historicalAutomationSchemaFixturePath },
   ])("pins the historical $label fixture and rejects changed current $label bytes", async ({ relativePath, currentPath, fixturePath }) => {
     const frozen = await readFile(fixturePath, "utf8");
     const sourceSha = (text) =>

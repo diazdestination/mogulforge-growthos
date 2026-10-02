@@ -4,6 +4,10 @@ Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 
 - Product and scope: `GROWTHOS-CONTRACTOR-OPERATIONS.md` and `GROWTHOS-CONTRACTOR-PRODUCT.md`.
+- New customer-care candidate: `reports/customer-care-integration-2026-10-02.md`,
+  with service, calls and invoice lane reports beside it. Contractor payment
+  collection is deferred; retain truthful external receipt records. Customer
+  reminders/call recovery require exact individual review, not blanket consent.
 - Current integration: `reports/geekom-contractor-integration-2026-10-02.md`;
   upstream scope: `reports/native-contractor-day-integration.md` and specialist reports.
 - Fresh managed recovery/schema evidence and cleanup status:
@@ -25,6 +29,10 @@ Use an isolated branch, verify identity/target and preserve other agents' work.
 - Additive schema preview: `reports/staging-schema-preview-2026-10-01/0003_swarm-foundation.sql`.
   Apply reviewed `0004_beta-operations.sql`, `0005_contractor-operations.sql`, then
   `0006_native-contractor-day.sql` generated against the verified48c3491 baseline.
+  The newer customer-care candidate adds reviewed `0007_customer-care.sql`
+  against ae6b6e4: 103 to 105 tables, with parent composite unique constraints
+  preceding the new tenant-bound foreign keys. Generate it offline with
+  `node scripts/customer-care-schema-preview.mjs`; this is not hosted approval.
   Preview only; do not bypass `scripts/release-schema.mjs` staging approval/hold.
 - Source import limits: `reports/swarm-opportunity-history-2026-10-01.md`.
 - Scope assignment/billing limits: `reports/swarm-subscription-controls-2026-10-01.md`.
@@ -37,13 +45,18 @@ Real PostgreSQL full CI remains required for multi-session lock/concurrency
 acceptance. No provider credentials or production data belong in test fixtures.
 
 `node scripts/contractor-recovery-drill.mjs` creates only in-memory synthetic
-databases. It upgrades the old90-table schema, checks current103-table/column
+databases. It upgrades the old90-table schema, checks current105-table/column
 coverage, snapshots/restores both companies and boots the real app through the
 production bundler under a SELECT-only role. It verifies tenant isolation, blocked
 writes and unchanged fingerprints, issued snapshot hashes, retained cash allocation
 reversals, invoice sequence and recurring service successors. The one reviewed
 active synthetic successor is accepted only behind a restored company pause;
 negative checks reject a removed pause, omitted exception or extra active record.
+It also retains disabled missed-call policies and the exact reviewed uncertain
+care execution; the narrow exception additionally requires that paused company,
+disabled policy and correlated case. Six negative cross-company foreign-key
+probes and 15 restricted real-app reads exercise the new scope. Do not generalize
+the synthetic exception to a hosted queue or another receipt.
 It accepts no target URL and cannot validate a
 managed backup, live keys, hosting or production RPO/RTO. Historical hosted pilot
 attestations remain frozen and cannot be relabelled as current-source acceptance.
@@ -51,7 +64,7 @@ attestations remain frozen and cannot be relabelled as current-source acceptance
 Preserve indeterminate execution history. Do not replay an uncertain external
 effect until reconciled with evidence. Roll back application code without
 automatically dropping newly stored source history or entitlement audit records.
-After adopting the 103-table workflows, the older 77f6d63 application is not a
+After adopting the 103/105-table workflows, the older 77f6d63 application is not a
 normal-write fallback: it does not enforce the new lifecycle/reply holds,
 durable billing attempts, invoice retention or agreed service recurrence. Keep
 an old-image fallback stopped/under maintenance or independently verified

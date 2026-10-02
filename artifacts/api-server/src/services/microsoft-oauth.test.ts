@@ -326,6 +326,27 @@ describe("Microsoft delegated authorization", () => {
 });
 
 describe("Microsoft sending and provider selection", () => {
+  it("checks the workflow after token refresh and stops before sendMail when approval changed", async () => {
+    await seedMicrosoft(); mockExchange();
+    const guard = vi.fn(async () => {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      throw new Error("Synthetic cancelled invoice");
+    });
+    await expect(sendMicrosoftForUser({ ...message(), beforeDispatch: guard })).rejects.toMatchObject({ code: "email_dispatch_blocked", effectNotAttempted: true });
+    expect(guard).toHaveBeenCalledWith({ provider: "microsoft", senderEmail: profile().mail });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect((await getMicrosoftStatus(orgA, userA)).connected).toBe(true);
+  });
+
+  it("does not send from a newly selected provider after preparation began", async () => {
+    await seedMicrosoft(); await seedGmail(); await selectUserEmailProvider(orgA, userA, "microsoft");
+    mockExchange();
+    await expect(sendEmailForUser({ ...message(), beforeDispatch: async () => {
+      await selectUserEmailProvider(orgA, userA, "gmail");
+    } })).rejects.toMatchObject({ code: "email_dispatch_blocked" });
+    expect(fetchMock).toHaveBeenCalledTimes(2); expect(gmailSend).not.toHaveBeenCalled();
+  });
+
   it("refreshes encrypted credentials, sends only as /me, and distinguishes acceptance/correlation from message IDs", async () => {
     await seedMicrosoft();
     mockExchange();

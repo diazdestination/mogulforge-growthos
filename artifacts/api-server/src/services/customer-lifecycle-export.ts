@@ -33,6 +33,7 @@ export const CUSTOMER_EXPORT_EXCLUSIONS = [
   "Invoice issued_document_sha256 verifies the original stored snapshot before export. exported_issued_document_sha256 verifies JSON.stringify of the exported allowlisted document; the two can differ because private fields and key order are normalized.",
   "Media lists include tenant-owned Postgres metadata only; binary photos, unknown/external object ownership and provider copies are excluded.",
   "Website/form submissions, full conversations/mailboxes, knowledge, analytics, automation definitions/queues and other account tables are outside this core export.",
+  "Missed-call recovery policies/cases, service-care approval snapshots, and invoice delivery approval/dispatch audit details are outside this core export. They remain in the database inventory and backups and require a separately reviewed communications export; provider identities and staff approvals are not copied into customer records.",
   "Backups, complete account erasure, retention decisions, billing cancellation and remote credential revocation require a separate operator review.",
 ] as const;
 const lineItems = z.array(z.object({ description: z.string(), quantity: z.number(), unitPriceCents: z.number(), totalCents: z.number() })).max(1000);

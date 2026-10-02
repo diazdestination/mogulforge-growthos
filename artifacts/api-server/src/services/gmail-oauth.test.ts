@@ -10,7 +10,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const googleMocks = vi.hoisted(() => ({
   generateAuthUrl: vi.fn(),
   getToken: vi.fn(),
+  getAccessToken: vi.fn(),
   request: vi.fn(),
+  transportRequest: vi.fn(),
   revokeToken: vi.fn(),
   setCredentials: vi.fn(),
   verifyIdToken: vi.fn(),
@@ -21,7 +23,9 @@ vi.mock("google-auth-library", () => ({
   OAuth2Client: class {
     generateAuthUrl = googleMocks.generateAuthUrl;
     getToken = googleMocks.getToken;
+    getAccessToken = googleMocks.getAccessToken;
     request = googleMocks.request;
+    transporter = { request: googleMocks.transportRequest };
     revokeToken = googleMocks.revokeToken;
     setCredentials = googleMocks.setCredentials;
     verifyIdToken = googleMocks.verifyIdToken;
@@ -88,7 +92,9 @@ beforeEach(() => {
       `https://accounts.google.test/o/oauth2/v2/auth?state=${encodeURIComponent(options.state)}`,
   );
   googleMocks.getToken.mockReset();
+  googleMocks.getAccessToken.mockReset().mockResolvedValue({ token: "synthetic-access-token" });
   googleMocks.request.mockReset();
+  googleMocks.transportRequest.mockReset();
   googleMocks.revokeToken.mockReset().mockResolvedValue(undefined);
   googleMocks.setCredentials.mockReset();
   googleMocks.verifyIdToken.mockReset();
@@ -217,8 +223,52 @@ describe("Gmail authorization lifecycle", () => {
     }
   });
 
+  it("runs workflow approval after token preparation and does not dispatch a withdrawn message", async () => {
+    const guard = vi.fn(async () => {
+      expect(googleMocks.getAccessToken).toHaveBeenCalledOnce();
+      throw new Error("Synthetic withdrawn approval");
+    });
+    await expect(sendGmailForUser({
+      organizationId: orgIds[0]!, userId: userIds[0]!, to: "recipient@example.invalid",
+      subject: "Synthetic", body: "Synthetic only", beforeDispatch: guard,
+    })).rejects.toMatchObject({ code: "email_dispatch_blocked", effectNotAttempted: true });
+    expect(guard).toHaveBeenCalledWith({ provider: "gmail", senderEmail: "sender-a@example.test" });
+    expect(googleMocks.request).not.toHaveBeenCalled();
+    expect(googleMocks.transportRequest).not.toHaveBeenCalled();
+    expect((await getGmailStatus(orgIds[0]!, userIds[0]!)).connected).toBe(true);
+  });
+
+  it("refuses a mailbox changed during token preparation", async () => {
+    googleMocks.getAccessToken.mockImplementationOnce(async () => {
+      await db.update(gmailConnectionsTable).set({ email: "changed@example.invalid" }).where(eq(gmailConnectionsTable.userId, userIds[0]!));
+      return { token: "synthetic-access-token" };
+    });
+    try {
+      await expect(sendGmailForUser({
+        organizationId: orgIds[0]!, userId: userIds[0]!, to: "recipient@example.invalid",
+        subject: "Synthetic", body: "Synthetic only",
+      })).rejects.toMatchObject({ code: "email_dispatch_blocked" });
+      expect(googleMocks.request).not.toHaveBeenCalled();
+      expect(googleMocks.transportRequest).not.toHaveBeenCalled();
+    } finally { await restoreActiveConnection(); }
+  });
+
+  it("uses a bounded non-retrying send after a successful final check", async () => {
+    googleMocks.transportRequest.mockResolvedValueOnce({ data: { id: "synthetic-message" } });
+    const guard = vi.fn(async () => undefined);
+    await expect(sendGmailForUser({
+      organizationId: orgIds[0]!, userId: userIds[0]!, to: "recipient@example.invalid",
+      subject: "Synthetic", body: "Synthetic only", beforeDispatch: guard,
+    })).resolves.toMatchObject({ id: "synthetic-message", provider: "gmail" });
+    expect(guard).toHaveBeenCalledOnce();
+    expect(googleMocks.request).not.toHaveBeenCalled();
+    expect(googleMocks.transportRequest).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      retry: false, maxRedirects: 0, timeout: 10_000, headers: { Authorization: "Bearer synthetic-access-token" },
+    }));
+  });
+
   it("fails closed and requires reconnect when Google rejects a revoked grant", async () => {
-    googleMocks.request.mockRejectedValueOnce(
+    googleMocks.transportRequest.mockRejectedValueOnce(
       Object.assign(new Error("Token has been expired or revoked"), {
         response: { status: 400, data: { error: "invalid_grant" } },
       }),

@@ -4,6 +4,7 @@ import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { detectSchemaPushFailure } from "../../../scripts/release-schema.mjs";
 
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const database = path.resolve(api, "../../lib/db");
@@ -31,25 +32,36 @@ Object.assign(env, {
   NO_COLOR: "1",
   LOG_LEVEL: "silent",
 });
-async function run(file, args, cwd) {
+async function run(file, args, cwd, schema = false) {
+  let output = "";
   const status = await new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [file, ...args], {
       cwd,
       env,
-      stdio: "inherit",
+      stdio: schema ? ["ignore", "pipe", "pipe"] : "inherit",
       windowsHide: true,
     });
+    if (schema) {
+      for (const [stream, sink] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
+        stream.on("data", (chunk) => { output += chunk.toString(); sink.write(chunk); });
+      }
+    }
     child.on("error", reject);
     child.on("exit", resolve);
   });
   if (status !== 0)
     throw new Error(`Isolated scheduler check failed (${status}).`);
+  // drizzle-kit can log a PostgreSQL failure and still exit zero. Never let a
+  // partial empty fixture masquerade as a correctly provisioned test database.
+  if (schema && (detectSchemaPushFailure(output) || !output.includes("Changes applied")))
+    throw new Error("Isolated schema preparation did not succeed.");
 }
 try {
   await run(
     path.join(database, "node_modules/drizzle-kit/bin.cjs"),
     ["push", "--force", "--config", "drizzle.config.ts"],
     database,
+    true,
   );
   await run(
     path.join(api, "node_modules/vitest/vitest.mjs"),

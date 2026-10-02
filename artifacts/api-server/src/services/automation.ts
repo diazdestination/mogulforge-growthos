@@ -273,6 +273,7 @@ async function executeAction(
   action: AutomationAction,
   context: EventContext,
   automationId: string,
+  scheduledActionId?: string,
 ): Promise<ActionResult> {
   if (context.leadId && ["send_email", "send_sms", "schedule_followup", "playbook_step"].includes(action.type)) {
     const { hasCustomerReplyHold } = await import("./response-correlation");
@@ -289,6 +290,11 @@ async function executeAction(
     });
 
   switch (action.type) {
+    case "service_care_reminder": {
+      if (!scheduledActionId) return { type: action.type, status: "skipped", detail: "Service reminders require their owned scheduled action." };
+      const { executeServiceCareReminder } = await import("./service-care");
+      return executeServiceCareReminder(organizationId, action.params, { ...context }, scheduledActionId);
+    }
     case "playbook_step": {
       const result = await executePlaybookStep(
         organizationId,
@@ -968,6 +974,24 @@ export async function processDueScheduledActions(organizationId?: string): Promi
   for (const item of due) {
     try {
       if (await customerWorkHeld(item.organizationId)) continue;
+      if (item.action.type === "service_care_reminder") {
+        const { preflightServiceCareReminder } = await import("./service-care");
+        const { resumeAt } = await preflightServiceCareReminder(item.organizationId, item.action.params, item.context, item.id);
+        if (resumeAt) {
+          // Deferral is still unclaimed work, not a successful/blocked send.
+          if (!Number.isFinite(resumeAt.getTime()) || resumeAt.getTime() <= Date.now())
+            throw new Error("Service reminder returned an invalid deferral.");
+          await db.update(scheduledActionsTable).set({ runAt: resumeAt }).where(and(
+            eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.organizationId, item.organizationId),
+            eq(scheduledActionsTable.status, "pending"), eq(scheduledActionsTable.runAt, item.runAt),
+            notExists(db.select({ id: revenueExecutionsTable.id }).from(revenueExecutionsTable).where(and(
+              eq(revenueExecutionsTable.organizationId, item.organizationId),
+              eq(revenueExecutionsTable.actionKey, `scheduled:${item.id}`),
+            ))),
+          ));
+          continue;
+        }
+      }
       const execution = await runDurableAction({
         organizationId: item.organizationId, actionKey: `scheduled:${item.id}`,
         leadId: typeof item.context.leadId === "string" ? item.context.leadId : null,
@@ -982,10 +1006,19 @@ export async function processDueScheduledActions(organizationId?: string): Promi
             .where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.organizationId, item.organizationId), eq(scheduledActionsTable.status, "pending")))
             .returning({ id: scheduledActionsTable.id });
           if (!claimed) return { state: "blocked", detail: "Scheduled action was cancelled or completed." };
-          const result = await executeAction(item.organizationId, item.action, item.context as EventContext, item.automationId ?? item.id);
+          const result = await executeAction(item.organizationId, item.action, item.context as EventContext, item.automationId ?? item.id, item.id);
           // A returned failure can follow an ambiguous provider response. Never auto-replay it.
           if (result.status === "failed") throw new Error("Action result needs reconciliation");
-          return { state: result.status === "skipped" ? "blocked" : "succeeded", detail: result.status === "skipped" ? "The action's current eligibility check prevented execution." : "Scheduled action completed; inspect its activity record for provider evidence." };
+          return {
+            state: result.status === "skipped" ? "blocked" : "succeeded",
+            // Service care returns fixed, safe operator explanations. Preserve
+            // those rather than hiding a changed approval behind a generic label.
+            detail: item.action.type === "service_care_reminder" && result.detail
+              ? result.detail
+              : result.status === "skipped"
+                ? "The action's current eligibility check prevented execution."
+                : "Scheduled action completed; inspect its activity record for provider evidence.",
+          };
         },
       });
       if (execution.state === "processing") continue;
@@ -1036,6 +1069,10 @@ export async function processDueScheduledActions(organizationId?: string): Promi
 export async function processScheduledWork(organizationId?: string, observe?: StageObserver): Promise<void> {
   const stage = (name: SchedulerStage, fn: () => Promise<void>) => runStage(name, fn, observe);
   await stage("scheduled-actions", () => processDueScheduledActions(organizationId));
+  await stage("missed-call-care", async () => {
+    const { processMissedCallCare } = await import("./missed-call-care");
+    await processMissedCallCare(organizationId);
+  });
   await stage("staff-lead-notifications", async () => {
     const { processStaffLeadPush } = await import("./staff-push");
     await processStaffLeadPush(organizationId);

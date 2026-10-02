@@ -422,6 +422,7 @@ router.post(
       );
       xml
         .dial({
+          answerOnBridge: true,
           callerId: config!.phoneNumber,
           timeout: 20,
           timeLimit: 300,

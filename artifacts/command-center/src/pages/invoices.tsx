@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, Plus, Printer, RefreshCw } from "lucide-react";
 import LeadSelect from "@/components/lead-select";
 import { InvoiceEditor } from "@/components/invoice-editor";
 import { InvoiceActions } from "@/components/invoice-actions";
+import { InvoiceDelivery } from "@/components/invoice-delivery";
 import { canManageInvoices, canReadInvoices } from "@/lib/permissions";
 import { contractorRequest } from "@/lib/contractor-api";
 import {
@@ -514,7 +515,8 @@ function InvoiceDraftEditor({
       (command.pending?.body.document as InvoiceDraft | undefined) ??
       draftDocument(invoice.document),
   }));
-  const changed = invoice.version !== base.version || invoice.status !== "draft";
+  const changed =
+    invoice.version !== base.version || invoice.status !== "draft";
   return (
     <>
       {changed && (
@@ -529,7 +531,10 @@ function InvoiceDraftEditor({
               className={invoiceButton}
               disabled={command.busy || !!command.pending}
               onClick={() => {
-                setBase({ version: invoice.version, document: draftDocument(invoice.document) });
+                setBase({
+                  version: invoice.version,
+                  document: draftDocument(invoice.document),
+                });
                 command.refreshed();
               }}
             >
@@ -668,8 +673,7 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
                   Edit draft
                 </button>
               )}
-            {actor.manage &&
-            (editing || !!command.pending?.body.document) ? (
+            {actor.manage && (editing || !!command.pending?.body.document) ? (
               <section className="space-y-4 rounded-xl border border-border bg-card p-4 md:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h2 className="text-lg font-semibold">
@@ -738,6 +742,14 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
             )}
             {actor.manage && !editing && (
               <InvoiceActions invoice={invoice} command={command} />
+            )}
+            {!editing && (
+              <InvoiceDelivery
+                key={`${actor.organizationId}:${actor.id}:${invoice.id}`}
+                invoice={invoice}
+                organizationId={actor.organizationId}
+                canManage={actor.manage}
+              />
             )}
             <section aria-label="Payment allocations" className="space-y-3">
               <h2 className="text-lg font-semibold">

@@ -25,6 +25,11 @@ vi.mock("./reactivation", () => ({
   drainReactivationCampaigns: vi.fn(async () => {}),
 }));
 
+// Never claim another parallel suite's approved missed-call fixtures.
+vi.mock("./missed-call-care", () => ({
+  processMissedCallCare: vi.fn(async () => {}),
+}));
+
 // The notification stage intentionally retires expired subscriptions and
 // abandoned claims even while outbound delivery is held. An unscoped real
 // invocation here could mutate another parallel suite's deliberately stale
@@ -37,6 +42,7 @@ vi.mock("./staff-push", async (importOriginal) => {
 import { markAbandonedConversations } from "./concierge";
 import { processScheduledWork } from "./automation";
 import { processStaffLeadPush } from "./staff-push";
+import { processMissedCallCare } from "./missed-call-care";
 import {
   cleanupExpiredPreviousSecrets,
   processPendingDeliveries,
@@ -92,6 +98,7 @@ describe("scheduler stage isolation", () => {
       "Ownership lost",
     );
     expect(processPendingDeliveries).not.toHaveBeenCalled();
+    expect(processMissedCallCare).not.toHaveBeenCalled();
     expect(processStaffLeadPush).not.toHaveBeenCalled();
   });
   it("still runs webhook retries and later stages when the scheduled-actions stage throws", async () => {
@@ -105,6 +112,7 @@ describe("scheduler stage isolation", () => {
     await expect(processScheduledWork()).resolves.toBeUndefined();
 
     expect(processPendingDeliveries).toHaveBeenCalledTimes(1);
+    expect(processMissedCallCare).toHaveBeenCalledExactlyOnceWith(undefined);
     expect(processStaffLeadPush).toHaveBeenCalledTimes(1);
     expect(cleanupExpiredPreviousSecrets).toHaveBeenCalledTimes(1);
     expect(markAbandonedConversations).toHaveBeenCalledTimes(1);
@@ -151,5 +159,18 @@ describe("scheduler stage isolation", () => {
     expect(processPendingDeliveries).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("SECRET_PUSH_ENDPOINT");
     expect(JSON.stringify(observe.mock.calls)).not.toContain("SECRET_PUSH_ENDPOINT");
+  });
+
+  it("isolates missed-call recovery failure and still runs staff notifications", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(processMissedCallCare).mockRejectedValueOnce(new Error("SECRET_CALLER_NUMBER"));
+    const observe = vi.fn(async () => {});
+    await expect(processScheduledWork(undefined, observe)).resolves.toBeUndefined();
+    expect(observe).toHaveBeenCalledWith("missed-call-care", "running");
+    expect(observe).toHaveBeenCalledWith("missed-call-care", "failed");
+    expect(processStaffLeadPush).toHaveBeenCalledExactlyOnceWith(undefined);
+    expect(observe).toHaveBeenCalledWith("upload-cleanup", "succeeded");
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("SECRET_CALLER_NUMBER");
+    expect(JSON.stringify(observe.mock.calls)).not.toContain("SECRET_CALLER_NUMBER");
   });
 });

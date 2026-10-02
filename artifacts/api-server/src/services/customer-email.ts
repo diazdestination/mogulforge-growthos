@@ -10,10 +10,23 @@ import {
 } from "./user-email";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
 import { getOrgSettings } from "./settings";
+import { EmailDispatchBlockedError } from "./email-dispatch-guard";
 
 export interface CustomerEmailContext {
   organizationId: string;
   leadId?: string | null;
+}
+
+export interface CustomerEmailSender {
+  userId: string;
+  source: "lead_assignee" | "company_default";
+  provider: "gmail" | "microsoft";
+  senderEmail: string;
+}
+
+function sameSender(a: CustomerEmailSender, b: CustomerEmailSender) {
+  return a.userId === b.userId && a.source === b.source && a.provider === b.provider &&
+    a.senderEmail.trim().toLowerCase() === b.senderEmail.trim().toLowerCase();
 }
 
 /** An admin may designate only an active, authorized member of this company. */
@@ -81,6 +94,17 @@ async function resolveSender(context: CustomerEmailContext) {
   return { userId, source };
 }
 
+/** Exact selected identity for a reviewed message; no arbitrary mailbox fallback. */
+export async function resolveCustomerEmailSender(
+  context: CustomerEmailContext,
+): Promise<CustomerEmailSender> {
+  const sender = await resolveSender(context);
+  const status = await getUserEmailStatus(context.organizationId, sender.userId);
+  if (!status.connected || !status.configured || !status.provider || !status.email)
+    throw new EmailDispatchBlockedError();
+  return { ...sender, provider: status.provider, senderEmail: status.email.trim().toLowerCase() };
+}
+
 export async function getCustomerEmailStatus(organizationId: string) {
   const settings = await getOrgSettings(organizationId);
   const userId = settings.customerEmailSenderUserId;
@@ -119,10 +143,14 @@ export async function sendCustomerEmail(
     to: string;
     subject: string;
     body: string;
+    expectedSender?: CustomerEmailSender;
+    beforeDispatch?: () => Promise<void>;
   },
 ) {
   assertOutboundDeliveryAllowed({ channel: "email", recipient: input.to });
-  const sender = await resolveSender(input);
+  const sender = await resolveCustomerEmailSender(input);
+  if (input.expectedSender && !sameSender(sender, input.expectedSender))
+    throw new EmailDispatchBlockedError();
   // The lower-level adapter rechecks active org membership and the exact
   // credential at dispatch. Errors propagate; there is no alternate mailbox.
   const result = await sendEmailForUser({
@@ -131,6 +159,12 @@ export async function sendCustomerEmail(
     to: input.to,
     subject: input.subject,
     body: input.body,
+    expectedSender: { provider: sender.provider, senderEmail: sender.senderEmail },
+    beforeDispatch: async () => {
+      await input.beforeDispatch?.();
+      const current = await resolveCustomerEmailSender(input);
+      if (!sameSender(sender, current)) throw new EmailDispatchBlockedError();
+    },
   });
   await recordAudit({
     organizationId: input.organizationId,

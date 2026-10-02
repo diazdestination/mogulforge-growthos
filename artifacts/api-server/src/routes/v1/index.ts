@@ -49,6 +49,8 @@ import dataLifecycleInventoryRouter from "./data-lifecycle-inventory";
 import customerLifecycleRouter from "./customer-lifecycle";
 import contractorTodayRouter from "./contractor-today";
 import invoicesRouter from "./invoices";
+import serviceCareRouter from "./service-care";
+import missedCallCareRouter from "./missed-call-care";
 
 const router: IRouter = Router();
 
@@ -72,6 +74,7 @@ router.use(projectsRouter);
 router.use(tasksRouter);
 router.use(appointmentsRouter);
 router.use(serviceObligationsRouter);
+router.use(serviceCareRouter);
 router.use(dashboardRouter);
 router.use(reportsRouter);
 router.use(assistantRouter);
@@ -80,6 +83,7 @@ router.use(dataLifecycleInventoryRouter);
 router.use(customerLifecycleRouter);
 router.use(twilioRouter);
 router.use(twilioVoiceRouter);
+router.use(missedCallCareRouter);
 router.use(apiKeysRouter);
 router.use(installationRouter);
 router.use(knowledgeRouter);

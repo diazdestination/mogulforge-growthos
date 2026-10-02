@@ -27,6 +27,7 @@ export interface AutomationAction {
     | "add_tag"
     | "schedule_followup"
     | "appointment_reminder"
+    | "service_care_reminder"
     | "playbook_step";
   /** Action-specific params, e.g. { templateId }, { status }, { assignedUserId }, { tagId }, { delayMinutes, action } */
   params: Record<string, unknown>;

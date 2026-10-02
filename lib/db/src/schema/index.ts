@@ -50,3 +50,4 @@ export * from "./staff-push";
 export * from "./email-intelligence";
 export * from "./revenue-workspace";
 export * from "./scheduler";
+export * from "./missed-call-care";

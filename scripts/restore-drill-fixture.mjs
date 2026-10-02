@@ -383,11 +383,15 @@ function normal(value, key) {
 }
 
 /** Checks stored app records using SELECT only, with secrets held only in memory. */
-export async function assertFixtureRecords(client, target, codec, { reviewedPausedServiceId = null } = {}) {
+export async function assertFixtureRecords(client, target, codec, { reviewedPausedServiceId = null, reviewedPausedCareExecutionId = null } = {}) {
   // The local contractor upgrade drill additionally restores one explicitly
   // reviewed successor. It may remain active only behind a restored company
   // pause. Ordinary restore acceptance keeps its original zero-active rule.
   if (reviewedPausedServiceId !== null && (!/^restore-drill-contractor-[ab]$/.test(target.syntheticSlug) || !/^[a-f0-9-]{36}$/.test(reviewedPausedServiceId))) fail("restore_fixture_service_exception_invalid");
+  // Customer-care recovery additionally preserves one exact indeterminate
+  // receipt behind BOTH a paused company and a disabled recovery policy. Never
+  // permit processing work or a blanket exception for other unknown effects.
+  if (reviewedPausedCareExecutionId !== null && (!reviewedPausedServiceId || !/^[a-f0-9-]{36}$/.test(reviewedPausedCareExecutionId))) fail("restore_fixture_care_exception_invalid");
   const id = fixtureIds(target.syntheticSlug);
   let ciphertext;
   for (const [table, expected] of fixtureRows(target.syntheticSlug)) {
@@ -432,12 +436,12 @@ export async function assertFixtureRecords(client, target, codec, { reviewedPaus
       (SELECT count(*) FROM reactivation_campaigns WHERE organization_id = $1 AND status NOT IN ('draft', 'completed', 'cancelled')) +
       (SELECT count(*) FROM service_obligations s WHERE organization_id = $1 AND status = 'active' ${reviewedPausedServiceId ? "AND NOT (s.id=$2::uuid AND EXISTS (SELECT 1 FROM customer_lifecycle cl WHERE cl.organization_id=s.organization_id AND cl.state='paused'))" : ""}) +
       (SELECT count(*) FROM bie_action_proposals WHERE organization_id = $1 AND status IN ('approved', 'processing')) +
-      (SELECT count(*) FROM revenue_executions WHERE organization_id = $1 AND state IN ('processing', 'indeterminate')) +
+      (SELECT count(*) FROM revenue_executions e WHERE organization_id = $1 AND state IN ('processing', 'indeterminate') ${reviewedPausedCareExecutionId ? "AND NOT (e.id=$3::uuid AND e.state='indeterminate' AND EXISTS (SELECT 1 FROM customer_lifecycle cl WHERE cl.organization_id=e.organization_id AND cl.state='paused') AND EXISTS (SELECT 1 FROM missed_call_care_policies p WHERE p.organization_id=e.organization_id AND p.enabled=false) AND EXISTS (SELECT 1 FROM missed_call_care_cases c WHERE c.organization_id=e.organization_id AND c.state='indeterminate' AND e.action_key='missed-call-care:' || c.call_id::text || ':sms:v1'))" : ""}) +
       (SELECT count(*) FROM webhook_endpoints WHERE organization_id = $1 AND is_active = true) +
       (SELECT count(*) FROM gmail_connections WHERE organization_id = $1 AND revoked_at IS NULL) +
       (SELECT count(*) FROM contacts WHERE organization_id = $1 AND (phone IS NOT NULL OR email NOT LIKE '%.invalid' OR do_not_contact = false OR do_not_contact_email = false OR do_not_contact_sms = false)) +
       (SELECT count(*) FROM users WHERE organization_id = $1 AND (email NOT LIKE '%.invalid' OR password_hash IS NOT NULL OR is_platform_admin = true)) AS unsafe_count`,
-    reviewedPausedServiceId ? [id.organization, reviewedPausedServiceId] : [id.organization],
+    reviewedPausedCareExecutionId ? [id.organization, reviewedPausedServiceId, reviewedPausedCareExecutionId] : reviewedPausedServiceId ? [id.organization, reviewedPausedServiceId] : [id.organization],
   );
   if (Number(forbidden.rows[0]?.unsafe_count) !== 0)
     fail("restore_fixture_outbound_or_identity_unsafe");

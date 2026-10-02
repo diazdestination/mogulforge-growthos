@@ -7,6 +7,24 @@
 
 ## Mission
 
+**October 2 customer-care candidate:** reviewed service reminders and office
+booking, individual missed-call recovery and invoice email delivery are now
+implemented for synthetic verification. See
+`reports/customer-care-integration-2026-10-02.md`. Additive `0007` raises the
+candidate from 103 to 105 tables. Exact-head CI, fresh reviewed held-staging
+schema/recovery/application acceptance and actual provider/device/company
+acceptance are still required. The earlier managed restore tested 103 tables,
+not this candidate. No deployment, credential rotation or sending was enabled.
+
+**October 2 payment scope clarification:** contractor payment collection is
+deferred to a future add-on, not required for this initial replacement release.
+Invoice delivery and accurate balances/staff-recorded external receipts remain
+in scope. Do not choose or activate a contractor processor. The existing Stripe
+test requirements below concern GrowthOS subscription billing and are unchanged.
+The owner authorized continued useful engineering; the bounded customer-care
+wave is recorded in `reports/customer-care-contract-2026-10-02.md`. It does not
+authorize hosted deployment, credential changes, spending or real customer sends.
+
 **October 2 replacement acceptance requirement:** the owner requires both
 contractors to be able to replace their actual required Housecall Pro workflows
 before onboarding/cutover. `HOUSECALL-PRO-REPLACEMENT-GATE.md` records the missing

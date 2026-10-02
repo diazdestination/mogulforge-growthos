@@ -6402,3 +6402,314 @@ export const SetServiceObligationRecurrenceResponse = zod.object({
 })
 
 
+/**
+ * Requires invoices.read. Provider acceptance does not establish delivery, customer receipt or payment.
+ * @summary Read invoice email evidence
+ */
+export const GetInvoiceDeliveryParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const GetInvoiceDeliveryResponse = zod.object({
+  "invoiceId": zod.uuid(),
+  "state": zod.enum(['not_sent', 'processing', 'accepted', 'held', 'uncertain', 'reconciled']),
+  "executionId": zod.uuid().nullable(),
+  "detail": zod.string(),
+  "provider": zod.union([zod.literal('gmail'),zod.literal('microsoft'),zod.literal(null)]).nullable(),
+  "providerMessageId": zod.string().nullable(),
+  "providerRequestId": zod.string().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "deliveryConfirmed": zod.literal(false),
+  "deliveryDetail": zod.string(),
+  "canPrepare": zod.boolean()
+})
+
+
+/**
+ * Session-only invoices.manage. Ten-minute actor-bound approval preview freezes the immutable invoice, recipient and selected sender; no provider call.
+ * @summary Review exact issued invoice and selected mailbox
+ */
+export const PreviewInvoiceDeliveryParams = zod.object({
+  "id": zod.uuid()
+})
+
+
+
+
+export const PreviewInvoiceDeliveryBody = zod.object({
+  "expectedVersion": zod.int().min(1)
+})
+
+export const PreviewInvoiceDeliveryResponse = zod.object({
+  "previewId": zod.uuid(),
+  "payloadSha256": zod.string(),
+  "expiresAt": zod.coerce.date(),
+  "invoiceId": zod.uuid(),
+  "recipient": zod.email(),
+  "subject": zod.string(),
+  "body": zod.string(),
+  "sender": zod.object({
+  "userId": zod.string(),
+  "source": zod.enum(['lead_assignee', 'company_default']),
+  "provider": zod.enum(['gmail', 'microsoft']),
+  "senderEmail": zod.email()
+}),
+  "deliveryDetail": zod.string()
+})
+
+
+/**
+ * Session-only invoices.manage. Rechecks identity, permission, content, recipient and holds at network dispatch. One logical send per invoice; timeout or unknown result cannot be bypassed by a new preview. No payment processor, public link or attachment.
+ * @summary Send the exact approved invoice once
+ */
+export const SendInvoiceDeliveryParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const sendInvoiceDeliveryBodyPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const SendInvoiceDeliveryBody = zod.object({
+  "previewId": zod.uuid(),
+  "payloadSha256": zod.string().regex(sendInvoiceDeliveryBodyPayloadSha256RegExp),
+  "confirmed": zod.literal(true)
+})
+
+export const SendInvoiceDeliveryResponse = zod.object({
+  "invoiceId": zod.uuid(),
+  "state": zod.enum(['not_sent', 'processing', 'accepted', 'held', 'uncertain', 'reconciled']),
+  "executionId": zod.uuid().nullable(),
+  "detail": zod.string(),
+  "provider": zod.union([zod.literal('gmail'),zod.literal('microsoft'),zod.literal(null)]).nullable(),
+  "providerMessageId": zod.string().nullable(),
+  "providerRequestId": zod.string().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "deliveryConfirmed": zod.literal(false),
+  "deliveryDetail": zod.string(),
+  "canPrepare": zod.boolean()
+})
+
+
+/**
+ * Requires crm.read. Read-only preview of expected-service copy, configured sender, receipt, staff-attested response and native appointment. Does not infer warranty coverage.
+ * @summary Review service reminder and booking evidence
+ */
+export const GetServiceCareParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const GetServiceCareQueryParams = zod.object({
+  "channel": zod.enum(['email', 'sms']).optional()
+})
+
+export const GetServiceCareResponse = zod.object({
+  "obligationId": zod.uuid(),
+  "expectedUpdatedAt": zod.coerce.date(),
+  "active": zod.boolean(),
+  "preview": zod.union([zod.record(zod.string(), zod.unknown()),zod.null()]),
+  "blockReason": zod.string().nullable(),
+  "deferredReason": zod.string().nullable(),
+  "reminder": zod.union([zod.record(zod.string(), zod.unknown()),zod.null()]),
+  "response": zod.union([zod.record(zod.string(), zod.unknown()),zod.null()]),
+  "booking": zod.union([zod.record(zod.string(), zod.unknown()),zod.null()]),
+  "appointment": zod.union([zod.record(zod.string(), zod.unknown()),zod.null()])
+})
+
+
+/**
+ * Session-only crm.write. Agreement evidence and current version required. Queues a server-owned reminder; global holds or quiet hours defer without claiming a send. Imported marketing remains held.
+ * @summary Approve one expected-service reminder
+ */
+export const ApproveServiceCareParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const approveServiceCareBodyPreviewFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveServiceCareBodyAgreementNoteMin = 10;
+export const approveServiceCareBodyAgreementNoteMax = 1000;
+
+
+
+export const ApproveServiceCareBody = zod.object({
+  "requestId": zod.uuid(),
+  "expectedUpdatedAt": zod.coerce.date(),
+  "channel": zod.enum(['email', 'sms']),
+  "previewFingerprint": zod.string().regex(approveServiceCareBodyPreviewFingerprintRegExp),
+  "agreementNote": zod.string().min(approveServiceCareBodyAgreementNoteMin).max(approveServiceCareBodyAgreementNoteMax),
+  "expectedServiceConfirmed": zod.literal(true)
+})
+
+export const ApproveServiceCareResponse = zod.object({
+  "approvalId": zod.uuid().optional(),
+  "responseId": zod.uuid().optional(),
+  "appointmentId": zod.uuid().optional(),
+  "replayed": zod.boolean()
+})
+
+
+/**
+ * Session-only crm.write. This is an explicit staff attestation, not a provider-verified inbox event. Cancels unclaimed reminder work and leaves office follow-up.
+ * @summary Record a customer response reviewed by staff
+ */
+export const RecordServiceCareResponseParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const recordServiceCareResponseBodyNoteMin = 10;
+export const recordServiceCareResponseBodyNoteMax = 1000;
+
+
+
+export const RecordServiceCareResponseBody = zod.object({
+  "requestId": zod.uuid(),
+  "expectedUpdatedAt": zod.coerce.date(),
+  "channel": zod.enum(['phone', 'email', 'sms', 'in_person']),
+  "outcome": zod.enum(['ready_to_book', 'follow_up', 'declined']),
+  "respondedAt": zod.coerce.date(),
+  "note": zod.string().min(recordServiceCareResponseBodyNoteMin).max(recordServiceCareResponseBodyNoteMax),
+  "staffAttested": zod.literal(true)
+})
+
+export const RecordServiceCareResponseResponse = zod.object({
+  "approvalId": zod.uuid().optional(),
+  "responseId": zod.uuid().optional(),
+  "appointmentId": zod.uuid().optional(),
+  "replayed": zod.boolean()
+})
+
+
+/**
+ * Session-only crm.write. Requires latest ready-to-book response, current version, explicit customer confirmation and same-company staff. Shared crew/capacity checks apply. Recurrence/completion and warranty validity are not inferred.
+ * @summary Book an office-confirmed service visit
+ */
+export const BookServiceCareVisitParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const bookServiceCareVisitBodyAssignedUserIdMax = 200;
+
+
+
+export const BookServiceCareVisitBody = zod.object({
+  "requestId": zod.uuid(),
+  "expectedUpdatedAt": zod.coerce.date(),
+  "responseId": zod.uuid(),
+  "assignedUserId": zod.string().min(1).max(bookServiceCareVisitBodyAssignedUserIdMax),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date(),
+  "type": zod.enum(['inspection', 'other']),
+  "customerConfirmed": zod.literal(true)
+})
+
+export const BookServiceCareVisitResponse = zod.object({
+  "approvalId": zod.uuid().optional(),
+  "responseId": zod.uuid().optional(),
+  "appointmentId": zod.uuid().optional(),
+  "replayed": zod.boolean()
+})
+
+
+/**
+ * Requires crm.read. Up to 50 newest cases with original call/handoff, dispatch evidence and up to five same-company same-phone inbound replies each. Replies are correlation candidates requiring staff review, not verified caller identity. Missing policy is disabled.
+ * @summary Read missed-call recovery work
+ */
+export const ListMissedCallCareResponse = zod.record(zod.string(), zod.unknown()).describe('Company-scoped recovery evidence. The snapshot is server-rendered; return it unchanged with the expected version for approval. Provider acceptance, confirmed delivery, staff-reviewed caller identity and customer response are distinct evidence.')
+
+
+/**
+ * Session-only settings.manage. Explicit template approval, timezone, business days and named active accepted owners. Closing time must follow opening; enabled policy requires both owners. No provider activation or unknown-caller consent.
+ * @summary Approve missed-call owners and sending hours
+ */
+export const saveMissedCallCarePolicyBodyExpectedVersionMin = 0;
+
+export const saveMissedCallCarePolicyBodyPolicyTimezoneMax = 80;
+
+export const saveMissedCallCarePolicyBodyPolicyDaysItemMax = 7;
+
+export const saveMissedCallCarePolicyBodyPolicyDaysMax = 7;
+
+export const saveMissedCallCarePolicyBodyPolicyOpensAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+export const saveMissedCallCarePolicyBodyPolicyClosesAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+export const saveMissedCallCarePolicyBodyPolicyBusinessHoursOwnerIdMax = 128;
+
+
+export const saveMissedCallCarePolicyBodyPolicyBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveMissedCallCarePolicyBodyPolicyAfterHoursOwnerIdMax = 128;
+
+
+export const saveMissedCallCarePolicyBodyPolicyAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveMissedCallCarePolicyBodyPolicyResponseMinutesMin = 5;
+export const saveMissedCallCarePolicyBodyPolicyResponseMinutesMax = 1440;
+
+
+
+export const SaveMissedCallCarePolicyBody = zod.object({
+  "expectedVersion": zod.int().min(saveMissedCallCarePolicyBodyExpectedVersionMin),
+  "policy": zod.object({
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(saveMissedCallCarePolicyBodyPolicyTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(saveMissedCallCarePolicyBodyPolicyDaysItemMax)).min(1).max(saveMissedCallCarePolicyBodyPolicyDaysMax),
+  "opensAt": zod.string().regex(saveMissedCallCarePolicyBodyPolicyOpensAtRegExp),
+  "closesAt": zod.string().regex(saveMissedCallCarePolicyBodyPolicyClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(saveMissedCallCarePolicyBodyPolicyBusinessHoursOwnerIdMax).regex(saveMissedCallCarePolicyBodyPolicyBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(saveMissedCallCarePolicyBodyPolicyAfterHoursOwnerIdMax).regex(saveMissedCallCarePolicyBodyPolicyAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(saveMissedCallCarePolicyBodyPolicyResponseMinutesMin).max(saveMissedCallCarePolicyBodyPolicyResponseMinutesMax)
+}),
+  "approveTemplate": zod.literal(true)
+})
+
+export const SaveMissedCallCarePolicyResponse = zod.record(zod.string(), zod.unknown()).describe('Company-scoped recovery evidence. The snapshot is server-rendered; return it unchanged with the expected version for approval. Provider acceptance, confirmed delivery, staff-reviewed caller identity and customer response are distinct evidence.')
+
+
+/**
+ * Requires crm.read. Reviewed caller and configured policy required. The returned exact snapshot includes current recipient, template and provider identity; caller ID alone is not consent.
+ * @summary Review exact missed-call response
+ */
+export const PreviewMissedCallCareParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const PreviewMissedCallCareResponse = zod.record(zod.string(), zod.unknown()).describe('Company-scoped recovery evidence. The snapshot is server-rendered; return it unchanged with the expected version for approval. Provider acceptance, confirmed delivery, staff-reviewed caller identity and customer response are distinct evidence.')
+
+
+/**
+ * Session-only crm.write. Pins exact server snapshot and version. The bounded worker respects purpose consent, STOP, hours, holds, frequency caps, replies and durable no-replay ownership.
+ * @summary Approve a reviewed missed-call follow-up
+ */
+export const ApproveMissedCallCareParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const approveMissedCallCareBodyExpectedVersionMin = 0;
+
+
+
+export const ApproveMissedCallCareBody = zod.object({
+  "expectedVersion": zod.int().min(approveMissedCallCareBodyExpectedVersionMin),
+  "expectedSnapshot": zod.record(zod.string(), zod.unknown()),
+  "approve": zod.literal(true)
+})
+
+export const ApproveMissedCallCareResponse = zod.record(zod.string(), zod.unknown()).describe('Company-scoped recovery evidence. The snapshot is server-rendered; return it unchanged with the expected version for approval. Provider acceptance, confirmed delivery, staff-reviewed caller identity and customer response are distinct evidence.')
+
+
+/**
+ * Session-only crm.write. Uses current version and retains history. Unknown effects must first be reconciled; closure does not send or authorize replay.
+ * @summary Resolve or cancel a recovery case
+ */
+export const CloseMissedCallCareParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const closeMissedCallCareBodyExpectedVersionMin = 0;
+
+
+
+export const CloseMissedCallCareBody = zod.object({
+  "expectedVersion": zod.int().min(closeMissedCallCareBodyExpectedVersionMin),
+  "outcome": zod.enum(['resolved', 'cancelled'])
+})
+
+export const CloseMissedCallCareResponse = zod.record(zod.string(), zod.unknown()).describe('Company-scoped recovery evidence. The snapshot is server-rendered; return it unchanged with the expected version for approval. Provider acceptance, confirmed delivery, staff-reviewed caller identity and customer response are distinct evidence.')
+
+
