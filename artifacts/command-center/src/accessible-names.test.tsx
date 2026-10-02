@@ -13,6 +13,7 @@ import { computeAccessibleName } from 'dom-accessibility-api';
 import { memoryLocation } from 'wouter/memory-location';
 import { Router } from 'wouter';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { RoiReport } from '@workspace/api-client-react';
 
 import { Shell } from '@/components/shell';
 import Dashboard from '@/pages/dashboard';
@@ -159,18 +160,54 @@ describe('every icon-only control keeps an accessible name', () => {
     {
       name: 'reports', path: '/reports', Page: Reports,
       handler: (_method: string, path: string) => {
-        if (path.includes('/reports/roi')) {
+        const period = {
+          startAt: '2026-09-01T00:00:00.000Z',
+          endAt: '2026-10-01T00:00:00.000Z',
+          timeZone: 'UTC' as const,
+        };
+        if (path.endsWith('/reports/roi')) {
           return new Response(
             JSON.stringify({
               windowDays: 30,
-              generatedAt: new Date().toISOString(),
-              leads: { total: 1, qualified: 1, bySource: [], byCampaign: [], byTool: [], byLandingPage: [], byServiceType: [] },
-              appointments: { total: 0, leadsWithAppointment: 0, appointmentRatePct: null },
-              responsiveness: { leadsContacted: 0, leadsReplied: 0, responseRatePct: null, medianMinutesToFirstTouch: null },
+              generatedAt: period.endAt,
+              period,
+              comparison: {
+                period: { startAt: '2026-08-02T00:00:00.000Z', endAt: period.startAt, timeZone: 'UTC' },
+                appointmentsRecorded: 0,
+                won: 0,
+                recordedWinValueCents: 0,
+                unknownWinValues: 0,
+              },
+              dataQuality: { unknownOriginalDates: 0, unknownWinValues: 0, unknownPipelineValues: 0, importedFirstTouchExcluded: 0 },
+              evidence: [],
+              leads: { total: 1, qualified: 1, native: 1, imported: 0, bySource: [], byCampaign: [], byTool: [], byLandingPage: [], byServiceType: [] },
+              appointments: { total: 0, distinctBookedLeads: 0, leadsWithAppointment: 0, appointmentRatePct: 0 },
+              responsiveness: { leadsContacted: 0, leadsReplied: 0, responseRatePct: null, medianMinutesToFirstTouch: null, firstTouchMeasuredLeads: 0 },
               playbooks: [],
               reviewsAndReferrals: { reviewRequestsSent: 0, reviewLinkClicks: 0, referralRequestsSent: 0, referralSubmissions: 0, referralLeads: 0 },
               reactivation: { campaignsLaunched: 0, leadsEnrolled: 0, leadsReplied: 0 },
               outcomes: { won: 0, revenueWonCents: 0, revenueByAttribution: [], pipelineValueCents: 0, lost: 0, lostReasons: [] },
+            } satisfies RoiReport),
+            { headers: { 'content-type': 'application/json' } },
+          );
+        }
+        if (path.endsWith('/revenue/value')) {
+          return new Response(
+            JSON.stringify({
+              period,
+              entryCount: 0,
+              receiptEntryCount: 0,
+              costEntryCount: 0,
+              acceptedEstimateCount: 0,
+              acceptedEstimateCents: 0,
+              completedProjectCount: 0,
+              netReceiptsCents: 0,
+              netDirectCostsCents: 0,
+              recordedContributionCents: null,
+              undatedAcceptedEstimateCount: 0,
+              undatedCompletedProjectCount: 0,
+              entries: [],
+              boundary: 'Staff-recorded entries; no bank/accounting synchronization or causal ROI.',
             }),
             { headers: { 'content-type': 'application/json' } },
           );
@@ -189,6 +226,10 @@ describe('every icon-only control keeps an accessible name', () => {
     mockApi('owner', handler ? { handler } : {});
     renderAt(path, <Page />);
     await settle();
+    if (path === '/reports') {
+      await screen.findByRole('region', { name: 'Win evidence' });
+      await screen.findByRole('region', { name: 'Value ledger' });
+    }
     expectAllControlsNamed({ mayBeEmpty });
 
     if (openModal) {

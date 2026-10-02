@@ -64,6 +64,17 @@ successful tenant-scoped reads. Synthetic invitation extraction verifies the
 actual configured origin and acceptance path. No test or permission gate is
 disabled. A subsequent complete CI run at the repaired head is required.
 
+The second run 36961422539 on cd54dd4 passed all 1,744 API tests (15 existing
+skips), 225 script checks and 16 library checks. All new reply and invitation
+PostgreSQL concurrency cases ran and passed, as did the older concurrent BIE
+execution case. The frontend reached 402 passes and one failure: the old
+report response fixture in the cross-page accessibility suite omitted the new
+period fields and caused a related unhandled render error. The repaired fixture
+uses the generated report type, includes a valid period ledger, and waits for
+the loaded report regions before applying the unchanged accessible-name guard.
+All 403 frontend tests and the frontend typecheck pass locally with no unhandled
+errors. The complete final-head pipeline remains required.
+
 ## Synthetic upgrade and recovery
 
 `scripts/contractor-recovery-drill.mjs` starts with the pinned90-table schema and

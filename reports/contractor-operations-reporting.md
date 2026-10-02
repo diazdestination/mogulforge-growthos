@@ -128,3 +128,24 @@ Verification after the repair:
 
 These are synthetic local checks. No provider calls, production changes,
 commits or pushes were made in this repair lane.
+
+### Second CI: accessibility fixture contract
+
+CI run `36961422539` on `cd54dd4` passed the complete API suite: 184 files
+passed, 3 skipped; 1,744 tests passed, 15 skipped. The frontend failed one
+Reports accessibility case and reported its unhandled `period.startAt` error.
+The local focused run reproduced both failures before the repair.
+
+Only `accessible-names.test.tsx` changed for this repair. Its Reports fixture
+now satisfies the generated `RoiReport` type, includes exact current and prior
+periods plus coverage/evidence fields, and supplies a complete empty value
+ledger for that period. The test waits for both report evidence and ledger
+content before checking every interactive control's accessible name. Existing
+control assertions remain intact; no errors are suppressed and no runtime
+components changed.
+
+After the repair, all 17 focused accessibility tests passed, followed by all
+403 Command Center tests across 68 files with no unhandled errors. The full
+Command Center TypeScript check and scoped whitespace check passed. This lane
+is frozen for the parent's integrated release checks; no provider calls,
+commits or pushes were made.
