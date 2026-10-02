@@ -5,6 +5,8 @@ import { canWrite } from '@/lib/permissions';
 import ServiceObligationEditor, { type ServiceRow } from '@/components/service-obligation-editor';
 
 type ServiceKind = 'warranty_check' | 'maintenance' | 'service_plan';
+type ServiceStatus = 'active' | 'completed' | 'cancelled';
+const SERVICE_PAGE_SIZE = 500;
 type ImportResult = { preview: boolean; totalRows: number; imported: number; duplicates: number; skipped: number; errors: string[] };
 
 const fields = [
@@ -35,6 +37,10 @@ export default function ServiceDesk() {
   const [rows, setRows] = useState<ServiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [recordStatus, setRecordStatus] = useState<ServiceStatus>('active');
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [reopening, setReopening] = useState<ServiceRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [contactId, setContactId] = useState('');
@@ -51,20 +57,54 @@ export default function ServiceDesk() {
   const [preview, setPreview] = useState<ImportResult | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const loadSequence = useRef(0);
+  const viewKey = `${me?.organization?.id ?? ''}:${recordStatus}:${offset}`;
+  const currentView = useRef(viewKey);
+  currentView.current = viewKey;
 
   async function refresh() {
+    const sequence = ++loadSequence.current;
     setLoading(true);
     try {
-      setRows(await jsonRequest<ServiceRow[]>('/api/v1/service-obligations'));
+      const response = await fetch(`/api/v1/service-obligations?status=${recordStatus}&offset=${offset}`, { credentials: 'include' });
+      const result = await response.json();
+      if (!response.ok || !Array.isArray(result)) throw new Error(result.error || 'Service schedule could not be loaded.');
+      if (sequence !== loadSequence.current || viewKey !== currentView.current) return;
+      setRows(result);
+      const limitHeader = response.headers.get('X-Result-Limit-Reached');
+      setHasMore(limitHeader === 'true' || (limitHeader === null && result.length >= SERVICE_PAGE_SIZE));
       setLoadError(false);
     } catch (error) {
+      if (sequence !== loadSequence.current || viewKey !== currentView.current) return;
       setLoadError(true);
       setNotice(error instanceof Error ? error.message : 'Service schedule could not be loaded.');
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current && viewKey === currentView.current) setLoading(false);
     }
   }
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    setRows([]); setReopening(null); setEditingId(null);
+    void refresh();
+    return () => { ++loadSequence.current; };
+  }, [recordStatus, offset, me?.organization?.id]);
+
+  async function reopenService() {
+    if (!editable || !reopening || busy || reopening.obligation.status !== 'cancelled') return;
+    setBusy(true); setNotice('');
+    try {
+      await jsonRequest(`/api/v1/service-obligations/${reopening.obligation.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'active', expectedUpdatedAt: reopening.obligation.updatedAt }),
+      });
+      setNotice('Service reopened as a one-time follow-up. Approve recurrence again only after reviewing the actual agreement. No appointment was booked and no customer message was sent.');
+    } catch (error) {
+      setNotice(`${error instanceof Error ? error.message : 'The reopening was not confirmed.'} Review the refreshed records before deciding whether to reopen again; no automatic retry was made.`);
+    } finally {
+      setReopening(null);
+      await refresh();
+      setBusy(false);
+    }
+  }
 
   async function addService(event: React.FormEvent) {
     event.preventDefault();
@@ -123,7 +163,7 @@ export default function ServiceDesk() {
   const canPreview = !!csv && mapping.firstName !== undefined && mapping.dueDate !== undefined &&
     (mapping.email !== undefined || mapping.phone !== undefined) &&
     (mapping.equipmentLabel !== undefined || !!defaultEquipment);
-  const active = rows.filter(row => row.obligation.status === 'active');
+  const visible = rows.filter(row => row.obligation.status === recordStatus);
   return (
     <div className="h-full overflow-auto p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
       <header>
@@ -131,11 +171,15 @@ export default function ServiceDesk() {
         <p className="text-sm text-muted-foreground">Warranty checks, maintenance, and plan visits stay with customers—not in the new-lead pipeline.</p>
       </header>
       {notice && <p role="status" className="rounded-lg border bg-card p-3 text-sm">{notice}</p>}
-      <section className="rounded-xl border bg-card p-4 space-y-3" aria-label="Upcoming service">
-        <h2 className="font-semibold">Upcoming service ({active.length})</h2>
-        {loading ? <p>Loading service dates…</p> : loadError ? <p role="alert" className="text-sm text-muted-foreground">Service dates are unavailable. Try again before deciding what needs follow-up.</p> : active.length === 0 ? <p className="text-sm text-muted-foreground">No active service dates yet.</p> : (
+      <section className="rounded-xl border bg-card p-4 space-y-3" aria-label="Service records">
+        <h2 className="font-semibold">{recordStatus === 'active' ? 'Upcoming service' : 'Service history'}</h2>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-sm">Service records<select className="block min-h-11 rounded-lg border bg-background p-2" disabled={busy} value={recordStatus} onChange={event => { setRecordStatus(event.target.value as ServiceStatus); setOffset(0); }}><option value="active">Active follow-up</option><option value="completed">Completed visits</option><option value="cancelled">Cancelled service</option></select></label>
+          <button type="button" className="min-h-11 rounded border px-3 py-2 text-sm disabled:opacity-50" disabled={loading || busy} onClick={() => void refresh()}>Refresh service records</button>
+        </div>
+        {loading ? <p>Loading service dates…</p> : loadError ? <p role="alert" className="text-sm text-muted-foreground">Service dates are unavailable. Try again before deciding what needs follow-up.</p> : visible.length === 0 ? <p className="text-sm text-muted-foreground">{offset ? 'No further service records on this page.' : recordStatus === 'active' ? 'No active service dates yet.' : `No ${recordStatus} service records yet.`}</p> : (
           <ul className="space-y-2">
-            {active.map(row => { const { obligation, contact, task } = row; return (
+            {visible.map(row => { const { obligation, contact, task } = row; return (
               <li key={obligation.id} className="rounded-lg border p-3 flex flex-wrap items-center justify-between gap-3 text-sm">
                 <div className="min-w-0 break-words">
                   <p className="font-medium">{contact.firstName} {contact.lastName ?? ''} · {kindNames[obligation.kind]} · {obligation.equipmentLabel}</p>
@@ -143,13 +187,31 @@ export default function ServiceDesk() {
                   {obligation.appointmentId && <p>Appointment linked</p>}
                   <p className="text-muted-foreground">{obligation.recurrence ? `Agreed every ${obligation.recurrence.intervalMonths} months` : 'One-time service'} · {task.assignedUserId ? 'Staff assigned' : 'Staff assignment needed'}</p>
                   {(obligation.coverageStartsOn || obligation.coverageEndsOn) && <p className="text-muted-foreground">Recorded coverage: {obligation.coverageStartsOn || 'Start not recorded'} to {obligation.coverageEndsOn || 'End not recorded'}</p>}
+                  {recordStatus !== 'active' && <div className="mt-2 space-y-1">
+                    <p className="capitalize">Recorded status: {obligation.status}</p>
+                    {obligation.completedAt && <p>Completion recorded {new Date(obligation.completedAt).toLocaleString()}</p>}
+                    {obligation.completionNote && <p>{obligation.completionNote}</p>}
+                    {obligation.coverageEvidence && <p>{obligation.coverageEvidence}</p>}
+                    {obligation.recurrence?.agreementNote && <p>Recorded recurrence agreement: {obligation.recurrence.agreementNote}</p>}
+                  </div>}
                 </div>
-                {editable && <button disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setEditingId(editingId === obligation.id ? null : obligation.id)}>Manage service</button>}
-                {editable && editingId === obligation.id && <ServiceObligationEditor key={`${obligation.id}:${obligation.updatedAt}`} row={row} onClose={() => setEditingId(null)} onSaved={async message => { setNotice(message); await refresh(); }} />}
+                {editable && recordStatus === 'active' && <button disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setEditingId(editingId === obligation.id ? null : obligation.id)}>Manage service</button>}
+                {editable && recordStatus === 'active' && editingId === obligation.id && <ServiceObligationEditor key={`${obligation.id}:${obligation.updatedAt}`} row={row} onClose={() => setEditingId(null)} onSaved={async message => { setNotice(message); await refresh(); }} />}
+                {editable && recordStatus === 'cancelled' && <button type="button" disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setReopening(row)}>Review reopening</button>}
+                {editable && recordStatus === 'cancelled' && reopening?.obligation.id === obligation.id && <div role="group" aria-label="Reopen service review" className="w-full space-y-2 border-t pt-3">
+                  <p>Reopen this cancelled service as active staff follow-up? Its recurrence approval is cleared. A new agreement review and explicit approval are required before future recurring tasks. This does not book an appointment or contact the customer.</p>
+                  <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => void reopenService()}>Reopen service</button><button type="button" disabled={busy} className="min-h-11 rounded border px-3 py-2" onClick={() => setReopening(null)}>Keep cancelled</button></div>
+                </div>}
               </li>
             ); })}
           </ul>
         )}
+        {!loading && !loadError && <div className="space-y-2 border-t pt-3 text-sm">
+          <p>Showing {visible.length} {recordStatus} records on page {Math.floor(offset / SERVICE_PAGE_SIZE) + 1}, up to {SERVICE_PAGE_SIZE} per page.</p>
+          {hasMore && <p>More service records are available. Continue to the next page; this is not the complete service count.</p>}
+          {offset >= 100_000 && hasMore && <p>The supported paging limit has been reached. Ask an operator for a scoped export; additional records are not shown here.</p>}
+          <div className="flex flex-wrap gap-2"><button type="button" disabled={busy || offset === 0} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setOffset(value => Math.max(0, value - SERVICE_PAGE_SIZE))}>Previous service page</button><button type="button" disabled={busy || !hasMore || offset >= 100_000} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setOffset(value => value + SERVICE_PAGE_SIZE)}>Next service page</button></div>
+        </div>}
       </section>
       {editable && <div className="grid gap-5 lg:grid-cols-2">
         <form onSubmit={addService} className="rounded-xl border bg-card p-4 space-y-3">

@@ -3941,6 +3941,12 @@ export interface ServiceObligation {
   nextObligationId?: string | null;
 }
 
+export interface ServiceObligationListItem {
+  obligation: ServiceObligation;
+  contact: Contact;
+  task: CrmTask;
+}
+
 /**
  * Opaque session token — `Bearer <sid>`.
  */
@@ -4186,5 +4192,23 @@ export const ListInvoicesStatus = {
   draft: 'draft',
   issued: 'issued',
   void: 'void',
+} as const;
+
+export type ListServiceObligationsParams = {
+status?: ListServiceObligationsStatus;
+/**
+ * @minimum 0
+ * @maximum 100000
+ */
+offset?: number;
+};
+
+export type ListServiceObligationsStatus = typeof ListServiceObligationsStatus[keyof typeof ListServiceObligationsStatus];
+
+
+export const ListServiceObligationsStatus = {
+  active: 'active',
+  completed: 'completed',
+  cancelled: 'cancelled',
 } as const;
 

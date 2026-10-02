@@ -132,6 +132,7 @@ import type {
   ListLeadsParams,
   ListProjectsParams,
   ListPropertiesParams,
+  ListServiceObligationsParams,
   ListTasksParams,
   ListTodayActionsParams,
   ListWebhookDeliveriesParams,
@@ -195,6 +196,7 @@ import type {
   SavedFilter,
   SavedFilterInput,
   ServiceObligation,
+  ServiceObligationListItem,
   ServiceRecurrenceCommand,
   SessionProfile,
   SmartForm,
@@ -14169,6 +14171,91 @@ export const useReverseInvoiceAllocation = <TError = ErrorType<void>,
       > => {
       return useMutation(getReverseInvoiceAllocationMutationOptions(options));
     }
+
+export const getListServiceObligationsUrl = (params?: ListServiceObligationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/service-obligations?${stringifiedParams}` : `/api/v1/service-obligations`
+}
+
+/**
+ * Company-scoped records, ordered by due date then ID. Status filtering happens before paging. The existing array response is retained; read X-Result-Limit-Reached to identify additional records. Paging is not a stable snapshot if records change between requests.
+ * @summary List company service follow-up or history
+ */
+export const listServiceObligations = async (params?: ListServiceObligationsParams, options?: Parameters<typeof customFetch>[1]): Promise<ServiceObligationListItem[]> => {
+
+  return customFetch<ServiceObligationListItem[]>(getListServiceObligationsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListServiceObligationsQueryKey = (params?: ListServiceObligationsParams,) => {
+    return [
+    `/api/v1/service-obligations`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListServiceObligationsQueryOptions = <TData = Awaited<ReturnType<typeof listServiceObligations>>, TError = ErrorType<void>>(params?: ListServiceObligationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceObligations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListServiceObligationsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listServiceObligations>>> = ({ signal }) => listServiceObligations(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listServiceObligations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListServiceObligationsQueryResult = NonNullable<Awaited<ReturnType<typeof listServiceObligations>>>
+export type ListServiceObligationsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List company service follow-up or history
+ */
+
+export function useListServiceObligations<TData = Awaited<ReturnType<typeof listServiceObligations>>, TError = ErrorType<void>>(
+ params?: ListServiceObligationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceObligations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListServiceObligationsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getSetServiceObligationRecurrenceUrl = (id: string,) => {
 

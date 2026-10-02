@@ -3,6 +3,19 @@
 Follow `PAID-BETA-READINESS-P0.md`; complete the exact candidate CI before a
 release. The swarm foundation reports distinguish local proof from hosted proof.
 
+October 2 integration follow-up: use
+`reports/geekom-contractor-integration-2026-10-02.md` and its integration PR for
+current evidence. Re-run CI on the exact resulting main commit after merge;
+the workflow has no push trigger, so dispatch it explicitly. The held staging
+app remains the older 77f6d63 image with 95 tables until separately verified.
+The cumulative source expects 103 tables; never deploy it onto the 95-table
+database or run an unreviewed automatic schema push.
+
+Azure return-to-desk item: the owner now reports a new Azure account. Wait for
+the first sign-in, confirm the actual directory and account, then inspect app
+registrations and configure the existing Microsoft integration. Preserve the
+account and all outbound holds; do not repeat signup or send to contractors.
+
 1. Review/integrate the stacked candidate chain; rehearse the reviewed additive
    schema delta against an approved restored target with outbound hold intact.
    Inventory the object-storage adapter before accepting private-photo behavior.

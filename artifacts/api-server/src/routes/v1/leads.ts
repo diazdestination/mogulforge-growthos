@@ -390,6 +390,8 @@ router.post(
     if (!result.ok) {
       if (result.error === crm.INVOICE_HISTORY_RETAINED) {
         res.status(409).json({ error: "These customer records have retained invoice history. Keep them separate and ask your operator to review the duplicate.", code: result.error });
+      } else if (result.error === crm.OUTREACH_HISTORY_RETAINED) {
+        res.status(409).json({ error: "These records have imported source history or an unresolved customer reply. Keep them separate and ask your operator to review the duplicate; merging does not authorize outreach.", code: result.error });
       } else if (result.error === "same_lead") {
         res.status(400).json({ error: "Cannot merge a lead into itself" });
       } else {

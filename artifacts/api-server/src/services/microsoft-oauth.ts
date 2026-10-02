@@ -15,6 +15,7 @@ import {
 import { hasPermission } from "../lib/permissions";
 import { isSafeMailbox } from "./providers";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
+import { assertCustomerLifecycleActive, CustomerLifecycleHoldError } from "./customer-lifecycle";
 
 export const MICROSOFT_SCOPES = [
   "https://graph.microsoft.com/Mail.Send",
@@ -482,6 +483,7 @@ export async function sendMicrosoftForUser(
       "Email recipient, subject, or body is invalid.",
     );
   await requireMember(input);
+  await assertCustomerLifecycleActive(input.organizationId);
   const connection = await getMicrosoftConnection(
     input.organizationId,
     input.userId,
@@ -542,6 +544,9 @@ export async function sendMicrosoftForUser(
     )
       throw revoked();
     // Recheck holds immediately at dispatch; no fallback or automatic send retry.
+    // Token refresh and mailbox validation can outlive a company's pause request.
+    // They are preparation, not acceptance of the customer email by Microsoft.
+    await assertCustomerLifecycleActive(input.organizationId);
     assertOutboundDeliveryAllowed({ channel: "email", recipient: input.to });
     const clientRequestId = randomUUID();
     dispatched = true;
@@ -596,6 +601,7 @@ export async function sendMicrosoftForUser(
       clientRequestId,
     };
   } catch (error) {
+    if (error instanceof CustomerLifecycleHoldError) throw error;
     const failure = error instanceof MicrosoftMailError ? error : unavailable();
     const code =
       dispatched && failure.code === "microsoft_unavailable"

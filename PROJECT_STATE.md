@@ -1,6 +1,16 @@
 # GrowthOS project state
 
-Updated October 1, 2026. Latest candidate: `agent/growthos-native-contractor-day`,
+Updated October 2, 2026. GEEKOM retrieved and independently reviewed WILLOWFORGE's
+`caec65a6f2ffa7821721e9ea97a31a4fafd4afc8` (PR #11). The cumulative integration
+candidate is `agent/integrate-contractor-day-20261002`; its PR and exact-head CI
+are authoritative for integration status. See
+`reports/geekom-contractor-integration-2026-10-02.md` for repairs and release gates.
+The existing Microsoft/mobile source at `2c12ddc` is an ancestor and is preserved.
+Azure account creation is now user-reported; first sign-in and directory/app
+inventory are explicitly deferred until the owner returns. Do not create another
+account or treat the account as verified, connected, or authorized for sends.
+
+Prior WILLOWFORGE candidate: `agent/growthos-native-contractor-day`,
 stacked on `agent/growthos-contractor-operations` (PR #10), beta PR #9, swarm PR #8, contractor PR #7, Revenue Desk PR #6 and
 recovery PR #1. GitHub main remains the eventual canonical integration target.
 No merge or deployment is implied by a local candidate or green CI.

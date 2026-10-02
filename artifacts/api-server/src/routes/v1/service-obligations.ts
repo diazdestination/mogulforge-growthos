@@ -6,6 +6,7 @@ import {
   approveServiceRecurrence,
   importServiceCustomers,
   listServiceObligations,
+  SERVICE_LIST_PAGE_SIZE,
   updateServiceObligation,
 } from "../../services/service-obligations";
 import { contractorMutation, contractorScheduleError } from "../../middlewares/contractor-mutation";
@@ -33,7 +34,15 @@ const mapping = z.object({
 }).strict();
 
 router.get("/service-obligations", requireMember("crm.read"), async (req, res) => {
-  res.json(await listServiceObligations(req.member!.organizationId));
+  const query = z.object({
+    status: z.enum(['active', 'completed', 'cancelled']).optional(),
+    offset: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().min(0).max(100_000)).optional(),
+  }).strict().safeParse(req.query);
+  if (!query.success) { res.status(400).json({ error: 'Choose a valid service status and page.' }); return; }
+  const rows = await listServiceObligations(req.member!.organizationId, { ...query.data, includeLookahead: true });
+  res.set('Cache-Control', 'no-store');
+  res.set('X-Result-Limit-Reached', rows.length > SERVICE_LIST_PAGE_SIZE ? 'true' : 'false');
+  res.json(rows.slice(0, SERVICE_LIST_PAGE_SIZE));
 });
 
 router.post("/service-obligations", requireMember("crm.write"), async (req, res) => {

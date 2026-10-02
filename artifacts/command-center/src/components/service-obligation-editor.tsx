@@ -3,7 +3,7 @@ import { useListAppointments, useListUsers } from '@workspace/api-client-react';
 import { canAssignWork, scheduleTimezone } from '@/lib/contractor-schedule';
 
 export type ServiceRow = {
-  obligation: { id: string; contactId: string; kind: 'warranty_check' | 'maintenance' | 'service_plan'; equipmentLabel: string; dueAt: string; status: 'active' | 'completed' | 'cancelled'; source: string; appointmentId: string | null; updatedAt: string; recurrence: { intervalMonths: number; anchorDate: string; endDate: string | null; agreementNote: string } | null; coverageStartsOn: string | null; coverageEndsOn: string | null; coverageEvidence: string | null };
+  obligation: { id: string; contactId: string; kind: 'warranty_check' | 'maintenance' | 'service_plan'; equipmentLabel: string; dueAt: string; status: 'active' | 'completed' | 'cancelled'; source: string; appointmentId: string | null; updatedAt: string; recurrence: { intervalMonths: number; anchorDate: string; endDate: string | null; agreementNote: string } | null; coverageStartsOn: string | null; coverageEndsOn: string | null; coverageEvidence: string | null; completionNote?: string | null; completedAt?: string | null };
   contact: { id: string; firstName: string; lastName: string | null; phone: string | null; email: string | null };
   task: { status: string; dueAt: string | null; assignedUserId: string | null };
 };

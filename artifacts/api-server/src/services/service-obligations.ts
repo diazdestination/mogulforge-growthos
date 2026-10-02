@@ -201,15 +201,17 @@ export async function createServiceObligation(
   });
 }
 
-export async function listServiceObligations(organizationId: string) {
+export const SERVICE_LIST_PAGE_SIZE = 500;
+export async function listServiceObligations(organizationId: string, options: { status?: 'active' | 'completed' | 'cancelled'; offset?: number; includeLookahead?: boolean } = {}) {
   return db
     .select({ obligation: serviceObligationsTable, contact: contactsTable, task: crmTasksTable })
     .from(serviceObligationsTable)
-    .innerJoin(contactsTable, eq(serviceObligationsTable.contactId, contactsTable.id))
-    .innerJoin(crmTasksTable, eq(serviceObligationsTable.taskId, crmTasksTable.id))
-    .where(eq(serviceObligationsTable.organizationId, organizationId))
-    .orderBy(asc(serviceObligationsTable.dueAt))
-    .limit(500);
+    .innerJoin(contactsTable, and(eq(serviceObligationsTable.contactId, contactsTable.id), eq(contactsTable.organizationId, organizationId)))
+    .innerJoin(crmTasksTable, and(eq(serviceObligationsTable.taskId, crmTasksTable.id), eq(crmTasksTable.organizationId, organizationId)))
+    .where(and(eq(serviceObligationsTable.organizationId, organizationId), options.status ? eq(serviceObligationsTable.status, options.status) : undefined))
+    .orderBy(asc(serviceObligationsTable.dueAt), asc(serviceObligationsTable.id))
+    .offset(options.offset ?? 0)
+    .limit(SERVICE_LIST_PAGE_SIZE + (options.includeLookahead ? 1 : 0));
 }
 
 export async function updateServiceObligation(

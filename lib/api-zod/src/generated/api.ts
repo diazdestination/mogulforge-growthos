@@ -6255,6 +6255,92 @@ export const ReverseInvoiceAllocationResponse = zod.object({
 
 
 /**
+ * Company-scoped records, ordered by due date then ID. Status filtering happens before paging. The existing array response is retained; read X-Result-Limit-Reached to identify additional records. Paging is not a stable snapshot if records change between requests.
+ * @summary List company service follow-up or history
+ */
+export const listServiceObligationsQueryOffsetDefault = 0;
+export const listServiceObligationsQueryOffsetMin = 0;
+export const listServiceObligationsQueryOffsetMax = 100000;
+
+
+
+export const ListServiceObligationsQueryParams = zod.object({
+  "status": zod.enum(['active', 'completed', 'cancelled']).optional(),
+  "offset": zod.coerce.number().int().min(listServiceObligationsQueryOffsetMin).max(listServiceObligationsQueryOffsetMax).default(listServiceObligationsQueryOffsetDefault)
+})
+
+export const listServiceObligationsResponseObligationRecurrenceOneIntervalMonthsMax = 60;
+
+
+
+export const ListServiceObligationsResponseItem = zod.object({
+  "obligation": zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "propertyId": zod.uuid().nullish(),
+  "appointmentId": zod.uuid().nullish(),
+  "taskId": zod.uuid(),
+  "kind": zod.enum(['warranty_check', 'maintenance', 'service_plan']),
+  "equipmentLabel": zod.string(),
+  "dueAt": zod.coerce.date(),
+  "noticeDays": zod.int(),
+  "status": zod.enum(['active', 'completed', 'cancelled']),
+  "source": zod.string(),
+  "externalRef": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "recurrence": zod.union([zod.object({
+  "mode": zod.enum(['calendar_months']),
+  "intervalMonths": zod.int().min(1).max(listServiceObligationsResponseObligationRecurrenceOneIntervalMonthsMax),
+  "anchorDate": zod.coerce.date(),
+  "endDate": zod.coerce.date().nullable(),
+  "agreementNote": zod.string(),
+  "approvedByUserId": zod.string(),
+  "approvedAt": zod.coerce.date()
+}),zod.null()]).optional(),
+  "predecessorObligationId": zod.uuid().nullish(),
+  "occurrenceIndex": zod.int().optional(),
+  "coverageStartsOn": zod.coerce.date().nullish(),
+  "coverageEndsOn": zod.coerce.date().nullish(),
+  "coverageEvidence": zod.string().nullish(),
+  "completionNote": zod.string().nullish(),
+  "completedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "nextObligationId": zod.uuid().nullish()
+}),
+  "contact": zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "firstName": zod.string(),
+  "lastName": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "preferredContactMethod": zod.string().nullish(),
+  "doNotContact": zod.boolean().optional().describe('Hard do-not-contact flag; blocks ALL automated outreach on every channel.'),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "task": zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "leadId": zod.uuid().nullish(),
+  "leadLabel": zod.string().nullish().describe('Convenience display name of the linked lead (contact name, falling back to lead summary; list endpoints only).'),
+  "contactId": zod.uuid().nullish(),
+  "assignedUserId": zod.string().nullish(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "status": zod.enum(['open', 'in_progress', 'done', 'cancelled']),
+  "priority": zod.enum(['low', 'normal', 'high', 'emergency']),
+  "dueAt": zod.coerce.date().nullish(),
+  "completedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+})
+export const ListServiceObligationsResponse = zod.array(ListServiceObligationsResponseItem).max(500)
+
+
+/**
  * Calendar-month recurrence requires agreement evidence and current updatedAt. Completion creates at most one next obligation and staff task. Does not book appointments or send messages.
  * @summary Record explicitly agreed service recurrence
  */

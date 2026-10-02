@@ -497,6 +497,66 @@ function CreateInvoice({
   );
 }
 
+/** Keep the optimistic token paired with the document loaded into this editor. */
+function InvoiceDraftEditor({
+  invoice,
+  command,
+}: {
+  invoice: InvoiceDetail;
+  command: Command;
+}) {
+  const [base, setBase] = useState(() => ({
+    version:
+      typeof command.pending?.body.expectedVersion === "number"
+        ? command.pending.body.expectedVersion
+        : invoice.version,
+    document:
+      (command.pending?.body.document as InvoiceDraft | undefined) ??
+      draftDocument(invoice.document),
+  }));
+  const changed = invoice.version !== base.version || invoice.status !== "draft";
+  return (
+    <>
+      {changed && (
+        <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+          <p role="alert" className="text-sm">
+            {invoice.status === "draft"
+              ? `The saved invoice changed from version ${base.version} to ${invoice.version}. Your unsaved edits are retained below, but cannot overwrite the newer document. Discard them and load the latest version before editing again.`
+              : `This invoice is now ${invoice.status}. Your unsaved draft is retained below, read-only. Cancel editing to review the saved document.`}
+          </p>
+          {invoice.status === "draft" && (
+            <button
+              className={invoiceButton}
+              disabled={command.busy || !!command.pending}
+              onClick={() => {
+                setBase({ version: invoice.version, document: draftDocument(invoice.document) });
+                command.refreshed();
+              }}
+            >
+              Discard my edits and load latest version
+            </button>
+          )}
+        </div>
+      )}
+      <InvoiceEditor
+        key={base.version}
+        initial={base.document}
+        disabled={command.locked || changed}
+        busy={command.busy}
+        onSave={(document) => {
+          if (changed) return;
+          void command.submit(
+            `/invoices/${invoice.id}`,
+            "PATCH",
+            { expectedVersion: base.version, document },
+            "Save draft",
+          );
+        }}
+      />
+    </>
+  );
+}
+
 function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
   const queryClient = useQueryClient();
   const detailKey = ["invoices", actor.organizationId, "detail", id];
@@ -609,7 +669,6 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
                 </button>
               )}
             {actor.manage &&
-            invoice.status === "draft" &&
             (editing || !!command.pending?.body.document) ? (
               <section className="space-y-4 rounded-xl border border-border bg-card p-4 md:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -624,23 +683,7 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
                     Cancel editing
                   </button>
                 </div>
-                <InvoiceEditor
-                  initial={
-                    (command.pending?.body.document as
-                      InvoiceDraft | undefined) ??
-                    draftDocument(invoice.document)
-                  }
-                  disabled={command.locked}
-                  busy={command.busy}
-                  onSave={(document) =>
-                    void command.submit(
-                      `/invoices/${id}`,
-                      "PATCH",
-                      { expectedVersion: invoice.version, document },
-                      "Save draft",
-                    )
-                  }
-                />
+                <InvoiceDraftEditor invoice={invoice} command={command} />
               </section>
             ) : (
               <InvoiceDocumentView invoice={invoice} />

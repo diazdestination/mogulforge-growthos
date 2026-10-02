@@ -7,10 +7,7 @@ import { getInspectionAvailabilityWarning } from '@workspace/inspection-availabi
 import { canWrite } from '@/lib/permissions';
 import { useGetMe } from '@workspace/api-client-react';
 import { format } from 'date-fns';
-import { updateAppointment as updateAppointmentRequest } from '@workspace/api-client-react';
-import { useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { toast as globalToast } from '@/hooks/use-toast';
-import { ToastAction } from '@/components/ui/toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { canAssignWork, localDateTime, scheduleTimezone } from '@/lib/contractor-schedule';
 
 export default function Appointments() {
@@ -29,6 +26,9 @@ export default function Appointments() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAppt, setEditingAppt] = useState<any>(null);
+  const [statusReview, setStatusReview] = useState<{ id: string; status: AppointmentStatus } | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewError, setReviewError] = useState('');
 
   const openEdit = (appt: any) => {
     setEditingAppt(appt);
@@ -43,12 +43,28 @@ export default function Appointments() {
   const updateAppt = useUpdateAppointment();
 
   const handleStatusChange = (id: string, status: AppointmentStatus) => {
-    if(!canEdit) return;
+    if(!canEdit || statusReview || updateAppt.isPending) return;
     const original = appointments?.find(appointment => appointment.id === id);
     updateAppt.mutate({ id, data: { status, ...(original?.updatedAt ? { expectedUpdatedAt: original.updatedAt } : {}) } }, {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() }),
-      onError: () => { void refetch(); showApptStatusFailedToast(id, status, queryClient, original?.updatedAt); },
+      onError: () => { setReviewError(''); setStatusReview({ id, status }); },
     });
+  }
+
+  async function reviewStatusChange() {
+    if (!statusReview || !canEdit || reviewing) return;
+    setReviewing(true); setReviewError('');
+    try {
+      const result = await refetch();
+      if (result.isError) throw new Error('The current appointment could not be loaded. No change has been retried.');
+      const current = result.data?.find(appointment => appointment.id === statusReview.id);
+      if (!current) throw new Error('This appointment is not in the selected range. Adjust the date or team filter, then refresh and review again. No change has been retried.');
+      // Review the actual saved record, not the earlier desired status. A lost
+      // acknowledgement may already have committed that command.
+      setEditingAppt(current); setIsFormOpen(true); setStatusReview(null);
+    } catch (error) {
+      setReviewError(error instanceof Error ? error.message : 'Refresh failed. No change has been retried.');
+    } finally { setReviewing(false); }
   }
 
   // Sort by date ascending (upcoming first)
@@ -71,6 +87,12 @@ export default function Appointments() {
       </header>
 
       <div className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
+        {statusReview && <div role="alert" className="mx-auto mb-5 max-w-5xl space-y-2 rounded-lg border border-destructive p-4">
+          <p className="font-semibold">Appointment update needs review</p>
+          <p className="text-sm">The requested change to {statusReview.status.replaceAll('_', ' ')} was not confirmed. It may already have saved, or another team member may have changed the record. Review the current appointment before deciding what to do next. No change is retried automatically.</p>
+          {reviewError && <p className="text-sm">{reviewError}</p>}
+          {canEdit && <button type="button" disabled={reviewing} className="min-h-11 rounded border px-3 py-2 text-sm disabled:opacity-50" onClick={() => void reviewStatusChange()}>Refresh and review appointment</button>}
+        </div>}
         <div className="mx-auto mb-5 max-w-5xl space-y-2">
           <div className="flex flex-wrap items-end gap-3">
             <label className="min-w-0 text-sm">Start date<input type="date" className="block min-h-11 max-w-full rounded-lg border bg-background p-2 text-base" value={date} onChange={event => setDate(event.target.value)} /></label>
@@ -104,6 +126,7 @@ export default function Appointments() {
 
                   {/* Details */}
                   <div className="flex-1 min-w-0">
+                    <p className="mb-2 break-words text-base font-semibold">{appt.leadLabel || 'Customer not recorded'}</p>
                     <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2.5">
                       <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest ${
                         appt.type === 'inspection' ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400' :
@@ -141,7 +164,7 @@ export default function Appointments() {
                           appt.status === 'cancelled' || appt.status === 'no_show' ? 'bg-destructive/15 text-destructive border border-destructive/30' :
                           'bg-background border border-border text-foreground'
                         }`}
-                        aria-label="Appointment status" value={appt.status}
+                        aria-label="Appointment status" value={appt.status} disabled={!!statusReview || updateAppt.isPending}
                         onChange={(e) => handleStatusChange(appt.id, e.target.value as AppointmentStatus)}
                       >
                         <option value="scheduled">Scheduled</option>
@@ -155,7 +178,7 @@ export default function Appointments() {
                     )}
                     
                     {canEdit && (
-                      <button data-testid="edit-appointment" aria-label="Edit appointment" onClick={() => openEdit(appt)} className="md:opacity-0 md:group-hover:opacity-100 w-10 h-10 md:w-8 md:h-8 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-primary transition-all rounded-full hover:bg-muted md:mt-auto active:scale-95 bg-muted/50 md:bg-transparent border border-border md:border-none shadow-sm md:shadow-none">
+                      <button data-testid="edit-appointment" aria-label="Edit appointment" disabled={!!statusReview || updateAppt.isPending} onClick={() => openEdit(appt)} className="md:opacity-0 md:group-hover:opacity-100 w-10 h-10 md:w-8 md:h-8 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-primary transition-all rounded-full hover:bg-muted md:mt-auto active:scale-95 bg-muted/50 md:bg-transparent border border-border md:border-none shadow-sm md:shadow-none disabled:opacity-50">
                         <Edit className="w-4 h-4 md:w-4 md:h-4" />
                       </button>
                     )}
@@ -173,7 +196,7 @@ export default function Appointments() {
         )}
       </div>
 
-      {isFormOpen && (
+      {isFormOpen && canEdit && (
         <ApptFormModal 
           appt={editingAppt} 
           onClose={() => setIsFormOpen(false)} 
@@ -183,34 +206,6 @@ export default function Appointments() {
   );
 }
 
-/**
- * Error toast with a Retry action for the one-shot appointment status change.
- * Module level (global toast store + plain fetch client) so retrying keeps
- * working across re-renders — same pattern as pipeline.tsx.
- */
-function showApptStatusFailedToast(apptId: string, status: AppointmentStatus, queryClient: QueryClient, expectedUpdatedAt?: string) {
-  const { dismiss } = globalToast({
-    variant: 'destructive',
-    title: 'Appointment not updated',
-    description: `Marking the appointment "${status.replace(/_/g, ' ')}" failed. Retry below.`,
-    action: (
-      <ToastAction
-        altText="Retry appointment status update"
-        onClick={async () => {
-          try {
-            await updateAppointmentRequest(apptId, { status, ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}) });
-            queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() });
-            dismiss();
-          } catch {
-            showApptStatusFailedToast(apptId, status, queryClient, expectedUpdatedAt);
-          }
-        }}
-      >
-        Retry
-      </ToastAction>
-    ),
-  });
-}
 function ApptFormModal({ appt, onClose }: { appt?: any, onClose: () => void }) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {

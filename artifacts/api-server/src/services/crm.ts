@@ -10,6 +10,7 @@ import {
   crmTasksTable,
   db,
   estimatesTable,
+  emailResponseReviewsTable,
   invoicesTable,
   leadsTable,
   leadTagsTable,
@@ -31,6 +32,7 @@ import {
 } from "./inspection-booking";
 import { appointmentCustomer, assertHistoricalStaff, assertOperationalStaff, assertResourceWindow, assertScheduleInterval, assertScheduleVersion, ensureInvoicePreparationTask, lockContractorSchedule, ScheduleError, type ScheduleTransaction } from "./contractor-scheduling";
 import { reconcileServiceAppointment } from "./service-obligations";
+import { lockReplyLead } from "./response-correlation";
 
 /**
  * Org-scoped CRM data access. Every query in this module REQUIRES an
@@ -649,6 +651,7 @@ export async function findDuplicateLeadGroups(
 
 // ---------- lead merge ----------
 export const INVOICE_HISTORY_RETAINED = "invoice_history_retained" as const;
+export const OUTREACH_HISTORY_RETAINED = "outreach_history_retained" as const;
 
 /**
  * Merge one duplicate lead into a surviving lead. Moves the source lead's
@@ -673,30 +676,35 @@ export async function mergeLeads(
       movedProjects: number;
       movedConversations: number;
     }
-  | { ok: false; error: "not_found" | "same_lead" | typeof INVOICE_HISTORY_RETAINED }
+  | { ok: false; error: "not_found" | "same_lead" | typeof INVOICE_HISTORY_RETAINED | typeof OUTREACH_HISTORY_RETAINED }
 > {
   if (survivorId === sourceId) return { ok: false, error: "same_lead" };
-  const leads = await db
-    .select()
-    .from(leadsTable)
-    .where(
-      and(
-        eq(leadsTable.organizationId, organizationId),
-        inArray(leadsTable.id, [survivorId, sourceId]),
-      ),
-    );
-  const survivor = leads.find((l) => l.id === survivorId);
-  const source = leads.find((l) => l.id === sourceId);
-  if (!survivor || !source) return { ok: false, error: "not_found" };
-
   return db.transaction(async (tx) => {
     // Serialize with invoice creation so a document cannot appear between the
     // retention check and moving its lead/project/estimate relationships.
     await lockContractorSchedule(tx, organizationId);
+    // Follow the schedule-before-reply lock order used by durable execution.
+    // Re-read both records under lock; a merge is never a source attestation or
+    // an implicit resolution of a customer reply on either opportunity.
+    for (const id of [survivorId, sourceId].sort()) await lockReplyLead(tx, organizationId, id);
+    const leads = await tx.select().from(leadsTable).where(and(
+      eq(leadsTable.organizationId, organizationId),
+      inArray(leadsTable.id, [survivorId, sourceId]),
+    )).orderBy(leadsTable.id).for("update");
+    const survivor = leads.find((lead) => lead.id === survivorId);
+    const source = leads.find((lead) => lead.id === sourceId);
+    if (!survivor || !source) return { ok: false as const, error: "not_found" as const };
     const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(
       eq(invoicesTable.organizationId, organizationId), inArray(invoicesTable.leadId, [survivorId, sourceId]),
     )).limit(1);
     if (invoice) return { ok: false as const, error: INVOICE_HISTORY_RETAINED };
+    const [replyHold] = await tx.select({ id: emailResponseReviewsTable.id }).from(emailResponseReviewsTable).where(and(
+      eq(emailResponseReviewsTable.organizationId, organizationId),
+      inArray(emailResponseReviewsTable.leadId, [survivorId, sourceId]),
+      eq(emailResponseReviewsTable.holdActive, true),
+    )).limit(1);
+    if (replyHold || leads.some(lead => lead.creationMethod === "import" || lead.importedHistory !== null || lead.importSourceKey !== null || lead.externalOpportunityId !== null))
+      return { ok: false as const, error: OUTREACH_HISTORY_RETAINED };
     // Move activities onto the survivor.
     const movedActivities = await tx
       .update(activitiesTable)

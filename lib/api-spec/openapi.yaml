@@ -4392,6 +4392,53 @@ paths:
           "description": "Stale version, conflicting retry, immutable issued document or ledger reconciliation required."
         "503":
           "description": "Unavailable. Retain the exact request UUID and payload when checking or retrying an uncertain mutation."
+  "/v1/service-obligations":
+    "get":
+      "operationId": "listServiceObligations"
+      "tags": ["contractor"]
+      "summary": "List company service follow-up or history"
+      "description": "Company-scoped records, ordered by due date then ID. Status filtering happens before paging. The existing array response is retained; read X-Result-Limit-Reached to identify additional records. Paging is not a stable snapshot if records change between requests."
+      "parameters":
+        - "name": "status"
+          "in": "query"
+          "required": false
+          "schema":
+            "type": "string"
+            "enum": ["active", "completed", "cancelled"]
+        - "name": "offset"
+          "in": "query"
+          "required": false
+          "schema":
+            "type": "integer"
+            "minimum": 0
+            "maximum": 100000
+            "default": 0
+      "responses":
+        "200":
+          "description": "Up to 500 service records. Omit status to retain the legacy all-status list."
+          "headers":
+            "X-Result-Limit-Reached":
+              "description": "True only when a lookahead record proves another page exists."
+              "schema":
+                "type": "string"
+                "enum": ["true", "false"]
+            "Cache-Control":
+              "schema":
+                "type": "string"
+                "enum": ["no-store"]
+          "content":
+            "application/json":
+              "schema":
+                "type": "array"
+                "maxItems": 500
+                "items":
+                  "$ref": "#/components/schemas/ServiceObligationListItem"
+        "400":
+          "description": "Invalid status, offset or unknown query fields."
+        "401":
+          "description": "Authentication required."
+        "403":
+          "description": "CRM read permission required."
   "/v1/service-obligations/{id}/recurrence":
     "post":
       "operationId": "setServiceObligationRecurrence"
@@ -9428,6 +9475,16 @@ components:
         "approvedAt":
           "type": "string"
           "format": "date-time"
+    ServiceObligationListItem:
+      "type": "object"
+      "required": ["obligation", "contact", "task"]
+      "properties":
+        "obligation":
+          "$ref": "#/components/schemas/ServiceObligation"
+        "contact":
+          "$ref": "#/components/schemas/Contact"
+        "task":
+          "$ref": "#/components/schemas/CrmTask"
     ServiceObligation:
       "type": "object"
       "required": ["id","organizationId","contactId","taskId","kind","equipmentLabel","dueAt","noticeDays","status","source","createdAt","updatedAt"]
