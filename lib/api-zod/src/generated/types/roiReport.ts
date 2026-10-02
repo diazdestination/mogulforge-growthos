@@ -5,7 +5,11 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+import type { RoiPeriod } from './roiPeriod';
 import type { RoiReportAppointments } from './roiReportAppointments';
+import type { RoiReportComparison } from './roiReportComparison';
+import type { RoiReportDataQuality } from './roiReportDataQuality';
+import type { RoiReportEvidenceItem } from './roiReportEvidenceItem';
 import type { RoiReportLeads } from './roiReportLeads';
 import type { RoiReportOutcomes } from './roiReportOutcomes';
 import type { RoiReportPlaybooksItem } from './roiReportPlaybooksItem';
@@ -16,6 +20,10 @@ import type { RoiReportReviewsAndReferrals } from './roiReportReviewsAndReferral
 export interface RoiReport {
   windowDays: number;
   generatedAt: Date;
+  period: RoiPeriod;
+  comparison: RoiReportComparison;
+  dataQuality: RoiReportDataQuality;
+  evidence: RoiReportEvidenceItem[];
   leads: RoiReportLeads;
   appointments: RoiReportAppointments;
   responsiveness: RoiReportResponsiveness;

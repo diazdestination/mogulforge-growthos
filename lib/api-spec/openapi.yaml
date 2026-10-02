@@ -218,6 +218,12 @@ paths:
       operationId: inviteUser
       tags: [users]
       summary: Invite a new team member by email (admin only)
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Keep this UUID unchanged when retrying the identical invitation after an unknown result.
+          schema: { type: string, format: uuid }
       requestBody:
         required: true
         content:
@@ -226,7 +232,13 @@ paths:
               $ref: "#/components/schemas/InviteUserInput"
       responses:
         "201":
-          description: Invited member (activates on first sign-in)
+          description: Pending member requiring signed invitation acceptance or verified-mailbox OIDC adoption
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvitedMember"
+        "200":
+          description: Original invitation request reconciled without resending
           content:
             application/json:
               schema:
@@ -2247,6 +2259,15 @@ paths:
           required: false
           schema:
             type: integer
+            minimum: 1
+            maximum: 365
+        - name: endAt
+          in: query
+          required: false
+          description: Exclusive UTC end of the report period; defaults to the generation time.
+          schema:
+            type: string
+            format: date-time
       responses:
         "200":
           description: ROI report for the requested window
@@ -2265,6 +2286,14 @@ paths:
           required: false
           schema:
             type: integer
+            minimum: 1
+            maximum: 365
+        - name: endAt
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
       responses:
         "200":
           description: CSV download
@@ -3903,6 +3932,141 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TestLeadCleanupResponse"
+  /v1/platform/clients/{orgId}/invitations:
+    get:
+      operationId: listClientStaffInvitations
+      tags: [onboarding]
+      summary: Review invitations for a platform-managed company
+      description: Platform administrator session required. Never returns invitation tokens or links.
+      parameters:
+        - { name: orgId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientStaffInvitationList" }
+    post:
+      operationId: createClientStaffInvitation
+      tags: [onboarding]
+      summary: Invite a staff member using an immutable request ID
+      description: Platform administrator session required. Repeat the identical request ID after an unknown result; changing its contents returns a conflict. An unconfirmed delivery requires explicit review.
+      parameters:
+        - { name: orgId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateClientStaffInvitation" }
+      responses:
+        "201":
+          description: Invitation recorded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientStaffInvitationCreated" }
+        "200":
+          description: Original request found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientStaffInvitationCreated" }
+
+  /v1/platform/clients/{orgId}/invitations/{invitationId}/reissue:
+    post:
+      operationId: reissueClientStaffInvitation
+      tags: [onboarding]
+      summary: Reissue a reviewed staff invitation
+      description: Platform administrator session required. The version must match the latest invitation. Expired pending invitations can be renewed; stale versions and already accepted or revoked invitations conflict.
+      parameters:
+        - { name: orgId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: invitationId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ClientStaffInvitationAction" }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientStaffInvitation" }
+
+  /v1/platform/clients/{orgId}/invitations/{invitationId}/revoke:
+    post:
+      operationId: revokeClientStaffInvitation
+      tags: [onboarding]
+      summary: Revoke a pending staff invitation
+      description: Platform administrator session required. The version must match the latest invitation. Expired pending invitations can be revoked; stale versions and already accepted invitations conflict.
+      parameters:
+        - { name: orgId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: invitationId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ClientStaffInvitationAction" }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientStaffInvitation" }
+
+  /v1/email-intelligence/replies:
+    get:
+      operationId: listCustomerReplies
+      tags: [email-intelligence]
+      summary: Review customer replies and active follow-up holds
+      description: Requires an authenticated member with CRM read access. Returned messages are redacted and may have been deleted; durable reply decisions survive deletion.
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 0, maximum: 10000, default: 0 } }
+        - { name: scope, in: query, schema: { type: string, enum: [attention, all], default: attention } }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerReplyList" }
+
+  /v1/email-intelligence/replies/{id}/review:
+    post:
+      operationId: reviewCustomerReply
+      tags: [email-intelligence]
+      summary: Confirm or dismiss an ambiguous reply
+      description: Requires active CRM write access in the same company. Audited; does not automatically resume cancelled work or a company pause. Conflicting decisions return 409.
+      parameters:
+        - { $ref: "#/components/parameters/IdPathParam" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviewCustomerReply" }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerReplyDecision" }
+
+  /v1/email-intelligence/replies/{id}/resolve:
+    post:
+      operationId: resolveCustomerReply
+      tags: [email-intelligence]
+      summary: Resolve a reviewed follow-up hold
+      description: Requires active CRM write access in the same company. Audited; does not automatically resume cancelled work or a company pause. Conflicting decisions return 409.
+      parameters:
+        - { $ref: "#/components/parameters/IdPathParam" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResolveCustomerReply" }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomerReplyDecision" }
 components:
   parameters:
     IdPathParam:
@@ -4696,21 +4860,83 @@ components:
           type: string
         count:
           type: integer
+    RoiPeriod:
+      type: object
+      required: [startAt, endAt, timeZone]
+      properties:
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+        timeZone:
+          type: string
+          enum: [UTC]
     RoiReport:
       type: object
       required:
-        [windowDays, generatedAt, leads, appointments, responsiveness, playbooks, reviewsAndReferrals, reactivation, outcomes]
+        [windowDays, generatedAt, period, comparison, dataQuality, evidence, leads, appointments, responsiveness, playbooks, reviewsAndReferrals, reactivation, outcomes]
       properties:
         windowDays:
           type: integer
         generatedAt:
           type: string
           format: date-time
+        period:
+          $ref: "#/components/schemas/RoiPeriod"
+        comparison:
+          type: object
+          required: [period, appointmentsRecorded, won, recordedWinValueCents, unknownWinValues]
+          properties:
+            period:
+              $ref: "#/components/schemas/RoiPeriod"
+            appointmentsRecorded:
+              type: integer
+            won:
+              type: integer
+            recordedWinValueCents:
+              type: [integer, "null"]
+            unknownWinValues:
+              type: integer
+        dataQuality:
+          type: object
+          required: [unknownOriginalDates, unknownWinValues, unknownPipelineValues, importedFirstTouchExcluded]
+          properties:
+            unknownOriginalDates:
+              type: integer
+            unknownWinValues:
+              type: integer
+            unknownPipelineValues:
+              type: integer
+            importedFirstTouchExcluded:
+              type: integer
+        evidence:
+          type: array
+          items:
+            type: object
+            required: [leadId, title, wonAt, valueCents, attribution]
+            properties:
+              leadId:
+                type: string
+              title:
+                type: string
+              wonAt:
+                type: string
+                format: date-time
+              valueCents:
+                type: [integer, "null"]
+              attribution:
+                type: string
         leads:
           type: object
-          required: [total, qualified, bySource, byCampaign, byTool, byLandingPage, byServiceType]
+          required: [total, native, imported, qualified, bySource, byCampaign, byTool, byLandingPage, byServiceType]
           properties:
             total:
+              type: integer
+            native:
+              type: integer
+            imported:
               type: integer
             qualified:
               type: integer
@@ -4736,21 +4962,25 @@ components:
                 $ref: "#/components/schemas/RoiBreakdownRow"
         appointments:
           type: object
-          required: [total, leadsWithAppointment]
+          required: [total, leadsWithAppointment, distinctBookedLeads]
           properties:
             total:
               type: integer
             leadsWithAppointment:
               type: integer
+            distinctBookedLeads:
+              type: integer
             appointmentRatePct:
               type: [integer, "null"]
         responsiveness:
           type: object
-          required: [leadsContacted, leadsReplied]
+          required: [leadsContacted, leadsReplied, firstTouchMeasuredLeads]
           properties:
             leadsContacted:
               type: integer
             leadsReplied:
+              type: integer
+            firstTouchMeasuredLeads:
               type: integer
             responseRatePct:
               type: [integer, "null"]
@@ -4807,21 +5037,23 @@ components:
             won:
               type: integer
             revenueWonCents:
-              type: integer
+              type: [integer, "null"]
             revenueByAttribution:
               type: array
               items:
                 type: object
-                required: [category, count, revenueCents]
+                required: [category, count, revenueCents, unknownValues]
                 properties:
                   category:
                     type: string
                   count:
                     type: integer
                   revenueCents:
+                    type: [integer, "null"]
+                  unknownValues:
                     type: integer
             pipelineValueCents:
-              type: integer
+              type: [integer, "null"]
             lost:
               type: integer
             lostReasons:
@@ -7924,3 +8156,137 @@ components:
       properties:
         removed:
           type: number
+    ClientStaffInvitation:
+      type: object
+      required: [id, organizationId, email, role, version, state, deliveryState, expiresAt, acceptedAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { type: string, enum: [owner, admin, sales_manager, sales_rep, inspector, production, office, viewer] }
+        version: { type: integer, minimum: 1 }
+        state: { type: string, enum: [pending, expired, accepted, revoked] }
+        deliveryState: { type: string, enum: [sending, sent, unconfirmed] }
+        expiresAt: { type: string, format: date-time }
+        acceptedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    ClientStaffInvitationList:
+      type: object
+      required: [organizationId, invitations, truncated]
+      properties:
+        organizationId: { type: string, format: uuid }
+        invitations:
+          type: array
+          maxItems: 100
+          items: { $ref: "#/components/schemas/ClientStaffInvitation" }
+        truncated: { type: boolean }
+    ClientStaffInvitationCreated:
+      type: object
+      required: [invitation, duplicate]
+      properties:
+        invitation: { $ref: "#/components/schemas/ClientStaffInvitation" }
+        duplicate: { type: boolean }
+    CreateClientStaffInvitation:
+      type: object
+      additionalProperties: false
+      required: [requestId, email, role, confirmed]
+      properties:
+        requestId: { type: string, format: uuid }
+        email: { type: string, format: email, maxLength: 254 }
+        role: { type: string, enum: [owner, admin, sales_manager, sales_rep, inspector, production, office, viewer] }
+        firstName: { type: string, maxLength: 100 }
+        lastName: { type: string, maxLength: 100 }
+        confirmed: { type: boolean, enum: [true] }
+    ClientStaffInvitationAction:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, confirmed]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        confirmed: { type: boolean, enum: [true] }
+    CustomerReplyEffects:
+      type: object
+      required: [pausedEnrollments, cancelledActions, blockedProposals, reconciliationRequired]
+      properties:
+        pausedEnrollments: { type: integer, minimum: 0 }
+        cancelledActions: { type: integer, minimum: 0 }
+        blockedProposals: { type: integer, minimum: 0 }
+        reconciliationRequired: { type: integer, minimum: 0 }
+    CustomerReplyItem:
+      type: object
+      required: [id, messageId, state, reason, leadId, replyAt, receivedAt, holdActive, reviewedAt, releasedAt, effectSummary, subject, fromEmail, leadSummary]
+      properties:
+        id: { type: string, format: uuid }
+        messageId: { type: [string, "null"], format: uuid }
+        state: { type: string, enum: [needs_review, confirmed, dismissed] }
+        reason: { type: string }
+        leadId: { type: [string, "null"], format: uuid }
+        replyAt: { type: [string, "null"], format: date-time }
+        receivedAt: { type: string, format: date-time }
+        holdActive: { type: boolean }
+        reviewedAt: { type: [string, "null"], format: date-time }
+        releasedAt: { type: [string, "null"], format: date-time }
+        effectSummary:
+          anyOf:
+            - { $ref: "#/components/schemas/CustomerReplyEffects" }
+            - { type: "null" }
+        subject: { type: [string, "null"] }
+        fromEmail: { type: [string, "null"] }
+        leadSummary: { type: [string, "null"] }
+    CustomerReplyList:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          maxItems: 20
+          items: { $ref: "#/components/schemas/CustomerReplyItem" }
+        total: { type: integer, minimum: 0 }
+        page: { type: integer, minimum: 0 }
+        pageSize: { type: integer, enum: [20] }
+    ReviewCustomerReply:
+      type: object
+      additionalProperties: false
+      required: [decision, note]
+      properties:
+        decision: { type: string, enum: [confirm, dismiss] }
+        leadId: { type: string, format: uuid, description: Required when confirming. }
+        note: { type: string, minLength: 10, maxLength: 1000 }
+        replyAt:
+          type: string
+          format: date-time
+          description: Required when the source has no original time. Cannot replace a known source time. At most 60 seconds of future clock skew is permitted.
+    ResolveCustomerReply:
+      type: object
+      additionalProperties: false
+      required: [note]
+      properties:
+        note: { type: string, minLength: 10, maxLength: 1000 }
+    CustomerReplyDecision:
+      type: object
+      required: [id, organizationId, sourceId, messageId, externalMessageId, payloadSha256, state, reason, leadId, contactId, outboundActivityId, replyAt, receivedAt, holdActive, reviewedByUserId, reviewedAt, reviewNote, effectSummary, releasedByUserId, releasedAt, releaseNote]
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        sourceId: { type: string, format: uuid }
+        messageId: { type: [string, "null"], format: uuid }
+        externalMessageId: { type: string }
+        payloadSha256: { type: string }
+        state: { type: string, enum: [needs_review, confirmed, dismissed] }
+        reason: { type: string }
+        leadId: { type: [string, "null"], format: uuid }
+        contactId: { type: [string, "null"], format: uuid }
+        outboundActivityId: { type: [string, "null"], format: uuid }
+        replyAt: { type: [string, "null"], format: date-time }
+        receivedAt: { type: string, format: date-time }
+        holdActive: { type: boolean }
+        reviewedByUserId: { type: [string, "null"] }
+        reviewedAt: { type: [string, "null"], format: date-time }
+        reviewNote: { type: [string, "null"] }
+        effectSummary:
+          anyOf:
+            - { $ref: "#/components/schemas/CustomerReplyEffects" }
+            - { type: "null" }
+        releasedByUserId: { type: [string, "null"] }
+        releasedAt: { type: [string, "null"], format: date-time }
+        releaseNote: { type: [string, "null"] }

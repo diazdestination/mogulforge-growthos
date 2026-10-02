@@ -9,5 +9,7 @@
 export type RoiReportOutcomesRevenueByAttributionItem = {
   category: string;
   count: number;
-  revenueCents: number;
+  /** @nullable */
+  revenueCents: number | null;
+  unknownValues: number;
 };

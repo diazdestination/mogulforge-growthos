@@ -34,6 +34,7 @@ import { and, desc, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { isSafeMailbox } from "./providers";
 import { getSendingHours } from "./settings";
 import { customerWorkHeld } from "./customer-lifecycle-runtime";
+import { hasCustomerReplyHold, hasContactReplyHold } from "./response-correlation";
 
 export type SendChannel = "email" | "sms";
 /** outreach = automated marketing touches; transactional = confirmations, reminders, replies. */
@@ -269,6 +270,11 @@ export async function checkSendEligibility(
   }
 
   if (kind !== "outreach") return { ok: true };
+
+  if (input.leadId && await hasCustomerReplyHold(organizationId, input.leadId))
+    return { ok: false, outcome: "blocked", reason: "customer_reply_requires_review" };
+  if (!input.leadId && await hasContactReplyHold(organizationId, contact.id))
+    return { ok: false, outcome: "blocked", reason: "reply_requires_opportunity_context" };
 
   // A CSV snapshot does not establish current status, replies or eligibility.
   // Read the current tenant-owned record here instead of trusting a caller flag.

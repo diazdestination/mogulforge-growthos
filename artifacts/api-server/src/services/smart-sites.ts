@@ -23,6 +23,7 @@ import { buildTouch, leadAttributionColumns } from "./attribution";
 import { hasPermission } from "../lib/permissions";
 import { getCustomerLifecycleStatus } from "./customer-lifecycle";
 import { customerWorkHeld } from "./customer-lifecycle-runtime";
+import { acceptedStaffCondition } from "./accepted-staff";
 
 export class SmartSiteError extends Error {
   constructor(
@@ -102,7 +103,7 @@ export async function smartSiteLaunchReadiness(
       .where(
         and(
           eq(usersTable.organizationId, organizationId),
-          eq(usersTable.isActive, true),
+          acceptedStaffCondition(),
         ),
       ),
     db
@@ -246,7 +247,7 @@ export async function updateSmartSite(
         .where(
           and(
             eq(usersTable.organizationId, organizationId),
-            eq(usersTable.isActive, true),
+            acceptedStaffCondition(),
           ),
         )
         .for("share");
@@ -439,7 +440,7 @@ export async function captureSmartSiteInquiry(
       .where(
         and(
           eq(usersTable.organizationId, organizationId),
-          eq(usersTable.isActive, true),
+          acceptedStaffCondition(),
         ),
       )
       .for("share");

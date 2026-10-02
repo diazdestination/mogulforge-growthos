@@ -8,6 +8,8 @@ import {
 
 import {
   db,
+  auditEventsTable,
+  emailResponseReviewsTable,
   emailIntelligenceFactsTable,
   emailIntelligenceMessagesTable,
   emailIntelligenceSourcesTable,
@@ -15,10 +17,12 @@ import {
   type EmailIntelligenceFactStatus,
   type EmailIntelligenceSource,
 } from "@workspace/db";
-import { and, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
+import { z } from "zod/v4";
 
 import { encryptEmailContent } from "../lib/email-content-encryption";
 import { recordAudit } from "./audit";
+import { registerEmailResponse, type VerifiedReplyParent } from "./response-correlation";
 
 const MAX_TEXT_BYTES = 256 * 1024;
 const MAX_RECIPIENTS = 25;
@@ -45,6 +49,9 @@ export interface EmailIntelligencePayload {
   text: string;
   sentAt?: string | null;
   attachmentCount?: number;
+  /** Supplied only by the authenticated normalizer after resolving the original
+   * provider message in its sending mailbox, never copied from email text. */
+  replyTo?: VerifiedReplyParent | null;
 }
 
 export interface DerivedEmailFact {
@@ -346,11 +353,13 @@ function validatePayload(payload: EmailIntelligencePayload): EmailIntelligencePa
   if (typeof payload.externalMessageId !== "string" || !payload.externalMessageId.trim() || payload.externalMessageId.length > 500) {
     throw new EmailIntelligenceError("A bounded external message id is required.");
   }
+  if (typeof payload.forwardedBy !== "string" || typeof payload.from !== "string") throw new EmailIntelligenceError("Email identities must be strings.");
   const forwardedBy = normalizeEmail(payload.forwardedBy);
   const from = normalizeEmail(payload.from);
   if (!Array.isArray(payload.to) || payload.to.length === 0 || payload.to.length > MAX_RECIPIENTS) {
     throw new EmailIntelligenceError(`Provide between 1 and ${MAX_RECIPIENTS} recipients.`);
   }
+  if (payload.to.some(value => typeof value !== "string")) throw new EmailIntelligenceError("Recipients must be email strings.");
   const to = payload.to.map(normalizeEmail);
   if (typeof payload.subject !== "string" || payload.subject.length > 1_000) {
     throw new EmailIntelligenceError("The email subject is invalid.");
@@ -361,10 +370,19 @@ function validatePayload(payload: EmailIntelligencePayload): EmailIntelligencePa
   if ((payload.attachmentCount ?? 0) > 0) {
     throw new EmailIntelligenceError("Attachments are disabled for the founding beta.", 422, "attachments_disabled");
   }
-  if (payload.sentAt && Number.isNaN(Date.parse(payload.sentAt))) {
+  if (payload.sentAt != null && !z.iso.datetime({ offset: true }).safeParse(payload.sentAt).success) {
     throw new EmailIntelligenceError("The sent timestamp is invalid.");
   }
-  return { ...payload, externalMessageId: payload.externalMessageId.trim(), forwardedBy, from, to };
+  let replyTo: VerifiedReplyParent | null = null;
+  if (payload.replyTo != null) {
+    const parent = payload.replyTo;
+    if (typeof parent !== "object" || !["gmail", "microsoft"].includes(parent.provider) ||
+        typeof parent.outboundMessageId !== "string" || !parent.outboundMessageId.trim() || parent.outboundMessageId.length > 500 ||
+        typeof parent.senderEmail !== "string" || Object.keys(parent).some(key => !["provider", "outboundMessageId", "senderEmail"].includes(key)))
+      throw new EmailIntelligenceError("Reply parent requires the original provider, message ID, and sending mailbox.");
+    replyTo = { provider: parent.provider, outboundMessageId: parent.outboundMessageId.trim(), senderEmail: normalizeEmail(parent.senderEmail) };
+  }
+  return { ...payload, externalMessageId: payload.externalMessageId.trim(), forwardedBy, from, to, replyTo };
 }
 
 async function ingestForSource(
@@ -401,7 +419,18 @@ async function ingestForSource(
     `${source.organizationId}:${source.id}:${messageId}:email`,
   );
   const rawExpiresAt = new Date(Date.now() + source.retentionDays * 24 * 60 * 60 * 1000);
-  const [message] = await db
+  const payloadSha256 = createHash("sha256").update(JSON.stringify({ rawText, forwardedBy: payload.forwardedBy, replyTo: payload.replyTo ?? null })).digest("hex");
+  return db.transaction(async tx => {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`email-intake:${source.organizationId}:${source.id}:${payload.externalMessageId}`}, 0))`);
+  const [prior] = await tx.select().from(emailResponseReviewsTable).where(and(
+    eq(emailResponseReviewsTable.organizationId, source.organizationId), eq(emailResponseReviewsTable.sourceId, source.id),
+    eq(emailResponseReviewsTable.externalMessageId, payload.externalMessageId),
+  ));
+  if (prior) {
+    if (prior.payloadSha256 !== payloadSha256) throw new EmailIntelligenceError("This message ID was already received with different content or reply evidence.", 409, "message_conflict");
+    return { duplicate: true, message: { id: prior.messageId }, facts: [], response: prior };
+  }
+  const [message] = await tx
     .insert(emailIntelligenceMessagesTable)
     .values({
       id: messageId,
@@ -422,7 +451,7 @@ async function ingestForSource(
     })
     .returning();
   if (!message) {
-    const [existing] = await db
+    const [existing] = await tx
       .select()
       .from(emailIntelligenceMessagesTable)
       .where(and(
@@ -430,12 +459,16 @@ async function ingestForSource(
         eq(emailIntelligenceMessagesTable.externalMessageId, payload.externalMessageId),
       ))
       .limit(1);
-    return { duplicate: true, message: existing, facts: [] };
+    if (!existing || existing.contentSha256 !== contentSha256) throw new EmailIntelligenceError("This message ID conflicts with its original content.", 409, "message_conflict");
+    const response = await registerEmailResponse(tx, { organizationId: source.organizationId, sourceId: source.id, messageId: existing.id,
+      externalMessageId: payload.externalMessageId, payloadSha256, from: payload.from, to: payload.to,
+      sentAt: existing.sentAt, legacy: true });
+    return { duplicate: true, message: existing, facts: [], response };
   }
 
   const derived = deriveEmailFacts(payload.subject, payload.text);
   const facts = derived.length
-    ? await db.insert(emailIntelligenceFactsTable).values(derived.map((fact) => ({
+    ? await tx.insert(emailIntelligenceFactsTable).values(derived.map((fact) => ({
         organizationId: source.organizationId,
         sourceId: source.id,
         messageId: message.id,
@@ -445,12 +478,15 @@ async function ingestForSource(
         confidence: fact.confidence,
       }))).returning()
     : [];
-  await db.update(emailIntelligenceSourcesTable).set({
+  await tx.update(emailIntelligenceSourcesTable).set({
     lastReceivedAt: new Date(),
     lastErrorAt: null,
     lastErrorCode: null,
   }).where(eq(emailIntelligenceSourcesTable.id, source.id));
-  await recordAudit({
+  const response = await registerEmailResponse(tx, { organizationId: source.organizationId, sourceId: source.id, messageId: message.id,
+    externalMessageId: payload.externalMessageId, payloadSha256, from: payload.from, to: payload.to,
+    sentAt: message.sentAt, replyTo: payload.replyTo, synthetic: options.synthetic });
+  await tx.insert(auditEventsTable).values({
     organizationId: source.organizationId,
     actorUserId: options.actorUserId ?? null,
     action: options.synthetic ? "email_intelligence.synthetic_message_processed" : "email_intelligence.message_processed",
@@ -464,7 +500,8 @@ async function ingestForSource(
       attachmentCount: 0,
     },
   });
-  return { duplicate: false, message, facts };
+  return { duplicate: false, message, facts, response };
+  });
 }
 
 export async function ingestEmailByAlias(alias: string, payload: EmailIntelligencePayload) {

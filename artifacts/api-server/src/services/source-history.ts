@@ -1,6 +1,18 @@
 import type { ImportedOpportunityHistory } from "@workspace/db";
+import { sql, type SQLWrapper } from "drizzle-orm";
 
 export class SourceHistoryValidationError extends Error {}
+
+/** SQL equivalent of originalOpportunityDate for aggregates; import writers validate ISO dates. */
+export function originalOpportunityDateSql(leadsTable: {
+  createdAt: SQLWrapper; creationMethod: SQLWrapper; importedHistory: SQLWrapper;
+}) {
+  return sql<Date | null>`case
+    when ${leadsTable.importedHistory} is not null
+      then nullif(${leadsTable.importedHistory}->>'originalCreatedAt', '')::timestamptz
+    when ${leadsTable.creationMethod} = 'import' then null
+    else ${leadsTable.createdAt} end`;
+}
 
 /** Source dates are independent of the time GrowthOS received a record. */
 export function originalOpportunityDate(lead: {

@@ -144,6 +144,10 @@ export const ListUsersResponse = zod.array(ListUsersResponseItem)
 /**
  * @summary Invite a new team member by email (admin only)
  */
+export const InviteUserHeader = zod.object({
+  "Idempotency-Key": zod.uuid().optional().describe('Keep this UUID unchanged when retrying the identical invitation after an unknown result.')
+})
+
 export const InviteUserBody = zod.object({
   "email": zod.email(),
   "role": zod.enum(['owner', 'admin', 'sales_manager', 'sales_rep', 'inspector', 'production', 'office', 'viewer']),
@@ -2146,15 +2150,51 @@ export const ListLeadConversationsResponse = zod.array(ListLeadConversationsResp
 /**
  * @summary Organization ROI report with honest revenue attribution
  */
+export const getRoiReportQueryDaysMax = 365;
+
+
+
 export const GetRoiReportQueryParams = zod.object({
-  "days": zod.coerce.number().int().optional()
+  "days": zod.coerce.number().int().min(1).max(getRoiReportQueryDaysMax).optional(),
+  "endAt": zod.date().optional().describe('Exclusive UTC end of the report period; defaults to the generation time.')
 })
 
 export const GetRoiReportResponse = zod.object({
   "windowDays": zod.int(),
   "generatedAt": zod.coerce.date(),
+  "period": zod.object({
+  "startAt": zod.coerce.date(),
+  "endAt": zod.coerce.date(),
+  "timeZone": zod.enum(['UTC'])
+}),
+  "comparison": zod.object({
+  "period": zod.object({
+  "startAt": zod.coerce.date(),
+  "endAt": zod.coerce.date(),
+  "timeZone": zod.enum(['UTC'])
+}),
+  "appointmentsRecorded": zod.int(),
+  "won": zod.int(),
+  "recordedWinValueCents": zod.int().nullable(),
+  "unknownWinValues": zod.int()
+}),
+  "dataQuality": zod.object({
+  "unknownOriginalDates": zod.int(),
+  "unknownWinValues": zod.int(),
+  "unknownPipelineValues": zod.int(),
+  "importedFirstTouchExcluded": zod.int()
+}),
+  "evidence": zod.array(zod.object({
+  "leadId": zod.string(),
+  "title": zod.string(),
+  "wonAt": zod.coerce.date(),
+  "valueCents": zod.int().nullable(),
+  "attribution": zod.string()
+})),
   "leads": zod.object({
   "total": zod.int(),
+  "native": zod.int(),
+  "imported": zod.int(),
   "qualified": zod.int(),
   "bySource": zod.array(zod.object({
   "key": zod.string(),
@@ -2180,11 +2220,13 @@ export const GetRoiReportResponse = zod.object({
   "appointments": zod.object({
   "total": zod.int(),
   "leadsWithAppointment": zod.int(),
+  "distinctBookedLeads": zod.int(),
   "appointmentRatePct": zod.int().nullish()
 }),
   "responsiveness": zod.object({
   "leadsContacted": zod.int(),
   "leadsReplied": zod.int(),
+  "firstTouchMeasuredLeads": zod.int(),
   "responseRatePct": zod.int().nullish(),
   "medianMinutesToFirstTouch": zod.int().nullish()
 }),
@@ -2211,13 +2253,14 @@ export const GetRoiReportResponse = zod.object({
 }),
   "outcomes": zod.object({
   "won": zod.int(),
-  "revenueWonCents": zod.int(),
+  "revenueWonCents": zod.int().nullable(),
   "revenueByAttribution": zod.array(zod.object({
   "category": zod.string(),
   "count": zod.int(),
-  "revenueCents": zod.int()
+  "revenueCents": zod.int().nullable(),
+  "unknownValues": zod.int()
 })),
-  "pipelineValueCents": zod.int(),
+  "pipelineValueCents": zod.int().nullable(),
   "lost": zod.int(),
   "lostReasons": zod.array(zod.object({
   "key": zod.string(),
@@ -2230,8 +2273,13 @@ export const GetRoiReportResponse = zod.object({
 /**
  * @summary ROI report flattened to CSV
  */
+export const exportRoiReportQueryDaysMax = 365;
+
+
+
 export const ExportRoiReportQueryParams = zod.object({
-  "days": zod.coerce.number().int().optional()
+  "days": zod.coerce.number().int().min(1).max(exportRoiReportQueryDaysMax).optional(),
+  "endAt": zod.date().optional()
 })
 
 export const ExportRoiReportResponse = zod.unknown()
@@ -4364,6 +4412,326 @@ export const CreateOnboardingTestLeadResponse = zod.object({
  */
 export const DeleteOnboardingTestLeadResponse = zod.object({
   "removed": zod.number()
+})
+
+
+/**
+ * Platform administrator session required. Never returns invitation tokens or links.
+ * @summary Review invitations for a platform-managed company
+ */
+export const ListClientStaffInvitationsParams = zod.object({
+  "orgId": zod.uuid()
+})
+
+
+export const listClientStaffInvitationsResponseInvitationsMax = 100;
+
+
+
+export const ListClientStaffInvitationsResponse = zod.object({
+  "organizationId": zod.uuid(),
+  "invitations": zod.array(zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "email": zod.email(),
+  "role": zod.enum(['owner', 'admin', 'sales_manager', 'sales_rep', 'inspector', 'production', 'office', 'viewer']),
+  "version": zod.int().min(1),
+  "state": zod.enum(['pending', 'expired', 'accepted', 'revoked']),
+  "deliveryState": zod.enum(['sending', 'sent', 'unconfirmed']),
+  "expiresAt": zod.coerce.date(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})).max(listClientStaffInvitationsResponseInvitationsMax),
+  "truncated": zod.boolean()
+})
+
+
+/**
+ * Platform administrator session required. Repeat the identical request ID after an unknown result; changing its contents returns a conflict. An unconfirmed delivery requires explicit review.
+ * @summary Invite a staff member using an immutable request ID
+ */
+export const CreateClientStaffInvitationParams = zod.object({
+  "orgId": zod.uuid()
+})
+
+export const createClientStaffInvitationBodyEmailMax = 254;
+
+export const createClientStaffInvitationBodyFirstNameMax = 100;
+
+export const createClientStaffInvitationBodyLastNameMax = 100;
+
+
+
+export const CreateClientStaffInvitationBody = zod.object({
+  "requestId": zod.uuid(),
+  "email": zod.email().max(createClientStaffInvitationBodyEmailMax),
+  "role": zod.enum(['owner', 'admin', 'sales_manager', 'sales_rep', 'inspector', 'production', 'office', 'viewer']),
+  "firstName": zod.string().max(createClientStaffInvitationBodyFirstNameMax).optional(),
+  "lastName": zod.string().max(createClientStaffInvitationBodyLastNameMax).optional(),
+  "confirmed": zod.literal(true)
+})
+
+
+
+
+export const CreateClientStaffInvitationResponse = zod.object({
+  "invitation": zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "email": zod.email(),
+  "role": zod.enum(['owner', 'admin', 'sales_manager', 'sales_rep', 'inspector', 'production', 'office', 'viewer']),
+  "version": zod.int().min(1),
+  "state": zod.enum(['pending', 'expired', 'accepted', 'revoked']),
+  "deliveryState": zod.enum(['sending', 'sent', 'unconfirmed']),
+  "expiresAt": zod.coerce.date(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+}),
+  "duplicate": zod.boolean()
+})
+
+
+/**
+ * Platform administrator session required. The version must match the latest invitation. Expired pending invitations can be renewed; stale versions and already accepted or revoked invitations conflict.
+ * @summary Reissue a reviewed staff invitation
+ */
+export const ReissueClientStaffInvitationParams = zod.object({
+  "orgId": zod.uuid(),
+  "invitationId": zod.uuid()
+})
+
+
+
+
+export const ReissueClientStaffInvitationBody = zod.object({
+  "expectedVersion": zod.int().min(1),
+  "confirmed": zod.literal(true)
+})
+
+
+
+
+export const ReissueClientStaffInvitationResponse = zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "email": zod.email(),
+  "role": zod.enum(['owner', 'admin', 'sales_manager', 'sales_rep', 'inspector', 'production', 'office', 'viewer']),
+  "version": zod.int().min(1),
+  "state": zod.enum(['pending', 'expired', 'accepted', 'revoked']),
+  "deliveryState": zod.enum(['sending', 'sent', 'unconfirmed']),
+  "expiresAt": zod.coerce.date(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * Platform administrator session required. The version must match the latest invitation. Expired pending invitations can be revoked; stale versions and already accepted invitations conflict.
+ * @summary Revoke a pending staff invitation
+ */
+export const RevokeClientStaffInvitationParams = zod.object({
+  "orgId": zod.uuid(),
+  "invitationId": zod.uuid()
+})
+
+
+
+
+export const RevokeClientStaffInvitationBody = zod.object({
+  "expectedVersion": zod.int().min(1),
+  "confirmed": zod.literal(true)
+})
+
+
+
+
+export const RevokeClientStaffInvitationResponse = zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "email": zod.email(),
+  "role": zod.enum(['owner', 'admin', 'sales_manager', 'sales_rep', 'inspector', 'production', 'office', 'viewer']),
+  "version": zod.int().min(1),
+  "state": zod.enum(['pending', 'expired', 'accepted', 'revoked']),
+  "deliveryState": zod.enum(['sending', 'sent', 'unconfirmed']),
+  "expiresAt": zod.coerce.date(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * Requires an authenticated member with CRM read access. Returned messages are redacted and may have been deleted; durable reply decisions survive deletion.
+ * @summary Review customer replies and active follow-up holds
+ */
+export const listCustomerRepliesQueryPageDefault = 0;
+export const listCustomerRepliesQueryPageMin = 0;
+export const listCustomerRepliesQueryPageMax = 10000;
+
+export const listCustomerRepliesQueryScopeDefault = `attention`;
+
+export const ListCustomerRepliesQueryParams = zod.object({
+  "page": zod.coerce.number().int().min(listCustomerRepliesQueryPageMin).max(listCustomerRepliesQueryPageMax).default(listCustomerRepliesQueryPageDefault),
+  "scope": zod.enum(['attention', 'all']).default(listCustomerRepliesQueryScopeDefault)
+})
+
+export const listCustomerRepliesResponseItemsItemEffectSummaryOnePausedEnrollmentsMin = 0;
+
+export const listCustomerRepliesResponseItemsItemEffectSummaryOneCancelledActionsMin = 0;
+
+export const listCustomerRepliesResponseItemsItemEffectSummaryOneBlockedProposalsMin = 0;
+
+export const listCustomerRepliesResponseItemsItemEffectSummaryOneReconciliationRequiredMin = 0;
+
+export const listCustomerRepliesResponseItemsMax = 20;
+
+export const listCustomerRepliesResponseTotalMin = 0;
+
+export const listCustomerRepliesResponsePageMin = 0;
+
+
+
+export const ListCustomerRepliesResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "messageId": zod.uuid().nullable(),
+  "state": zod.enum(['needs_review', 'confirmed', 'dismissed']),
+  "reason": zod.string(),
+  "leadId": zod.uuid().nullable(),
+  "replyAt": zod.coerce.date().nullable(),
+  "receivedAt": zod.coerce.date(),
+  "holdActive": zod.boolean(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "releasedAt": zod.coerce.date().nullable(),
+  "effectSummary": zod.union([zod.object({
+  "pausedEnrollments": zod.int().min(listCustomerRepliesResponseItemsItemEffectSummaryOnePausedEnrollmentsMin),
+  "cancelledActions": zod.int().min(listCustomerRepliesResponseItemsItemEffectSummaryOneCancelledActionsMin),
+  "blockedProposals": zod.int().min(listCustomerRepliesResponseItemsItemEffectSummaryOneBlockedProposalsMin),
+  "reconciliationRequired": zod.int().min(listCustomerRepliesResponseItemsItemEffectSummaryOneReconciliationRequiredMin)
+}),zod.null()]),
+  "subject": zod.string().nullable(),
+  "fromEmail": zod.string().nullable(),
+  "leadSummary": zod.string().nullable()
+})).max(listCustomerRepliesResponseItemsMax),
+  "total": zod.int().min(listCustomerRepliesResponseTotalMin),
+  "page": zod.int().min(listCustomerRepliesResponsePageMin),
+  "pageSize": zod.literal(20)
+})
+
+
+/**
+ * Requires active CRM write access in the same company. Audited; does not automatically resume cancelled work or a company pause. Conflicting decisions return 409.
+ * @summary Confirm or dismiss an ambiguous reply
+ */
+export const ReviewCustomerReplyParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const reviewCustomerReplyBodyNoteMin = 10;
+export const reviewCustomerReplyBodyNoteMax = 1000;
+
+
+
+export const ReviewCustomerReplyBody = zod.object({
+  "decision": zod.enum(['confirm', 'dismiss']),
+  "leadId": zod.uuid().optional().describe('Required when confirming.'),
+  "note": zod.string().min(reviewCustomerReplyBodyNoteMin).max(reviewCustomerReplyBodyNoteMax),
+  "replyAt": zod.coerce.date().optional().describe('Required when the source has no original time. Cannot replace a known source time. At most 60 seconds of future clock skew is permitted.')
+})
+
+export const reviewCustomerReplyResponseEffectSummaryOnePausedEnrollmentsMin = 0;
+
+export const reviewCustomerReplyResponseEffectSummaryOneCancelledActionsMin = 0;
+
+export const reviewCustomerReplyResponseEffectSummaryOneBlockedProposalsMin = 0;
+
+export const reviewCustomerReplyResponseEffectSummaryOneReconciliationRequiredMin = 0;
+
+
+
+export const ReviewCustomerReplyResponse = zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "sourceId": zod.uuid(),
+  "messageId": zod.uuid().nullable(),
+  "externalMessageId": zod.string(),
+  "payloadSha256": zod.string(),
+  "state": zod.enum(['needs_review', 'confirmed', 'dismissed']),
+  "reason": zod.string(),
+  "leadId": zod.uuid().nullable(),
+  "contactId": zod.uuid().nullable(),
+  "outboundActivityId": zod.uuid().nullable(),
+  "replyAt": zod.coerce.date().nullable(),
+  "receivedAt": zod.coerce.date(),
+  "holdActive": zod.boolean(),
+  "reviewedByUserId": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewNote": zod.string().nullable(),
+  "effectSummary": zod.union([zod.object({
+  "pausedEnrollments": zod.int().min(reviewCustomerReplyResponseEffectSummaryOnePausedEnrollmentsMin),
+  "cancelledActions": zod.int().min(reviewCustomerReplyResponseEffectSummaryOneCancelledActionsMin),
+  "blockedProposals": zod.int().min(reviewCustomerReplyResponseEffectSummaryOneBlockedProposalsMin),
+  "reconciliationRequired": zod.int().min(reviewCustomerReplyResponseEffectSummaryOneReconciliationRequiredMin)
+}),zod.null()]),
+  "releasedByUserId": zod.string().nullable(),
+  "releasedAt": zod.coerce.date().nullable(),
+  "releaseNote": zod.string().nullable()
+})
+
+
+/**
+ * Requires active CRM write access in the same company. Audited; does not automatically resume cancelled work or a company pause. Conflicting decisions return 409.
+ * @summary Resolve a reviewed follow-up hold
+ */
+export const ResolveCustomerReplyParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const resolveCustomerReplyBodyNoteMin = 10;
+export const resolveCustomerReplyBodyNoteMax = 1000;
+
+
+
+export const ResolveCustomerReplyBody = zod.object({
+  "note": zod.string().min(resolveCustomerReplyBodyNoteMin).max(resolveCustomerReplyBodyNoteMax)
+})
+
+export const resolveCustomerReplyResponseEffectSummaryOnePausedEnrollmentsMin = 0;
+
+export const resolveCustomerReplyResponseEffectSummaryOneCancelledActionsMin = 0;
+
+export const resolveCustomerReplyResponseEffectSummaryOneBlockedProposalsMin = 0;
+
+export const resolveCustomerReplyResponseEffectSummaryOneReconciliationRequiredMin = 0;
+
+
+
+export const ResolveCustomerReplyResponse = zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "sourceId": zod.uuid(),
+  "messageId": zod.uuid().nullable(),
+  "externalMessageId": zod.string(),
+  "payloadSha256": zod.string(),
+  "state": zod.enum(['needs_review', 'confirmed', 'dismissed']),
+  "reason": zod.string(),
+  "leadId": zod.uuid().nullable(),
+  "contactId": zod.uuid().nullable(),
+  "outboundActivityId": zod.uuid().nullable(),
+  "replyAt": zod.coerce.date().nullable(),
+  "receivedAt": zod.coerce.date(),
+  "holdActive": zod.boolean(),
+  "reviewedByUserId": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewNote": zod.string().nullable(),
+  "effectSummary": zod.union([zod.object({
+  "pausedEnrollments": zod.int().min(resolveCustomerReplyResponseEffectSummaryOnePausedEnrollmentsMin),
+  "cancelledActions": zod.int().min(resolveCustomerReplyResponseEffectSummaryOneCancelledActionsMin),
+  "blockedProposals": zod.int().min(resolveCustomerReplyResponseEffectSummaryOneBlockedProposalsMin),
+  "reconciliationRequired": zod.int().min(resolveCustomerReplyResponseEffectSummaryOneReconciliationRequiredMin)
+}),zod.null()]),
+  "releasedByUserId": zod.string().nullable(),
+  "releasedAt": zod.coerce.date().nullable(),
+  "releaseNote": zod.string().nullable()
 })
 
 

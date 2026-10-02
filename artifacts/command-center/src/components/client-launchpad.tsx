@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { ClientStaffInvitations } from "./client-staff-invitations";
 
 type Profile = { id: string; name: string; services: [string, string][] };
 type Organization = {
@@ -523,6 +524,12 @@ function ClientReadiness({
           Refresh checks
         </Button>
       </div>
+      <ClientStaffInvitations
+        key={`${actorId}:${organizationId}`}
+        actorId={actorId}
+        organizationId={organizationId}
+        needsOwner={report.staffing.activeManagers === 0}
+      />
       {report.sites.length > 1 && (
         <div className="space-y-2">
           <Label htmlFor="readiness-site">Website connection</Label>
@@ -567,7 +574,7 @@ function ClientReadiness({
                 ? "Configured"
                 : "Missing"
             }
-            detail={`${report.staffing.activeManagers} active manager(s), ${report.staffing.activeResponders} responder(s). Owner approval and invitations are separate.`}
+            detail={`${report.staffing.activeManagers} accepted manager(s), ${report.staffing.activeResponders} accepted responder(s). Pending invitations do not count.`}
           />
           {site && (
             <>

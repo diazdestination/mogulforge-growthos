@@ -5,6 +5,15 @@ offer, purchase, customer contract, entitlement migration or production release.
 
 ## Decision
 
+**Latest owner clarification:** GrowthOS should replace Housecall Pro for the
+beta companies, with simpler navigation and dependable native scheduling,
+invoices and warranty/service tracking. Read `GROWTHOS-CONTRACTOR-OPERATIONS.md`.
+The earlier add-on positioning below is historical context. Housecall Pro
+connectivity is optional migration/transition support; native operation must
+not require a continuing Housecall Pro subscription. Replacement readiness
+requires accepted daily workflows and reconciled migration, not more features
+alone. Existing beta agreements and live release gates remain unchanged.
+
 Build one configurable contractor growth platform with a flagship package worth
 at least **$1,500 per month**. Two companies, roofing and HVAC, have agreed to a
 special **$500/month limited beta** according to Adam. Neither activation nor

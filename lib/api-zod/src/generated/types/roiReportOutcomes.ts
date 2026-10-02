@@ -10,9 +10,11 @@ import type { RoiReportOutcomesRevenueByAttributionItem } from './roiReportOutco
 
 export type RoiReportOutcomes = {
   won: number;
-  revenueWonCents: number;
+  /** @nullable */
+  revenueWonCents: number | null;
   revenueByAttribution: RoiReportOutcomesRevenueByAttributionItem[];
-  pipelineValueCents: number;
+  /** @nullable */
+  pipelineValueCents: number | null;
   lost: number;
   lostReasons: RoiBreakdownRow[];
 };

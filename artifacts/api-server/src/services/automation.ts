@@ -271,6 +271,11 @@ async function executeAction(
   context: EventContext,
   automationId: string,
 ): Promise<ActionResult> {
+  if (context.leadId && ["send_email", "send_sms", "schedule_followup", "playbook_step"].includes(action.type)) {
+    const { hasCustomerReplyHold } = await import("./response-correlation");
+    if (await hasCustomerReplyHold(organizationId, context.leadId))
+      return { type: action.type, status: "skipped", detail: "blocked: customer_reply_requires_review" };
+  }
   const audit = (detail: Record<string, unknown>) =>
     recordAudit({
       organizationId,
@@ -397,7 +402,7 @@ async function executeAction(
           contactId: contact.id,
           type: "automation_message_sent",
           title: `Automation ${channel === "email" ? "email" : "text"} sent`,
-          metadata: { automationId, channel, ...(channel === "email" ? emailAcceptanceEvidence(res) : { provider: res.provider, providerMessageId: res.id }) },
+          metadata: { automationId, channel, ...(channel === "email" ? emailAcceptanceEvidence(res, { organizationId, leadId: context.leadId, recipientEmail: contact.email! }) : { provider: res.provider, providerMessageId: res.id }) },
         });
       }
       await audit({
@@ -742,7 +747,7 @@ async function executeAction(
           metadata: {
             appointmentId,
             channel,
-            ...(channel === "email" ? emailAcceptanceEvidence(res) : { provider: res.provider, providerMessageId: res.id }),
+            ...(channel === "email" ? emailAcceptanceEvidence(res, { organizationId, leadId: appointment.leadId, recipientEmail: contact.email! }) : { provider: res.provider, providerMessageId: res.id }),
             scheduledStart: appointment.scheduledStart.toISOString(),
           },
         });
@@ -965,6 +970,7 @@ export async function processDueScheduledActions(organizationId?: string): Promi
       if (await customerWorkHeld(item.organizationId)) continue;
       const execution = await runDurableAction({
         organizationId: item.organizationId, actionKey: `scheduled:${item.id}`,
+        leadId: typeof item.context.leadId === "string" ? item.context.leadId : null,
         kind: item.action.type, payload: { action: item.action, context: item.context },
         execute: async () => {
           // Re-read cancellation after acquiring exclusive durable ownership.

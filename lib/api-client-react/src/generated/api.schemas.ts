@@ -587,8 +587,48 @@ export interface RoiBreakdownRow {
   count: number;
 }
 
+export type RoiPeriodTimeZone = typeof RoiPeriodTimeZone[keyof typeof RoiPeriodTimeZone];
+
+
+export const RoiPeriodTimeZone = {
+  UTC: 'UTC',
+} as const;
+
+export interface RoiPeriod {
+  startAt: string;
+  endAt: string;
+  timeZone: RoiPeriodTimeZone;
+}
+
+export type RoiReportComparison = {
+  period: RoiPeriod;
+  appointmentsRecorded: number;
+  won: number;
+  /** @nullable */
+  recordedWinValueCents: number | null;
+  unknownWinValues: number;
+};
+
+export type RoiReportDataQuality = {
+  unknownOriginalDates: number;
+  unknownWinValues: number;
+  unknownPipelineValues: number;
+  importedFirstTouchExcluded: number;
+};
+
+export type RoiReportEvidenceItem = {
+  leadId: string;
+  title: string;
+  wonAt: string;
+  /** @nullable */
+  valueCents: number | null;
+  attribution: string;
+};
+
 export type RoiReportLeads = {
   total: number;
+  native: number;
+  imported: number;
   qualified: number;
   bySource: RoiBreakdownRow[];
   byCampaign: RoiBreakdownRow[];
@@ -600,6 +640,7 @@ export type RoiReportLeads = {
 export type RoiReportAppointments = {
   total: number;
   leadsWithAppointment: number;
+  distinctBookedLeads: number;
   /** @nullable */
   appointmentRatePct?: number | null;
 };
@@ -607,6 +648,7 @@ export type RoiReportAppointments = {
 export type RoiReportResponsiveness = {
   leadsContacted: number;
   leadsReplied: number;
+  firstTouchMeasuredLeads: number;
   /** @nullable */
   responseRatePct?: number | null;
   /** @nullable */
@@ -640,14 +682,18 @@ export type RoiReportReactivation = {
 export type RoiReportOutcomesRevenueByAttributionItem = {
   category: string;
   count: number;
-  revenueCents: number;
+  /** @nullable */
+  revenueCents: number | null;
+  unknownValues: number;
 };
 
 export type RoiReportOutcomes = {
   won: number;
-  revenueWonCents: number;
+  /** @nullable */
+  revenueWonCents: number | null;
   revenueByAttribution: RoiReportOutcomesRevenueByAttributionItem[];
-  pipelineValueCents: number;
+  /** @nullable */
+  pipelineValueCents: number | null;
   lost: number;
   lostReasons: RoiBreakdownRow[];
 };
@@ -655,6 +701,10 @@ export type RoiReportOutcomes = {
 export interface RoiReport {
   windowDays: number;
   generatedAt: string;
+  period: RoiPeriod;
+  comparison: RoiReportComparison;
+  dataQuality: RoiReportDataQuality;
+  evidence: RoiReportEvidenceItem[];
   leads: RoiReportLeads;
   appointments: RoiReportAppointments;
   responsiveness: RoiReportResponsiveness;
@@ -2924,6 +2974,233 @@ export interface TestLeadCleanupResponse {
   removed: number;
 }
 
+export type ClientStaffInvitationRole = typeof ClientStaffInvitationRole[keyof typeof ClientStaffInvitationRole];
+
+
+export const ClientStaffInvitationRole = {
+  owner: 'owner',
+  admin: 'admin',
+  sales_manager: 'sales_manager',
+  sales_rep: 'sales_rep',
+  inspector: 'inspector',
+  production: 'production',
+  office: 'office',
+  viewer: 'viewer',
+} as const;
+
+export type ClientStaffInvitationState = typeof ClientStaffInvitationState[keyof typeof ClientStaffInvitationState];
+
+
+export const ClientStaffInvitationState = {
+  pending: 'pending',
+  expired: 'expired',
+  accepted: 'accepted',
+  revoked: 'revoked',
+} as const;
+
+export type ClientStaffInvitationDeliveryState = typeof ClientStaffInvitationDeliveryState[keyof typeof ClientStaffInvitationDeliveryState];
+
+
+export const ClientStaffInvitationDeliveryState = {
+  sending: 'sending',
+  sent: 'sent',
+  unconfirmed: 'unconfirmed',
+} as const;
+
+export interface ClientStaffInvitation {
+  id: string;
+  organizationId: string;
+  email: string;
+  role: ClientStaffInvitationRole;
+  /** @minimum 1 */
+  version: number;
+  state: ClientStaffInvitationState;
+  deliveryState: ClientStaffInvitationDeliveryState;
+  expiresAt: string;
+  /** @nullable */
+  acceptedAt: string | null;
+  createdAt: string;
+}
+
+export interface ClientStaffInvitationList {
+  organizationId: string;
+  /** @maxItems 100 */
+  invitations: ClientStaffInvitation[];
+  truncated: boolean;
+}
+
+export interface ClientStaffInvitationCreated {
+  invitation: ClientStaffInvitation;
+  duplicate: boolean;
+}
+
+export type CreateClientStaffInvitationRole = typeof CreateClientStaffInvitationRole[keyof typeof CreateClientStaffInvitationRole];
+
+
+export const CreateClientStaffInvitationRole = {
+  owner: 'owner',
+  admin: 'admin',
+  sales_manager: 'sales_manager',
+  sales_rep: 'sales_rep',
+  inspector: 'inspector',
+  production: 'production',
+  office: 'office',
+  viewer: 'viewer',
+} as const;
+
+export interface CreateClientStaffInvitation {
+  requestId: string;
+  /** @maxLength 254 */
+  email: string;
+  role: CreateClientStaffInvitationRole;
+  /** @maxLength 100 */
+  firstName?: string;
+  /** @maxLength 100 */
+  lastName?: string;
+  confirmed: true;
+}
+
+export interface ClientStaffInvitationAction {
+  /** @minimum 1 */
+  expectedVersion: number;
+  confirmed: true;
+}
+
+export interface CustomerReplyEffects {
+  /** @minimum 0 */
+  pausedEnrollments: number;
+  /** @minimum 0 */
+  cancelledActions: number;
+  /** @minimum 0 */
+  blockedProposals: number;
+  /** @minimum 0 */
+  reconciliationRequired: number;
+}
+
+export type CustomerReplyItemState = typeof CustomerReplyItemState[keyof typeof CustomerReplyItemState];
+
+
+export const CustomerReplyItemState = {
+  needs_review: 'needs_review',
+  confirmed: 'confirmed',
+  dismissed: 'dismissed',
+} as const;
+
+export interface CustomerReplyItem {
+  id: string;
+  /** @nullable */
+  messageId: string | null;
+  state: CustomerReplyItemState;
+  reason: string;
+  /** @nullable */
+  leadId: string | null;
+  /** @nullable */
+  replyAt: string | null;
+  receivedAt: string;
+  holdActive: boolean;
+  /** @nullable */
+  reviewedAt: string | null;
+  /** @nullable */
+  releasedAt: string | null;
+  effectSummary: CustomerReplyEffects | null;
+  /** @nullable */
+  subject: string | null;
+  /** @nullable */
+  fromEmail: string | null;
+  /** @nullable */
+  leadSummary: string | null;
+}
+
+export type CustomerReplyListPageSize = typeof CustomerReplyListPageSize[keyof typeof CustomerReplyListPageSize];
+
+
+export const CustomerReplyListPageSize = {
+  NUMBER_20: 20,
+} as const;
+
+export interface CustomerReplyList {
+  /** @maxItems 20 */
+  items: CustomerReplyItem[];
+  /** @minimum 0 */
+  total: number;
+  /** @minimum 0 */
+  page: number;
+  pageSize: CustomerReplyListPageSize;
+}
+
+export type ReviewCustomerReplyDecision = typeof ReviewCustomerReplyDecision[keyof typeof ReviewCustomerReplyDecision];
+
+
+export const ReviewCustomerReplyDecision = {
+  confirm: 'confirm',
+  dismiss: 'dismiss',
+} as const;
+
+export interface ReviewCustomerReply {
+  decision: ReviewCustomerReplyDecision;
+  /** Required when confirming. */
+  leadId?: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  note: string;
+  /** Required when the source has no original time. Cannot replace a known source time. At most 60 seconds of future clock skew is permitted. */
+  replyAt?: string;
+}
+
+export interface ResolveCustomerReply {
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  note: string;
+}
+
+export type CustomerReplyDecisionState = typeof CustomerReplyDecisionState[keyof typeof CustomerReplyDecisionState];
+
+
+export const CustomerReplyDecisionState = {
+  needs_review: 'needs_review',
+  confirmed: 'confirmed',
+  dismissed: 'dismissed',
+} as const;
+
+export interface CustomerReplyDecision {
+  id: string;
+  organizationId: string;
+  sourceId: string;
+  /** @nullable */
+  messageId: string | null;
+  externalMessageId: string;
+  payloadSha256: string;
+  state: CustomerReplyDecisionState;
+  reason: string;
+  /** @nullable */
+  leadId: string | null;
+  /** @nullable */
+  contactId: string | null;
+  /** @nullable */
+  outboundActivityId: string | null;
+  /** @nullable */
+  replyAt: string | null;
+  receivedAt: string;
+  holdActive: boolean;
+  /** @nullable */
+  reviewedByUserId: string | null;
+  /** @nullable */
+  reviewedAt: string | null;
+  /** @nullable */
+  reviewNote: string | null;
+  effectSummary: CustomerReplyEffects | null;
+  /** @nullable */
+  releasedByUserId: string | null;
+  /** @nullable */
+  releasedAt: string | null;
+  /** @nullable */
+  releaseNote: string | null;
+}
+
 /**
  * Opaque session token — `Bearer <sid>`.
  */
@@ -3051,11 +3328,24 @@ since?: string;
 };
 
 export type GetRoiReportParams = {
+/**
+ * @minimum 1
+ * @maximum 365
+ */
 days?: number;
+/**
+ * Exclusive UTC end of the report period; defaults to the generation time.
+ */
+endAt?: string;
 };
 
 export type ExportRoiReportParams = {
+/**
+ * @minimum 1
+ * @maximum 365
+ */
 days?: number;
+endAt?: string;
 };
 
 export type GetReferralLinkInfo200 = {
@@ -3094,4 +3384,21 @@ endpointId?: string;
 export type LogoutPortalSession200 = {
   ok: boolean;
 };
+
+export type ListCustomerRepliesParams = {
+/**
+ * @minimum 0
+ * @maximum 10000
+ */
+page?: number;
+scope?: ListCustomerRepliesScope;
+};
+
+export type ListCustomerRepliesScope = typeof ListCustomerRepliesScope[keyof typeof ListCustomerRepliesScope];
+
+
+export const ListCustomerRepliesScope = {
+  attention: 'attention',
+  all: 'all',
+} as const;
 

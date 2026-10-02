@@ -10,6 +10,12 @@ import {
   checkSiteCredential,
 } from "../../services/client-onboarding";
 import { rotateSmartSiteKey, SmartSiteError } from "../../services/smart-sites";
+import {
+  createStaffInvitation,
+  listStaffInvitations,
+  updateStaffInvitation,
+  StaffInvitationError,
+} from "../../services/staff-invitations";
 const router = Router();
 const safe =
   (fn: (req: Request, res: Response) => Promise<void>) =>
@@ -27,7 +33,10 @@ const safe =
         throw new SmartSiteError("origin_not_allowed", 403);
       await fn(req, res);
     } catch (err) {
-      if (err instanceof SmartSiteError) {
+      if (
+        err instanceof SmartSiteError ||
+        err instanceof StaffInvitationError
+      ) {
         res.status(err.status).json({ error: err.code });
         return;
       }
@@ -99,6 +108,86 @@ router.post(
       await checkSiteCredential(
         z.uuid().parse(req.params.id),
         (req.header("authorization") ?? "").replace(/^Bearer /, ""),
+      ),
+    );
+  }),
+);
+
+const staffInviteBody = z
+  .object({
+    requestId: z.uuid(),
+    email: z.email().trim().max(254),
+    role: z.enum([
+      "owner",
+      "admin",
+      "sales_manager",
+      "sales_rep",
+      "inspector",
+      "production",
+      "office",
+      "viewer",
+    ]),
+    firstName: z.string().trim().max(100).optional(),
+    lastName: z.string().trim().max(100).optional(),
+    confirmed: z.literal(true),
+  })
+  .strict();
+const staffInviteAction = z
+  .object({
+    expectedVersion: z.number().int().min(1),
+    confirmed: z.literal(true),
+  })
+  .strict();
+
+router.get(
+  "/platform/clients/:orgId/invitations",
+  requirePlatformAdmin,
+  safe(async (req, res) => {
+    res.json(
+      await listStaffInvitations(
+        { userId: req.sessionUser!.id, scope: "platform" },
+        z.uuid().parse(req.params.orgId),
+      ),
+    );
+  }),
+);
+router.post(
+  "/platform/clients/:orgId/invitations",
+  requirePlatformAdmin,
+  rateLimit({ windowMs: 60_000, max: 10, key: "client-staff-invitations" }),
+  safe(async (req, res) => {
+    const result = await createStaffInvitation(
+      { userId: req.sessionUser!.id, scope: "platform" },
+      z.uuid().parse(req.params.orgId),
+      staffInviteBody.parse(req.body),
+    );
+    res.status(result.duplicate ? 200 : 201).json(result);
+  }),
+);
+router.post(
+  "/platform/clients/:orgId/invitations/:invitationId/reissue",
+  requirePlatformAdmin,
+  safe(async (req, res) => {
+    res.json(
+      await updateStaffInvitation(
+        { userId: req.sessionUser!.id, scope: "platform" },
+        z.uuid().parse(req.params.orgId),
+        z.uuid().parse(req.params.invitationId),
+        { ...staffInviteAction.parse(req.body), action: "reissue" },
+      ),
+    );
+  }),
+);
+router.post(
+  "/platform/clients/:orgId/invitations/:invitationId/revoke",
+  requirePlatformAdmin,
+  safe(async (req, res) => {
+    res.json(
+      await updateStaffInvitation(
+        { userId: req.sessionUser!.id, scope: "platform" },
+        z.uuid().parse(req.params.orgId),
+        z.uuid().parse(req.params.invitationId),
+        { ...staffInviteAction.parse(req.body), action: "revoke" },
       ),
     );
   }),

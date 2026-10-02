@@ -25,6 +25,7 @@ import { clientReadiness } from "./client-onboarding";
 import { getPortalConversation, getPortalOverview } from "./portal";
 import { smartSiteFollowup } from "./smart-site-followup";
 import type { PortalSession } from "@workspace/db";
+import { inReportingPeriod, parseReportingPeriod, type ReportingPeriod } from "./reporting-period";
 
 export class RevenueError extends Error {
   constructor(
@@ -481,12 +482,20 @@ export async function recordValueEntry(
   });
 }
 
-export async function valueLedger(org: string) {
+export async function valueLedger(org: string, requestedPeriod?: ReportingPeriod) {
+  const period = requestedPeriod ? parseReportingPeriod({ startAt: requestedPeriod.startAt, endAt: requestedPeriod.endAt }) : undefined;
+  const entryScope = and(
+    eq(entries.organizationId, org),
+    sql`exists (select 1 from ${leadsTable} l where l.id = ${entries.leadId} and l.organization_id = ${org})`,
+    period ? inReportingPeriod(entries.occurredAt, period) : undefined,
+  );
+  const acceptedInRange = period ? inReportingPeriod(estimatesTable.acceptedAt, period) : sql`true`;
+  const completedInRange = period ? inReportingPeriod(projectsTable.completedAt, period) : sql`true`;
   const [rows, totals, accepted, completed] = await Promise.all([
     db
       .select()
       .from(entries)
-      .where(eq(entries.organizationId, org))
+      .where(entryScope)
       .orderBy(desc(entries.occurredAt))
       .limit(200),
     db
@@ -496,27 +505,33 @@ export async function valueLedger(org: string) {
         count: sql<number>`count(*)::int`,
       })
       .from(entries)
-      .where(eq(entries.organizationId, org))
+      .where(entryScope)
       .groupBy(entries.kind),
     db
       .select({
-        count: sql<number>`count(*)::int`,
-        amount: sql<string>`coalesce(sum(${estimatesTable.totalCents}),0)::text`,
+        count: sql<number>`count(*) filter (where ${acceptedInRange})::int`,
+        amount: sql<string>`coalesce(sum(${estimatesTable.totalCents}) filter (where ${acceptedInRange}),0)::text`,
+        undated: sql<number>`count(*) filter (where ${estimatesTable.acceptedAt} is null)::int`,
       })
       .from(estimatesTable)
       .where(
         and(
           eq(estimatesTable.organizationId, org),
           eq(estimatesTable.status, "accepted"),
+          sql`exists (select 1 from ${leadsTable} l where l.id = ${estimatesTable.leadId} and l.organization_id = ${org})`,
         ),
       ),
     db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({
+        count: sql<number>`count(*) filter (where ${completedInRange})::int`,
+        undated: sql<number>`count(*) filter (where ${projectsTable.completedAt} is null)::int`,
+      })
       .from(projectsTable)
       .where(
         and(
           eq(projectsTable.organizationId, org),
           eq(projectsTable.status, "completed"),
+          sql`exists (select 1 from ${leadsTable} l where l.id = ${projectsTable.leadId} and l.organization_id = ${org})`,
         ),
       ),
   ]);
@@ -538,12 +553,14 @@ export async function valueLedger(org: string) {
     throw new RevenueError("Totals exceed supported precision.", 422);
   return {
     currency: "USD",
-    period: "all_time",
+    period: period ?? "all_time",
     entries: rows,
     entryCount: totals.reduce((n, t) => n + t.count, 0),
     acceptedEstimateCount: accepted[0]?.count ?? 0,
     acceptedEstimateCents: Number(accepted[0]?.amount ?? 0),
     completedProjectCount: completed[0]?.count ?? 0,
+    undatedAcceptedEstimateCount: accepted[0]?.undated ?? 0,
+    undatedCompletedProjectCount: completed[0]?.undated ?? 0,
     netReceiptsCents,
     netDirectCostsCents,
     receiptEntryCount,
@@ -553,7 +570,8 @@ export async function valueLedger(org: string) {
         ? netReceiptsCents - netDirectCostsCents
         : null,
     boundary:
-      "All-time staff-recorded entries, not a bank/accounting synchronization or causal ROI. Contribution is recorded receipts less recorded direct costs; missing costs, tax and overhead prevent a profit claim. Use new refund/cost-refund entries to correct history.",
+      (period ? "UTC period uses financial event, estimate acceptance and project completion dates; undated records are excluded. " : "All-time staff-recorded entries. ") +
+      "No bank/accounting synchronization or causal ROI. Contribution is recorded receipts less recorded direct costs; missing costs, tax and overhead prevent a profit claim. Use new refund/cost-refund entries to correct history.",
   };
 }
 

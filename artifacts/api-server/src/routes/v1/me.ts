@@ -1,5 +1,10 @@
 import { InviteUserBody, UpdateUserBody } from "@workspace/api-zod";
-import { db, organizationsTable, usersTable } from "@workspace/db";
+import {
+  db,
+  organizationsTable,
+  staffInvitationsTable,
+  usersTable,
+} from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { z } from "zod";
@@ -10,8 +15,39 @@ import { recordAudit } from "../../services/audit";
 import { listMembers } from "../../services/crm";
 import { sendInviteEmail } from "../../services/invite-email";
 import { isTransactionalEmailConfigured } from "../../services/providers";
+import {
+  createStaffInvitation,
+  updateStaffInvitation,
+  StaffInvitationError,
+} from "../../services/staff-invitations";
 
 const router: IRouter = Router();
+
+function invitationOriginAllowed(req: Request, res: Response) {
+  if (req.headers.origin && req.headers.origin !== process.env.APP_ORIGIN) {
+    res.status(403).json({ error: "Origin is not allowed" });
+    return false;
+  }
+  return true;
+}
+function invitationFailure(res: Response, error: unknown) {
+  if (!(error instanceof StaffInvitationError)) throw error;
+  const messages: Record<string, string> = {
+    email_unavailable:
+      "An account or invitation already uses this email. Review its existing workspace; membership was not changed.",
+    already_a_member: "This person is already a member of this workspace.",
+    invitation_recently_attempted:
+      "Invitation was recently attempted. Wait a minute, then review its delivery before retrying.",
+  };
+  res
+    .status(error.status)
+    .json({
+      error:
+        messages[error.code] ??
+        "The invitation changed or cannot be managed. Refresh and review its current status.",
+      code: error.code,
+    });
+}
 
 const UpdateMyProfileBody = z
   .object({
@@ -142,6 +178,7 @@ router.post(
   "/users/invite",
   requireMember("users.manage"),
   async (req: Request, res: Response): Promise<void> => {
+    if (!invitationOriginAllowed(req, res)) return;
     if (
       process.env.NODE_ENV === "production" &&
       !isTransactionalEmailConfigured()
@@ -165,57 +202,56 @@ router.post(
         .json({ error: "Only the owner can grant the owner role" });
       return;
     }
-    const [existing] = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.email, email.toLowerCase()));
-    if (existing) {
-      res
-        .status(409)
-        .json({ error: "A member with this email already exists" });
+    const suppliedRequestId = req.header("Idempotency-Key");
+    if (
+      suppliedRequestId &&
+      !z.string().uuid().safeParse(suppliedRequestId).success
+    ) {
+      res.status(400).json({ error: "Invalid invitation request identity" });
       return;
     }
-    const [user] = await db
-      .insert(usersTable)
-      .values({
-        // "invite:" ids are adopted (re-keyed to the auth subject) on first sign-in.
-        id: `invite:${crypto.randomUUID()}`,
-        email: email.toLowerCase(),
-        firstName: firstName ?? null,
-        lastName: lastName ?? null,
-        organizationId: req.member!.organizationId,
-        role,
-        emailVerifiedAt: null,
-      })
-      .returning();
-    // Notify the invitee. Failures are surfaced to the admin in the
-    // response (inviteEmail.sent=false) rather than failing the invite.
-    const inviter = req.member!.user;
-    const inviterName =
-      [inviter.firstName, inviter.lastName].filter(Boolean).join(" ") ||
-      inviter.email ||
-      "A teammate";
-    const inviteEmail = await sendInviteEmail({
-      invitedUserId: user.id,
-      organizationId: req.member!.organizationId,
-      to: user.email!,
-      inviteeFirstName: user.firstName,
-      inviterName,
-      role,
-    });
-    await recordAudit({
-      organizationId: req.member!.organizationId,
-      actorUserId: req.member!.user.id,
-      action: "user.invited",
-      entityType: "user",
-      metadata: {
-        invitedUserId: user.id,
-        email: user.email,
-        role,
-        inviteEmailSent: inviteEmail.sent,
-      },
-    });
-    res.status(201).json({ ...memberDto(user), inviteEmail });
+    try {
+      const result = await createStaffInvitation(
+        { userId: req.member!.user.id, scope: "member" },
+        req.member!.organizationId,
+        {
+          requestId: suppliedRequestId ?? crypto.randomUUID(),
+          email,
+          role,
+          firstName: firstName ?? undefined,
+          lastName: lastName ?? undefined,
+        },
+      );
+      const [user] = await db
+        .select()
+        .from(usersTable)
+        .where(
+          and(
+            eq(usersTable.email, email.trim().toLowerCase()),
+            eq(usersTable.organizationId, req.member!.organizationId),
+          ),
+        );
+      if (!user) {
+        res
+          .status(409)
+          .json({ error: "Membership changed; refresh the team list" });
+        return;
+      }
+      const sent = result.invitation.deliveryState === "sent";
+      res
+        .status(result.duplicate ? 200 : 201)
+        .json({
+          ...memberDto(user),
+          inviteEmail: {
+            sent,
+            error: sent
+              ? null
+              : "Invitation delivery is unconfirmed. Review provider evidence before sending again.",
+          },
+        });
+    } catch (error) {
+      invitationFailure(res, error);
+    }
   },
 );
 
@@ -223,6 +259,7 @@ router.post(
   "/users/:id/resend-invite",
   requireMember("users.manage"),
   async (req: Request, res: Response): Promise<void> => {
+    if (!invitationOriginAllowed(req, res)) return;
     if (
       process.env.NODE_ENV === "production" &&
       !isTransactionalEmailConfigured()
@@ -254,6 +291,48 @@ router.post(
     }
     if (!target.email) {
       res.status(400).json({ error: "Pending invite has no email address" });
+      return;
+    }
+    const [tracked] = await db
+      .select()
+      .from(staffInvitationsTable)
+      .where(
+        and(
+          eq(staffInvitationsTable.pendingUserId, target.id),
+          eq(staffInvitationsTable.organizationId, actor.organizationId),
+        ),
+      );
+    if (tracked) {
+      try {
+        const result = await updateStaffInvitation(
+          { userId: actor.user.id, scope: "member" },
+          actor.organizationId,
+          tracked.id,
+          {
+            action: "reissue",
+            expectedVersion: tracked.version,
+            confirmed: true,
+          },
+        );
+        const sent = result.deliveryState === "sent";
+        res.json({
+          sent,
+          error: sent
+            ? null
+            : "Invitation delivery is unconfirmed. Review provider evidence before sending again.",
+        });
+      } catch (error) {
+        invitationFailure(res, error);
+      }
+      return;
+    }
+    if (!target.isActive) {
+      res
+        .status(409)
+        .json({
+          error:
+            "This legacy invitation was revoked. Review access before issuing a new invitation.",
+        });
       return;
     }
     // Cooldown: one resend per invite per minute, shared across instances,
@@ -307,6 +386,7 @@ router.patch(
   "/users/:id",
   requireMember("users.manage"),
   async (req: Request, res: Response): Promise<void> => {
+    if (!invitationOriginAllowed(req, res)) return;
     const parsed = UpdateUserBody.safeParse(req.body);
     if (
       !parsed.success ||
@@ -344,6 +424,44 @@ router.patch(
         .json({ error: "Only the owner can change owner membership" });
       return;
     }
+    if (target.id.startsWith("invite:")) {
+      const [tracked] = await db
+        .select()
+        .from(staffInvitationsTable)
+        .where(
+          and(
+            eq(staffInvitationsTable.pendingUserId, target.id),
+            eq(staffInvitationsTable.organizationId, actor.organizationId),
+          ),
+        );
+      if (tracked) {
+        if (parsed.data.role !== undefined || parsed.data.isActive !== false) {
+          res
+            .status(409)
+            .json({
+              error:
+                "Accept the invitation before changing its role. Use resend to explicitly reissue a revoked invitation.",
+            });
+          return;
+        }
+        try {
+          await updateStaffInvitation(
+            { userId: actor.user.id, scope: "member" },
+            actor.organizationId,
+            tracked.id,
+            {
+              action: "revoke",
+              expectedVersion: tracked.version,
+              confirmed: true,
+            },
+          );
+          res.json(memberDto({ ...target, isActive: false }));
+        } catch (error) {
+          invitationFailure(res, error);
+        }
+        return;
+      }
+    }
     const [updated] = await db
       .update(usersTable)
       .set({
@@ -354,6 +472,12 @@ router.patch(
       })
       .where(eq(usersTable.id, target.id))
       .returning();
+    if (!updated) {
+      res
+        .status(409)
+        .json({ error: "Membership changed. Refresh before trying again." });
+      return;
+    }
     await recordAudit({
       organizationId: actor.organizationId,
       actorUserId: actor.user.id,

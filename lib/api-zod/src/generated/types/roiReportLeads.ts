@@ -9,6 +9,8 @@ import type { RoiBreakdownRow } from './roiBreakdownRow';
 
 export type RoiReportLeads = {
   total: number;
+  native: number;
+  imported: number;
   qualified: number;
   bySource: RoiBreakdownRow[];
   byCampaign: RoiBreakdownRow[];

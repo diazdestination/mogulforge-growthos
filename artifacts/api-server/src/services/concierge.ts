@@ -1175,7 +1175,7 @@ async function sendBookingConfirmation(
         appointmentId: state.appointmentId,
         channel,
         to,
-        ...(channel === "email" ? emailAcceptanceEvidence(providerResult) : { provider: providerResult.provider, providerMessageId: providerResult.id }),
+        ...(channel === "email" ? emailAcceptanceEvidence(providerResult, { organizationId, leadId: state.leadId, recipientEmail: to }) : { provider: providerResult.provider, providerMessageId: providerResult.id }),
         mock: providerResult.provider.startsWith("mock"),
       },
     });

@@ -53,6 +53,10 @@ import type {
   CaptureMappingPreview,
   CaptureMappingPreviewRequest,
   CheckInstallationInput,
+  ClientStaffInvitation,
+  ClientStaffInvitationAction,
+  ClientStaffInvitationCreated,
+  ClientStaffInvitationList,
   ConciergeConversation,
   ConciergeMessageRequest,
   ConciergeReply,
@@ -65,10 +69,13 @@ import type {
   ConversionInsights,
   CopilotPerformance,
   CreateApiKeyInput,
+  CreateClientStaffInvitation,
   CreateOrgInput,
   CrmTask,
   CrmTaskInput,
   CrmTaskUpdate,
+  CustomerReplyDecision,
+  CustomerReplyList,
   DashboardSummary,
   DeleteForm200,
   DeleteLeadPhotoRequest,
@@ -110,6 +117,7 @@ import type {
   ListAutomationRunsParams,
   ListCaptureDeliveriesParams,
   ListContactsParams,
+  ListCustomerRepliesParams,
   ListEstimatesParams,
   ListLeadsParams,
   ListProjectsParams,
@@ -169,6 +177,8 @@ import type {
   ReactivationSegmentPreview,
   ReactivationSegmentPreviewRequest,
   ReferralSubmissionInput,
+  ResolveCustomerReply,
+  ReviewCustomerReply,
   RoiReport,
   RotateWebhookSecretInput,
   SavedFilter,
@@ -12777,5 +12787,537 @@ export const useDeleteOnboardingTestLead = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteOnboardingTestLeadMutationOptions(options));
+    }
+
+export const getListClientStaffInvitationsUrl = (orgId: string,) => {
+
+
+
+
+  return `/api/v1/platform/clients/${orgId}/invitations`
+}
+
+/**
+ * Platform administrator session required. Never returns invitation tokens or links.
+ * @summary Review invitations for a platform-managed company
+ */
+export const listClientStaffInvitations = async (orgId: string, options?: Parameters<typeof customFetch>[1]): Promise<ClientStaffInvitationList> => {
+
+  return customFetch<ClientStaffInvitationList>(getListClientStaffInvitationsUrl(orgId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListClientStaffInvitationsQueryKey = (orgId: string,) => {
+    return [
+    `/api/v1/platform/clients/${orgId}/invitations`
+    ] as const;
+    }
+
+
+export const getListClientStaffInvitationsQueryOptions = <TData = Awaited<ReturnType<typeof listClientStaffInvitations>>, TError = ErrorType<unknown>>(orgId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClientStaffInvitations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListClientStaffInvitationsQueryKey(orgId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listClientStaffInvitations>>> = ({ signal }) => listClientStaffInvitations(orgId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: orgId !== null && orgId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listClientStaffInvitations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListClientStaffInvitationsQueryResult = NonNullable<Awaited<ReturnType<typeof listClientStaffInvitations>>>
+export type ListClientStaffInvitationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Review invitations for a platform-managed company
+ */
+
+export function useListClientStaffInvitations<TData = Awaited<ReturnType<typeof listClientStaffInvitations>>, TError = ErrorType<unknown>>(
+ orgId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClientStaffInvitations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListClientStaffInvitationsQueryOptions(orgId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateClientStaffInvitationUrl = (orgId: string,) => {
+
+
+
+
+  return `/api/v1/platform/clients/${orgId}/invitations`
+}
+
+/**
+ * Platform administrator session required. Repeat the identical request ID after an unknown result; changing its contents returns a conflict. An unconfirmed delivery requires explicit review.
+ * @summary Invite a staff member using an immutable request ID
+ */
+export const createClientStaffInvitation = async (orgId: string,
+    createClientStaffInvitation: CreateClientStaffInvitation, options?: Parameters<typeof customFetch>[1]): Promise<ClientStaffInvitationCreated> => {
+
+  return customFetch<ClientStaffInvitationCreated>(getCreateClientStaffInvitationUrl(orgId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createClientStaffInvitation)
+  }
+);}
+
+
+
+
+
+export const getCreateClientStaffInvitationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createClientStaffInvitation>>, TError,{orgId: string;data: BodyType<CreateClientStaffInvitation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createClientStaffInvitation>>, TError,{orgId: string;data: BodyType<CreateClientStaffInvitation>}, TContext> => {
+
+const mutationKey = ['createClientStaffInvitation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createClientStaffInvitation>>, {orgId: string;data: BodyType<CreateClientStaffInvitation>}> = (props) => {
+          const {orgId,data} = props ?? {};
+
+          return  createClientStaffInvitation(orgId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateClientStaffInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof createClientStaffInvitation>>>
+    export type CreateClientStaffInvitationMutationBody = BodyType<CreateClientStaffInvitation>
+    export type CreateClientStaffInvitationMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Invite a staff member using an immutable request ID
+ */
+export const useCreateClientStaffInvitation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createClientStaffInvitation>>, TError,{orgId: string;data: BodyType<CreateClientStaffInvitation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createClientStaffInvitation>>,
+        TError,
+        {orgId: string;data: BodyType<CreateClientStaffInvitation>},
+        TContext
+      > => {
+      return useMutation(getCreateClientStaffInvitationMutationOptions(options));
+    }
+
+export const getReissueClientStaffInvitationUrl = (orgId: string,
+    invitationId: string,) => {
+
+
+
+
+  return `/api/v1/platform/clients/${orgId}/invitations/${invitationId}/reissue`
+}
+
+/**
+ * Platform administrator session required. The version must match the latest invitation. Expired pending invitations can be renewed; stale versions and already accepted or revoked invitations conflict.
+ * @summary Reissue a reviewed staff invitation
+ */
+export const reissueClientStaffInvitation = async (orgId: string,
+    invitationId: string,
+    clientStaffInvitationAction: ClientStaffInvitationAction, options?: Parameters<typeof customFetch>[1]): Promise<ClientStaffInvitation> => {
+
+  return customFetch<ClientStaffInvitation>(getReissueClientStaffInvitationUrl(orgId,invitationId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(clientStaffInvitationAction)
+  }
+);}
+
+
+
+
+
+export const getReissueClientStaffInvitationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reissueClientStaffInvitation>>, TError,{orgId: string;invitationId: string;data: BodyType<ClientStaffInvitationAction>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reissueClientStaffInvitation>>, TError,{orgId: string;invitationId: string;data: BodyType<ClientStaffInvitationAction>}, TContext> => {
+
+const mutationKey = ['reissueClientStaffInvitation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reissueClientStaffInvitation>>, {orgId: string;invitationId: string;data: BodyType<ClientStaffInvitationAction>}> = (props) => {
+          const {orgId,invitationId,data} = props ?? {};
+
+          return  reissueClientStaffInvitation(orgId,invitationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReissueClientStaffInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof reissueClientStaffInvitation>>>
+    export type ReissueClientStaffInvitationMutationBody = BodyType<ClientStaffInvitationAction>
+    export type ReissueClientStaffInvitationMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reissue a reviewed staff invitation
+ */
+export const useReissueClientStaffInvitation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reissueClientStaffInvitation>>, TError,{orgId: string;invitationId: string;data: BodyType<ClientStaffInvitationAction>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reissueClientStaffInvitation>>,
+        TError,
+        {orgId: string;invitationId: string;data: BodyType<ClientStaffInvitationAction>},
+        TContext
+      > => {
+      return useMutation(getReissueClientStaffInvitationMutationOptions(options));
+    }
+
+export const getRevokeClientStaffInvitationUrl = (orgId: string,
+    invitationId: string,) => {
+
+
+
+
+  return `/api/v1/platform/clients/${orgId}/invitations/${invitationId}/revoke`
+}
+
+/**
+ * Platform administrator session required. The version must match the latest invitation. Expired pending invitations can be revoked; stale versions and already accepted invitations conflict.
+ * @summary Revoke a pending staff invitation
+ */
+export const revokeClientStaffInvitation = async (orgId: string,
+    invitationId: string,
+    clientStaffInvitationAction: ClientStaffInvitationAction, options?: Parameters<typeof customFetch>[1]): Promise<ClientStaffInvitation> => {
+
+  return customFetch<ClientStaffInvitation>(getRevokeClientStaffInvitationUrl(orgId,invitationId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(clientStaffInvitationAction)
+  }
+);}
+
+
+
+
+
+export const getRevokeClientStaffInvitationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeClientStaffInvitation>>, TError,{orgId: string;invitationId: string;data: BodyType<ClientStaffInvitationAction>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeClientStaffInvitation>>, TError,{orgId: string;invitationId: string;data: BodyType<ClientStaffInvitationAction>}, TContext> => {
+
+const mutationKey = ['revokeClientStaffInvitation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeClientStaffInvitation>>, {orgId: string;invitationId: string;data: BodyType<ClientStaffInvitationAction>}> = (props) => {
+          const {orgId,invitationId,data} = props ?? {};
+
+          return  revokeClientStaffInvitation(orgId,invitationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeClientStaffInvitationMutationResult = NonNullable<Awaited<ReturnType<typeof revokeClientStaffInvitation>>>
+    export type RevokeClientStaffInvitationMutationBody = BodyType<ClientStaffInvitationAction>
+    export type RevokeClientStaffInvitationMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Revoke a pending staff invitation
+ */
+export const useRevokeClientStaffInvitation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeClientStaffInvitation>>, TError,{orgId: string;invitationId: string;data: BodyType<ClientStaffInvitationAction>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof revokeClientStaffInvitation>>,
+        TError,
+        {orgId: string;invitationId: string;data: BodyType<ClientStaffInvitationAction>},
+        TContext
+      > => {
+      return useMutation(getRevokeClientStaffInvitationMutationOptions(options));
+    }
+
+export const getListCustomerRepliesUrl = (params?: ListCustomerRepliesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/email-intelligence/replies?${stringifiedParams}` : `/api/v1/email-intelligence/replies`
+}
+
+/**
+ * Requires an authenticated member with CRM read access. Returned messages are redacted and may have been deleted; durable reply decisions survive deletion.
+ * @summary Review customer replies and active follow-up holds
+ */
+export const listCustomerReplies = async (params?: ListCustomerRepliesParams, options?: Parameters<typeof customFetch>[1]): Promise<CustomerReplyList> => {
+
+  return customFetch<CustomerReplyList>(getListCustomerRepliesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCustomerRepliesQueryKey = (params?: ListCustomerRepliesParams,) => {
+    return [
+    `/api/v1/email-intelligence/replies`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCustomerRepliesQueryOptions = <TData = Awaited<ReturnType<typeof listCustomerReplies>>, TError = ErrorType<unknown>>(params?: ListCustomerRepliesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCustomerReplies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCustomerRepliesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCustomerReplies>>> = ({ signal }) => listCustomerReplies(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCustomerReplies>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCustomerRepliesQueryResult = NonNullable<Awaited<ReturnType<typeof listCustomerReplies>>>
+export type ListCustomerRepliesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Review customer replies and active follow-up holds
+ */
+
+export function useListCustomerReplies<TData = Awaited<ReturnType<typeof listCustomerReplies>>, TError = ErrorType<unknown>>(
+ params?: ListCustomerRepliesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCustomerReplies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCustomerRepliesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReviewCustomerReplyUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/email-intelligence/replies/${id}/review`
+}
+
+/**
+ * Requires active CRM write access in the same company. Audited; does not automatically resume cancelled work or a company pause. Conflicting decisions return 409.
+ * @summary Confirm or dismiss an ambiguous reply
+ */
+export const reviewCustomerReply = async (id: string,
+    reviewCustomerReply: ReviewCustomerReply, options?: Parameters<typeof customFetch>[1]): Promise<CustomerReplyDecision> => {
+
+  return customFetch<CustomerReplyDecision>(getReviewCustomerReplyUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(reviewCustomerReply)
+  }
+);}
+
+
+
+
+
+export const getReviewCustomerReplyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewCustomerReply>>, TError,{id: string;data: BodyType<ReviewCustomerReply>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewCustomerReply>>, TError,{id: string;data: BodyType<ReviewCustomerReply>}, TContext> => {
+
+const mutationKey = ['reviewCustomerReply'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewCustomerReply>>, {id: string;data: BodyType<ReviewCustomerReply>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reviewCustomerReply(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewCustomerReplyMutationResult = NonNullable<Awaited<ReturnType<typeof reviewCustomerReply>>>
+    export type ReviewCustomerReplyMutationBody = BodyType<ReviewCustomerReply>
+    export type ReviewCustomerReplyMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Confirm or dismiss an ambiguous reply
+ */
+export const useReviewCustomerReply = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewCustomerReply>>, TError,{id: string;data: BodyType<ReviewCustomerReply>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewCustomerReply>>,
+        TError,
+        {id: string;data: BodyType<ReviewCustomerReply>},
+        TContext
+      > => {
+      return useMutation(getReviewCustomerReplyMutationOptions(options));
+    }
+
+export const getResolveCustomerReplyUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/email-intelligence/replies/${id}/resolve`
+}
+
+/**
+ * Requires active CRM write access in the same company. Audited; does not automatically resume cancelled work or a company pause. Conflicting decisions return 409.
+ * @summary Resolve a reviewed follow-up hold
+ */
+export const resolveCustomerReply = async (id: string,
+    resolveCustomerReply: ResolveCustomerReply, options?: Parameters<typeof customFetch>[1]): Promise<CustomerReplyDecision> => {
+
+  return customFetch<CustomerReplyDecision>(getResolveCustomerReplyUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(resolveCustomerReply)
+  }
+);}
+
+
+
+
+
+export const getResolveCustomerReplyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveCustomerReply>>, TError,{id: string;data: BodyType<ResolveCustomerReply>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resolveCustomerReply>>, TError,{id: string;data: BodyType<ResolveCustomerReply>}, TContext> => {
+
+const mutationKey = ['resolveCustomerReply'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolveCustomerReply>>, {id: string;data: BodyType<ResolveCustomerReply>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  resolveCustomerReply(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResolveCustomerReplyMutationResult = NonNullable<Awaited<ReturnType<typeof resolveCustomerReply>>>
+    export type ResolveCustomerReplyMutationBody = BodyType<ResolveCustomerReply>
+    export type ResolveCustomerReplyMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Resolve a reviewed follow-up hold
+ */
+export const useResolveCustomerReply = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveCustomerReply>>, TError,{id: string;data: BodyType<ResolveCustomerReply>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resolveCustomerReply>>,
+        TError,
+        {id: string;data: BodyType<ResolveCustomerReply>},
+        TContext
+      > => {
+      return useMutation(getResolveCustomerReplyMutationOptions(options));
     }
 

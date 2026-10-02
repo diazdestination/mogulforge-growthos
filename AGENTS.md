@@ -2,10 +2,16 @@
 
 ## October 1 contractor product direction
 
+Latest clarification: Adam wants GrowthOS to replace Housecall Pro, specifically
+prioritizing scheduling, invoices, warranty tracking and clear navigation.
+Read `GROWTHOS-CONTRACTOR-OPERATIONS.md` before assuming an ongoing Housecall Pro
+dependency. Native operations and controlled migration are the direction;
+existing release and real-customer activation gates still apply.
+
 Read `GROWTHOS-CONTRACTOR-PRODUCT.md` for Adam's latest direction: one reusable
 roofing/HVAC platform, a limited $500 founding beta, a $1,500/month flagship
 target, higher tiers/add-ons, and support for both Smart Sites and existing
-websites. Housecall Pro is the provisional source-system interpretation; account
+websites. Housecall Pro access is optional migration support; account
 eligibility is unverified. Package targets are not implemented entitlements or
 live offers. Preserve agreed beta terms and complete the paid-beta gates below.
 Website onboarding implementation evidence: `CONTRACTOR-PACKAGING-QA-2026-10-01.md`.

@@ -23,7 +23,7 @@ import {
   consumeIdentityToken,
   issueIdentityToken,
 } from '../services/identity-token';
-import { verifyInviteToken } from '../services/invite-token';
+import { acceptPendingStaffInvitation, StaffInvitationError } from '../services/staff-invitations';
 import { ensureMembership } from '../services/org';
 import { isTransactionalEmailConfigured } from '../services/providers';
 import { reportCallbackBruteForceBlock } from '../services/security-alerts';
@@ -198,13 +198,14 @@ function getSafeErrorMetadata(error: unknown) {
 async function upsertUser(claims: Record<string, unknown>) {
   const userData = {
     id: claims.sub as string,
-    email: (claims.email as string) || null,
+    email: typeof claims.email === 'string' ? claims.email.trim().toLowerCase() : null,
     firstName: (claims.first_name as string) || null,
     lastName: (claims.last_name as string) || null,
     profileImageUrl: (claims.profile_image_url || claims.picture) as
       string | null,
-    // A successful OIDC exchange proves control through the trusted IdP.
-    emailVerifiedAt: new Date(),
+    // Signing in proves the IdP identity; mailbox control needs its separate
+    // verified-email claim. Preserve established same-mailbox evidence below.
+    emailVerifiedAt: claims.email_verified === true ? new Date() : null,
   };
 
   // Invited members are pre-provisioned with a placeholder "invite:" id and
@@ -216,22 +217,11 @@ async function upsertUser(claims: Record<string, unknown>) {
       .from(usersTable)
       .where(eq(usersTable.email, userData.email.toLowerCase()));
     if (invited && invited.id.startsWith('invite:')) {
-      const [adopted] = await db
-        .update(usersTable)
-        .set({
-          id: userData.id,
-          firstName: userData.firstName ?? invited.firstName,
-          lastName: userData.lastName ?? invited.lastName,
-          profileImageUrl: userData.profileImageUrl,
-          emailVerifiedAt: new Date(),
-          // A pending invite is intentionally inactive until the invitee
-          // proves control of the invited email by completing registration.
-          // Successful adoption is the activation boundary.
-          isActive: true,
-          updatedAt: new Date(),
-        })
-        .where(eq(usersTable.id, invited.id))
-        .returning();
+      const adopted = await acceptPendingStaffInvitation({
+        pendingUserId: invited.id, email: userData.email, newUserId: userData.id, oidcEmailVerified: claims.email_verified === true,
+        firstName: userData.firstName, lastName: userData.lastName,
+        profileImageUrl: userData.profileImageUrl, trustedOidc: true,
+      });
       const adoptedMember = await ensureMembership(adopted.id);
       return adoptedMember ?? adopted;
     }
@@ -244,6 +234,7 @@ async function upsertUser(claims: Record<string, unknown>) {
       target: usersTable.id,
       set: {
         ...userData,
+        emailVerifiedAt: userData.emailVerifiedAt ?? sql`case when lower(${usersTable.email}) is not distinct from ${userData.email} then ${usersTable.emailVerifiedAt} else null end`,
         updatedAt: new Date(),
       },
     })
@@ -353,7 +344,14 @@ router.get('/callback', async (req: Request, res: Response) => {
     return;
   }
 
-  const dbUser = await upsertUser(claims as unknown as Record<string, unknown>);
+  let dbUser;
+  try {
+    dbUser = await upsertUser(claims as unknown as Record<string, unknown>);
+  } catch (error) {
+    if (!(error instanceof StaffInvitationError)) throw error;
+    res.status(403).json({ error: 'This invitation cannot be accepted with this sign-in. Use the current emailed invitation link, or ask your administrator to review access.', code: 'INVITATION_ACCEPTANCE_REQUIRED' });
+    return;
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const sessionData: SessionData = {
@@ -463,6 +461,10 @@ router.post(
       const sid = await createSession(sessionData);
       res.json(ExchangeMobileAuthorizationCodeResponse.parse({ token: sid }));
     } catch (err) {
+      if (err instanceof StaffInvitationError) {
+        res.status(403).json({ error: 'Use the current emailed invitation link or ask your administrator to review access.', code: 'INVITATION_ACCEPTANCE_REQUIRED' });
+        return;
+      }
       const justBlocked = await invalidAuthAttemptLimiter.recordFailure(ip);
       if (justBlocked) {
         void reportCallbackBruteForceBlock({
@@ -624,12 +626,7 @@ router.post('/auth/register', async (req: Request, res: Response) => {
     existing?.id.startsWith('invite:') &&
     (!inviteToken ||
       !existing.organizationId ||
-      !existing.email ||
-      !verifyInviteToken(inviteToken, {
-        inviteId: existing.id,
-        organizationId: existing.organizationId,
-        email: existing.email,
-      }))
+      !existing.email)
   ) {
     res.status(403).json({
       error:
@@ -661,26 +658,17 @@ router.post('/auth/register', async (req: Request, res: Response) => {
   let dbUser;
   if (existing) {
     const localUserId = crypto.randomUUID();
-    const [adopted] = await db
-      .update(usersTable)
-      .set({
-        // Retire the invite placeholder at the same boundary that proves
-        // control of the invited address. Leaving an activated account with
-        // an "invite:" id makes the team UI and resend endpoint continue to
-        // treat it as pending.
-        id: localUserId,
-        passwordHash,
-        firstName: firstName ?? existing.firstName,
-        lastName: lastName ?? existing.lastName,
-        emailVerifiedAt: new Date(),
-        // The invite was confirmed active above. Completing password
-        // registration accepts it and keeps the new member active.
-        isActive: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(usersTable.id, existing.id))
-      .returning();
-    dbUser = (await ensureMembership(adopted.id)) ?? adopted;
+    try {
+      const adopted = await acceptPendingStaffInvitation({
+        pendingUserId: existing.id, email, newUserId: localUserId, token: inviteToken,
+        passwordHash, firstName, lastName,
+      });
+      dbUser = (await ensureMembership(adopted.id)) ?? adopted;
+    } catch (error) {
+      if (!(error instanceof StaffInvitationError)) throw error;
+      res.status(403).json({ error: 'This invitation changed, was revoked or expired. Ask your administrator for a current invitation.', code: 'BETA_INVITE_TOKEN_REQUIRED' });
+      return;
+    }
   } else {
     const [created] = await db
       .insert(usersTable)

@@ -62,6 +62,9 @@ const pinnedReactivationPath = fileURLToPath(
 const historicalReactivationFixturePath = fileURLToPath(
   new URL("./test-support/fixtures/c050067/reactivation.ts.txt", import.meta.url),
 );
+const pinnedDurableRelativePath = "artifacts/api-server/src/services/durable-execution.ts";
+const pinnedDurablePath = fileURLToPath(new URL(`../${pinnedDurableRelativePath}`, import.meta.url));
+const historicalDurableFixturePath = fileURLToPath(new URL("./test-support/fixtures/c050067/durable-execution.ts.txt", import.meta.url));
 
 describe("hosted crash probe guards", () => {
   it("requires exact approved source identity, holds and a deterministic nonce", () => {
@@ -198,7 +201,7 @@ describe("hosted crash probe guards", () => {
       actualSourceReads.some((path) => path.endsWith("pilot-crash-runtime.ts")),
     ).toBe(true);
     expect(
-      actualSourceReads.some((path) => path.endsWith("durable-execution.ts")),
+      actualSourceReads.some((path) => path.endsWith("durable-execution.ts.txt")),
     ).toBe(true);
     await expect(
       attestCrashSources(root, pinnedEnv, async (path, encoding) =>
@@ -218,6 +221,7 @@ describe("hosted crash probe guards", () => {
   it.each([
     { label: "startup", relativePath: pinnedIndexRelativePath, currentPath: pinnedIndexPath, fixturePath: historicalIndexFixturePath },
     { label: "reactivation", relativePath: pinnedReactivationRelativePath, currentPath: pinnedReactivationPath, fixturePath: historicalReactivationFixturePath },
+    { label: "durable execution", relativePath: pinnedDurableRelativePath, currentPath: pinnedDurablePath, fixturePath: historicalDurableFixturePath },
   ])("pins the historical $label fixture and rejects changed current $label bytes", async ({ relativePath, currentPath, fixturePath }) => {
     const frozen = await readFile(fixturePath, "utf8");
     const sourceSha = (text) =>

@@ -29,6 +29,7 @@ export function inviteSignupUrl(params: {
   invitedUserId: string;
   organizationId: string;
   email: string;
+  tokenRevision?: string;
 }): string {
   const base = crmAppUrl();
   const url = new URL("signup", base.endsWith("/") ? base : `${base}/`);
@@ -38,6 +39,7 @@ export function inviteSignupUrl(params: {
       inviteId: params.invitedUserId,
       organizationId: params.organizationId,
       email: params.email,
+      tokenRevision: params.tokenRevision,
     }),
   );
   url.searchParams.set("email", params.email.trim().toLowerCase());
@@ -56,6 +58,8 @@ export async function sendInviteEmail(params: {
   inviteeFirstName?: string | null;
   inviterName: string;
   role: string;
+  tokenRevision?: string;
+  shouldSend?: () => Promise<boolean>;
 }): Promise<InviteEmailResult> {
   try {
     if (!isSafeMailbox(params.to)) {
@@ -68,6 +72,7 @@ export async function sendInviteEmail(params: {
       invitedUserId: params.invitedUserId,
       organizationId: params.organizationId,
       email: params.to,
+      tokenRevision: params.tokenRevision,
     });
     const roleLabel = params.role.replace(/_/g, " ");
     const body = [
@@ -84,6 +89,12 @@ export async function sendInviteEmail(params: {
       "",
       `— ${businessName}`,
     ].join("\n");
+    if (params.shouldSend && !(await params.shouldSend()))
+      return {
+        sent: false,
+        error:
+          "Invitation delivery is no longer authorized. Refresh the invitation status.",
+      };
     await transactionalEmailProvider.send(
       params.to,
       `You've been invited to the ${businessName} team`,

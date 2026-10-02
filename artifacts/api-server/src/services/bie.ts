@@ -37,6 +37,7 @@ import { hasPermission } from "../lib/permissions";
 import { isDeepStrictEqual } from "node:util";
 import { assertCapabilityForActor, CapabilityAccessError, getEntitlements } from "./entitlements";
 import { needsSourceVerification, originalOpportunityDate, sourceLastContactDate } from "./source-history";
+import { hasCustomerReplyHold } from "./response-correlation";
 
 const SOURCES: BieSource[] = [
   "google_ads",
@@ -824,6 +825,7 @@ export async function executeBieProposal(
   const execution = await runDurableAction({
     organizationId,
     actionKey: `bie:${actionId}`,
+    leadId: proposal.leadId,
     kind: proposal.actionType,
     payload: proposal.payload,
     actorUserId,
@@ -880,6 +882,8 @@ async function executeBieProposalEffect(
     );
   }
   const lead = await crm.getLead(organizationId, proposal.leadId);
+  if (lead && await hasCustomerReplyHold(organizationId, lead.id))
+    return markAction(proposal.id, "blocked", "Customer replied; resolve the reply review before new follow-up.");
   if (!lead)
     return markAction(
       proposal.id,
@@ -910,7 +914,7 @@ async function executeBieProposalEffect(
       and(
         eq(activitiesTable.organizationId, organizationId),
         eq(activitiesTable.leadId, lead.id),
-        gte(activitiesTable.createdAt, proposal.createdAt),
+        gte(activitiesTable.occurredAt, proposal.createdAt),
         inArray(activitiesTable.type, [
           "portal_message",
           "customer_reply",
@@ -1094,7 +1098,7 @@ async function executeBieProposalEffect(
         channel: "email",
         to: contact.email,
         from: sent.senderEmail,
-        ...emailAcceptanceEvidence(sent),
+        ...emailAcceptanceEvidence(sent, { organizationId, leadId: lead.id, recipientEmail: contact.email }),
         source: "bie.revenue_recovery",
       },
     });

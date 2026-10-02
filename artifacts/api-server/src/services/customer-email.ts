@@ -139,7 +139,7 @@ export async function sendCustomerEmail(
     entityType: input.leadId ? "lead" : "organization",
     entityId: input.leadId ?? input.organizationId,
     metadata: {
-      ...emailAcceptanceEvidence(result),
+      ...emailAcceptanceEvidence(result, input.leadId ? { organizationId: input.organizationId, leadId: input.leadId, recipientEmail: input.to } : undefined),
       senderUserId: sender.userId,
       senderSource: sender.source,
     },

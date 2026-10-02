@@ -105,8 +105,20 @@ The journal partition includes API origin and site ID. Reconfiguring either cann
 
 ## Local verification
 
+`operations.mjs` adds private read-only health, an atomic worker heartbeat and a
+SQLite-consistent backup helper. `backupWebsiteJournal` requires Node >=22.16,
+uses a new private directory on every run, checks integrity and records a digest.
+It neither copies the encryption key nor marks a backup as restore-verified.
+`inspectWebsiteOperations` checks heartbeat identity/age, queue age and capacity
+without draining or expiring records. It emits no customer text or credentials.
+
+The CSS consumer includes opt-in CLI commands and a reviewed-host supervision
+template; see its `ops/RECOVERY.md`. A deployed supervisor, alert destination,
+backup schedule, matching CRM receipt store and actual restore acceptance remain
+operational gates. Local synthetic recovery does not establish production RPO/RTO.
+
 ```text
-node --test examples/website-connection/adapter.test.mjs
+node --test examples/website-connection/adapter.test.mjs examples/website-connection/operations.test.mjs
 cd artifacts/api-server
 node scripts/test-scheduler-isolated.mjs src/services/smart-site-lifecycle-race.test.ts src/routes/v1/beta-company-rehearsal.test.ts
 ```

@@ -9,6 +9,7 @@
 export type RoiReportAppointments = {
   total: number;
   leadsWithAppointment: number;
+  distinctBookedLeads: number;
   /** @nullable */
   appointmentRatePct?: number | null;
 };

@@ -20,6 +20,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { isLegacyDefaultOrg } from "../lib/orgFlavor";
 import { recordAudit } from "./audit";
 import { needsSourceVerification } from "./source-history";
+import { hasCustomerReplyHold, lockReplyLead } from "./response-correlation";
 import {
   engagementLinkUrl,
   getOrCreateEngagementLink,
@@ -284,6 +285,8 @@ export async function enrollLead(
   runAt = nextAllowedSendTime(sendingHours, runAt) ?? runAt;
   try {
     const create = async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
+      await lockReplyLead(tx, organizationId, leadId);
+      if (await hasCustomerReplyHold(organizationId, leadId, tx)) return null;
       const [enrollment] = await tx
         .insert(playbookEnrollmentsTable)
         .values({
@@ -351,8 +354,9 @@ async function scheduleStep(
   enrollment: PlaybookEnrollment,
   stepIndex: number,
   runAt: Date,
+  writer: Pick<typeof db, "insert"> = db,
 ): Promise<void> {
-  await db.insert(scheduledActionsTable).values({
+  await writer.insert(scheduledActionsTable).values({
     organizationId: enrollment.organizationId,
     action: {
       type: "playbook_step",
@@ -417,6 +421,11 @@ export async function executePlaybookStep(
     }).where(and(eq(playbookEnrollmentsTable.id, enrollment.id), eq(playbookEnrollmentsTable.organizationId, organizationId),
       eq(playbookEnrollmentsTable.status, "active"), eq(playbookEnrollmentsTable.currentStep, stepIndex)));
     return { status: "skipped", detail: "paused: customer_lifecycle_paused" };
+  }
+
+  if (await hasCustomerReplyHold(organizationId, enrollment.leadId)) {
+    await pauseEnrollment(enrollment.id, "Customer replied; resolve the reply review before resuming");
+    return { status: "skipped", detail: "paused: customer_reply_requires_review" };
   }
 
   const [playbook] = await db
@@ -878,7 +887,7 @@ export async function executePlaybookStep(
         enrollmentId: enrollment.id,
         stepIndex,
         channel: step.channel,
-        ...(step.channel === "email" ? emailAcceptanceEvidence(sendResult) : { provider: sendResult.provider, providerMessageId: sendResult.id }),
+        ...(step.channel === "email" ? emailAcceptanceEvidence(sendResult, { organizationId, leadId: lead.id, recipientEmail: contact.email! }) : { provider: sendResult.provider, providerMessageId: sendResult.id }),
         senderUserId: emailSenderUserId,
         from: sendResult.senderEmail ?? null,
         aiProvider: draft.provider,
@@ -900,7 +909,7 @@ export async function executePlaybookStep(
         playbookId: playbook.id,
         stepIndex,
         channel: step.channel,
-        ...(step.channel === "email" ? emailAcceptanceEvidence(sendResult) : { provider: sendResult.provider, providerMessageId: sendResult.id }),
+        ...(step.channel === "email" ? emailAcceptanceEvidence(sendResult, { organizationId, leadId: lead.id, recipientEmail: contact.email! }) : { provider: sendResult.provider, providerMessageId: sendResult.id }),
         senderUserId: emailSenderUserId,
         from: sendResult.senderEmail ?? null,
         mock: sendResult.provider.startsWith("mock-"),
@@ -1054,98 +1063,46 @@ export async function enrollLeadInPlaybookById(
   if (!playbook || playbook.steps.length === 0) return null;
   return enrollLead(organizationId, leadId, playbook);
 }
-/** Rep control: resume a paused enrollment (reschedules the current step). */
-export async function resumeEnrollment(
-  organizationId: string,
-  enrollmentId: string,
-): Promise<PlaybookEnrollment | null> {
-  const [enrollment] = await db
-    .select()
-    .from(playbookEnrollmentsTable)
-    .where(
-      and(
-        eq(playbookEnrollmentsTable.id, enrollmentId),
-        eq(playbookEnrollmentsTable.organizationId, organizationId),
-      ),
-    );
-  if (!enrollment || enrollment.status !== "paused") return null;
-  const [playbook] = await db
-    .select()
-    .from(playbooksTable)
-    .where(eq(playbooksTable.id, enrollment.playbookId));
-  const step = playbook?.steps[enrollment.currentStep];
-  if (!playbook || !step) return null;
-  const runAt = new Date(Date.now() + Math.min(step.delayMinutes, 60) * 60_000);
-  const [updated] = await db
-    .update(playbookEnrollmentsTable)
-    .set({ status: "active", pauseReason: null, nextRunAt: runAt })
-    .where(eq(playbookEnrollmentsTable.id, enrollment.id))
-    .returning();
-  await scheduleStep(updated, updated.currentStep, runAt);
-  await appendHistory(enrollment.id, {
-    at: new Date().toISOString(),
-    kind: "resumed",
+/** Rep controls serialize with reply confirmation before changing a step. */
+async function changeEnrollmentStep(organizationId: string, enrollmentId: string, operation: "resume" | "skip"): Promise<PlaybookEnrollment | null> {
+  return db.transaction(async tx => {
+    const [initial] = await tx.select().from(playbookEnrollmentsTable).where(and(
+      eq(playbookEnrollmentsTable.id, enrollmentId), eq(playbookEnrollmentsTable.organizationId, organizationId),
+    ));
+    if (!initial) return null;
+    await lockReplyLead(tx, organizationId, initial.leadId);
+    const [enrollment] = await tx.select().from(playbookEnrollmentsTable).where(and(
+      eq(playbookEnrollmentsTable.id, enrollmentId), eq(playbookEnrollmentsTable.organizationId, organizationId),
+    )).for("update");
+    if (!enrollment || (operation === "resume" ? enrollment.status !== "paused" : !["active", "paused"].includes(enrollment.status))) return null;
+    if (await hasCustomerReplyHold(organizationId, enrollment.leadId, tx)) return enrollment;
+    const [playbook] = await tx.select().from(playbooksTable).where(and(eq(playbooksTable.id, enrollment.playbookId), eq(playbooksTable.organizationId, organizationId)));
+    if (!playbook) return null;
+    const nextIndex = enrollment.currentStep + (operation === "skip" ? 1 : 0);
+    const step = playbook.steps[nextIndex];
+    if (!step && operation === "resume") return null;
+    const entries: EnrollmentHistoryEntry[] = [{ at: new Date().toISOString(), kind: operation === "resume" ? "resumed" : "skipped", ...(operation === "skip" ? { stepIndex: enrollment.currentStep } : {}) }];
+    if (!step) entries.push({ at: new Date().toISOString(), kind: "completed", detail: "skipped past final step" });
+    const runAt = step ? new Date(Date.now() + (operation === "resume" ? Math.min(step.delayMinutes, 60) : step.delayMinutes) * 60_000) : null;
+    const [updated] = await tx.update(playbookEnrollmentsTable).set({
+      currentStep: step ? nextIndex : enrollment.currentStep,
+      status: step ? "active" : "completed", nextRunAt: runAt,
+      pauseReason: step ? null : "skipped past final step",
+      history: sql`${playbookEnrollmentsTable.history} || ${JSON.stringify(entries)}::jsonb`,
+    }).where(eq(playbookEnrollmentsTable.id, enrollment.id)).returning();
+    if (step && runAt) await scheduleStep(updated, nextIndex, runAt, tx);
+    return updated;
   });
-  return updated;
+}
+
+/** Rep control: resume a paused enrollment (reschedules the current step). */
+export async function resumeEnrollment(organizationId: string, enrollmentId: string): Promise<PlaybookEnrollment | null> {
+  return changeEnrollmentStep(organizationId, enrollmentId, "resume");
 }
 
 /** Rep control: skip the current step and schedule the next one now. */
-export async function skipEnrollmentStep(
-  organizationId: string,
-  enrollmentId: string,
-): Promise<PlaybookEnrollment | null> {
-  const [enrollment] = await db
-    .select()
-    .from(playbookEnrollmentsTable)
-    .where(
-      and(
-        eq(playbookEnrollmentsTable.id, enrollmentId),
-        eq(playbookEnrollmentsTable.organizationId, organizationId),
-      ),
-    );
-  if (
-    !enrollment ||
-    (enrollment.status !== "active" && enrollment.status !== "paused")
-  ) {
-    return null;
-  }
-  const [playbook] = await db
-    .select()
-    .from(playbooksTable)
-    .where(eq(playbooksTable.id, enrollment.playbookId));
-  if (!playbook) return null;
-  await appendHistory(enrollment.id, {
-    at: new Date().toISOString(),
-    kind: "skipped",
-    stepIndex: enrollment.currentStep,
-  });
-  const nextIndex = enrollment.currentStep + 1;
-  const nextStep = playbook.steps[nextIndex];
-  if (!nextStep) {
-    await finishEnrollment(
-      enrollment.id,
-      "completed",
-      "skipped past final step",
-    );
-    const [finished] = await db
-      .select()
-      .from(playbookEnrollmentsTable)
-      .where(eq(playbookEnrollmentsTable.id, enrollment.id));
-    return finished ?? null;
-  }
-  const runAt = new Date(Date.now() + nextStep.delayMinutes * 60_000);
-  const [updated] = await db
-    .update(playbookEnrollmentsTable)
-    .set({
-      currentStep: nextIndex,
-      nextRunAt: runAt,
-      status: "active",
-      pauseReason: null,
-    })
-    .where(eq(playbookEnrollmentsTable.id, enrollment.id))
-    .returning();
-  await scheduleStep(updated, nextIndex, runAt);
-  return updated;
+export async function skipEnrollmentStep(organizationId: string, enrollmentId: string): Promise<PlaybookEnrollment | null> {
+  return changeEnrollmentStep(organizationId, enrollmentId, "skip");
 }
 
 /** The lead-detail panel: live (or most recent) enrollment for a lead. */

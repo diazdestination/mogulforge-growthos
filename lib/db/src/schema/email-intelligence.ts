@@ -2,6 +2,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -12,6 +13,9 @@ import {
 
 import { usersTable } from "./auth";
 import { organizationsTable } from "./organizations";
+import { leadsTable } from "./leads";
+import { contactsTable } from "./contacts";
+import { activitiesTable } from "./activities";
 
 export type EmailIntelligenceSourceStatus = "pending" | "active" | "paused" | "error";
 export type EmailIntelligenceMessageStatus = "processed" | "raw_purged";
@@ -139,3 +143,33 @@ export const emailIntelligenceFactsTable = pgTable(
 export type EmailIntelligenceSource = typeof emailIntelligenceSourcesTable.$inferSelect;
 export type EmailIntelligenceMessage = typeof emailIntelligenceMessagesTable.$inferSelect;
 export type EmailIntelligenceFact = typeof emailIntelligenceFactsTable.$inferSelect;
+
+/** Minimal durable reply evidence. Raw-content deletion must not release a hold. */
+export const emailResponseReviewsTable = pgTable("email_response_reviews", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizationsTable.id),
+  sourceId: uuid("source_id").notNull().references(() => emailIntelligenceSourcesTable.id),
+  messageId: uuid("message_id").references(() => emailIntelligenceMessagesTable.id, { onDelete: "set null" }),
+  externalMessageId: text("external_message_id").notNull(),
+  payloadSha256: text("payload_sha256").notNull(),
+  state: text("state").$type<"needs_review" | "confirmed" | "dismissed">().notNull().default("needs_review"),
+  reason: text("reason").notNull(),
+  leadId: uuid("lead_id").references(() => leadsTable.id),
+  contactId: uuid("contact_id").references(() => contactsTable.id),
+  outboundActivityId: uuid("outbound_activity_id").references(() => activitiesTable.id, { onDelete: "set null" }),
+  replyAt: timestamp("reply_at", { withTimezone: true }),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  holdActive: boolean("hold_active").notNull().default(false),
+  reviewedByUserId: varchar("reviewed_by_user_id").references(() => usersTable.id),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  reviewNote: text("review_note"),
+  effectSummary: jsonb("effect_summary").$type<{ pausedEnrollments: number; cancelledActions: number; blockedProposals: number; reconciliationRequired: number }>(),
+  releasedByUserId: varchar("released_by_user_id").references(() => usersTable.id),
+  releasedAt: timestamp("released_at", { withTimezone: true }),
+  releaseNote: text("release_note"),
+}, (table) => [
+  uniqueIndex("email_response_source_external_uniq").on(table.sourceId, table.externalMessageId),
+  index("email_response_org_review_idx").on(table.organizationId, table.state, table.receivedAt),
+  index("email_response_org_lead_hold_idx").on(table.organizationId, table.leadId, table.holdActive),
+]);
+export type EmailResponseReview = typeof emailResponseReviewsTable.$inferSelect;

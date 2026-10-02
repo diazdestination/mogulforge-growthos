@@ -7,5 +7,13 @@
  */
 
 export type GetRoiReportParams = {
+/**
+ * @minimum 1
+ * @maximum 365
+ */
 days?: number;
+/**
+ * Exclusive UTC end of the report period; defaults to the generation time.
+ */
+endAt?: Date;
 };

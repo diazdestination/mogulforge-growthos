@@ -1,5 +1,16 @@
 # Current delivery decisions
 
+## Contractor operations clarification - October 1
+
+Adam accepted the autonomous next wave and clarified the goal is to replace
+Housecall Pro. Reported pain is navigation, organization and dependability;
+named tasks are scheduling, invoices and warranty tracking. Treat source
+integration as optional migration/transition support and build native daily
+workflows. Record missing invoice/payment and field-operation acceptance
+explicitly. See `GROWTHOS-CONTRACTOR-OPERATIONS.md`. Current reliability repairs
+remain first; no source-account cancellation, data cutover or live activation
+is inferred. Honor the limited $500 beta agreements.
+
 October 1, 2026, based on Adam's contractor scope and explicit swarm request.
 
 - Preserve one shared platform with configurable trades and existing websites.

@@ -24,9 +24,10 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useGetMe, UserRole } from '@workspace/api-client-react';
-import { canManageSettings } from '@/lib/permissions';
+import { canManageSettings, canWrite } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import { RevenueWorkspace } from '@/components/revenue-workspace';
+import { CustomerReplies } from '@/components/customer-replies';
 
 type SourceStatus = 'not_connected' | 'pending' | 'connected' | 'error';
 type ActionType = 'create_task' | 'change_stage' | 'send_email';
@@ -460,6 +461,7 @@ export default function Bie() {
       )}
 
       <RevenueWorkspace />
+      <CustomerReplies canReview={canWrite(profile?.role as UserRole | undefined)} />
       <details className="space-y-5 rounded-xl border p-4">
       <summary className="cursor-pointer text-sm font-semibold">Advanced BIE analysis, integrations & policy</summary>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

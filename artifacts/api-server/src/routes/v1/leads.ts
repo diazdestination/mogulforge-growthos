@@ -591,7 +591,7 @@ router.post(
         to: contact.email,
         from: sent.senderEmail,
         subject,
-        ...emailAcceptanceEvidence(sent),
+        ...emailAcceptanceEvidence(sent, { organizationId: req.member!.organizationId, leadId: lead.id, recipientEmail: contact.email }),
         source: "crm-compose",
       },
     });
@@ -605,7 +605,7 @@ router.post(
         to: contact.email,
         from: sent.senderEmail,
         subject,
-        ...emailAcceptanceEvidence(sent),
+        ...emailAcceptanceEvidence(sent, { organizationId: req.member!.organizationId, leadId: lead.id, recipientEmail: contact.email }),
       },
     });
     res.status(201).json(activity);

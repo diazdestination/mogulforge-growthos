@@ -124,6 +124,9 @@ interface Room {
   }[];
 }
 interface Ledger {
+  period: "all_time" | { startAt: string; endAt: string; timeZone: "UTC" };
+  undatedAcceptedEstimateCount: number;
+  undatedCompletedProjectCount: number;
   entryCount: number;
   acceptedEstimateCount: number;
   acceptedEstimateCents: number;
@@ -1191,15 +1194,17 @@ export function ValueLedger({
   manager = false,
   busy = false,
   work,
+  period,
 }: {
   records?: LeadRecord[];
   manager?: boolean;
   busy?: boolean;
   work?: Work;
+  period?: { startAt: string; endAt: string; timeZone: "UTC" };
 }) {
   const ledger = useQuery({
-    queryKey: ["revenue", "value"],
-    queryFn: () => revenueRequest<Ledger>("/revenue/value"),
+    queryKey: ["revenue", "value", period ?? "all_time"],
+    queryFn: () => revenueRequest<Ledger>("/revenue/value" + (period ? `?${new URLSearchParams({ startAt: period.startAt, endAt: period.endAt })}` : "")),
   });
   const [leadId, setLeadId] = useState("");
   const [amount, setAmount] = useState("");
@@ -1242,7 +1247,7 @@ export function ValueLedger({
           Trace the value. See the evidence.
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          All-time USD records · {data.entryCount} financial entries · latest
+          {period ? "Selected UTC period · USD records" : "All-time USD records"} · {data.entryCount} financial entries · latest
           200 shown
         </p>
       </div>
@@ -1281,6 +1286,11 @@ export function ValueLedger({
         />
       </div>
       <Note>{data.boundary}</Note>
+      {period && ((data.undatedAcceptedEstimateCount ?? 0) > 0 || (data.undatedCompletedProjectCount ?? 0) > 0) && (
+        <Note>
+          Dates need attention: {data.undatedAcceptedEstimateCount ?? 0} accepted estimates and {data.undatedCompletedProjectCount ?? 0} completed projects have no event date and are excluded from this period.
+        </Note>
+      )}
       {records.length > 0 && (
         <div className="space-y-3 rounded-xl border p-4">
           <h4 className="font-semibold">Follow a customer’s evidence chain</h4>
@@ -1414,9 +1424,9 @@ export function ValueLedger({
             key={e.id}
             className="flex flex-wrap justify-between gap-2 rounded-lg border p-3 text-sm"
           >
-            <div>
+            <div className="min-w-0 max-w-full">
               <Link
-                className="text-primary hover:underline"
+                className="block break-words text-primary hover:underline"
                 href={`/leads/${e.leadId}`}
               >
                 {e.sourceReference}

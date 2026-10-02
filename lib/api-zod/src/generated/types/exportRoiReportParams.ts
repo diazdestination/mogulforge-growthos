@@ -7,5 +7,10 @@
  */
 
 export type ExportRoiReportParams = {
+/**
+ * @minimum 1
+ * @maximum 365
+ */
 days?: number;
+endAt?: Date;
 };

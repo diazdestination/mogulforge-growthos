@@ -1,3 +1,4 @@
+import { acceptedStaffCondition } from "./accepted-staff";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod/v4";
@@ -160,7 +161,7 @@ export async function clientReadiness(organizationId: string) {
     .where(
       and(
         eq(usersTable.organizationId, organizationId),
-        eq(usersTable.isActive, true),
+        acceptedStaffCondition(),
       ),
     );
   const staffing = {

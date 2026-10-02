@@ -17,6 +17,7 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, isNull, inArray } from "drizzle-orm";
 import { requireMember } from "../../middlewares/requireMember";
+import { parseReportingPeriod } from "../../services/reporting-period";
 import { requirePlatformAdmin } from "./orgs";
 import { rateLimit } from "../../lib/rateLimit";
 import { getSchedulerHealth } from "../../services/scheduler-runtime";
@@ -178,7 +179,7 @@ router.get(
   "/revenue/value",
   requireMember("crm.read"),
   safe(async (req, res) =>
-    res.json(await valueLedger(req.member!.organizationId)),
+    res.json(await valueLedger(req.member!.organizationId, parseReportingPeriod(req.query))),
   ),
 );
 router.post(

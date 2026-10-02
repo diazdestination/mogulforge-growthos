@@ -9,6 +9,7 @@
 export type RoiReportResponsiveness = {
   leadsContacted: number;
   leadsReplied: number;
+  firstTouchMeasuredLeads: number;
   /** @nullable */
   responseRatePct?: number | null;
   /** @nullable */

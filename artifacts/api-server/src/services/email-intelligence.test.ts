@@ -242,7 +242,7 @@ describe("tenant-scoped Email Intelligence Inbox", () => {
     await db
       .update(emailIntelligenceMessagesTable)
       .set({ rawExpiresAt: expiredAt })
-      .where(eq(emailIntelligenceMessagesTable.id, ingested.message.id));
+      .where(eq(emailIntelligenceMessagesTable.id, ingested.message.id!));
 
     const purgedCount = await purgeExpiredEmailContent(new Date());
     expect(purgedCount).toBe(1);
@@ -250,7 +250,7 @@ describe("tenant-scoped Email Intelligence Inbox", () => {
     const [purged] = await db
       .select()
       .from(emailIntelligenceMessagesTable)
-      .where(eq(emailIntelligenceMessagesTable.id, ingested.message.id));
+      .where(eq(emailIntelligenceMessagesTable.id, ingested.message.id!));
     expect(purged?.encryptedRawText).toBeNull();
     expect(purged?.rawPurgedAt).toBeInstanceOf(Date);
     expect(purged?.status).toBe("raw_purged");

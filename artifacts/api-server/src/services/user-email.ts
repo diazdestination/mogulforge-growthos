@@ -4,6 +4,7 @@ import { hasPermission } from "../lib/permissions";
 import { getGmailStatus, sendGmailForUser } from "./gmail-oauth";
 import { getMicrosoftStatus, sendMicrosoftForUser } from "./microsoft-oauth";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
+import { signOutboundReplyEvidence, type OutboundReplyContext } from "./reply-evidence";
 
 export type UserEmailProvider = "gmail" | "microsoft";
 export interface UserEmailResult {
@@ -141,10 +142,13 @@ export function emailAcceptanceEvidence(result: {
   provider: string;
   providerRequestId?: string | null;
   clientRequestId?: string;
-}) {
+  senderEmail?: string;
+}, context?: OutboundReplyContext) {
   return {
     provider: result.provider,
     providerMessageId: result.id,
+    ...(result.senderEmail ? { senderEmail: result.senderEmail.trim().toLowerCase() } : {}),
+    ...(context ? signOutboundReplyEvidence(result, context) : {}),
     ...(result.providerRequestId
       ? { providerRequestId: result.providerRequestId }
       : {}),

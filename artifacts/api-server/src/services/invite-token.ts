@@ -6,6 +6,7 @@ type InviteTokenBinding = {
   inviteId: string;
   organizationId: string;
   email: string;
+  tokenRevision?: string;
 };
 
 type InviteTokenPayload = {
@@ -13,6 +14,7 @@ type InviteTokenPayload = {
   inviteId: string;
   organizationId: string;
   email: string;
+  tokenRevision?: string;
   issuedAt: number;
   expiresAt: number;
 };
@@ -40,6 +42,7 @@ export function createInviteToken(
     inviteId: binding.inviteId,
     organizationId: binding.organizationId,
     email: binding.email.trim().toLowerCase(),
+    ...(binding.tokenRevision ? { tokenRevision: binding.tokenRevision } : {}),
     issuedAt: now,
     expiresAt: now + INVITE_TOKEN_TTL_MS,
   };
@@ -79,6 +82,7 @@ export function verifyInviteToken(
       payload.inviteId !== binding.inviteId ||
       payload.organizationId !== binding.organizationId ||
       payload.email !== binding.email.trim().toLowerCase() ||
+      payload.tokenRevision !== binding.tokenRevision ||
       !Number.isSafeInteger(payload.issuedAt) ||
       !Number.isSafeInteger(payload.expiresAt) ||
       payload.issuedAt! > now + 5 * 60 * 1000 ||
