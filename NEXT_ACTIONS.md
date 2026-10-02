@@ -3,21 +3,34 @@
 Follow `PAID-BETA-READINESS-P0.md`; complete the exact candidate CI before a
 release. The swarm foundation reports distinguish local proof from hosted proof.
 
-October 2 integration follow-up: use
+October 2 integration follow-up: PR #12 merged the cumulative work as
+main `47aca5beeb06e665bddfff23545640d779de51cc`; explicitly dispatched exact-main
+CI37052487433 passed all release jobs. Use
 `reports/geekom-contractor-integration-2026-10-02.md` and its integration PR for
-current evidence. Re-run CI on the exact resulting main commit after merge;
+current evidence. Each later candidate still needs exact-head CI;
 the workflow has no push trigger, so dispatch it explicitly. The held staging
 app remains the older 77f6d63 image with 95 tables until separately verified.
 The cumulative source expects 103 tables; never deploy it onto the 95-table
 database or run an unreviewed automatic schema push.
+
+Before real onboarding/cutover, satisfy `HOUSECALL-PRO-REPLACEMENT-GATE.md` for
+both companies. The owner explicitly requires replacement of their actual
+Housecall Pro workflows, not a reduced assisted pilot. Finish the service-due and
+missed-call customer loops, invoice delivery/agreed collection, required migration
+and source adoption, then real provider/device and uncoached staff acceptance.
+The payment processor decision has been requested; do not choose or activate one.
 
 Azure return-to-desk item: the owner now reports a new Azure account. Wait for
 the first sign-in, confirm the actual directory and account, then inspect app
 registrations and configure the existing Microsoft integration. Preserve the
 account and all outbound holds; do not repeat signup or send to contractors.
 
-1. Review/integrate the stacked candidate chain; rehearse the reviewed additive
-   schema delta against an approved restored target with outbound hold intact.
+1. Preserve the now-integrated stacked chain. The managed restore, reviewed
+   95-to-103 rehearsal and restricted exact-image app acceptance passed on the
+   temporary restored copy; see `reports/managed-contractor-recovery-2026-10-02.md`
+   for evidence and cleanup status. Next is the separately reviewed/authorized
+   held 95-to-103 staging rollout and exact-release normal-mode acceptance, not
+   replaying the one-use restore-target script against the original staging DB.
    Inventory the object-storage adapter before accepting private-photo behavior.
 2. Accept the implemented checkout/replacement and core export/company-hold
    flows against approved hosted billing/provider environments. Complete the
@@ -43,7 +56,8 @@ account and all outbound holds; do not repeat signup or send to contractors.
 6. Expand the premium tier inventory and trade workflows using those observations;
    measure revenue evidence, staff effort, communication costs and renewal intent.
 
-Current engineering candidate: `agent/growthos-native-contractor-day` on PR10.
+Integrated runtime baseline: main `47aca5b`, including PR11's
+`agent/growthos-native-contractor-day` work and the independent PR12 repairs.
 Review additive `0006_native-contractor-day.sql` after0002–0005. The local synthetic
 90-to103-table upgrade/restore passed with restricted real-app reads; it is not
 a managed production restore. Verify actual staff invitations and trusted incoming

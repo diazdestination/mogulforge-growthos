@@ -1,5 +1,15 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## October 2 replacement acceptance requirement
+
+The owner requires both waiting contractors to be able to replace their actual
+required Housecall Pro workflows before real onboarding/cutover. Read
+`HOUSECALL-PRO-REPLACEMENT-GATE.md` for the source-grounded gap matrix and separate
+company acceptance cards. Do not substitute a reduced assisted pilot or treat
+green CI/backup recovery as functional replacement. Preserve the required release,
+provider, customer-contact and financial gates; cancellation of the old subscriptions
+is a separate owner action. Azure first sign-in remains a return-to-desk item.
+
 ## October 1 contractor product direction
 
 Adam explicitly authorized continuing with the next native replacement wave
