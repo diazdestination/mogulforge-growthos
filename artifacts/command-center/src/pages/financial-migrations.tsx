@@ -97,9 +97,9 @@ export default function FinancialMigrations() {
   const { data: me, isLoading, isError } = useGetMe();
   if (isLoading)
     return (
-      <main className="p-6" role="status">
+      <div className="p-6" role="status">
         Checking financial review access…
-      </main>
+      </div>
     );
   if (
     isError ||
@@ -108,7 +108,7 @@ export default function FinancialMigrations() {
     !["owner", "admin"].includes(me.role ?? "")
   )
     return (
-      <main className="p-6">
+      <div className="p-6">
         <h1 className="text-xl font-semibold">
           Financial migration is restricted
         </h1>
@@ -119,7 +119,7 @@ export default function FinancialMigrations() {
         <Link href="/" className={invoiceButton}>
           Back to Today
         </Link>
-      </main>
+      </div>
     );
   return (
     <MigrationDesk
@@ -234,7 +234,7 @@ function MigrationDesk({
     }
   }
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto max-w-5xl min-w-0 space-y-6 p-4 sm:p-6">
       <header className="space-y-2">
         <Link href="/invoices" className={invoiceButton}>
           Back to invoices
@@ -552,6 +552,6 @@ function MigrationDesk({
           <p>No financial reviews yet.</p>
         )}
       </section>
-    </main>
+    </div>
   );
 }

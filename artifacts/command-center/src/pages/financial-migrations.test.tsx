@@ -132,6 +132,13 @@ async function prepare() {
     screen.getByRole("button", { name: "Preview and reconcile" }),
   );
 }
+it("uses the app main landmark without nesting another main", async () => {
+  server();
+  renderWithQuery(<main><FinancialMigrations /></main>);
+  expect(screen.getAllByRole("main")).toHaveLength(1);
+  await screen.findByRole("heading", { name: "Bring over invoice history" });
+  expect(screen.getAllByRole("main")).toHaveLength(1);
+});
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

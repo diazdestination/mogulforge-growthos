@@ -65,10 +65,16 @@ schema/router/OpenAPI/push/export/recovery files. Cross-review found and repaire
 6. Historical c050067 harness tests now read exact frozen app and revenue-schema
    blobs where current source evolved. Historical source/image/bundle digests
    remain unchanged; current bytes are still rejected under historical pins.
+7. Built-browser inspection found Win-back nested a second application shell.
+   It now shares the routed shell; financial migration also uses its parent's
+   main landmark. Regression tests protect single navigation/main landmarks.
+   Import copy now directs operators to the separate current cutover/permission
+   review without implying that import itself enables outreach.
 
 ## Local verification and release gates
 
-- Full Command Center:514tests/81files passed after integration.
+- Full Command Center:516tests/82files passed after the final layout integration;
+  Command Center types and production build passed again on that follow-up.
 - Full workspace TypeScript checks and both production builds passed.
 - Integrated export/inventory/routes/push/scheduler selection:103tests passed.
 - Service watch:20API passed/1independent-PG skip;17UI passed.
@@ -91,8 +97,14 @@ schema/router/OpenAPI/push/export/recovery files. Cross-review found and repaire
   no provider credentials. Service acknowledgement/retained plan and historical
   opening-invoice preview/commit exercised. Service390/320widths have no document
   overflow; imported invoice390/320widths also fit, retaining $125 original,
-  $45 opening due and $0 post-cutoff receipts. Further source proof is in the private
-  checkpoint. This is not physical iPhone push or uncoached staff acceptance.
+  $45 opening due and $0 post-cutoff receipts. Source management preview, approval
+  and revocation retain original history and never grant email permission. Both
+  source review and financial migration also fit390/320without document overflow.
+  The initial source-index unavailable state cleared on explicit Retry; bounded
+  subsequent actual HTTP contract/concurrency reads passed, without reproducing
+  a source defect or masking the error. See the source report for exact limits.
+  Further source proof is in the private checkpoint. This is not physical iPhone
+  push or uncoached staff acceptance.
 - Exact PR-head CI (all PostgreSQL tests, types, builds, Docker) and separately
   dispatched exact-main CI must pass before selecting the release. See attached
   PR/checks and private dated STATE checkpoint for their final identities.

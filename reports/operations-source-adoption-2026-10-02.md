@@ -151,6 +151,26 @@ to obtain a pass. Both diagnostic processes exited and their disposable database
 resources closed. This explains the local PGlite limitation; it is not a passing
 full-suite result or a substitute for the required real PostgreSQL CI run.
 
+### Built loopback preview index investigation
+
+During final browser QA of the built `--operations` preview after `9084608`, the
+source panel displayed its unavailable state. Against that same running preview,
+a fresh fictional local session received a 200 index with the expected one
+fictional imported opportunity and empty campaigns. Three sequential index reads
+passed the panel's exact Zod response schema. Sequential reads of source index,
+reactivation segments, campaigns and lead imports all returned the expected
+status/shape; three rounds of the same four requests concurrently also returned
+200 and correct shapes (twelve concurrent responses). No session tokens were
+printed or retained.
+
+The coordinator subsequently confirmed that the panel's explicit Retry loaded
+the expected index. These bounded checks did not reproduce a source-route/schema
+defect or prove a particular PGlite result-corruption mechanism. No source guard,
+auth/database semantics, timeout, retry policy or preview harness was changed to
+hide the failure. The shared preview was not restarted by this lane. This is
+loopback synthetic evidence only, not hosted-browser or PostgreSQL concurrency
+acceptance.
+
 Independent cross-review found duplicate signed outbound-parent activities;
 the regression first failed with `needs_review` and no linked lead/hold. After
 removing provider-parent metadata from the cap-only activity, an actual accepted
