@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vite
 import { getExpectedTwilioSignature } from "twilio";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, organizationsTable, usersTable, contactsTable, customerLifecycleTable,
-  twilioClientBindingsTable, twilioCallsTable, missedCallHandoffsTable, rateLimitCountersTable } from "@workspace/db";
+  twilioClientBindingsTable, twilioCallsTable, missedCallHandoffsTable, missedCallCareCasesTable, rateLimitCountersTable } from "@workspace/db";
 import app from "../../app";
 import { createSession, deleteSession } from "../../lib/auth";
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
@@ -53,6 +53,9 @@ beforeEach(async () => {
   // Reset only this synthetic worker's loopback voice budget; production rate
   // limiting remains active and unchanged for every request under test.
   await db.delete(rateLimitCountersTable).where(eq(rateLimitCountersTable.key, `voice-app:127.0.0.1:test-${process.pid}`));
+  // Only these synthetic companies are reset, in child-before-parent order.
+  // Retained production call/care foreign keys remain enforced under test.
+  await db.delete(missedCallCareCasesTable).where(inArray(missedCallCareCasesTable.organizationId, companies.map((company) => company.org)));
   await db.delete(missedCallHandoffsTable).where(inArray(missedCallHandoffsTable.organizationId, companies.map((company) => company.org)));
   await db.delete(twilioCallsTable).where(inArray(twilioCallsTable.organizationId, companies.map((company) => company.org)));
   await db.delete(customerLifecycleTable).where(inArray(customerLifecycleTable.organizationId, companies.map((company) => company.org)));
@@ -137,6 +140,7 @@ it("preserves the missed-call review record for an inbound leg handed off before
   expect((await webhook(company, path, { CallSid, DialCallStatus: "no-answer" })).status).toBe(200);
   expect((await webhook(company, path, { CallSid, DialCallStatus: "no-answer" })).status).toBe(200);
   expect(await db.select().from(missedCallHandoffsTable).where(and(eq(missedCallHandoffsTable.organizationId, company.org), eq(missedCallHandoffsTable.callId, call.id)))).toHaveLength(1);
+  expect(await db.select().from(missedCallCareCasesTable).where(and(eq(missedCallCareCasesTable.organizationId, company.org), eq(missedCallCareCasesTable.callId, call.id)))).toHaveLength(1);
   expect((await calls(company))[0].dialStatus).toBe("no-answer");
   expect(network).not.toHaveBeenCalled();
 });

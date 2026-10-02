@@ -12,6 +12,7 @@ import * as apiKeys from "../../services/api-keys";
 
 let server: Server, base: string, org: string, otherOrg: string, owner: string, ownerSession: string, viewerSession: string, otherSession: string, call: string;
 const originalFetch = globalThis.fetch;
+const origin = "https://growth.example";
 const policyBody = { expectedVersion: 0, policy: DEFAULT_CARE_POLICY, approveTemplate: true };
 async function staff(organizationId: string, role: "owner" | "viewer") {
   const [user] = await db.insert(usersTable).values({ organizationId, role, emailVerifiedAt: new Date(), email: `${randomUUID()}@example.invalid` }).returning();
@@ -20,10 +21,13 @@ async function staff(organizationId: string, role: "owner" | "viewer") {
 }
 function request(path: string, body?: unknown, headers: Record<string, string> = {}, method = "POST") {
   return originalFetch(`${base}/api/v1${path}`, { method: body === undefined ? "GET" : method, headers: {
-    cookie: `sid=${ownerSession}`, origin: "https://growth.example", ...(body === undefined ? {} : { "content-type": "application/json" }), ...headers,
+    cookie: `sid=${ownerSession}`, origin, ...(body === undefined ? {} : { "content-type": "application/json" }), ...headers,
   }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
 beforeAll(async () => {
+  // Pin the server and request fixture together; CI's default origin differs
+  // from the disposable local runner, and must not mask downstream guards.
+  vi.stubEnv("APP_ORIGIN", origin);
   const target = new URL(process.env.DATABASE_URL ?? "");
   if (process.env.NODE_ENV !== "test" || !["localhost", "127.0.0.1"].includes(target.hostname)) throw new Error("Use the isolated test runner");
   [org, otherOrg] = (await db.insert(organizationsTable).values([{ name: "Synthetic call API", slug: `care-http-${randomUUID()}` }, { name: "Other call API", slug: `care-http-${randomUUID()}` }]).returning()).map((item) => item.id);
@@ -38,7 +42,7 @@ beforeAll(async () => {
 afterAll(async () => {
   server.closeAllConnections(); await new Promise<void>((resolve) => server.close(() => resolve()));
   await deleteTestOrgs(org, otherOrg); for (const session of [ownerSession, viewerSession, otherSession]) await deleteSession(session);
-  vi.unstubAllGlobals(); vi.restoreAllMocks();
+  vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks();
 });
 describe("missed-call human approval HTTP boundaries", () => {
   it("requires a session, derives tenant ownership, and permits viewers to inspect but not mutate", async () => {
@@ -56,9 +60,9 @@ describe("missed-call human approval HTTP boundaries", () => {
       { origin: "https://untrusted.growth.example", authorization: "Basic synthetic" },
       { origin: "https://untrusted.growth.example", authorization: `Bearer ${ownerSession}` },
       { origin: "null", authorization: "Basic synthetic" },
-      { origin: "https://growth.example/path" },
-      { origin: "https://growth.example", "sec-fetch-site": "same-site" },
-      { origin: "https://growth.example", "sec-fetch-site": "cross-site" },
+      { origin: `${origin}/path` },
+      { origin, "sec-fetch-site": "same-site" },
+      { origin, "sec-fetch-site": "cross-site" },
     ];
     for (const headers of blockedHeaders) {
       expect((await request("/communications/missed-call-care/policy", policyBody, headers, "PUT")).status).toBe(403);

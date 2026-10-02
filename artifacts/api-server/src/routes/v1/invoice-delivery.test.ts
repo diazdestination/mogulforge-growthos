@@ -131,6 +131,7 @@ beforeAll(async () => {
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 afterAll(async () => {
   if (server) {
@@ -238,33 +239,37 @@ describe("invoice email HTTP boundary", () => {
     }
     expect(preview).not.toHaveBeenCalled();
   });
-  it("passes only member-scoped identity and the exact reviewed send body to delivery service", async () => {
-    const f = await fixture();
-    const input = {
-      previewId: randomUUID(),
-      payloadSha256: "a".repeat(64),
-      confirmed: true as const,
-    };
-    const current = await delivery.getInvoiceDelivery(
-      f.org,
-      f.id,
-      f.invoice.id,
-    );
-    const send = vi
-      .spyOn(delivery, "sendInvoiceDelivery")
-      .mockResolvedValue(current);
-    expect(
-      (
-        await request(f.sid, `${f.invoice.id}/delivery/send`, input, {
-          Origin: "https://growth.example",
-        })
-      ).status,
-    ).toBe(200);
-    expect(send).toHaveBeenCalledExactlyOnceWith(
-      f.org,
-      f.id,
-      f.invoice.id,
-      input,
-    );
-  });
+  it.each(["http://localhost:3001", "https://growth.example"])(
+    "passes only member-scoped identity and the exact reviewed send body with configured origin %s",
+    async (appOrigin) => {
+      vi.stubEnv("APP_ORIGIN", appOrigin);
+      const f = await fixture();
+      const input = {
+        previewId: randomUUID(),
+        payloadSha256: "a".repeat(64),
+        confirmed: true as const,
+      };
+      const current = await delivery.getInvoiceDelivery(
+        f.org,
+        f.id,
+        f.invoice.id,
+      );
+      const send = vi
+        .spyOn(delivery, "sendInvoiceDelivery")
+        .mockResolvedValue(current);
+      expect(
+        (
+          await request(f.sid, `${f.invoice.id}/delivery/send`, input, {
+            Origin: appOrigin,
+          })
+        ).status,
+      ).toBe(200);
+      expect(send).toHaveBeenCalledExactlyOnceWith(
+        f.org,
+        f.id,
+        f.invoice.id,
+        input,
+      );
+    },
+  );
 });

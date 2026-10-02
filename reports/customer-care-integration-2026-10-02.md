@@ -118,11 +118,28 @@ in the private Jarvis customer-care handoff, not the public/repository data.
 
 ## Exact-head CI and integration
 
-Pending the coordinator's committed candidate and CI run. Do not mark this
-release-ready until all test/type/build/Docker checks pass on the actual head.
-The CI workflow has no push trigger; explicitly dispatch an exact-main run after
-any merge. A later documentation-only update must be identified as such rather
-than relabelling the tested runtime or hosted image.
+[PR #14](https://github.com/diazdestination/mogulforge-growthos/pull/14) is the
+canonical integration/check record. The implementation commit is
+`9e4eb263d70d25f5f3b8b5cf591270f81855b3e2`; test-integration fixes follow it.
+Always match the check's head SHA to the candidate rather than inferring green
+from this report's date or from an earlier run.
+
+The initial [CI37070893118](https://github.com/diazdestination/mogulforge-growthos/actions/runs/37070893118)
+applied the fresh PostgreSQL schema, passed 1,982 API tests and reported seven
+test failures across five files (15 existing API skips). It was not merged or
+waived. The failures exposed a stale 103/100 inventory expectation, a cleanup
+order missing the new call-care child, two HTTP fixtures assuming the isolated
+runner's Origin, and an older expectation for the deliberately sanitized final
+email-dispatch hold error. The follow-up preserves strict FK/security/error
+contracts, updates fixture/count expectations and adds explicit configured-origin
+coverage; all **34 tests across those five suites pass** in the combined isolated
+rerun. It does not disable or skip those tests. Bounded independent reviews
+found no concrete invoice/service transaction leak or concurrency deadlock.
+
+All test/type/build/Docker checks still must pass on the actual candidate head.
+The workflow has no push trigger; explicitly dispatch an exact-main run after
+integration. Record its actual SHA/run in the PR and private Jarvis checkpoint;
+neither merging nor CI proves a hosted image or live provider acceptance.
 
 ## Still required before either contractor cuts over
 

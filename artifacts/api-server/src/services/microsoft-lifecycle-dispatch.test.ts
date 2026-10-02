@@ -7,6 +7,7 @@ import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import { transitionCustomerLifecycle } from "./customer-lifecycle";
 import { getMicrosoftConnection, sendMicrosoftForUser } from "./microsoft-oauth";
 import { sendEmailForUser } from "./user-email";
+import { EmailDispatchBlockedError } from "./email-dispatch-guard";
 
 const organizations: string[] = [];
 const fetchMock = vi.fn<typeof fetch>();
@@ -59,7 +60,12 @@ it.each(["refresh", "mailbox"])("does not dispatch a customer email when pause c
     if (boundary === "mailbox") await pause(input);
     return mailbox();
   }).mockResolvedValueOnce(new Response(null, { status: 202 }));
-  await expect(sendEmailForUser(input)).rejects.toMatchObject({ code: "customer_lifecycle_paused" });
+  // The final dispatch guard deliberately hides private callback details while
+  // proving that no irreversible send was attempted. Do not weaken this to an
+  // arbitrary error or trust a provider's similarly named property.
+  const attempt = sendEmailForUser(input);
+  await expect(attempt).rejects.toBeInstanceOf(EmailDispatchBlockedError);
+  await expect(attempt).rejects.toMatchObject({ code: "email_dispatch_blocked", effectNotAttempted: true });
   expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/sendMail"))).toBe(false);
   // A company operating hold is not credential revocation or a provider failure.
   const connection = await getMicrosoftConnection(input.organizationId, input.userId);
