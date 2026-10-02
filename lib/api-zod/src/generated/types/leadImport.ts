@@ -11,7 +11,11 @@ export interface LeadImport {
   fileName?: string | null;
   totalRows: number;
   imported: number;
+  updated: number;
   duplicates: number;
+  conflicts: number;
+  sourceKey?: string | null;
+  snapshotAsOf?: string | null;
   skipped: number;
   suppressed: number;
   errors: string[];

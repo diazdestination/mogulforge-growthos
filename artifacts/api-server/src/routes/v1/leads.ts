@@ -455,6 +455,14 @@ router.post(
       res.status(400).json({ error: "Invalid activity" });
       return;
     }
+    // Photo references grant access through staff/portal galleries. The generic
+    // activity endpoint must not bypass the dedicated object ownership check.
+    if (parsed.data.type === "photos_attached") {
+      res.status(400).json({
+        error: "Use the photo attachment endpoint to add photos",
+      });
+      return;
+    }
     const lead = await crm.getLead(req.member!.organizationId, String(req.params.id));
     if (!lead) {
       res.status(404).json({ error: "Lead not found" });

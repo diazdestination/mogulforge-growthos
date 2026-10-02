@@ -41,6 +41,7 @@ const SESSION_ONLY_ROUTES = new Set([
   "POST /orgs",
   "GET /platform/orgs",
   "PATCH /platform/orgs/:id",
+  "POST /platform/orgs/:id/entitlements",
   "GET /platform/clients/profiles",
   "GET /platform/clients/health",
   "GET /platform/runtime",
@@ -186,6 +187,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   // Billing changes the organization's subscription and payment-management
   // state; keep every surface admin-only.
   "GET /billing": "settings.manage",
+  "GET /billing/entitlements": "crm.read",
   "POST /billing/checkout": "settings.manage",
   "POST /billing/portal": "settings.manage",
   // BIE Revenue Command Center. Read access can inspect tenant-owned

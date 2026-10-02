@@ -15,4 +15,8 @@ export interface LeadImportRequest {
   hasHeader?: boolean;
   defaultStatus?: string;
   defaultSource?: string;
+  /** Stable lowercase source/account key, required with external opportunity IDs. Reuse it on every import from the same account. */
+  sourceKey?: string;
+  /** Original export snapshot date (ISO date or timestamp with timezone). Omit when unknown; upload time is never source freshness. */
+  snapshotAsOf?: string;
 }

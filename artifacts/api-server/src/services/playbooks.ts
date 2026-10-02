@@ -19,6 +19,7 @@ import {
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { isLegacyDefaultOrg } from "../lib/orgFlavor";
 import { recordAudit } from "./audit";
+import { needsSourceVerification } from "./source-history";
 import {
   engagementLinkUrl,
   getOrCreateEngagementLink,
@@ -485,11 +486,38 @@ export async function executePlaybookStep(
   const sendingHours = await getSendingHours(organizationId);
   const gate = await checkSendEligibility({
     organizationId,
+    leadId: lead.id,
     contact,
     channel: step.channel,
     kind: "outreach",
     sendingHours,
   });
+  const permanentStop = !gate.ok && gate.outcome === "blocked" &&
+    (gate.reason.startsWith("suppressed:") || gate.reason === "do_not_contact");
+  if (!permanentStop && (needsSourceVerification(lead) ||
+      (!gate.ok && gate.reason === "imported_source_requires_current_review"))) {
+    // Source review takes priority over a missing address, SMS consent or send
+    // window. None of those channel conditions can consume a source-held step.
+    // Explicit suppression/DNC still uses the existing permanent-stop path.
+    const reason = "Imported source needs current review before outreach";
+    const entry: EnrollmentHistoryEntry = {
+      at: new Date().toISOString(), kind: "paused", stepIndex,
+      channel: step.channel, detail: reason,
+    };
+    await db.update(playbookEnrollmentsTable).set({
+      status: "paused", pauseReason: reason, nextRunAt: null,
+      history: sql`${playbookEnrollmentsTable.history} || ${JSON.stringify([entry])}::jsonb`,
+    }).where(and(
+      eq(playbookEnrollmentsTable.id, enrollment.id),
+      eq(playbookEnrollmentsTable.organizationId, organizationId),
+      eq(playbookEnrollmentsTable.status, "active"),
+      eq(playbookEnrollmentsTable.currentStep, stepIndex),
+    ));
+    await recordBlockedSend({ organizationId, channel: step.channel,
+      reason: "imported_source_requires_current_review", outcome: "blocked",
+      source: "playbook", leadId: lead.id, contactId: contact.id });
+    return { status: "skipped", detail: "paused: imported_source_requires_current_review" };
+  }
   let gateSkipReason: string | null = null;
   let emailSenderUserId: string | null = null;
   if (!gate.ok) {

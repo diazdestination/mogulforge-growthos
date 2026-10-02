@@ -35,6 +35,8 @@ import { checkSendEligibility, recordBlockedSend } from "./send-gate";
 import { runDurableAction } from "./durable-execution";
 import { hasPermission } from "../lib/permissions";
 import { isDeepStrictEqual } from "node:util";
+import { assertCapabilityForActor, CapabilityAccessError, getEntitlements } from "./entitlements";
+import { needsSourceVerification, originalOpportunityDate, sourceLastContactDate } from "./source-history";
 
 const SOURCES: BieSource[] = [
   "google_ads",
@@ -154,6 +156,13 @@ export async function updateAutopilotPolicy(
   actorUserId: string,
   input: Partial<BieAutopilotPolicy>,
 ): Promise<BieAutopilotPolicy> {
+  const [actor] = await db.select({ role: usersTable.role }).from(usersTable).where(and(
+    eq(usersTable.id, actorUserId),
+    eq(usersTable.organizationId, organizationId),
+    eq(usersTable.isActive, true),
+  ));
+  if (!actor || !hasPermission(actor.role, "settings.manage"))
+    throw new CapabilityAccessError("revenue.autopilot", "permission_required", "An active company owner or administrator must manage automated execution.");
   const current = await getAutopilotPolicy(organizationId);
   const allowedActions = Array.isArray(input.allowedActions)
     ? input.allowedActions.filter((value): value is BieActionType =>
@@ -177,6 +186,9 @@ export async function updateAutopilotPolicy(
         ? null
         : (input.pauseReason ?? current.pauseReason ?? null),
   };
+  // Pausing/disabling remains available even when the package no longer allows execution.
+  if (policy.enabled && !policy.pausedAt)
+    await assertCapabilityForActor(organizationId, actorUserId, "revenue.autopilot", "settings.manage");
   await db
     .insert(bieAutopilotPoliciesTable)
     .values({ organizationId, policy, updatedByUserId: actorUserId })
@@ -213,6 +225,7 @@ export async function buildRevenueRecoveryBriefing(
       urgency: leadsTable.urgency,
       estimatedValueCents: leadsTable.estimatedValueCents,
       creationMethod: leadsTable.creationMethod,
+      importedHistory: leadsTable.importedHistory,
       createdAt: leadsTable.createdAt,
       updatedAt: leadsTable.updatedAt,
       summary: leadsTable.summary,
@@ -277,11 +290,12 @@ export async function buildRevenueRecoveryBriefing(
     sentEstimates.map((row) => [row.leadId, row.sentAt]),
   );
   const lastCustomerStep = (lead: (typeof leadRows)[number]) => {
-    const dates = [latestActivity.get(lead.id), lastEstimate.get(lead.id)]
-      .filter(Boolean)
-      .map((value) => new Date(value!).getTime());
+    const dates = [latestActivity.get(lead.id), lastEstimate.get(lead.id), sourceLastContactDate(lead.importedHistory)]
+      .map(asDate)
+      .filter((value): value is Date => Boolean(value) && Number.isFinite(value!.getTime()))
+      .map((value) => value.getTime());
     // Assignment, enrichment and internal notes are not customer contact.
-    return dates.length ? new Date(Math.max(...dates)) : lead.createdAt;
+    return dates.length ? new Date(Math.max(...dates)) : originalOpportunityDate(lead);
   };
 
   const activeForRecovery = new Set([
@@ -292,13 +306,17 @@ export async function buildRevenueRecoveryBriefing(
     "lost",
   ]);
   const stalledEstimate = leadRows.filter((lead) => {
-    const quietDays = daysSince(lastCustomerStep(lead));
+    const lastStep = lastCustomerStep(lead);
+    if (!lastStep) return false;
+    const quietDays = daysSince(lastStep);
     return (
       ["estimate_sent", "claim_pending"].includes(lead.status) && quietDays >= 7
     );
   });
   const dormantPipeline = leadRows.filter((lead) => {
-    const quietDays = daysSince(lastCustomerStep(lead));
+    const lastStep = lastCustomerStep(lead);
+    if (!lastStep) return false;
+    const quietDays = daysSince(lastStep);
     return activeForRecovery.has(lead.status) && quietDays >= 14;
   });
   const valueOf = (rows: typeof leadRows) =>
@@ -777,6 +795,11 @@ export async function executeBieProposal(
   const proposal = await getProposal(organizationId, actionId);
   if (!proposal) return null;
   if (proposal.status !== "approved") return proposal;
+  if (options.automated) {
+    const decision = (await getEntitlements(organizationId)).capabilities["revenue.autopilot"];
+    // Hold before claiming: a downgrade must not consume or discard approved work.
+    if (!decision.allowed) return { ...proposal, executionDetail: decision.detail };
+  }
   const [actor] = actorUserId
     ? await db
         .select()
@@ -914,6 +937,18 @@ async function executeBieProposalEffect(
       "New customer activity or an appointment needs a human review before this older follow-up.",
     );
 
+  if (options.automated) {
+    try {
+      // Recheck after claiming and after loading current lead state, before effects.
+      await assertCapabilityForActor(organizationId, actorUserId ?? "", "revenue.autopilot", "crm.write");
+    } catch (error) {
+      if (!(error instanceof CapabilityAccessError)) throw error;
+      return markAction(proposal.id, "blocked", error.message);
+    }
+    if (proposal.actionType === "change_stage" && needsSourceVerification(lead))
+      return markAction(proposal.id, "blocked", "Imported source status requires current review before an automated stage change.");
+  }
+
   try {
     if (proposal.actionType === "create_task") {
       const task = await crm.createTask(organizationId, {
@@ -1008,6 +1043,7 @@ async function executeBieProposalEffect(
     }
     const eligibility = await checkSendEligibility({
       organizationId,
+      leadId: lead.id,
       contact,
       channel: "email",
       kind: "outreach",
@@ -1083,6 +1119,8 @@ export async function runAutopilot(
 ): Promise<BieActionProposal[]> {
   const policy = await getAutopilotPolicy(organizationId);
   if (!policy.enabled || policy.pausedAt || policy.allowedActions.length === 0)
+    return [];
+  if (!(await getEntitlements(organizationId)).capabilities["revenue.autopilot"].allowed)
     return [];
   const approved = await db
     .select({ id: bieActionProposalsTable.id })

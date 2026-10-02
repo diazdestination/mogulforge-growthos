@@ -23,12 +23,13 @@ import {
   auditEventsTable,
   consentRecordsTable,
   db,
+  leadsTable,
   suppressionsTable,
   type SendingHoursSettings,
   type Suppression,
   type SuppressionReason,
 } from "@workspace/db";
-import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import { isSafeMailbox } from "./providers";
 import { getSendingHours } from "./settings";
@@ -203,6 +204,8 @@ export function nextAllowedSendTime(
 
 export interface SendGateInput {
   organizationId: string;
+  /** Source opportunity, resolved on the server; never a freshness attestation. */
+  leadId?: string | null;
   contact: {
     id: string;
     email?: string | null;
@@ -261,6 +264,31 @@ export async function checkSendEligibility(
   }
 
   if (kind !== "outreach") return { ok: true };
+
+  // A CSV snapshot does not establish current status, replies or eligibility.
+  // Read the current tenant-owned record here instead of trusting a caller flag.
+  // Without opportunity context an imported contact is ambiguous, so hold it.
+  if (input.leadId) {
+    const [lead] = await db.select({
+      creationMethod: leadsTable.creationMethod,
+      importedHistory: leadsTable.importedHistory,
+    }).from(leadsTable).where(and(
+      eq(leadsTable.id, input.leadId),
+      eq(leadsTable.organizationId, organizationId),
+      eq(leadsTable.contactId, contact.id),
+    )).limit(1);
+    if (!lead) return { ok: false, outcome: "blocked", reason: "source_opportunity_unavailable" };
+    if (lead.creationMethod === "import" || lead.importedHistory !== null)
+      return { ok: false, outcome: "blocked", reason: "imported_source_requires_current_review" };
+  } else {
+    const [imported] = await db.select({ id: leadsTable.id }).from(leadsTable).where(and(
+      eq(leadsTable.organizationId, organizationId),
+      eq(leadsTable.contactId, contact.id),
+      or(eq(leadsTable.creationMethod, "import"), isNotNull(leadsTable.importedHistory)),
+    )).limit(1);
+    if (imported)
+      return { ok: false, outcome: "blocked", reason: "imported_source_requires_current_review" };
+  }
 
   const cfg = input.sendingHours ?? (await getSendingHours(organizationId));
 

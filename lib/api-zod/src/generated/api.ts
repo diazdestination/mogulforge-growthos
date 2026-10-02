@@ -3302,7 +3302,11 @@ export const ListLeadImportsResponseItem = zod.object({
   "fileName": zod.string().nullish(),
   "totalRows": zod.number(),
   "imported": zod.number(),
+  "updated": zod.number(),
   "duplicates": zod.number(),
+  "conflicts": zod.number(),
+  "sourceKey": zod.string().nullish(),
+  "snapshotAsOf": zod.string().nullish(),
   "skipped": zod.number(),
   "suppressed": zod.number(),
   "errors": zod.array(zod.string()),
@@ -3320,7 +3324,9 @@ export const ImportLeadsCsvBody = zod.object({
   "fileName": zod.string().optional(),
   "hasHeader": zod.boolean().optional(),
   "defaultStatus": zod.string().optional(),
-  "defaultSource": zod.string().optional()
+  "defaultSource": zod.string().optional(),
+  "sourceKey": zod.string().optional().describe('Stable lowercase source\/account key, required with external opportunity IDs. Reuse it on every import from the same account.'),
+  "snapshotAsOf": zod.string().optional().describe('Original export snapshot date (ISO date or timestamp with timezone). Omit when unknown; upload time is never source freshness.')
 })
 
 export const ImportLeadsCsvResponse = zod.object({
@@ -3328,7 +3334,11 @@ export const ImportLeadsCsvResponse = zod.object({
   "fileName": zod.string().nullish(),
   "totalRows": zod.number(),
   "imported": zod.number(),
+  "updated": zod.number(),
   "duplicates": zod.number(),
+  "conflicts": zod.number(),
+  "sourceKey": zod.string().nullish(),
+  "snapshotAsOf": zod.string().nullish(),
   "skipped": zod.number(),
   "suppressed": zod.number(),
   "errors": zod.array(zod.string()),
@@ -3379,7 +3389,10 @@ export const PreviewReactivationSegmentResponse = zod.object({
   "contactName": zod.string().nullish(),
   "status": zod.string(),
   "source": zod.string().nullish(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "originalCreatedAt": zod.string().nullish(),
+  "sourceSnapshotAsOf": zod.string().nullish(),
+  "requiresSourceVerification": zod.boolean().optional()
 }))
 })
 

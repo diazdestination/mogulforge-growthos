@@ -1,9 +1,13 @@
 import { db, organizationsTable } from '@workspace/db';
 import { eq } from 'drizzle-orm';
 import { Router, type IRouter, type Request, type Response } from 'express';
+import { z } from 'zod/v4';
 
 import { requireMember } from '../../middlewares/requireMember';
+import { requirePlatformAdmin } from './orgs';
+import { assignEntitlements, CapabilityAccessError, entitlementAssignmentSchema, getEntitlements } from '../../services/entitlements';
 import {
+  BillingCheckoutConflictError,
   createCheckoutSession,
   createPortalSession,
   getBillingStatus,
@@ -69,6 +73,32 @@ router.get(
   },
 );
 
+// Capability state is readable by members; it does not reveal Stripe IDs or
+// permit customer-supplied plan values to change server-owned access.
+router.get('/billing/entitlements', requireMember('crm.read'), async (req: Request, res: Response): Promise<void> => {
+  res.json(await getEntitlements(req.member!.organizationId));
+});
+
+// Reuses the explicitly cross-organization platform-operator identity model.
+// Ordinary tenant admins and API keys cannot enroll or upgrade a company.
+router.post('/platform/orgs/:id/entitlements', requirePlatformAdmin, async (req: Request, res: Response): Promise<void> => {
+  const orgId = z.uuid().safeParse(req.params.id);
+  const assignment = entitlementAssignmentSchema.safeParse(req.body);
+  if (!orgId.success || !assignment.success) {
+    res.status(400).json({ error: 'Provide a valid organization, known plan, explicit grants and a scope-change reason.' });
+    return;
+  }
+  try {
+    res.json(await assignEntitlements(orgId.data, req.sessionUser!.id, assignment.data));
+  } catch (error) {
+    if (error instanceof CapabilityAccessError) {
+      res.status(error.reason === 'organization_missing' ? 404 : error.status).json({ error: error.message, code: error.code, reason: error.reason });
+      return;
+    }
+    throw error;
+  }
+});
+
 // Start a Stripe Checkout for the subscription. Returns a URL to redirect to.
 router.post(
   '/billing/checkout',
@@ -92,6 +122,10 @@ router.post(
       });
       res.json({ url });
     } catch (err) {
+      if (err instanceof BillingCheckoutConflictError) {
+        res.status(err.status).json({ error: err.message, code: err.code });
+        return;
+      }
       req.log?.error({ err }, 'stripe checkout session failed');
       res.status(500).json({ error: 'Could not start checkout' });
     }

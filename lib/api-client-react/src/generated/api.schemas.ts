@@ -2386,6 +2386,10 @@ export interface LeadImportRequest {
   hasHeader?: boolean;
   defaultStatus?: string;
   defaultSource?: string;
+  /** Stable lowercase source/account key, required with external opportunity IDs. Reuse it on every import from the same account. */
+  sourceKey?: string;
+  /** Original export snapshot date (ISO date or timestamp with timezone). Omit when unknown; upload time is never source freshness. */
+  snapshotAsOf?: string;
 }
 
 export interface LeadImport {
@@ -2393,7 +2397,11 @@ export interface LeadImport {
   fileName?: string | null;
   totalRows: number;
   imported: number;
+  updated: number;
   duplicates: number;
+  conflicts: number;
+  sourceKey?: string | null;
+  snapshotAsOf?: string | null;
   skipped: number;
   suppressed: number;
   errors: string[];
@@ -2430,6 +2438,9 @@ export type ReactivationSegmentPreviewSampleItem = {
   status: string;
   source?: string | null;
   createdAt: string;
+  originalCreatedAt?: string | null;
+  sourceSnapshotAsOf?: string | null;
+  requiresSourceVerification?: boolean;
 };
 
 export interface ReactivationSegmentPreview {

@@ -296,6 +296,7 @@ async function executeAction(
       // Unified pre-send gate: DNC, suppressions, consent, quiet hours, caps.
       const gate = await checkSendEligibility({
         organizationId,
+        leadId: context.leadId,
         contact,
         channel,
         kind: "outreach",

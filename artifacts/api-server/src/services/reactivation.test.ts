@@ -203,6 +203,50 @@ describe("segments", () => {
 });
 
 describe("campaign lifecycle + throttle", () => {
+  it("skips held imports before enrollment or stage mutation while enrolling a fresh inquiry", async () => {
+    const source = `source-hold-${crypto.randomUUID()}`;
+    const result = await importLeads(orgId, {
+      csv: "First,Email,Status\nLost,held-lost@example.invalid,lost\nCompleted,held-completed@example.invalid,completed",
+      mapping: { firstName: 0, email: 1, status: 2 },
+      defaultSource: source,
+    });
+    if ("error" in result) throw new Error(result.error);
+    expect(result.imported).toBe(2);
+    const legacy = await makeLead(orgId, { status: "lost", source });
+    await db.update(leadsTable).set({ creationMethod: "import" }).where(eq(leadsTable.id, legacy.lead.id));
+    const fresh = await makeLead(orgId, { status: "new", source });
+    const before = await db.select().from(leadsTable).where(and(eq(leadsTable.organizationId, orgId), eq(leadsTable.source, source)));
+    const held = before.filter((lead) => lead.id !== fresh.lead.id);
+    expect(held).toHaveLength(3);
+    const campaign = await createCampaign(orgId, {
+      name: "Source holds", playbookId, segment: { statuses: ["lost", "completed", "new"], sources: [source] }, ratePerHour: 20,
+    });
+    if ("error" in campaign) throw new Error(campaign.error);
+    const launched = await launchCampaign(orgId, campaign.id);
+    if ("error" in launched) throw new Error(launched.error);
+    await db.update(reactivationCampaignsTable).set({ launchedAt: new Date(Date.now() - 3_600_000) }).where(eq(reactivationCampaignsTable.id, campaign.id));
+    await drainReactivationCampaigns(orgId);
+    await drainReactivationCampaigns(orgId);
+    const rows = await db.select().from(reactivationCampaignLeadsTable).where(eq(reactivationCampaignLeadsTable.campaignId, campaign.id));
+    for (const lead of held) {
+      expect(rows.find((row) => row.leadId === lead.id)).toMatchObject({
+        status: "skipped", enrollmentId: null, previousLeadStatus: lead.status,
+        detail: "source_verification_required: imported history needs current source verification before enrollment",
+      });
+      const [unchanged] = await db.select().from(leadsTable).where(eq(leadsTable.id, lead.id));
+      expect(unchanged.status).toBe(lead.status);
+      const enrollments = await db.select().from(playbookEnrollmentsTable).where(eq(playbookEnrollmentsTable.leadId, lead.id));
+      expect(enrollments).toHaveLength(0);
+      const scheduled = await db.select().from(scheduledActionsTable).where(and(
+        eq(scheduledActionsTable.organizationId, orgId), sql`${scheduledActionsTable.context}->>'leadId' = ${lead.id}`,
+      ));
+      expect(scheduled).toHaveLength(0);
+    }
+    expect(rows.find((row) => row.leadId === fresh.lead.id)).toMatchObject({ status: "enrolled" });
+    const report = await getCampaignReport(orgId, campaign.id);
+    expect(report).toMatchObject({ skipped: 3, enrolled: 1, pending: 0, campaign: { status: "completed" } });
+  });
+
   it("launches, paces enrollment by ratePerHour, and reactivates cold leads", async () => {
     const old = new Date(Date.now() - 400 * 86_400_000);
     const leads = [];

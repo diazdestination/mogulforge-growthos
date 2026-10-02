@@ -325,6 +325,11 @@ export class ObjectStorageService {
       if (!row) throw new ObjectNotFoundError();
       return new PostgresObjectFile(row);
     }
+    // Legacy GCS/Replit uploads have no authoritative, server-owned tenant
+    // association. Caller-supplied activity links or arbitrary object metadata
+    // cannot establish ownership. Keep scoped reads/attachment checks closed
+    // until that provider has a reviewed ownership registry and migration.
+    if (organizationId) throw new ObjectNotFoundError();
     let entityDir = this.getPrivateObjectDir();
     if (!entityDir.endsWith("/")) entityDir += "/";
     const { bucketName, objectName } = parseObjectPath(

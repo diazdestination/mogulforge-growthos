@@ -7092,9 +7092,15 @@ components:
           type: string
         defaultSource:
           type: string
+        sourceKey:
+          type: string
+          description: Stable lowercase source/account key, required with external opportunity IDs. Reuse it on every import from the same account.
+        snapshotAsOf:
+          type: string
+          description: Original export snapshot date (ISO date or timestamp with timezone). Omit when unknown; upload time is never source freshness.
     LeadImport:
       type: object
-      required: [id, totalRows, imported, duplicates, skipped, suppressed, errors, createdAt]
+      required: [id, totalRows, imported, updated, duplicates, conflicts, skipped, suppressed, errors, createdAt]
       properties:
         id:
           type: string
@@ -7105,8 +7111,18 @@ components:
           type: number
         imported:
           type: number
+        updated:
+          type: number
         duplicates:
           type: number
+        conflicts:
+          type: number
+        sourceKey:
+          type: string
+          nullable: true
+        snapshotAsOf:
+          type: string
+          nullable: true
         skipped:
           type: number
         suppressed:
@@ -7187,6 +7203,14 @@ components:
                 nullable: true
               createdAt:
                 type: string
+              originalCreatedAt:
+                type: string
+                nullable: true
+              sourceSnapshotAsOf:
+                type: string
+                nullable: true
+              requiresSourceVerification:
+                type: boolean
     CaptureFieldMapping:
       type: object
       description: External payload field name -> MogulForge lead field name

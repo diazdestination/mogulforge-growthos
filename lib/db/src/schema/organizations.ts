@@ -1,6 +1,15 @@
-import { pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+
+export type EntitlementPlanId = "beta" | "growth" | "scale";
+export type EntitlementCapability = "revenue.autopilot";
+export interface OrganizationEntitlements {
+  version: 1;
+  planId: EntitlementPlanId;
+  source: "manual" | "stripe";
+  grants: EntitlementCapability[];
+}
 
 export const organizationsTable = pgTable(
   "organizations",
@@ -15,6 +24,9 @@ export const organizationsTable = pgTable(
     // trialing | active | past_due | canceled | incomplete | null
     subscriptionStatus: text("subscription_status"),
     planTier: text("plan_tier"),
+    // Null preserves legacy access. Only explicit, audited operator assignment
+    // enrolls a tenant in capabilities; a billing event never silently migrates it.
+    entitlements: jsonb("entitlements").$type<OrganizationEntitlements>(),
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -29,6 +41,8 @@ export const organizationsTable = pgTable(
 
 export const insertOrganizationSchema = createInsertSchema(
   organizationsTable,
-).omit({ id: true, createdAt: true, updatedAt: true });
+).omit({ id: true, createdAt: true, updatedAt: true, entitlements: true,
+  stripeCustomerId: true, stripeSubscriptionId: true, subscriptionStatus: true,
+  planTier: true, trialEndsAt: true });
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 export type Organization = typeof organizationsTable.$inferSelect;

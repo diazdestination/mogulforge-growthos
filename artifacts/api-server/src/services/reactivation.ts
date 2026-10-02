@@ -3,6 +3,7 @@ import {
   appointmentsTable,
   contactsTable,
   db,
+  importedOpportunityHistorySchema,
   leadImportsTable,
   leadsTable,
   playbookEnrollmentsTable,
@@ -11,18 +12,21 @@ import {
   reactivationCampaignsTable,
   suppressionsTable,
   type LeadImport,
+  type ImportedOpportunityHistory,
   type Playbook,
   type ReactivationCampaign,
   type ReactivationSegment,
   type SendingHoursSettings,
 } from "@workspace/db";
-import { and, desc, eq, inArray, lt, notInArray, or, sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, desc, eq, inArray, notInArray, or, sql } from "drizzle-orm";
 
 import { recordAudit } from "./audit";
 import { OUTREACH_ACTIVE_STATUSES, enrollLead, stopEnrollmentById } from "./playbooks";
 import { draftOutreachMessage } from "./providers";
 import { normalizeAddress } from "./send-gate";
 import { getOrgSettings, getSendingHours } from "./settings";
+import { needsSourceVerification, parseSourceAmount, parseSourceDate, SourceHistoryValidationError } from "./source-history";
 
 /**
  * Cold-lead reactivation: CSV lead import, segment building over stale
@@ -83,14 +87,19 @@ export const IMPORT_FIELDS = [
   "lastName",
   "email",
   "phone",
-  "addressLine1",
-  "city",
-  "state",
-  "postalCode",
   "status",
   "source",
   "serviceType",
   "notes",
+  "externalOpportunityId",
+  "externalCustomerId",
+  "externalEstimateId",
+  "originalCreatedAt",
+  "sourceUpdatedAt",
+  "statusChangedAt",
+  "lastContactAt",
+  "estimatedValue",
+  "currency",
 ] as const;
 export type ImportField = (typeof IMPORT_FIELDS)[number];
 
@@ -127,6 +136,10 @@ export async function importLeads(
     hasHeader?: boolean;
     defaultStatus?: string;
     defaultSource?: string;
+    /** Stable source/account namespace; use the same value on every reimport. */
+    sourceKey?: string;
+    /** When the source export was captured, not when this upload occurred. */
+    snapshotAsOf?: string;
     createdByUserId?: string | null;
   },
 ): Promise<LeadImport | { error: string }> {
@@ -137,6 +150,15 @@ export async function importLeads(
     return { error: `Too many rows (max ${MAX_IMPORT_ROWS})` };
   }
   const m = params.mapping;
+  if (!m || typeof m !== "object" || Array.isArray(m) || Object.entries(m).some(([key, value]) =>
+    !IMPORT_FIELDS.includes(key as ImportField) || !Number.isInteger(value) || value < 0 || value > 255,
+  )) return { error: "Mappings must use supported field names and column numbers from 0 to 255" };
+  if (new Set(Object.values(m)).size !== Object.values(m).length) {
+    return { error: "Each CSV column can only map to one field" };
+  }
+  if (params.hasHeader !== false && Object.values(m).some((index) => index >= all[0].length)) {
+    return { error: "A mapped column is missing from the CSV header" };
+  }
   if (m.firstName === undefined) return { error: "A First name column mapping is required" };
   if (m.email === undefined && m.phone === undefined) {
     return { error: "Map at least an Email or Phone column" };
@@ -145,9 +167,22 @@ export async function importLeads(
     ? (params.defaultStatus as string)
     : "nurture";
   const source = clean(params.defaultSource, 100) ?? "csv-import";
+  const sourceKey = params.sourceKey?.trim() || null;
+  if (sourceKey && !/^[a-z0-9][a-z0-9._-]{0,99}$/.test(sourceKey)) {
+    return { error: "Source key must use 1–100 lowercase letters, numbers, dots, underscores or hyphens" };
+  }
+  if (m.externalOpportunityId !== undefined && !sourceKey) {
+    return { error: "A stable source key is required when mapping external opportunity IDs" };
+  }
+  const receivedAt = new Date();
+  let snapshotAsOf: string | null;
+  try { snapshotAsOf = parseSourceDate(params.snapshotAsOf, "Snapshot date", receivedAt); }
+  catch (err) { return { error: err instanceof Error ? err.message : "Invalid snapshot date" }; }
 
   let imported = 0;
+  let updated = 0;
   let duplicates = 0;
+  let conflicts = 0;
   let skipped = 0;
   let suppressedCount = 0;
   const errors: string[] = [];
@@ -159,17 +194,20 @@ export async function importLeads(
     .where(eq(suppressionsTable.organizationId, organizationId));
   const suppressedSet = new Set(suppressions.map((s) => `${s.channel}:${s.value}`));
 
-  // Dedupe within the file too.
-  const seenInFile = new Set<string>();
-
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
+    const rowNo = i + (params.hasHeader === false ? 1 : 2);
+    if (Object.values(m).some((index) => index >= row.length) ||
+        (params.hasHeader !== false && row.length !== all[0].length)) {
+      skipped++;
+      if (errors.length < MAX_ERROR_SAMPLES) errors.push(`Row ${rowNo}: column count does not match the header or mapping; no values were applied`);
+      continue;
+    }
     const get = (f: ImportField) => (m[f] === undefined ? undefined : row[m[f]!]);
     const firstName = clean(get("firstName"), 100);
     const email = clean(get("email"), 200)?.toLowerCase() ?? null;
     const phone = clean(get("phone"), 40);
     const phoneDigits = phone ? phone.replace(/\D/g, "") : null;
-    const rowNo = i + (params.hasHeader === false ? 1 : 2);
 
     if (!firstName) {
       skipped++;
@@ -184,66 +222,176 @@ export async function importLeads(
       continue;
     }
 
-    const fileKey = email ?? `p:${phoneDigits}`;
-    if (seenInFile.has(fileKey)) {
-      duplicates++;
-      continue;
-    }
-    seenInFile.add(fileKey);
-
-    // Dedupe against existing contacts by email/phone.
-    const matchConds = [];
-    if (email) matchConds.push(sql`lower(${contactsTable.email}) = ${email}`);
-    if (phoneDigits && phoneDigits.length >= 7) {
-      matchConds.push(
-        sql`regexp_replace(coalesce(${contactsTable.phone}, ''), '\\D', '', 'g') = ${phoneDigits}`,
-      );
-    }
-    const [existing] = await db
-      .select({ id: contactsTable.id })
-      .from(contactsTable)
-      .where(and(eq(contactsTable.organizationId, organizationId), or(...matchConds)))
-      .limit(1);
-    if (existing) {
-      duplicates++;
-      continue;
-    }
-
     const isSuppressed =
       (email && suppressedSet.has(`email:${normalizeAddress("email", email)}`)) ||
       (phone && suppressedSet.has(`sms:${normalizeAddress("sms", phone)}`));
-    if (isSuppressed) suppressedCount++;
-
-    const rawStatus = clean(get("status"), 40);
-    const status = rawStatus && VALID_STATUSES.has(rawStatus) ? rawStatus : defaultStatus;
 
     try {
-      await db.transaction(async (tx) => {
-        const [contact] = await tx
-          .insert(contactsTable)
-          .values({
-            organizationId,
-            firstName,
-            lastName: clean(get("lastName"), 100),
-            email,
-            phone,
-          })
-          .returning();
+      const identity = (field: ImportField): string | null => {
+        const value = get(field)?.trim() || null;
+        if (value && (value.length > 200 || /[\x00-\x1f\x7f]/.test(value))) {
+          throw new SourceHistoryValidationError(`${field} must be a valid ID of at most 200 characters`);
+        }
+        return value;
+      };
+      const externalOpportunityId = identity("externalOpportunityId");
+      if (m.externalOpportunityId !== undefined && !externalOpportunityId) {
+        throw new SourceHistoryValidationError("missing external opportunity ID; row was not converted into a contact-only import");
+      }
+      const rawStatus = clean(get("status"), 40);
+      if (m.status !== undefined && !rawStatus) throw new SourceHistoryValidationError("mapped status is blank; an unknown source stage was not replaced with the default");
+      if (rawStatus && !VALID_STATUSES.has(rawStatus)) throw new SourceHistoryValidationError("unknown status; map it to a supported GrowthOS stage first");
+      const status = rawStatus ?? defaultStatus;
+      const estimatedValueCents = parseSourceAmount(get("estimatedValue"));
+      const rawCurrency = clean(get("currency"), 10)?.toUpperCase() ?? null;
+      if (rawCurrency && rawCurrency !== "USD") throw new SourceHistoryValidationError("only USD amounts are supported; no currency conversion was performed");
+      if (estimatedValueCents !== null && rawCurrency !== "USD") throw new SourceHistoryValidationError("an explicit USD currency column is required with an estimate amount");
+      const originalCreatedAt = parseSourceDate(get("originalCreatedAt"), "Original opportunity date", receivedAt);
+      const sourceUpdatedAt = parseSourceDate(get("sourceUpdatedAt"), "Source updated date", receivedAt);
+      const statusChangedAt = parseSourceDate(get("statusChangedAt"), "Status changed date", receivedAt);
+      const lastContactAt = parseSourceDate(get("lastContactAt"), "Last contact date", receivedAt);
+      const latestBound = sourceUpdatedAt ?? snapshotAsOf;
+      if (sourceUpdatedAt && snapshotAsOf && sourceUpdatedAt > snapshotAsOf) throw new SourceHistoryValidationError("Source updated date is after the snapshot date");
+      if (latestBound && [originalCreatedAt, statusChangedAt, lastContactAt].some((date) => date && date > latestBound)) {
+        throw new SourceHistoryValidationError("A history date is after the source update or snapshot date");
+      }
+      if (originalCreatedAt && statusChangedAt && statusChangedAt < originalCreatedAt) throw new SourceHistoryValidationError("Status changed date is before the original opportunity date");
+      const applied = {
+        status,
+        estimatedValueCents,
+        serviceType: clean(get("serviceType"), 100),
+        summary: clean(get("notes"), 500),
+        latestSource: clean(get("source"), 100) ?? source,
+      };
+      const provenance = {
+        originalCreatedAt, sourceUpdatedAt, statusChangedAt, lastContactAt,
+        externalCustomerId: identity("externalCustomerId"),
+        externalEstimateId: identity("externalEstimateId"),
+        currency: rawCurrency as "USD" | null,
+      };
+      const fingerprint = createHash("sha256").update(JSON.stringify({
+        ...provenance, applied, source: clean(get("source"), 100) ?? source,
+        // Compare contact identity without retaining raw uploaded contact values in history.
+        email, phone: phoneDigits,
+      })).digest("hex");
+      const appliedFingerprint = createHash("sha256").update(JSON.stringify(applied)).digest("hex");
+      const history: ImportedOpportunityHistory = {
+        version: 1, kind: "csv_snapshot", ...provenance, appliedFingerprint, fingerprint, snapshotAsOf,
+        mappedFields: Object.keys(m).sort(),
+        firstImportedAt: receivedAt.toISOString(), lastImportedAt: receivedAt.toISOString(),
+      };
+      importedOpportunityHistorySchema.parse(history);
+      const outcome = await db.transaction(async (tx) => {
+        // Import requests for one tenant serialize contact matching and opportunity creation.
+        // The unique index remains the final protection against duplicate source IDs.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`lead-import:${organizationId}`}))`);
+        const matchConds = [];
+        if (email) matchConds.push(sql`lower(${contactsTable.email}) = ${email}`);
+        if (phoneDigits && phoneDigits.length >= 7) {
+          matchConds.push(sql`regexp_replace(coalesce(${contactsTable.phone}, ''), '\\D', '', 'g') = ${phoneDigits}`);
+        }
+        const contacts = await tx.select().from(contactsTable)
+          .where(and(eq(contactsTable.organizationId, organizationId), or(...matchConds))).limit(2);
+        if (contacts.length > 1) return { kind: "conflict", reason: "contact details match different people; reconcile before import" } as const;
+        const contact = contacts[0];
+        if (contact && ((email && contact.email && normalizeAddress("email", contact.email) !== email) ||
+            (phone && contact.phone && normalizeAddress("sms", contact.phone) !== normalizeAddress("sms", phone)))) {
+          return { kind: "conflict", reason: "a matched person has conflicting contact details; reconcile before linking this opportunity" } as const;
+        }
+        if (sourceKey && history.externalCustomerId) {
+          const knownCustomers = await tx.selectDistinct({ contactId: leadsTable.contactId }).from(leadsTable).where(and(
+            eq(leadsTable.organizationId, organizationId), eq(leadsTable.importSourceKey, sourceKey),
+            sql`${leadsTable.importedHistory}->>'externalCustomerId' = ${history.externalCustomerId}`,
+          )).limit(2);
+          if (knownCustomers.length && (!contact || knownCustomers.some((known) => known.contactId !== contact.id))) {
+            return { kind: "conflict", reason: "known source customer identity resolves to different or unrecognized contact details" } as const;
+          }
+        }
+        if (contact && sourceKey && history.externalCustomerId) {
+          const [contradictoryCustomer] = await tx.select({ id: leadsTable.id }).from(leadsTable).where(and(
+            eq(leadsTable.organizationId, organizationId), eq(leadsTable.contactId, contact.id),
+            eq(leadsTable.importSourceKey, sourceKey),
+            sql`${leadsTable.importedHistory}->>'externalCustomerId' IS NOT NULL`,
+            sql`${leadsTable.importedHistory}->>'externalCustomerId' <> ${history.externalCustomerId}`,
+          )).limit(1);
+          if (contradictoryCustomer) return { kind: "conflict", reason: "source customer ID conflicts with this person's imported history" } as const;
+        }
+        const [existing] = externalOpportunityId && sourceKey
+          ? await tx.select().from(leadsTable).where(and(
+              eq(leadsTable.organizationId, organizationId), eq(leadsTable.importSourceKey, sourceKey),
+              eq(leadsTable.externalOpportunityId, externalOpportunityId),
+            )).for("update")
+          : [];
+        if (existing) {
+          const previous = existing.importedHistory;
+          if (!contact || existing.contactId !== contact.id || !previous ||
+              (previous.externalCustomerId && previous.externalCustomerId !== history.externalCustomerId)) {
+            return { kind: "conflict", reason: "source opportunity has a different or unresolved customer identity" } as const;
+          }
+          if (previous.fingerprint === fingerprint) return { kind: "duplicate" } as const;
+          if (JSON.stringify(previous.mappedFields) !== JSON.stringify(history.mappedFields)) {
+            return { kind: "conflict", reason: "mapped fields changed; reconcile before applying a partial source update" } as const;
+          }
+          if (!sourceUpdatedAt || !previous.sourceUpdatedAt || sourceUpdatedAt <= previous.sourceUpdatedAt) {
+            return { kind: "conflict", reason: "changed opportunity needs a strictly newer source updated date; stale or conflicting snapshot was not applied" } as const;
+          }
+          if (previous.originalCreatedAt && originalCreatedAt !== previous.originalCreatedAt) {
+            return { kind: "conflict", reason: "original opportunity date changed; reconcile source identity" } as const;
+          }
+          if (previous.lastContactAt && (!lastContactAt || lastContactAt < previous.lastContactAt)) {
+            return { kind: "conflict", reason: "last contact history would move backward or disappear" } as const;
+          }
+          if (previous.statusChangedAt && (!statusChangedAt || statusChangedAt < previous.statusChangedAt)) {
+            return { kind: "conflict", reason: "status history would move backward or disappear" } as const;
+          }
+          const currentFingerprint = createHash("sha256").update(JSON.stringify({
+            status: existing.status, estimatedValueCents: existing.estimatedValueCents,
+            serviceType: existing.serviceType, summary: existing.summary,
+            latestSource: existing.latestSource,
+          })).digest("hex");
+          if (previous.appliedFingerprint !== currentFingerprint) {
+            return { kind: "conflict", reason: "GrowthOS values changed after import; reconcile before replacing local work" } as const;
+          }
+          await tx.update(leadsTable).set({
+            ...applied, status: status as typeof leadsTable.$inferSelect.status,
+            importedHistory: { ...history, firstImportedAt: previous.firstImportedAt },
+          }).where(and(eq(leadsTable.id, existing.id), eq(leadsTable.organizationId, organizationId)));
+          return { kind: "updated" } as const;
+        }
+        // A person is not an opportunity. With an external ID a new job may reuse this contact.
+        // Without one, retain conservative legacy matching and make no guessed merge.
+        if (!externalOpportunityId && contact) return { kind: "duplicate" } as const;
+        const contactId = contact?.id ?? (await tx.insert(contactsTable).values({
+          organizationId, firstName, lastName: clean(get("lastName"), 100), email, phone,
+        }).returning({ id: contactsTable.id }))[0].id;
         await tx.insert(leadsTable).values({
           organizationId,
-          contactId: contact.id,
+          contactId,
+          ...applied,
           status: status as typeof leadsTable.$inferSelect.status,
-          serviceType: clean(get("serviceType"), 100),
-          summary: clean(get("notes"), 500),
           source: clean(get("source"), 100) ?? source,
           latestSource: clean(get("source"), 100) ?? source,
           creationMethod: "import",
+          importSourceKey: sourceKey,
+          externalOpportunityId,
+          importedHistory: history,
         });
+        return { kind: "imported" } as const;
       });
-      imported++;
-    } catch {
+      if (outcome.kind === "conflict") {
+        conflicts++;
+        if (errors.length < MAX_ERROR_SAMPLES) errors.push(`Row ${rowNo}: ${outcome.reason}`);
+      } else if (outcome.kind === "duplicate") duplicates++;
+      else {
+        if (outcome.kind === "updated") updated++;
+        else imported++;
+        if (isSuppressed) suppressedCount++;
+      }
+    } catch (err) {
       skipped++;
-      if (errors.length < MAX_ERROR_SAMPLES) errors.push(`Row ${rowNo}: failed to save`);
+      // Only our validation errors are safe to show; never leak SQL or uploaded values.
+      const message = err instanceof SourceHistoryValidationError ? err.message : "failed to save";
+      if (errors.length < MAX_ERROR_SAMPLES) errors.push(`Row ${rowNo}: ${message}`);
     }
   }
 
@@ -254,7 +402,11 @@ export async function importLeads(
       fileName: clean(params.fileName, 200),
       totalRows: rows.length,
       imported,
+      updated,
       duplicates,
+      conflicts,
+      sourceKey,
+      snapshotAsOf: snapshotAsOf ? new Date(snapshotAsOf) : null,
       skipped,
       suppressed: suppressedCount,
       errors,
@@ -267,7 +419,7 @@ export async function importLeads(
     action: "leads.imported",
     entityType: "lead_import",
     entityId: record.id,
-    metadata: { imported, duplicates, skipped },
+    metadata: { imported, updated, duplicates, conflicts, skipped, sourceKey, snapshotAsOf },
   });
   return record;
 }
@@ -315,11 +467,24 @@ function segmentConditions(organizationId: string, seg: ReactivationSegment) {
     );
   }
   if (seg.minAgeDays) {
-    conds.push(lt(leadsTable.createdAt, new Date(Date.now() - seg.minAgeDays * 86_400_000)));
+    const cutoff = new Date(Date.now() - seg.minAgeDays * 86_400_000);
+    conds.push(sql`CASE
+      WHEN ${leadsTable.importedHistory} IS NOT NULL
+        THEN (${leadsTable.importedHistory}->>'originalCreatedAt')::timestamptz
+      WHEN ${leadsTable.creationMethod} = 'import' THEN NULL
+      ELSE ${leadsTable.createdAt}
+    END < ${cutoff}`);
   }
   if (seg.inactiveDays) {
     const cutoff = new Date(Date.now() - seg.inactiveDays * 86_400_000);
     conds.push(
+      // Missing imported history is not evidence that the customer has gone quiet.
+      sql`CASE
+        WHEN ${leadsTable.importedHistory} IS NOT NULL
+          THEN coalesce(${leadsTable.importedHistory}->>'lastContactAt', ${leadsTable.importedHistory}->>'originalCreatedAt')::timestamptz
+        WHEN ${leadsTable.creationMethod} = 'import' THEN NULL
+        ELSE ${leadsTable.createdAt}
+      END < ${cutoff}`,
       sql`NOT EXISTS (
         SELECT 1 FROM ${activitiesTable}
         WHERE ${activitiesTable.leadId} = ${leadsTable.id}
@@ -351,6 +516,9 @@ export interface SegmentPreview {
     status: string;
     source: string | null;
     createdAt: string;
+    originalCreatedAt: string | null;
+    sourceSnapshotAsOf: string | null;
+    requiresSourceVerification: boolean;
   }[];
 }
 
@@ -372,6 +540,8 @@ export async function previewSegment(
       status: leadsTable.status,
       source: leadsTable.source,
       createdAt: leadsTable.createdAt,
+      creationMethod: leadsTable.creationMethod,
+      importedHistory: leadsTable.importedHistory,
     })
     .from(leadsTable)
     .leftJoin(contactsTable, eq(leadsTable.contactId, contactsTable.id))
@@ -387,6 +557,9 @@ export async function previewSegment(
       status: s.status,
       source: s.source,
       createdAt: s.createdAt.toISOString(),
+      originalCreatedAt: s.importedHistory?.originalCreatedAt ?? (s.creationMethod === "import" ? null : s.createdAt.toISOString()),
+      sourceSnapshotAsOf: s.importedHistory?.snapshotAsOf ?? null,
+      requiresSourceVerification: s.creationMethod === "import" || s.importedHistory?.kind === "csv_snapshot",
     })),
   };
 }
@@ -769,6 +942,9 @@ async function enrollCampaignLead(
     .from(leadsTable)
     .where(and(eq(leadsTable.id, leadId), eq(leadsTable.organizationId, campaign.organizationId)));
   if (!lead) return { status: "skipped", detail: "lead deleted" };
+  if (needsSourceVerification(lead)) {
+    return { status: "skipped", detail: "source_verification_required: imported history needs current source verification before enrollment" };
+  }
 
   // The playbook engine only sends to outreach-active leads; move cold
   // stages (lost, completed, …) back into nurture so the win-back sequence

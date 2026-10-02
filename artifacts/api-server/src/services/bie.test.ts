@@ -55,7 +55,7 @@ describe("BIE Revenue Command", () => {
       status: "estimate_sent",
       summary: "Storm-damage estimate awaiting homeowner response",
       estimatedValueCents: 185_000,
-      creationMethod: "import",
+      creationMethod: "api",
     });
     expect(lead).not.toBeNull();
     await db

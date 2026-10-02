@@ -15,6 +15,7 @@ import {
 } from "../../services/bie";
 import type { BieActionType, BieAutopilotPolicy } from "@workspace/db";
 import { z } from "zod/v4";
+import { assertCapabilityForActor, CapabilityAccessError } from "../../services/entitlements";
 
 const router: IRouter = Router();
 
@@ -166,13 +167,12 @@ router.put(
     if (typeof body.pauseReason === "string")
       patch.pauseReason = body.pauseReason.slice(0, 500);
     if (body.pauseReason === null) patch.pauseReason = null;
-    res.json(
-      await updateAutopilotPolicy(
-        req.member!.organizationId,
-        req.member!.user.id,
-        patch,
-      ),
-    );
+    try {
+      res.json(await updateAutopilotPolicy(req.member!.organizationId, req.member!.user.id, patch));
+    } catch (error) {
+      if (!(error instanceof CapabilityAccessError)) throw error;
+      res.status(error.status).json({ error: error.message, code: error.code, capability: error.capability, reason: error.reason });
+    }
   },
 );
 
@@ -182,7 +182,13 @@ router.post(
   "/bie/autopilot/run",
   requireMember("settings.manage"),
   async (req: Request, res: Response): Promise<void> => {
-    res.json(await runAutopilot(req.member!.organizationId));
+    try {
+      await assertCapabilityForActor(req.member!.organizationId, req.member!.user.id, "revenue.autopilot", "settings.manage");
+      res.json(await runAutopilot(req.member!.organizationId));
+    } catch (error) {
+      if (!(error instanceof CapabilityAccessError)) throw error;
+      res.status(error.status).json({ error: error.message, code: error.code, capability: error.capability, reason: error.reason });
+    }
   },
 );
 

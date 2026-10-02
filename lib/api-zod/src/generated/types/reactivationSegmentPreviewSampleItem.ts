@@ -12,4 +12,7 @@ export type ReactivationSegmentPreviewSampleItem = {
   status: string;
   source?: string | null;
   createdAt: string;
+  originalCreatedAt?: string | null;
+  sourceSnapshotAsOf?: string | null;
+  requiresSourceVerification?: boolean;
 };

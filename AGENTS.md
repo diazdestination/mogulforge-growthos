@@ -10,6 +10,15 @@ eligibility is unverified. Package targets are not implemented entitlements or
 live offers. Preserve agreed beta terms and complete the paid-beta gates below.
 Website onboarding implementation evidence: `CONTRACTOR-PACKAGING-QA-2026-10-01.md`.
 
+October 1 coordinated foundation candidate: read `GROWTHOS-SWARM-PLAN.md` and
+`reports/swarm-integration-2026-10-01.md` before continuing imports, billing,
+automated source eligibility or private-photo access. CSV provenance is not
+current source verification. Only `revenue.autopilot` is tier-gated in this
+slice; live charging and the wider tier catalog remain unaccepted. Legacy
+GCS/Replit object ownership is an explicit compatibility gate. See
+`NEXT_ACTIONS.md` for the next acceptance work; keep GEEKOM's Microsoft lane
+separate until actual remote coordination is established.
+
 ## Paid-Beta P0 Release Directive
 
 Before any new product implementation, read and follow `PAID-BETA-READINESS-P0.md`.
