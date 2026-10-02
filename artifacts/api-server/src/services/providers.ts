@@ -419,6 +419,10 @@ export const customerEmailProvider: CustomerEmailProvider = {
 const tenantAwareSmsProvider: SmsProvider = {
   async send(to, body, context) {
     assertOutboundDeliveryAllowed();
+    if (context?.organizationId) {
+      const { assertCustomerLifecycleActive } = await import("./customer-lifecycle");
+      await assertCustomerLifecycleActive(context.organizationId);
+    }
     const binding = context?.organizationId
       ? await twilioForOrganization(context.organizationId)
       : null;

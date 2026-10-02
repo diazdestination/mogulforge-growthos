@@ -828,6 +828,8 @@ export async function drainReactivationCampaigns(organizationId?: string): Promi
 }
 
 async function drainCampaign(campaign: ReactivationCampaign): Promise<void> {
+  const { customerWorkHeld } = await import("./customer-lifecycle-runtime");
+  if (await customerWorkHeld(campaign.organizationId)) return;
   if (!campaign.launchedAt) return;
   const playbook = await getOrgPlaybook(campaign.organizationId, campaign.playbookId);
   if (!playbook) return;
@@ -838,6 +840,7 @@ async function drainCampaign(campaign: ReactivationCampaign): Promise<void> {
   // linkage commit together. A crash rolls back the whole lead and leaves
   // it pending; there is no "enrolled without enrollmentId" window.
   for (let i = 0; i < MAX_ENROLL_PER_TICK; i++) {
+    if (await customerWorkHeld(campaign.organizationId)) return;
     let attemptedRowId: string | undefined;
     try {
       const advanced = await db.transaction(async (tx) => {

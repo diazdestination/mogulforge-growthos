@@ -96,7 +96,7 @@ const read = (sid = "", path = "/api/v1/data-lifecycle/inventory", extra: Reques
 const table = (body: DataLifecycleInventory, name: string) => body.tables.find((entry) => entry.table === name)!;
 
 describe("read-only lifecycle inventory tenant boundary", () => {
-  it("matches all 95 deployed synthetic tables and counts in a server-enforced read-only snapshot", async () => {
+  it("matches all reviewed deployed synthetic tables and counts in a server-enforced read-only snapshot", async () => {
     let readOnly = "", schemaRows: InventoryTableShape[] = [];
     const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
     const query = client.query.bind(client);
@@ -115,7 +115,7 @@ describe("read-only lifecycle inventory tenant boundary", () => {
     expect(failures, JSON.stringify(failures)).toEqual([]);
     expect(inventory.status).toBe("bounded_preview");
     expect(readOnly).toBe("on");
-    expect(inventory.coverage).toMatchObject({ classifiedTables: 95, countedTables: 92, excludedTables: 3, deployedSchema: "matched", reasons: [] });
+    expect(inventory.coverage).toMatchObject({ classifiedTables: 97, countedTables: 94, excludedTables: 3, deployedSchema: "matched", reasons: [] });
   });
 
   it("requires active owner/admin membership and does not elevate an unscoped platform session", async () => {

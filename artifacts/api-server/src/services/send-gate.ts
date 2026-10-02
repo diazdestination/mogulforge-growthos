@@ -33,6 +33,7 @@ import { and, desc, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import { isSafeMailbox } from "./providers";
 import { getSendingHours } from "./settings";
+import { customerWorkHeld } from "./customer-lifecycle-runtime";
 
 export type SendChannel = "email" | "sms";
 /** outreach = automated marketing touches; transactional = confirmations, reminders, replies. */
@@ -224,6 +225,10 @@ export async function checkSendEligibility(
   input: SendGateInput,
 ): Promise<SendGateResult> {
   const { organizationId, contact, channel, kind } = input;
+
+  if (await customerWorkHeld(organizationId)) {
+    return { ok: false, outcome: "blocked", reason: "customer_lifecycle_paused" };
+  }
 
   // 1. Hard do-not-contact flag.
   if (contact.doNotContact) {

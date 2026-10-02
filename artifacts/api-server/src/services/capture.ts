@@ -221,6 +221,9 @@ export async function captureExternalLead(
   opts: { idempotencyKey?: string | null } = {},
 ): Promise<CaptureResult> {
   const organizationId = endpoint.organizationId;
+  const { customerWorkHeld } = await import("./customer-lifecycle-runtime");
+  if (await customerWorkHeld(organizationId))
+    return { ok: false, error: "customer_lifecycle_paused" };
   const idempotencyKey = asText(opts.idempotencyKey, 200);
 
   // Reserve-first idempotency: exactly one delivery with a given key wins the

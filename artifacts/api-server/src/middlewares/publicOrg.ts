@@ -9,6 +9,7 @@ import {
   resolveInstallationKey,
 } from "../services/installation";
 import { getDefaultOrganization } from "../services/org";
+import { customerWorkHeld } from "../services/customer-lifecycle-runtime";
 
 declare global {
   namespace Express {
@@ -89,6 +90,14 @@ export function resolvePublicOrg(opts: { requireKey?: boolean } = {}) {
     next: NextFunction,
   ): Promise<void> => {
     try {
+      const proceed = async () => {
+        if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method) &&
+            req.publicOrg && await customerWorkHeld(req.publicOrg.id)) {
+          res.status(423).json({ error: "Company intake is temporarily paused", code: "customer_lifecycle_paused" });
+          return;
+        }
+        next();
+      };
       const rawKey = installationKeyFrom(req);
       if (!rawKey) {
         if (opts.requireKey) {
@@ -96,7 +105,7 @@ export function resolvePublicOrg(opts: { requireKey?: boolean } = {}) {
           return;
         }
         req.publicOrg = await getDefaultOrganization();
-        next();
+        await proceed();
         return;
       }
       const key = await resolveInstallationKey(rawKey);
@@ -123,7 +132,7 @@ export function resolvePublicOrg(opts: { requireKey?: boolean } = {}) {
         }
         req.publicOrg = selfOrg;
         req.publicOrgKey = key;
-        next();
+        await proceed();
         return;
       }
       if (!hostname) {
@@ -147,7 +156,7 @@ export function resolvePublicOrg(opts: { requireKey?: boolean } = {}) {
       }
       req.publicOrg = org;
       req.publicOrgKey = key;
-      next();
+      await proceed();
     } catch (err) {
       next(err);
     }

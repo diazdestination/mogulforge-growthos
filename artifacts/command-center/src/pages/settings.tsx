@@ -3,6 +3,7 @@ import { VoiceDesk } from '@/components/voice-desk';
 import { CustomerEmailSender } from '@/components/customer-email-sender';
 import { LeadAlertRouting } from '@/components/lead-alert-routing';
 import { DataLifecycleInventory } from '@/components/data-lifecycle-inventory';
+import { CustomerLifecycle } from '@/components/customer-lifecycle';
 import { useEffect, useRef, useState } from 'react';
 import {
   useGetMe,
@@ -1144,7 +1145,7 @@ export default function Settings() {
           <TabsContent value="tags"><TagsTab /></TabsContent>
           <TabsContent value="reviews"><GoogleReviewsTab /></TabsContent>
           <TabsContent value="data-privacy">{me.organization
-            ? <DataLifecycleInventory accountKey={`${me.id}:${me.organization.id}`} />
+            ? <div className="space-y-6"><CustomerLifecycle accountKey={`${me.id}:${me.organization.id}`} /><DataLifecycleInventory accountKey={`${me.id}:${me.organization.id}`} /></div>
             : <p className="text-sm text-muted-foreground">A company membership is required to check a data inventory.</p>}
           </TabsContent>
         </Tabs>

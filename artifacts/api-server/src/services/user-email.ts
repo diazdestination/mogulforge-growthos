@@ -122,12 +122,15 @@ export async function sendEmailForUser(input: {
   subject: string;
   body: string;
 }): Promise<UserEmailResult> {
+  const { assertCustomerLifecycleActive } = await import("./customer-lifecycle");
+  await assertCustomerLifecycleActive(input.organizationId);
   assertOutboundDeliveryAllowed({ channel: "email", recipient: input.to });
   const status = await getUserEmailStatus(input.organizationId, input.userId);
   if (!status.connected || !status.configured || !status.provider)
     throw new Error(
       status.reason ?? "The selected email sender is unavailable.",
     );
+  await assertCustomerLifecycleActive(input.organizationId);
   if (status.provider === "microsoft") return sendMicrosoftForUser(input);
   return { ...(await sendGmailForUser(input)), acceptance: "accepted" };
 }

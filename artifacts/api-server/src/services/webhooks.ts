@@ -426,6 +426,8 @@ export async function attemptDelivery(
     .from(webhookDeliveriesTable)
     .where(eq(webhookDeliveriesTable.id, deliveryId));
   if (!delivery || delivery.status !== "pending") return;
+  const { customerWorkHeld } = await import("./customer-lifecycle-runtime");
+  if (await customerWorkHeld(delivery.organizationId)) return;
 
   const endpoint =
     endpointHint ??
@@ -469,6 +471,7 @@ export async function attemptDelivery(
   }
 
   const body = JSON.stringify(delivery.payload);
+  if (await customerWorkHeld(delivery.organizationId)) return;
   // Re-sign with a fresh timestamp on every attempt so receivers can apply
   // replay-window checks even for retried deliveries.
   const signature = buildSignatureHeader(activeSigningSecrets(endpoint), body);
@@ -600,12 +603,14 @@ export async function cleanupExpiredPreviousSecrets(
 /** Retry due pending deliveries. Called by the scheduler tick. */
 export async function processPendingDeliveries(): Promise<number> {
   if (outboundDeliveryHeld()) return 0;
+  const { customerWorkAllowedSql } = await import("./customer-lifecycle-runtime");
   const due = await db
     .select({ id: webhookDeliveriesTable.id })
     .from(webhookDeliveriesTable)
     .where(
       and(
         eq(webhookDeliveriesTable.status, "pending"),
+        customerWorkAllowedSql(webhookDeliveriesTable.organizationId),
         or(
           isNull(webhookDeliveriesTable.nextAttemptAt),
           lte(webhookDeliveriesTable.nextAttemptAt, new Date()),

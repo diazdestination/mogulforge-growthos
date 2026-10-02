@@ -45,6 +45,7 @@ import {
   recordReviewClick,
 } from "../../services/engagement-links";
 import { SubmitReferralBody } from "@workspace/api-zod";
+import { CustomerLifecycleHoldError } from "../../services/customer-lifecycle";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -895,13 +896,18 @@ router.post(
       res.status(400).json({ error: "An email or phone number is required" });
       return;
     }
-    const result = await recordReferralSubmission(link, {
-      name,
-      email: email ?? undefined,
-      phone: phone ?? undefined,
-      notes: notes ?? undefined,
-    });
-    res.status(201).json({ ok: true, leadId: result.leadId });
+    try {
+      const result = await recordReferralSubmission(link, {
+        name,
+        email: email ?? undefined,
+        phone: phone ?? undefined,
+        notes: notes ?? undefined,
+      });
+      res.status(201).json({ ok: true, leadId: result.leadId });
+    } catch (error) {
+      if (!(error instanceof CustomerLifecycleHoldError)) throw error;
+      res.status(423).json({ code: error.code, error: "This company is not accepting new requests right now." });
+    }
   },
 );
 

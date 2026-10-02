@@ -22,6 +22,7 @@ import { and, asc, desc, eq, lte, notExists, sql } from "drizzle-orm";
 import type { SchedulerStage, StageObserver } from "./scheduler-runtime";
 import { recordAudit } from "./audit";
 import { runDurableAction } from "./durable-execution";
+import { customerWorkAllowedSql, customerWorkHeld } from "./customer-lifecycle-runtime";
 import { isLegacyDefaultOrg } from "../lib/orgFlavor";
 import {
   applyStageBehaviorToLead,
@@ -125,11 +126,13 @@ export async function runEvent(
   event: AutomationEventName,
   context: EventContext,
 ): Promise<void> {
+  // Stops and outcome history still apply while held. Only new work is gated.
+  const workHeld = await customerWorkHeld(organizationId);
   // Outbound webhook mirror for lifecycle events.
-  if (event === "lead.created" || event === "appointment.booked") {
+  if (!workHeld && (event === "lead.created" || event === "appointment.booked")) {
     mirrorToWebhooks(organizationId, event, context);
   }
-  if (event === "lead.updated" || event === "lead.assigned") {
+  if (!workHeld && (event === "lead.updated" || event === "lead.assigned")) {
     const s = context.fields?.["lead.status"];
     // Only mirror terminal events on a REAL status transition — a non-status
     // update to an already-won/lost lead must not re-emit the event.
@@ -141,7 +144,7 @@ export async function runEvent(
   }
   // Closer Engine hooks: enroll new leads in an outreach playbook, and
   // stop live enrollments the moment the lead converts or advances.
-  if (event === "lead.created" && context.leadId) {
+  if (!workHeld && event === "lead.created" && context.leadId) {
     await autoEnrollLead(organizationId, context.leadId);
   } else if (event === "appointment.booked" && context.leadId) {
     await stopEnrollmentsForLead(
@@ -163,7 +166,7 @@ export async function runEvent(
       // cancel / hand off to another playbook) for ACQUISITION sequences.
       // Defaults preserve the old fixed behavior: outreach stages continue,
       // everything else completes.
-      await applyStageBehaviorToLead(organizationId, context.leadId, status);
+      await applyStageBehaviorToLead(organizationId, context.leadId, status, !workHeld);
     }
     // A lost lead also ends any live post-sale sequence.
     if (status === "lost") {
@@ -186,10 +189,11 @@ export async function runEvent(
         await classifyWonLead(organizationId, context.leadId);
       }
       // Milestone-gated post-sale playbooks (review/referral/maintenance).
-      await handlePostSaleTransition(organizationId, context.leadId, status);
+      if (!workHeld) await handlePostSaleTransition(organizationId, context.leadId, status);
     }
   }
 
+  if (workHeld) return;
   const rules = await db
     .select()
     .from(automationsTable)
@@ -940,6 +944,7 @@ export async function processDueScheduledActions(organizationId?: string): Promi
     .where(
       and(
         eq(scheduledActionsTable.status, "pending"),
+        customerWorkAllowedSql(scheduledActionsTable.organizationId),
         lte(scheduledActionsTable.runAt, new Date()),
         organizationId
           ? eq(scheduledActionsTable.organizationId, organizationId)
@@ -957,6 +962,7 @@ export async function processDueScheduledActions(organizationId?: string): Promi
     .limit(20);
   for (const item of due) {
     try {
+      if (await customerWorkHeld(item.organizationId)) continue;
       const execution = await runDurableAction({
         organizationId: item.organizationId, actionKey: `scheduled:${item.id}`,
         kind: item.action.type, payload: { action: item.action, context: item.context },

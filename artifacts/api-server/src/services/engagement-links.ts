@@ -12,6 +12,7 @@ import { emitAutomationEvent } from "./automation";
 import { buildTouch, leadAttributionColumns } from "./attribution";
 import { publicBaseUrl } from "./send-gate";
 import { getOrgSettings } from "./settings";
+import { assertCustomerLifecycleActive } from "./customer-lifecycle";
 
 /**
  * Tokenized post-sale engagement links (review click-through + referral
@@ -129,6 +130,7 @@ export async function recordReferralSubmission(
   link: EngagementLink,
   submission: ReferralSubmission,
 ): Promise<{ leadId: string }> {
+  await assertCustomerLifecycleActive(link.organizationId);
   const [referrer] = await db
     .select()
     .from(contactsTable)

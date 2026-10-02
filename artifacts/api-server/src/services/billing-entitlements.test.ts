@@ -140,6 +140,7 @@ describe('signed Stripe state synchronization', () => {
   it('blocks an unmapped checkout before creating a customer or any checkout side effect', async () => {
     const org = await fixture();
     org.stripeSubscriptionId = null;
+    await db.update(organizationsTable).set({ stripeSubscriptionId: null }).where(eq(organizationsTable.id, org.id));
     vi.stubEnv('STRIPE_PLAN_PRICE_MAP', '{}');
     expect(billing.getBillingStatus(org).canCheckout).toBe(false);
     await expect(billing.createCheckoutSession(org, { successUrl: 'https://example.test/success', cancelUrl: 'https://example.test/cancel' })).rejects.toThrow('approved internal plan mapping');

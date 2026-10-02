@@ -156,6 +156,7 @@ export async function listStaffPushDeliveries(organizationId: string) {
 
 /** Internal-only worker. A claimed network effect is NEVER automatically retried. */
 export async function processStaffLeadPush(organizationId?: string): Promise<void> {
+  const { customerWorkAllowedSql, customerWorkHeld } = await import("./customer-lifecycle-runtime");
   const now = new Date();
   const scope = organizationId ? eq(deliveries.organizationId, organizationId) : undefined;
   // Reboot recovery: pending rows survive; interrupted claimed rows become
@@ -169,9 +170,10 @@ export async function processStaffLeadPush(organizationId?: string): Promise<voi
     .where(and(organizationId ? eq(subscriptions.organizationId, organizationId) : undefined, isNull(subscriptions.revokedAt),
       sql`(${subscriptions.sessionId} IS NULL OR ${subscriptions.expiresAt} <= ${now})`));
   if (!staffPushAllowed()) return;
-  const queued = await db.select({ id: deliveries.id }).from(deliveries).where(and(scope, eq(deliveries.state, "pending"), gt(deliveries.expiresAt, now)))
+  const queued = await db.select({ id: deliveries.id, organizationId: deliveries.organizationId }).from(deliveries).where(and(scope, customerWorkAllowedSql(deliveries.organizationId), eq(deliveries.state, "pending"), gt(deliveries.expiresAt, now)))
     .orderBy(asc(deliveries.createdAt)).limit(BATCH_SIZE);
   for (const item of queued) {
+    if (await customerWorkHeld(item.organizationId)) continue;
     const [claim] = await db.update(deliveries).set({ state: "dispatching", claimedAt: new Date() })
       .where(and(eq(deliveries.id, item.id), eq(deliveries.state, "pending"), gt(deliveries.expiresAt, new Date())))
       .returning();
@@ -194,6 +196,11 @@ export async function processStaffLeadPush(organizationId?: string): Promise<voi
       if (!subscription.success) { await complete("cancelled", "subscription_unavailable"); continue; }
       // Recheck the kill switch immediately before entering the only network path.
       if (!staffPushAllowed(device.userId)) { await complete("cancelled", "sending_held"); continue; }
+      if (await customerWorkHeld(claim.organizationId)) {
+        await db.update(deliveries).set({ state: "pending", claimedAt: null })
+          .where(and(eq(deliveries.id, claim.id), eq(deliveries.state, "dispatching")));
+        continue;
+      }
       const status = await sendStaffPush(subscription.data, JSON.stringify(staffLeadPayload(claim.organizationId, claim.leadId)), device.userId);
       if (status === 404 || status === 410) {
         await db.update(subscriptions).set({ revokedAt: new Date(), encryptedSubscription: null, sessionId: null })

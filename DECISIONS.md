@@ -18,3 +18,20 @@ October 1, 2026, based on Adam's contractor scope and explicit swarm request.
   the coordinator owns shared integration, commits and release evidence.
 
 These decisions do not approve charging, contacting customers or deployment.
+
+## Private beta operations wave
+
+- Persist immutable checkout terms and provider keys before requests. Recover
+  known provider records; hold unknown effects before the provider retry window
+  expires. A canceled subscription needs explicit operator replacement approval.
+- Offer a clearly bounded core-record JSON export with coverage, checksum and
+  exclusions. Offboarding is a reviewed request; it never silently deletes data
+  or cancels payment/provider contracts.
+- Apply company holds at covered public intake and final outbound boundaries.
+  Preserve stop signals, outcome history, opt-outs and signed provider receipts.
+- Use the same credentialed server-side contract for existing sites and Smart
+  Sites. The reference Node adapter stores an encrypted delivery journal on a
+  persistent volume. Confirmed CRM receipt is required to claim saved delivery.
+- Rehearse the two named beta companies privately with synthetic data. A rehearsal
+  suffix, invented test identity or recorded synthetic value is never activation,
+  real customer revenue, proven conversion improvement or market validation.

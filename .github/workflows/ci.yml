@@ -65,6 +65,9 @@ jobs:
       - name: Run all test suites
         run: pnpm -r --if-present run test
 
+      - name: Verify reusable website delivery adapter
+        run: node --test examples/website-connection/adapter.test.mjs
+
       - name: Run TypeScript checks
         run: pnpm run typecheck
 

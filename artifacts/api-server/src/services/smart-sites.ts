@@ -21,6 +21,8 @@ import {
 } from "./smart-site-contract";
 import { buildTouch, leadAttributionColumns } from "./attribution";
 import { hasPermission } from "../lib/permissions";
+import { getCustomerLifecycleStatus } from "./customer-lifecycle";
+import { customerWorkHeld } from "./customer-lifecycle-runtime";
 
 export class SmartSiteError extends Error {
   constructor(
@@ -373,6 +375,8 @@ export async function captureSmartSiteInquiry(
   input: SmartSiteIntake,
   siteReceivedAt?: Date,
 ) {
+  if (await customerWorkHeld(site.organizationId))
+    throw new SmartSiteError("customer_lifecycle_paused", 423);
   const profile = SMART_SITE_PROFILES.find((p) => p.id === site.profile);
   const service = profile?.services.find(
     (s) => s[0] === input.project.serviceCode,
@@ -381,6 +385,14 @@ export async function captureSmartSiteInquiry(
   const payloadHash = hash(JSON.stringify(input));
   const organizationId = site.organizationId;
   return db.transaction(async (tx) => {
+    // Lifecycle transitions take the matching exclusive lock. Take this first,
+    // then re-read through this transaction so a waiting intake cannot bypass a pause.
+    await tx.execute(sql`select set_config('lock_timeout', '3000ms', true)`);
+    await tx.execute(
+      sql`select pg_advisory_xact_lock_shared(hashtextextended(${`customer-lifecycle:${organizationId}`}, 0))`,
+    );
+    if (!(await getCustomerLifecycleStatus(organizationId, tx)).automationAllowed)
+      throw new SmartSiteError("customer_lifecycle_paused", 423);
     // Low-volume acquisition per tenant: serialize contact matching and duplicate receipt creation.
     // Transaction-scoped locks release on crash/rollback, unlike a stranded "pending" reservation.
     await tx.execute(
@@ -688,6 +700,7 @@ export async function captureSmartSiteAcquisitionEvents(
   site: typeof smartSitesTable.$inferSelect,
   input: SmartSiteAcquisitionBatch,
 ) {
+  if (await customerWorkHeld(site.organizationId)) throw new SmartSiteError("customer_lifecycle_paused", 423);
   if (!site.analyticsEnabled)
     throw new SmartSiteError("site_measurement_disabled", 503);
   if (input.policyVersion !== site.analyticsPolicyVersion)
@@ -707,6 +720,12 @@ export async function captureSmartSiteAcquisitionEvents(
     now - site.analyticsRetentionDays * 86_400_000,
   );
   return db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('lock_timeout', '3000ms', true)`);
+    await tx.execute(
+      sql`select pg_advisory_xact_lock_shared(hashtextextended(${`customer-lifecycle:${site.organizationId}`}, 0))`,
+    );
+    if (!(await getCustomerLifecycleStatus(site.organizationId, tx)).automationAllowed)
+      throw new SmartSiteError("customer_lifecycle_paused", 423);
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${`smart-site-events:${site.id}`}, 0))`,
     );

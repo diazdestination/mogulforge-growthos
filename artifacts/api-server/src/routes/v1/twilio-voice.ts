@@ -7,6 +7,7 @@ import { requireMember } from "../../middlewares/requireMember";
 import { rateLimit } from "../../lib/rateLimit";
 import { ensureMissedCallHandoff, reviewMissedCall } from "../../services/missed-call-handoff";
 import { assertOutboundDeliveryAllowed, outboundDeliveryHeld } from "../../services/outbound-hold";
+import { customerWorkHeld } from "../../services/customer-lifecycle-runtime";
 import {
   phoneE164,
   twilioForInbound,
@@ -109,6 +110,10 @@ router.post(
     }
     if (outboundDeliveryHeld()) {
       res.status(503).json({ error: "Outbound calls are disabled in this environment." });
+      return;
+    }
+    if (await customerWorkHeld(req.member!.organizationId)) {
+      res.status(423).json({ error: "Company calling is paused. Review operating status before starting a call.", code: "customer_lifecycle_paused" });
       return;
     }
     const config = await voiceConfiguration(req.member!.organizationId),
@@ -262,6 +267,14 @@ router.post(
       params.append("StatusCallbackEvent", "answered");
       params.append("StatusCallbackEvent", "completed");
       assertOutboundDeliveryAllowed();
+      if (await customerWorkHeld(config.organizationId)) {
+        // We know no call POST was attempted. Keep the receipt as cancelled;
+        // never release this request identity for an automatic replay.
+        await db.update(twilioCallsTable).set({ status: "cancelled", updatedAt: new Date() })
+          .where(and(eq(twilioCallsTable.id, operation.id), eq(twilioCallsTable.status, "dispatching")));
+        res.status(423).json({ id: operation.id, error: "Company calling paused before this call was sent.", code: "customer_lifecycle_paused" });
+        return;
+      }
       const response = await fetch(
         `https://api.twilio.com/2010-04-01/Accounts/${current.accountSid}/Calls.json`,
         {
@@ -399,7 +412,9 @@ router.post(
         raced.accountSid === config!.accountSid &&
         raced.direction === "inbound" && raced.phone === phone ? raced : null;
     });
-    if (!operation) {
+    // An incoming provider call is already evidence worth retaining. Company
+    // holds prevent the new staff leg while signed status callbacks still work.
+    if (!operation || await customerWorkHeld(config!.organizationId)) {
       xml.reject({ reason: "busy" });
     } else {
       xml.say(
@@ -477,7 +492,7 @@ router.post("/public/voice/answer", async (req, res) => {
   }
   const { op, config } = bound;
   const xml = new twiml.VoiceResponse();
-  if (config.voiceEnabled) {
+  if (config.voiceEnabled && !(await customerWorkHeld(op.organizationId))) {
     xml
       .gather({
         numDigits: 1,
@@ -499,7 +514,7 @@ router.post("/public/voice/connect", async (req, res) => {
     return;
   }
   const { op, config } = bound;
-  if (!config.voiceEnabled || req.body.Digits !== "1") {
+  if (!config.voiceEnabled || req.body.Digits !== "1" || await customerWorkHeld(op.organizationId)) {
     res.type("text/xml").send(hangup());
     return;
   }

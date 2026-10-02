@@ -795,6 +795,9 @@ export async function executeBieProposal(
   const proposal = await getProposal(organizationId, actionId);
   if (!proposal) return null;
   if (proposal.status !== "approved") return proposal;
+  const { customerWorkHeld } = await import("./customer-lifecycle-runtime");
+  if (await customerWorkHeld(organizationId))
+    return { ...proposal, executionDetail: "Company operations are paused. Approved work is retained for review." };
   if (options.automated) {
     const decision = (await getEntitlements(organizationId)).capabilities["revenue.autopilot"];
     // Hold before claiming: a downgrade must not consume or discard approved work.
@@ -1117,6 +1120,8 @@ async function executeBieProposalEffect(
 export async function runAutopilot(
   organizationId: string,
 ): Promise<BieActionProposal[]> {
+  const { customerWorkHeld } = await import("./customer-lifecycle-runtime");
+  if (await customerWorkHeld(organizationId)) return [];
   const policy = await getAutopilotPolicy(organizationId);
   if (!policy.enabled || policy.pausedAt || policy.allowedActions.length === 0)
     return [];

@@ -3,8 +3,8 @@
  * deletion order, retention policy, or proof of complete account ownership.
  * Every new table must receive an explicit classification before preview runs.
  */
-export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-01.inventory-v1";
-export const DATA_LIFECYCLE_EXPECTED_TABLES = 95;
+export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-01.inventory-v2";
+export const DATA_LIFECYCLE_EXPECTED_TABLES = 97;
 export const DATA_LIFECYCLE_ROW_LIMIT = 10_000;
 
 export type InventoryCategory =
@@ -41,6 +41,7 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("bie_agent_runs", "intelligence"),
   direct("bie_autopilot_policies", "configuration"),
   direct("bie_connected_sources", "configuration"),
+  direct("billing_checkouts", "configuration"),
   direct("capture_deliveries", "acquisition"),
   direct("capture_endpoints", "acquisition"),
   direct("claim_canonical_graphs", "intelligence"),
@@ -57,6 +58,7 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("conversation_messages", "communications"),
   direct("conversations", "communications"),
   direct("crm_tasks", "crm"),
+  direct("customer_lifecycle", "configuration"),
   direct("decision_rooms", "intelligence"),
   direct("email_intelligence_facts", "intelligence"),
   direct("email_intelligence_messages", "communications"),

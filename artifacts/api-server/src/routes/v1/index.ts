@@ -46,6 +46,7 @@ import staffPushRouter from "./staff-push";
 import emailIntelligenceRouter from "./email-intelligence";
 import serviceObligationsRouter from "./service-obligations";
 import dataLifecycleInventoryRouter from "./data-lifecycle-inventory";
+import customerLifecycleRouter from "./customer-lifecycle";
 
 const router: IRouter = Router();
 
@@ -72,6 +73,7 @@ router.use(reportsRouter);
 router.use(assistantRouter);
 router.use(settingsRouter);
 router.use(dataLifecycleInventoryRouter);
+router.use(customerLifecycleRouter);
 router.use(twilioRouter);
 router.use(twilioVoiceRouter);
 router.use(apiKeysRouter);

@@ -385,6 +385,7 @@ export async function executePlaybookStep(
   organizationId: string,
   params: { enrollmentId?: string; stepIndex?: number },
 ): Promise<{ status: "success" | "skipped"; detail: string }> {
+  const { customerWorkHeld } = await import("./customer-lifecycle-runtime");
   const { enrollmentId, stepIndex } = params;
   if (typeof enrollmentId !== "string" || typeof stepIndex !== "number") {
     return { status: "skipped", detail: "missing enrollment params" };
@@ -404,6 +405,18 @@ export async function executePlaybookStep(
   }
   if (enrollment.currentStep !== stepIndex) {
     return { status: "skipped", detail: "step already handled" };
+  }
+  if (await customerWorkHeld(organizationId)) {
+    // A scheduler can already own the action when the company hold lands.
+    // Expose the retained step for explicit resumption instead of stranding an
+    // active enrollment after its scheduled receipt has been closed.
+    const reason = "Company work paused during step preparation; review before resuming";
+    const entry: EnrollmentHistoryEntry = { at: new Date().toISOString(), kind: "paused", stepIndex, detail: reason };
+    await db.update(playbookEnrollmentsTable).set({ status: "paused", pauseReason: reason, nextRunAt: null,
+      history: sql`${playbookEnrollmentsTable.history} || ${JSON.stringify([entry])}::jsonb`,
+    }).where(and(eq(playbookEnrollmentsTable.id, enrollment.id), eq(playbookEnrollmentsTable.organizationId, organizationId),
+      eq(playbookEnrollmentsTable.status, "active"), eq(playbookEnrollmentsTable.currentStep, stepIndex)));
+    return { status: "skipped", detail: "paused: customer_lifecycle_paused" };
   }
 
   const [playbook] = await db
@@ -494,6 +507,17 @@ export async function executePlaybookStep(
   });
   const permanentStop = !gate.ok && gate.outcome === "blocked" &&
     (gate.reason.startsWith("suppressed:") || gate.reason === "do_not_contact");
+  if (!gate.ok && gate.reason === "customer_lifecycle_paused") {
+    // The company may have paused after this step's entry check. Retain the
+    // same step for explicit review instead of consuming it as a channel skip.
+    const reason = "Company work paused during step preparation; review before resuming";
+    const entry: EnrollmentHistoryEntry = { at: new Date().toISOString(), kind: "paused", stepIndex, channel: step.channel, detail: reason };
+    await db.update(playbookEnrollmentsTable).set({ status: "paused", pauseReason: reason, nextRunAt: null,
+      history: sql`${playbookEnrollmentsTable.history} || ${JSON.stringify([entry])}::jsonb`,
+    }).where(and(eq(playbookEnrollmentsTable.id, enrollment.id), eq(playbookEnrollmentsTable.organizationId, organizationId),
+      eq(playbookEnrollmentsTable.status, "active"), eq(playbookEnrollmentsTable.currentStep, stepIndex)));
+    return { status: "skipped", detail: "paused: customer_lifecycle_paused" };
+  }
   if (!permanentStop && (needsSourceVerification(lead) ||
       (!gate.ok && gate.reason === "imported_source_requires_current_review"))) {
     // Source review takes priority over a missing address, SMS consent or send
@@ -1168,6 +1192,7 @@ export async function applyStageBehaviorToLead(
   organizationId: string,
   leadId: string,
   status: string,
+  allowEnrollment = true,
 ): Promise<void> {
   try {
     const behaviors = await getPlaybookStageBehaviors(organizationId);
@@ -1221,7 +1246,7 @@ export async function applyStageBehaviorToLead(
           undefined,
           "acquisition",
         );
-        if (target) {
+        if (target && allowEnrollment) {
           await enrollLeadInPlaybookById(organizationId, leadId, target);
         }
         return;

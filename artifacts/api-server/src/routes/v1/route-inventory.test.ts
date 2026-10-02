@@ -42,6 +42,8 @@ const SESSION_ONLY_ROUTES = new Set([
   "GET /platform/orgs",
   "PATCH /platform/orgs/:id",
   "POST /platform/orgs/:id/entitlements",
+  "POST /platform/orgs/:id/billing/replacement",
+  "POST /platform/orgs/:id/billing/reconcile",
   "GET /platform/clients/profiles",
   "GET /platform/clients/health",
   "GET /platform/runtime",
@@ -65,6 +67,9 @@ const SESSION_ONLY_ROUTES = new Set([
  * - settings.manage — org configuration surfaces (owner/admin)
  */
 const EXPECTED_PERMISSIONS: Record<string, Permission> = {
+  "GET /customer-lifecycle": "settings.manage",
+  "POST /customer-lifecycle/transition": "settings.manage",
+  "GET /customer-lifecycle/export": "settings.manage",
   "GET /staff-push/status": "crm.read",
   "POST /staff-push/subscriptions": "crm.read",
   "POST /staff-push/subscriptions/revoke": "crm.read",
