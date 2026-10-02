@@ -97,3 +97,34 @@ schema; the rerun after generation completed passed all 22 tests.
 - API tests: new `services/reporting-periods.test.ts` and
   `routes/v1/reporting-periods.test.ts`.
 - Parent coordinated the OpenAPI contract and generated API clients.
+
+## CI integration follow-up
+
+CI run `36960497654` on `869e2df` exposed two older test contracts that no
+longer matched reporting behavior. The repair changes tests only:
+
+- Normal-mode NM-03 now explicitly requires HTTP 400 for a query-based
+  organization override on both JSON and CSV endpoints. It then verifies a
+  successful canonical JSON report and CSV for the same exact period, with
+  only the signed-in company's source data even when forged tenant headers
+  are supplied. The existing foreign-record and unchanged-company snapshot
+  assertions remain in place.
+- The financial-event test now checks the current explicit boundaries: no
+  bank/accounting synchronization or causal ROI, and no profit claim without
+  the missing costs, tax and overhead. Product copy and service logic are
+  unchanged.
+
+Verification after the repair:
+
+- `test-tenant-acceptance-isolated.mjs`: all 15 normal-mode tenant tests passed.
+- Reporting service and HTTP suites: all 14 tests passed.
+- Existing Revenue Workspace suite: 10 of 11 passed, including the repaired
+  financial-event assertion. Its five-simultaneous-BIE-executions case hit the
+  known PGlite multi-session socket limitation (`08P01`, bind parameter count
+  mismatch), both in the combined run and one fresh scoped rerun. That case
+  passed the original real-PostgreSQL CI run; its implementation and concurrency
+  assertions were preserved for the parent's full PostgreSQL rerun.
+- API TypeScript check and scoped whitespace check passed.
+
+These are synthetic local checks. No provider calls, production changes,
+commits or pushes were made in this repair lane.

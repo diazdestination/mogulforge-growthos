@@ -30,7 +30,11 @@ import {
   updateStaffInvitation,
 } from "../../services/staff-invitations";
 import * as settings from "../../services/settings";
-import { createInviteToken } from "../../services/invite-token";
+import {
+  createInviteToken,
+  verifyInviteToken,
+} from "../../services/invite-token";
+import { crmAppUrl } from "../../services/invite-email";
 import { clientReadiness } from "../../services/client-onboarding";
 
 let server: Server,
@@ -107,19 +111,57 @@ type Invitation = {
   deliveryState: string;
   expiresAt: string;
 };
-const create = async (input = fixture(), org = clientOrg) => {
+const create = async (
+  input = fixture(),
+  org = clientOrg,
+  expectedDelivery: "sent" | "unconfirmed" = "sent",
+) => {
   const response = await request(platformSid, path(org), input);
   expect([200, 201], await response.clone().text()).toContain(response.status);
-  return (await response.json()) as {
+  const result = (await response.json()) as {
     invitation: Invitation;
     duplicate: boolean;
   };
+  expect(result.invitation.deliveryState).toBe(expectedDelivery);
+  return result;
 };
 const token = (to: string) => {
-  const body = mail.filter((m) => m.to === to).at(-1)!.body;
-  return new URL(
-    body.split("\n").find((line) => line.startsWith("https://"))!,
-  ).searchParams.get("invite")!;
+  const accepted = mail.filter((m) => m.to === to).at(-1);
+  if (!accepted)
+    throw new Error(
+      "Synthetic sender did not accept an email for this recipient",
+    );
+  expect(transactionalEmailProvider.send).toHaveBeenCalledWith(
+    to,
+    expect.any(String),
+    accepted.body,
+  );
+  const links = accepted.body.split(/\r?\n/).flatMap((line) => {
+    try {
+      const url = new URL(line.trim());
+      return ["http:", "https:"].includes(url.protocol) &&
+        url.searchParams.has("invite")
+        ? [url]
+        : [];
+    } catch {
+      return [];
+    }
+  });
+  expect(
+    links,
+    "Email must contain exactly one absolute invitation URL",
+  ).toHaveLength(1);
+  const url = links[0];
+  const expected = new URL("signup", `${crmAppUrl().replace(/\/$/, "")}/`);
+  expect(url.origin).toBe(expected.origin);
+  expect(url.pathname).toBe(expected.pathname);
+  expect(url.searchParams.get("email")).toBe(to.trim().toLowerCase());
+  const signed = url.searchParams.get("invite");
+  expect(
+    signed,
+    "Delivered invitation must contain the signed token",
+  ).toBeTruthy();
+  return signed!;
 };
 const ledger = async (id: string) =>
   (
@@ -178,6 +220,11 @@ beforeAll(async () => {
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 beforeEach(async () => {
+  // CI supplies no APP_URL/APP_ORIGIN; vitest.config defaults to this local HTTP
+  // origin. Keep that baseline explicit even in the HTTPS isolated runner.
+  vi.stubEnv("APP_URL", "");
+  vi.stubEnv("APP_ORIGIN", "http://localhost:3001");
+  vi.stubEnv("REPLIT_DOMAINS", "");
   mail.length = 0;
   vi.spyOn(transactionalEmailProvider, "send").mockImplementation(
     async (to, _subject, body) => {
@@ -195,7 +242,10 @@ beforeEach(async () => {
       ),
     );
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
 afterAll(async () => {
   if (server)
     await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -203,6 +253,37 @@ afterAll(async () => {
 });
 
 describe("staff invitations through normal authenticated HTTP", () => {
+  it.each(["http://localhost:3001", "https://app.example.invalid/crm"])(
+    "validates the delivered signed invitation using configured base %s",
+    async (appBase) => {
+      vi.stubEnv("APP_URL", appBase);
+      const input = fixture();
+      const created = await create(input);
+      const row = await ledger(created.invitation.id);
+      const deliveredToken = token(input.email);
+      expect(transactionalEmailProvider.send).toHaveBeenCalledTimes(1);
+      expect(mail).toHaveLength(1);
+      expect(mail[0].body).toContain(`${appBase}/signup?`);
+      expect(row.deliveryState).toBe("sent");
+      expect(
+        verifyInviteToken(deliveredToken, {
+          inviteId: row.pendingUserId,
+          organizationId: row.organizationId,
+          email: row.email,
+          tokenRevision: row.tokenRevision,
+        }),
+      ).toBe(true);
+      expect(
+        verifyInviteToken(deliveredToken, {
+          inviteId: row.pendingUserId,
+          organizationId: foreignOrg,
+          email: row.email,
+          tokenRevision: row.tokenRevision,
+        }),
+      ).toBe(false);
+    },
+  );
+
   it("does not start a provider send when preparation finishes after the durable delivery deadline", async () => {
     const configured = await settings.getOrgSettings(clientOrg);
     let prepared!: () => void, finish!: (value: typeof configured) => void;
@@ -618,9 +699,9 @@ describe("staff invitations through normal authenticated HTTP", () => {
       new Error("provider-secret-CANARY-2847"),
     );
     const input = fixture(),
-      created = await create(input);
+      created = await create(input, clientOrg, "unconfirmed");
     expect(created.invitation.deliveryState).toBe("unconfirmed");
-    const repeated = await create(input);
+    const repeated = await create(input, clientOrg, "unconfirmed");
     expect(repeated.duplicate).toBe(true);
     expect(transactionalEmailProvider.send).toHaveBeenCalledTimes(1);
     const audit = await db

@@ -49,6 +49,10 @@ const SESSION_ONLY_ROUTES = new Set([
   "GET /platform/runtime",
   "POST /platform/clients",
   "GET /platform/clients/:orgId/readiness",
+  "GET /platform/clients/:orgId/invitations",
+  "POST /platform/clients/:orgId/invitations",
+  "POST /platform/clients/:orgId/invitations/:invitationId/reissue",
+  "POST /platform/clients/:orgId/invitations/:invitationId/revoke",
   "POST /platform/clients/:orgId/sites/:siteId/key",
 ]);
 
@@ -258,6 +262,9 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "POST /email-intelligence/source": "settings.manage",
   "PATCH /email-intelligence/source/:id": "settings.manage",
   "GET /email-intelligence/messages": "crm.read",
+  "GET /email-intelligence/replies": "crm.read",
+  "POST /email-intelligence/replies/:id/review": "crm.write",
+  "POST /email-intelligence/replies/:id/resolve": "crm.write",
   "POST /email-intelligence/test": "settings.manage",
   "POST /email-intelligence/facts/:id/review": "crm.write",
   "DELETE /email-intelligence/messages/:id/raw": "settings.manage",

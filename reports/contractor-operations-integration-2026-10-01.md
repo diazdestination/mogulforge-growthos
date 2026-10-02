@@ -54,6 +54,16 @@ manual-send evidence, heartbeat normalization and recovery-setup cleanup. New
 nullable reply effects and legacy invite retry contracts were corrected in OpenAPI;
 generated clients were rebuilt. See the three specialist reports for exact cases.
 
+The first full CI run 36960497654 on 869e2df caught nine integration-test failures:
+the new guarded routes needed explicit permission-inventory entries; normal-mode
+report tests still expected tenant-query overrides to be ignored instead of
+rejected; a financial disclaimer assertion used the earlier wording; and the
+invitation test URL extractor assumed HTTPS while CI uses a local HTTP origin.
+The repairs retain the strict runtime guards and verify both rejection and
+successful tenant-scoped reads. Synthetic invitation extraction verifies the
+actual configured origin and acceptance path. No test or permission gate is
+disabled. A subsequent complete CI run at the repaired head is required.
+
 ## Synthetic upgrade and recovery
 
 `scripts/contractor-recovery-drill.mjs` starts with the pinned90-table schema and

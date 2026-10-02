@@ -44,6 +44,7 @@ import {
   objectStorageClient,
 } from "../../lib/objectStorage";
 import { createApiKey } from "../../services/api-keys";
+import type { RoiReport } from "../../services/roi-report";
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
 
 type Tenant = {
@@ -208,35 +209,29 @@ beforeAll(async () => {
       Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
       Buffer.from(marker),
     ]);
-    await db
-      .insert(storedObjectsTable)
-      .values({
-        id: photo,
-        organizationId: org.id,
-        data: bytes,
-        contentType: "image/png",
-        sizeBytes: bytes.length,
-      });
-    await db
-      .insert(activitiesTable)
-      .values({
-        organizationId: org.id,
-        leadId: lead.id,
-        contactId: contact.id,
-        type: "photos_attached",
-        title: "Synthetic owned photo",
-        metadata: { photoPaths: [`/objects/uploads/${photo}`] },
-      });
+    await db.insert(storedObjectsTable).values({
+      id: photo,
+      organizationId: org.id,
+      data: bytes,
+      contentType: "image/png",
+      sizeBytes: bytes.length,
+    });
+    await db.insert(activitiesTable).values({
+      organizationId: org.id,
+      leadId: lead.id,
+      contactId: contact.id,
+      type: "photos_attached",
+      title: "Synthetic owned photo",
+      metadata: { photoPaths: [`/objects/uploads/${photo}`] },
+    });
     const portalToken = randomUUID();
-    await db
-      .insert(portalSessionsTable)
-      .values({
-        organizationId: org.id,
-        identifier: email,
-        channel: "email",
-        tokenHash: createHash("sha256").update(portalToken).digest("hex"),
-        expiresAt: new Date(Date.now() + 3_600_000),
-      });
+    await db.insert(portalSessionsTable).values({
+      organizationId: org.id,
+      identifier: email,
+      channel: "email",
+      tokenHash: createHash("sha256").update(portalToken).digest("hex"),
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
     const key = (
       await createApiKey({
         organizationId: org.id,
@@ -416,13 +411,45 @@ describe.each([0, 1])(
     it("NM-03 scopes exports and evidence and rejects another company's recorded payment", async () => {
       const { own, other } = pair();
       const before = await snapshot(other.org);
+      for (const path of ["/reports/roi", "/reports/roi/export"]) {
+        const rejected = await request(
+          own,
+          `${path}?organizationId=${other.org}`,
+        );
+        expect(rejected.status).toBe(400);
+        expect(rejected.headers.get("cache-control")).toBe("no-store");
+        expect(await rejected.json()).toEqual({ error: expect.any(String) });
+      }
+      const forgedHeaders = {
+        "x-organization-id": other.org,
+        "x-org-id": other.org,
+      };
+      const reportResponse = await request(
+        own,
+        "/reports/roi",
+        "GET",
+        undefined,
+        forgedHeaders,
+      );
+      expect(reportResponse.status).toBe(200);
+      expect(reportResponse.headers.get("cache-control")).toBe("no-store");
+      const report = (await reportResponse.json()) as RoiReport;
+      expect(report.leads.total).toBe(1);
+      expect(report.leads.bySource).toEqual([{ key: own.source, count: 1 }]);
+      expect(JSON.stringify(report)).not.toContain(other.source);
       const exported = await request(
         own,
-        `/reports/roi/export?organizationId=${other.org}`,
+        `/reports/roi/export?days=${report.windowDays}&endAt=${encodeURIComponent(report.period.endAt)}`,
+        "GET",
+        undefined,
+        forgedHeaders,
       );
       expect(exported.status).toBe(200);
+      expect(exported.headers.get("cache-control")).toBe("no-store");
       expect(exported.headers.get("content-type")).toContain("text/csv");
       const csv = await exported.text();
+      expect(csv).toContain(`start_at_inclusive,UTC,${report.period.startAt}`);
+      expect(csv).toContain(`end_at_exclusive,UTC,${report.period.endAt}`);
       expect(csv).toContain(own.source);
       expect(csv).not.toContain(other.source);
       expect((await request(own, `/revenue/evidence/${own.lead}`)).status).toBe(
@@ -613,31 +640,27 @@ describe.each([0, 1])(
       const before = await snapshot(other.org);
       const unowned = randomUUID();
       unownedObjects.push(unowned);
-      await db
-        .insert(storedObjectsTable)
-        .values({
-          id: unowned,
-          data: Buffer.from("unowned synthetic bytes"),
-          contentType: "image/png",
-          sizeBytes: 23,
-        });
+      await db.insert(storedObjectsTable).values({
+        id: unowned,
+        data: Buffer.from("unowned synthetic bytes"),
+        contentType: "image/png",
+        sizeBytes: 23,
+      });
       // Model already-persisted legacy or malformed references: fixing only the
       // write handler must not leave these links capable of exposing bytes.
-      await db
-        .insert(activitiesTable)
-        .values({
-          organizationId: own.org,
-          leadId: own.lead,
-          contactId: own.contact,
-          type: "photos_attached",
-          title: "Synthetic legacy invalid references",
-          metadata: {
-            photoPaths: [
-              `/objects/uploads/${other.photo}`,
-              `/objects/uploads/${unowned}`,
-            ],
-          },
-        });
+      await db.insert(activitiesTable).values({
+        organizationId: own.org,
+        leadId: own.lead,
+        contactId: own.contact,
+        type: "photos_attached",
+        title: "Synthetic legacy invalid references",
+        metadata: {
+          photoPaths: [
+            `/objects/uploads/${other.photo}`,
+            `/objects/uploads/${unowned}`,
+          ],
+        },
+      });
       for (const id of [other.photo, unowned]) {
         const staff = await request(own, `/storage/objects/uploads/${id}`);
         expect(staff.status).toBe(404);

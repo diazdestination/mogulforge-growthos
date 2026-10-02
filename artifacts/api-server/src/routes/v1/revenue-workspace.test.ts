@@ -342,7 +342,12 @@ describe("tenant-scoped revenue workspace", () => {
     expect(ledger.netReceiptsCents).toBe(40000);
     expect(ledger.netDirectCostsCents).toBe(17000);
     expect(ledger.recordedContributionCents).toBe(23000);
-    expect(ledger.boundary).toContain("not a bank");
+    expect(ledger.boundary).toContain(
+      "No bank/accounting synchronization or causal ROI",
+    );
+    expect(ledger.boundary).toContain(
+      "missing costs, tax and overhead prevent a profit claim",
+    );
     expect(
       (await call("/revenue/value", { ...input, amountCents: 0 })).status,
     ).toBe(400);
@@ -485,15 +490,13 @@ describe("tenant-scoped revenue workspace", () => {
       (await call(`/bie/actions/${p.id}/approve`, { expectedPayload: payload }))
         .status,
     ).toBe(200);
-    await db
-      .insert(activitiesTable)
-      .values({
-        organizationId: org,
-        leadId: lead,
-        type: "portal_message",
-        title: "LOCAL QA customer reply",
-        createdAt: new Date(Date.now() + 100),
-      });
+    await db.insert(activitiesTable).values({
+      organizationId: org,
+      leadId: lead,
+      type: "portal_message",
+      title: "LOCAL QA customer reply",
+      createdAt: new Date(Date.now() + 100),
+    });
     const result = await executeBieProposal(org, p.id, actor);
     expect(result?.status).toBe("blocked");
     expect(result?.executionDetail).toContain("New customer activity");
