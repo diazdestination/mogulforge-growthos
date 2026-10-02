@@ -17,7 +17,6 @@ import {
   type CaptureEndpoint,
   type CaptureMappingPreview,
 } from '@workspace/api-client-react';
-import { Shell } from '@/components/shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +32,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Copy, Loader2, Plus, Trash2, Webhook } from 'lucide-react';
+import { SmartSitesControl } from '@/components/smart-sites-control';
 
 const TARGET_FIELDS = [
   'firstName',
@@ -151,25 +151,38 @@ export default function Capture() {
     previewMapping.mutate({ data: { mapping, payload } });
   };
 
-  const copy = (text: string, label: string) => {
-    void navigator.clipboard?.writeText(text);
-    toast({ title: `${label} copied` });
+  const copy = async (text: string, label: string) => {
+    try {
+      if (!navigator.clipboard?.writeText)
+        throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(text);
+      toast({ title: `${label} copied` });
+    } catch {
+      toast({
+        title: "Could not copy",
+        description: "Select the text and copy it manually.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
-    <Shell>
       <div className="space-y-6 p-4 md:p-6">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <Webhook className="h-6 w-6" aria-hidden="true" /> Lead Capture
           </h1>
           <p className="text-sm text-muted-foreground">
-            Bring leads in from your existing website forms, Zapier, or any outside
-            system — they flow through the same dedupe, scoring, and follow-up as
-            every other lead.
+            Keep your current website or connect a MogulForge Smart Site.
+            Set up lead delivery, choose who responds, and verify the connection
+            before turning it on.
           </p>
         </div>
 
+        <SmartSitesControl />
+
+        <details className="space-y-5 rounded-xl border p-4">
+          <summary className="cursor-pointer font-medium">Advanced: existing forms & developer APIs</summary>
         <Card>
           <CardHeader>
             <CardTitle>New capture endpoint</CardTitle>
@@ -264,7 +277,7 @@ export default function Capture() {
                 value={testPayload}
                 onChange={(e) => setTestPayload(e.target.value)}
               />
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="secondary"
                   data-testid="button-preview-mapping"
@@ -446,7 +459,7 @@ export default function Capture() {
             </p>
           </CardContent>
         </Card>
+        </details>
       </div>
-    </Shell>
   );
 }

@@ -9,13 +9,21 @@ import {
   usersTable,
 } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
 
 import app from "../../app";
 import { createSession } from "../../lib/auth";
-import { providers } from "../../services/providers";
+import * as providers from "../../services/providers";
 
 /**
  * POST /v1/users/:id/resend-invite must only work for pending invites
@@ -55,10 +63,13 @@ async function sessionFor(user: { id: string }) {
 }
 
 async function resend(userId: string, sid: string) {
-  return fetch(`${baseUrl}/v1/users/${encodeURIComponent(userId)}/resend-invite`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${sid}` },
-  });
+  return fetch(
+    `${baseUrl}/v1/users/${encodeURIComponent(userId)}/resend-invite`,
+    {
+      method: "POST",
+      headers: { authorization: `Bearer ${sid}` },
+    },
+  );
 }
 
 beforeAll(async () => {
@@ -144,11 +155,38 @@ afterAll(async () => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
+
+describe("production invitation delivery gate", () => {
+  it("returns 503 and creates no invite when platform email is unconfigured", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("RESEND_FROM_EMAIL", "");
+    const email = `blocked-invite-${Date.now()}@example.com`;
+
+    const res = await fetch(`${baseUrl}/v1/users/invite`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${adminSid}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ email, role: "viewer" }),
+    });
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({
+      code: "TRANSACTIONAL_EMAIL_NOT_CONFIGURED",
+    });
+    expect(
+      await db.select().from(usersTable).where(eq(usersTable.email, email)),
+    ).toHaveLength(0);
+  });
 });
 
 describe("POST /v1/users/:id/resend-invite", () => {
   it("returns 400 for an already-active (non-invite) member", async () => {
-    const send = vi.spyOn(providers.email, "send");
+    const send = vi.spyOn(providers.transactionalEmailProvider, "send");
     const res = await resend(activeMember.id, adminSid);
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string };
@@ -157,14 +195,14 @@ describe("POST /v1/users/:id/resend-invite", () => {
   });
 
   it("returns 404 for a pending invite from another organization", async () => {
-    const send = vi.spyOn(providers.email, "send");
+    const send = vi.spyOn(providers.transactionalEmailProvider, "send");
     const res = await resend(foreignInvite.id, adminSid);
     expect(res.status).toBe(404);
     expect(send).not.toHaveBeenCalled();
   });
 
   it("returns 403 for a caller without users.manage", async () => {
-    const send = vi.spyOn(providers.email, "send");
+    const send = vi.spyOn(providers.transactionalEmailProvider, "send");
     const res = await resend(pendingInvite.id, repSid);
     expect(res.status).toBe(403);
     expect(send).not.toHaveBeenCalled();
@@ -172,7 +210,7 @@ describe("POST /v1/users/:id/resend-invite", () => {
 
   it("resends to a pending invite and records a user.invite_resent audit event", async () => {
     const send = vi
-      .spyOn(providers.email, "send")
+      .spyOn(providers.transactionalEmailProvider, "send")
       .mockResolvedValue({ id: "x", provider: "mock-email" });
 
     const res = await resend(pendingInvite.id, adminSid);
@@ -196,8 +234,12 @@ describe("POST /v1/users/:id/resend-invite", () => {
     expect(events).toHaveLength(1);
     expect(events[0].actorUserId).toBe(admin.id);
     expect(events[0].entityType).toBe("user");
-    expect((events[0].metadata as Record<string, unknown>).inviteEmailSent).toBe(true);
-    expect((events[0].metadata as Record<string, unknown>).email).toBe(pendingInvite.email);
+    expect(
+      (events[0].metadata as Record<string, unknown>).inviteEmailSent,
+    ).toBe(true);
+    expect((events[0].metadata as Record<string, unknown>).email).toBe(
+      pendingInvite.email,
+    );
   });
 
   it("rejects a rapid repeat resend with 429 and allows again after the cooldown", async () => {
@@ -213,7 +255,7 @@ describe("POST /v1/users/:id/resend-invite", () => {
       .returning();
 
     const send = vi
-      .spyOn(providers.email, "send")
+      .spyOn(providers.transactionalEmailProvider, "send")
       .mockResolvedValue({ id: "x", provider: "mock-email" });
 
     const first = await resend(invite.id, adminSid);
@@ -244,7 +286,9 @@ describe("POST /v1/users/:id/resend-invite", () => {
     await db
       .update(rateLimitCountersTable)
       .set({ resetAt: new Date(Date.now() - 1000) })
-      .where(sql`${rateLimitCountersTable.key} like ${`invite-resend:${org.id}:${invite.id}%`}`);
+      .where(
+        sql`${rateLimitCountersTable.key} like ${`invite-resend:${org.id}:${invite.id}%`}`,
+      );
 
     const third = await resend(invite.id, adminSid);
     expect(third.status).toBe(200);

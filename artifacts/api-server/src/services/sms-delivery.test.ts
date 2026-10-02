@@ -1,19 +1,22 @@
 /**
  * SMS delivery round-trip tests.
  *
- * Verifies the full path: automation trigger → send_sms action →
- * SmsProvider.send() → Twilio HTTP API, using a stubbed fetch so the suite
- * runs without real Twilio credentials. Also covers provider selection
- * (twilio vs mock) which is decided at module load from env.
+ * Verifies the consent-gated Twilio adapter with intercepted HTTP, provider
+ * selection, and the fail-closed boundary that keeps legacy marketing
+ * automations from borrowing the initial customer-care SMS program.
  */
 import {
   automationRunsTable,
   consentRecordsTable,
+  contactsTable,
   db,
   organizationsTable,
   DEFAULT_SENDING_HOURS,
+  twilioClientBindingsTable,
+  twilioConsentProofsTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
@@ -21,16 +24,38 @@ import { updateOrgSettings } from "./settings";
 
 import { createAutomation, runEvent } from "./automation";
 import * as crm from "./crm";
-import { mockSmsProvider, providers, twilioSmsProvider } from "./providers";
+import { providers, twilioSmsProvider } from "./providers";
+import { SMS_DISCLOSURE_VERSION } from "./twilio-controls";
 
-const TWILIO_ENV = {
-  TWILIO_ACCOUNT_SID: "ACtest123",
-  TWILIO_AUTH_TOKEN: "authtokentest",
-  TWILIO_PHONE_NUMBER: "+15559990000",
-};
+const account = `AC${"a".repeat(32)}`;
+const service = `MG${"b".repeat(32)}`;
+const apiKey = `SK${"3".repeat(32)}`;
+const apiSecret = "synthetic-api-key-secret";
+const authToken = "synthetic-webhook-token";
+const sender = "+15005550009";
+const recipient = "+15551234567";
+let org: { id: string };
+let contact: { id: string };
+
+function twilioEnv() {
+  return {
+    APP_ORIGIN: "https://growth.example",
+    TWILIO_CLIENT_SMS_TEST_AUTH_TOKEN: authToken,
+    TWILIO_CLIENT_SMS_TEST_API_KEY_SECRET: apiSecret,
+  };
+}
 
 function stubTwilioEnv() {
-  for (const [k, v] of Object.entries(TWILIO_ENV)) vi.stubEnv(k, v);
+  for (const [k, v] of Object.entries(twilioEnv())) vi.stubEnv(k, v);
+}
+
+function context() {
+  return {
+    organizationId: org.id,
+    contactId: contact.id,
+    purpose: "customer_care" as const,
+    idempotencyKey: randomUUID(),
+  };
 }
 
 /** Stub global fetch to act as the Twilio Messages endpoint. */
@@ -62,34 +87,86 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+beforeAll(async () => {
+  const [createdOrg] = await db
+    .insert(organizationsTable)
+    .values({ name: "SMS Delivery Test Org", slug: `test-sms-${randomUUID()}` })
+    .returning();
+  org = createdOrg;
+  await db.insert(twilioClientBindingsTable).values({
+    organizationId: org.id, accountSid: account, phoneNumber: sender,
+    messagingServiceSid: service, apiKeySid: apiKey,
+    authTokenSecretRef: "TWILIO_CLIENT_SMS_TEST_AUTH_TOKEN",
+    apiKeySecretRef: "TWILIO_CLIENT_SMS_TEST_API_KEY_SECRET",
+    publicOrigin: "https://growth.example", businessName: "Synthetic SMS",
+    smsDisclosureVersion: SMS_DISCLOSURE_VERSION, dailySmsLimit: 20,
+    launchApproved: true, smsEnabled: true, registrationApproved: true,
+    advancedOptOut: true, geoPermissionsReviewed: true,
+  });
+  const [createdContact] = await db
+    .insert(contactsTable)
+    .values({ organizationId: org.id, firstName: "Synthetic", phone: recipient })
+    .returning();
+  contact = createdContact;
+  await db.insert(twilioConsentProofsTable).values({
+    organizationId: org.id,
+    contactId: contact.id,
+    phone: recipient,
+    purpose: "customer_care",
+    granted: true,
+    disclosureVersion: SMS_DISCLOSURE_VERSION,
+    source: "synthetic test proof",
+  });
+  await db.insert(consentRecordsTable).values({
+    organizationId: org.id,
+    contactId: contact.id,
+    channel: "sms",
+    granted: true,
+    disclosureVersion: SMS_DISCLOSURE_VERSION,
+  });
+  await updateOrgSettings(org.id, {
+    sendingHours: { ...DEFAULT_SENDING_HOURS, quietHoursEnabled: false },
+  });
+});
+
+afterAll(async () => {
+  await deleteTestOrgs(org.id);
+});
+
 describe("twilioSmsProvider", () => {
   it("POSTs the correct to/from/body to the Twilio API and returns the SID", async () => {
     stubTwilioEnv();
-    const calls = stubTwilioFetch({ ok: true, json: { sid: "SMabc123" } });
+    const sid = `SM${"a".repeat(32)}`;
+    const calls = stubTwilioFetch({ ok: true, json: { sid } });
 
-    const res = await twilioSmsProvider.send("+15551234567", "Hello homeowner");
+    const res = await twilioSmsProvider.send(recipient, "Hello homeowner", context());
 
-    expect(res).toEqual({ id: "SMabc123", provider: "twilio" });
+    expect(res).toEqual({ id: sid, provider: "twilio" });
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe(
-      "https://api.twilio.com/2010-04-01/Accounts/ACtest123/Messages.json",
+      `https://api.twilio.com/2010-04-01/Accounts/${account}/Messages.json`,
     );
     const init = calls[0].init;
     expect(init.method).toBe("POST");
     const headers = init.headers as Record<string, string>;
     expect(headers.authorization).toBe(
-      `Basic ${Buffer.from("ACtest123:authtokentest").toString("base64")}`,
+      `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString("base64")}`,
     );
     const params = new URLSearchParams(String(init.body));
-    expect(params.get("To")).toBe("+15551234567");
-    expect(params.get("From")).toBe("+15559990000");
-    expect(params.get("Body")).toBe("Hello homeowner");
+    expect(params.get("To")).toBe(recipient);
+    expect(params.get("From")).toBeNull();
+    expect(params.get("MessagingServiceSid")).toBe(service);
+    expect(params.get("Body")).toContain("Hello homeowner");
+    expect(params.get("Body")).toContain("Reply STOP");
+    expect(params.get("StatusCallback")).toMatch(
+      /^https:\/\/growth\.example\/api\/v1\/public\/sms\/status\?operation=/,
+    );
   });
 
   it("throws when Twilio env is missing (never silently pretends to send)", async () => {
     const calls = stubTwilioFetch();
-    await expect(twilioSmsProvider.send("+15551234567", "x")).rejects.toThrow(
-      /not configured/i,
+    await expect(twilioSmsProvider.send(recipient, "x", context())).rejects.toThrow(
+      /disabled/i,
     );
     expect(calls).toHaveLength(0);
   });
@@ -97,7 +174,7 @@ describe("twilioSmsProvider", () => {
   it("throws on a non-OK Twilio response", async () => {
     stubTwilioEnv();
     stubTwilioFetch({ ok: false, status: 401, text: "auth error" });
-    await expect(twilioSmsProvider.send("+15551234567", "x")).rejects.toThrow(
+    await expect(twilioSmsProvider.send(recipient, "x", context())).rejects.toThrow(
       /Twilio send failed: 401/,
     );
   });
@@ -105,49 +182,29 @@ describe("twilioSmsProvider", () => {
   it("throws when Twilio returns no message SID", async () => {
     stubTwilioEnv();
     stubTwilioFetch({ ok: true, json: {} });
-    await expect(twilioSmsProvider.send("+15551234567", "x")).rejects.toThrow(
-      /no message SID/i,
+    await expect(twilioSmsProvider.send(recipient, "x", context())).rejects.toThrow(
+      /no valid message SID/i,
     );
   });
 });
 
 describe("SMS provider selection (module load)", () => {
-  it("selects twilioSmsProvider when all three Twilio secrets are set", async () => {
+  it("routes a configured client through the Twilio guard at send time", async () => {
     stubTwilioEnv();
-    vi.resetModules();
-    const fresh = await import("./providers");
-    expect(fresh.providers.sms).toBe(fresh.twilioSmsProvider);
+    const sid = `SM${"b".repeat(32)}`;
+    const calls = stubTwilioFetch({ ok: true, json: { sid } });
+    expect((await providers.sms.send(recipient, "Configured", context())).provider).toBe("twilio");
+    expect(calls).toHaveLength(1);
   });
 
-  it("falls back to mockSmsProvider when any Twilio secret is missing", async () => {
-    stubTwilioEnv();
-    vi.stubEnv("TWILIO_AUTH_TOKEN", "");
-    vi.resetModules();
-    const fresh = await import("./providers");
-    expect(fresh.providers.sms).toBe(fresh.mockSmsProvider);
+  it("never falls back to mock for a bound client with a missing secret", async () => {
+    const calls = stubTwilioFetch();
+    await expect(providers.sms.send(recipient, "No secret", context())).rejects.toThrow(/disabled/i);
+    expect(calls).toHaveLength(0);
   });
 });
 
 describe("automation → send_sms → Twilio round-trip", () => {
-  let org: { id: string };
-
-  beforeAll(async () => {
-    const [row] = await db
-      .insert(organizationsTable)
-      .values({ name: "SMS Delivery Test Org", slug: `test-sms-${Date.now()}` })
-      .returning();
-    org = row;
-  // These suites run at any wall-clock time: disable the (default-on)
-  // sending window so step execution is deterministic.
-  await updateOrgSettings(org.id, {
-    sendingHours: { ...DEFAULT_SENDING_HOURS, quietHoursEnabled: false },
-  });
-  });
-
-  afterAll(async () => {
-    await deleteTestOrgs(org.id);
-  });
-
   async function makeLead(phone: string, firstName: string) {
     const contact = await crm.createContact(org.id, {
       firstName,
@@ -160,13 +217,13 @@ describe("automation → send_sms → Twilio round-trip", () => {
       contactId: contact.id,
       channel: "sms",
       granted: true,
-      disclosureVersion: "v1",
+      disclosureVersion: SMS_DISCLOSURE_VERSION,
     });
     const lead = await crm.createLead(org.id, { contactId: contact.id });
     return { contact, lead: lead! };
   }
 
-  it("delivers a triggered automation SMS through the Twilio HTTP layer with rendered to/from/body", async () => {
+  it("fails closed for legacy marketing automations without handing anything to Twilio", async () => {
     stubTwilioEnv();
     const calls = stubTwilioFetch({ ok: true, json: { sid: "SMe2e456" } });
 
@@ -186,49 +243,15 @@ describe("automation → send_sms → Twilio round-trip", () => {
       const { lead } = await makeLead("+15557654321", "Rhonda");
       await runEvent(org.id, "lead.created", { leadId: lead.id });
 
-      // The HTTP layer saw exactly one Twilio send with the rendered message.
-      expect(calls).toHaveLength(1);
-      const params = new URLSearchParams(String(calls[0].init.body));
-      expect(params.get("To")).toBe("+15557654321");
-      expect(params.get("From")).toBe("+15559990000");
-      expect(params.get("Body")).toBe("Hi Rhonda, thanks!");
-
-      // The run is recorded as a real twilio delivery, not a mock.
+      expect(calls).toHaveLength(0);
       const runs = await db
         .select()
         .from(automationRunsTable)
         .where(eq(automationRunsTable.automationId, rule.id));
       expect(runs).toHaveLength(1);
-      expect(runs[0].status).toBe("success");
-      expect(runs[0].actionResults[0].status).toBe("success");
-      expect(runs[0].actionResults[0].detail).toBe("twilio:SMe2e456");
-    } finally {
-      providers.sms = original;
-    }
-  });
-
-  it("records a failed run when Twilio rejects the send (no silent success)", async () => {
-    stubTwilioEnv();
-    stubTwilioFetch({ ok: false, status: 500, text: "twilio down" });
-
-    const original = providers.sms;
-    providers.sms = twilioSmsProvider;
-    try {
-      const rule = await createAutomation(org.id, {
-        name: "e2e sms failure",
-        event: "lead.created",
-        actions: [{ type: "send_sms", params: { body: "Hello" } }],
-      });
-      const { lead } = await makeLead("+15550009999", "Fiona");
-      await runEvent(org.id, "lead.created", { leadId: lead.id });
-
-      const runs = await db
-        .select()
-        .from(automationRunsTable)
-        .where(eq(automationRunsTable.automationId, rule.id));
-      expect(runs).toHaveLength(1);
-      expect(runs[0].status).not.toBe("success");
+      expect(runs[0].status).toBe("failed");
       expect(runs[0].actionResults[0].status).toBe("failed");
+      expect(runs[0].actionResults[0].detail).toMatch(/purpose is not enabled/i);
     } finally {
       providers.sms = original;
     }
@@ -236,8 +259,7 @@ describe("automation → send_sms → Twilio round-trip", () => {
 
   it("uses the labeled mock provider (no HTTP) when Twilio is not configured", async () => {
     const calls = stubTwilioFetch();
-    // Default in this test env: providers.sms is the mock.
-    expect(providers.sms).toBe(mockSmsProvider);
+    // Without a tenant context in this local test, the router selects the labeled mock.
     const res = await providers.sms.send("+15551112222", "mock check");
     expect(res.provider).toBe("mock-sms");
     expect(calls).toHaveLength(0);

@@ -1,0 +1,66 @@
+name: growthos-staging-parity
+
+# Production-image acceptance stack. It deliberately gives the application a
+# restricted database role and creates a Fly-like provider-owned pg_stat view.
+# Run through scripts/verify-docker-staging-parity.ps1 instead of directly.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: growthos_parity
+    volumes:
+      - ./scripts/docker-parity-init.sql:/docker-entrypoint-initdb.d/10-provider-owned-monitoring.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d growthos_parity"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  schema:
+    image: mogulforge-growthos-parity:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GROWTHOS_BUILD_SHA: ${GROWTHOS_BUILD_SHA:-}
+    environment:
+      DATABASE_URL: postgresql://growthos_app:growthos-parity-password@db:5432/growthos_parity
+      NODE_ENV: production
+    command:
+      - sh
+      - -lc
+      - cd /app && pnpm --filter @workspace/db run push-force
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    image: mogulforge-growthos-parity:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GROWTHOS_BUILD_SHA: ${GROWTHOS_BUILD_SHA:-}
+    environment:
+      APP_ORIGIN: http://localhost:18080
+      BETA_SIGNUP_ALLOWLIST: parity-owner@example.com
+      DATABASE_URL: postgresql://growthos_app:growthos-parity-password@db:5432/growthos_parity
+      GROWTHOS_ENVIRONMENT: test
+      GROWTHOS_OUTBOUND_HOLD: "true"
+      STAGING_OUTBOUND_APPROVED: "false"
+      STAGING_EMAIL_RECIPIENT_ALLOWLIST: ""
+      SCHEDULER_AUTOSTART: "false"
+      AUTO_MIGRATE: "false"
+      NODE_ENV: production
+      OBJECT_STORAGE_PROVIDER: postgres
+      OAUTH_TOKEN_ENCRYPTION_KEY: AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
+      PORT: 3001
+      SESSION_SECRET: docker-parity-session-secret-that-is-long-enough
+      STATIC_DIR: /app/public
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:18080:3001"

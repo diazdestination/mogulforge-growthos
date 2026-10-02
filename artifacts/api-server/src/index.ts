@@ -1,11 +1,15 @@
-import { db, organizationsTable } from "@workspace/db";
+import { db, pool, organizationsTable } from "@workspace/db";
 import app from "./app";
 import { runAutoMigrate } from "./lib/auto-migrate";
+import { assertStagingDatabaseIdentity } from "./lib/staging-database-identity";
+import { assertRestoreDatabaseIdentity } from "./lib/restore-mode";
 import { logger } from "./lib/logger";
+import { observeDatabasePoolErrors } from "./lib/database-pool-errors";
+import { ensureDefaultAutomations } from "./services/automation";
 import {
-  ensureDefaultAutomations,
   startAutomationScheduler,
-} from "./services/automation";
+  stopAutomationScheduler,
+} from "./services/scheduler";
 import { ensureDefaultServiceAreas, getOrgSettings } from "./services/settings";
 import { ensureInstallation } from "./services/installation";
 import { ensurePlatformAdmins } from "./services/org";
@@ -25,17 +29,28 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 async function main(): Promise<void> {
+  observeDatabasePoolErrors(pool, logger);
+  // The release command guards schema push separately. Check the actual
+  // session here before startup seeding or a stale secret can touch prod data.
+  await assertStagingDatabaseIdentity(pool);
+  const restoreOnly = await assertRestoreDatabaseIdentity(pool);
   // No-op unless AUTO_MIGRATE is set. Awaited before listen so we never serve
   // traffic against a database whose schema hasn't been applied yet.
-  await runAutoMigrate();
+  if (!restoreOnly) await runAutoMigrate();
 
-  app.listen(port, (err) => {
+  const server = app.listen(port, process.env.HOST || "0.0.0.0", (err) => {
     if (err) {
       logger.error({ err }, "Error listening on port");
       process.exit(1);
     }
 
     logger.info({ port }, "Server listening");
+    if (restoreOnly) {
+      logger.info(
+        "Restore-only inspection: scheduler and startup seeding are disabled",
+      );
+      return;
+    }
     startAutomationScheduler();
     // One-time (idempotent) grant: default-org owners become platform admins.
     void ensurePlatformAdmins().catch((err: unknown) =>
@@ -68,6 +83,37 @@ async function main(): Promise<void> {
         "Seeding default automations / service areas failed",
       ),
     );
+  });
+  let shuttingDown = false;
+  const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info("Draining HTTP requests and background work");
+    // Bound shutdown. An interrupted durable receipt remains held for review;
+    // a replacement process must never blindly replay an uncertain effect.
+    const deadline = setTimeout(() => process.exit(1), 25_000);
+    deadline.unref();
+    try {
+      await Promise.all([
+        new Promise<void>((resolve, reject) =>
+          server.close((error) => (error ? reject(error) : resolve())),
+        ),
+        stopAutomationScheduler(),
+      ]);
+      await pool.end();
+      clearTimeout(deadline);
+    } catch {
+      logger.error(
+        "Graceful shutdown did not finish; durable actions may need review",
+      );
+      process.exit(1);
+    }
+  };
+  process.once("SIGTERM", () => {
+    void shutdown();
+  });
+  process.once("SIGINT", () => {
+    void shutdown();
   });
 }
 

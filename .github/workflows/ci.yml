@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Test, typecheck, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mogulforge_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mogulforge_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/mogulforge_test
+      SESSION_SECRET: ci-only-session-secret-that-is-long-enough-for-validation
+      EMAIL_INGESTION_WEBHOOK_SECRET: ci-only-email-intake-signing-secret
+      EMAIL_INTELLIGENCE_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      OAUTH_TOKEN_ENCRYPTION_KEY: AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.3.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Apply test database schema
+        run: pnpm --filter @workspace/db run push-force
+
+      - name: Run all test suites
+        run: pnpm -r --if-present run test
+
+      - name: Verify reusable website delivery adapter
+        run: node --test examples/website-connection/adapter.test.mjs examples/website-connection/operations.test.mjs
+
+      - name: Run TypeScript checks
+        run: pnpm run typecheck
+
+      - name: Build Command Center
+        run: pnpm --filter @workspace/command-center run build
+
+      - name: Build API server
+        run: pnpm --filter @workspace/api-server run build
+
+      - name: Run Docker staging-parity gate
+        shell: pwsh
+        run: ./scripts/verify-docker-staging-parity.ps1

@@ -37,8 +37,10 @@ router.get(
         return;
       }
 
-      const objectFile =
-        await objectStorageService.getObjectEntityFile(objectPath);
+      const objectFile = await objectStorageService.getObjectEntityFile(
+        objectPath,
+        req.member!.organizationId,
+      );
 
       const response = await objectStorageService.downloadObject(objectFile);
 

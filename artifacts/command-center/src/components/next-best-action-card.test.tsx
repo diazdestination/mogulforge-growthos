@@ -89,6 +89,17 @@ function renderCard(handler: (method: string, path: string) => Response | undefi
   return fetchMock;
 }
 
+async function waitForReadyDraft() {
+  await screen.findByTestId('next-best-action-card');
+  // The card mounts before the composer's effect copies the fetched draft into
+  // editable state. Clicking its initially disabled Send button loses the event.
+  await waitFor(() => {
+    expect((screen.getByLabelText('Draft subject') as HTMLInputElement).value).toBe(emailAction.draft.subject);
+    expect((screen.getByLabelText('Draft message') as HTMLTextAreaElement).value).toBe(emailAction.draft.body);
+    expect((screen.getByRole('button', { name: /^send$/i }) as HTMLButtonElement).disabled).toBe(false);
+  });
+}
+
 /** Standard handler: email action, successful feedback + send-email. */
 function happyHandler(getAction: () => unknown) {
   return (method: string, path: string): Response | undefined => {
@@ -114,7 +125,7 @@ describe('NextBestActionCard', () => {
   it('sends the draft unchanged and records "sent" feedback', async () => {
     const fetchMock = renderCard(happyHandler(() => emailAction));
 
-    await screen.findByTestId('next-best-action-card');
+    await waitForReadyDraft();
     fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
 
     await waitFor(() => expect(callsTo(fetchMock, 'POST', SEND_EMAIL_PATH).length).toBe(1));
@@ -132,7 +143,7 @@ describe('NextBestActionCard', () => {
   it('records "edited" feedback and sends the edited body when the rep tweaks the draft', async () => {
     const fetchMock = renderCard(happyHandler(() => emailAction));
 
-    await screen.findByTestId('next-best-action-card');
+    await waitForReadyDraft();
     fireEvent.change(screen.getByLabelText(/draft message/i), {
       target: { value: 'Hi Jane, edited follow-up.' },
     });

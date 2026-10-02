@@ -40,7 +40,7 @@ async function requireSessionUser(
 }
 
 /** Platform super-admin gate (MogulForge operators), distinct from org owner. */
-async function requirePlatformAdmin(
+export async function requirePlatformAdmin(
   req: Request,
   res: Response,
   next: NextFunction,

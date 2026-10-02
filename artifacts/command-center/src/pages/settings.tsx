@@ -1,3 +1,9 @@
+import { SmsDesk } from '@/components/sms-desk';
+import { VoiceDesk } from '@/components/voice-desk';
+import { CustomerEmailSender } from '@/components/customer-email-sender';
+import { LeadAlertRouting } from '@/components/lead-alert-routing';
+import { DataLifecycleInventory } from '@/components/data-lifecycle-inventory';
+import { CustomerLifecycle } from '@/components/customer-lifecycle';
 import { useEffect, useRef, useState } from 'react';
 import {
   useGetMe,
@@ -59,7 +65,6 @@ import {
   type UserRole,
   expireWebhookPreviousSecret as expireWebhookPreviousSecretRequest,
   updateUser as updateUserRequest,
-  resendInvite as resendInviteRequest,
   ApiError,
   type UpdateUserInput,
   type GoogleReviewsConfig,
@@ -95,6 +100,7 @@ import { Redirect } from 'wouter';
 import { Loader2, Settings2, Trash2, Copy, Zap, RefreshCw, Pencil, ShieldAlert } from 'lucide-react';
 import { canManageSettings } from '@/lib/permissions';
 import { toLocalDateInputValue } from '@/lib/date-input';
+import { EmailConnectionsCard } from '@/components/email-connections-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -185,7 +191,7 @@ function BusinessProfileTab() {
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Business name</Label>
-            <Input value={profile.businessName ?? ''} onChange={set('businessName')} placeholder="Painless Roofing & Water Restoration" />
+            <Input value={profile.businessName ?? ''} onChange={set('businessName')} placeholder="MogulForge Home Services" />
           </div>
           <div className="space-y-1.5">
             <Label>Phone</Label>
@@ -219,7 +225,7 @@ function BusinessProfileTab() {
           </div>
           <div className="space-y-1.5">
             <Label>Website URL</Label>
-            <Input value={profile.website ?? ''} onChange={set('website')} placeholder="https://painlessroofing.com" />
+            <Input value={profile.website ?? ''} onChange={set('website')} placeholder="https://example.com" />
           </div>
           <div className="space-y-1.5">
             <Label>Facebook URL</Label>
@@ -685,32 +691,30 @@ function AutomationsTab() {
           <p className="font-medium">
             Automation emails are failing to send
             {emailProvider.provider === 'gmail' && ' through Gmail'}
-            {emailProvider.provider === 'resend' && ' through Resend'}
-            {emailProvider.provider === 'mock' && ' (no provider connected)'}
+            {emailProvider.provider === 'microsoft' && ' through Microsoft 365 / Outlook'}
+            {emailProvider.provider === 'disabled' && ' (check the selected email sender)'}
             .
           </p>
           <p className="mt-1">
             The last {emailProvider.recentSendFailures === 1 ? 'email send attempt' : `${emailProvider.recentSendFailures} email send attempts`} failed
             {emailProvider.lastSendFailureDetail ? <>: <span className="font-mono text-xs">{emailProvider.lastSendFailureDetail}</span></> : ''}
             {'. '}
-            {emailProvider.provider === 'gmail'
-              ? 'The Gmail connection may have expired — reconnect Gmail from the Replit Connectors panel to resume sending.'
-              : 'Check the email provider configuration to resume sending.'}
+            Check the lead owner or company default sender's selected Gmail or Microsoft account in My Profile. Inspect Sent Items before retrying an uncertain send.
           </p>
         </div>
       )}
       {emailProvider && (
         <div
           className={`rounded-md border px-4 py-3 text-sm ${
-            emailProvider.provider === 'mock'
+            emailProvider.provider === 'disabled'
               ? 'border-amber-300 bg-amber-50 text-amber-900'
               : 'border-border bg-muted/50 text-muted-foreground'
           }`}
           data-testid="text-email-provider-note"
         >
-          {emailProvider.provider === 'gmail' && (
+          {(emailProvider.provider === 'gmail' || emailProvider.provider === 'microsoft') && (
             <>
-              Automation emails are sent through Gmail
+              Unassigned customer emails use the company default {emailProvider.provider === 'gmail' ? 'Gmail' : 'Microsoft 365 / Outlook'} account
               {emailProvider.senderEmail ? (
                 <> from <span className="font-medium text-foreground">{emailProvider.senderEmail}</span></>
               ) : (
@@ -719,11 +723,8 @@ function AutomationsTab() {
               .
             </>
           )}
-          {emailProvider.provider === 'resend' && (
-            <>Automation emails are sent via Resend from {emailProvider.senderEmail ?? 'the configured address'}.</>
-          )}
-          {emailProvider.provider === 'mock' && (
-            <>No real email provider is connected — automation emails are only logged, not delivered. Connect Gmail to send real email.</>
+          {emailProvider.provider === 'disabled' && (
+            <>{emailProvider.reason ?? 'No default customer email sender is ready. Choose an active staff member with their selected email account connected below.'}</>
           )}
         </div>
       )}
@@ -747,11 +748,14 @@ function AutomationsTab() {
               .
             </>
           )}
-          {smsProvider.provider === 'mock' && (
-            <>No real SMS provider is connected — automation texts are only logged, not delivered. Set the Twilio credentials to send real texts.</>
-          )}
+          {smsProvider.provider === 'mock' && <p>Local SMS simulation is active. No texts are delivered.</p>}
+          {smsProvider.provider === 'disabled' && <p>SMS delivery is disabled. This organization needs its own approved sender, verified consent and an authorized usage limit.</p>}
+          <p className="mt-2"><a className="underline" href="/sms-preferences.html" target="_blank" rel="noreferrer">MogulForge text preferences</a> · <a className="underline" href="/messaging-terms.html" target="_blank" rel="noreferrer">Messaging terms</a></p>
         </div>
       )}
+      <CustomerEmailSender />
+      <SmsDesk />
+      <VoiceDesk />
       <Card>
         <CardHeader>
           <CardTitle>New automation</CardTitle>
@@ -931,7 +935,7 @@ function WebhooksTab() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-3">
-            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/hooks/painless" />
+            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://example.com/hooks/mogulforge" />
             <Button
               disabled={!url.startsWith('http') || create.isPending}
               onClick={() => create.mutate({ data: { url } }, { onSuccess: () => setUrl('') })}
@@ -1085,6 +1089,7 @@ function TagsTab() {
 
 export default function Settings() {
   const { data: me, isLoading } = useGetMe();
+  const gmailReturn = new URLSearchParams(window.location.search).get('gmail');
 
   if (isLoading) {
     return <div className="flex h-full items-center justify-center bg-background"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -1103,9 +1108,10 @@ export default function Settings() {
         </div>
       </header>
       <div className="flex-1 overflow-auto p-6 max-w-4xl w-full">
-        <Tabs defaultValue="business">
+        <Tabs defaultValue={gmailReturn || new URLSearchParams(window.location.search).get('microsoft') ? 'integrations' : 'business'}>
           <TabsList className="mb-4 flex-wrap h-auto">
             <TabsTrigger value="business">Business</TabsTrigger>
+            <TabsTrigger value="integrations">Connections</TabsTrigger>
             <TabsTrigger value="team">Team</TabsTrigger>
             <TabsTrigger value="services">Services & Areas</TabsTrigger>
             <TabsTrigger value="scheduling">Scheduling</TabsTrigger>
@@ -1120,11 +1126,13 @@ export default function Settings() {
             <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
             <TabsTrigger value="tags">Tags</TabsTrigger>
             <TabsTrigger value="reviews">Google Reviews</TabsTrigger>
+            <TabsTrigger value="data-privacy">Data & privacy</TabsTrigger>
           </TabsList>
           <TabsContent value="business" className="space-y-6"><BusinessProfileTab /><FallbackInboxTab /></TabsContent>
+          <TabsContent value="integrations"><EmailConnectionsCard callbackState={gmailReturn} returnPath="/settings" /></TabsContent>
           <TabsContent value="team"><TeamTab meId={me.id} meRole={me.role} /></TabsContent>
           <TabsContent value="services"><ServicesTab /></TabsContent>
-          <TabsContent value="scheduling" className="space-y-6"><SchedulingTab /><ReminderTab /></TabsContent>
+          <TabsContent value="scheduling" className="space-y-6"><SchedulingTab /><ReminderTab /><LeadAlertRouting /></TabsContent>
           <TabsContent value="scoring"><ScoringTab /></TabsContent>
           <TabsContent value="ai"><AiTab /></TabsContent>
           <TabsContent value="automations" className="space-y-6"><AutomationsTab /><SendingHoursTab /></TabsContent>
@@ -1136,6 +1144,10 @@ export default function Settings() {
           <TabsContent value="knowledge"><KnowledgeTab /></TabsContent>
           <TabsContent value="tags"><TagsTab /></TabsContent>
           <TabsContent value="reviews"><GoogleReviewsTab /></TabsContent>
+          <TabsContent value="data-privacy">{me.organization
+            ? <div className="space-y-6"><CustomerLifecycle accountKey={`${me.id}:${me.organization.id}`} /><DataLifecycleInventory accountKey={`${me.id}:${me.organization.id}`} /></div>
+            : <p className="text-sm text-muted-foreground">A company membership is required to check a data inventory.</p>}
+          </TabsContent>
         </Tabs>
       </div>
     </div>
@@ -1334,46 +1346,19 @@ function resendCooldownSeconds(error: unknown): number | null {
 
 function showResendCooldownToast(seconds: number) {
   globalToast({
-    title: 'Invite was just resent',
+    title: 'Resend is temporarily limited',
     description:
       seconds > 1
-        ? `To avoid spamming their inbox, you can resend again in about ${seconds} seconds.`
-        : 'To avoid spamming their inbox, you can resend again in a moment.',
+        ? `Wait about ${seconds} seconds, then check the previous email's delivery status before another attempt.`
+        : "Check the previous email's delivery status before another attempt.",
   });
 }
 
-function showResendInviteFailedToast(userId: string, queryClient: QueryClient, error?: string) {
-  const { dismiss } = globalToast({
+function showResendInviteUnconfirmedToast() {
+  globalToast({
     variant: 'destructive',
-    title: 'Could not re-send the invite email',
-    description: `${error || 'Re-sending the invite failed'}. Retry below.`,
-    action: (
-      <ToastAction
-        altText="Retry re-sending the invite"
-        onClick={async () => {
-          try {
-            const result = await resendInviteRequest(userId);
-            if (result.sent) {
-              queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
-              dismiss();
-              globalToast({ title: 'Invite email re-sent' });
-            } else {
-              showResendInviteFailedToast(userId, queryClient, result.error || undefined);
-            }
-          } catch (e) {
-            const cooldown = resendCooldownSeconds(e);
-            if (cooldown !== null) {
-              dismiss();
-              showResendCooldownToast(cooldown);
-            } else {
-              showResendInviteFailedToast(userId, queryClient);
-            }
-          }
-        }}
-      >
-        Retry
-      </ToastAction>
-    ),
+    title: 'Invite email outcome unconfirmed',
+    description: 'The email may already have been accepted. Ask an administrator to check provider delivery records before sending another invitation.',
   });
 }
 
@@ -1386,17 +1371,17 @@ function TeamTab({ meId, meRole }: { meId: string; meRole: UserRole }) {
     mutation: {
       onSuccess: (member) => {
         void invalidate();
-        if (member.inviteEmail?.sent) {
-          toast({ title: 'Invite sent — we emailed them a sign-in link' });
+        if (member.inviteEmail?.sent === true) {
+          toast({ title: 'Invitation email accepted for sending', description: 'Inbox delivery is not yet confirmed.' });
         } else {
           toast({
-            title: 'Invite created, but the email failed to send',
-            description: `${member.inviteEmail?.error || 'Email could not be delivered'}. Ask them to sign in with their email address.`,
+            title: 'Invite created; email outcome unconfirmed',
+            description: 'The email may already have been accepted. Check provider delivery records before sending another invitation.',
             variant: 'destructive',
           });
         }
       },
-      onError: (e) => toast({ title: (e as Error)?.message || 'Could not invite member', variant: 'destructive' }),
+      onError: () => toast({ title: 'Invitation request unconfirmed', description: 'Check the team list and provider delivery records before another attempt.', variant: 'destructive' }),
     },
   });
   const update = useUpdateUser({
@@ -1408,19 +1393,19 @@ function TeamTab({ meId, meRole }: { meId: string; meRole: UserRole }) {
   const [resendingId, setResendingId] = useState<string | null>(null);
   const resend = useResendInvite({
     mutation: {
-      onSuccess: (result, vars) => {
-        if (result.sent) {
-          toast({ title: 'Invite email re-sent' });
+      onSuccess: (result) => {
+        if (result.sent === true) {
+          toast({ title: 'Invitation email accepted for sending', description: 'Inbox delivery is not yet confirmed.' });
         } else {
-          showResendInviteFailedToast(vars.id, queryClient, result.error || undefined);
+          showResendInviteUnconfirmedToast();
         }
       },
-      onError: (e, vars) => {
+      onError: (e) => {
         const cooldown = resendCooldownSeconds(e);
         if (cooldown !== null) {
           showResendCooldownToast(cooldown);
         } else {
-          showResendInviteFailedToast(vars.id, queryClient);
+          showResendInviteUnconfirmedToast();
         }
       },
       onSettled: () => setResendingId(null),

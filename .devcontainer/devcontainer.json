@@ -1,5 +1,5 @@
 {
-  "name": "Painless CRM Template",
+  "name": "MogulForge GrowthOS",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
   "postCreateCommand": "bash scripts/install-sync-workflow.sh",
   "customizations": {

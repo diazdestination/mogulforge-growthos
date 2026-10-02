@@ -105,6 +105,23 @@ export function mockApi(role: string, options: MockApiOptions = {}) {
       }
       return json({ ...sampleMe(role), ...options.me });
     }
+    if (path.endsWith('/api/v1/communications/sms')) {
+      return json({
+        enabled: false,
+        inbound: [],
+        outbound: [],
+        usage: {
+          operations: 0,
+          limit: 0,
+          warning: false,
+          uncertain: 0,
+          failed: 0,
+        },
+      });
+    }
+    if (path.endsWith('/api/v1/communications/voice')) {
+      return json({ enabled: false, calls: [] });
+    }
     if (path.endsWith('/api/v1/contacts')) return json([sampleContact]);
     if (path.endsWith('/api/v1/tasks')) return json([sampleTask]);
     if (path.endsWith('/api/v1/appointments')) return json([sampleAppointment]);

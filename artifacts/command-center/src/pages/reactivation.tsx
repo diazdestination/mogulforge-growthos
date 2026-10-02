@@ -71,6 +71,15 @@ const IMPORT_FIELDS: { key: string; label: string; hint?: string }[] = [
   { key: 'source', label: 'Source' },
   { key: 'serviceType', label: 'Service type' },
   { key: 'notes', label: 'Notes' },
+  { key: 'externalOpportunityId', label: 'Opportunity / job ID', hint: 'stable ID, not customer ID' },
+  { key: 'externalCustomerId', label: 'Customer ID' },
+  { key: 'externalEstimateId', label: 'Estimate ID' },
+  { key: 'originalCreatedAt', label: 'Original opportunity date', hint: 'YYYY-MM-DD or ISO timestamp' },
+  { key: 'sourceUpdatedAt', label: 'Source updated date', hint: 'required for changed reimports' },
+  { key: 'statusChangedAt', label: 'Status changed date' },
+  { key: 'lastContactAt', label: 'Last actual customer contact' },
+  { key: 'estimatedValue', label: 'Estimate amount', hint: 'USD dollars; blank means unknown' },
+  { key: 'currency', label: 'Currency', hint: 'USD required with an amount' },
 ];
 
 /** Header-name heuristics for auto-mapping columns. */
@@ -79,10 +88,19 @@ const AUTO_MAP: Record<string, RegExp> = {
   lastName: /last|lname|surname/i,
   email: /e-?mail/i,
   phone: /phone|mobile|cell/i,
-  status: /status|stage/i,
-  source: /source|origin|channel/i,
-  serviceType: /service|job|work/i,
+  status: /^(?:lead[ _-]?)?status$|^stage$/i,
+  source: /^(?:lead[ _-]?)?source$|^origin$|^channel$/i,
+  serviceType: /^(?:service|job|work)[ _-]?type$/i,
   notes: /note|comment|summary|description/i,
+  externalOpportunityId: /^(?:external[ _-]?)?(?:opportunity|job)[ _-]?id$/i,
+  externalCustomerId: /^(?:external[ _-]?)?customer[ _-]?id$/i,
+  externalEstimateId: /^(?:external[ _-]?)?estimate[ _-]?id$/i,
+  originalCreatedAt: /^original[ _-]?(?:created[ _-]?at|opportunity[ _-]?date)$/i,
+  sourceUpdatedAt: /^source[ _-]?updated[ _-]?(?:at|date)$/i,
+  statusChangedAt: /^status[ _-]?changed[ _-]?(?:at|date)$/i,
+  lastContactAt: /^last[ _-]?contact[ _-]?(?:at|date)$/i,
+  estimatedValue: /^estimate[ _-]?(?:amount|value)$|^estimated[ _-]?value$/i,
+  currency: /^currency$/i,
 };
 
 function parseHeaderLine(csv: string): string[] {
@@ -91,7 +109,7 @@ function parseHeaderLine(csv: string): string[] {
   return line.split(',').map((h) => h.replace(/^"|"$/g, '').trim());
 }
 
-function ImportCard() {
+export function ImportCard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -100,13 +118,15 @@ function ImportCard() {
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<string, number>>({});
   const [defaultStatus, setDefaultStatus] = useState('nurture');
+  const [sourceKey, setSourceKey] = useState('');
+  const [snapshotAsOf, setSnapshotAsOf] = useState('');
   const { data: imports } = useListLeadImports();
   const importMutation = useImportLeadsCsv({
     mutation: {
       onSuccess: (result) => {
         toast({
           title: 'Import finished',
-          description: `${result.imported} imported, ${result.duplicates} duplicates skipped, ${result.skipped} invalid${result.suppressed ? `, ${result.suppressed} on the do-not-send list` : ''}.`,
+          description: `${result.imported} added, ${result.updated} updated, ${result.duplicates} unchanged, ${result.conflicts} need review, ${result.skipped} invalid${result.suppressed ? `, ${result.suppressed} on the do-not-send list` : ''}.`,
         });
         setCsv(null);
         setFileName(null);
@@ -127,7 +147,16 @@ function ImportCard() {
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
-    const text = await file.text();
+    if (file.size > 5_000_000) {
+      toast({ title: 'File is too large', description: 'Choose a CSV smaller than 5 MB.', variant: 'destructive' });
+      return;
+    }
+    let text: string;
+    try { text = await file.text(); }
+    catch {
+      toast({ title: 'File could not be read', description: 'Choose the file again. Your current mapping has been kept.', variant: 'destructive' });
+      return;
+    }
     const hs = parseHeaderLine(text);
     const auto: Record<string, number> = {};
     for (const f of IMPORT_FIELDS) {
@@ -143,67 +172,65 @@ function ImportCard() {
   const canImport =
     csv !== null &&
     mapping.firstName !== undefined &&
-    (mapping.email !== undefined || mapping.phone !== undefined);
+    (mapping.email !== undefined || mapping.phone !== undefined) &&
+    (mapping.externalOpportunityId === undefined || /^[a-z0-9][a-z0-9._-]{0,99}$/.test(sourceKey));
+
+  const mappingControl = (f: (typeof IMPORT_FIELDS)[number]) => (
+    <div key={f.key} className="min-w-0 space-y-1">
+      <Label htmlFor={`map-${f.key}`}>
+        {f.label}
+        {f.hint && <span className="ml-1 font-normal text-muted-foreground">({f.hint})</span>}
+      </Label>
+      <Select value={mapping[f.key] !== undefined ? String(mapping[f.key]) : 'none'} disabled={importMutation.isPending}
+        onValueChange={(v) => setMapping((m) => {
+          const next = { ...m };
+          if (v === 'none') delete next[f.key];
+          else next[f.key] = Number(v);
+          return next;
+        })}>
+        <SelectTrigger id={`map-${f.key}`} aria-label={`Column for ${f.label}`} className="min-w-0">
+          <SelectValue placeholder="Not mapped" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">Not mapped</SelectItem>
+          {headers.map((h, i) => <SelectItem key={`${h}-${i}`} value={String(i)}>{h || `Column ${i + 1}`}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileUp className="h-5 w-5" aria-hidden="true" />
-          Import old leads (CSV)
+          Import opportunity history (CSV)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Bring in an approved export for analysis and staff tasks. A CSV is a snapshot, not live sync.
+          Imported opportunities remain blocked from automated outreach until current source verification is supported.
+        </p>
         <div className="flex flex-wrap items-center gap-3">
           <Input
             ref={fileRef}
             type="file"
             accept=".csv,text/csv"
+            disabled={importMutation.isPending}
             aria-label="Choose a CSV file"
             className="max-w-xs"
             onChange={(e) => onFile(e.target.files?.[0])}
           />
-          {fileName && <Badge variant="secondary">{fileName}</Badge>}
+          {fileName && <Badge variant="outline" className="max-w-full whitespace-normal break-all">{fileName}</Badge>}
         </div>
         {csv !== null && (
           <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {IMPORT_FIELDS.map((f) => (
-                <div key={f.key} className="space-y-1">
-                  <Label htmlFor={`map-${f.key}`}>
-                    {f.label}
-                    {f.hint && (
-                      <span className="ml-1 text-xs text-muted-foreground">({f.hint})</span>
-                    )}
-                  </Label>
-                  <Select
-                    value={mapping[f.key] !== undefined ? String(mapping[f.key]) : 'none'}
-                    onValueChange={(v) =>
-                      setMapping((m) => {
-                        const next = { ...m };
-                        if (v === 'none') delete next[f.key];
-                        else next[f.key] = Number(v);
-                        return next;
-                      })
-                    }
-                  >
-                    <SelectTrigger id={`map-${f.key}`} aria-label={`Column for ${f.label}`}>
-                      <SelectValue placeholder="Not mapped" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Not mapped</SelectItem>
-                      {headers.map((h, i) => (
-                        <SelectItem key={`${h}-${i}`} value={String(i)}>
-                          {h || `Column ${i + 1}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
+              {IMPORT_FIELDS.slice(0, 8).map(mappingControl)}
               <div className="space-y-1">
                 <Label htmlFor="import-default-status">Default status</Label>
-                <Select value={defaultStatus} onValueChange={setDefaultStatus}>
+                <Select value={defaultStatus} onValueChange={setDefaultStatus} disabled={importMutation.isPending}>
                   <SelectTrigger id="import-default-status" aria-label="Default lead status">
                     <SelectValue />
                   </SelectTrigger>
@@ -216,7 +243,34 @@ function ImportCard() {
                 </Select>
               </div>
             </div>
+            <details className="space-y-3" open={mapping.externalOpportunityId !== undefined || undefined}>
+              <summary className="cursor-pointer font-medium">Source identity, dates and estimate value</summary>
+              <p className="text-sm text-muted-foreground">
+                Map an opportunity or job ID to keep repeat jobs for the same customer separate.
+                Without it, existing contacts are skipped. Changed reimports need a newer source updated date;
+                conflicting history or staff edits are held for review. Leave unknown dates and amounts blank.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="import-source-key">Source account key</Label>
+                  <Input id="import-source-key" value={sourceKey} disabled={importMutation.isPending}
+                    placeholder="e.g. housecallpro-main" maxLength={100}
+                    onChange={(event) => setSourceKey(event.target.value.trim())}
+                    aria-describedby="import-source-key-help" />
+                  <p id="import-source-key-help" className="text-sm text-muted-foreground">Use the same lowercase key for each export from this account.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="import-snapshot-date">Export snapshot date, if known</Label>
+                  <Input id="import-snapshot-date" value={snapshotAsOf} disabled={importMutation.isPending}
+                    placeholder="YYYY-MM-DD or ISO timestamp" onChange={(event) => setSnapshotAsOf(event.target.value)}
+                    aria-describedby="import-snapshot-help" />
+                  <p id="import-snapshot-help" className="text-sm text-muted-foreground">When the export was captured. Upload time does not establish freshness.</p>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{IMPORT_FIELDS.slice(8).map(mappingControl)}</div>
+            </details>
             <Button
+              className="dark:text-slate-950"
               disabled={!canImport || importMutation.isPending}
               onClick={() =>
                 importMutation.mutate({
@@ -225,6 +279,8 @@ function ImportCard() {
                     mapping,
                     fileName: fileName ?? undefined,
                     defaultStatus,
+                    sourceKey: sourceKey || undefined,
+                    snapshotAsOf: snapshotAsOf.trim() || undefined,
                   },
                 })
               }
@@ -234,11 +290,11 @@ function ImportCard() {
               ) : (
                 <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
               )}
-              Import leads
+              Import opportunities
             </Button>
             {!canImport && (
               <p className="text-sm text-muted-foreground">
-                Map at least First name plus an Email or Phone column.
+                Map First name plus Email or Phone. When mapping an opportunity ID, provide a stable source account key.
               </p>
             )}
           </>
@@ -247,10 +303,11 @@ function ImportCard() {
           <div className="space-y-1 text-sm text-muted-foreground">
             <p className="font-medium text-foreground">Recent imports</p>
             {imports.slice(0, 3).map((imp) => (
-              <p key={imp.id}>
-                {imp.fileName ?? 'CSV'} — {imp.imported} imported, {imp.duplicates} duplicates,{' '}
-                {imp.skipped} skipped
-              </p>
+              <div key={imp.id} className="space-y-1 break-words">
+                <p>{imp.fileName ?? 'CSV'} — {imp.imported} added, {imp.updated} updated, {imp.duplicates} unchanged, {imp.conflicts} need review, {imp.skipped} invalid</p>
+                <p>Source: {imp.sourceKey ?? 'not specified'} · Snapshot: {imp.snapshotAsOf ? new Date(imp.snapshotAsOf).toLocaleString() : 'unknown'} · Uploaded: {new Date(imp.createdAt).toLocaleString()}</p>
+                {imp.errors.length > 0 && <details><summary className="cursor-pointer text-foreground">Review row issues</summary><ul className="list-disc space-y-1 pl-5">{imp.errors.map((error, index) => <li key={index}>{error}</li>)}</ul></details>}
+              </div>
             ))}
           </div>
         )}

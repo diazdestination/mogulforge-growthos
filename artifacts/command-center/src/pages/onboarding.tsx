@@ -112,21 +112,26 @@ export default function Onboarding() {
     mutation: {
       onSuccess: (member) => {
         const email = member.email ?? inviteEmail;
+        if (member.inviteEmail?.sent !== true) {
+          toast({
+            title: 'Invite created; email outcome unconfirmed',
+            description: 'The email may already have been accepted. Check provider delivery records before sending another invitation.',
+            variant: 'destructive',
+          });
+          return;
+        }
         setInvitedEmails((prev) => [...prev, email]);
         setInviteEmail('');
         update.mutate({ data: { completeSteps: ['invite-team'] } });
         toast({
-          title: 'Invite sent',
-          description: member.inviteEmail?.sent === false
-            ? `${email} was added but the invite email could not be delivered.`
-            : `${email} will receive a sign-in link shortly.`,
+          title: 'Invitation email accepted for sending',
+          description: 'Inbox delivery is not yet confirmed.',
         });
       },
-      onError: (err: unknown) => {
-        const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      onError: () => {
         toast({
-          title: 'Could not send invite',
-          description: msg ?? 'Please check the email address and try again.',
+          title: 'Invitation request unconfirmed',
+          description: 'Check the team list and provider delivery records before another attempt.',
           variant: 'destructive',
         });
       },

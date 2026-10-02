@@ -4,8 +4,11 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { requireMember } from "../../middlewares/requireMember";
 import { recordAudit } from "../../services/audit";
 import * as crm from "../../services/crm";
+import { z } from "zod";
+import { contractorMutation, contractorScheduleError } from "../../middlewares/contractor-mutation";
 
 const router: IRouter = Router();
+router.use(["/projects", "/projects/:id"], contractorMutation);
 
 router.get(
   "/projects",
@@ -78,7 +81,7 @@ router.patch(
   "/projects/:id",
   requireMember("crm.write"),
   async (req: Request, res: Response): Promise<void> => {
-    const parsed = UpdateProjectBody.safeParse(req.body);
+    const parsed = UpdateProjectBody.extend({ expectedUpdatedAt: z.iso.datetime().optional() }).safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid project update" });
       return;
@@ -120,6 +123,10 @@ router.delete(
       req.member!.organizationId,
       String(req.params.id),
     );
+    if (deleted === crm.INVOICE_HISTORY_RETAINED) {
+      res.status(409).json({ error: "This job is referenced by retained invoice history and cannot be deleted.", code: deleted });
+      return;
+    }
     if (!deleted) {
       res.status(404).json({ error: "Project not found" });
       return;
@@ -135,4 +142,5 @@ router.delete(
   },
 );
 
+router.use(contractorScheduleError);
 export default router;

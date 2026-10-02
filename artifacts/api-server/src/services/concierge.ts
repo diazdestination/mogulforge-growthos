@@ -48,6 +48,7 @@ import { stopEnrollmentsForLead } from "./playbooks";
 import { recordLeadOutcome } from "./playbook-learning";
 import { buildKnowledgeFacts, findKnowledgeAnswer } from "./knowledge";
 import { isSafeMailbox, mockAiProvider, openAiProvider, providers, type AiProvider } from "./providers";
+import { emailAcceptanceEvidence } from "./user-email";
 import { getAiInstructions, getConciergeSettings, getInspectionAvailability, getLeadScoring, getOrgSettings } from "./settings";
 
 /** Concierge-scoped provider selection: real OpenAI when a key is present. */
@@ -57,7 +58,7 @@ function conciergeAi(): AiProvider {
 
 export const CONCIERGE_DISCLOSURE_VERSION = "concierge-v1-2026-08";
 
-/** Effective org concierge config (defaults = original Painless behavior). */
+/** Effective organization concierge config. */
 export type ConciergeConfig = Required<ConciergeSettings>;
 
 /** Intent catalog as a key-indexed map for a config. */
@@ -1130,7 +1131,7 @@ async function sendBookingConfirmation(
 
   let channel: "email" | "sms";
   let to: string;
-  let providerResult: { id: string; provider: string };
+  let providerResult: { id: string | null; provider: string; providerRequestId?: string | null; clientRequestId?: string };
   if (useEmail) {
     channel = "email";
     to = state.email!;
@@ -1138,6 +1139,7 @@ async function sendBookingConfirmation(
       to,
       `Your inspection is confirmed — ${windowLabel}`,
       bodyLines.join("\n"),
+      { organizationId, leadId: state.leadId },
     );
   } else if (state.phone) {
     channel = "sms";
@@ -1145,6 +1147,7 @@ async function sendBookingConfirmation(
     providerResult = await providers.sms.send(
       to,
       `${businessName}: your inspection is confirmed for ${windowLabel} at ${address}. ${reschedule}`,
+      { organizationId, contactId: state.contactId!, purpose: 'appointments', idempotencyKey: `appointment:${state.appointmentId}:confirmation` },
     );
   } else if (emailOk) {
     channel = "email";
@@ -1153,6 +1156,7 @@ async function sendBookingConfirmation(
       to,
       `Your inspection is confirmed — ${windowLabel}`,
       bodyLines.join("\n"),
+      { organizationId, leadId: state.leadId },
     );
   } else {
     return null;
@@ -1171,8 +1175,7 @@ async function sendBookingConfirmation(
         appointmentId: state.appointmentId,
         channel,
         to,
-        provider: providerResult.provider,
-        providerMessageId: providerResult.id,
+        ...(channel === "email" ? emailAcceptanceEvidence(providerResult, { organizationId, leadId: state.leadId, recipientEmail: to }) : { provider: providerResult.provider, providerMessageId: providerResult.id }),
         mock: providerResult.provider.startsWith("mock"),
       },
     });

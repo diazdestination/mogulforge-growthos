@@ -7,75 +7,154 @@
  */
 import {
   activitiesTable,
+  auditEventsTable,
   contactsTable,
   db,
   leadsTable,
   playbookTouchesTable,
+  suppressionsTable,
   type PlaybookTouch,
   type SuppressionReason,
 } from "@workspace/db";
-import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 
 import { recordAudit } from "./audit";
-import { addSuppression, type SendChannel } from "./send-gate";
+import {
+  addSuppression,
+  normalizeAddress,
+  type SendChannel,
+} from "./send-gate";
 
-export type DeliverySignal = "delivered" | "bounced" | "unsubscribed";
+export type DeliverySignal =
+  "delivered" | "bounced" | "unsubscribed" | "delayed" | "failed";
+
+type ProviderDeliveryCorrelation = {
+  providerMessageId: string;
+  address: string;
+} & (
+  | { provider: "resend"; channel: "email"; organizationId?: string }
+  | { provider: "twilio"; channel: "sms"; organizationId: string }
+);
+
+type DeliveryDatabase = Pick<typeof db, "select" | "update" | "insert">;
+
+/**
+ * A provider ID alone is not tenant authority. Bind it to exactly one touch,
+ * the expected provider/channel, same-tenant lead/contact, and recipient.
+ * Resend cannot choose an organization using an untrusted payload address.
+ * Ambiguous IDs and changed/deleted contact addresses require reconciliation.
+ */
+async function findCorrelatedTouch(
+  tx: DeliveryDatabase,
+  input: ProviderDeliveryCorrelation,
+) {
+  if (!input.providerMessageId || !input.address) return null;
+  const candidates = await tx
+    .select({ touch: playbookTouchesTable, contact: contactsTable })
+    .from(playbookTouchesTable)
+    .innerJoin(
+      leadsTable,
+      and(
+        eq(leadsTable.id, playbookTouchesTable.leadId),
+        eq(leadsTable.organizationId, playbookTouchesTable.organizationId),
+      ),
+    )
+    .innerJoin(
+      contactsTable,
+      and(
+        eq(contactsTable.id, leadsTable.contactId),
+        eq(contactsTable.organizationId, playbookTouchesTable.organizationId),
+      ),
+    )
+    .where(
+      and(
+        eq(playbookTouchesTable.providerMessageId, input.providerMessageId),
+        eq(playbookTouchesTable.provider, input.provider),
+        eq(playbookTouchesTable.channel, input.channel),
+        input.organizationId
+          ? eq(playbookTouchesTable.organizationId, input.organizationId)
+          : undefined,
+      ),
+    )
+    .limit(2)
+    .for("update");
+  if (candidates.length !== 1) return null;
+  const candidate = candidates[0];
+  const currentAddress =
+    input.channel === "email"
+      ? candidate.contact.email
+      : candidate.contact.phone;
+  if (
+    !currentAddress ||
+    normalizeAddress(input.channel, currentAddress) !==
+      normalizeAddress(input.channel, input.address)
+  )
+    return null;
+  return candidate;
+}
 
 function channelNoun(channel: SendChannel): string {
   return channel === "email" ? "email" : "text";
 }
 
 /**
- * Update one touch's delivery column from a provider webhook, correlated by
- * provider message id. "delivered" never overwrites a bounce/unsubscribe;
- * bounce/unsubscribe overwrite anything. Adds a lead-timeline activity for
- * bounces and unsubscribes (delivered stays quiet — it's the happy path).
- * Returns the touch (with org/lead context) or null when no touch matches.
+ * Persist a monotonic delivery transition and its timeline evidence together.
+ * Temporary failures can recover to delivered; permanent bounce and complaint
+ * states cannot be overwritten by a late delivery. Replays are no-ops.
  */
-export async function recordTouchDelivery(input: {
-  providerMessageId: string;
-  signal: DeliverySignal;
-  detail?: string;
-}): Promise<PlaybookTouch | null> {
+async function applyTouchDelivery(
+  tx: DeliveryDatabase,
+  existing: PlaybookTouch,
+  input: { providerMessageId: string; signal: DeliverySignal; detail?: string },
+): Promise<PlaybookTouch> {
   const { providerMessageId, signal, detail } = input;
-  if (!providerMessageId) return null;
-  const now = new Date();
-  const guard =
-    signal === "delivered"
-      ? // delivered only fills an empty slot
-        isNull(playbookTouchesTable.delivery)
-      : // bounce/unsubscribe always win
+  const priorStates: Record<DeliverySignal, string[]> = {
+    delivered: ["delayed", "failed"],
+    delayed: [],
+    failed: ["delayed"],
+    bounced: ["delivered", "delayed", "failed"],
+    unsubscribed: ["delivered", "delayed", "failed", "bounced"],
+  };
+  const [touch] = await tx
+    .update(playbookTouchesTable)
+    .set({ delivery: signal, deliveryAt: new Date() })
+    .where(
+      and(
+        eq(playbookTouchesTable.id, existing.id),
+        eq(playbookTouchesTable.organizationId, existing.organizationId),
         or(
           isNull(playbookTouchesTable.delivery),
-          eq(playbookTouchesTable.delivery, "delivered"),
-        );
-  const [touch] = await db
-    .update(playbookTouchesTable)
-    .set({ delivery: signal, deliveryAt: now })
-    .where(
-      and(eq(playbookTouchesTable.providerMessageId, providerMessageId), guard),
+          inArray(playbookTouchesTable.delivery, priorStates[signal]),
+        ),
+      ),
     )
     .returning();
-  if (!touch) {
-    // Either no touch with this id, or the update was a no-op (already in a
-    // terminal state) — fetch for context so callers can still suppress.
-    const [existing] = await db
-      .select()
-      .from(playbookTouchesTable)
-      .where(eq(playbookTouchesTable.providerMessageId, providerMessageId));
-    return existing ?? null;
-  }
+  if (!touch) return existing;
 
   if (signal !== "delivered") {
     const channel = touch.channel as SendChannel;
-    await db.insert(activitiesTable).values({
+    const activity = {
+      bounced: {
+        type: "message_bounced",
+        title: `Outreach ${channelNoun(channel)} bounced`,
+      },
+      unsubscribed: {
+        type: "message_unsubscribed",
+        title: `Recipient unsubscribed from automated ${channelNoun(channel)}s`,
+      },
+      delayed: {
+        type: "message_delivery_delayed",
+        title: `Outreach ${channelNoun(channel)} delivery delayed`,
+      },
+      failed: {
+        type: "message_delivery_failed",
+        title: `Outreach ${channelNoun(channel)} delivery needs review`,
+      },
+    }[signal];
+    await tx.insert(activitiesTable).values({
       organizationId: touch.organizationId,
       leadId: touch.leadId,
-      type: signal === "bounced" ? "message_bounced" : "message_unsubscribed",
-      title:
-        signal === "bounced"
-          ? `Outreach ${channelNoun(channel)} bounced`
-          : `Recipient unsubscribed from automated ${channelNoun(channel)}s`,
+      ...activity,
       metadata: {
         channel,
         provider: touch.provider,
@@ -86,6 +165,18 @@ export async function recordTouchDelivery(input: {
     });
   }
   return touch;
+}
+
+export async function recordTouchDelivery(
+  input: ProviderDeliveryCorrelation & {
+    signal: DeliverySignal;
+    detail?: string;
+  },
+): Promise<PlaybookTouch | null> {
+  return db.transaction(async (tx) => {
+    const match = await findCorrelatedTouch(tx, input);
+    return match ? applyTouchDelivery(tx, match.touch, input) : null;
+  });
 }
 
 /**
@@ -207,65 +298,70 @@ export async function recordContactOptOut(input: {
 }
 
 /**
- * Handle a bounce-class webhook for a touch: mark the touch, then flip the
- * per-channel DNC flag + suppression for the lead's contact. When no touch
- * matches (e.g. non-playbook send), falls back to suppressing every contact
- * matching the address — same cross-org matching the STOP flow uses.
+ * Persist a permanent failure/complaint and its tenant-scoped suppression in
+ * one transaction. Errors must propagate so the provider retries; never ACK a
+ * partially saved suppression. Unknown IDs do not authorize address lookups.
  */
-export async function handleBounce(input: {
-  providerMessageId: string;
-  channel: SendChannel;
-  address?: string | null;
-  reason: SuppressionReason;
-  source: string;
-  detail?: string;
-}): Promise<void> {
-  const touch = await recordTouchDelivery({
-    providerMessageId: input.providerMessageId,
-    signal: "bounced",
-    detail: input.detail,
-  });
-  if (touch) {
-    const [lead] = await db
-      .select({ contactId: leadsTable.contactId })
-      .from(leadsTable)
-      .where(eq(leadsTable.id, touch.leadId));
-    if (lead?.contactId) {
-      await suppressChannelForContact({
+export async function handleBounce(
+  input: ProviderDeliveryCorrelation & {
+    reason: "hard_bounce" | "unsubscribed";
+    source: string;
+    detail?: string;
+  },
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    const match = await findCorrelatedTouch(tx, input);
+    if (!match) return;
+    const { contact } = match;
+    const touch = await applyTouchDelivery(tx, match.touch, {
+      ...input,
+      signal: input.reason === "unsubscribed" ? "unsubscribed" : "bounced",
+    });
+    await tx
+      .update(contactsTable)
+      .set(
+        input.channel === "email"
+          ? { doNotContactEmail: true }
+          : { doNotContactSms: true },
+      )
+      .where(
+        and(
+          eq(contactsTable.id, contact.id),
+          eq(contactsTable.organizationId, touch.organizationId),
+        ),
+      );
+    const inserted = await tx
+      .insert(suppressionsTable)
+      .values({
         organizationId: touch.organizationId,
-        contactId: lead.contactId,
         channel: input.channel,
+        value: normalizeAddress(input.channel, input.address),
         reason: input.reason,
         source: input.source,
-        detail: input.detail,
+        detail: input.detail ?? null,
+      })
+      .onConflictDoNothing()
+      .returning({ id: suppressionsTable.id });
+    const alreadyBlocked =
+      input.channel === "email"
+        ? contact.doNotContactEmail
+        : contact.doNotContactSms;
+    if (inserted.length || !alreadyBlocked) {
+      await tx.insert(auditEventsTable).values({
+        organizationId: touch.organizationId,
+        action: "send.channel_suppressed",
+        entityType: "contact",
+        entityId: contact.id,
+        metadata: {
+          channel: input.channel,
+          reason: input.reason,
+          source: input.source,
+          provider: input.provider,
+          providerMessageId: input.providerMessageId,
+        },
       });
     }
-    return;
-  }
-  // No touch matched — suppress by address wherever that contact exists.
-  if (!input.address) return;
-  const matches =
-    input.channel === "email"
-      ? await db
-          .select({ id: contactsTable.id, organizationId: contactsTable.organizationId })
-          .from(contactsTable)
-          .where(sql`lower(coalesce(${contactsTable.email}, '')) = ${input.address.trim().toLowerCase()}`)
-      : await db
-          .select({ id: contactsTable.id, organizationId: contactsTable.organizationId })
-          .from(contactsTable)
-          .where(
-            sql`regexp_replace(coalesce(${contactsTable.phone}, ''), '\\D', '', 'g') LIKE ${"%" + input.address.replace(/\D+/g, "").slice(-10)}`,
-          );
-  for (const contact of matches) {
-    await suppressChannelForContact({
-      organizationId: contact.organizationId,
-      contactId: contact.id,
-      channel: input.channel,
-      reason: input.reason,
-      source: input.source,
-      detail: input.detail,
-    });
-  }
+  });
 }
 
 /**

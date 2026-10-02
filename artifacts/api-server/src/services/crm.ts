@@ -1,4 +1,5 @@
 import { dispatchWebhookEvent } from "./webhooks";
+import { enqueueStaffLeadPush } from "./staff-push";
 import {
   activitiesTable,
   analyticsEventsTable,
@@ -9,6 +10,8 @@ import {
   crmTasksTable,
   db,
   estimatesTable,
+  emailResponseReviewsTable,
+  invoicesTable,
   leadsTable,
   leadTagsTable,
   projectsTable,
@@ -24,9 +27,12 @@ import {
   scheduleAppointmentReminder,
 } from "./automation";
 import {
-  insertInspectionIfAvailable,
-  updateInspectionIfAvailable,
+  insertInspectionInTransaction,
+  updateInspectionInTransaction,
 } from "./inspection-booking";
+import { appointmentCustomer, assertHistoricalStaff, assertOperationalStaff, assertResourceWindow, assertScheduleInterval, assertScheduleVersion, ensureInvoicePreparationTask, lockContractorSchedule, ScheduleError, type ScheduleTransaction } from "./contractor-scheduling";
+import { reconcileServiceAppointment } from "./service-obligations";
+import { lockReplyLead } from "./response-correlation";
 
 /**
  * Org-scoped CRM data access. Every query in this module REQUIRES an
@@ -50,11 +56,12 @@ interface RelationalRefs {
 export async function validateOrgRefs(
   organizationId: string,
   refs: RelationalRefs,
+  reader: typeof db | ScheduleTransaction = db,
 ): Promise<boolean> {
   const checks: Promise<boolean>[] = [];
   if (refs.contactId) {
     checks.push(
-      db
+      reader
         .select({ id: contactsTable.id })
         .from(contactsTable)
         .where(
@@ -68,7 +75,7 @@ export async function validateOrgRefs(
   }
   if (refs.propertyId) {
     checks.push(
-      db
+      reader
         .select({ id: propertiesTable.id })
         .from(propertiesTable)
         .where(
@@ -82,7 +89,7 @@ export async function validateOrgRefs(
   }
   if (refs.leadId) {
     checks.push(
-      db
+      reader
         .select({ id: leadsTable.id })
         .from(leadsTable)
         .where(
@@ -96,13 +103,14 @@ export async function validateOrgRefs(
   }
   if (refs.assignedUserId) {
     checks.push(
-      db
+      reader
         .select({ id: usersTable.id })
         .from(usersTable)
         .where(
           and(
             eq(usersTable.id, refs.assignedUserId),
             eq(usersTable.organizationId, organizationId),
+            eq(usersTable.isActive, true),
           ),
         )
         .then((r) => r.length > 0),
@@ -388,18 +396,17 @@ export async function createLead(
   });
   if (!ok) return null;
 
-  const [row] = await db
-    .insert(leadsTable)
-    .values({
-      // API-created leads still record how they entered the system and keep
-      // latestSource in sync with the original source by default.
-      creationMethod: "api",
-      latestSource: input.latestSource ?? input.source ?? null,
-      ...input,
-      organizationId,
-    })
-    .returning();
-  return row;
+  return db.transaction(async (tx) => {
+    const [row] = await tx.insert(leadsTable).values({
+        // Import is deliberately excluded to avoid bulk-alerting historical leads.
+        creationMethod: "api",
+        latestSource: input.latestSource ?? input.source ?? null,
+        ...input,
+        organizationId,
+      }).returning();
+    if (row.creationMethod !== "import") await enqueueStaffLeadPush(tx, organizationId, row);
+    return row;
+  });
 }
 
 export async function updateLead(
@@ -414,12 +421,25 @@ export async function updateLead(
     assignedUserId: input.assignedUserId,
   });
   if (!ok) return null;
-  const [row] = await db
-    .update(leadsTable)
-    .set(safe)
-    .where(and(eq(leadsTable.id, id), eq(leadsTable.organizationId, organizationId)))
-    .returning();
-  return row ?? null;
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(leadsTable)
+      .set(safe)
+      .where(and(eq(leadsTable.id, id), eq(leadsTable.organizationId, organizationId)))
+      .returning();
+    if (row && input.assignedUserId !== undefined) {
+      await tx
+        .update(crmTasksTable)
+        .set({ assignedUserId: input.assignedUserId })
+        .where(and(
+          eq(crmTasksTable.organizationId, organizationId),
+          eq(crmTasksTable.leadId, id),
+          eq(crmTasksTable.sourceEvent, "smart_site.lead_saved"),
+          inArray(crmTasksTable.status, ["open", "in_progress"]),
+        ));
+    }
+    return row ?? null;
+  });
 }
 
 export async function listEstimates(
@@ -492,17 +512,28 @@ export async function bulkUpdateLeads(
   const set: Record<string, unknown> = {};
   if (patch.status !== undefined) set.status = patch.status;
   if (patch.assignedUserId !== undefined) set.assignedUserId = patch.assignedUserId;
-  const rows = await db
-    .update(leadsTable)
-    .set(set)
-    .where(
-      and(
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .update(leadsTable)
+      .set(set)
+      .where(and(
         eq(leadsTable.organizationId, organizationId),
         inArray(leadsTable.id, leadIds),
-      ),
-    )
-    .returning({ id: leadsTable.id });
-  return rows.map((r) => r.id);
+      ))
+      .returning({ id: leadsTable.id });
+    if (patch.assignedUserId !== undefined && rows.length) {
+      await tx
+        .update(crmTasksTable)
+        .set({ assignedUserId: patch.assignedUserId })
+        .where(and(
+          eq(crmTasksTable.organizationId, organizationId),
+          inArray(crmTasksTable.leadId, rows.map((r) => r.id)),
+          eq(crmTasksTable.sourceEvent, "smart_site.lead_saved"),
+          inArray(crmTasksTable.status, ["open", "in_progress"]),
+        ));
+    }
+    return rows.map((r) => r.id);
+  });
 }
 
 export async function bulkTagLeads(
@@ -619,6 +650,8 @@ export async function findDuplicateLeadGroups(
 }
 
 // ---------- lead merge ----------
+export const INVOICE_HISTORY_RETAINED = "invoice_history_retained" as const;
+export const OUTREACH_HISTORY_RETAINED = "outreach_history_retained" as const;
 
 /**
  * Merge one duplicate lead into a surviving lead. Moves the source lead's
@@ -643,23 +676,35 @@ export async function mergeLeads(
       movedProjects: number;
       movedConversations: number;
     }
-  | { ok: false; error: "not_found" | "same_lead" }
+  | { ok: false; error: "not_found" | "same_lead" | typeof INVOICE_HISTORY_RETAINED | typeof OUTREACH_HISTORY_RETAINED }
 > {
   if (survivorId === sourceId) return { ok: false, error: "same_lead" };
-  const leads = await db
-    .select()
-    .from(leadsTable)
-    .where(
-      and(
-        eq(leadsTable.organizationId, organizationId),
-        inArray(leadsTable.id, [survivorId, sourceId]),
-      ),
-    );
-  const survivor = leads.find((l) => l.id === survivorId);
-  const source = leads.find((l) => l.id === sourceId);
-  if (!survivor || !source) return { ok: false, error: "not_found" };
-
   return db.transaction(async (tx) => {
+    // Serialize with invoice creation so a document cannot appear between the
+    // retention check and moving its lead/project/estimate relationships.
+    await lockContractorSchedule(tx, organizationId);
+    // Follow the schedule-before-reply lock order used by durable execution.
+    // Re-read both records under lock; a merge is never a source attestation or
+    // an implicit resolution of a customer reply on either opportunity.
+    for (const id of [survivorId, sourceId].sort()) await lockReplyLead(tx, organizationId, id);
+    const leads = await tx.select().from(leadsTable).where(and(
+      eq(leadsTable.organizationId, organizationId),
+      inArray(leadsTable.id, [survivorId, sourceId]),
+    )).orderBy(leadsTable.id).for("update");
+    const survivor = leads.find((lead) => lead.id === survivorId);
+    const source = leads.find((lead) => lead.id === sourceId);
+    if (!survivor || !source) return { ok: false as const, error: "not_found" as const };
+    const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(
+      eq(invoicesTable.organizationId, organizationId), inArray(invoicesTable.leadId, [survivorId, sourceId]),
+    )).limit(1);
+    if (invoice) return { ok: false as const, error: INVOICE_HISTORY_RETAINED };
+    const [replyHold] = await tx.select({ id: emailResponseReviewsTable.id }).from(emailResponseReviewsTable).where(and(
+      eq(emailResponseReviewsTable.organizationId, organizationId),
+      inArray(emailResponseReviewsTable.leadId, [survivorId, sourceId]),
+      eq(emailResponseReviewsTable.holdActive, true),
+    )).limit(1);
+    if (replyHold || leads.some(lead => lead.creationMethod === "import" || lead.importedHistory !== null || lead.importSourceKey !== null || lead.externalOpportunityId !== null))
+      return { ok: false as const, error: OUTREACH_HISTORY_RETAINED };
     // Move activities onto the survivor.
     const movedActivities = await tx
       .update(activitiesTable)
@@ -975,6 +1020,23 @@ export async function listTasks(
   }));
 }
 
+/** Resolve a workday deep link independently of the bounded recent-task list. */
+export async function getTask(organizationId: string, id: string) {
+  return db.transaction(async tx => {
+    const [task] = await tx.select().from(crmTasksTable).where(and(eq(crmTasksTable.organizationId, organizationId), eq(crmTasksTable.id, id)));
+    if (!task || !await validateOrgRefs(organizationId, task, tx)) return null;
+    let leadLabel: string | null = null;
+    if (task.leadId) {
+      const [row] = await tx.select({ leadSummary: leadsTable.summary, contactFirstName: contactsTable.firstName, contactLastName: contactsTable.lastName })
+        .from(leadsTable).innerJoin(contactsTable, and(eq(contactsTable.id, leadsTable.contactId), eq(contactsTable.organizationId, organizationId)))
+        .where(and(eq(leadsTable.id, task.leadId), eq(leadsTable.organizationId, organizationId)));
+      if (!row) return null;
+      leadLabel = buildLeadLabel(row);
+    }
+    return { ...task, leadLabel };
+  }, { isolationLevel: "repeatable read", accessMode: "read only" });
+}
+
 export async function createTask(
   organizationId: string,
   input: Omit<typeof crmTasksTable.$inferInsert, "organizationId">,
@@ -1026,7 +1088,7 @@ export async function deleteTask(organizationId: string, id: string) {
 
 // ---------- appointments ----------
 
-export async function listAppointments(organizationId: string, leadId?: string) {
+export async function listAppointments(organizationId: string, leadId?: string, filters: { from?: Date; to?: Date; assignedUserId?: string; contactId?: string } = {}) {
   const scope = eq(appointmentsTable.organizationId, organizationId);
   const rows = await db
     .select({
@@ -1037,13 +1099,19 @@ export async function listAppointments(organizationId: string, leadId?: string) 
     })
     .from(appointmentsTable)
     .leftJoin(leadsTable, eq(appointmentsTable.leadId, leadsTable.id))
-    .leftJoin(contactsTable, eq(leadsTable.contactId, contactsTable.id))
-    .where(leadId ? and(scope, eq(appointmentsTable.leadId, leadId)) : scope)
-    .orderBy(desc(appointmentsTable.scheduledStart))
+    .leftJoin(contactsTable, eq(sql`coalesce(${appointmentsTable.contactId}, ${leadsTable.contactId})`, contactsTable.id))
+    .where(and(scope,
+      leadId ? eq(appointmentsTable.leadId, leadId) : undefined,
+      filters.assignedUserId ? eq(appointmentsTable.assignedUserId, filters.assignedUserId) : undefined,
+      filters.contactId ? eq(contactsTable.id, filters.contactId) : undefined,
+      filters.to ? sql`${appointmentsTable.scheduledStart} < ${filters.to}` : undefined,
+      filters.from ? sql`coalesce(${appointmentsTable.scheduledEnd}, ${appointmentsTable.scheduledStart} + interval '2 hours') > ${filters.from}` : undefined,
+    ))
+    .orderBy(filters.from ? appointmentsTable.scheduledStart : desc(appointmentsTable.scheduledStart))
     .limit(200);
   return rows.map((row) => ({
     ...row.appointment,
-    leadLabel: row.appointment.leadId ? buildLeadLabel(row) : null,
+    leadLabel: buildLeadLabel(row),
   }));
 }
 
@@ -1080,51 +1148,42 @@ export async function createAppointment(
     assignedUserId: input.assignedUserId,
   });
   if (!ok) return null;
-  // Staff bookings of inspection windows share the concierge's race-safe
-  // capacity guard so a rep can't double-book a window the chat (or another
-  // rep) just filled. Only active bookings with a defined window are guarded.
-  const status = input.status ?? "scheduled";
-  if (
-    input.type === "inspection" &&
-    (status === "scheduled" || status === "confirmed") &&
-    input.scheduledStart
-  ) {
-    const row = await insertInspectionIfAvailable({
-      ...input,
-      organizationId,
-      scheduledStart: input.scheduledStart,
-    });
-    if (!row) return "conflict";
-    if (row.status === "scheduled" || row.status === "confirmed") {
-      await scheduleAppointmentReminder(organizationId, row);
-    }
+  return db.transaction(async tx => {
+    await lockContractorSchedule(tx, organizationId);
+    const status = input.status ?? "scheduled";
+    const active = status === "scheduled" || status === "confirmed";
+    const staff = input.assignedUserId ? [input.assignedUserId] : [];
+    await assertOperationalStaff(tx, organizationId, staff);
+    const end = input.scheduledEnd ?? new Date(input.scheduledStart.getTime() + 2 * 3_600_000);
+    assertScheduleInterval(input.scheduledStart, end);
+    if (active) await assertResourceWindow(tx, organizationId, staff, input.scheduledStart, end);
+    const contactId = await appointmentCustomer(tx, organizationId, input);
+    const values = { ...input, organizationId, contactId, scheduledEnd: end };
+    const row = (input.type ?? "inspection") === "inspection" && active
+      ? await insertInspectionInTransaction(tx, values)
+      : (await tx.insert(appointmentsTable).values(values).returning())[0];
+    if (!row) return "conflict" as const;
+    if (active) await scheduleAppointmentReminder(organizationId, row, undefined, tx);
     return row;
-  }
-  const [row] = await db
-    .insert(appointmentsTable)
-    .values({ ...input, organizationId })
-    .returning();
-  if (row && (row.status === "scheduled" || row.status === "confirmed")) {
-    await scheduleAppointmentReminder(organizationId, row);
-  }
-  return row;
+  });
 }
 
 export async function updateAppointment(
   organizationId: string,
   id: string,
-  input: Partial<typeof appointmentsTable.$inferInsert>,
+  input: Partial<typeof appointmentsTable.$inferInsert> & { expectedUpdatedAt?: string | Date },
 ): Promise<typeof appointmentsTable.$inferSelect | null | "conflict" | "past_start"> {
-  const { organizationId: _ignored, id: _id, ...safe } = input as Record<string, unknown>;
+  const { organizationId: _ignored, id: _id, expectedUpdatedAt, ...safe } = input;
   const ok = await validateOrgRefs(organizationId, {
     leadId: input.leadId,
     contactId: input.contactId,
     propertyId: input.propertyId,
-    assignedUserId: input.assignedUserId,
   });
   if (!ok) return null;
-
-  const [existing] = await db
+  let becameCancelled = false;
+  const result = await db.transaction(async tx => {
+  await lockContractorSchedule(tx, organizationId);
+  const [existing] = await tx
     .select()
     .from(appointmentsTable)
     .where(
@@ -1134,6 +1193,13 @@ export async function updateAppointment(
       ),
     );
   if (!existing) return null;
+  assertScheduleVersion(existing.updatedAt, expectedUpdatedAt);
+  safe.contactId = await appointmentCustomer(tx, organizationId, { leadId: input.leadId === undefined ? existing.leadId : input.leadId, contactId: input.contactId === undefined ? existing.contactId : input.contactId, propertyId: input.propertyId === undefined ? existing.propertyId : input.propertyId });
+  // A start-only move preserves the already recorded duration. Explicit end
+  // edits are validated below; the UI sends both endpoints.
+  if (input.scheduledStart !== undefined && input.scheduledEnd === undefined) {
+    safe.scheduledEnd = new Date(input.scheduledStart.getTime() + (existing.scheduledEnd ? existing.scheduledEnd.getTime() - existing.scheduledStart.getTime() : 2 * 3_600_000));
+  }
 
   // The edit path must not sneak an inspection into a full window: if the
   // result of this update is an active inspection and its window changed —
@@ -1170,8 +1236,15 @@ export async function updateAppointment(
     scheduledStart:
       input.scheduledStart !== undefined ? input.scheduledStart : existing.scheduledStart,
     scheduledEnd:
-      input.scheduledEnd !== undefined ? input.scheduledEnd : existing.scheduledEnd,
+      safe.scheduledEnd !== undefined ? safe.scheduledEnd : existing.scheduledEnd,
   };
+  const staff = (input.assignedUserId === undefined ? existing.assignedUserId : input.assignedUserId);
+  if (!isActive(next.status)) {
+    await assertHistoricalStaff(tx, organizationId, staff ? [staff] : []);
+    if (staff && staff !== existing.assignedUserId) await assertOperationalStaff(tx, organizationId, [staff]);
+  } else if (input.assignedUserId !== undefined || input.status !== undefined || input.scheduledStart !== undefined || input.scheduledEnd !== undefined) await assertOperationalStaff(tx, organizationId, staff ? [staff] : []);
+  assertScheduleInterval(next.scheduledStart, next.scheduledEnd);
+  if (isActive(next.status)) await assertResourceWindow(tx, organizationId, staff ? [staff] : [], next.scheduledStart, next.scheduledEnd ?? new Date(next.scheduledStart.getTime() + 2 * 3_600_000), { appointmentId: id });
   const wasCounting = existing.type === "inspection" && isActive(existing.status);
   const windowChanged =
     input.scheduledStart !== undefined || input.scheduledEnd !== undefined;
@@ -1183,14 +1256,14 @@ export async function updateAppointment(
 
   let row: typeof appointmentsTable.$inferSelect | null;
   if (needsGuard) {
-    const guarded = await updateInspectionIfAvailable(organizationId, id, safe, {
+    const guarded = await updateInspectionInTransaction(tx, organizationId, id, safe, {
       start: next.scheduledStart!,
       end: next.scheduledEnd,
     });
     if (guarded === "conflict") return "conflict";
     row = guarded;
   } else {
-    const [updated] = await db
+    const [updated] = await tx
       .update(appointmentsTable)
       .set(safe)
       .where(
@@ -1203,27 +1276,27 @@ export async function updateAppointment(
     row = updated ?? null;
   }
   if (row) {
+    becameCancelled = row.status === "cancelled" && existing.status !== "cancelled";
     // Keep the ~24h homeowner reminder in sync: cancelled/completed/no-show
     // appointments must not send stale reminders, and a rescheduled start
     // gets a fresh reminder aligned to the new window.
     if (row.status !== "scheduled" && row.status !== "confirmed") {
-      await cancelAppointmentReminders(organizationId, row.id);
+      await cancelAppointmentReminders(organizationId, row.id, tx);
       // Outbound webhook mirror: a booked appointment being cancelled is a
       // lifecycle event outside systems care about. Only fire on the actual
       // transition into cancelled, not repeat saves.
-      if (row.status === "cancelled" && existing.status !== "cancelled") {
-        void dispatchWebhookEvent(organizationId, "appointment.cancelled", {
-          appointmentId: row.id,
-          leadId: row.leadId ?? null,
-          contactId: row.contactId ?? null,
-        }).catch(() => {});
-      }
-    } else if (input.scheduledStart !== undefined) {
-      await cancelAppointmentReminders(organizationId, row.id);
-      await scheduleAppointmentReminder(organizationId, row);
+    } else if (input.scheduledStart !== undefined || !isActive(existing.status)) {
+      await cancelAppointmentReminders(organizationId, row.id, tx);
+      await scheduleAppointmentReminder(organizationId, row, undefined, tx);
     }
+    await reconcileServiceAppointment(tx, organizationId, row);
   }
   return row ?? null;
+  });
+  if (result && typeof result !== "string" && becameCancelled) {
+    void dispatchWebhookEvent(organizationId, "appointment.cancelled", { appointmentId: result.id, leadId: result.leadId, contactId: result.contactId }).catch(() => {});
+  }
+  return result;
 }
 
 // ---------- users / dashboard / audit ----------
@@ -1434,13 +1507,20 @@ export async function getDashboardSummary(organizationId: string) {
 }
 
 export async function deleteEstimate(organizationId: string, id: string) {
-  const rows = await db
+  return db.transaction(async tx => {
+  await lockContractorSchedule(tx, organizationId);
+  const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(
+    eq(invoicesTable.organizationId, organizationId), eq(invoicesTable.estimateId, id),
+  )).limit(1);
+  if (invoice) return INVOICE_HISTORY_RETAINED;
+  const rows = await tx
     .delete(estimatesTable)
     .where(
       and(eq(estimatesTable.id, id), eq(estimatesTable.organizationId, organizationId)),
     )
     .returning({ id: estimatesTable.id });
   return rows.length > 0;
+  });
 }
 
 /** Sentinel returned when an estimate is already linked to another project. */
@@ -1456,6 +1536,7 @@ async function estimateAlreadyLinked(
   organizationId: string,
   estimateId: string,
   excludeProjectId?: string,
+  reader: typeof db | ScheduleTransaction = db,
 ): Promise<boolean> {
   const conditions = [
     eq(projectsTable.organizationId, organizationId),
@@ -1464,7 +1545,7 @@ async function estimateAlreadyLinked(
   if (excludeProjectId) {
     conditions.push(ne(projectsTable.id, excludeProjectId));
   }
-  const [row] = await db
+  const [row] = await reader
     .select({ id: projectsTable.id })
     .from(projectsTable)
     .where(and(...conditions))
@@ -1492,18 +1573,36 @@ export async function updateProject(
     scheduledEnd?: Date | null;
     crewUserIds?: string[];
     crewNotes?: string | null;
+    expectedUpdatedAt?: string | Date;
   },
 ) {
-  const existing = await getProject(organizationId, id);
+  return db.transaction(async tx => {
+  await lockContractorSchedule(tx, organizationId);
+  const [existing] = await tx.select().from(projectsTable).where(and(eq(projectsTable.id, id), eq(projectsTable.organizationId, organizationId)));
   if (!existing) return null;
+  assertScheduleVersion(existing.updatedAt, input.expectedUpdatedAt);
   const ok = await validateProjectRefs(organizationId, {
     estimateId: input.estimateId,
-    crewUserIds: input.crewUserIds,
-  });
+  }, tx);
   if (!ok) return null;
+  const staff = input.crewUserIds ?? existing.crewUserIds;
+  if (["completed", "cancelled"].includes(input.status ?? existing.status)) {
+    await assertHistoricalStaff(tx, organizationId, staff);
+    await assertOperationalStaff(tx, organizationId, staff.filter(id => !existing.crewUserIds.includes(id)));
+  } else if (input.crewUserIds !== undefined || input.status !== undefined || input.scheduledStart !== undefined || input.scheduledEnd !== undefined) await assertOperationalStaff(tx, organizationId, staff);
+  const start = input.scheduledStart === undefined ? existing.scheduledStart : input.scheduledStart;
+  const end = input.scheduledEnd === undefined ? existing.scheduledEnd : input.scheduledEnd;
+  assertScheduleInterval(start, end);
+  if (start && staff.length && !end && (input.scheduledStart !== undefined || input.crewUserIds !== undefined)) throw new ScheduleError("invalid_interval", 400);
+  if (start && ["scheduled", "in_progress"].includes(input.status ?? existing.status)) await assertResourceWindow(tx, organizationId, staff, start, end ?? new Date(start.getTime() + 86_400_000), { projectId: id });
+  const estimateId = input.estimateId === undefined ? existing.estimateId : input.estimateId;
+  if (estimateId) {
+    const [estimate] = await tx.select().from(estimatesTable).where(and(eq(estimatesTable.id, estimateId), eq(estimatesTable.organizationId, organizationId)));
+    if (!estimate || estimate.leadId !== existing.leadId) throw new ScheduleError("estimate_lead_mismatch", 400);
+  }
   if (
     input.estimateId &&
-    (await estimateAlreadyLinked(organizationId, input.estimateId, id))
+    (await estimateAlreadyLinked(organizationId, input.estimateId, id, tx))
   ) {
     return DUPLICATE_ESTIMATE;
   }
@@ -1519,23 +1618,26 @@ export async function updateProject(
     patch.status = input.status;
     if (input.status === "completed" && !existing.completedAt) {
       patch.completedAt = new Date();
-    }
+    } else if (input.status !== "completed") patch.completedAt = null;
   }
 
   try {
-    const [row] = await db
+    if (!Object.keys(patch).length) return existing;
+    const [row] = await tx
       .update(projectsTable)
       .set(patch)
       .where(
         and(eq(projectsTable.id, id), eq(projectsTable.organizationId, organizationId)),
       )
       .returning();
+    if (row && input.status !== undefined) await ensureInvoicePreparationTask(tx, row);
     return row ?? null;
   } catch (error) {
     // Concurrent link raced past the pre-check; the unique index caught it.
     if (isUniqueEstimateViolation(error)) return DUPLICATE_ESTIMATE;
     throw error;
   }
+  });
 }
 
 interface EstimateLineItemInput {
@@ -1558,21 +1660,31 @@ export async function createProject(
     crewNotes?: string | null;
   },
 ) {
+  return db.transaction(async tx => {
+  await lockContractorSchedule(tx, organizationId);
   const ok = await validateProjectRefs(organizationId, {
     leadId: input.leadId,
     estimateId: input.estimateId,
     crewUserIds: input.crewUserIds,
-  });
+  }, tx);
   if (!ok) return null;
+  await assertOperationalStaff(tx, organizationId, input.crewUserIds ?? []);
+  assertScheduleInterval(input.scheduledStart, input.scheduledEnd);
+  if (input.scheduledStart && input.crewUserIds?.length && !input.scheduledEnd) throw new ScheduleError("invalid_interval", 400);
+  if (input.scheduledStart && ["scheduled", "in_progress"].includes(input.status ?? "scheduled")) await assertResourceWindow(tx, organizationId, input.crewUserIds ?? [], input.scheduledStart, input.scheduledEnd ?? new Date(input.scheduledStart.getTime() + 86_400_000));
+  if (input.estimateId) {
+    const [estimate] = await tx.select().from(estimatesTable).where(and(eq(estimatesTable.id, input.estimateId), eq(estimatesTable.organizationId, organizationId)));
+    if (!estimate || estimate.leadId !== input.leadId) throw new ScheduleError("estimate_lead_mismatch", 400);
+  }
   if (
     input.estimateId &&
-    (await estimateAlreadyLinked(organizationId, input.estimateId))
+    (await estimateAlreadyLinked(organizationId, input.estimateId, undefined, tx))
   ) {
     return DUPLICATE_ESTIMATE;
   }
   const status = input.status ?? "scheduled";
   try {
-    const [row] = await db
+    const [row] = await tx
       .insert(projectsTable)
       .values({
         organizationId,
@@ -1587,22 +1699,35 @@ export async function createProject(
         completedAt: status === "completed" ? new Date() : null,
       })
       .returning();
+    await ensureInvoicePreparationTask(tx, row);
     return row;
   } catch (error) {
     // Concurrent create raced past the pre-check; the unique index caught it.
     if (isUniqueEstimateViolation(error)) return DUPLICATE_ESTIMATE;
     throw error;
   }
+  });
 }
 
 export async function deleteProject(organizationId: string, id: string) {
-  const rows = await db
+  return db.transaction(async tx => {
+  await lockContractorSchedule(tx, organizationId);
+  const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(
+    eq(invoicesTable.organizationId, organizationId), eq(invoicesTable.projectId, id),
+  )).limit(1);
+  if (invoice) return INVOICE_HISTORY_RETAINED;
+  const rows = await tx
     .delete(projectsTable)
     .where(
       and(eq(projectsTable.id, id), eq(projectsTable.organizationId, organizationId)),
     )
     .returning({ id: projectsTable.id });
+  if (rows.length) await tx.update(crmTasksTable).set({ status: "cancelled", completedAt: null }).where(and(
+    eq(crmTasksTable.organizationId, organizationId), eq(crmTasksTable.sourceEvent, `project.invoice_preparation:${id}`),
+    inArray(crmTasksTable.status, ["open", "in_progress"]),
+  ));
   return rows.length > 0;
+  });
 }
 
 function computeEstimateTotals(lineItems: EstimateLineItemInput[], taxCents: number) {
@@ -1698,16 +1823,17 @@ export async function updateEstimate(
 async function validateProjectRefs(
   organizationId: string,
   refs: { leadId?: string | null; estimateId?: string | null; crewUserIds?: string[] },
+  reader: typeof db | ScheduleTransaction = db,
 ): Promise<boolean> {
-  if (refs.leadId && !(await validateOrgRefs(organizationId, { leadId: refs.leadId }))) {
+  if (refs.leadId && !(await validateOrgRefs(organizationId, { leadId: refs.leadId }, reader))) {
     return false;
   }
   if (refs.estimateId) {
-    const estimate = await getEstimate(organizationId, refs.estimateId);
+    const [estimate] = await reader.select({ id: estimatesTable.id }).from(estimatesTable).where(and(eq(estimatesTable.id, refs.estimateId), eq(estimatesTable.organizationId, organizationId)));
     if (!estimate) return false;
   }
   for (const userId of refs.crewUserIds ?? []) {
-    if (!(await validateOrgRefs(organizationId, { assignedUserId: userId }))) {
+    if (!(await validateOrgRefs(organizationId, { assignedUserId: userId }, reader))) {
       return false;
     }
   }

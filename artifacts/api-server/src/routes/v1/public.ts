@@ -13,11 +13,13 @@ import { analyticsEventsTable, db } from "@workspace/db";
 import { Router, type IRouter, type Request, type Response } from "express";
 
 import {
+  InvalidUploadTokenError,
   ObjectNotFoundError,
   ObjectStorageService,
 } from "../../lib/objectStorage";
 import { validatePhotoObjects } from "../../lib/photoValidation";
 import { rateLimit } from "../../lib/rateLimit";
+import { normalizeIpAddress } from "../../lib/ip";
 import { resolvePublicOrg } from "../../middlewares/publicOrg";
 import { captureAssessment } from "../../services/assessment";
 import { emitAutomationEvent } from "../../services/automation";
@@ -43,6 +45,7 @@ import {
   recordReviewClick,
 } from "../../services/engagement-links";
 import { SubmitReferralBody } from "@workspace/api-zod";
+import { CustomerLifecycleHoldError } from "../../services/customer-lifecycle";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -50,12 +53,50 @@ const objectStorageService = new ObjectStorageService();
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+router.put(
+  "/public/uploads/local/:objectId",
+  rateLimit({ windowMs: 60_000, max: 30, key: "local-object-upload" }),
+  async (req: Request, res: Response): Promise<void> => {
+    const objectId = String(req.params.objectId);
+    const token = typeof req.query.token === "string" ? req.query.token : "";
+    if (!UUID_RE.test(objectId) || !token || !Buffer.isBuffer(req.body)) {
+      res.status(400).json({ error: "Invalid upload request" });
+      return;
+    }
+    try {
+      await objectStorageService.storeDatabaseUpload({
+        objectId,
+        token,
+        data: req.body,
+        contentType: req.header("content-type") || "application/octet-stream",
+      });
+      res.status(201).end();
+    } catch (error) {
+      if (error instanceof InvalidUploadTokenError) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "23505"
+      ) {
+        res.status(409).json({ error: "Upload URL has already been used" });
+        return;
+      }
+      req.log.error({ err: error }, "Error storing local object upload");
+      res.status(500).json({ error: "Failed to store upload" });
+    }
+  },
+);
+
 function clientIp(req: Request): string | undefined {
-  return (
+  const raw =
     (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-    req.socket.remoteAddress ||
-    undefined
-  );
+    req.socket.remoteAddress;
+  const normalized = normalizeIpAddress(raw);
+  return normalized === "unknown" ? undefined : normalized;
 }
 
 router.post(
@@ -68,17 +109,18 @@ router.post(
       res.status(400).json({ error: "Invalid assessment submission" });
       return;
     }
+    const org = req.publicOrg!;
     if (parsed.data.photoPaths?.length) {
       const validation = await validatePhotoObjects(
         objectStorageService,
         parsed.data.photoPaths,
+        org.id,
       );
       if (!validation.ok) {
         res.status(400).json({ error: validation.reason });
         return;
       }
     }
-    const org = req.publicOrg!;
     const result = await captureAssessment({
       organizationId: org.id,
       submission: parsed.data,
@@ -108,7 +150,11 @@ router.post(
       return;
     }
     try {
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL({
+        organizationId: req.publicOrg!.id,
+        contentType: parsed.data.contentType,
+        size: parsed.data.size,
+      });
       const objectPath =
         objectStorageService.normalizeObjectEntityPath(uploadURL);
       res.json(RequestPublicUploadUrlResponse.parse({ uploadURL, objectPath }));
@@ -469,7 +515,11 @@ router.post(
       .filter((v): v is string[] => Array.isArray(v) && v.length > 0 && v.every((p) => typeof p === "string" && p.startsWith("/objects/")))
       .flat();
     if (photoPaths.length > 0) {
-      const validation = await validatePhotoObjects(objectStorageService, photoPaths);
+      const validation = await validatePhotoObjects(
+        objectStorageService,
+        photoPaths,
+        org.id,
+      );
       if (!validation.ok) {
         res.status(400).json({ error: validation.reason });
         return;
@@ -846,13 +896,18 @@ router.post(
       res.status(400).json({ error: "An email or phone number is required" });
       return;
     }
-    const result = await recordReferralSubmission(link, {
-      name,
-      email: email ?? undefined,
-      phone: phone ?? undefined,
-      notes: notes ?? undefined,
-    });
-    res.status(201).json({ ok: true, leadId: result.leadId });
+    try {
+      const result = await recordReferralSubmission(link, {
+        name,
+        email: email ?? undefined,
+        phone: phone ?? undefined,
+        notes: notes ?? undefined,
+      });
+      res.status(201).json({ ok: true, leadId: result.leadId });
+    } catch (error) {
+      if (!(error instanceof CustomerLifecycleHoldError)) throw error;
+      res.status(423).json({ code: error.code, error: "This company is not accepting new requests right now." });
+    }
   },
 );
 

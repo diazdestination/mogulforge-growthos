@@ -11,14 +11,21 @@ import {
   leadTagsTable,
   messageTemplatesTable,
   scheduledActionsTable,
+  orgSettingsTable,
+  DEFAULT_APPOINTMENT_REMINDER,
+  revenueExecutionsTable,
   tagsTable,
   usersTable,
   type ActionResult,
   type Automation,
   type AutomationAction,
 } from "@workspace/db";
-import { and, desc, eq, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, notExists, notInArray, sql } from "drizzle-orm";
+import type { SchedulerStage, StageObserver } from "./scheduler-runtime";
 import { recordAudit } from "./audit";
+import { runDurableAction } from "./durable-execution";
+import { formatAppointmentWindow, lockContractorSchedule, type ScheduleTransaction } from "./contractor-scheduling";
+import { customerWorkAllowedSql, customerWorkHeld } from "./customer-lifecycle-runtime";
 import { isLegacyDefaultOrg } from "../lib/orgFlavor";
 import {
   applyStageBehaviorToLead,
@@ -29,6 +36,7 @@ import {
 import { recordLeadOutcome } from "./playbook-learning";
 import { classifyWonLead, handlePostSaleTransition } from "./post-sale";
 import { providers } from "./providers";
+import { emailAcceptanceEvidence } from "./user-email";
 import {
   checkSendEligibility,
   handleProviderFailure,
@@ -46,8 +54,8 @@ import {
  * Event-driven automation engine. Events are emitted from CRM flows; rules
  * (automations table) match on event + simple equality conditions and run
  * their configured actions. Every run is recorded; every action is audited.
- * Outbound email/SMS goes through the configured providers (Twilio/Resend
- * when their secrets are set, labeled mocks otherwise).
+ * Customer email requires the tenant's assigned/configured Gmail sender.
+ * SMS goes through the organization's approved Twilio binding.
  */
 
 export type AutomationEventName =
@@ -121,11 +129,13 @@ export async function runEvent(
   event: AutomationEventName,
   context: EventContext,
 ): Promise<void> {
+  // Stops and outcome history still apply while held. Only new work is gated.
+  const workHeld = await customerWorkHeld(organizationId);
   // Outbound webhook mirror for lifecycle events.
-  if (event === "lead.created" || event === "appointment.booked") {
+  if (!workHeld && (event === "lead.created" || event === "appointment.booked")) {
     mirrorToWebhooks(organizationId, event, context);
   }
-  if (event === "lead.updated" || event === "lead.assigned") {
+  if (!workHeld && (event === "lead.updated" || event === "lead.assigned")) {
     const s = context.fields?.["lead.status"];
     // Only mirror terminal events on a REAL status transition — a non-status
     // update to an already-won/lost lead must not re-emit the event.
@@ -137,7 +147,7 @@ export async function runEvent(
   }
   // Closer Engine hooks: enroll new leads in an outreach playbook, and
   // stop live enrollments the moment the lead converts or advances.
-  if (event === "lead.created" && context.leadId) {
+  if (!workHeld && event === "lead.created" && context.leadId) {
     await autoEnrollLead(organizationId, context.leadId);
   } else if (event === "appointment.booked" && context.leadId) {
     await stopEnrollmentsForLead(
@@ -159,7 +169,7 @@ export async function runEvent(
       // cancel / hand off to another playbook) for ACQUISITION sequences.
       // Defaults preserve the old fixed behavior: outreach stages continue,
       // everything else completes.
-      await applyStageBehaviorToLead(organizationId, context.leadId, status);
+      await applyStageBehaviorToLead(organizationId, context.leadId, status, !workHeld);
     }
     // A lost lead also ends any live post-sale sequence.
     if (status === "lost") {
@@ -182,10 +192,11 @@ export async function runEvent(
         await classifyWonLead(organizationId, context.leadId);
       }
       // Milestone-gated post-sale playbooks (review/referral/maintenance).
-      await handlePostSaleTransition(organizationId, context.leadId, status);
+      if (!workHeld) await handlePostSaleTransition(organizationId, context.leadId, status);
     }
   }
 
+  if (workHeld) return;
   const rules = await db
     .select()
     .from(automationsTable)
@@ -263,6 +274,11 @@ async function executeAction(
   context: EventContext,
   automationId: string,
 ): Promise<ActionResult> {
+  if (context.leadId && ["send_email", "send_sms", "schedule_followup", "playbook_step"].includes(action.type)) {
+    const { hasCustomerReplyHold } = await import("./response-correlation");
+    if (await hasCustomerReplyHold(organizationId, context.leadId))
+      return { type: action.type, status: "skipped", detail: "blocked: customer_reply_requires_review" };
+  }
   const audit = (detail: Record<string, unknown>) =>
     recordAudit({
       organizationId,
@@ -292,6 +308,7 @@ async function executeAction(
       // Unified pre-send gate: DNC, suppressions, consent, quiet hours, caps.
       const gate = await checkSendEligibility({
         organizationId,
+        leadId: context.leadId,
         contact,
         channel,
         kind: "outreach",
@@ -343,7 +360,7 @@ async function executeAction(
           detail: `blocked: ${gate.reason}`,
         };
       }
-      let res: { id: string; provider: string };
+      let res: { id: string | null; provider: string; providerRequestId?: string | null; clientRequestId?: string };
       try {
         res =
           channel === "email"
@@ -351,8 +368,9 @@ async function executeAction(
                 contact.email!,
                 rendered.subject ?? `${await getBusinessName(organizationId)} update`,
                 rendered.body + unsubscribeFooter(organizationId, contact.id),
+                { organizationId, leadId: context.leadId },
               )
-            : await providers.sms.send(contact.phone!, rendered.body);
+            : await providers.sms.send(contact.phone!, rendered.body, { organizationId, contactId: contact.id, purpose: 'marketing', idempotencyKey: `automation:${automationId}:${context.leadId ?? contact.id}:${JSON.stringify(action.params)}` });
       } catch (err) {
         // Permanently bad address → suppress so nothing retries it.
         const suppressed = await handleProviderFailure({
@@ -387,7 +405,7 @@ async function executeAction(
           contactId: contact.id,
           type: "automation_message_sent",
           title: `Automation ${channel === "email" ? "email" : "text"} sent`,
-          metadata: { automationId, channel, provider: res.provider },
+          metadata: { automationId, channel, ...(channel === "email" ? emailAcceptanceEvidence(res, { organizationId, leadId: context.leadId, recipientEmail: contact.email! }) : { provider: res.provider, providerMessageId: res.id }) },
         });
       }
       await audit({
@@ -629,14 +647,11 @@ async function executeAction(
       const businessName =
         await getBusinessName(organizationId);
       const businessPhone = settings.businessProfile.phone ?? "";
-      const windowLabel = new Intl.DateTimeFormat("en-US", {
-        timeZone: process.env.CONCIERGE_TIMEZONE ?? "America/New_York",
-        weekday: "long",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        hour12: true,
-      }).format(appointment.scheduledStart);
+      // Resolve the same company timezone used by Today. Invalid or missing
+      // settings are shown explicitly as UTC, never as a host-wide default.
+      const configuredZone = settings.inspectionAvailability?.timezone;
+      const zones = await db.execute(sql`select name from pg_timezone_names where name=${configuredZone ?? "UTC"} limit 1`);
+      const windowLabel = formatAppointmentWindow(appointment.scheduledStart, zones.rows[0]?.name ?? "UTC");
       const reschedule = businessPhone
         ? `Need to reschedule? Call or text us at ${businessPhone}.`
         : "Need to reschedule? Contact our office and we'll find a time that works.";
@@ -719,8 +734,8 @@ async function executeAction(
       }
       const res =
         channel === "email"
-          ? await providers.email.send(contact.email!, emailSubject, emailBody)
-          : await providers.sms.send(contact.phone!, smsBody);
+          ? await providers.email.send(contact.email!, emailSubject, emailBody, { organizationId, leadId: appointment.leadId })
+          : await providers.sms.send(contact.phone!, smsBody, { organizationId, contactId: contact.id, purpose: 'appointments', idempotencyKey: `appointment:${appointmentId}:reminder:${appointment.scheduledStart.toISOString()}` });
       if (appointment.leadId) {
         await db.insert(activitiesTable).values({
           organizationId,
@@ -732,7 +747,7 @@ async function executeAction(
           metadata: {
             appointmentId,
             channel,
-            provider: res.provider,
+            ...(channel === "email" ? emailAcceptanceEvidence(res, { organizationId, leadId: appointment.leadId, recipientEmail: contact.email! }) : { provider: res.provider, providerMessageId: res.id }),
             scheduledStart: appointment.scheduledStart.toISOString(),
           },
         });
@@ -907,75 +922,102 @@ async function renderTemplate(
 
 // ---------- scheduler ----------
 
-let schedulerTimer: NodeJS.Timeout | null = null;
-
 /**
  * Run one scheduler stage in isolation: a failure is logged, never thrown,
  * so one broken stage (e.g. a DB error while querying scheduled actions)
  * can't stop later stages like webhook retry delivery from running.
  */
-async function runStage(name: string, fn: () => Promise<void>): Promise<void> {
+async function runStage(name: SchedulerStage, fn: () => Promise<void>, observe?: StageObserver): Promise<void> {
+  // Persist progress before starting effects; a lost ownership connection stops
+  // the cycle here. Observer failures are deliberately NOT swallowed.
+  await observe?.(name, "running");
+  let failed = false;
   try {
     await fn();
-  } catch (err) {
-    console.error(`[automation] scheduler stage "${name}" failed:`, err);
+  } catch {
+    failed = true;
+    console.error(`[automation] scheduler stage "${name}" failed; inspect runtime health`);
   }
+  await observe?.(name, failed ? "failed" : "succeeded");
 }
 
 /** Stage 1: execute due scheduled automation actions. */
-async function processDueScheduledActions(organizationId?: string): Promise<void> {
+export async function processDueScheduledActions(organizationId?: string): Promise<void> {
   const due = await db
     .select()
     .from(scheduledActionsTable)
     .where(
       and(
         eq(scheduledActionsTable.status, "pending"),
+        customerWorkAllowedSql(scheduledActionsTable.organizationId),
         lte(scheduledActionsTable.runAt, new Date()),
         organizationId
           ? eq(scheduledActionsTable.organizationId, organizationId)
           : undefined,
+        // Live owners must not occupy every slot and starve later due work.
+        notExists(db.select({ id: revenueExecutionsTable.id }).from(revenueExecutionsTable).where(and(
+          eq(revenueExecutionsTable.organizationId, scheduledActionsTable.organizationId),
+          sql`${revenueExecutionsTable.actionKey} = 'scheduled:' || ${scheduledActionsTable.id}::text`,
+          eq(revenueExecutionsTable.state, "processing"),
+          sql`${revenueExecutionsTable.expiresAt} >= now()`,
+        ))),
       ),
     )
+    .orderBy(asc(scheduledActionsTable.runAt), asc(scheduledActionsTable.id))
     .limit(20);
   for (const item of due) {
-    // Atomically CLAIM the row before executing: bump attempts guarded by a
-    // compare-and-set on (status='pending', attempts unchanged). A concurrent
-    // worker or overlapping tick loses the CAS and skips the row, so each
-    // scheduled send executes at most once — no double sends, no duplicate
-    // deferral re-queues, and frequency caps stay accurate.
-    const [claimed] = await db
-      .update(scheduledActionsTable)
-      .set({ attempts: item.attempts + 1 })
-      .where(
-        and(
-          eq(scheduledActionsTable.id, item.id),
-          eq(scheduledActionsTable.status, "pending"),
-          eq(scheduledActionsTable.attempts, item.attempts),
-        ),
-      )
-      .returning({ id: scheduledActionsTable.id });
-    if (!claimed) continue; // another worker took it
     try {
-      await executeAction(
-        item.organizationId,
-        item.action,
-        item.context as EventContext,
-        item.automationId ?? item.id,
-      );
+      if (await customerWorkHeld(item.organizationId)) continue;
+      const execution = await runDurableAction({
+        organizationId: item.organizationId, actionKey: `scheduled:${item.id}`,
+        leadId: typeof item.context.leadId === "string" ? item.context.leadId : null,
+        appointmentId: item.action.type === "appointment_reminder" && typeof item.context.appointmentId === "string" ? item.context.appointmentId : null,
+        kind: item.action.type, payload: { action: item.action, context: item.context },
+        execute: async () => {
+          // Re-read cancellation after acquiring exclusive durable ownership.
+          const [current] = await db.select().from(scheduledActionsTable).where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.organizationId, item.organizationId)));
+          if (!current || current.status !== "pending") return { state: "blocked", detail: "Scheduled action was cancelled or completed." };
+          const [claimed] = await db.update(scheduledActionsTable)
+            .set({ attempts: sql`${scheduledActionsTable.attempts} + 1` })
+            .where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.organizationId, item.organizationId), eq(scheduledActionsTable.status, "pending")))
+            .returning({ id: scheduledActionsTable.id });
+          if (!claimed) return { state: "blocked", detail: "Scheduled action was cancelled or completed." };
+          const result = await executeAction(item.organizationId, item.action, item.context as EventContext, item.automationId ?? item.id);
+          // A returned failure can follow an ambiguous provider response. Never auto-replay it.
+          if (result.status === "failed") throw new Error("Action result needs reconciliation");
+          return { state: result.status === "skipped" ? "blocked" : "succeeded", detail: result.status === "skipped" ? "The action's current eligibility check prevented execution." : "Scheduled action completed; inspect its activity record for provider evidence." };
+        },
+      });
+      if (execution.state === "processing") continue;
       await db
         .update(scheduledActionsTable)
-        .set({ status: "done" })
-        .where(eq(scheduledActionsTable.id, item.id));
-    } catch (err) {
+        .set({ status: execution.state === "indeterminate" ? "failed" : "done", lastError: execution.state === "indeterminate" ? "Indeterminate result: reconcile in Revenue Desk; automatic replay blocked." : null })
+        .where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.status, "pending")));
+    } catch {
+      // A DB error can happen AFTER ownership or even after the effect. Inspect
+      // the receipt first. Existing ownership is never treated as a safe retry.
+      const [receipt] = await db.select({ state: revenueExecutionsTable.state }).from(revenueExecutionsTable)
+        .where(and(eq(revenueExecutionsTable.organizationId, item.organizationId), eq(revenueExecutionsTable.actionKey, `scheduled:${item.id}`)));
+      if (receipt) {
+        await db.update(scheduledActionsTable).set({
+          status: ["succeeded", "blocked", "confirmed_succeeded", "confirmed_not_performed"].includes(receipt.state) ? "done" : "failed",
+          lastError: "Execution receipt exists; inspect that receipt before any new action. Automatic replay is blocked.",
+        }).where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.status, "pending")));
+        // Even a payload conflict cannot spin forever or acquire a new effect.
+        continue;
+      }
       const attempts = item.attempts + 1;
       await db
         .update(scheduledActionsTable)
         .set({
           status: attempts >= 3 ? "failed" : "pending",
-          lastError: err instanceof Error ? err.message : "failed",
-          runAt: new Date(Date.now() + 5 * 60_000),
+          attempts,
+          lastError: attempts >= 3
+            ? "Preparation failed three times before execution ownership. Operator review required."
+            : "Preparation failed before execution ownership. A bounded retry is scheduled.",
+          runAt: new Date(Date.now() + Math.min(30, 5 * 2 ** (attempts - 1)) * 60_000),
         })
-        .where(eq(scheduledActionsTable.id, item.id));
+        .where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.status, "pending"), eq(scheduledActionsTable.attempts, item.attempts)));
     }
   }
 }
@@ -986,18 +1028,23 @@ async function processDueScheduledActions(organizationId?: string): Promise<void
  * one stage never skips the others — in particular, webhook retries and the
  * abandoned-chat sweep still run if executing scheduled actions throws.
  *
- * @param organizationId - When provided, only the scheduled-actions stage runs
- *   and it is restricted to that org. All other global housekeeping stages are
+ * @param organizationId - When provided, actions and reactivation run only for
+ *   that org. All other global housekeeping stages are
  *   skipped. This prevents parallel test workers from stealing each other's
  *   pending actions or processing each other's webhook deliveries.
  */
-export async function processScheduledWork(organizationId?: string): Promise<void> {
-  await runStage("scheduled-actions", () => processDueScheduledActions(organizationId));
+export async function processScheduledWork(organizationId?: string, observe?: StageObserver): Promise<void> {
+  const stage = (name: SchedulerStage, fn: () => Promise<void>) => runStage(name, fn, observe);
+  await stage("scheduled-actions", () => processDueScheduledActions(organizationId));
+  await stage("staff-lead-notifications", async () => {
+    const { processStaffLeadPush } = await import("./staff-push");
+    await processStaffLeadPush(organizationId);
+  });
   // Throttled reactivation campaigns release their next batch of leads into
   // playbook sequences (their first step becomes due on a later tick).
   // Dynamic import avoids a static circular dependency (reactivation →
   // playbooks → automation).
-  await runStage("reactivation-drain", async () => {
+  await stage("reactivation-drain", async () => {
     const { drainReactivationCampaigns } = await import("./reactivation");
     await drainReactivationCampaigns(organizationId);
   });
@@ -1005,53 +1052,42 @@ export async function processScheduledWork(organizationId?: string): Promise<voi
   // (i.e. in tests). Those stages are not org-specific and would interfere with
   // parallel test workers that own different portions of the shared database.
   if (organizationId) return;
-  await runStage("webhook-retries", async () => {
+  await stage("webhook-retries", async () => {
     await processPendingDeliveries();
   });
   // Drop encrypted previous webhook secrets whose grace window has elapsed.
-  await runStage("webhook-secret-cleanup", async () => {
+  await stage("webhook-secret-cleanup", async () => {
     await cleanupExpiredPreviousSecrets();
   });
   // Flag concierge chats idle >30 min as abandoned (emits assessment.abandoned).
   // Dynamic import avoids a static circular dependency (concierge → automation).
-  await runStage("abandoned-chat-sweep", async () => {
+  await stage("abandoned-chat-sweep", async () => {
     const { markAbandonedConversations } = await import("./concierge");
     await markAbandonedConversations();
   });
   // Delete expired/consumed portal login codes and expired portal sessions.
-  await runStage("portal-credential-cleanup", async () => {
+  await stage("portal-credential-cleanup", async () => {
     const { cleanupExpiredPortalCredentials } = await import("./portal");
     await cleanupExpiredPortalCredentials();
   });
+  // Enforce Email Intelligence raw-content retention independently of UI reads.
+  // Facts and audit evidence remain; only the encrypted source body is purged.
+  await stage("email-intelligence-retention", async () => {
+    const { purgeExpiredEmailContent } = await import("./email-intelligence");
+    await purgeExpiredEmailContent();
+  });
   // Email org admins once when an active API key nears its expiry date.
-  await runStage("api-key-expiry-reminders", async () => {
+  await stage("api-key-expiry-reminders", async () => {
     const { processApiKeyExpiryReminders } = await import(
       "./api-key-expiry-reminder"
     );
     await processApiKeyExpiryReminders();
   });
   // Periodically delete orphaned public photo uploads (runs at most hourly).
-  // maybeCleanupOrphanedUploads already catches its own errors.
-  await maybeCleanupOrphanedUploads();
+  await stage("upload-cleanup", maybeCleanupOrphanedUploads);
 }
 
 const UPLOAD_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
-export function startAutomationScheduler(intervalMs = 60_000): void {
-  if (schedulerTimer) return;
-  schedulerTimer = setInterval(() => {
-    void processScheduledWork().catch((err) =>
-      console.error("[automation] scheduler tick failed:", err),
-    );
-  }, intervalMs);
-  schedulerTimer.unref();
-}
-
-export function stopAutomationScheduler(): void {
-  if (schedulerTimer) {
-    clearInterval(schedulerTimer);
-    schedulerTimer = null;
-  }
-}
 
 /** Display name of the seeded abandoned-chat follow-up rule (editable by admins). */
 export const DEFAULT_ABANDONED_FOLLOWUP_NAME = "Abandoned chat follow-up";
@@ -1440,20 +1476,16 @@ export async function ensureDefaultAutomations(
 }
 
 async function maybeCleanupOrphanedUploads(): Promise<void> {
+  // Self-hosted/Fly installations can run without Replit Object Storage.
+  // In that configuration there is no bucket to clean, so stay silent instead
+  // of emitting a false operational error on every scheduler interval.
+  if (!process.env.PRIVATE_OBJECT_DIR) return;
   const now = Date.now();
   if (now - lastUploadCleanupAt < UPLOAD_CLEANUP_INTERVAL_MS) return;
+  const { cleanupOrphanedUploads } = await import("./upload-cleanup");
+  const result = await cleanupOrphanedUploads();
+  if (result.errors > 0) throw new Error("Upload cleanup needs review.");
   lastUploadCleanupAt = now;
-  try {
-    const { cleanupOrphanedUploads } = await import("./upload-cleanup");
-    const result = await cleanupOrphanedUploads();
-    if (result.deleted > 0 || result.errors > 0) {
-      console.log(
-        `[upload-cleanup] scanned=${result.scanned} deleted=${result.deleted} kept=${result.kept} errors=${result.errors}`,
-      );
-    }
-  } catch (err) {
-    console.error("[upload-cleanup] run failed:", err);
-  }
 }
 
 /**
@@ -1473,13 +1505,27 @@ export async function scheduleAppointmentReminder(
     scheduledStart: Date;
   },
   contactMethod?: string | null,
+  transaction?: ScheduleTransaction,
 ): Promise<boolean> {
+  if (!transaction) return db.transaction(async tx => {
+    await lockContractorSchedule(tx, organizationId);
+    return scheduleAppointmentReminder(organizationId, appointment, contactMethod, tx);
+  });
   const startMs = appointment.scheduledStart.getTime();
   const now = Date.now();
   if (startMs - now <= 2 * 3_600_000) return false;
-  const { leadTimeHours } = await getAppointmentReminderSettings(organizationId);
+  const [settings] = await transaction.select({ reminder: orgSettingsTable.appointmentReminder }).from(orgSettingsTable).where(eq(orgSettingsTable.organizationId, organizationId));
+  const configuredLeadTime = settings?.reminder?.leadTimeHours;
+  const leadTimeHours = typeof configuredLeadTime === "number" && Number.isFinite(configuredLeadTime) ? Math.min(336, Math.max(1, configuredLeadTime)) : DEFAULT_APPOINTMENT_REMINDER.leadTimeHours;
   const runAt = new Date(Math.max(now, startMs - leadTimeHours * 3_600_000));
-  await db.insert(scheduledActionsTable).values({
+  const [existing] = await transaction.select({ id: scheduledActionsTable.id }).from(scheduledActionsTable).where(and(
+    eq(scheduledActionsTable.organizationId, organizationId), inArray(scheduledActionsTable.status, ["pending", "done"]),
+    sql`${scheduledActionsTable.context} ->> 'appointmentId' = ${appointment.id}`,
+    sql`${scheduledActionsTable.context} ->> 'event' = ${APPOINTMENT_REMINDER_EVENT}`,
+    sql`${scheduledActionsTable.context} -> 'fields' ->> 'appointment.scheduledStart' = ${appointment.scheduledStart.toISOString()}`,
+  )).limit(1);
+  if (existing) return false;
+  await transaction.insert(scheduledActionsTable).values({
     organizationId,
     automationId: null,
     action: {
@@ -1507,8 +1553,21 @@ export async function scheduleAppointmentReminder(
 export async function cancelAppointmentReminders(
   organizationId: string,
   appointmentId: string,
+  transaction?: ScheduleTransaction,
 ): Promise<number> {
-  const cancelled = await db
+  if (!transaction) return db.transaction(async tx => {
+    await lockContractorSchedule(tx, organizationId);
+    return cancelAppointmentReminders(organizationId, appointmentId, tx);
+  });
+  const owned = await transaction.select({ actionId: scheduledActionsTable.id, state: revenueExecutionsTable.state }).from(scheduledActionsTable)
+    .innerJoin(revenueExecutionsTable, and(eq(revenueExecutionsTable.organizationId, organizationId), sql`${revenueExecutionsTable.actionKey} = 'scheduled:' || ${scheduledActionsTable.id}::text`))
+    .where(and(eq(scheduledActionsTable.organizationId, organizationId), eq(scheduledActionsTable.status, "pending"), sql`${scheduledActionsTable.context} ->> 'appointmentId' = ${appointmentId}`, sql`${scheduledActionsTable.context} ->> 'event' = ${APPOINTMENT_REMINDER_EVENT}`));
+  for (const receipt of owned.filter(row => ["processing", "indeterminate"].includes(row.state))) {
+    const marker = `appointment.reminder_reconcile:${receipt.actionId}`;
+    const [task] = await transaction.select({ id: crmTasksTable.id }).from(crmTasksTable).where(and(eq(crmTasksTable.organizationId, organizationId), eq(crmTasksTable.sourceEvent, marker))).limit(1);
+    if (!task) await transaction.insert(crmTasksTable).values({ organizationId, sourceEvent: marker, title: "Check an appointment reminder after a schedule change", description: `Appointment ${appointmentId} changed after reminder execution was claimed. Check the execution receipt before any resend.`, dueAt: new Date(), priority: "high" });
+  }
+  const cancelled = await transaction
     .update(scheduledActionsTable)
     .set({ status: "cancelled" })
     .where(
@@ -1517,6 +1576,7 @@ export async function cancelAppointmentReminders(
         eq(scheduledActionsTable.status, "pending"),
         sql`${scheduledActionsTable.context} ->> 'appointmentId' = ${appointmentId}`,
         sql`${scheduledActionsTable.context} ->> 'event' = ${APPOINTMENT_REMINDER_EVENT}`,
+        owned.length ? notInArray(scheduledActionsTable.id, owned.map(row => row.actionId)) : undefined,
       ),
     )
     .returning({ id: scheduledActionsTable.id });

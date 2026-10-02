@@ -13,15 +13,19 @@ import {
   type PlaybookCategory,
   type PlaybookEnrollment,
   type PlaybookStep,
+  type SendingHoursSettings,
   type StageBehavior,
 } from "@workspace/db";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { isLegacyDefaultOrg } from "../lib/orgFlavor";
 import { recordAudit } from "./audit";
+import { needsSourceVerification } from "./source-history";
+import { hasCustomerReplyHold, lockReplyLead } from "./response-correlation";
 import {
   engagementLinkUrl,
   getOrCreateEngagementLink,
 } from "./engagement-links";
+import { getUserEmailStatus, sendEmailForUser, emailAcceptanceEvidence } from "./user-email";
 import {
   adjustSendTime,
   chooseVariant,
@@ -182,10 +186,7 @@ export async function ensureDefaultPlaybook(
 
 function rulesMatch(playbook: Playbook, lead: Lead): boolean {
   const rules = playbook.enrollmentRules ?? {};
-  if (
-    typeof rules.minScore === "number" &&
-    lead.score < rules.minScore
-  ) {
+  if (typeof rules.minScore === "number" && lead.score < rules.minScore) {
     return false;
   }
   if (rules.urgencies?.length && !rules.urgencies.includes(lead.urgency)) {
@@ -197,7 +198,10 @@ function rulesMatch(playbook: Playbook, lead: Lead): boolean {
   ) {
     return false;
   }
-  if (rules.sources?.length && (!lead.source || !rules.sources.includes(lead.source))) {
+  if (
+    rules.sources?.length &&
+    (!lead.source || !rules.sources.includes(lead.source))
+  ) {
     return false;
   }
   return true;
@@ -244,7 +248,9 @@ export async function autoEnrollLead(
     // stage-behavior hand-offs or dedicated flows.
     const match = playbooks.find(
       (p) =>
-        p.category === "acquisition" && p.steps.length > 0 && rulesMatch(p, lead),
+        p.category === "acquisition" &&
+        p.steps.length > 0 &&
+        rulesMatch(p, lead),
     );
     if (!match) return null;
 
@@ -263,36 +269,69 @@ export async function enrollLead(
   organizationId: string,
   leadId: string,
   playbook: Playbook,
+  options?: {
+    /** Reuse the campaign's transaction so progress and the first step commit together. */
+    transaction?: Parameters<Parameters<typeof db.transaction>[0]>[0];
+    skipAudit?: boolean;
+    sendingHours?: SendingHoursSettings;
+  },
 ): Promise<PlaybookEnrollment | null> {
   const firstStep = playbook.steps[0];
   if (!firstStep) return null;
   let runAt = new Date(Date.now() + firstStep.delayMinutes * 60_000);
   // Never schedule the first touch outside the org's permitted sending
   // window (e.g. a lead captured at 2am waits until 8am local).
-  const sendingHours = await getSendingHours(organizationId);
+  const sendingHours = options?.sendingHours ?? (await getSendingHours(organizationId));
   runAt = nextAllowedSendTime(sendingHours, runAt) ?? runAt;
   try {
-    const [enrollment] = await db
-      .insert(playbookEnrollmentsTable)
-      .values({
+    const create = async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
+      await lockReplyLead(tx, organizationId, leadId);
+      if (await hasCustomerReplyHold(organizationId, leadId, tx)) return null;
+      const [enrollment] = await tx
+        .insert(playbookEnrollmentsTable)
+        .values({
+          organizationId,
+          playbookId: playbook.id,
+          leadId,
+          kind: playbook.kind,
+          category: playbook.category,
+          status: "active",
+          currentStep: 0,
+          nextRunAt: runAt,
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (!enrollment) return null;
+      await tx.insert(scheduledActionsTable).values({
         organizationId,
-        playbookId: playbook.id,
-        leadId,
-        kind: playbook.kind,
-        category: playbook.category,
-        status: "active",
-        currentStep: 0,
-        nextRunAt: runAt,
-      })
-      .returning();
-    await scheduleStep(enrollment, 0, runAt);
-    await recordAudit({
-      organizationId,
-      action: "playbook.enrolled",
-      entityType: "lead",
-      entityId: leadId,
-      metadata: { playbookId: playbook.id, playbookName: playbook.name },
-    });
+        action: {
+          type: "playbook_step",
+          params: { enrollmentId: enrollment.id, stepIndex: 0 },
+        },
+        context: { leadId },
+        runAt,
+      });
+      return enrollment;
+    };
+    const enrollment = options?.transaction
+      ? await create(options.transaction)
+      : await db.transaction(create);
+    if (!enrollment) return null;
+    if (!options?.skipAudit) {
+      try {
+        await recordAudit({
+          organizationId,
+          action: "playbook.enrolled",
+          entityType: "lead",
+          entityId: leadId,
+          metadata: { playbookId: playbook.id, playbookName: playbook.name },
+        });
+      } catch (err) {
+        // Audit availability must not make a committed enrollment look failed
+        // to callers and prompt them to create a second sequence.
+        console.error("[playbooks] enrollment audit failed:", err);
+      }
+    }
     return enrollment;
   } catch (err) {
     // Unique partial index: another live enrollment (same category, or same
@@ -300,7 +339,9 @@ export async function enrollLead(
     // the cause too.
     const messages = [
       err instanceof Error ? err.message : "",
-      err instanceof Error && err.cause instanceof Error ? err.cause.message : "",
+      err instanceof Error && err.cause instanceof Error
+        ? err.cause.message
+        : "",
     ].join(" ");
     if (/playbook_enrollments_lead_(playbook_)?active_idx/.test(messages)) {
       return null;
@@ -313,8 +354,9 @@ async function scheduleStep(
   enrollment: PlaybookEnrollment,
   stepIndex: number,
   runAt: Date,
+  writer: Pick<typeof db, "insert"> = db,
 ): Promise<void> {
-  await db.insert(scheduledActionsTable).values({
+  await writer.insert(scheduledActionsTable).values({
     organizationId: enrollment.organizationId,
     action: {
       type: "playbook_step",
@@ -347,6 +389,7 @@ export async function executePlaybookStep(
   organizationId: string,
   params: { enrollmentId?: string; stepIndex?: number },
 ): Promise<{ status: "success" | "skipped"; detail: string }> {
+  const { customerWorkHeld } = await import("./customer-lifecycle-runtime");
   const { enrollmentId, stepIndex } = params;
   if (typeof enrollmentId !== "string" || typeof stepIndex !== "number") {
     return { status: "skipped", detail: "missing enrollment params" };
@@ -366,6 +409,23 @@ export async function executePlaybookStep(
   }
   if (enrollment.currentStep !== stepIndex) {
     return { status: "skipped", detail: "step already handled" };
+  }
+  if (await customerWorkHeld(organizationId)) {
+    // A scheduler can already own the action when the company hold lands.
+    // Expose the retained step for explicit resumption instead of stranding an
+    // active enrollment after its scheduled receipt has been closed.
+    const reason = "Company work paused during step preparation; review before resuming";
+    const entry: EnrollmentHistoryEntry = { at: new Date().toISOString(), kind: "paused", stepIndex, detail: reason };
+    await db.update(playbookEnrollmentsTable).set({ status: "paused", pauseReason: reason, nextRunAt: null,
+      history: sql`${playbookEnrollmentsTable.history} || ${JSON.stringify([entry])}::jsonb`,
+    }).where(and(eq(playbookEnrollmentsTable.id, enrollment.id), eq(playbookEnrollmentsTable.organizationId, organizationId),
+      eq(playbookEnrollmentsTable.status, "active"), eq(playbookEnrollmentsTable.currentStep, stepIndex)));
+    return { status: "skipped", detail: "paused: customer_lifecycle_paused" };
+  }
+
+  if (await hasCustomerReplyHold(organizationId, enrollment.leadId)) {
+    await pauseEnrollment(enrollment.id, "Customer replied; resolve the reply review before resuming");
+    return { status: "skipped", detail: "paused: customer_reply_requires_review" };
   }
 
   const [playbook] = await db
@@ -413,7 +473,8 @@ export async function executePlaybookStep(
     const continues =
       behavior.action === "continue" ||
       // An "enroll into this very playbook" stage must not complete itself.
-      (behavior.action === "enroll" && behavior.enrollPlaybookId === playbook.id);
+      (behavior.action === "enroll" &&
+        behavior.enrollPlaybookId === playbook.id);
     if (!continues) {
       if (behavior.action === "pause") {
         await pauseEnrollment(enrollment.id, `lead moved to ${lead.status}`);
@@ -447,12 +508,51 @@ export async function executePlaybookStep(
   const sendingHours = await getSendingHours(organizationId);
   const gate = await checkSendEligibility({
     organizationId,
+    leadId: lead.id,
     contact,
     channel: step.channel,
     kind: "outreach",
     sendingHours,
   });
+  const permanentStop = !gate.ok && gate.outcome === "blocked" &&
+    (gate.reason.startsWith("suppressed:") || gate.reason === "do_not_contact");
+  if (!gate.ok && gate.reason === "customer_lifecycle_paused") {
+    // The company may have paused after this step's entry check. Retain the
+    // same step for explicit review instead of consuming it as a channel skip.
+    const reason = "Company work paused during step preparation; review before resuming";
+    const entry: EnrollmentHistoryEntry = { at: new Date().toISOString(), kind: "paused", stepIndex, channel: step.channel, detail: reason };
+    await db.update(playbookEnrollmentsTable).set({ status: "paused", pauseReason: reason, nextRunAt: null,
+      history: sql`${playbookEnrollmentsTable.history} || ${JSON.stringify([entry])}::jsonb`,
+    }).where(and(eq(playbookEnrollmentsTable.id, enrollment.id), eq(playbookEnrollmentsTable.organizationId, organizationId),
+      eq(playbookEnrollmentsTable.status, "active"), eq(playbookEnrollmentsTable.currentStep, stepIndex)));
+    return { status: "skipped", detail: "paused: customer_lifecycle_paused" };
+  }
+  if (!permanentStop && (needsSourceVerification(lead) ||
+      (!gate.ok && gate.reason === "imported_source_requires_current_review"))) {
+    // Source review takes priority over a missing address, SMS consent or send
+    // window. None of those channel conditions can consume a source-held step.
+    // Explicit suppression/DNC still uses the existing permanent-stop path.
+    const reason = "Imported source needs current review before outreach";
+    const entry: EnrollmentHistoryEntry = {
+      at: new Date().toISOString(), kind: "paused", stepIndex,
+      channel: step.channel, detail: reason,
+    };
+    await db.update(playbookEnrollmentsTable).set({
+      status: "paused", pauseReason: reason, nextRunAt: null,
+      history: sql`${playbookEnrollmentsTable.history} || ${JSON.stringify([entry])}::jsonb`,
+    }).where(and(
+      eq(playbookEnrollmentsTable.id, enrollment.id),
+      eq(playbookEnrollmentsTable.organizationId, organizationId),
+      eq(playbookEnrollmentsTable.status, "active"),
+      eq(playbookEnrollmentsTable.currentStep, stepIndex),
+    ));
+    await recordBlockedSend({ organizationId, channel: step.channel,
+      reason: "imported_source_requires_current_review", outcome: "blocked",
+      source: "playbook", leadId: lead.id, contactId: contact.id });
+    return { status: "skipped", detail: "paused: imported_source_requires_current_review" };
+  }
   let gateSkipReason: string | null = null;
+  let emailSenderUserId: string | null = null;
   if (!gate.ok) {
     if (gate.outcome === "deferred") {
       // Quiet hours / frequency cap: pause, never drop. Re-queue the exact
@@ -498,15 +598,89 @@ export async function executePlaybookStep(
       leadId: lead.id,
       contactId: contact.id,
     });
-    if (gate.reason.startsWith("suppressed:") || gate.reason === "do_not_contact") {
+    if (
+      gate.reason.startsWith("suppressed:") ||
+      gate.reason === "do_not_contact"
+    ) {
       // The recipient opted out (or is flagged do-not-contact): exit the
       // whole sequence rather than skipping one step.
-      await finishEnrollment(enrollment.id, "stopped", `send blocked: ${gate.reason}`);
+      await finishEnrollment(
+        enrollment.id,
+        "stopped",
+        `send blocked: ${gate.reason}`,
+      );
       return { status: "skipped", detail: `blocked: ${gate.reason}` };
     }
     // Non-fatal (missing/invalid address, no SMS consent): claim + skip the
     // touch and let the sequence continue on other channels.
     gateSkipReason = gate.reason;
+  }
+
+  // Automated email must have an explicit, user-owned sender. Never fall
+  // back to the organization's generic provider (or a platform mailbox).
+  // Check this before claiming the step so assigning a rep / connecting
+  // Gmail can resume the same touch instead of silently consuming it.
+  if (step.channel === "email" && !gateSkipReason) {
+    if (!lead.assignedUserId) {
+      const reason = "automated_sender_unassigned";
+      await pauseEnrollment(
+        enrollment.id,
+        "Automated email paused: assign this lead to a user with a connected selected email account",
+      );
+      await recordBlockedSend({
+        organizationId,
+        channel: "email",
+        reason,
+        outcome: "blocked",
+        source: "playbook",
+        mode: "automated",
+        leadId: lead.id,
+        contactId: contact.id,
+      });
+      return { status: "skipped", detail: `paused: ${reason}` };
+    }
+    const gmail = await getUserEmailStatus(organizationId, lead.assignedUserId);
+    if (!gmail.senderActive) {
+      const reason = "assigned_sender_inactive";
+      await pauseEnrollment(
+        enrollment.id,
+        "Automated email paused: the assigned user is no longer active",
+      );
+      await recordBlockedSend({
+        organizationId,
+        channel: "email",
+        reason,
+        outcome: "blocked",
+        source: "playbook",
+        mode: "automated",
+        leadId: lead.id,
+        contactId: contact.id,
+      });
+      return { status: "skipped", detail: `paused: ${reason}` };
+    }
+    if (!gmail.configured || !gmail.connected) {
+      const reason = gmail.configured
+        ? "assigned_sender_email_not_connected"
+        : "email_provider_not_configured";
+      await pauseEnrollment(
+        enrollment.id,
+        gmail.configured
+          ? "Automated email paused: the assigned user must connect their selected email account"
+          : "Automated email paused: the selected email provider is not configured or selected",
+      );
+      await recordBlockedSend({
+        organizationId,
+        channel: "email",
+        reason,
+        outcome: "blocked",
+        source: "playbook",
+        mode: "automated",
+        leadId: lead.id,
+        contactId: contact.id,
+      });
+      return { status: "skipped", detail: `paused: ${reason}` };
+    }
+    emailSenderUserId = lead.assignedUserId;
   }
 
   // Atomically CLAIM this step before any external side effect: advance
@@ -522,7 +696,8 @@ export async function executePlaybookStep(
     // Learning loop: nudge the follow-up into the org's best-performing
     // send window once there's enough outcome data (no-op before that).
     const tentative = new Date(Date.now() + nextStep.delayMinutes * 60_000);
-    nextRunAt = (await adjustSendTime(organizationId, tentative, sendingHours)).runAt;
+    nextRunAt = (await adjustSendTime(organizationId, tentative, sendingHours))
+      .runAt;
     // Never schedule the follow-up outside the org's permitted sending
     // window: defer it to the next valid local send time.
     const clamped = nextAllowedSendTime(sendingHours, nextRunAt);
@@ -581,15 +756,25 @@ export async function executePlaybookStep(
   }
 
   // Channel reachability + SMS consent gate.
-  let sendResult: { id: string; provider: string } | null = null;
+  let sendResult: {
+    id: string | null;
+    provider: string;
+    senderEmail?: string;
+    providerRequestId?: string | null;
+    clientRequestId?: string;
+  } | null = null;
   let skipDetail: string | null = null;
   const settings = await getOrgSettings(organizationId);
-  const businessName =
-    await getBusinessName(organizationId);
+  const businessName = await getBusinessName(organizationId);
 
   // Learning loop: bandit-allocated message variant (pinned wins; even
   // split while exploring; Thompson sampling on reply rate afterwards).
-  const variant = await chooseVariant(organizationId, playbook, stepIndex, step);
+  const variant = await chooseVariant(
+    organizationId,
+    playbook,
+    stepIndex,
+    step,
+  );
 
   const draft = await draftOutreachMessage({
     channel: step.channel,
@@ -624,19 +809,30 @@ export async function executePlaybookStep(
   } else {
     try {
       if (step.channel === "email") {
-        sendResult = await providers.email.send(
-          contact.email!,
-          variant.subject ?? step.subject ?? `${businessName} — following up`,
-          draft.body + linkSuffix + unsubscribeFooter(organizationId, contact.id),
-        );
+        sendResult = await sendEmailForUser({
+          organizationId,
+          userId: emailSenderUserId!,
+          to: contact.email!,
+          subject:
+            variant.subject ?? step.subject ?? `${businessName} — following up`,
+          body:
+            draft.body +
+            linkSuffix +
+            unsubscribeFooter(organizationId, contact.id),
+        });
       } else {
-        sendResult = await providers.sms.send(contact.phone!, draft.body + linkSuffix);
+        sendResult = await providers.sms.send(
+          contact.phone!,
+          draft.body + linkSuffix,
+          { organizationId, contactId: contact.id, purpose: 'marketing', idempotencyKey: `playbook:${enrollment.id}:${stepIndex}` },
+        );
       }
     } catch (err) {
       // Permanently bad address → suppress it and stop the sequence so
       // nothing keeps hammering a dead mailbox/number. Transient/provider
       // config failures rethrow (step is already claimed; no double send).
-      const address = step.channel === "email" ? contact.email! : contact.phone!;
+      const address =
+        step.channel === "email" ? contact.email! : contact.phone!;
       const suppressed = await handleProviderFailure({
         organizationId,
         channel: step.channel,
@@ -691,7 +887,9 @@ export async function executePlaybookStep(
         enrollmentId: enrollment.id,
         stepIndex,
         channel: step.channel,
-        provider: sendResult.provider,
+        ...(step.channel === "email" ? emailAcceptanceEvidence(sendResult, { organizationId, leadId: lead.id, recipientEmail: contact.email! }) : { provider: sendResult.provider, providerMessageId: sendResult.id }),
+        senderUserId: emailSenderUserId,
+        from: sendResult.senderEmail ?? null,
         aiProvider: draft.provider,
       },
     });
@@ -711,7 +909,9 @@ export async function executePlaybookStep(
         playbookId: playbook.id,
         stepIndex,
         channel: step.channel,
-        provider: sendResult.provider,
+        ...(step.channel === "email" ? emailAcceptanceEvidence(sendResult, { organizationId, leadId: lead.id, recipientEmail: contact.email! }) : { provider: sendResult.provider, providerMessageId: sendResult.id }),
+        senderUserId: emailSenderUserId,
+        from: sendResult.senderEmail ?? null,
         mock: sendResult.provider.startsWith("mock-"),
       },
     });
@@ -790,13 +990,19 @@ export async function stopEnrollmentsForLead(
           eq(playbookEnrollmentsTable.leadId, leadId),
           inArray(playbookEnrollmentsTable.status, ["active", "paused"]),
           ...(kind ? [eq(playbookEnrollmentsTable.kind, kind)] : []),
-          ...(category ? [eq(playbookEnrollmentsTable.category, category)] : []),
+          ...(category
+            ? [eq(playbookEnrollmentsTable.category, category)]
+            : []),
         ),
       );
     for (const enrollment of live) {
       await db
         .update(playbookEnrollmentsTable)
-        .set({ status, pauseReason: reason, nextRunAt: status === "paused" ? enrollment.nextRunAt : null })
+        .set({
+          status,
+          pauseReason: reason,
+          nextRunAt: status === "paused" ? enrollment.nextRunAt : null,
+        })
         .where(eq(playbookEnrollmentsTable.id, enrollment.id));
       await appendHistory(enrollment.id, {
         at: new Date().toISOString(),
@@ -806,6 +1012,30 @@ export async function stopEnrollmentsForLead(
     }
   } catch (err) {
     console.error("[playbooks] stopEnrollmentsForLead failed:", err);
+  }
+}
+
+/** Stop exactly one linked sequence (for campaign cancellation). */
+export async function stopEnrollmentById(
+  organizationId: string,
+  enrollmentId: string,
+  reason: string,
+): Promise<void> {
+  const [stopped] = await db
+    .update(playbookEnrollmentsTable)
+    .set({ status: "stopped", pauseReason: reason, nextRunAt: null })
+    .where(
+      and(
+        eq(playbookEnrollmentsTable.id, enrollmentId),
+        eq(playbookEnrollmentsTable.organizationId, organizationId),
+        inArray(playbookEnrollmentsTable.status, ["active", "paused"]),
+      ),
+    )
+    .returning({ id: playbookEnrollmentsTable.id });
+  if (stopped) {
+    await appendHistory(enrollmentId, {
+      at: new Date().toISOString(), kind: "stopped", detail: reason,
+    });
   }
 }
 
@@ -833,93 +1063,55 @@ export async function enrollLeadInPlaybookById(
   if (!playbook || playbook.steps.length === 0) return null;
   return enrollLead(organizationId, leadId, playbook);
 }
-/** Rep control: resume a paused enrollment (reschedules the current step). */
-export async function resumeEnrollment(
-  organizationId: string,
-  enrollmentId: string,
-): Promise<PlaybookEnrollment | null> {
-  const [enrollment] = await db
-    .select()
-    .from(playbookEnrollmentsTable)
-    .where(
-      and(
-        eq(playbookEnrollmentsTable.id, enrollmentId),
-        eq(playbookEnrollmentsTable.organizationId, organizationId),
-      ),
-    );
-  if (!enrollment || enrollment.status !== "paused") return null;
-  const [playbook] = await db
-    .select()
-    .from(playbooksTable)
-    .where(eq(playbooksTable.id, enrollment.playbookId));
-  const step = playbook?.steps[enrollment.currentStep];
-  if (!playbook || !step) return null;
-  const runAt = new Date(Date.now() + Math.min(step.delayMinutes, 60) * 60_000);
-  const [updated] = await db
-    .update(playbookEnrollmentsTable)
-    .set({ status: "active", pauseReason: null, nextRunAt: runAt })
-    .where(eq(playbookEnrollmentsTable.id, enrollment.id))
-    .returning();
-  await scheduleStep(updated, updated.currentStep, runAt);
-  await appendHistory(enrollment.id, {
-    at: new Date().toISOString(),
-    kind: "resumed",
+/** Rep controls serialize with reply confirmation before changing a step. */
+async function changeEnrollmentStep(organizationId: string, enrollmentId: string, operation: "resume" | "skip"): Promise<PlaybookEnrollment | null> {
+  return db.transaction(async tx => {
+    const [initial] = await tx.select().from(playbookEnrollmentsTable).where(and(
+      eq(playbookEnrollmentsTable.id, enrollmentId), eq(playbookEnrollmentsTable.organizationId, organizationId),
+    ));
+    if (!initial) return null;
+    await lockReplyLead(tx, organizationId, initial.leadId);
+    const [enrollment] = await tx.select().from(playbookEnrollmentsTable).where(and(
+      eq(playbookEnrollmentsTable.id, enrollmentId), eq(playbookEnrollmentsTable.organizationId, organizationId),
+    )).for("update");
+    if (!enrollment || (operation === "resume" ? enrollment.status !== "paused" : !["active", "paused"].includes(enrollment.status))) return null;
+    if (await hasCustomerReplyHold(organizationId, enrollment.leadId, tx)) return enrollment;
+    const [playbook] = await tx.select().from(playbooksTable).where(and(eq(playbooksTable.id, enrollment.playbookId), eq(playbooksTable.organizationId, organizationId)));
+    if (!playbook) return null;
+    const nextIndex = enrollment.currentStep + (operation === "skip" ? 1 : 0);
+    const step = playbook.steps[nextIndex];
+    if (!step && operation === "resume") return null;
+    const entries: EnrollmentHistoryEntry[] = [{ at: new Date().toISOString(), kind: operation === "resume" ? "resumed" : "skipped", ...(operation === "skip" ? { stepIndex: enrollment.currentStep } : {}) }];
+    if (!step) entries.push({ at: new Date().toISOString(), kind: "completed", detail: "skipped past final step" });
+    const runAt = step ? new Date(Date.now() + (operation === "resume" ? Math.min(step.delayMinutes, 60) : step.delayMinutes) * 60_000) : null;
+    const [updated] = await tx.update(playbookEnrollmentsTable).set({
+      currentStep: step ? nextIndex : enrollment.currentStep,
+      status: step ? "active" : "completed", nextRunAt: runAt,
+      pauseReason: step ? null : "skipped past final step",
+      history: sql`${playbookEnrollmentsTable.history} || ${JSON.stringify(entries)}::jsonb`,
+    }).where(eq(playbookEnrollmentsTable.id, enrollment.id)).returning();
+    if (step && runAt) await scheduleStep(updated, nextIndex, runAt, tx);
+    return updated;
   });
-  return updated;
+}
+
+/** Rep control: resume a paused enrollment (reschedules the current step). */
+export async function resumeEnrollment(organizationId: string, enrollmentId: string): Promise<PlaybookEnrollment | null> {
+  return changeEnrollmentStep(organizationId, enrollmentId, "resume");
 }
 
 /** Rep control: skip the current step and schedule the next one now. */
-export async function skipEnrollmentStep(
-  organizationId: string,
-  enrollmentId: string,
-): Promise<PlaybookEnrollment | null> {
-  const [enrollment] = await db
-    .select()
-    .from(playbookEnrollmentsTable)
-    .where(
-      and(
-        eq(playbookEnrollmentsTable.id, enrollmentId),
-        eq(playbookEnrollmentsTable.organizationId, organizationId),
-      ),
-    );
-  if (!enrollment || (enrollment.status !== "active" && enrollment.status !== "paused")) {
-    return null;
-  }
-  const [playbook] = await db
-    .select()
-    .from(playbooksTable)
-    .where(eq(playbooksTable.id, enrollment.playbookId));
-  if (!playbook) return null;
-  await appendHistory(enrollment.id, {
-    at: new Date().toISOString(),
-    kind: "skipped",
-    stepIndex: enrollment.currentStep,
-  });
-  const nextIndex = enrollment.currentStep + 1;
-  const nextStep = playbook.steps[nextIndex];
-  if (!nextStep) {
-    await finishEnrollment(enrollment.id, "completed", "skipped past final step");
-    const [finished] = await db
-      .select()
-      .from(playbookEnrollmentsTable)
-      .where(eq(playbookEnrollmentsTable.id, enrollment.id));
-    return finished ?? null;
-  }
-  const runAt = new Date(Date.now() + nextStep.delayMinutes * 60_000);
-  const [updated] = await db
-    .update(playbookEnrollmentsTable)
-    .set({ currentStep: nextIndex, nextRunAt: runAt, status: "active", pauseReason: null })
-    .where(eq(playbookEnrollmentsTable.id, enrollment.id))
-    .returning();
-  await scheduleStep(updated, nextIndex, runAt);
-  return updated;
+export async function skipEnrollmentStep(organizationId: string, enrollmentId: string): Promise<PlaybookEnrollment | null> {
+  return changeEnrollmentStep(organizationId, enrollmentId, "skip");
 }
 
 /** The lead-detail panel: live (or most recent) enrollment for a lead. */
 export async function getLeadEnrollment(
   organizationId: string,
   leadId: string,
-): Promise<(PlaybookEnrollment & { playbookName: string; totalSteps: number }) | null> {
+): Promise<
+  (PlaybookEnrollment & { playbookName: string; totalSteps: number }) | null
+> {
   const [row] = await db
     .select({
       enrollment: playbookEnrollmentsTable,
@@ -957,6 +1149,7 @@ export async function applyStageBehaviorToLead(
   organizationId: string,
   leadId: string,
   status: string,
+  allowEnrollment = true,
 ): Promise<void> {
   try {
     const behaviors = await getPlaybookStageBehaviors(organizationId);
@@ -1010,7 +1203,7 @@ export async function applyStageBehaviorToLead(
           undefined,
           "acquisition",
         );
-        if (target) {
+        if (target && allowEnrollment) {
           await enrollLeadInPlaybookById(organizationId, leadId, target);
         }
         return;

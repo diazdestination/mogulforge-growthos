@@ -4,6 +4,8 @@ export type Permission =
   | "crm.read"
   | "crm.write"
   | "crm.delete"
+  | "invoices.read"
+  | "invoices.manage"
   | "audit.read"
   | "users.read"
   | "users.manage"
@@ -36,6 +38,8 @@ const PERMISSION_MATRIX: Record<Permission, UserRole[]> = {
   "crm.read": ALL_ROLES,
   "crm.write": WRITE_ROLES,
   "crm.delete": ["owner", "admin", "sales_manager"],
+  "invoices.read": ["owner", "admin", "office", "sales_manager"],
+  "invoices.manage": ["owner", "admin", "office"],
   "audit.read": ADMIN_ROLES,
   "users.read": ALL_ROLES,
   "users.manage": ADMIN_ROLES,

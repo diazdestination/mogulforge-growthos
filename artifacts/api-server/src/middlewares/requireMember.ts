@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import type { NextFunction, Request, Response } from "express";
 
 import { hasPermission, type Permission } from "../lib/permissions";
+import { normalizeIpAddress } from "../lib/ip";
 import { createFailureLimiter, incrementShared } from "../lib/rateLimit";
 import { resolveApiKey } from "../services/api-keys";
 import { reportApiKeyBruteForceBlock } from "../services/security-alerts";
@@ -63,7 +64,7 @@ export function requireMember(permission: Permission): RequireMemberGuard {
         : (req.headers?.["x-api-key"] as string | undefined);
     if (rawKey) {
       // req.ip respects the app-level "trust proxy" setting.
-      const ip = req.ip || req.socket?.remoteAddress || "unknown";
+      const ip = normalizeIpAddress(req.ip || req.socket?.remoteAddress);
       // isBlockedShared falls back to the shared DB counter when the local
       // cache has no entry for this IP — so a freshly restarted instance
       // enforces an existing cluster-wide block without needing to record a
@@ -92,6 +93,7 @@ export function requireMember(permission: Permission): RequireMemberGuard {
       if (
         permission === "settings.manage" ||
         permission === "users.manage" ||
+        permission === "invoices.manage" ||
         !hasPermission(resolved.key.role, permission)
       ) {
         res.status(403).json({ error: "API key lacks this permission" });

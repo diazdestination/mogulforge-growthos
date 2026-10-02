@@ -23,7 +23,7 @@ router.post(
   "/lead-imports",
   requireMember("crm.write"),
   async (req: Request, res: Response): Promise<void> => {
-    const { csv, mapping, fileName, hasHeader, defaultStatus, defaultSource } =
+    const { csv, mapping, fileName, hasHeader, defaultStatus, defaultSource, sourceKey, snapshotAsOf } =
       req.body ?? {};
     if (typeof csv !== "string" || csv.length === 0 || csv.length > 5_000_000) {
       res.status(400).json({ error: "A CSV file (under 5MB) is required" });
@@ -33,6 +33,11 @@ router.post(
       res.status(400).json({ error: "A column mapping is required" });
       return;
     }
+    if ((sourceKey !== undefined && typeof sourceKey !== "string") ||
+        (snapshotAsOf !== undefined && typeof snapshotAsOf !== "string")) {
+      res.status(400).json({ error: "Source account key and snapshot date must be strings" });
+      return;
+    }
     const result = await importLeads(req.member!.organizationId, {
       csv,
       mapping,
@@ -40,6 +45,8 @@ router.post(
       hasHeader: hasHeader !== false,
       defaultStatus: typeof defaultStatus === "string" ? defaultStatus : undefined,
       defaultSource: typeof defaultSource === "string" ? defaultSource : undefined,
+      sourceKey: typeof sourceKey === "string" ? sourceKey : undefined,
+      snapshotAsOf: typeof snapshotAsOf === "string" ? snapshotAsOf : undefined,
       createdByUserId: req.member!.user.id,
     });
     if ("error" in result) {

@@ -45,6 +45,10 @@ const EMAIL = `portal-photo-${Date.now()}@example.com`;
 const EMAIL_OTHER = `portal-photo-other-${Date.now()}@example.com`;
 
 beforeAll(async () => {
+  server = app.listen(0);
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
+
   const [o] = await db
     .insert(organizationsTable)
     .values({ name: "Portal Photo Org", slug: `portal-photo-${Date.now()}` })
@@ -70,8 +74,10 @@ beforeAll(async () => {
 
   // Upload a real tiny object so the owned-photo request can stream bytes.
   const storage = new ObjectStorageService();
-  const uploadUrl = await storage.getObjectEntityUploadURL();
-  const put = await fetch(uploadUrl, {
+  const uploadUrl = await storage.getObjectEntityUploadURL({
+    organizationId: org.id,
+  });
+  const put = await fetch(new URL(uploadUrl, baseUrl), {
     method: "PUT",
     headers: { "content-type": "image/png" },
     body: PNG_BYTES,
@@ -107,9 +113,6 @@ beforeAll(async () => {
     expiresAt: new Date(Date.now() + 60_000),
   });
 
-  server = app.listen(0);
-  await new Promise<void>((resolve) => server.once("listening", resolve));
-  baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`;
 });
 
 afterAll(async () => {

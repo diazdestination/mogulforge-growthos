@@ -1,122 +1,128 @@
-# Painless Command Center — Client Template
+# MogulForge GrowthOS
 
-A full-stack roofing CRM: pipeline board, lead management, scheduling, automated emails, portal access for homeowners, and an AI roof concierge. Built on React + Vite (frontend) and Node/Fastify + PostgreSQL (API server).
+**Revenue Intelligence and Recovery Operating System for home-services businesses.**
 
----
+[MogulForge](https://mogulforge.ai) helps operators turn fragmented customer,
+pipeline, communication, and operational data into clear next actions. GrowthOS
+combines a multi-tenant CRM with evidence-backed business intelligence,
+approval-first automation, and an expanding permissioned business-data graph.
 
-## ⚡ First thing after cloning: activate the sync workflow
+The product is designed for roofing and adjacent home-services businesses where
+slow follow-up, disconnected systems, and incomplete operational visibility can
+cause otherwise recoverable opportunities to disappear.
 
-This repository ships with a **Sync from upstream monorepo** GitHub Actions workflow that lets you pull the latest updates from the Painless CRM monorepo with one click. It needs a one-time setup step to become dispatchable:
+## Platform
 
-**Option A — GitHub Codespaces (automatic)**
+### Revenue Command Center
 
-Open this repo in a Codespace. The devcontainer runs the activation script automatically on container create — nothing else to do.
+- Lead, customer, property, appointment, task, estimate, and pipeline workflows
+- Attribution and operational reporting
+- Organization-aware access and tenant isolation
+- Homeowner communication and lead-capture experiences
 
-**Option B — local clone (one command)**
+### Business Intelligence Engine
 
-```bash
-bash scripts/install-sync-workflow.sh
-```
+- Deterministic opportunity detection grounded in tenant-owned records
+- Evidence-backed explanations with confidence and limitations
+- Reviewable action proposals with approve, edit, reject, and execution states
+- Guardrailed automation policies and immutable activity history
+- Outcome tracking designed to distinguish recovered revenue from pipeline value
 
-This moves the staged workflow file into `.github/workflows/` and pushes it. After that, go to **Actions → "Sync from upstream monorepo" → Run workflow** to pull future updates.
+### Evidence Intelligence
 
-> The script is safe to re-run; it exits immediately if the workflow is already in place.
+- Approved, tenant-scoped source artifacts
+- Local redaction and citation-bounded AI drafting
+- Human review before conclusions are finalized
+- Tamper-evident Loss Evidence Certificates
 
----
+### Permissioned Business Graph
 
-## Rebranding for a new client
+- Per-user Gmail sending foundation with no platform-account fallback
+- Incremental Google module authorization and explicit scope disclosure
+- Planned connectors for Calendar, selected Drive and Sheets assets, Analytics,
+  Search Console, Google Ads, and Business Profile
+- Phased email intelligence architecture that begins with customer-controlled
+  sources and reserves unrestricted mailbox analysis for formal verification
 
-**Everything client-specific lives in two config files. Edit both before your first deploy.**
+## Trust principles
 
-| File | Audience | What to change |
-|---|---|---|
-| `artifacts/command-center/src/lib/client.config.ts` | **Frontend** (browser bundle) | Business name, short name, app title, primary color (hex + HSL), phone, timezone |
-| `artifacts/api-server/src/lib/client.config.ts` | **Backend** (server process) | Default org name, org slug, fallback business name, AI assistant name, AI greeting |
+- Tenant-private by default
+- Least-privilege, incremental authorization
+- Human approval before consequential outbound actions
+- Connected documents and messages treated as untrusted data, never instructions
+- Evidence and provenance retained for material recommendations
+- No shared-model training on customer data by default
+- Clear separation between implemented foundations, verified integrations, and
+  planned capabilities
 
-### Why two files?
+## Current status
 
-The frontend config is baked into the browser bundle at build time (Vite replaces references at compile time — values are never fetched from the server). The backend config is loaded by the Node.js process at startup and seeds the database on first boot. Merging them into one file would require shipping server-only secrets alongside client JS, or adding a runtime fetch step before the app renders — neither is worth the trade-off.
+| Surface | Status |
+| --- | --- |
+| Corporate site | Live at [mogulforge.ai](https://mogulforge.ai) |
+| Founding-beta application | Live at [app.mogulforge.ai](https://app.mogulforge.ai) on the approved production baseline |
+| Current development branch | Under review; not deployed to production |
+| Per-user Gmail sending | Secure application foundation implemented; real production OAuth acceptance remains pending |
+| Google Business Graph | Permission and module foundation implemented; source adapters remain in development |
+| Email Intelligence Inbox | Secure tenant intake, redaction, retention, review, and synthetic-test foundation implemented; live provider routing remains pending |
+| Full Gmail inbox intelligence | Restricted-scope connector intentionally deferred pending verification and security readiness |
 
-### Values that must stay in sync
+Product documentation does not imply that an unfinished connector is available
+to customers. Release claims must be supported by the exact deployed version and
+its acceptance evidence.
 
-A few values appear in both configs and need to match:
+## Technology
 
-| Value | Frontend key | Backend key |
-|---|---|---|
-| Business name | `businessName` | `defaultOrgName` |
-| Short business name | `businessShortName` | `businessShortName` |
-| Phone number | `phone` | `phone` |
+- React, TypeScript, and Vite command center
+- Express API and background services
+- PostgreSQL with Drizzle ORM
+- Self-hosted email/password authentication
+- Optional OpenAI, Google, Stripe, and communications adapters
+- Single-container production build with Docker Compose and Fly.io configuration
 
-If these drift apart, the UI and outbound messages (email, SMS) will show different names — update both whenever you change one.
-
-### After editing those files
-
-1. **Logo** — replace `artifacts/command-center/public/favicon.ico` and any logo assets with the new client's logo.
-2. **Domain/origin** — set the `DOMAIN` environment variable (used by the API server to build portal links and OG cards).
-
-> **No manual edits to `index.html` or `index.css` are needed.** The browser tab title, Open Graph meta tags, and the `--primary` CSS variable are all injected automatically from `client.config.ts` at build time via the `clientBrandingPlugin` in `vite.config.ts`.
-
----
-
-## Local development
-
-### Prerequisites
-- Node 22+
-- pnpm 9+
-- PostgreSQL 15+ (or a `DATABASE_URL` pointing at one)
-
-### Setup
-
-```bash
-# Install dependencies
-pnpm install
-
-# Push the database schema
-pnpm --filter @workspace/db run push
-
-# Start the API server
-pnpm --filter @workspace/api-server run dev
-
-# In a separate terminal, start the CRM frontend
-pnpm --filter @workspace/command-center run dev
-```
-
-The CRM will be available at the URL printed by Vite (usually `http://localhost:5173`).
-
-### Environment variables
-
-Copy `.env.example` (if present) or create a `.env` file in `artifacts/api-server/` with:
-
-```
-PORT=3001
-DATABASE_URL=postgresql://user:pass@localhost:5432/yourdb
-SESSION_SECRET=a-long-random-string
-# Optional: OPENAI_API_KEY for the AI concierge
-```
-
----
-
-## Deploying
-
-This monorepo is designed for Replit deployment (Autoscale or Reserved VM). On Replit:
-
-1. Fork or import this repo into a new Repl.
-2. Add the required secrets via **Secrets** in the Replit sidebar.
-3. The `artifacts/api-server` and `artifacts/command-center` workflows start automatically.
-
-For other platforms, build both packages (`pnpm --filter @workspace/command-center run build` and `pnpm --filter @workspace/api-server run build`) and deploy the resulting artifacts as two services (API + static SPA).
-
----
-
-## Architecture
-
-```
+```text
 artifacts/
-  api-server/       Node.js API (Express + Drizzle ORM)
-  command-center/   React + Vite SPA (Tailwind, shadcn/ui, Wouter)
+  api-server/       Express API and background services
+  command-center/   React and Vite application
 lib/
-  api-zod/          Shared API schema (Zod)
-  api-client-react/ React Query hooks generated from the schema
-  db/               Drizzle schema + migrations
-  replit-auth-web/  Auth hooks (Replit OIDC)
+  api-spec/         OpenAPI source
+  api-zod/          Generated request and response schemas
+  api-client-react/ Generated React Query client
+  db/               Drizzle schema and database tooling
 ```
+
+## Development
+
+Copy `.env.example` to `.env`, provide development-only values, and start the
+local stack:
+
+```powershell
+docker compose up -d --build
+```
+
+The application is then available at `http://localhost:8080`, with PostgreSQL on
+`localhost:5433`. Never commit `.env` or expose secret values in logs.
+
+For the Windows development workflow and database bootstrap, see
+[DEV-LOCAL.md](DEV-LOCAL.md).
+
+## Operations and architecture
+
+- [BETA-SUCCESS-PLAN.md](BETA-SUCCESS-PLAN.md) — founding-beta gates and success measures
+- [DEPLOY.md](DEPLOY.md) — container and self-hosting model
+- [BETA-LAUNCH.md](BETA-LAUNCH.md) — Fly.io release checklist
+- [EVIDENCE-INTELLIGENCE.md](EVIDENCE-INTELLIGENCE.md) — evidence architecture and trust gates
+- [GOOGLE-OAUTH-SETUP.md](GOOGLE-OAUTH-SETUP.md) — per-user Gmail authorization
+- [GOOGLE-BUSINESS-GRAPH.md](GOOGLE-BUSINESS-GRAPH.md) — permissioned Google source strategy
+- [EMAIL-INTELLIGENCE-ARCHITECTURE.md](EMAIL-INTELLIGENCE-ARCHITECTURE.md) — phased email intelligence model
+- [EMAIL-INTELLIGENCE-SETUP.md](EMAIL-INTELLIGENCE-SETUP.md) — Cloudflare intake bridge and activation gates
+- [GROWTHOS-RESUME.md](GROWTHOS-RESUME.md) — verified implementation state and continuation point
+
+## Repository policy
+
+This private repository contains the GrowthOS application. The corporate
+marketing site and upstream reference template are maintained separately.
+Changes reach production only after review, validation, and explicit deployment
+authorization.
+
+Copyright © 2026 MogulForge. All rights reserved.

@@ -8,6 +8,8 @@ import {
   useGetContact,
   useGetProperty,
   getGetLeadQueryKey,
+  getGetLeadNextActionQueryKey,
+  getListTodayActionsQueryKey,
   getGetContactQueryKey,
   getGetPropertyQueryKey,
   getListLeadActivitiesQueryKey,
@@ -43,13 +45,14 @@ import { useToast } from '@/hooks/use-toast';
 import { PhotoLightbox } from '@/components/photo-lightbox';
 import { extractPhotoPaths, flattenPhotoPaths, photoUrl } from '@/lib/photos';
 import { LeadContactActions } from '@/components/lead-contact-actions';
+import { ManualLeadSms } from '@/components/manual-lead-sms';
 import { NextBestActionCard } from '@/components/next-best-action-card';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 
 export default function LeadDetail() {
   const { id } = useParams<{ id: string }>();
-  const { data: lead, isLoading: leadLoading } = useGetLead(id!, { query: { enabled: !!id, queryKey: getGetLeadQueryKey(id!) } });
+  const { data: lead, isLoading: leadLoading, error: leadError, refetch: refreshLead } = useGetLead(id!, { query: { enabled: !!id, queryKey: getGetLeadQueryKey(id!) } });
   const { data: contact } = useGetContact(lead?.contactId!, { query: { enabled: !!lead?.contactId, queryKey: getGetContactQueryKey(lead?.contactId!) } });
   const { data: property } = useGetProperty(lead?.propertyId!, { query: { enabled: !!lead?.propertyId, queryKey: getGetPropertyQueryKey(lead?.propertyId!) } });
   
@@ -70,6 +73,16 @@ export default function LeadDetail() {
   if (leadLoading) {
     return <div className="p-8 flex justify-center h-full items-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   }
+
+  if (leadError) {
+    const status = (leadError as { status?: number }).status;
+    return <section role="alert" className="p-6 space-y-3">
+      <h1 className="text-lg font-bold">Lead unavailable</h1>
+      <p>{status === 401 || status === 403 || status === 404 ? 'This lead is unavailable to the account you are signed in with. It may have been removed or your access may have changed.' : 'The lead could not be loaded. Go online and try again; customer details are not saved for offline access.'}</p>
+      <button type="button" className="rounded-md border px-3 py-2 text-sm" onClick={() => void refreshLead()}>Try again</button>
+      <Link href="/pipeline" className="block text-primary underline">Open my pipeline</Link>
+    </section>;
+  }
   
   if (!lead) {
     return <div className="p-8 flex flex-col items-center justify-center h-full text-muted-foreground border-2 border-dashed border-border rounded-xl m-6 bg-muted/10">Lead not found.</div>;
@@ -80,6 +93,9 @@ export default function LeadDetail() {
     updateLead.mutate({ id: lead.id, data: { status: newStatus } }, {
       onSuccess: (data) => {
         queryClient.setQueryData(getGetLeadQueryKey(lead.id), (old: any) => old ? { ...old, status: data.status } : old);
+        queryClient.invalidateQueries({ queryKey: getGetLeadNextActionQueryKey(lead.id) });
+        queryClient.invalidateQueries({ queryKey: getListTodayActionsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: ['smart-sites'] });
       },
       onError: (error: unknown) => {
         const serverMessage =
@@ -125,10 +141,10 @@ export default function LeadDetail() {
       )}
 
       {/* Two-column body */}
-      <div className="flex flex-col md:flex-row flex-1 overflow-hidden relative">
+      <div data-testid="lead-detail-scroll-body" className="flex flex-col md:flex-row flex-1 min-h-0 overflow-y-auto md:overflow-hidden relative">
 
       {/* Left Column - Details */}
-      <div className="w-full md:w-1/3 md:min-w-[320px] md:max-w-[400px] border-b md:border-b-0 md:border-r border-border bg-card overflow-y-auto flex flex-col shrink-0">
+      <div className="w-full md:w-1/3 md:min-w-[320px] md:max-w-[400px] border-b md:border-b-0 md:border-r border-border bg-card md:overflow-y-auto flex flex-col shrink-0">
         
         {/* Header Block */}
         <div className="p-4 md:p-6 border-b border-border bg-primary/5 text-foreground relative">
@@ -215,6 +231,8 @@ export default function LeadDetail() {
             ) : <div className="text-sm text-muted-foreground italic p-4 border border-dashed border-border rounded-xl bg-muted/10">Loading...</div>}
           </section>
 
+          {contact?.phone && <ManualLeadSms key={`${lead.organizationId}:${lead.id}`} leadId={lead.id} organizationId={lead.organizationId} canWrite={canWrite(me?.role)} />}
+
           {property && (
             <section>
               <h3 className="flex items-center gap-2 text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">
@@ -286,7 +304,7 @@ export default function LeadDetail() {
       </div>
 
       {/* Right Column - Activity Timeline / Messages */}
-      <div className="flex-1 flex flex-col min-w-0 bg-background relative h-[50vh] md:h-auto border-t md:border-t-0 border-border">
+      <div className="flex-none md:flex-1 flex flex-col min-w-0 bg-background relative h-[70vh] md:h-auto border-t md:border-t-0 border-border">
         <div className="px-4 md:px-6 pt-4 md:pt-5 pb-0 border-b border-border shrink-0 bg-card/80 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-1">
             <button
@@ -1042,6 +1060,8 @@ function ActivityComposer({ leadId }: { leadId: string }) {
       onSuccess: () => {
         setBody('');
         queryClient.invalidateQueries({ queryKey: getListLeadActivitiesQueryKey(leadId) });
+        queryClient.invalidateQueries({ queryKey: getGetLeadNextActionQueryKey(leadId) });
+        queryClient.invalidateQueries({ queryKey: getListTodayActionsQueryKey() });
         setIsSubmitting(false);
       },
       onError: (error: unknown) => {

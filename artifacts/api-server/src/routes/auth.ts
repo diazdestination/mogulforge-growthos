@@ -4,14 +4,28 @@ import {
   GetCurrentAuthUserResponse,
   LogoutMobileSessionResponse,
 } from '@workspace/api-zod';
-import { db, usersTable } from '@workspace/db';
-import { eq } from 'drizzle-orm';
+import { db, sessionsTable, usersTable } from '@workspace/db';
+import { createHash } from 'node:crypto';
+import { eq, sql } from 'drizzle-orm';
 import { Router, type IRouter, type Request, type Response } from 'express';
 import * as oidc from 'openid-client';
 import { z } from 'zod';
 
 import { hashPassword, verifyPassword } from '../lib/password';
+import { consumeCooldown, createFailureLimiter } from '../lib/rateLimit';
+import { recordAudit } from '../services/audit';
+import {
+  reportIdentityEmailFailure,
+  sendEmailVerification,
+  sendPasswordReset,
+} from '../services/identity-email';
+import {
+  consumeIdentityToken,
+  issueIdentityToken,
+} from '../services/identity-token';
+import { acceptPendingStaffInvitation, StaffInvitationError } from '../services/staff-invitations';
 import { ensureMembership } from '../services/org';
+import { isTransactionalEmailConfigured } from '../services/providers';
 import { reportCallbackBruteForceBlock } from '../services/security-alerts';
 import {
   clearSession,
@@ -24,7 +38,6 @@ import {
   SESSION_TTL,
   type SessionData,
 } from '../lib/auth';
-import { createFailureLimiter } from '../lib/rateLimit';
 
 const INVALID_AUTH_WINDOW_MS = 15 * 60 * 1000;
 const INVALID_AUTH_MAX_FAILURES = 10;
@@ -62,11 +75,46 @@ const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 
 const router: IRouter = Router();
 
-function getOrigin(req: Request): string {
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  const host =
-    req.headers['x-forwarded-host'] || req.headers['host'] || 'localhost';
-  return `${proto}://${host}`;
+/** OIDC redirect URIs must not inherit caller-controlled Host/proxy headers. */
+export function oidcAppOrigin(): string {
+  const explicitOrigin =
+    process.env.APP_ORIGIN?.trim() || process.env.APP_URL?.trim();
+  const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0]?.trim();
+  if (
+    !explicitOrigin &&
+    replitDomain &&
+    !/^[a-z0-9.-]+(?::\d{1,5})?$/i.test(replitDomain)
+  ) {
+    throw new Error('OIDC app origin is invalid');
+  }
+  const configured =
+    explicitOrigin || (replitDomain ? `https://${replitDomain}` : '');
+  if (!configured && process.env.NODE_ENV === 'production') {
+    throw new Error('APP_ORIGIN is required for OIDC redirects');
+  }
+  let url: URL;
+  try {
+    url = new URL(configured || 'http://localhost:5000');
+  } catch {
+    throw new Error('OIDC app origin is invalid');
+  }
+  if (
+    !['https:', 'http:'].includes(url.protocol) ||
+    (process.env.NODE_ENV === 'production' && url.protocol !== 'https:') ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error('OIDC app origin is invalid');
+  }
+  return url.origin;
+}
+
+export function oidcCallbackUrl(requestUrl?: string): URL {
+  const callback = new URL('/api/callback', oidcAppOrigin());
+  if (requestUrl) callback.search = new URL(requestUrl, callback).search;
+  return callback;
 }
 
 function setSessionCookie(res: Response, sid: string) {
@@ -150,12 +198,14 @@ function getSafeErrorMetadata(error: unknown) {
 async function upsertUser(claims: Record<string, unknown>) {
   const userData = {
     id: claims.sub as string,
-    email: (claims.email as string) || null,
+    email: typeof claims.email === 'string' ? claims.email.trim().toLowerCase() : null,
     firstName: (claims.first_name as string) || null,
     lastName: (claims.last_name as string) || null,
     profileImageUrl: (claims.profile_image_url || claims.picture) as
-      | string
-      | null,
+      string | null,
+    // Signing in proves the IdP identity; mailbox control needs its separate
+    // verified-email claim. Preserve established same-mailbox evidence below.
+    emailVerifiedAt: claims.email_verified === true ? new Date() : null,
   };
 
   // Invited members are pre-provisioned with a placeholder "invite:" id and
@@ -166,18 +216,12 @@ async function upsertUser(claims: Record<string, unknown>) {
       .select()
       .from(usersTable)
       .where(eq(usersTable.email, userData.email.toLowerCase()));
-    if (invited && invited.id.startsWith("invite:")) {
-      const [adopted] = await db
-        .update(usersTable)
-        .set({
-          id: userData.id,
-          firstName: userData.firstName ?? invited.firstName,
-          lastName: userData.lastName ?? invited.lastName,
-          profileImageUrl: userData.profileImageUrl,
-          updatedAt: new Date(),
-        })
-        .where(eq(usersTable.id, invited.id))
-        .returning();
+    if (invited && invited.id.startsWith('invite:')) {
+      const adopted = await acceptPendingStaffInvitation({
+        pendingUserId: invited.id, email: userData.email, newUserId: userData.id, oidcEmailVerified: claims.email_verified === true,
+        firstName: userData.firstName, lastName: userData.lastName,
+        profileImageUrl: userData.profileImageUrl, trustedOidc: true,
+      });
       const adoptedMember = await ensureMembership(adopted.id);
       return adoptedMember ?? adopted;
     }
@@ -190,6 +234,7 @@ async function upsertUser(claims: Record<string, unknown>) {
       target: usersTable.id,
       set: {
         ...userData,
+        emailVerifiedAt: userData.emailVerifiedAt ?? sql`case when lower(${usersTable.email}) is not distinct from ${userData.email} then ${usersTable.emailVerifiedAt} else null end`,
         updatedAt: new Date(),
       },
     })
@@ -209,7 +254,7 @@ router.get('/auth/user', (req: Request, res: Response) => {
 
 router.get('/login', async (req: Request, res: Response) => {
   const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
+  const callbackUrl = oidcCallbackUrl().href;
 
   const returnTo = getSafeReturnTo(req.query.returnTo);
 
@@ -245,12 +290,14 @@ router.get('/callback', async (req: Request, res: Response) => {
   // without needing to see any failures first.
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
   if (await invalidAuthAttemptLimiter.isBlockedShared(ip)) {
-    res.status(429).json({ error: 'Too many failed login attempts, please try again later' });
+    res.status(429).json({
+      error: 'Too many failed login attempts, please try again later',
+    });
     return;
   }
 
   const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
+  const currentUrl = oidcCallbackUrl(req.url);
 
   const codeVerifier = req.cookies?.code_verifier;
   const nonce = req.cookies?.nonce;
@@ -260,10 +307,6 @@ router.get('/callback', async (req: Request, res: Response) => {
     res.redirect('/api/login');
     return;
   }
-
-  const currentUrl = new URL(
-    `${callbackUrl}?${new URL(req.url, `http://${req.headers.host}`).searchParams}`,
-  );
 
   let tokens: oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers;
   try {
@@ -301,7 +344,14 @@ router.get('/callback', async (req: Request, res: Response) => {
     return;
   }
 
-  const dbUser = await upsertUser(claims as unknown as Record<string, unknown>);
+  let dbUser;
+  try {
+    dbUser = await upsertUser(claims as unknown as Record<string, unknown>);
+  } catch (error) {
+    if (!(error instanceof StaffInvitationError)) throw error;
+    res.status(403).json({ error: 'This invitation cannot be accepted with this sign-in. Use the current emailed invitation link, or ask your administrator to review access.', code: 'INVITATION_ACCEPTANCE_REQUIRED' });
+    return;
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const sessionData: SessionData = {
@@ -324,7 +374,7 @@ router.get('/callback', async (req: Request, res: Response) => {
 
 router.get('/logout', async (req: Request, res: Response) => {
   const config = await getOidcConfig();
-  const origin = getOrigin(req);
+  const origin = oidcAppOrigin();
   const returnTo = getSafeReturnTo(req.query.returnTo);
   const postLogoutRedirectUrl = new URL(returnTo, `${origin}/`).href;
 
@@ -347,7 +397,9 @@ router.post(
     // has no entry for this IP — so a freshly restarted instance enforces an
     // existing cluster-wide block without needing to record a new failure first.
     if (await invalidAuthAttemptLimiter.isBlockedShared(ip)) {
-      res.status(429).json({ error: 'Too many failed login attempts, please try again later' });
+      res.status(429).json({
+        error: 'Too many failed login attempts, please try again later',
+      });
       return;
     }
 
@@ -409,6 +461,10 @@ router.post(
       const sid = await createSession(sessionData);
       res.json(ExchangeMobileAuthorizationCodeResponse.parse({ token: sid }));
     } catch (err) {
+      if (err instanceof StaffInvitationError) {
+        res.status(403).json({ error: 'Use the current emailed invitation link or ask your administrator to review access.', code: 'INVITATION_ACCEPTANCE_REQUIRED' });
+        return;
+      }
       const justBlocked = await invalidAuthAttemptLimiter.recordFailure(ip);
       if (justBlocked) {
         void reportCallbackBruteForceBlock({
@@ -442,12 +498,67 @@ const RegisterBody = z.object({
   password: z.string().min(8).max(200),
   firstName: z.string().trim().max(100).optional(),
   lastName: z.string().trim().max(100).optional(),
+  inviteToken: z.string().trim().min(1).max(4096).optional(),
 });
 
 const LoginBody = z.object({
   email: z.string().email().max(320),
   password: z.string().min(1).max(200),
 });
+
+const EmailOnlyBody = z.object({
+  email: z.string().email().max(320),
+});
+
+const TokenOnlyBody = z.object({
+  token: z.string().trim().min(1).max(512),
+});
+
+const ResetPasswordBody = TokenOnlyBody.extend({
+  password: z.string().min(8).max(200),
+});
+
+const IDENTITY_REQUEST_ACCEPTED = {
+  message:
+    'If an eligible account exists, MogulForge will send the next step to that email address.',
+};
+
+const IDENTITY_COOLDOWN_MS = 15 * 60 * 1000;
+const IDENTITY_COOLDOWN_MAX = 3;
+
+function identityCooldownKey(
+  purpose: 'email-verification' | 'password-reset',
+  email: string,
+  ip: string,
+): string {
+  const digest = createHash('sha256')
+    .update(`${email}:${ip}`, 'utf8')
+    .digest('hex');
+  return `identity:${purpose}:${digest}`;
+}
+
+function transactionalEmailUnavailable(res: Response): void {
+  res.status(503).json({
+    error:
+      'MogulForge account email is temporarily unavailable. Please try again later.',
+    code: 'IDENTITY_EMAIL_NOT_CONFIGURED',
+  });
+}
+
+function isBetaSelfRegistrationAllowed(email: string): boolean {
+  const allowlist = (process.env.BETA_SIGNUP_ALLOWLIST ?? '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  // Production is invite-only unless an address is explicitly allowlisted.
+  // Development and test remain open so local setup and existing fixtures work.
+  if (allowlist.length === 0) {
+    return process.env.NODE_ENV !== 'production';
+  }
+
+  return allowlist.includes(email);
+}
 
 type SessionUserFields = {
   id: string;
@@ -480,38 +591,84 @@ router.post('/auth/register', async (req: Request, res: Response) => {
   const parsed = RegisterBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
-      error: 'A valid email and a password of at least 8 characters are required',
+      error:
+        'A valid email and a password of at least 8 characters are required',
     });
     return;
   }
   const email = parsed.data.email.toLowerCase();
-  const { password, firstName, lastName } = parsed.data;
-  const passwordHash = await hashPassword(password);
+  const { password, firstName, lastName, inviteToken } = parsed.data;
 
   const [existing] = await db
     .select()
     .from(usersTable)
     .where(eq(usersTable.email, email));
 
+  // Existing accounts keep the same response regardless of beta-gate state.
+  // Only active pre-provisioned invite rows bypass the allowlist because an
+  // organization owner has approved their access. Deactivating a pending
+  // invite revokes it and must not be undone by the invitee registering later.
+  if (existing && !existing.id.startsWith('invite:')) {
+    res
+      .status(409)
+      .json({ error: 'An account with this email already exists' });
+    return;
+  }
+  if (existing?.id.startsWith('invite:') && !existing.isActive) {
+    res.status(403).json({
+      error:
+        'This GrowthOS invitation is no longer active. Ask your MogulForge administrator for a new invitation.',
+      code: 'BETA_INVITE_REVOKED',
+    });
+    return;
+  }
+  if (
+    existing?.id.startsWith('invite:') &&
+    (!inviteToken ||
+      !existing.organizationId ||
+      !existing.email)
+  ) {
+    res.status(403).json({
+      error:
+        'This invitation link is invalid or has expired. Ask your MogulForge administrator to resend it.',
+      code: 'BETA_INVITE_TOKEN_REQUIRED',
+    });
+    return;
+  }
+  if (!existing && !isBetaSelfRegistrationAllowed(email)) {
+    res.status(403).json({
+      error:
+        'GrowthOS is currently invite-only. Ask your MogulForge administrator for beta access.',
+      code: 'BETA_INVITE_REQUIRED',
+    });
+    return;
+  }
+
+  if (
+    !existing &&
+    process.env.NODE_ENV === 'production' &&
+    !isTransactionalEmailConfigured()
+  ) {
+    transactionalEmailUnavailable(res);
+    return;
+  }
+
+  const passwordHash = await hashPassword(password);
+
   let dbUser;
   if (existing) {
-    // Adopt a pre-provisioned invite row (keeps its org + role); otherwise the
-    // email is genuinely taken.
-    if (!existing.id.startsWith('invite:')) {
-      res.status(409).json({ error: 'An account with this email already exists' });
+    const localUserId = crypto.randomUUID();
+    try {
+      const adopted = await acceptPendingStaffInvitation({
+        pendingUserId: existing.id, email, newUserId: localUserId, token: inviteToken,
+        passwordHash, firstName, lastName,
+      });
+      dbUser = (await ensureMembership(adopted.id)) ?? adopted;
+    } catch (error) {
+      if (!(error instanceof StaffInvitationError)) throw error;
+      res.status(403).json({ error: 'This invitation changed, was revoked or expired. Ask your administrator for a current invitation.', code: 'BETA_INVITE_TOKEN_REQUIRED' });
       return;
     }
-    const [adopted] = await db
-      .update(usersTable)
-      .set({
-        passwordHash,
-        firstName: firstName ?? existing.firstName,
-        lastName: lastName ?? existing.lastName,
-        updatedAt: new Date(),
-      })
-      .where(eq(usersTable.id, existing.id))
-      .returning();
-    dbUser = (await ensureMembership(adopted.id)) ?? adopted;
   } else {
     const [created] = await db
       .insert(usersTable)
@@ -520,9 +677,46 @@ router.post('/auth/register', async (req: Request, res: Response) => {
         passwordHash,
         firstName: firstName ?? null,
         lastName: lastName ?? null,
+        emailVerifiedAt:
+          process.env.NODE_ENV === 'production' ? null : new Date(),
       })
       .returning();
     dbUser = (await ensureMembership(created.id)) ?? created;
+  }
+
+  // A signed team invitation already proved mailbox control. Self-serve local
+  // registrations must verify their email before we mint an authenticated
+  // session in production.
+  if (!existing && process.env.NODE_ENV === 'production') {
+    const token = await issueIdentityToken({
+      userId: dbUser.id,
+      purpose: 'email_verification',
+    });
+    try {
+      await sendEmailVerification({
+        to: email,
+        token,
+        firstName: dbUser.firstName,
+      });
+      if (dbUser.organizationId) {
+        void recordAudit({
+          organizationId: dbUser.organizationId,
+          actorUserId: dbUser.id,
+          action: 'identity.email_verification.sent',
+          entityType: 'user',
+          metadata: { targetUserId: dbUser.id },
+        }).catch(() => {});
+      }
+    } catch (error) {
+      // Do not expose provider details or create an account-enumeration side
+      // channel. The unverified account can recover via resend verification.
+      reportIdentityEmailFailure('email_verification', error);
+    }
+    res.status(202).json({
+      verificationRequired: true,
+      message: 'Check your email to verify your GrowthOS account.',
+    });
+    return;
   }
 
   await startLocalSession(res, dbUser);
@@ -532,9 +726,9 @@ router.post('/auth/register', async (req: Request, res: Response) => {
 router.post('/auth/login', async (req: Request, res: Response) => {
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
   if (await invalidAuthAttemptLimiter.isBlockedShared(ip)) {
-    res
-      .status(429)
-      .json({ error: 'Too many failed login attempts, please try again later' });
+    res.status(429).json({
+      error: 'Too many failed login attempts, please try again later',
+    });
     return;
   }
 
@@ -550,7 +744,8 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     .from(usersTable)
     .where(eq(usersTable.email, email));
 
-  const ok = !!user && (await verifyPassword(parsed.data.password, user.passwordHash));
+  const ok =
+    !!user && (await verifyPassword(parsed.data.password, user.passwordHash));
   if (!ok) {
     // Count the failure toward this IP's brute-force budget (shared limiter
     // with the OIDC callback so pivoting between routes hits the same block).
@@ -569,9 +764,239 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     res.status(403).json({ error: 'This account has been deactivated' });
     return;
   }
+  if (!user.emailVerifiedAt) {
+    res.status(403).json({
+      error: 'Verify your email address before signing in.',
+      code: 'EMAIL_VERIFICATION_REQUIRED',
+    });
+    return;
+  }
 
   await startLocalSession(res, user);
   res.json({ user: sessionUser(user) });
+});
+
+router.post('/auth/forgot-password', async (req: Request, res: Response) => {
+  if (
+    process.env.NODE_ENV === 'production' &&
+    !isTransactionalEmailConfigured()
+  ) {
+    transactionalEmailUnavailable(res);
+    return;
+  }
+
+  const parsed = EmailOnlyBody.safeParse(req.body);
+  if (!parsed.success) {
+    // Keep the response indistinguishable from an unknown account.
+    res.status(202).json(IDENTITY_REQUEST_ACCEPTED);
+    return;
+  }
+
+  const email = parsed.data.email.toLowerCase();
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  const cooldown = await consumeCooldown({
+    key: identityCooldownKey('password-reset', email, ip),
+    windowMs: IDENTITY_COOLDOWN_MS,
+    max: IDENTITY_COOLDOWN_MAX,
+  });
+  if (!cooldown.allowed) {
+    res.status(202).json(IDENTITY_REQUEST_ACCEPTED);
+    return;
+  }
+
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.email, email));
+
+  if (user?.isActive && user.passwordHash) {
+    try {
+      const token = await issueIdentityToken({
+        userId: user.id,
+        purpose: 'password_reset',
+      });
+      await sendPasswordReset({
+        to: email,
+        token,
+        firstName: user.firstName,
+      });
+      if (user.organizationId) {
+        void recordAudit({
+          organizationId: user.organizationId,
+          actorUserId: user.id,
+          action: 'identity.password_reset.requested',
+          entityType: 'user',
+          metadata: { targetUserId: user.id },
+        }).catch(() => {});
+      }
+    } catch (error) {
+      reportIdentityEmailFailure('password_reset', error);
+    }
+  }
+
+  res.status(202).json(IDENTITY_REQUEST_ACCEPTED);
+});
+
+router.post(
+  '/auth/resend-verification',
+  async (req: Request, res: Response) => {
+    if (
+      process.env.NODE_ENV === 'production' &&
+      !isTransactionalEmailConfigured()
+    ) {
+      transactionalEmailUnavailable(res);
+      return;
+    }
+
+    const parsed = EmailOnlyBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(202).json(IDENTITY_REQUEST_ACCEPTED);
+      return;
+    }
+
+    const email = parsed.data.email.toLowerCase();
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+    const cooldown = await consumeCooldown({
+      key: identityCooldownKey('email-verification', email, ip),
+      windowMs: IDENTITY_COOLDOWN_MS,
+      max: IDENTITY_COOLDOWN_MAX,
+    });
+    if (!cooldown.allowed) {
+      res.status(202).json(IDENTITY_REQUEST_ACCEPTED);
+      return;
+    }
+
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, email));
+
+    if (user?.isActive && user.passwordHash && !user.emailVerifiedAt) {
+      try {
+        const token = await issueIdentityToken({
+          userId: user.id,
+          purpose: 'email_verification',
+        });
+        await sendEmailVerification({
+          to: email,
+          token,
+          firstName: user.firstName,
+        });
+        if (user.organizationId) {
+          void recordAudit({
+            organizationId: user.organizationId,
+            actorUserId: user.id,
+            action: 'identity.email_verification.resent',
+            entityType: 'user',
+            metadata: { targetUserId: user.id },
+          }).catch(() => {});
+        }
+      } catch (error) {
+        reportIdentityEmailFailure('email_verification', error);
+      }
+    }
+
+    res.status(202).json(IDENTITY_REQUEST_ACCEPTED);
+  },
+);
+
+router.post('/auth/verify-email', async (req: Request, res: Response) => {
+  const parsed = TokenOnlyBody.safeParse(req.body);
+  if (!parsed.success) {
+    res
+      .status(400)
+      .json({ error: 'This verification link is invalid or expired.' });
+    return;
+  }
+
+  const consumed = await consumeIdentityToken({
+    token: parsed.data.token,
+    purpose: 'email_verification',
+  });
+  if (!consumed) {
+    res
+      .status(400)
+      .json({ error: 'This verification link is invalid or expired.' });
+    return;
+  }
+
+  const [user] = await db
+    .update(usersTable)
+    .set({ emailVerifiedAt: new Date(), updatedAt: new Date() })
+    .where(eq(usersTable.id, consumed.userId))
+    .returning();
+  if (!user?.isActive) {
+    res
+      .status(400)
+      .json({ error: 'This verification link is invalid or expired.' });
+    return;
+  }
+
+  if (user.organizationId) {
+    void recordAudit({
+      organizationId: user.organizationId,
+      actorUserId: user.id,
+      action: 'identity.email_verified',
+      entityType: 'user',
+      metadata: { targetUserId: user.id },
+    }).catch(() => {});
+  }
+  await startLocalSession(res, user);
+  res.json({ success: true, user: sessionUser(user) });
+});
+
+router.post('/auth/reset-password', async (req: Request, res: Response) => {
+  const parsed = ResetPasswordBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error:
+        'This reset link is invalid or expired, or the password is too short.',
+    });
+    return;
+  }
+
+  const consumed = await consumeIdentityToken({
+    token: parsed.data.token,
+    purpose: 'password_reset',
+  });
+  if (!consumed) {
+    res.status(400).json({ error: 'This reset link is invalid or expired.' });
+    return;
+  }
+
+  const [existingUser] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, consumed.userId));
+  if (!existingUser?.isActive || !existingUser.passwordHash) {
+    res.status(400).json({ error: 'This reset link is invalid or expired.' });
+    return;
+  }
+
+  const passwordHash = await hashPassword(parsed.data.password);
+  const [user] = await db
+    .update(usersTable)
+    .set({ passwordHash, updatedAt: new Date() })
+    .where(eq(usersTable.id, existingUser.id))
+    .returning();
+
+  // Password recovery is a credential rotation boundary. Invalidate every
+  // existing browser/mobile session for the account before acknowledging it.
+  await db
+    .delete(sessionsTable)
+    .where(sql`${sessionsTable.sess} -> 'user' ->> 'id' = ${user.id}`);
+
+  if (user.organizationId) {
+    void recordAudit({
+      organizationId: user.organizationId,
+      actorUserId: user.id,
+      action: 'identity.password_reset.completed',
+      entityType: 'user',
+      metadata: { targetUserId: user.id },
+    }).catch(() => {});
+  }
+
+  res.json({ success: true, message: 'Your password has been reset.' });
 });
 
 router.post('/auth/logout', async (req: Request, res: Response) => {

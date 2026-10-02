@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Permission } from "../../lib/permissions";
 import v1Router from "./index";
+import { requirePlatformAdmin } from "./orgs";
 
 /**
  * Route-inventory test: walks the actual mounted Express router and asserts
@@ -18,6 +19,7 @@ interface RouteEntry {
   permissions: Permission[];
   /** Number of handlers on the route (guards + terminal handler). */
   handlerCount: number;
+  platformGuard: boolean;
 }
 
 // Routes that are intentionally reachable without authentication.
@@ -39,6 +41,19 @@ const SESSION_ONLY_ROUTES = new Set([
   "POST /orgs",
   "GET /platform/orgs",
   "PATCH /platform/orgs/:id",
+  "POST /platform/orgs/:id/entitlements",
+  "POST /platform/orgs/:id/billing/replacement",
+  "POST /platform/orgs/:id/billing/reconcile",
+  "GET /platform/clients/profiles",
+  "GET /platform/clients/health",
+  "GET /platform/runtime",
+  "POST /platform/clients",
+  "GET /platform/clients/:orgId/readiness",
+  "GET /platform/clients/:orgId/invitations",
+  "POST /platform/clients/:orgId/invitations",
+  "POST /platform/clients/:orgId/invitations/:invitationId/reissue",
+  "POST /platform/clients/:orgId/invitations/:invitationId/revoke",
+  "POST /platform/clients/:orgId/sites/:siteId/key",
 ]);
 
 /**
@@ -56,8 +71,65 @@ const SESSION_ONLY_ROUTES = new Set([
  * - settings.manage — org configuration surfaces (owner/admin)
  */
 const EXPECTED_PERMISSIONS: Record<string, Permission> = {
+  "GET /contractor/today": "crm.read",
+  "GET /tasks/:id": "crm.read",
+  "GET /invoices": "invoices.read",
+  "GET /invoices/:id": "invoices.read",
+  "POST /invoices": "invoices.manage",
+  "PATCH /invoices/:id": "invoices.manage",
+  "POST /invoices/:id/issue": "invoices.manage",
+  "POST /invoices/:id/void": "invoices.manage",
+  "POST /invoices/:id/payments": "invoices.manage",
+  "POST /invoices/:id/allocations": "invoices.manage",
+  "POST /invoices/:id/allocations/:allocationId/reverse": "invoices.manage",
+  "GET /customer-lifecycle": "settings.manage",
+  "POST /customer-lifecycle/transition": "settings.manage",
+  "GET /customer-lifecycle/export": "settings.manage",
+  "GET /staff-push/status": "crm.read",
+  "POST /staff-push/subscriptions": "crm.read",
+  "POST /staff-push/subscriptions/revoke": "crm.read",
+  "GET /staff-push/policy": "settings.manage",
+  "PUT /staff-push/policy": "settings.manage",
+  "GET /staff-push/deliveries": "settings.manage",
+  "GET /integrations/microsoft": "crm.read",
+  "POST /integrations/microsoft/connect": "crm.write",
+  "GET /integrations/microsoft/callback": "crm.write",
+  "DELETE /integrations/microsoft": "crm.write",
+  "GET /integrations/email-sender": "crm.read",
+  "PUT /integrations/email-sender": "crm.write",
+  "GET /leads/:id/manual-sms": "crm.write",
+  "POST /leads/:id/manual-sms/draft-opened": "crm.write",
+  "GET /revenue/desk": "crm.read",
+  "POST /revenue/leads/:id/claim": "crm.write",
+  "GET /revenue/profile": "crm.read",
+  "POST /revenue/profile": "settings.manage",
+  "GET /revenue/rooms/:id": "crm.read",
+  "POST /revenue/rooms/:id": "settings.manage",
+  "GET /revenue/value": "crm.read",
+  "POST /revenue/value": "settings.manage",
+  "GET /revenue/evidence/:id": "crm.read",
+  "GET /revenue/growth": "crm.read",
+  "POST /revenue/growth": "crm.write",
+  "POST /revenue/growth/:id/approve": "settings.manage",
+  "GET /revenue/executions/:id": "crm.read",
+  "POST /revenue/executions/:id/reconcile": "settings.manage",
+  "PATCH /revenue/proposals/:id": "crm.write",
+  "GET /smart-sites/profiles": "crm.read",
+  "GET /smart-sites": "crm.read",
+  "GET /smart-sites/overview": "crm.read",
+  "GET /smart-sites/acquisition": "crm.read",
+  "GET /smart-sites/launch-readiness": "crm.read",
+  "POST /smart-sites": "settings.manage",
+  "PATCH /smart-sites/:id": "settings.manage",
+  "PATCH /smart-sites/:id/measurement": "settings.manage",
+  "POST /smart-sites/:id/rotate-key": "settings.manage",
+  "GET /smart-sites/follow-up": "crm.read",
+  "PATCH /smart-sites/:id/response-target": "settings.manage",
+  "PATCH /smart-sites/leads/:id/owner": "crm.write",
+  "POST /smart-sites/leads/:id/contact-attempts": "crm.write",
   // me / users
   "GET /me": "crm.read",
+  "PATCH /me": "crm.read",
   "GET /users": "users.read",
   "POST /users/invite": "users.manage",
   "POST /users/:id/resend-invite": "users.manage",
@@ -132,12 +204,83 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /reports/roi": "crm.read",
   "GET /reports/roi/export": "crm.read",
   "GET /audit-events": "audit.read",
+  // Billing changes the organization's subscription and payment-management
+  // state; keep every surface admin-only.
+  "GET /billing": "settings.manage",
+  "GET /billing/entitlements": "crm.read",
+  "POST /billing/checkout": "settings.manage",
+  "POST /billing/portal": "settings.manage",
+  // BIE Revenue Command Center. Read access can inspect tenant-owned
+  // evidence; only writers may review/execute actions, and owners/admins
+  // exclusively configure or trigger autopilot.
+  "GET /bie/briefing": "crm.read",
+  "POST /bie/briefing/run": "crm.read",
+  "GET /bie/sources": "crm.read",
+  "GET /bie/actions": "crm.read",
+  "POST /bie/actions/generate": "crm.write",
+  "POST /bie/actions/:id/approve": "crm.write",
+  "POST /bie/actions/:id/reject": "crm.write",
+  "POST /bie/actions/:id/execute": "crm.write",
+  "GET /bie/autopilot": "crm.read",
+  "PUT /bie/autopilot": "settings.manage",
+  "POST /bie/autopilot/run": "settings.manage",
+  // Evidence Intelligence stores tenant-owned source artifacts and produces
+  // AI drafts only. Every consequential transition remains a human write.
+  "GET /bie/claims": "crm.read",
+  "POST /bie/claims": "crm.write",
+  "GET /bie/claims/:id": "crm.read",
+  "POST /bie/claims/:id/artifacts": "crm.write",
+  "GET /bie/claims/:id/artifacts/:artifactId/content": "crm.read",
+  "POST /bie/claims/:id/analyze": "crm.write",
+  "POST /bie/claims/:id/observations/:observationId/review": "crm.write",
+  "POST /bie/claims/:id/certificates/:certificateId/issue": "crm.write",
+  "GET /bie/claims/:id/graphs": "crm.read",
+  "POST /bie/claims/:id/graphs/native-estimate": "crm.write",
+  "GET /bie/claims/:id/graphs/:graphId/targets/:target": "crm.read",
+  "GET /bie/claims/:id/corroborations": "crm.read",
+  "POST /bie/claims/:id/corroborations": "crm.write",
+  "POST /bie/claims/:id/corroborations/:corroborationId/review": "crm.write",
+  "GET /bie/claims/:id/routes": "crm.read",
+  "POST /bie/claims/:id/routes": "crm.write",
   // settings surfaces
   "GET /settings": "crm.read",
   // read-only effective availability; needed by anyone booking appointments
   "GET /settings/inspection-availability": "crm.read",
   "GET /settings/email-provider": "settings.manage",
+  "GET /data-lifecycle/inventory": "settings.manage",
   "GET /settings/sms-provider": "settings.manage",
+  "GET /communications/sms": "crm.read",
+  "GET /communications/voice": "crm.read",
+  "POST /communications/voice": "crm.write",
+  "POST /communications/voice/:id/review": "crm.write",
+  "GET /service-obligations": "crm.read",
+  "POST /service-obligations": "crm.write",
+  "PATCH /service-obligations/:id": "crm.write",
+  "POST /service-obligations/import": "crm.write",
+  "POST /service-obligations/:id/recurrence": "crm.write",
+  "POST /communications/sms": "crm.write",
+  // Gmail authorization is personal to the signed-in member, not an org-wide
+  // admin credential. Tenant/user binding is enforced again in the service.
+  "GET /integrations/gmail": "crm.read",
+  "POST /integrations/gmail/connect": "crm.read",
+  "GET /integrations/gmail/callback": "crm.read",
+  "DELETE /integrations/gmail": "crm.read",
+  "GET /integrations/google/modules": "crm.read",
+  "POST /integrations/google/modules/:module/connect": "crm.read",
+  "PUT /integrations/google/modules/:module": "crm.read",
+  // Email Intelligence source configuration is owner/admin controlled. All
+  // members may inspect tenant facts; writers disposition findings.
+  "GET /email-intelligence": "crm.read",
+  "POST /email-intelligence/source": "settings.manage",
+  "PATCH /email-intelligence/source/:id": "settings.manage",
+  "GET /email-intelligence/messages": "crm.read",
+  "GET /email-intelligence/replies": "crm.read",
+  "POST /email-intelligence/replies/:id/review": "crm.write",
+  "POST /email-intelligence/replies/:id/resolve": "crm.write",
+  "POST /email-intelligence/test": "settings.manage",
+  "POST /email-intelligence/facts/:id/review": "crm.write",
+  "DELETE /email-intelligence/messages/:id/raw": "settings.manage",
+  "DELETE /email-intelligence/messages/:id": "settings.manage",
   "PUT /settings": "settings.manage",
   "GET /installation": "settings.manage",
   "POST /installation/checks": "settings.manage",
@@ -215,13 +358,23 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "PATCH /onboarding": "settings.manage",
   "POST /onboarding/test-lead": "settings.manage",
   "DELETE /onboarding/test-lead": "settings.manage",
+  // Demo data changes organization-wide sample records, so only admins may
+  // load or clear it.
+  "POST /demo-data": "settings.manage",
+  "DELETE /demo-data": "settings.manage",
 };
 
 // DELETE routes allowed to use something weaker than crm.delete, with the
 // reason. Everything else destructive must be crm.delete or settings.manage.
 const DELETE_EXEMPTIONS: Record<string, Permission> = {
+  // Personal Microsoft authorization only; the explicit session-only gate
+  // forbids API keys and scopes revocation to the caller, never tenant data.
+  "DELETE /integrations/microsoft": "crm.write",
   // Personal, per-user resource — deleting your own saved filter.
   "DELETE /saved-filters/:id": "crm.read",
+  // Personal, per-user authorization — revokes only the caller's own Gmail
+  // token and cannot remove another member's connection or organization data.
+  "DELETE /integrations/gmail": "crm.read",
   // Removes one photo path from a lead's activity row, not the lead itself;
   // write-level access is the correct bar.
   "DELETE /leads/:id/photos": "crm.write",
@@ -241,7 +394,10 @@ function isTaggedGuard(
 }
 
 /** Recursively collect every route mounted on a router. */
-function collectRoutes(router: unknown, routes: RouteEntry[] = []): RouteEntry[] {
+function collectRoutes(
+  router: unknown,
+  routes: RouteEntry[] = [],
+): RouteEntry[] {
   const stack = (router as { stack?: unknown[] }).stack;
   if (!Array.isArray(stack)) return routes;
   for (const layer of stack as Array<{
@@ -271,6 +427,9 @@ function collectRoutes(router: unknown, routes: RouteEntry[] = []): RouteEntry[]
             path,
             permissions,
             handlerCount: layer.route.stack.length,
+            platformGuard: layer.route.stack.some(
+              (l) => l.handle === requirePlatformAdmin,
+            ),
           });
         }
       }
@@ -296,6 +455,13 @@ const protectedRoutes = routes.filter(
 );
 
 describe("v1 route inventory", () => {
+  it("platform routes carry the fresh session and platform-admin gate", () => {
+    expect(
+      routes
+        .filter((r) => r.path.startsWith("/platform/") && !r.platformGuard)
+        .map(keyOf),
+    ).toEqual([]);
+  });
   it("discovers a non-trivial number of routes (walker sanity check)", () => {
     // If Express internals change and the walker silently finds nothing,
     // every other assertion would vacuously pass. Guard against that.
@@ -307,8 +473,10 @@ describe("v1 route inventory", () => {
     const unguarded = protectedRoutes
       .filter((r) => r.permissions.length === 0)
       .map(keyOf);
-    expect(unguarded, `Routes missing requireMember: ${unguarded.join(", ")}`)
-      .toEqual([]);
+    expect(
+      unguarded,
+      `Routes missing requireMember: ${unguarded.join(", ")}`,
+    ).toEqual([]);
   });
 
   it("every non-public route carries exactly the permission the contract expects", () => {
@@ -335,8 +503,9 @@ describe("v1 route inventory", () => {
     const stale = Object.keys(EXPECTED_PERMISSIONS).filter(
       (key) => !mounted.has(key),
     );
-    expect(stale, `Remove stale contract entries: ${stale.join(", ")}`)
-      .toEqual([]);
+    expect(stale, `Remove stale contract entries: ${stale.join(", ")}`).toEqual(
+      [],
+    );
   });
 
   it("DELETE routes are destructive-grade (crm.delete / settings.manage) unless explicitly exempted", () => {

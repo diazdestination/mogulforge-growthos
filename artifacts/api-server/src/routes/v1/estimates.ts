@@ -114,6 +114,10 @@ router.delete(
       req.member!.organizationId,
       String(req.params.id),
     );
+    if (deleted === crm.INVOICE_HISTORY_RETAINED) {
+      res.status(409).json({ error: "This estimate is referenced by retained invoice history and cannot be deleted.", code: deleted });
+      return;
+    }
     if (!deleted) {
       res.status(404).json({ error: "Estimate not found" });
       return;

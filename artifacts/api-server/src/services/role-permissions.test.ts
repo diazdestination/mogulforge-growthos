@@ -49,6 +49,8 @@ const EXPECTED: Record<Permission, Role[]> = {
     "office",
   ],
   "crm.delete": ["owner", "admin", "sales_manager"],
+  "invoices.read": ["owner", "admin", "office", "sales_manager"],
+  "invoices.manage": ["owner", "admin", "office"],
   "audit.read": ["owner", "admin"],
   "users.read": [...ALL_ROLES],
   "users.manage": ["owner", "admin"],
@@ -61,6 +63,7 @@ const ROUTE_OPERATIONS: Record<string, Permission[]> = {
   leads: ["crm.read", "crm.write"],
   tasks: ["crm.read", "crm.write", "crm.delete"],
   appointments: ["crm.read", "crm.write"],
+  invoices: ["invoices.read", "invoices.manage"],
   auditLog: ["audit.read"],
 };
 
@@ -77,6 +80,8 @@ let fe: {
   canDelete: (role?: string | null) => boolean;
   canViewAuditLog: (role?: string | null) => boolean;
   canManageSettings: (role?: string | null) => boolean;
+  canReadInvoices: (role?: string | null) => boolean;
+  canManageInvoices: (role?: string | null) => boolean;
 };
 
 beforeAll(async () => {
@@ -169,6 +174,8 @@ describe("requireMember middleware enforces the matrix against real users", () =
     "crm.delete",
     "audit.read",
     "settings.manage",
+    "invoices.read",
+    "invoices.manage",
   ];
 
   for (const permission of checkedPermissions) {
@@ -244,6 +251,12 @@ describe("frontend permission helpers stay in sync with server matrix", () => {
         hasPermission(role, "settings.manage"),
       );
     });
+    it(`${role}: invoice visibility matches server invoices.read`, () => {
+      expect(fe.canReadInvoices(role)).toBe(hasPermission(role, "invoices.read"));
+    });
+    it(`${role}: financial controls match server invoices.manage`, () => {
+      expect(fe.canManageInvoices(role)).toBe(hasPermission(role, "invoices.manage"));
+    });
   }
 
   it("frontend helpers deny everything for missing role", () => {
@@ -251,5 +264,7 @@ describe("frontend permission helpers stay in sync with server matrix", () => {
     expect(fe.canDelete(undefined)).toBe(false);
     expect(fe.canViewAuditLog(null)).toBe(false);
     expect(fe.canManageSettings(null)).toBe(false);
+    expect(fe.canReadInvoices(null)).toBe(false);
+    expect(fe.canManageInvoices(undefined)).toBe(false);
   });
 });

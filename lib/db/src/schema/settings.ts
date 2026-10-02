@@ -2,6 +2,7 @@ import { jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { organizationsTable } from "./organizations";
+import { usersTable } from "./auth";
 
 export interface BusinessProfile {
   businessName?: string;
@@ -413,6 +414,11 @@ export const orgSettingsTable = pgTable(
      * single inbox instead of every active org admin/owner.
      */
     fallbackNotificationInbox: text("fallback_notification_inbox"),
+    /** Explicit Gmail identity for unassigned customer mail and portal codes. */
+    customerEmailSenderUserId: text("customer_email_sender_user_id").references(
+      () => usersTable.id,
+      { onDelete: "set null" },
+    ),
     /** Google Place ID and API key for the public reviews widget. */
     googleReviews: jsonb("google_reviews").$type<GoogleReviewsConfig | null>(),
     /** Embeddable website widget (closer.js) modules & appearance. */

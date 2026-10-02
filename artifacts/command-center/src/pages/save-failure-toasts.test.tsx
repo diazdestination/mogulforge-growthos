@@ -56,9 +56,10 @@ describe('save forms never fail silently', () => {
     renderPage(<TasksPage />, failPost('/api/v1/tasks', 'task boom'));
 
     fireEvent.click(await screen.findByTestId('add-task'));
-    const modal = modalRoot();
-    const [title] = Array.from(modal.querySelectorAll('input'));
-    fireEvent.change(title, { target: { value: 'Call the adjuster' } });
+    const modal = screen.getByRole('dialog', { name: 'New Task' });
+    const title = modal.querySelector('input[aria-label="Title"]');
+    expect(title).toBeTruthy();
+    fireEvent.change(title!, { target: { value: 'Call the adjuster' } });
     fireEvent.click(screen.getByRole('button', { name: /save task/i }));
 
     await waitFor(() => expect(screen.getByText(/task not created/i)).toBeTruthy());

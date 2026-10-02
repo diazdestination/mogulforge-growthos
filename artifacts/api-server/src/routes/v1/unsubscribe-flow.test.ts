@@ -16,9 +16,11 @@ import {
   playbookEnrollmentsTable,
   playbooksTable,
   suppressionsTable,
+  twilioClientBindingsTable,
 } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { getExpectedTwilioSignature } from "twilio";
 
 import app from "../../app";
 import {
@@ -41,6 +43,14 @@ beforeAll(async () => {
     .values({ name: "Unsub Flow Test", slug: `test-unsub-${Date.now()}` })
     .returning();
   org = o;
+  vi.stubEnv("TWILIO_CLIENT_UNSUB_AUTH_TOKEN", "synthetic-token");
+  await db.insert(twilioClientBindingsTable).values({
+    organizationId: org.id, accountSid: "AC" + "8".repeat(32),
+    phoneNumber: "+15005550008", messagingServiceSid: "MG" + "9".repeat(32),
+    authTokenSecretRef: "TWILIO_CLIENT_UNSUB_AUTH_TOKEN",
+    publicOrigin: "https://growth.example", businessName: "Synthetic Unsub",
+    smsDisclosureVersion: "synthetic-unsub-v1",
+  });
   const [c] = await db
     .insert(contactsTable)
     .values({
@@ -85,6 +95,7 @@ beforeAll(async () => {
 afterAll(async () => {
   server?.close();
   await deleteTestOrgs(org.id);
+  vi.unstubAllEnvs();
 });
 
 describe("email unsubscribe", () => {
@@ -141,11 +152,13 @@ describe("email unsubscribe", () => {
 });
 
 describe("inbound SMS STOP/START", () => {
+  let sequence = 0;
   async function inbound(from: string, body: string) {
+    const params = { From: from, Body: body, To: '+15005550008', AccountSid: 'AC'+'8'.repeat(32), MessagingServiceSid: 'MG'+'9'.repeat(32), MessageSid: 'SM'+(++sequence).toString(16).padStart(32, '0') };
     return fetch(`${baseUrl}/api/v1/public/sms/inbound`, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ From: from, Body: body }).toString(),
+      headers: { "Content-Type": "application/x-www-form-urlencoded", 'x-twilio-signature': getExpectedTwilioSignature('synthetic-token', 'https://growth.example/api/v1/public/sms/inbound', params) },
+      body: new URLSearchParams(params).toString(),
     });
   }
 
@@ -180,24 +193,24 @@ describe("inbound SMS STOP/START", () => {
     expect(row.doNotContactSms).toBe(true);
   });
 
-  it("START lifts only a STOP suppression, clears the flag, and re-grants consent", async () => {
+  it("START lifts only a STOP suppression and requires fresh purpose consent", async () => {
     const res = await inbound("555-867-5309", "START");
     expect(res.status).toBe(200);
     expect(await getSuppression(org.id, "sms", "5558675309")).toBeNull();
 
-    // Per-channel DNC flag must be cleared or the send gate keeps blocking.
+    // Transport START must not restore previously revoked program consent.
     const [row] = await db
       .select()
       .from(contactsTable)
       .where(eq(contactsTable.id, contact.id));
-    expect(row.doNotContactSms).toBe(false);
+    expect(row.doNotContactSms).toBe(true);
     const gate = await checkSendEligibility({
       organizationId: org.id,
       contact: row,
       channel: "sms",
       kind: "transactional",
     });
-    expect(gate).toEqual({ ok: true });
+    expect(gate.ok).toBe(false);
 
     const [consent] = await db
       .select()
@@ -211,7 +224,7 @@ describe("inbound SMS STOP/START", () => {
       )
       .orderBy(desc(consentRecordsTable.recordedAt))
       .limit(1);
-    expect(consent?.granted).toBe(true);
+    expect(consent?.granted).toBe(false);
   });
 
   it("STOP then START handles multiple contacts sharing a number in one org", async () => {
@@ -239,7 +252,7 @@ describe("inbound SMS STOP/START", () => {
       .from(contactsTable)
       .where(eq(contactsTable.organizationId, org.id));
     for (const id of [c1.id, c2.id]) {
-      expect(rows.find((r) => r.id === id)?.doNotContactSms).toBe(false);
+      expect(rows.find((r) => r.id === id)?.doNotContactSms).toBe(true);
     }
     expect(await getSuppression(org.id, "sms", "5559990001")).toBeNull();
   });

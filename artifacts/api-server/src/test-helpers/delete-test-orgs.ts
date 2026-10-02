@@ -16,9 +16,10 @@ import { sql } from "drizzle-orm";
  * so we discover them from information_schema (future tables are covered
  * automatically) and delete with a retry loop — a table whose delete is
  * blocked by an FK from another pending table is retried on the next pass.
- * The loop throws if a full pass makes no progress, and the helper verifies
- * the org rows themselves are gone, so cleanup failures are loud instead of
- * silent.
+ * The final organization delete is also retried after another scoped sweep,
+ * because parallel suites can finish an already-started audit write between
+ * the first sweep and the parent delete. The helper verifies the org rows
+ * themselves are gone, so cleanup failures are loud instead of silent.
  */
 export async function deleteTestOrgs(
   ...orgIds: Array<string | undefined | null>
@@ -41,39 +42,55 @@ export async function deleteTestOrgs(
       AND t.table_type = 'BASE TABLE'
   `);
 
-  let pending = discovered.rows.map((r) => r.table_name);
-  while (pending.length > 0) {
-    const blocked: string[] = [];
-    const errors: string[] = [];
-    for (const table of pending) {
-      try {
-        await db.execute(
-          sql`DELETE FROM ${sql.identifier(table)} WHERE organization_id IN (${idList})`,
-        );
-      } catch (err) {
-        // 23503 = foreign_key_violation: another pending table still
-        // references this one; retry after that table is cleared.
-        // (drizzle may wrap the pg error, so also check `cause`.)
-        const code =
-          (err as { code?: string }).code ??
-          ((err as { cause?: { code?: string } }).cause?.code);
-        if (code === "23503") {
-          blocked.push(table);
-          errors.push(`${table}: ${(err as Error).message}`);
-        } else {
-          throw err;
+  const postgresErrorCode = (err: unknown): string | undefined =>
+    (err as { code?: string }).code ??
+    (err as { cause?: { code?: string } }).cause?.code;
+
+  const deleteScopedRows = async (): Promise<void> => {
+    let pending = discovered.rows.map((r) => r.table_name);
+    while (pending.length > 0) {
+      const blocked: string[] = [];
+      const errors: string[] = [];
+      for (const table of pending) {
+        try {
+          await db.execute(
+            sql`DELETE FROM ${sql.identifier(table)} WHERE organization_id IN (${idList})`,
+          );
+        } catch (err) {
+          // 23503 = foreign_key_violation: another pending table still
+          // references this one; retry after that table is cleared.
+          // (drizzle may wrap the pg error, so also check `cause`.)
+          if (postgresErrorCode(err) === "23503") {
+            blocked.push(table);
+            errors.push(`${table}: ${(err as Error).message}`);
+          } else {
+            throw err;
+          }
         }
       }
+      if (blocked.length === pending.length) {
+        throw new Error(
+          `deleteTestOrgs made no progress; still blocked: ${errors.join("; ")}`,
+        );
+      }
+      pending = blocked;
     }
-    if (blocked.length === pending.length) {
-      throw new Error(
-        `deleteTestOrgs made no progress; still blocked: ${errors.join("; ")}`,
-      );
+  };
+
+  const maxOrganizationDeleteAttempts = 5;
+  for (let attempt = 1; ; attempt += 1) {
+    await deleteScopedRows();
+    try {
+      await db.execute(sql`DELETE FROM organizations WHERE id IN (${idList})`);
+      break;
+    } catch (err) {
+      const canRetry =
+        postgresErrorCode(err) === "23503" &&
+        attempt < maxOrganizationDeleteAttempts;
+      if (!canRetry) throw err;
     }
-    pending = blocked;
   }
 
-  await db.execute(sql`DELETE FROM organizations WHERE id IN (${idList})`);
   const remaining = await db.execute<{ id: string }>(
     sql`SELECT id FROM organizations WHERE id IN (${idList})`,
   );

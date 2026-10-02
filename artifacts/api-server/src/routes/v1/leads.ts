@@ -32,10 +32,12 @@ import {
   recordActionFeedback,
 } from "../../services/next-best-action";
 import { notifyHomeownerOfTeamReply } from "../../services/portal-message-email";
+import { sendEmailForUser, emailAcceptanceEvidence, type UserEmailResult } from "../../services/user-email";
 import {
-  gmailEmailProvider,
-  isGmailConfigured,
-} from "../../services/providers";
+  checkSendEligibility,
+  handleProviderFailure,
+  recordBlockedSend,
+} from "../../services/send-gate";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -386,7 +388,11 @@ router.post(
       req.member!.user.id,
     );
     if (!result.ok) {
-      if (result.error === "same_lead") {
+      if (result.error === crm.INVOICE_HISTORY_RETAINED) {
+        res.status(409).json({ error: "These customer records have retained invoice history. Keep them separate and ask your operator to review the duplicate.", code: result.error });
+      } else if (result.error === crm.OUTREACH_HISTORY_RETAINED) {
+        res.status(409).json({ error: "These records have imported source history or an unresolved customer reply. Keep them separate and ask your operator to review the duplicate; merging does not authorize outreach.", code: result.error });
+      } else if (result.error === "same_lead") {
         res.status(400).json({ error: "Cannot merge a lead into itself" });
       } else {
         res.status(404).json({ error: "Lead not found" });
@@ -453,6 +459,14 @@ router.post(
       res.status(400).json({ error: "Invalid activity" });
       return;
     }
+    // Photo references grant access through staff/portal galleries. The generic
+    // activity endpoint must not bypass the dedicated object ownership check.
+    if (parsed.data.type === "photos_attached") {
+      res.status(400).json({
+        error: "Use the photo attachment endpoint to add photos",
+      });
+      return;
+    }
     const lead = await crm.getLead(req.member!.organizationId, String(req.params.id));
     if (!lead) {
       res.status(404).json({ error: "Lead not found" });
@@ -504,14 +518,6 @@ router.post(
       res.status(400).json({ error: "This lead's contact has no email address" });
       return;
     }
-    if (!isGmailConfigured()) {
-      res.status(503).json({
-        error:
-          "Gmail is not connected. Connect the Gmail integration to send emails from the CRM.",
-      });
-      return;
-    }
-
     const subject = parsed.data.subject.trim();
     const body = parsed.data.body.trim();
     if (!subject || !body) {
@@ -519,16 +525,60 @@ router.post(
       return;
     }
 
-    let sent: { id: string; provider: string };
+    // A direct CRM compose is a human-approved one-to-one message. Enforce
+    // hard contact preferences and suppressions, while leaving quiet hours
+    // and marketing frequency caps to automated outreach paths.
+    const eligibility = await checkSendEligibility({
+      organizationId: req.member!.organizationId,
+      contact,
+      channel: "email",
+      kind: "transactional",
+    });
+    if (!eligibility.ok) {
+      await recordBlockedSend({
+        organizationId: req.member!.organizationId,
+        actorUserId: req.member!.user.id,
+        channel: "email",
+        outcome: eligibility.outcome,
+        reason: eligibility.reason,
+        source: "crm-compose",
+        mode: "manual",
+        leadId: lead.id,
+        contactId: contact.id,
+        resumeAt: "resumeAt" in eligibility ? eligibility.resumeAt : undefined,
+      });
+      res.status(409).json({
+        error: `Email blocked by contact preferences (${eligibility.reason})`,
+      });
+      return;
+    }
+
+    let sent: UserEmailResult;
     try {
-      sent = await gmailEmailProvider.send(contact.email, subject, body);
+      sent = await sendEmailForUser({
+        organizationId: req.member!.organizationId,
+        userId: req.member!.user.id,
+        to: contact.email,
+        subject,
+        body,
+      });
     } catch (err) {
-      console.error("[leads] Gmail send failed:", err);
-      res.status(502).json({
+      console.error("[leads] Selected email provider did not confirm acceptance");
+      await handleProviderFailure({
+        organizationId: req.member!.organizationId,
+        channel: "email",
+        address: contact.email,
+        err,
+        source: "crm-compose",
+      });
+      const message = err instanceof Error ? err.message : "";
+      res.status(message.includes("My Profile") ? 503 : 502).json({
         error:
-          err instanceof Error && err.message.includes("invalid recipient")
-            ? "The contact's email address is not a valid recipient"
-            : "Sending the email through Gmail failed. Try again in a moment.",
+          message.includes("My Profile")
+            ? "Connect and select Gmail or Microsoft 365 / Outlook in My Profile before sending email."
+            : message.includes("invalid recipient")
+              ? "The contact's email address is not a valid recipient"
+              : "Email acceptance was not confirmed. Check your selected mailbox before trying again; GrowthOS did not retry or switch accounts.",
       });
       return;
     }
@@ -538,14 +588,14 @@ router.post(
       contactId: lead.contactId,
       actorUserId: req.member!.user.id,
       type: "lead_email_sent",
-      title: `Email sent: ${subject}`,
+      title: `Email accepted by provider: ${subject}`,
       body: body.length > 300 ? `${body.slice(0, 300)}…` : body,
       metadata: {
         channel: "email",
         to: contact.email,
+        from: sent.senderEmail,
         subject,
-        provider: sent.provider,
-        providerMessageId: sent.id,
+        ...emailAcceptanceEvidence(sent, { organizationId: req.member!.organizationId, leadId: lead.id, recipientEmail: contact.email }),
         source: "crm-compose",
       },
     });
@@ -555,7 +605,12 @@ router.post(
       action: "lead.email_sent",
       entityType: "lead",
       entityId: lead.id,
-      metadata: { to: contact.email, subject, provider: sent.provider },
+      metadata: {
+        to: contact.email,
+        from: sent.senderEmail,
+        subject,
+        ...emailAcceptanceEvidence(sent, { organizationId: req.member!.organizationId, leadId: lead.id, recipientEmail: contact.email }),
+      },
     });
     res.status(201).json(activity);
   },
@@ -617,7 +672,11 @@ router.post(
       return;
     }
     try {
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL({
+        organizationId: req.member!.organizationId,
+        contentType: parsed.data.contentType,
+        size: parsed.data.size,
+      });
       const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
       res.json({ uploadURL, objectPath });
     } catch (error) {
@@ -644,6 +703,7 @@ router.post(
     const validation = await validatePhotoObjects(
       objectStorageService,
       parsed.data.photoPaths,
+      req.member!.organizationId,
     );
     if (!validation.ok) {
       res.status(400).json({ error: validation.reason });

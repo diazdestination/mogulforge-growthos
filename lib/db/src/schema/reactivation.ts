@@ -33,8 +33,14 @@ export const leadImportsTable = pgTable(
     /** Rows in the uploaded file (excluding the header). */
     totalRows: integer("total_rows").notNull().default(0),
     imported: integer("imported").notNull().default(0),
-    /** Rows matched to an existing contact with a live lead. */
+    /** Existing source opportunities safely updated from a newer snapshot. */
+    updated: integer("updated").notNull().default(0),
+    /** Unchanged source opportunities, or legacy rows matching an existing person. */
     duplicates: integer("duplicates").notNull().default(0),
+    /** Ambiguous identity, stale/conflicting source history, or local edits; not applied. */
+    conflicts: integer("conflicts").notNull().default(0),
+    sourceKey: text("source_key"),
+    snapshotAsOf: timestamp("snapshot_as_of", { withTimezone: true }),
     /** Rows dropped for validation errors (missing name/contact info). */
     skipped: integer("skipped").notNull().default(0),
     /** Imported rows whose address is on the suppression list (they exist

@@ -1,0 +1,26 @@
+import { expect, it } from 'vitest';
+import { runContractorRecoveryDrill } from './contractor-recovery-drill.mjs';
+
+it('upgrades the full prior schema, restores both synthetic companies, boots a read-only real app and preserves uncertainty/holds', async () => {
+  const result = await runContractorRecoveryDrill({ emit: () => {} });
+  expect(result.previousTableCount).toBe(90);
+  expect(result.tableCount).toBe(103);
+  expect(result.sourceFingerprint).toBe(result.restoredFingerprint);
+  expect(result.appBootVerified).toBe(true);
+  expect(result.readOnlyDatabaseVerified).toBe(true);
+  expect(result.tenantBoundariesVerified).toBe(true);
+  expect(result.postSnapshotMarkerAbsent).toBe(true);
+  expect(result.uncertainCheckoutPreserved).toBe(true);
+  expect(result.replyHoldSurvivesRawDeletion).toBe(true);
+  expect(result.tableCounts.staff_invitations).toBe(2);
+  expect(result.tableCounts.invoices).toBe(2);
+  expect(result.tableCounts.invoice_receipt_allocations).toBe(4);
+  expect(result.readChecks).toBe(12);
+  expect(result.issuedInvoiceSnapshotPreserved).toBe(true);
+  expect(result.invoiceNumberingPreserved).toBe(true);
+  expect(result.receiptReversalPreservesCash).toBe(true);
+  expect(result.recurringServiceSuccessorPreserved).toBe(true);
+  expect(result.pausedServiceExceptionVerified).toBe(true);
+  expect(result.providerCalls).toBe(0);
+  expect(result.managedBackupRestoreVerified).toBe(false);
+}, 120_000);

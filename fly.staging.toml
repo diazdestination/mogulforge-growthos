@@ -1,0 +1,44 @@
+# GrowthOS staging app configuration. A different app, origin and logical
+# database do not establish privilege isolation if they share one MPG cluster.
+# See STAGING-PREFLIGHT-2026-09-30.md before any deployment.
+
+app = 'mogulforge-growthos-staging'
+primary_region = 'iad'
+kill_signal = 'SIGTERM'
+kill_timeout = 30
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[deploy]
+  release_command = "node /app/scripts/release-schema.mjs"
+
+[env]
+  APP_ORIGIN = 'https://mogulforge-growthos-staging.fly.dev'
+  NODE_ENV = 'production'
+  OBJECT_STORAGE_PROVIDER = 'postgres'
+  PORT = '3001'
+  # Fail closed until staging data and provider credentials pass preflight.
+  SCHEDULER_AUTOSTART = 'false'
+  # Keep real email/SMS/webhook dispatch disabled even if a route is invoked.
+  GROWTHOS_OUTBOUND_HOLD = 'true'
+  # A later authorized provider test needs this AND an explicit hold release.
+  STAGING_OUTBOUND_APPROVED = 'false'
+  # Email tests additionally require a comma-separated list of exact approved
+  # inboxes. Configure privately; never use a wildcard or an entire domain.
+  STAGING_EMAIL_RECIPIENT_ALLOWLIST = ''
+  # The release command must not run drizzle --force without a reviewed delta.
+  STAGING_SCHEMA_PUSH_APPROVED = 'false'
+  STATIC_DIR = '/app/public'
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  # Reserve the always-on topology; background work is held above for preflight.
+  min_machines_running = 1
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '1gb'

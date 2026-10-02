@@ -42,6 +42,13 @@ function renderShell() {
 }
 
 describe('Shell sidebar admin-link gating', () => {
+  it.each([false, true])('gates Client Launchpad by platform access, not owner role (%s)', async (isPlatformAdmin) => {
+    mockApi('owner', { handler: (_method, path) => path.endsWith('/session') ? new Response(JSON.stringify({ id: 'u1', isPlatformAdmin }), { headers: { 'Content-Type': 'application/json' } }) : undefined });
+    renderShell();
+    await screen.findAllByText('Painless');
+    if (isPlatformAdmin) await screen.findAllByText('Client Launchpad');
+    else expect(screen.queryAllByText('Client Launchpad')).toHaveLength(0);
+  });
   it.each(['viewer', 'sales_rep'] as const)(
     '%s does not see Settings or Audit Log',
     async (role) => {

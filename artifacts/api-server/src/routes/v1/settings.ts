@@ -5,6 +5,7 @@ import { hasPermission } from "../../lib/permissions";
 
 import { requireMember } from "../../middlewares/requireMember";
 import { recordAudit } from "../../services/audit";
+import { assertCustomerEmailSender } from "../../services/customer-email";
 import { getEmailSendHealth } from "../../services/automation";
 import {
   getEmailProviderStatus,
@@ -45,11 +46,17 @@ function applyApiKeyMask(settings: OrgSettings, isAdmin: boolean): OrgSettings {
   if (!settings.googleReviews?.apiKey) return settings;
   const { googleReviews, ...rest } = settings;
   if (!isAdmin) {
-    return { ...rest, googleReviews: googleReviews ? { placeId: googleReviews.placeId } : null };
+    return {
+      ...rest,
+      googleReviews: googleReviews ? { placeId: googleReviews.placeId } : null,
+    };
   }
   return {
     ...rest,
-    googleReviews: { ...googleReviews, apiKey: maskApiKey(googleReviews.apiKey!) },
+    googleReviews: {
+      ...googleReviews,
+      apiKey: maskApiKey(googleReviews.apiKey!),
+    },
   };
 }
 
@@ -63,7 +70,7 @@ router.get(
   requireMember("settings.manage"),
   async (req: Request, res: Response): Promise<void> => {
     const [status, sendHealth] = await Promise.all([
-      getEmailProviderStatus(),
+      getEmailProviderStatus(req.member!.organizationId),
       getEmailSendHealth(req.member!.organizationId),
     ]);
     res.json({
@@ -80,8 +87,8 @@ router.get(
 router.get(
   "/settings/sms-provider",
   requireMember("settings.manage"),
-  (_req: Request, res: Response): void => {
-    res.json(getSmsProviderStatus());
+  async (req: Request, res: Response): Promise<void> => {
+    res.json(await getSmsProviderStatus(req.member!.organizationId));
   },
 );
 
@@ -116,6 +123,24 @@ router.put(
       return;
     }
     const { securityAlertsAcknowledgedAt, ...rest } = parsed.data;
+    if (rest.customerEmailSenderUserId != null) {
+      try {
+        await assertCustomerEmailSender(
+          req.member!.organizationId,
+          rest.customerEmailSenderUserId,
+        );
+      } catch (error) {
+        res
+          .status(400)
+          .json({
+            error:
+              error instanceof Error
+                ? error.message
+                : "Customer email sender is unavailable",
+          });
+        return;
+      }
+    }
     let acknowledgedAt: Date | undefined;
     if (securityAlertsAcknowledgedAt !== undefined) {
       const ts = new Date(securityAlertsAcknowledgedAt);
@@ -131,7 +156,10 @@ router.put(
     // preserve the stored key instead of overwriting with the mask string.
     // An explicitly empty or absent apiKey means "clear the key" (intentional).
     let patch = rest as Parameters<typeof updateOrgSettings>[1];
-    if (patch.googleReviews != null && isMaskedSentinel(patch.googleReviews.apiKey)) {
+    if (
+      patch.googleReviews != null &&
+      isMaskedSentinel(patch.googleReviews.apiKey)
+    ) {
       const existing = await getOrgSettings(req.member!.organizationId);
       patch = {
         ...patch,

@@ -48,7 +48,9 @@ import { createAppointment as createAppointmentRaw, updateAppointment } from "./
 
 /** Unwrap createAppointment's conflict union — these tests never expect a full window. */
 async function createAppointment(...args: Parameters<typeof createAppointmentRaw>) {
-  const row = await createAppointmentRaw(...args);
+  // These cases test reminders, not the separate inspection capacity gate.
+  // Omitted appointment type still means inspection in the real service.
+  const row = await createAppointmentRaw(args[0], { type: "other", ...args[1] });
   if (row === "conflict") throw new Error("unexpected inspection window conflict in test");
   if (row === "past_start") throw new Error("unexpected past-start rejection in test");
   return row;
@@ -290,6 +292,26 @@ describe("appointment reminders", () => {
     });
     await runReminderNow(appt!.id);
     expect(await sentChannelFor(l.id)).toEqual(["email"]);
+  });
+
+  it("uses the company timezone in reminder copy even when the host timezone differs", async () => {
+    const [previous] = await db.select().from(orgSettingsTable).where(eq(orgSettingsTable.organizationId, org.id));
+    const previousHostZone = process.env.CONCIERGE_TIMEZONE;
+    process.env.CONCIERGE_TIMEZONE = "America/New_York";
+    try {
+      const availability = { ...DEFAULT_INSPECTION_AVAILABILITY, timezone: "America/Los_Angeles" };
+      await db.insert(orgSettingsTable).values({ organizationId: org.id, inspectionAvailability: availability }).onConflictDoUpdate({ target: orgSettingsTable.organizationId, set: { inspectionAvailability: availability } });
+      const { contact: c, lead: l } = await makeContactLead({ email: "timezone@example.test", preferredContactMethod: "email" });
+      const appt = await createAppointment(org.id, { contactId: c.id, leadId: l.id, scheduledStart: new Date("2035-01-02T16:15:00Z") });
+      await runReminderNow(appt!.id);
+      const call = vi.mocked(providers.email.send).mock.calls.find(args => args[0] === "timezone@example.test");
+      expect(call?.[2]).toContain("8:15 AM PST");
+      expect(call?.[2]).not.toContain("11:15 AM");
+    } finally {
+      if (previousHostZone === undefined) delete process.env.CONCIERGE_TIMEZONE;
+      else process.env.CONCIERGE_TIMEZONE = previousHostZone;
+      await db.update(orgSettingsTable).set({ inspectionAvailability: previous?.inspectionAvailability ?? DEFAULT_INSPECTION_AVAILABILITY }).where(eq(orgSettingsTable.organizationId, org.id));
+    }
   });
 
   it("CRM-created appointments use SMS when the contact prefers text and consented", async () => {

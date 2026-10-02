@@ -194,6 +194,7 @@ router.post(
     const validation = await validatePhotoObjects(
       objectStorageService,
       parsed.data.photoPaths,
+      session.organizationId,
     );
     if (!validation.ok) {
       res.status(400).json({ error: validation.reason });
@@ -246,8 +247,10 @@ router.get(
         return;
       }
 
-      const objectFile =
-        await objectStorageService.getObjectEntityFile(objectPath);
+      const objectFile = await objectStorageService.getObjectEntityFile(
+        objectPath,
+        session.organizationId,
+      );
       const response = await objectStorageService.downloadObject(objectFile);
 
       res.status(response.status);

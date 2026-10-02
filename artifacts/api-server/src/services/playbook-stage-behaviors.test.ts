@@ -5,12 +5,34 @@ import {
   organizationsTable,
   playbookEnrollmentsTable,
   playbooksTable,
+  usersTable,
+  DEFAULT_SENDING_HOURS,
   type Playbook,
 } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+
+const getGmailStatusMock = vi.hoisted(() => vi.fn());
+const sendGmailForUserMock = vi.hoisted(() => vi.fn());
+
+vi.mock("./user-email", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./user-email")>();
+  return {
+    ...original,
+    getUserEmailStatus: getGmailStatusMock,
+    sendEmailForUser: sendGmailForUserMock,
+  };
+});
 
 import { runEvent } from "./automation";
 import * as crm from "./crm";
@@ -24,6 +46,7 @@ import {
 import { updateOrgSettings } from "./settings";
 
 let org: { id: string };
+let assignedUser: { id: string };
 
 beforeAll(async () => {
   const slug = `test-stagebeh-${Date.now()}`;
@@ -32,6 +55,15 @@ beforeAll(async () => {
     .values({ name: "Stage Behavior Test Org", slug })
     .returning();
   org = row;
+  const [user] = await db
+    .insert(usersTable)
+    .values({
+      organizationId: org.id,
+      email: `stage-behavior-sender-${Date.now()}@example.com`,
+      role: "sales_rep",
+    })
+    .returning();
+  assignedUser = user;
 });
 
 afterAll(async () => {
@@ -39,8 +71,24 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  // Reset stage-behavior overrides between tests.
-  await updateOrgSettings(org.id, { playbookStageBehaviors: null });
+  getGmailStatusMock.mockReset();
+  getGmailStatusMock.mockResolvedValue({
+    configured: true,
+    connected: true,
+    senderActive: true,
+  });
+  sendGmailForUserMock.mockReset();
+  sendGmailForUserMock.mockResolvedValue({
+    id: "gmail-stage-behavior-test",
+    provider: "gmail",
+    senderEmail: "stage-behavior-sender@example.com",
+  });
+  // Reset stage-behavior overrides and keep send expectations independent of
+  // the wall clock. Quiet-hours behavior is covered in send-gate.test.ts.
+  await updateOrgSettings(org.id, {
+    playbookStageBehaviors: null,
+    sendingHours: { ...DEFAULT_SENDING_HOURS, quietHoursEnabled: false },
+  });
 });
 
 async function makeLead() {
@@ -57,7 +105,10 @@ async function makeLead() {
     granted: true,
     disclosureVersion: "v1",
   });
-  const lead = await crm.createLead(org.id, { contactId: contact.id });
+  const lead = await crm.createLead(org.id, {
+    contactId: contact.id,
+    assignedUserId: assignedUser.id,
+  });
   return { contact, lead: lead! };
 }
 
@@ -74,7 +125,12 @@ async function makePlaybook(
       isActive: true,
       enrollmentRules: {},
       steps: [
-        { channel: "email" as const, delayMinutes: 5, subject: "Hi", prompt: "say hi" },
+        {
+          channel: "email" as const,
+          delayMinutes: 5,
+          subject: "Hi",
+          prompt: "say hi",
+        },
       ],
     })
     .returning();
@@ -162,7 +218,10 @@ describe("stage → behavior map", () => {
   });
 
   it("configured enroll hands the lead to the target playbook", async () => {
-    const target = await makePlaybook("Estimate follow-up", "estimate_follow_up");
+    const target = await makePlaybook(
+      "Estimate follow-up",
+      "estimate_follow_up",
+    );
     await updateOrgSettings(org.id, {
       playbookStageBehaviors: {
         estimate_sent: { action: "enroll", enrollPlaybookId: target.id },
@@ -232,7 +291,10 @@ describe("playbook categories & concurrency", () => {
   });
 
   it("pausing one enrollment leaves the lead's other-category sequences running", async () => {
-    const review = await makePlaybook("Review request pause-scope", "review_request");
+    const review = await makePlaybook(
+      "Review request pause-scope",
+      "review_request",
+    );
     const { lead } = await makeLead();
     const acq = await autoEnrollLead(org.id, lead.id);
     const other = await enrollLeadInPlaybookById(org.id, lead.id, review.id);
@@ -270,45 +332,61 @@ describe("playbook categories & concurrency", () => {
 });
 
 describe("step-execution stage guard", () => {
-  it("sends a due step when the stage is configured to continue", { timeout: 60_000 }, async () => {
-    await updateOrgSettings(org.id, {
-      playbookStageBehaviors: { estimate_sent: { action: "continue" } },
-    });
-    const { lead } = await makeLead();
-    const enrollment = await autoEnrollLead(org.id, lead.id);
-    await setLeadStatus(lead.id, "estimate_sent");
-    const result = await executePlaybookStep(org.id, {
-      enrollmentId: enrollment!.id,
-      stepIndex: 0,
-    });
-    expect(result.status).toBe("success");
-  });
+  it(
+    "sends a due step when the stage is configured to continue",
+    { timeout: 60_000 },
+    async () => {
+      await updateOrgSettings(org.id, {
+        playbookStageBehaviors: { estimate_sent: { action: "continue" } },
+      });
+      const { lead } = await makeLead();
+      const enrollment = await autoEnrollLead(org.id, lead.id);
+      await setLeadStatus(lead.id, "estimate_sent");
+      const result = await executePlaybookStep(org.id, {
+        enrollmentId: enrollment!.id,
+        stepIndex: 0,
+      });
+      expect(result.status).toBe("success");
+    },
+  );
 
-  it("pauses a due step when the stage is configured to pause", { timeout: 60_000 }, async () => {
-    await updateOrgSettings(org.id, {
-      playbookStageBehaviors: { estimate_sent: { action: "pause" } },
-    });
-    const { lead } = await makeLead();
-    const enrollment = await autoEnrollLead(org.id, lead.id);
-    await setLeadStatus(lead.id, "estimate_sent");
-    const result = await executePlaybookStep(org.id, {
-      enrollmentId: enrollment!.id,
-      stepIndex: 0,
-    });
-    expect(result.status).toBe("skipped");
-    const [row] = await getEnrollments(lead.id);
-    expect(row.status).toBe("paused");
-  });
+  it(
+    "pauses a due step when the stage is configured to pause",
+    { timeout: 60_000 },
+    async () => {
+      await updateOrgSettings(org.id, {
+        playbookStageBehaviors: { estimate_sent: { action: "pause" } },
+      });
+      const { lead } = await makeLead();
+      const enrollment = await autoEnrollLead(org.id, lead.id);
+      await setLeadStatus(lead.id, "estimate_sent");
+      const result = await executePlaybookStep(org.id, {
+        enrollmentId: enrollment!.id,
+        stepIndex: 0,
+      });
+      expect(result.status).toBe("skipped");
+      const [row] = await getEnrollments(lead.id);
+      expect(row.status).toBe("paused");
+    },
+  );
 
-  it("non-acquisition sequences keep running regardless of stage", { timeout: 60_000 }, async () => {
-    const review = await makePlaybook("Review request 2", "review_request");
-    const { lead } = await makeLead();
-    const enrollment = await enrollLeadInPlaybookById(org.id, lead.id, review.id);
-    await setLeadStatus(lead.id, "completed");
-    const result = await executePlaybookStep(org.id, {
-      enrollmentId: enrollment!.id,
-      stepIndex: 0,
-    });
-    expect(result.status).toBe("success");
-  });
+  it(
+    "non-acquisition sequences keep running regardless of stage",
+    { timeout: 60_000 },
+    async () => {
+      const review = await makePlaybook("Review request 2", "review_request");
+      const { lead } = await makeLead();
+      const enrollment = await enrollLeadInPlaybookById(
+        org.id,
+        lead.id,
+        review.id,
+      );
+      await setLeadStatus(lead.id, "completed");
+      const result = await executePlaybookStep(org.id, {
+        enrollmentId: enrollment!.id,
+        stepIndex: 0,
+      });
+      expect(result.status).toBe("success");
+    },
+  );
 });

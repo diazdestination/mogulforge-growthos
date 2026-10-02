@@ -1,4 +1,4 @@
-# Painless Command Center — Client Template
+# MogulForge GrowthOS — Client Template
 
 A full-stack roofing CRM: pipeline board, lead management, scheduling, automated emails, portal access for homeowners, and an AI roof concierge. Built on React + Vite (frontend) and Node/Fastify + PostgreSQL (API server).
 
@@ -6,7 +6,7 @@ A full-stack roofing CRM: pipeline board, lead management, scheduling, automated
 
 ## ⚡ First thing after cloning: activate the sync workflow
 
-This repository ships with a **Sync from upstream monorepo** GitHub Actions workflow that lets you pull the latest updates from the Painless CRM monorepo with one click. It needs a one-time setup step to become dispatchable:
+This repository ships with a **Sync from upstream monorepo** GitHub Actions workflow that lets a maintained client template pull approved updates from its upstream CRM monorepo. It needs a one-time setup step to become dispatchable:
 
 **Option A — GitHub Codespaces (automatic)**
 

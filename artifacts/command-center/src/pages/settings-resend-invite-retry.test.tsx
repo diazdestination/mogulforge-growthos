@@ -1,9 +1,7 @@
 /**
- * Covers the settings Team tab's retry toast for the one-shot resend-invite
- * action: both a thrown request error and a `sent: false` response must
- * surface a toast with a Retry action, and a successful retry dismisses it.
- * A 429 Retry-After response shows a friendly cooldown notice instead of
- * the destructive retry toast.
+ * Invitation transport failures are not proof that no email was accepted.
+ * Never offer an immediate Retry action or claim inbox delivery. A 429 is a
+ * request cooldown, not evidence that the earlier email was delivered.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
@@ -64,13 +62,13 @@ async function openTeamTabAndResend() {
   fireEvent.click(resend);
 }
 
-describe('Settings resend-invite retry toast', () => {
+describe('Settings resend-invite outcome safety', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
   });
 
-  it('shows an error toast with a Retry action when the resend request fails', async () => {
+  it('requires reconciliation without a Retry action when the request fails', async () => {
     const fetchMock = renderTeamSettings((method, path) => {
       if (method === 'POST' && path.endsWith(resendPath)) {
         return jsonResponse({ error: 'boom' }, 500);
@@ -82,16 +80,14 @@ describe('Settings resend-invite retry toast', () => {
 
     await waitFor(() => expect(resendCalls(fetchMock).length).toBe(1));
     await waitFor(() => {
-      expect(screen.getByText(/could not re-send the invite email/i)).toBeTruthy();
+      expect(screen.getByText(/invite email outcome unconfirmed/i)).toBeTruthy();
     });
-    // Shows a retry action so the rep can try again.
-    expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy();
-    // Cooldown message must not appear — this is a plain failure, not a 429.
-    expect(screen.queryByText(/invite was just resent/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
+    expect(screen.getByText(/check provider delivery records/)).toBeTruthy();
+    expect(screen.queryByText(/temporarily limited/i)).toBeNull();
   });
 
-  it('shows a cooldown toast (not a retry) when the server says the invite was just resent', async () => {
-    // 429 with a Retry-After header triggers the friendly "just resent" cooldown UI.
+  it('shows a cooldown without claiming the prior email was sent', async () => {
     renderTeamSettings((method, path) => {
       if (method === 'POST' && path.endsWith(resendPath)) {
         return jsonResponse({ error: 'Too Many Requests' }, 429, { 'retry-after': '42' });
@@ -102,20 +98,18 @@ describe('Settings resend-invite retry toast', () => {
     await openTeamTabAndResend();
 
     await waitFor(() => {
-      expect(screen.getByText(/invite was just resent/i)).toBeTruthy();
+      expect(screen.getByText(/resend is temporarily limited/i)).toBeTruthy();
     });
     expect(screen.getByText(/about 42 seconds/i)).toBeTruthy();
     // Shows a cooldown notice, not a failure — no retry action.
-    expect(screen.queryByText(/could not re-send the invite email/i)).toBeNull();
+    expect(screen.queryByText(/invite email outcome unconfirmed/i)).toBeNull();
     expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
   });
 
-  it('shows a Retry toast when the email is not delivered (sent: false), and retry success dismisses it', async () => {
-    let fail = true;
+  it('does not turn an uncertain provider response into an immediate retry', async () => {
     const fetchMock = renderTeamSettings((method, path) => {
       if (method === 'POST' && path.endsWith(resendPath)) {
-        if (fail) return jsonResponse({ sent: false, error: 'Delivery failed' });
-        return jsonResponse({ sent: true });
+        return jsonResponse({ sent: false, error: 'CANARY_PRIVATE_PROVIDER_DETAIL' });
       }
       return undefined;
     });
@@ -123,25 +117,17 @@ describe('Settings resend-invite retry toast', () => {
     await openTeamTabAndResend();
 
     await waitFor(() => expect(resendCalls(fetchMock).length).toBe(1));
-    const retry = await screen.findByRole('button', { name: /retry/i });
-
-    fail = false;
-    fireEvent.click(retry);
-
-    await waitFor(() => expect(resendCalls(fetchMock).length).toBe(2));
-    // Wait for the toast to disappear — use queryAllByText to avoid false failures
-    // from the aria-live region that mirrors the toast title.
-    await waitFor(() => {
-      const nodes = screen.queryAllByText(/could not re-send the invite email/i);
-      const visibleToasts = nodes.filter(el => !el.closest('[aria-live]'));
-      expect(visibleToasts).toHaveLength(0);
-    });
+    await screen.findByText(/invite email outcome unconfirmed/i);
+    expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
+    expect(screen.queryByText(/CANARY_PRIVATE_PROVIDER_DETAIL/)).toBeNull();
+    expect(screen.queryByText(/cannot activate/)).toBeNull();
+    expect(resendCalls(fetchMock)).toHaveLength(1);
   });
 
-  it('re-surfaces the toast when the retry fails again', async () => {
+  it('distinguishes provider acceptance from inbox delivery', async () => {
     const fetchMock = renderTeamSettings((method, path) => {
       if (method === 'POST' && path.endsWith(resendPath)) {
-        return jsonResponse({ error: 'boom' }, 500);
+        return jsonResponse({ sent: true, error: null });
       }
       return undefined;
     });
@@ -149,13 +135,24 @@ describe('Settings resend-invite retry toast', () => {
     await openTeamTabAndResend();
 
     await waitFor(() => expect(resendCalls(fetchMock).length).toBe(1));
-    const retry = await screen.findByRole('button', { name: /retry/i });
-    fireEvent.click(retry);
+    await screen.findByText(/invitation email accepted for sending/i);
+    expect(screen.getByText(/Inbox delivery is not yet confirmed/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
+    expect(resendCalls(fetchMock)).toHaveLength(1);
+  });
 
-    await waitFor(() => expect(resendCalls(fetchMock).length).toBe(2));
-
-    // The toast (with its Retry action) is still there for another attempt.
-    expect(screen.getByText(/could not re-send the invite email/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy();
+  it('does not claim a newly invited teammate cannot activate after an unknown send', async () => {
+    renderTeamSettings((method, path) => method === 'POST' && path.endsWith('/api/v1/users/invite')
+      ? jsonResponse({ ...inviteUser, inviteEmail: { sent: false, error: 'CANARY_PRIVATE_PROVIDER_DETAIL' } })
+      : undefined);
+    const tab = await screen.findByRole('tab', { name: /team/i });
+    fireEvent.mouseDown(tab);
+    fireEvent.click(tab);
+    fireEvent.change(await screen.findByPlaceholderText('email@company.com'), { target: { value: 'new@example.test' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Invite', exact: true }));
+    await screen.findByText('Invite created; email outcome unconfirmed');
+    expect(screen.getByText(/Check provider delivery records/)).toBeTruthy();
+    expect(screen.queryByText(/cannot activate|CANARY_PRIVATE_PROVIDER_DETAIL/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
   });
 });

@@ -1,4 +1,5 @@
 import {
+  auditEventsTable,
   consentRecordsTable,
   db,
   organizationsTable,
@@ -6,15 +7,37 @@ import {
   playbooksTable,
   scheduledActionsTable,
   activitiesTable,
+  usersTable,
   DEFAULT_SENDING_HOURS,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import { updateOrgSettings } from "./settings";
 
+const getGmailStatusMock = vi.hoisted(() => vi.fn());
+const sendGmailForUserMock = vi.hoisted(() => vi.fn());
+
+vi.mock("./user-email", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./user-email")>();
+  return {
+    ...original,
+    getUserEmailStatus: getGmailStatusMock,
+    sendEmailForUser: sendGmailForUserMock,
+  };
+});
+
 import { runEvent } from "./automation";
+import { MicrosoftMailError } from "./microsoft-oauth";
 import * as crm from "./crm";
 import {
   autoEnrollLead,
@@ -28,6 +51,7 @@ import {
 } from "./playbooks";
 
 let org: { id: string };
+let assignedUser: { id: string };
 
 beforeAll(async () => {
   const slug = `test-playbook-${Date.now()}`;
@@ -36,6 +60,15 @@ beforeAll(async () => {
     .values({ name: "Playbook Test Org", slug })
     .returning();
   org = row;
+  const [user] = await db
+    .insert(usersTable)
+    .values({
+      organizationId: org.id,
+      email: `playbook-sender-${Date.now()}@example.com`,
+      role: "sales_rep",
+    })
+    .returning();
+  assignedUser = user;
   // These suites run at any wall-clock time: disable the (default-on)
   // sending window so step execution is deterministic.
   await updateOrgSettings(org.id, {
@@ -43,16 +76,38 @@ beforeAll(async () => {
   });
 });
 
+beforeEach(() => {
+  getGmailStatusMock.mockReset();
+  getGmailStatusMock.mockResolvedValue({
+    configured: true,
+    connected: true,
+    senderActive: true,
+  });
+  sendGmailForUserMock.mockReset();
+  sendGmailForUserMock.mockResolvedValue({
+    id: "gmail-playbook-test",
+    provider: "gmail",
+    senderEmail: "assigned-sender@example.com",
+  });
+});
+
 afterAll(async () => {
   await deleteTestOrgs(org.id);
 });
 
-async function makeLead(opts?: { smsGranted?: boolean; email?: string | null }) {
+async function makeLead(opts?: {
+  smsGranted?: boolean;
+  email?: string | null;
+  unassigned?: boolean;
+}) {
   const contact = await crm.createContact(org.id, {
     firstName: "Play",
     lastName: "Book",
     phone: "+15550002222",
-    email: opts?.email === null ? undefined : (opts?.email ?? "playbook@test.example"),
+    email:
+      opts?.email === null
+        ? undefined
+        : (opts?.email ?? "playbook@test.example"),
   });
   await db.insert(consentRecordsTable).values({
     organizationId: org.id,
@@ -61,7 +116,10 @@ async function makeLead(opts?: { smsGranted?: boolean; email?: string | null }) 
     granted: opts?.smsGranted ?? true,
     disclosureVersion: "v1",
   });
-  const lead = await crm.createLead(org.id, { contactId: contact.id });
+  const lead = await crm.createLead(org.id, {
+    contactId: contact.id,
+    ...(opts?.unassigned ? {} : { assignedUserId: assignedUser.id }),
+  });
   return { contact, lead: lead! };
 }
 
@@ -119,6 +177,14 @@ describe("closer engine playbooks", () => {
       stepIndex: 0,
     });
     expect(result.status).toBe("success");
+    expect(sendGmailForUserMock).toHaveBeenCalledOnce();
+    expect(sendGmailForUserMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: org.id,
+        userId: assignedUser.id,
+        to: "playbook@test.example",
+      }),
+    );
 
     const [after] = await db
       .select()
@@ -138,6 +204,33 @@ describe("closer engine playbooks", () => {
         ),
       );
     expect(touches).toHaveLength(1);
+    expect(touches[0].metadata).toEqual(
+      expect.objectContaining({
+        provider: "gmail",
+        providerMessageId: "gmail-playbook-test",
+        senderUserId: assignedUser.id,
+        from: "assigned-sender@example.com",
+      }),
+    );
+
+    const [audit] = await db
+      .select()
+      .from(auditEventsTable)
+      .where(
+        and(
+          eq(auditEventsTable.organizationId, org.id),
+          eq(auditEventsTable.action, "playbook.step_sent"),
+          eq(auditEventsTable.entityId, lead.id),
+        ),
+      );
+    expect(audit.metadata).toEqual(
+      expect.objectContaining({
+        provider: "gmail",
+        providerMessageId: "gmail-playbook-test",
+        senderUserId: assignedUser.id,
+        from: "assigned-sender@example.com",
+      }),
+    );
 
     // Stale re-run of the same step is a no-op.
     const rerun = await executePlaybookStep(org.id, {
@@ -145,6 +238,156 @@ describe("closer engine playbooks", () => {
       stepIndex: 0,
     });
     expect(rerun.status).toBe("skipped");
+  });
+
+  it("pauses an automated email before claiming it when the lead has no assigned sender", async () => {
+    const { lead } = await makeLead({ unassigned: true });
+    const enrollment = await autoEnrollLead(org.id, lead.id);
+
+    const result = await executePlaybookStep(org.id, {
+      enrollmentId: enrollment!.id,
+      stepIndex: 0,
+    });
+
+    expect(result).toEqual({
+      status: "skipped",
+      detail: "paused: automated_sender_unassigned",
+    });
+    expect(getGmailStatusMock).not.toHaveBeenCalled();
+    expect(sendGmailForUserMock).not.toHaveBeenCalled();
+    const [after] = await db
+      .select()
+      .from(playbookEnrollmentsTable)
+      .where(eq(playbookEnrollmentsTable.id, enrollment!.id));
+    expect(after.status).toBe("paused");
+    expect(after.currentStep).toBe(0);
+    expect(after.pauseReason).toContain("assign this lead");
+  });
+
+  it("keeps Microsoft request correlations distinct from message and delivery receipts", async () => {
+    sendGmailForUserMock.mockResolvedValue({
+      id: null,
+      provider: "microsoft",
+      senderEmail: "selected@example.invalid",
+      acceptance: "accepted",
+      providerRequestId: "00000000-0000-4000-8000-000000000001",
+      clientRequestId: "00000000-0000-4000-8000-000000000002",
+    });
+    const { lead } = await makeLead();
+    const enrollment = await autoEnrollLead(org.id, lead.id);
+    expect(
+      await executePlaybookStep(org.id, {
+        enrollmentId: enrollment!.id,
+        stepIndex: 0,
+      }),
+    ).toMatchObject({ status: "success" });
+    const [touch] = await db
+      .select()
+      .from(activitiesTable)
+      .where(
+        and(
+          eq(activitiesTable.leadId, lead.id),
+          eq(activitiesTable.type, "playbook_touch_sent"),
+        ),
+      );
+    expect(touch.metadata).toMatchObject({
+      provider: "microsoft",
+      providerMessageId: null,
+      providerRequestId: "00000000-0000-4000-8000-000000000001",
+      clientRequestId: "00000000-0000-4000-8000-000000000002",
+      acceptance: "accepted",
+      deliveryConfirmed: false,
+    });
+    expect(sendGmailForUserMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not send a claimed Microsoft step again after an ambiguous provider result", async () => {
+    sendGmailForUserMock.mockRejectedValue(
+      new MicrosoftMailError(
+        "microsoft_send_outcome_unknown",
+        "Outcome unknown; inspect Sent Items.",
+        false,
+        true,
+      ),
+    );
+    const { lead } = await makeLead();
+    const enrollment = await autoEnrollLead(org.id, lead.id);
+    const input = { enrollmentId: enrollment!.id, stepIndex: 0 };
+    await expect(executePlaybookStep(org.id, input)).rejects.toMatchObject({
+      outcomeUnknown: true,
+    });
+    expect(await executePlaybookStep(org.id, input)).toMatchObject({
+      status: "skipped",
+    });
+    expect(sendGmailForUserMock).toHaveBeenCalledTimes(1);
+    const touches = await db
+      .select()
+      .from(activitiesTable)
+      .where(
+        and(
+          eq(activitiesTable.leadId, lead.id),
+          eq(activitiesTable.type, "playbook_touch_sent"),
+        ),
+      );
+    expect(touches).toHaveLength(0);
+  });
+
+  it("pauses an automated email before claiming it when the assigned user has no Gmail connection", async () => {
+    getGmailStatusMock.mockResolvedValue({
+      configured: true,
+      connected: false,
+      senderActive: true,
+    });
+    const { lead } = await makeLead();
+    const enrollment = await autoEnrollLead(org.id, lead.id);
+
+    const result = await executePlaybookStep(org.id, {
+      enrollmentId: enrollment!.id,
+      stepIndex: 0,
+    });
+
+    expect(result).toEqual({
+      status: "skipped",
+      detail: "paused: assigned_sender_email_not_connected",
+    });
+    expect(sendGmailForUserMock).not.toHaveBeenCalled();
+    const [after] = await db
+      .select()
+      .from(playbookEnrollmentsTable)
+      .where(eq(playbookEnrollmentsTable.id, enrollment!.id));
+    expect(after.status).toBe("paused");
+    expect(after.currentStep).toBe(0);
+    expect(after.pauseReason).toContain(
+      "assigned user must connect their selected email account",
+    );
+  });
+
+  it("pauses an automated email before claiming it when the assigned user is inactive", async () => {
+    getGmailStatusMock.mockResolvedValue({
+      configured: true,
+      connected: false,
+      senderActive: false,
+    });
+    const { lead } = await makeLead();
+    const enrollment = await autoEnrollLead(org.id, lead.id);
+
+    const result = await executePlaybookStep(org.id, {
+      enrollmentId: enrollment!.id,
+      stepIndex: 0,
+    });
+
+    expect(result).toEqual({
+      status: "skipped",
+      detail: "paused: assigned_sender_inactive",
+    });
+    expect(sendGmailForUserMock).not.toHaveBeenCalled();
+    const [after] = await db
+      .select()
+      .from(playbookEnrollmentsTable)
+      .where(eq(playbookEnrollmentsTable.id, enrollment!.id));
+    expect(after.status).toBe("paused");
+    expect(after.currentStep).toBe(0);
+    expect(after.pauseReason).toContain("assigned user is no longer active");
   });
 
   it("skips an SMS step without consent but still advances", async () => {
@@ -211,9 +454,18 @@ describe("closer engine playbooks", () => {
     const { lead } = await makeLead();
     const enrollment = await autoEnrollLead(org.id, lead.id);
     const results = await Promise.all([
-      executePlaybookStep(org.id, { enrollmentId: enrollment!.id, stepIndex: 0 }),
-      executePlaybookStep(org.id, { enrollmentId: enrollment!.id, stepIndex: 0 }),
-      executePlaybookStep(org.id, { enrollmentId: enrollment!.id, stepIndex: 0 }),
+      executePlaybookStep(org.id, {
+        enrollmentId: enrollment!.id,
+        stepIndex: 0,
+      }),
+      executePlaybookStep(org.id, {
+        enrollmentId: enrollment!.id,
+        stepIndex: 0,
+      }),
+      executePlaybookStep(org.id, {
+        enrollmentId: enrollment!.id,
+        stepIndex: 0,
+      }),
     ]);
     expect(results.filter((r) => r.status === "success")).toHaveLength(1);
 

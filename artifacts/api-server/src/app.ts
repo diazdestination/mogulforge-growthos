@@ -6,12 +6,13 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { restoreReadOnlyRequests } from "./lib/restore-mode";
 
 const app: Express = express();
 
-// We run behind Replit's proxy; trust the first hop so req.ip reflects the
-// real client address (used for rate limiting) without honoring arbitrary
-// client-spoofed X-Forwarded-For chains.
+// Production runs behind one trusted reverse-proxy hop (Fly, Replit, or the
+// operator's ingress), so req.ip reflects the client without trusting an
+// arbitrary forwarded chain.
 app.set("trust proxy", 1);
 
 app.use(
@@ -35,6 +36,13 @@ app.use(
 );
 app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
+app.use(restoreReadOnlyRequests);
+// The portable object-store adapter accepts a signed, short-lived raw PUT.
+// This must run before the general JSON parser so image bytes are preserved.
+app.use(
+  "/api/v1/public/uploads/local",
+  express.raw({ type: () => true, limit: "10mb" }),
+);
 // Voice-note transcription posts base64 audio (up to ~5MB raw, ~7MB as
 // base64 JSON); everything else keeps the conservative default limit.
 app.use(
@@ -44,6 +52,9 @@ app.use(
 // CSV lead imports post the raw file contents as a JSON string (up to 5MB
 // of CSV, ~6MB with JSON escaping); the route re-enforces the 5MB CSV cap.
 app.use("/api/v1/lead-imports", express.json({ limit: "8mb" }));
+// Evidence Intelligence accepts an explicitly approved artifact as base64 JSON.
+// The route itself enforces a 5MB raw cap and a strict MIME allowlist.
+app.use("/api/v1/bie/claims", express.json({ limit: "8mb" }));
 // Keep the raw body around for webhook signature verification (Resend/svix
 // signs the exact bytes, not the re-serialized JSON).
 app.use(

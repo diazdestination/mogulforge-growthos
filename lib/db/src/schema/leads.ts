@@ -5,6 +5,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -15,6 +16,44 @@ import { contactsTable } from "./contacts";
 import { leadStatusEnum, urgencyEnum } from "./enums";
 import { organizationsTable } from "./organizations";
 import { propertiesTable } from "./properties";
+
+/** An uploaded snapshot is historical evidence, never proof of current eligibility. */
+export interface ImportedOpportunityHistory {
+  version: 1;
+  kind: "csv_snapshot";
+  originalCreatedAt: string | null;
+  sourceUpdatedAt: string | null;
+  statusChangedAt: string | null;
+  lastContactAt: string | null;
+  snapshotAsOf: string | null;
+  firstImportedAt: string;
+  lastImportedAt: string;
+  externalCustomerId: string | null;
+  externalEstimateId: string | null;
+  currency: "USD" | null;
+  fingerprint: string;
+  mappedFields: string[];
+  /** Hash of last applied values; detect local edits without copying free text. */
+  appliedFingerprint: string;
+}
+
+export const importedOpportunityHistorySchema = z.object({
+  version: z.literal(1),
+  kind: z.literal("csv_snapshot"),
+  originalCreatedAt: z.iso.datetime().nullable(),
+  sourceUpdatedAt: z.iso.datetime().nullable(),
+  statusChangedAt: z.iso.datetime().nullable(),
+  lastContactAt: z.iso.datetime().nullable(),
+  snapshotAsOf: z.iso.datetime().nullable(),
+  firstImportedAt: z.iso.datetime(),
+  lastImportedAt: z.iso.datetime(),
+  externalCustomerId: z.string().min(1).max(200).nullable(),
+  externalEstimateId: z.string().min(1).max(200).nullable(),
+  currency: z.literal("USD").nullable(),
+  fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  appliedFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  mappedFields: z.array(z.string().min(1).max(40)).max(30),
+}).strict();
 
 export const leadsTable = pgTable(
   "leads",
@@ -67,6 +106,11 @@ export const leadsTable = pgTable(
     referrer: text("referrer"),
     /** How the lead entered the system: assessment | widget | form | concierge | api | import. */
     creationMethod: text("creation_method"),
+    /** Stable account/source namespace, distinct from marketing attribution. */
+    importSourceKey: text("import_source_key"),
+    /** Opportunity/job/estimate identity, not the customer's identity. */
+    externalOpportunityId: text("external_opportunity_id"),
+    importedHistory: jsonb("imported_history").$type<ImportedOpportunityHistory>(),
     /**
      * Website analytics visitor id linked at identification time (consent-
      * aware: only set when the visitor identified themselves through a
@@ -88,6 +132,9 @@ export const leadsTable = pgTable(
       table.assignedUserId,
     ),
     index("leads_org_anon_idx").on(table.organizationId, table.anonymousId),
+    uniqueIndex("leads_org_import_opportunity_idx").on(
+      table.organizationId, table.importSourceKey, table.externalOpportunityId,
+    ),
   ],
 );
 
@@ -95,6 +142,9 @@ export const insertLeadSchema = createInsertSchema(leadsTable).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  importSourceKey: true,
+  externalOpportunityId: true,
+  importedHistory: true,
 });
 export type InsertLead = z.infer<typeof insertLeadSchema>;
 export type Lead = typeof leadsTable.$inferSelect;

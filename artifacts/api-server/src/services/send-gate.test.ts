@@ -176,6 +176,14 @@ describe("checkSendEligibility", () => {
       contact,
       channel: "sms",
       kind: "outreach",
+      sendingHours: {
+        quietHoursEnabled: false,
+        timezone: "UTC",
+        startHour: 9,
+        endHour: 17,
+        days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        maxTouchesPerDay: 0,
+      },
     });
     expect(sms2.ok).toBe(true);
 
@@ -184,6 +192,14 @@ describe("checkSendEligibility", () => {
       contact,
       channel: "email",
       kind: "outreach",
+      sendingHours: {
+        quietHoursEnabled: false,
+        timezone: "UTC",
+        startHour: 9,
+        endHour: 17,
+        days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        maxTouchesPerDay: 0,
+      },
     });
     expect(email.ok).toBe(true);
   });

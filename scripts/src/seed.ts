@@ -16,7 +16,7 @@ import {
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 
-const ORG_SLUG = "painless";
+const ORG_SLUG = "mogulforge";
 
 async function main() {
   let [org] = await db
@@ -26,7 +26,7 @@ async function main() {
   if (!org) {
     [org] = await db
       .insert(organizationsTable)
-      .values({ name: "Painless Roofing & Water Restoration", slug: ORG_SLUG })
+      .values({ name: "MogulForge Home Services", slug: ORG_SLUG })
       .returning();
     console.log("Created default organization");
   }

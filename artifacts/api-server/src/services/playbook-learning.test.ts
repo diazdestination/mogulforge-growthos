@@ -5,14 +5,35 @@ import {
   playbookDecisionsTable,
   playbookTouchesTable,
   playbooksTable,
+  usersTable,
   type Playbook,
   DEFAULT_SENDING_HOURS,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import { updateOrgSettings } from "./settings";
+
+const getGmailStatusMock = vi.hoisted(() => vi.fn());
+const sendGmailForUserMock = vi.hoisted(() => vi.fn());
+
+vi.mock("./user-email", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./user-email")>();
+  return {
+    ...original,
+    getUserEmailStatus: getGmailStatusMock,
+    sendEmailForUser: sendGmailForUserMock,
+  };
+});
 
 import { runEvent } from "./automation";
 import * as crm from "./crm";
@@ -28,6 +49,7 @@ import {
 import { autoEnrollLead, executePlaybookStep } from "./playbooks";
 
 let org: { id: string };
+let assignedUser: { id: string };
 
 beforeAll(async () => {
   const slug = `test-pblearn-${Date.now()}`;
@@ -36,10 +58,34 @@ beforeAll(async () => {
     .values({ name: "Playbook Learning Test Org", slug })
     .returning();
   org = row;
+  const [user] = await db
+    .insert(usersTable)
+    .values({
+      organizationId: org.id,
+      email: `playbook-learning-sender-${Date.now()}@example.com`,
+      role: "sales_rep",
+    })
+    .returning();
+  assignedUser = user;
   // These suites run at any wall-clock time: disable the (default-on)
   // sending window so step execution is deterministic.
   await updateOrgSettings(org.id, {
     sendingHours: { ...DEFAULT_SENDING_HOURS, quietHoursEnabled: false },
+  });
+});
+
+beforeEach(() => {
+  getGmailStatusMock.mockReset();
+  getGmailStatusMock.mockResolvedValue({
+    configured: true,
+    connected: true,
+    senderActive: true,
+  });
+  sendGmailForUserMock.mockReset();
+  sendGmailForUserMock.mockResolvedValue({
+    id: "gmail-learning-test",
+    provider: "gmail",
+    senderEmail: "learning-sender@example.com",
   });
 });
 
@@ -61,7 +107,10 @@ async function makeLead() {
     granted: true,
     disclosureVersion: "v1",
   });
-  const lead = await crm.createLead(org.id, { contactId: contact.id });
+  const lead = await crm.createLead(org.id, {
+    contactId: contact.id,
+    assignedUserId: assignedUser.id,
+  });
   return { contact, lead: lead! };
 }
 
@@ -79,7 +128,9 @@ async function makeVariantPlaybook(pinned?: string): Promise<Playbook> {
           delayMinutes: 5,
           subject: "A subject",
           prompt: "variant A direction",
-          variants: [{ key: "B", prompt: "variant B direction", subject: "B subject" }],
+          variants: [
+            { key: "B", prompt: "variant B direction", subject: "B subject" },
+          ],
           ...(pinned ? { pinnedVariant: pinned } : {}),
         },
       ],
@@ -149,7 +200,10 @@ describe("closer engine learning loop", () => {
   it("event hooks attribute outcomes (booked via appointment, won via stage change)", async () => {
     const { lead } = await makeLead();
     const enrollment = await autoEnrollLead(org.id, lead.id);
-    await executePlaybookStep(org.id, { enrollmentId: enrollment!.id, stepIndex: 0 });
+    await executePlaybookStep(org.id, {
+      enrollmentId: enrollment!.id,
+      stepIndex: 0,
+    });
 
     await runEvent(org.id, "appointment.booked", { leadId: lead.id });
     await runEvent(org.id, "lead.updated", {
@@ -171,7 +225,12 @@ describe("closer engine learning loop", () => {
 
     // Pinned: always the pinned variant, regardless of data.
     const pinnedPb = await makeVariantPlaybook("B");
-    const pinChoice = await chooseVariant(org.id, pinnedPb, 0, pinnedPb.steps[0]);
+    const pinChoice = await chooseVariant(
+      org.id,
+      pinnedPb,
+      0,
+      pinnedPb.steps[0],
+    );
     expect(pinChoice.key).toBe("B");
 
     const pb = await makeVariantPlaybook();
@@ -182,18 +241,26 @@ describe("closer engine learning loop", () => {
     // Seed both variants past MIN_VARIANT_SAMPLE; B wins decisively.
     for (let i = 0; i < MIN_VARIANT_SAMPLE; i++) {
       await seedTouch({
-        playbookId: pb.id, enrollmentId: enrollment!.id, leadId: lead.id,
-        variantKey: "default", replied: false,
+        playbookId: pb.id,
+        enrollmentId: enrollment!.id,
+        leadId: lead.id,
+        variantKey: "default",
+        replied: false,
       });
       await seedTouch({
-        playbookId: pb.id, enrollmentId: enrollment!.id, leadId: lead.id,
-        variantKey: "B", replied: true,
+        playbookId: pb.id,
+        enrollmentId: enrollment!.id,
+        leadId: lead.id,
+        variantKey: "B",
+        replied: true,
       });
     }
     // Thompson sampling is stochastic; with a 100% vs 0% split B should
     // dominate overwhelmingly across a handful of draws.
     const picks = await Promise.all(
-      Array.from({ length: 5 }, () => chooseVariant(org.id, pb, 0, pb.steps[0])),
+      Array.from({ length: 5 }, () =>
+        chooseVariant(org.id, pb, 0, pb.steps[0]),
+      ),
     );
     expect(picks.filter((p) => p.key === "B").length).toBeGreaterThanOrEqual(4);
 
@@ -222,19 +289,29 @@ describe("closer engine learning loop", () => {
     // Hour 18 replies great, hour 14 poorly — both with enough volume.
     for (let i = 0; i < MIN_WINDOW_SAMPLE; i++) {
       await seedTouch({
-        playbookId: pb.id, enrollmentId: enrollment!.id, leadId: lead.id,
-        variantKey: "default", hour: 18, replied: true,
+        playbookId: pb.id,
+        enrollmentId: enrollment!.id,
+        leadId: lead.id,
+        variantKey: "default",
+        hour: 18,
+        replied: true,
       });
       await seedTouch({
-        playbookId: pb.id, enrollmentId: enrollment!.id, leadId: lead.id,
-        variantKey: "default", hour: 14, replied: i === 0,
+        playbookId: pb.id,
+        enrollmentId: enrollment!.id,
+        leadId: lead.id,
+        variantKey: "default",
+        hour: 14,
+        replied: i === 0,
       });
     }
     const after = await adjustSendTime(org.id, base);
     expect(after.adjusted).toBe(true);
     expect(after.runAt.getUTCHours()).toBe(18);
     expect(after.runAt.getTime()).toBeGreaterThan(base.getTime());
-    expect(after.runAt.getTime() - base.getTime()).toBeLessThanOrEqual(12 * 3_600_000);
+    expect(after.runAt.getTime() - base.getTime()).toBeLessThanOrEqual(
+      12 * 3_600_000,
+    );
 
     const decisions = await db
       .select()
@@ -256,7 +333,9 @@ describe("closer engine learning loop", () => {
     expect(row).toHaveProperty("playbookName");
     expect(row).toHaveProperty("variantKey");
     // Winners beat the pooled baseline in this seeded data set.
-    expect(insights.engineReplyRate).toBeGreaterThanOrEqual(insights.baselineReplyRate);
+    expect(insights.engineReplyRate).toBeGreaterThanOrEqual(
+      insights.baselineReplyRate,
+    );
     expect(insights.decisions.length).toBeGreaterThan(0);
   });
 });

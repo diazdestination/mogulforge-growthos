@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { enqueueStaffLeadPush } from "./staff-push";
 
 import {
   CAPTURE_TARGET_FIELDS,
@@ -11,6 +12,7 @@ import {
   type CaptureEndpoint,
   type CaptureFieldMapping,
   type CaptureTargetField,
+  type LeadStatus,
 } from "@workspace/db";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 
@@ -21,7 +23,7 @@ import {
   repeatTouchColumns,
 } from "./attribution";
 
-const OPEN_LEAD_STATUSES = ["new", "contacted", "qualified", "nurture", "follow_up"];
+const OPEN_LEAD_STATUSES: LeadStatus[] = ["new", "contact_attempted", "ai_qualified", "nurture", "follow_up"];
 
 // ---------- endpoint CRUD (org-scoped) ----------
 
@@ -219,6 +221,9 @@ export async function captureExternalLead(
   opts: { idempotencyKey?: string | null } = {},
 ): Promise<CaptureResult> {
   const organizationId = endpoint.organizationId;
+  const { customerWorkHeld } = await import("./customer-lifecycle-runtime");
+  if (await customerWorkHeld(organizationId))
+    return { ok: false, error: "customer_lifecycle_paused" };
   const idempotencyKey = asText(opts.idempotencyKey, 200);
 
   // Reserve-first idempotency: exactly one delivery with a given key wins the
@@ -349,7 +354,7 @@ async function runCapture(
             and(
               eq(leadsTable.organizationId, organizationId),
               eq(leadsTable.contactId, contactId),
-              inArray(leadsTable.status, OPEN_LEAD_STATUSES as never[]),
+              inArray(leadsTable.status, OPEN_LEAD_STATUSES),
             ),
           )
           .limit(1)
@@ -374,6 +379,7 @@ async function runCapture(
         ...leadAttributionColumns({ source, creationMethod: "capture", touch }),
       })
       .returning();
+    await enqueueStaffLeadPush(tx, organizationId, lead);
     return { leadId: lead.id, contactId, outcome: "created" as const };
   });
 

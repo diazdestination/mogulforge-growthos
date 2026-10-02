@@ -5,8 +5,12 @@ import { getBusinessName } from "./settings";
  * appointments, and timeline. No staff auth involved.
  */
 import { dispatchWebhookEvent } from "./webhooks";
-import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
-
+import {
+  createHash,
+  randomBytes,
+  randomInt,
+  timingSafeEqual,
+} from "node:crypto";
 
 import {
   activitiesTable,
@@ -24,7 +28,19 @@ import {
   type LeadStatus,
   type PortalSession,
 } from "@workspace/db";
-import { and, desc, eq, gt, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import { logger } from "../lib/logger";
 import { consumeCooldown } from "../lib/rateLimit";
@@ -155,12 +171,19 @@ export async function requestLoginCode(params: {
         identifier,
         `Your ${businessName} sign-in code`,
         body,
+        { organizationId: params.organizationId },
       );
     } else {
       const to = contacts[0].phone ?? identifier;
       await providers.sms.send(
         to,
         `${businessName} sign-in code: ${code}. Expires in 10 minutes.`,
+        {
+          organizationId: params.organizationId,
+          contactId: contacts[0].id,
+          purpose: "authentication",
+          idempotencyKey: `portal:${sha256(code)}`,
+        },
       );
     }
   } catch (err) {
@@ -203,18 +226,34 @@ export async function verifyLoginCode(params: {
   if (!matches) {
     await db
       .update(portalLoginCodesTable)
-      .set({ attempts: record.attempts + 1 })
-      .where(eq(portalLoginCodesTable.id, record.id));
+      .set({ attempts: sql`${portalLoginCodesTable.attempts} + 1` })
+      .where(
+        and(
+          eq(portalLoginCodesTable.id, record.id),
+          isNull(portalLoginCodesTable.consumedAt),
+          lt(portalLoginCodesTable.attempts, MAX_VERIFY_ATTEMPTS),
+        ),
+      );
     return null;
   }
 
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-  await db.transaction(async (tx) => {
-    await tx
+  const consumed = await db.transaction(async (tx) => {
+    const [claimed] = await tx
       .update(portalLoginCodesTable)
       .set({ consumedAt: new Date() })
-      .where(eq(portalLoginCodesTable.id, record.id));
+      .where(
+        and(
+          eq(portalLoginCodesTable.id, record.id),
+          eq(portalLoginCodesTable.organizationId, params.organizationId),
+          isNull(portalLoginCodesTable.consumedAt),
+          gt(portalLoginCodesTable.expiresAt, new Date()),
+          lt(portalLoginCodesTable.attempts, MAX_VERIFY_ATTEMPTS),
+        ),
+      )
+      .returning({ id: portalLoginCodesTable.id });
+    if (!claimed) return false;
     await tx.insert(portalSessionsTable).values({
       organizationId: params.organizationId,
       tokenHash: sha256(token),
@@ -222,8 +261,9 @@ export async function verifyLoginCode(params: {
       channel,
       expiresAt,
     });
+    return true;
   });
-  return { token, expiresAt };
+  return consumed ? { token, expiresAt } : null;
 }
 
 /** Resolve a live portal session from a bearer token, or null. */
@@ -355,7 +395,10 @@ const HOMEOWNER_VISIBLE_ACTIVITY_TYPES = [
  * copy because their stored title/body embed send-channel details (email
  * address / phone number of record) meant for the internal timeline.
  */
-function portalUpdateCopy(act: Activity): { title: string; body: string | null } {
+function portalUpdateCopy(act: Activity): {
+  title: string;
+  body: string | null;
+} {
   if (act.type === "appointment_reminder_sent") {
     return {
       title: "Appointment reminder sent",
@@ -450,7 +493,8 @@ export async function getPortalOverview(session: PortalSession) {
     const meta = act.metadata as { photoPaths?: unknown } | null;
     const paths = Array.isArray(meta?.photoPaths)
       ? meta.photoPaths.filter(
-          (p): p is string => typeof p === "string" && p.startsWith("/objects/"),
+          (p): p is string =>
+            typeof p === "string" && p.startsWith("/objects/"),
         )
       : [];
     if (paths.length === 0) continue;
@@ -678,7 +722,12 @@ export async function getPortalConversation(
   session: PortalSession,
   leadId: string,
 ): Promise<
-  | { id: string; sender: "homeowner" | "team"; body: string; occurredAt: string }[]
+  | {
+      id: string;
+      sender: "homeowner" | "team";
+      body: string;
+      occurredAt: string;
+    }[]
   | null
 > {
   const contacts = await findMatchingContacts(
@@ -716,7 +765,10 @@ export async function getPortalConversation(
 
   return rows.map((act) => ({
     id: act.id,
-    sender: act.type === "portal_message" ? ("homeowner" as const) : ("team" as const),
+    sender:
+      act.type === "portal_message"
+        ? ("homeowner" as const)
+        : ("team" as const),
     body: act.body ?? "",
     occurredAt: act.occurredAt.toISOString(),
   }));

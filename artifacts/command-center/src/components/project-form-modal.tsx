@@ -15,9 +15,10 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useToast, toast as globalToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import LeadSelect from '@/components/lead-select';
+import { canAssignWork, localDateTime, scheduleTimezone } from '@/lib/contractor-schedule';
 
 function toDateInput(value: string | null | undefined) {
-  return value ? new Date(value).toISOString().split('T')[0] : '';
+  return localDateTime(value);
 }
 
 export interface ProjectFormDefaults {
@@ -50,6 +51,7 @@ export default function ProjectFormModal({
   const [crew, setCrew] = useState<string[]>(project?.crewUserIds || []);
   const [crewNotes, setCrewNotes] = useState(project?.crewNotes || '');
   const [advanceLead, setAdvanceLead] = useState(defaults?.offerLeadAdvance ?? false);
+  const [formError, setFormError] = useState('');
 
   const { data: users } = useListUsers();
   const effectiveLeadId = project?.leadId || leadId;
@@ -72,6 +74,8 @@ export default function ProjectFormModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || (!project && !leadId)) return;
+    setFormError('');
+    if ((end && (!start || new Date(end) <= new Date(start))) || (start && crew.length && !end)) { setFormError('Set an end time after the start time for assigned work.'); return; }
 
     const finish = () => {
       queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
@@ -102,6 +106,7 @@ export default function ProjectFormModal({
           scheduledEnd: end ? new Date(end).toISOString() : null,
           crewUserIds: crew,
           crewNotes: crewNotes || null,
+          ...(project.updatedAt ? { expectedUpdatedAt: project.updatedAt } : {}),
         },
       }, { onSuccess: finish, onError: handleSaveError });
     } else {
@@ -146,12 +151,12 @@ export default function ProjectFormModal({
       <div className="bg-card border border-border shadow-xl rounded-xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
         <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30 shrink-0">
           <h2 className="text-lg font-bold">{project ? 'Edit Project' : defaults?.offerLeadAdvance ? 'Start Project' : 'New Project'}</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">&times;</button>
+          <button aria-label="Close project form" onClick={onClose} className="min-h-11 min-w-11 text-muted-foreground hover:text-foreground">&times;</button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Name *</label>
-            <input required className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none" value={name} onChange={e => setName(e.target.value)} />
+            <input aria-label="Project name" required className="w-full bg-background border border-border rounded-md px-3 py-2 text-base focus:ring-2 focus:ring-primary focus:outline-none" value={name} onChange={e => setName(e.target.value)} />
           </div>
 
           {!project && (
@@ -169,7 +174,7 @@ export default function ProjectFormModal({
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Linked Estimate</label>
-            <select className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none" value={estimateId} onChange={e => setEstimateId(e.target.value)} disabled={!effectiveLeadId}>
+            <select aria-label="Linked estimate" className="w-full bg-background border border-border rounded-md px-3 py-2 text-base focus:ring-2 focus:ring-primary focus:outline-none" value={estimateId} onChange={e => setEstimateId(e.target.value)} disabled={!effectiveLeadId}>
               <option value="">-- None --</option>
               {estimates?.map(estimate => (
                 <option key={estimate.id} value={estimate.id}>
@@ -179,21 +184,22 @@ export default function ProjectFormModal({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Scheduled Start</label>
-              <input type="date" className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-primary focus:outline-none" value={start} onChange={e => setStart(e.target.value)} />
+              <input aria-label="Scheduled start" type="datetime-local" className="min-w-0 w-full bg-background border border-border rounded-md px-3 py-2 text-base focus:ring-2 focus:ring-primary focus:outline-none" value={start} onChange={e => setStart(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Scheduled End</label>
-              <input type="date" className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-primary focus:outline-none" value={end} onChange={e => setEnd(e.target.value)} />
+              <input aria-label="Scheduled end" type="datetime-local" className="min-w-0 w-full bg-background border border-border rounded-md px-3 py-2 text-base focus:ring-2 focus:ring-primary focus:outline-none" value={end} onChange={e => setEnd(e.target.value)} />
             </div>
           </div>
+          <p className="text-sm text-muted-foreground">Times use {scheduleTimezone}. The full window reserves the assigned crew, including multi-day jobs.</p>
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Crew Assignment</label>
             <div className="border border-border rounded-md p-2 max-h-36 overflow-y-auto space-y-1 bg-background">
-              {users?.map(user => (
+              {users?.filter(canAssignWork).map(user => (
                 <label key={user.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted cursor-pointer text-sm">
                   <input type="checkbox" checked={crew.includes(user.id)} onChange={() => toggleCrew(user.id)} className="accent-primary" />
                   <span>{`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email}</span>
@@ -206,7 +212,7 @@ export default function ProjectFormModal({
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Crew Notes</label>
-            <textarea className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:outline-none min-h-[60px] resize-none" value={crewNotes} onChange={e => setCrewNotes(e.target.value)} />
+            <textarea aria-label="Crew notes" className="w-full bg-background border border-border rounded-md px-3 py-2 text-base focus:ring-2 focus:ring-primary focus:outline-none min-h-[60px] resize-none" value={crewNotes} onChange={e => setCrewNotes(e.target.value)} />
           </div>
 
           {!project && defaults?.offerLeadAdvance && (
@@ -216,6 +222,7 @@ export default function ProjectFormModal({
             </label>
           )}
 
+          {formError && <p role="alert" className="text-sm text-destructive">{formError}</p>}
           <div className="pt-2 flex justify-end gap-3">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium hover:bg-muted rounded-md transition-colors">Cancel</button>
             <button type="submit" disabled={isSubmitting} className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 min-w-[100px]">

@@ -9,6 +9,7 @@ import {
   resolveInstallationKey,
 } from "../services/installation";
 import { getDefaultOrganization } from "../services/org";
+import { customerWorkHeld } from "../services/customer-lifecycle-runtime";
 
 declare global {
   namespace Express {
@@ -39,11 +40,22 @@ function requestHostname(req: Request): string | null {
  */
 export function ownHostnames(): Set<string> {
   const hosts = new Set<string>();
+  const add = (raw: string | undefined) => {
+    if (!raw) return;
+    const value = raw.trim();
+    if (!value) return;
+    try {
+      hosts.add(new URL(value).hostname.toLowerCase());
+    } catch {
+      hosts.add(value.replace(/^\/\//, "").split("/")[0].split(":")[0].toLowerCase());
+    }
+  };
+  add(process.env.APP_ORIGIN);
+  for (const origin of (process.env.APP_ORIGINS ?? "").split(",")) add(origin);
   const dev = process.env.REPLIT_DEV_DOMAIN;
-  if (dev) hosts.add(dev.toLowerCase());
+  if (dev) add(dev);
   for (const d of (process.env.REPLIT_DOMAINS ?? "").split(",")) {
-    const h = d.trim().toLowerCase();
-    if (h) hosts.add(h);
+    add(d);
   }
   return hosts;
 }
@@ -78,6 +90,14 @@ export function resolvePublicOrg(opts: { requireKey?: boolean } = {}) {
     next: NextFunction,
   ): Promise<void> => {
     try {
+      const proceed = async () => {
+        if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method) &&
+            req.publicOrg && await customerWorkHeld(req.publicOrg.id)) {
+          res.status(423).json({ error: "Company intake is temporarily paused", code: "customer_lifecycle_paused" });
+          return;
+        }
+        next();
+      };
       const rawKey = installationKeyFrom(req);
       if (!rawKey) {
         if (opts.requireKey) {
@@ -85,7 +105,7 @@ export function resolvePublicOrg(opts: { requireKey?: boolean } = {}) {
           return;
         }
         req.publicOrg = await getDefaultOrganization();
-        next();
+        await proceed();
         return;
       }
       const key = await resolveInstallationKey(rawKey);
@@ -112,7 +132,7 @@ export function resolvePublicOrg(opts: { requireKey?: boolean } = {}) {
         }
         req.publicOrg = selfOrg;
         req.publicOrgKey = key;
-        next();
+        await proceed();
         return;
       }
       if (!hostname) {
@@ -136,7 +156,7 @@ export function resolvePublicOrg(opts: { requireKey?: boolean } = {}) {
       }
       req.publicOrg = org;
       req.publicOrgKey = key;
-      next();
+      await proceed();
     } catch (err) {
       next(err);
     }

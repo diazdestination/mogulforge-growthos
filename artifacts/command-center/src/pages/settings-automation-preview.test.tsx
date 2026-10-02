@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import Settings from '@/pages/settings';
+import { CLIENT } from '@/lib/client.config';
 import { renderWithQuery } from '@/test/render';
 import { mockApi } from '@/test/mock-api';
 
@@ -67,7 +68,7 @@ describe('Automation form message-body preview', () => {
 
     const preview = await screen.findByTestId('preview-automation-create');
     expect(preview.textContent).toContain('Jordan');
-    expect(preview.textContent).toContain('(404) 444-4476');
+    expect(preview.textContent).toContain(CLIENT.phone);
     expect(preview.textContent).not.toContain('{{contact.firstName}}');
   });
 

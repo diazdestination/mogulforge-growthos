@@ -15,6 +15,7 @@ import { Loader2, Plus, Trash2, Edit, HardHat, CheckCircle } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query';
 import { canWrite, canDelete } from '@/lib/permissions';
 import { format } from 'date-fns';
+import { toast } from '@/hooks/use-toast';
 
 const STATUS_STYLES: Record<ProjectStatus, string> = {
   scheduled: 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400 dark:border-blue-500/30',
@@ -89,7 +90,10 @@ export default function Projects() {
       .join(', ');
 
   const handleStatusChange = (project: Project, status: ProjectStatus) => {
-    updateProject.mutate({ id: project.id, data: { status } }, { onSuccess: invalidate });
+    updateProject.mutate({ id: project.id, data: { status, ...(project.updatedAt ? { expectedUpdatedAt: project.updatedAt } : {}) } }, {
+      onSuccess: () => { invalidate(); if (status === 'completed') toast({ title: 'Job completed', description: 'The office invoice preparation handoff is ready, unless an invoice is already prepared. No invoice was sent.' }); },
+      onError: (error: any) => { invalidate(); toast({ variant: 'destructive', title: 'Job status not saved', description: error?.data?.error || 'Refresh the job and try again.' }); },
+    });
   };
 
   const handleDelete = (id: string) => {

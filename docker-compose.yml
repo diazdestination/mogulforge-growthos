@@ -1,6 +1,6 @@
 # MogulForge — self-host stack (Postgres + single app container).
 # Quick start:
-#   1. cp .env.example .env   &&   set a real SESSION_SECRET
+#   1. cp .env.example .env   &&   set SESSION_SECRET + BETA_SIGNUP_ALLOWLIST
 #   2. docker compose up -d db
 #   3. docker compose run --rm app sh -lc \
 #        "cd /app && pnpm --filter @workspace/db exec drizzle-kit push --force"   # one-time schema
@@ -35,7 +35,22 @@ services:
       STATIC_DIR: /app/public
       DATABASE_URL: postgresql://postgres:mogulforge@db:5432/mogulforge
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
+      # Production auth is fail-closed: list approved new-company owner emails.
+      # Teammates invited in-app bypass this self-registration allowlist.
+      BETA_SIGNUP_ALLOWLIST: ${BETA_SIGNUP_ALLOWLIST:?set BETA_SIGNUP_ALLOWLIST in .env}
+      OBJECT_STORAGE_PROVIDER: ${OBJECT_STORAGE_PROVIDER:-postgres}
       NODE_ENV: production
+      # Evidence Intelligence uses the OpenAI Agents SDK. Keep the key in an
+      # ignored env file; Compose passes it at runtime and never bakes it into
+      # the image.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_EVIDENCE_MODEL: ${OPENAI_EVIDENCE_MODEL:-gpt-5.6-sol}
+      # Email Intelligence remains pending until all three values are supplied.
+      # Raw content uses a dedicated key and attachments stay disabled in code.
+      EMAIL_INGESTION_DOMAIN: ${EMAIL_INGESTION_DOMAIN:-}
+      EMAIL_INGESTION_WEBHOOK_SECRET: ${EMAIL_INGESTION_WEBHOOK_SECRET:-}
+      EMAIL_INTELLIGENCE_ENCRYPTION_KEY: ${EMAIL_INTELLIGENCE_ENCRYPTION_KEY:-}
       # ENABLE_DEV_LOGIN intentionally unset → no-password backdoor is OFF in prod.
     depends_on:
       db:

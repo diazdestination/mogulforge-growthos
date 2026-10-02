@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Mail, Phone, MessageSquareText, Loader2 } from 'lucide-react';
 import {
-  useCreateLeadActivity,
   useSendLeadEmail,
   getListLeadActivitiesQueryKey,
   useGetMe,
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { canWrite } from '@/lib/permissions';
+import { singleSmsPhone } from '@/lib/mobile-lead';
 
 type Channel = 'email' | 'call' | 'text';
 
@@ -21,9 +21,9 @@ const CHANNEL_CONFIG: Record<
 };
 
 /**
- * One-click Email / Call / Text actions for a lead's contact. Opens the
- * rep's mail/phone app via mailto:/tel:/sms: and logs the outbound contact
- * attempt to the lead's activity timeline (when the user can write).
+ * Email sends through the selected connected mailbox. Calling only opens the
+ * dialer; texting opens the gated manual draft panel. Launching another app is
+ * not evidence that the user contacted a customer, so it creates no send record.
  */
 export function LeadContactActions({
   leadId,
@@ -36,36 +36,18 @@ export function LeadContactActions({
   phone?: string | null;
   compact?: boolean;
 }) {
-  const createActivity = useCreateLeadActivity();
-  const queryClient = useQueryClient();
   const { data: me } = useGetMe();
   const [composeOpen, setComposeOpen] = useState(false);
 
   if (!email && !phone) return null;
 
-  const logAttempt = (channel: Channel, target: string) => {
-    if (!canWrite(me?.role)) return;
-    createActivity.mutate(
-      {
-        id: leadId,
-        data: {
-          type: 'communication',
-          title: CHANNEL_CONFIG[channel].title,
-          body: `Outbound ${channel === 'email' ? 'email' : channel === 'call' ? 'call' : 'text'} to ${target}`,
-          metadata: { channel, target, source: 'crm-contact-action' },
-        },
-      },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListLeadActivitiesQueryKey(leadId) });
-        },
-      },
-    );
-  };
-
   const actions: { channel: Channel; target: string }[] = [];
   if (email) actions.push({ channel: 'email', target: email });
-  if (phone) actions.push({ channel: 'call', target: phone }, { channel: 'text', target: phone });
+  const safePhone = singleSmsPhone(phone);
+  if (safePhone) {
+    actions.push({ channel: 'call', target: safePhone });
+    if (canWrite(me?.role)) actions.push({ channel: 'text', target: safePhone });
+  }
 
   const actionClass = compact
     ? 'inline-flex items-center justify-center w-7 h-7 rounded-md border border-border bg-background text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors'
@@ -76,7 +58,7 @@ export function LeadContactActions({
       {actions.map(({ channel, target }) => {
         const { label, Icon, href } = CHANNEL_CONFIG[channel];
         if (channel === 'email') {
-          // Email composes and sends through the company Gmail account
+          // Email composes and sends through the selected connected account
           // in-app (logged server-side) instead of opening a mail client.
           return (
             <button
@@ -96,8 +78,7 @@ export function LeadContactActions({
         return (
           <a
             key={channel}
-            href={href(target)}
-            onClick={() => logAttempt(channel, target)}
+            href={channel === 'text' ? `${import.meta.env.BASE_URL}leads/${encodeURIComponent(leadId)}#manual-sms` : href(target)}
             data-testid={`button-lead-${channel}`}
             title={`${label} ${target}`}
             className={actionClass}
@@ -119,8 +100,8 @@ export function LeadContactActions({
 }
 
 /**
- * In-CRM email compose modal. Sends through the org's connected Gmail
- * account via the API, which also logs the send on the lead's timeline.
+ * In-app compose modal. The API selects an authorized Gmail or Microsoft 365
+ * connection and records the actual provider result, never another user's fallback.
  */
 function LeadEmailComposeModal({
   leadId,
@@ -177,6 +158,7 @@ function LeadEmailComposeModal({
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto">
+          <p className="text-xs text-muted-foreground">Send email using your selected account. Connect Gmail or Microsoft 365 / Outlook in My Profile.</p>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">To</label>
             <div

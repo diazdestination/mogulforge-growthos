@@ -23,15 +23,18 @@ import {
   auditEventsTable,
   consentRecordsTable,
   db,
+  leadsTable,
   suppressionsTable,
   type SendingHoursSettings,
   type Suppression,
   type SuppressionReason,
 } from "@workspace/db";
-import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import { isSafeMailbox } from "./providers";
 import { getSendingHours } from "./settings";
+import { customerWorkHeld } from "./customer-lifecycle-runtime";
+import { hasCustomerReplyHold, hasContactReplyHold } from "./response-correlation";
 
 export type SendChannel = "email" | "sms";
 /** outreach = automated marketing touches; transactional = confirmations, reminders, replies. */
@@ -203,6 +206,8 @@ export function nextAllowedSendTime(
 
 export interface SendGateInput {
   organizationId: string;
+  /** Source opportunity, resolved on the server; never a freshness attestation. */
+  leadId?: string | null;
   contact: {
     id: string;
     email?: string | null;
@@ -221,6 +226,10 @@ export async function checkSendEligibility(
   input: SendGateInput,
 ): Promise<SendGateResult> {
   const { organizationId, contact, channel, kind } = input;
+
+  if (await customerWorkHeld(organizationId)) {
+    return { ok: false, outcome: "blocked", reason: "customer_lifecycle_paused" };
+  }
 
   // 1. Hard do-not-contact flag.
   if (contact.doNotContact) {
@@ -261,6 +270,36 @@ export async function checkSendEligibility(
   }
 
   if (kind !== "outreach") return { ok: true };
+
+  if (input.leadId && await hasCustomerReplyHold(organizationId, input.leadId))
+    return { ok: false, outcome: "blocked", reason: "customer_reply_requires_review" };
+  if (!input.leadId && await hasContactReplyHold(organizationId, contact.id))
+    return { ok: false, outcome: "blocked", reason: "reply_requires_opportunity_context" };
+
+  // A CSV snapshot does not establish current status, replies or eligibility.
+  // Read the current tenant-owned record here instead of trusting a caller flag.
+  // Without opportunity context an imported contact is ambiguous, so hold it.
+  if (input.leadId) {
+    const [lead] = await db.select({
+      creationMethod: leadsTable.creationMethod,
+      importedHistory: leadsTable.importedHistory,
+    }).from(leadsTable).where(and(
+      eq(leadsTable.id, input.leadId),
+      eq(leadsTable.organizationId, organizationId),
+      eq(leadsTable.contactId, contact.id),
+    )).limit(1);
+    if (!lead) return { ok: false, outcome: "blocked", reason: "source_opportunity_unavailable" };
+    if (lead.creationMethod === "import" || lead.importedHistory !== null)
+      return { ok: false, outcome: "blocked", reason: "imported_source_requires_current_review" };
+  } else {
+    const [imported] = await db.select({ id: leadsTable.id }).from(leadsTable).where(and(
+      eq(leadsTable.organizationId, organizationId),
+      eq(leadsTable.contactId, contact.id),
+      or(eq(leadsTable.creationMethod, "import"), isNotNull(leadsTable.importedHistory)),
+    )).limit(1);
+    if (imported)
+      return { ok: false, outcome: "blocked", reason: "imported_source_requires_current_review" };
+  }
 
   const cfg = input.sendingHours ?? (await getSendingHours(organizationId));
 
@@ -316,10 +355,12 @@ export async function checkSendEligibility(
  */
 export async function recordBlockedSend(input: {
   organizationId: string;
+  actorUserId?: string | null;
   channel: SendChannel;
   reason: string;
   outcome: "blocked" | "deferred";
-  source: string; // e.g. "playbook", "automation"
+  source: string; // e.g. "playbook", "automation", "crm-compose"
+  mode?: "automated" | "manual";
   leadId?: string | null;
   contactId?: string | null;
   resumeAt?: Date;
@@ -327,7 +368,7 @@ export async function recordBlockedSend(input: {
   try {
     await db.insert(auditEventsTable).values({
       organizationId: input.organizationId,
-      actorUserId: null,
+      actorUserId: input.actorUserId ?? null,
       action: `send.${input.outcome}`,
       entityType: input.leadId ? "lead" : "contact",
       entityId: input.leadId ?? input.contactId ?? null,
@@ -339,6 +380,9 @@ export async function recordBlockedSend(input: {
       },
     });
     if (input.leadId) {
+      const deliveryLabel = `${input.mode === "manual" ? "" : "Automated "}${
+        input.channel === "email" ? "email" : "text"
+      }`;
       await db.insert(activitiesTable).values({
         organizationId: input.organizationId,
         leadId: input.leadId,
@@ -346,8 +390,8 @@ export async function recordBlockedSend(input: {
         type: input.outcome === "deferred" ? "message_deferred" : "message_blocked",
         title:
           input.outcome === "deferred"
-            ? `Automated ${input.channel === "email" ? "email" : "text"} deferred (${humanReason(input.reason)})`
-            : `Automated ${input.channel === "email" ? "email" : "text"} blocked (${humanReason(input.reason)})`,
+            ? `${deliveryLabel} deferred (${humanReason(input.reason)})`
+            : `${deliveryLabel} blocked (${humanReason(input.reason)})`,
         metadata: {
           channel: input.channel,
           reason: input.reason,
@@ -476,6 +520,15 @@ export function parseUnsubscribeToken(
 
 /** Public base URL for links in outbound email (dev domain or published domain). */
 export function publicBaseUrl(): string {
+  const configured =
+    process.env.APP_ORIGIN?.trim() || process.env.APP_URL?.trim();
+  if (configured) {
+    try {
+      return new URL(configured).origin;
+    } catch {
+      // Fall through to legacy deployment variables.
+    }
+  }
   const domain =
     (process.env.REPLIT_DOMAINS ?? "").split(",")[0]?.trim() ||
     process.env.REPLIT_DEV_DOMAIN ||

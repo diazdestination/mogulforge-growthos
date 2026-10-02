@@ -1,0 +1,15 @@
+{
+  "id": "./",
+  "name": "MogulForge GrowthOS",
+  "short_name": "GrowthOS",
+  "description": "Your contractor business command center",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#05121d",
+  "theme_color": "#05121d",
+  "icons": [
+    { "src": "brand/growthos-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "brand/growthos-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
