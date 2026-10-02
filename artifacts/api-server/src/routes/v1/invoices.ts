@@ -19,6 +19,11 @@ import {
   updateInvoice,
   voidInvoice,
 } from "../../services/invoices";
+import {
+  getInvoiceDelivery,
+  previewInvoiceDelivery,
+  sendInvoiceDelivery,
+} from "../../services/invoice-delivery";
 
 const router: IRouter = Router();
 router.use("/invoices", (req, res, next) => {
@@ -95,6 +100,47 @@ const safe =
     }
   };
 const id = (req: Request) => z.uuid().parse(req.params.id);
+router.get(
+  "/invoices/:id/delivery",
+  requireMember("invoices.read"),
+  safe(async (req, res) =>
+    res.json(
+      await getInvoiceDelivery(
+        req.member!.organizationId,
+        req.member!.user.id,
+        id(req),
+      ),
+    ),
+  ),
+);
+router.post(
+  "/invoices/:id/delivery/preview",
+  requireMember("invoices.manage"),
+  safe(async (req, res) =>
+    res.json(
+      await previewInvoiceDelivery(
+        req.member!.organizationId,
+        req.member!.user.id,
+        id(req),
+        req.body,
+      ),
+    ),
+  ),
+);
+router.post(
+  "/invoices/:id/delivery/send",
+  requireMember("invoices.manage"),
+  safe(async (req, res) =>
+    res.json(
+      await sendInvoiceDelivery(
+        req.member!.organizationId,
+        req.member!.user.id,
+        id(req),
+        req.body,
+      ),
+    ),
+  ),
+);
 router.get(
   "/invoices",
   requireMember("invoices.read"),

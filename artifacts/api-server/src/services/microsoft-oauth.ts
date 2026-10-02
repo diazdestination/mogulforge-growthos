@@ -16,6 +16,7 @@ import { hasPermission } from "../lib/permissions";
 import { isSafeMailbox } from "./providers";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
 import { assertCustomerLifecycleActive, CustomerLifecycleHoldError } from "./customer-lifecycle";
+import { EmailDispatchBlockedError, runEmailDispatchGuard, type EmailDispatchGuard } from "./email-dispatch-guard";
 
 export const MICROSOFT_SCOPES = [
   "https://graph.microsoft.com/Mail.Send",
@@ -468,7 +469,7 @@ export async function disconnectMicrosoft(
 }
 
 export async function sendMicrosoftForUser(
-  input: Actor & { to: string; subject: string; body: string },
+  input: Actor & { to: string; subject: string; body: string; beforeDispatch?: EmailDispatchGuard },
 ) {
   assertOutboundDeliveryAllowed({ channel: "email", recipient: input.to });
   if (
@@ -533,6 +534,7 @@ export async function sendMicrosoftForUser(
       .returning();
     if (!updated) throw revoked();
     selected = updated;
+    await runEmailDispatchGuard(input.beforeDispatch, { provider: "microsoft", senderEmail: selected.email });
     await requireMember(input);
     const current = await getMicrosoftConnection(
       input.organizationId,
@@ -601,6 +603,7 @@ export async function sendMicrosoftForUser(
       clientRequestId,
     };
   } catch (error) {
+    if (error instanceof EmailDispatchBlockedError) throw error;
     if (error instanceof CustomerLifecycleHoldError) throw error;
     const failure = error instanceof MicrosoftMailError ? error : unavailable();
     const code =

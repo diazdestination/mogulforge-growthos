@@ -17,6 +17,9 @@ import {
 } from "../lib/token-encryption";
 import { isSafeMailbox } from "./providers";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
+import { hasPermission } from "../lib/permissions";
+import { assertCustomerLifecycleActive } from "./customer-lifecycle";
+import { EmailDispatchBlockedError, runEmailDispatchGuard, type EmailDispatchGuard } from "./email-dispatch-guard";
 
 const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 const IDENTITY_SCOPES = ["openid", "email", "profile"];
@@ -336,6 +339,7 @@ export async function sendGmailForUser(input: {
   to: string;
   subject: string;
   body: string;
+  beforeDispatch?: EmailDispatchGuard;
 }): Promise<{ id: string; provider: "gmail"; senderEmail: string }> {
   assertOutboundDeliveryAllowed({ channel: "email", recipient: input.to });
   if (!isSafeMailbox(input.to)) throw new Error("Refusing to send email: invalid recipient address");
@@ -353,7 +357,7 @@ export async function sendGmailForUser(input: {
     throw new Error("Gmail sender account is not active");
   }
   const connection = await getGmailConnection(input.organizationId, input.userId);
-  if (!connection?.encryptedRefreshToken) {
+  if (!connection?.encryptedRefreshToken || !connection.grantedScopes.includes(GMAIL_SEND_SCOPE)) {
     throw new Error("Connect your Gmail account before sending this BIE action");
   }
   const oauth = client();
@@ -377,10 +381,32 @@ export async function sendGmailForUser(input: {
     "utf8",
   ).toString("base64url");
   try {
-    const response = await oauth.request<{ id?: string }>({
+    // Finish token refresh before the final guard, not after its approval.
+    const { token: accessToken } = await oauth.getAccessToken();
+    if (!accessToken) throw new EmailDispatchBlockedError();
+    await runEmailDispatchGuard(input.beforeDispatch, { provider: "gmail", senderEmail: connection.email });
+    const current = await getGmailConnection(input.organizationId, input.userId);
+    const [member] = await db.select({ role: usersTable.role }).from(usersTable).where(and(
+      eq(usersTable.id, input.userId), eq(usersTable.organizationId, input.organizationId), eq(usersTable.isActive, true),
+    ));
+    if (!current || current.id !== connection.id || current.email !== connection.email ||
+        current.encryptedRefreshToken !== connection.encryptedRefreshToken ||
+        !current.grantedScopes.includes(GMAIL_SEND_SCOPE) || !member || !hasPermission(member.role, "crm.write"))
+      throw new EmailDispatchBlockedError();
+    await assertCustomerLifecycleActive(input.organizationId);
+    assertOutboundDeliveryAllowed({ channel: "email", recipient: input.to });
+    // OAuth2Client.request has its own 401/403 refresh-and-replay loop, outside
+    // Gaxios's retry:false setting. Irreversible sends must not enter that loop
+    // or acquire a new token after the final approval. Dispatch the frozen token
+    // exactly once through the bare transport; redirects are retries too.
+    const response = await oauth.transporter.request<{ id?: string }>({
       url: "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
       method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
       data: { raw },
+      retry: false,
+      maxRedirects: 0,
+      timeout: 10_000,
     });
     if (!response.data.id) throw new Error("Gmail returned no message id");
     await db
@@ -389,6 +415,7 @@ export async function sendGmailForUser(input: {
       .where(eq(gmailConnectionsTable.id, connection.id));
     return { id: response.data.id, provider: "gmail", senderEmail: connection.email };
   } catch (error) {
+    if (error instanceof EmailDispatchBlockedError) throw error;
     const failure = classifyGmailProviderError(error);
     const failedAt = new Date();
     await db

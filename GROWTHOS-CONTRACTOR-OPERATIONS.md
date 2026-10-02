@@ -4,6 +4,12 @@ Owner direction, October 1, 2026. This supersedes the assumption that GrowthOS
 must remain an add-on to Housecall Pro. It does not establish replacement
 readiness or authorize a customer cutover, charge, message or public launch.
 
+October 2 clarification: contractor payment collection is deferred to a future
+add-on. Initial invoicing must support delivery, balances and staff-recorded
+external payment evidence without requiring a processor choice or handling money.
+Existing references to processor collection below describe the later roadmap,
+not an initial launch requirement. GrowthOS subscription billing stays separate.
+
 ## Product target
 
 Adam wants GrowthOS to replace Housecall Pro for the two beta companies. He
@@ -95,8 +101,8 @@ report. Existing imported-data holds remain in force.
 1. Validate a native office/field day: inquiry, schedule, job, estimate, completion,
    invoice and warranty follow-up. Resolve each missing critical path before
    claiming that the beta can retire Housecall Pro.
-2. Accept native invoicing and recorded-payment reconciliation, then connect an
-   approved delivery/payment processor; keep accounting exports/integration modular. No banking,
+2. Accept native invoice delivery and recorded external-payment reconciliation;
+   defer processor collection to the later add-on. Keep accounting exports/integration modular. No banking,
    tax filing, payroll or accounting platform rewrite is implied.
 3. Rehearse implemented warranty/maintenance recurrence against actual agreements.
 4. Observe real staff using the implemented daily navigation and role permissions.

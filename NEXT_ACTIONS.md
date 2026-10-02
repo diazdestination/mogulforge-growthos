@@ -1,5 +1,17 @@
 # Next acceptance work
 
+Newest candidate: `agent/growthos-customer-care-20261002`, documented in
+`reports/customer-care-integration-2026-10-02.md`. Finish exact-head CI (real
+PostgreSQL concurrency, all tests, types, builds and Docker) before integration.
+Reviewed reminders/office booking, individually approved missed-call recovery
+and invoice email are implemented locally; they are not live or complete
+replacement acceptance. The new schema is **105 tables**: review `0007` after
+`0006`. Do not relabel the prior managed 103-table proof as 105-table acceptance.
+The separately requested held-staging upgrade/admin-rotation approval is still
+unanswered; all hosted/provider/customer holds remain. Azure first sign-in is
+still an owner-return item. Next engineering is required migration/native-source
+adoption, trusted inbound communication and actual staff-workday gaps.
+
 Follow `PAID-BETA-READINESS-P0.md`; complete the exact candidate CI before a
 release. The swarm foundation reports distinguish local proof from hosted proof.
 
@@ -10,15 +22,19 @@ CI37052487433 passed all release jobs. Use
 current evidence. Each later candidate still needs exact-head CI;
 the workflow has no push trigger, so dispatch it explicitly. The held staging
 app remains the older 77f6d63 image with 95 tables until separately verified.
-The cumulative source expects 103 tables; never deploy it onto the 95-table
+That earlier cumulative source expects 103 tables; the new customer-care source
+expects 105. Never deploy either onto the 95-table
 database or run an unreviewed automatic schema push.
 
 Before real onboarding/cutover, satisfy `HOUSECALL-PRO-REPLACEMENT-GATE.md` for
 both companies. The owner explicitly requires replacement of their actual
 Housecall Pro workflows, not a reduced assisted pilot. Finish the service-due and
-missed-call customer loops, invoice delivery/agreed collection, required migration
+missed-call customer loops, invoice delivery/external receipt tracking, required migration
 and source adoption, then real provider/device and uncoached staff acceptance.
-The payment processor decision has been requested; do not choose or activate one.
+The owner has deferred contractor payment collection to a later add-on; processor
+selection is no longer a launch input blocker. Keep truthful invoice balances and
+staff-recorded receipts without presenting them as processor-verified settlement.
+The active engineering contract is `reports/customer-care-contract-2026-10-02.md`.
 
 Azure return-to-desk item: the owner now reports a new Azure account. Wait for
 the first sign-in, confirm the actual directory and account, then inspect app
@@ -29,7 +45,8 @@ account and all outbound holds; do not repeat signup or send to contractors.
    95-to-103 rehearsal and restricted exact-image app acceptance passed on the
    temporary restored copy; see `reports/managed-contractor-recovery-2026-10-02.md`
    for evidence and cleanup status. Next is the separately reviewed/authorized
-   held 95-to-103 staging rollout and exact-release normal-mode acceptance, not
+   held staging rollout to the selected reviewed release/schema and exact-release
+   normal-mode acceptance, not
    replaying the one-use restore-target script against the original staging DB.
    Inventory the object-storage adapter before accepting private-photo behavior.
 2. Accept the implemented checkout/replacement and core export/company-hold
@@ -44,7 +61,7 @@ account and all outbound holds; do not repeat signup or send to contractors.
 4. Accept the native replacement candidate in `reports/native-contractor-day-integration.md`:
    internal invoice lifecycle/recorded-payment reconciliation, an office/field
    scheduling day, explicit service recurrence and simpler daily navigation.
-   Finish actual invoice delivery, payment processor/settlement, opening balances
+   Finish actual invoice delivery, external receipt reconciliation, opening balances
    and staff rehearsal in `BETA-CONTRACTOR-SUCCESS.md`. Housecall Pro is
    optional migration support. Preserve import holds until approved source
    reconciliation and a documented authoritative-writer/cutover decision.

@@ -38,7 +38,7 @@ vi.mock("./microsoft-oauth", async (importOriginal) => ({
   sendMicrosoftForUser: microsoftSend,
 }));
 import { MicrosoftMailError } from "./microsoft-oauth";
-import { getCustomerEmailStatus, sendCustomerEmail } from "./customer-email";
+import { getCustomerEmailStatus, resolveCustomerEmailSender, sendCustomerEmail } from "./customer-email";
 import {
   customerEmailProvider,
   resendEmailProvider,
@@ -217,6 +217,27 @@ afterAll(async () => {
 });
 
 describe("customer email identity isolation", () => {
+  it("rejects a stale preview sender without dispatch or fallback", async () => {
+    const expectedSender = await resolveCustomerEmailSender({ organizationId: orgA, leadId: leadA });
+    await expect(sendCustomerEmail({ ...content, organizationId: orgA, leadId: leadA,
+      expectedSender: { ...expectedSender, senderEmail: "not-the-approved-sender@example.invalid" },
+    })).rejects.toMatchObject({ code: "email_dispatch_blocked" });
+    expect(gmailSend).not.toHaveBeenCalled(); expect(microsoftSend).not.toHaveBeenCalled();
+  });
+
+  it("revalidates the lead's assigned sender in the actual dispatch callback", async () => {
+    const expectedSender = await resolveCustomerEmailSender({ organizationId: orgA, leadId: leadA });
+    gmailSend.mockImplementationOnce(async (input) => {
+      await db.update(leadsTable).set({ assignedUserId: defaultA }).where(eq(leadsTable.id, leadA));
+      await input.beforeDispatch({ provider: "gmail", senderEmail: expectedSender.senderEmail });
+      throw new Error("Must not pass the stale sender guard");
+    });
+    try {
+      await expect(sendCustomerEmail({ ...content, organizationId: orgA, leadId: leadA, expectedSender })).rejects.toMatchObject({ code: "email_dispatch_blocked" });
+    } finally { await db.update(leadsTable).set({ assignedUserId: userA }).where(eq(leadsTable.id, leadA)); }
+    expect(microsoftSend).not.toHaveBeenCalled();
+  });
+
   it("uses each tenant's selected identity and preserves an assigned lead's sender", async () => {
     await sendCustomerEmail({
       ...content,
@@ -227,6 +248,8 @@ describe("customer email identity isolation", () => {
       ...content,
       organizationId: orgA,
       userId: userA,
+      expectedSender: { provider: "gmail", senderEmail: expect.any(String) },
+      beforeDispatch: expect.any(Function),
     });
     await sendCustomerEmail({
       ...content,
@@ -237,12 +260,16 @@ describe("customer email identity isolation", () => {
       ...content,
       organizationId: orgB,
       userId: userB,
+      expectedSender: { provider: "gmail", senderEmail: expect.any(String) },
+      beforeDispatch: expect.any(Function),
     });
     await sendCustomerEmail({ ...content, organizationId: orgA });
     expect(gmailSend).toHaveBeenLastCalledWith({
       ...content,
       organizationId: orgA,
       userId: defaultA,
+      expectedSender: { provider: "gmail", senderEmail: expect.any(String) },
+      beforeDispatch: expect.any(Function),
     });
     const receipt = await db
       .select()
@@ -388,11 +415,15 @@ describe("customer email identity isolation", () => {
       ...content,
       organizationId: orgA,
       userId: userA,
+      expectedSender: { provider: "microsoft", senderEmail: `${userA}@example.invalid` },
+      beforeDispatch: expect.any(Function),
     });
     expect(microsoftSend).toHaveBeenNthCalledWith(2, {
       ...content,
       organizationId: orgB,
       userId: userB,
+      expectedSender: { provider: "microsoft", senderEmail: `${userB}@example.invalid` },
+      beforeDispatch: expect.any(Function),
     });
     expect(gmailSend).not.toHaveBeenCalled();
     const receipts = await db

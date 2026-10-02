@@ -17,8 +17,10 @@ are demonstrated.
 Preserve these agreements. Confirm what was already promised before assigning a
 plan. Core security, failure visibility, customer export and clear access cannot
 be premium-only benefits. Invoicing is internal document/receipt management in
-this candidate; online collection, actual invoice delivery and opening-balance
-migration are separate acceptance work.
+the prior candidate; actual invoice delivery and opening-balance migration are
+remaining acceptance work. The owner's October 2 clarification defers online
+contractor payment collection to a future add-on. Staff-recorded external receipts
+and balances remain in scope, but no processor choice or in-app charge is required.
 
 ## A short office-and-field rehearsal
 

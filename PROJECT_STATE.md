@@ -1,5 +1,21 @@
 # GrowthOS project state
 
+## October 2 customer-care continuation (newer candidate)
+
+The owner deferred contractor payment collection to a future add-on. The
+`agent/growthos-customer-care-20261002` candidate adds reviewed service reminders,
+staff-recorded responses and office booking, individual missed-call SMS recovery
+with accountable follow-up, and immutable invoice email delivery. It retains
+staff-recorded external receipts and does not introduce a contractor processor.
+See `reports/customer-care-integration-2026-10-02.md` for current tests and limits.
+This candidate expects **105 tables**, with additive `0007_customer-care.sql`
+after the 103-table native-workday baseline. Earlier managed 103-table evidence
+below does not validate this new schema or image. Hosted upgrades, staging
+credential rotation, provider/device acceptance and both contractor acceptance
+cards remain separate gates. Full exact-head CI is required before integration.
+
+## Previously integrated and managed-tested baseline
+
 Updated October 2, 2026. GEEKOM retrieved and independently reviewed WILLOWFORGE's
 `caec65a6f2ffa7821721e9ea97a31a4fafd4afc8` (PR #11). Cumulative integration PR #12
 merged as main `47aca5beeb06e665bddfff23545640d779de51cc`. Exact-main CI
@@ -29,17 +45,21 @@ No production deployment is implied by integration or green CI.
 The owner's October 2 requirement is now binding:
 `HOUSECALL-PRO-REPLACEMENT-GATE.md`. Both contractors' actual critical workflows
 must replace their Housecall Pro usage before onboarding/cutover. Neither company
-has passed. Missing customer service-reminder/missed-call loops, invoice delivery,
-agreed collection and reconciled migration remain engineering/acceptance work,
-not merely provider credentials. Payment processor selection is pending the
-owner's answer; platform subscription Stripe is not contractor collection.
+has passed. The new candidate implements bounded service-reminder, missed-call
+and invoice-delivery slices; automated incoming-mail handling, required migration,
+native-source adoption and actual customer acceptance remain unfinished, not
+merely provider credentials. The owner has now deferred contractor
+payment collection to a future add-on; no processor selection is needed to
+continue the initial release. Platform subscription Stripe remains separate.
+The active local engineering wave is `reports/customer-care-contract-2026-10-02.md`.
 
 Adam's current replacement direction is in `GROWTHOS-CONTRACTOR-OPERATIONS.md`:
 native scheduling, invoices, warranty tracking and clear daily navigation.
 Housecall Pro is optional migration support. Native internal invoice lifecycle
 and recorded-payment reconciliation are now implemented in this candidate;
-customer delivery, hosted collection and opening-balance migration still need
-acceptance. GrowthOS subscription billing is separate. Commercial scope
+customer delivery, external receipt reconciliation and opening-balance migration
+still need acceptance. Contractor collection is deferred; GrowthOS subscription
+billing is separate. Commercial scope
 is in `GROWTHOS-CONTRACTOR-PRODUCT.md`: two waiting
 roofing/HVAC companies at a limited $500/month beta, a flagship target of at
 least $1,500/month, shared trade packs and both Smart Sites/existing websites.

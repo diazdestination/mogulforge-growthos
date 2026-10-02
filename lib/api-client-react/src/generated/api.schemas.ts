@@ -3208,6 +3208,281 @@ export interface CustomerReplyDecision {
   releaseNote: string | null;
 }
 
+export type InvoiceDeliveryEvidenceState = typeof InvoiceDeliveryEvidenceState[keyof typeof InvoiceDeliveryEvidenceState];
+
+
+export const InvoiceDeliveryEvidenceState = {
+  not_sent: 'not_sent',
+  processing: 'processing',
+  accepted: 'accepted',
+  held: 'held',
+  uncertain: 'uncertain',
+  reconciled: 'reconciled',
+} as const;
+
+/**
+ * @nullable
+ */
+export type InvoiceDeliveryEvidenceProvider = typeof InvoiceDeliveryEvidenceProvider[keyof typeof InvoiceDeliveryEvidenceProvider] | null;
+
+
+export const InvoiceDeliveryEvidenceProvider = {
+  gmail: 'gmail',
+  microsoft: 'microsoft',
+} as const;
+
+export interface InvoiceDeliveryEvidence {
+  invoiceId: string;
+  state: InvoiceDeliveryEvidenceState;
+  /** @nullable */
+  executionId: string | null;
+  detail: string;
+  /** @nullable */
+  provider: InvoiceDeliveryEvidenceProvider;
+  /** @nullable */
+  providerMessageId: string | null;
+  /** @nullable */
+  providerRequestId: string | null;
+  /** @nullable */
+  acceptedAt: string | null;
+  deliveryConfirmed: false;
+  deliveryDetail: string;
+  canPrepare: boolean;
+}
+
+export interface InvoiceDeliveryPreviewRequest {
+  /** @minimum 1 */
+  expectedVersion: number;
+}
+
+export interface InvoiceDeliverySendRequest {
+  previewId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  confirmed: true;
+}
+
+export type InvoiceDeliveryPreviewSenderSource = typeof InvoiceDeliveryPreviewSenderSource[keyof typeof InvoiceDeliveryPreviewSenderSource];
+
+
+export const InvoiceDeliveryPreviewSenderSource = {
+  lead_assignee: 'lead_assignee',
+  company_default: 'company_default',
+} as const;
+
+export type InvoiceDeliveryPreviewSenderProvider = typeof InvoiceDeliveryPreviewSenderProvider[keyof typeof InvoiceDeliveryPreviewSenderProvider];
+
+
+export const InvoiceDeliveryPreviewSenderProvider = {
+  gmail: 'gmail',
+  microsoft: 'microsoft',
+} as const;
+
+export type InvoiceDeliveryPreviewSender = {
+  userId: string;
+  source: InvoiceDeliveryPreviewSenderSource;
+  provider: InvoiceDeliveryPreviewSenderProvider;
+  senderEmail: string;
+};
+
+export interface InvoiceDeliveryPreview {
+  previewId: string;
+  payloadSha256: string;
+  expiresAt: string;
+  invoiceId: string;
+  recipient: string;
+  subject: string;
+  body: string;
+  sender: InvoiceDeliveryPreviewSender;
+  deliveryDetail: string;
+  [key: string]: unknown;
+ }
+
+export type ServiceCareReviewPreview = { [key: string]: unknown } | null;
+
+export type ServiceCareReviewReminder = { [key: string]: unknown } | null;
+
+export type ServiceCareReviewResponse = { [key: string]: unknown } | null;
+
+export type ServiceCareReviewBooking = { [key: string]: unknown } | null;
+
+export type ServiceCareReviewAppointment = { [key: string]: unknown } | null;
+
+export interface ServiceCareReview {
+  obligationId: string;
+  expectedUpdatedAt: string;
+  active: boolean;
+  preview: ServiceCareReviewPreview;
+  /** @nullable */
+  blockReason: string | null;
+  /** @nullable */
+  deferredReason: string | null;
+  reminder: ServiceCareReviewReminder;
+  response: ServiceCareReviewResponse;
+  booking: ServiceCareReviewBooking;
+  appointment: ServiceCareReviewAppointment;
+  [key: string]: unknown;
+ }
+
+export type ApproveServiceCareChannel = typeof ApproveServiceCareChannel[keyof typeof ApproveServiceCareChannel];
+
+
+export const ApproveServiceCareChannel = {
+  email: 'email',
+  sms: 'sms',
+} as const;
+
+export interface ApproveServiceCare {
+  requestId: string;
+  expectedUpdatedAt: string;
+  channel: ApproveServiceCareChannel;
+  /** @pattern ^[a-f0-9]{64}$ */
+  previewFingerprint: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  agreementNote: string;
+  expectedServiceConfirmed: true;
+}
+
+export type RecordServiceCareResponseChannel = typeof RecordServiceCareResponseChannel[keyof typeof RecordServiceCareResponseChannel];
+
+
+export const RecordServiceCareResponseChannel = {
+  phone: 'phone',
+  email: 'email',
+  sms: 'sms',
+  in_person: 'in_person',
+} as const;
+
+export type RecordServiceCareResponseOutcome = typeof RecordServiceCareResponseOutcome[keyof typeof RecordServiceCareResponseOutcome];
+
+
+export const RecordServiceCareResponseOutcome = {
+  ready_to_book: 'ready_to_book',
+  follow_up: 'follow_up',
+  declined: 'declined',
+} as const;
+
+export interface RecordServiceCareResponse {
+  requestId: string;
+  expectedUpdatedAt: string;
+  channel: RecordServiceCareResponseChannel;
+  outcome: RecordServiceCareResponseOutcome;
+  respondedAt: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  note: string;
+  staffAttested: true;
+}
+
+export type BookServiceCareVisitType = typeof BookServiceCareVisitType[keyof typeof BookServiceCareVisitType];
+
+
+export const BookServiceCareVisitType = {
+  inspection: 'inspection',
+  other: 'other',
+} as const;
+
+export interface BookServiceCareVisit {
+  requestId: string;
+  expectedUpdatedAt: string;
+  responseId: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  assignedUserId: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  type: BookServiceCareVisitType;
+  customerConfirmed: true;
+}
+
+export interface ServiceCareCommandResult {
+  approvalId?: string;
+  responseId?: string;
+  appointmentId?: string;
+  replayed: boolean;
+}
+
+export interface MissedCallCarePolicy {
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  timezone: string;
+  /**
+     * @minItems 1
+     * @maxItems 7
+     * @items.minimum 1
+     * @items.maximum 7
+     */
+  days: number[];
+  /** @pattern ^(?:[01]\d|2[0-3]):[0-5]\d$ */
+  opensAt: string;
+  /** @pattern ^(?:[01]\d|2[0-3]):[0-5]\d$ */
+  closesAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @nullable
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  businessHoursOwnerId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @nullable
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  afterHoursOwnerId: string | null;
+  /**
+     * @minimum 5
+     * @maximum 1440
+     */
+  responseMinutes: number;
+}
+
+export interface SaveMissedCallCarePolicy {
+  /** @minimum 0 */
+  expectedVersion: number;
+  policy: MissedCallCarePolicy;
+  approveTemplate: true;
+}
+
+export type ApproveMissedCallCareExpectedSnapshot = { [key: string]: unknown };
+
+export interface ApproveMissedCallCare {
+  /** @minimum 0 */
+  expectedVersion: number;
+  expectedSnapshot: ApproveMissedCallCareExpectedSnapshot;
+  approve: true;
+}
+
+export type CloseMissedCallCareOutcome = typeof CloseMissedCallCareOutcome[keyof typeof CloseMissedCallCareOutcome];
+
+
+export const CloseMissedCallCareOutcome = {
+  resolved: 'resolved',
+  cancelled: 'cancelled',
+} as const;
+
+export interface CloseMissedCallCare {
+  /** @minimum 0 */
+  expectedVersion: number;
+  outcome: CloseMissedCallCareOutcome;
+}
+
+/**
+ * Company-scoped recovery evidence. The snapshot is server-rendered; return it unchanged with the expected version for approval. Provider acceptance, confirmed delivery, staff-reviewed caller identity and customer response are distinct evidence.
+ */
+export interface MissedCallCareReadModel { [key: string]: unknown }
+
 export interface InvoiceLineInput {
   /**
      * @minLength 1
@@ -4210,5 +4485,17 @@ export const ListServiceObligationsStatus = {
   active: 'active',
   completed: 'completed',
   cancelled: 'cancelled',
+} as const;
+
+export type GetServiceCareParams = {
+channel?: GetServiceCareChannel;
+};
+
+export type GetServiceCareChannel = typeof GetServiceCareChannel[keyof typeof GetServiceCareChannel];
+
+
+export const GetServiceCareChannel = {
+  email: 'email',
+  sms: 'sms',
 } as const;
 

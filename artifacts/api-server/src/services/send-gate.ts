@@ -29,7 +29,7 @@ import {
   type Suppression,
   type SuppressionReason,
 } from "@workspace/db";
-import { and, desc, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm";
 
 import { isSafeMailbox } from "./providers";
 import { getSendingHours } from "./settings";
@@ -150,7 +150,8 @@ export async function hasChannelConsent(
         eq(consentRecordsTable.channel, channel),
       ),
     )
-    .orderBy(desc(consentRecordsTable.recordedAt))
+    // Equal-time conflicting evidence must never silently grant permission.
+    .orderBy(desc(consentRecordsTable.recordedAt), asc(consentRecordsTable.granted))
     .limit(1);
   return Boolean(row?.granted);
 }

@@ -2,6 +2,15 @@
 
 ## October 2 replacement acceptance requirement
 
+The owner's latest scope clarification defers contractor card/bank payment
+collection to a future add-on. It is not an initial launch blocker or a reason
+to wait for processor selection. Finish invoices, delivery, balances and truthful
+staff-recorded external receipts; do not imply that GrowthOS moves money or
+verifies settlement. GrowthOS's own subscription billing is a separate concern.
+Continue bounded customer-care engineering under
+`reports/customer-care-contract-2026-10-02.md`; existing release and live-contact
+approval gates are unchanged.
+
 The owner requires both waiting contractors to be able to replace their actual
 required Housecall Pro workflows before real onboarding/cutover. Read
 `HOUSECALL-PRO-REPLACEMENT-GATE.md` for the source-grounded gap matrix and separate

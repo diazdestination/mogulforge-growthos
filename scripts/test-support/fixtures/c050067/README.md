@@ -6,6 +6,8 @@ These are exact source snapshots from `git show c050067000f3ea1f2d94aa53b3a9c4f7
 - `automation.ts.txt`: `artifacts/api-server/src/services/automation.ts`
 - `scheduler-runtime.ts.txt`: `artifacts/api-server/src/services/scheduler-runtime.ts`
 - `reactivation.ts.txt`: `artifacts/api-server/src/services/reactivation.ts`
+- `durable-execution.ts.txt`: `artifacts/api-server/src/services/durable-execution.ts`
+- `schema-automations.ts.txt`: `lib/db/src/schema/automations.ts`
 
 The reactivation snapshot's LF-normalized SHA-256 is
 `972a2a3ee396aa81811fdad6e2ef664ccede6dad2ddeb448b2ac1c6d0ded9327`,
@@ -40,3 +42,25 @@ The missing-bundle and mismatched-bundle tests reach their intended guards again
   idle-runtime check against disposable loopback PGlite.
 
 These are local test results; they add no hosted or provider acceptance evidence.
+
+## Automation schema fixture repair — October 2, 2026
+
+The customer-care wave evolved `AutomationAction` in the current automation
+schema source. The historical crash attestation correctly rejected its changed
+bytes, causing the source-attestation and missing-bundle guard tests to stop
+before their intended assertions. The old source was recovered verbatim from
+the same `c050067000f3ea1f2d94aa53b3a9c4f71f0d3b41` Git object above, with
+LF-normalized SHA-256
+`6987bd462afed4f34cf10d124f41c8b013c3815ec1bf85e18aa448633858facb`.
+
+Only the test reader/bundler maps this newly evolved file to its frozen input.
+The added regression verifies that original hash, proves the frozen file was
+read, and rejects actual changed current schema bytes under the old pin. The
+hosted crash operator, manifest pins, release identity and bundle/helper tamper
+checks are unchanged. This does not authorize replaying any hosted drill.
+
+Verification: all frozen manifest hashes passed, and
+`pnpm --filter @workspace/scripts exec vitest run pilot-crash-drill.test.mjs pilot-scheduler-idle.test.mjs pilot-scheduler-probe.test.mjs --maxWorkers=1`
+passed **62 tests in 3 files**, exit 0, 66.08 seconds. The actual timed idle
+runtime ran only against disposable loopback PGlite with provider/network deny.
+No hosted drill, migration, provider call or external write occurred.

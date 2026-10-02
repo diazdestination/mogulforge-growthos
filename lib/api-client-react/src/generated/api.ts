@@ -30,6 +30,8 @@ import type {
   Appointment,
   AppointmentInput,
   AppointmentUpdate,
+  ApproveMissedCallCare,
+  ApproveServiceCare,
   AssessmentResult,
   AssessmentSubmission,
   AssistantChatInput,
@@ -44,6 +46,7 @@ import type {
   AutomationRun,
   AutomationUpdate,
   BeginBrowserLoginParams,
+  BookServiceCareVisit,
   BulkLeadActionRequest,
   BulkLeadActionResult,
   CaptureDelivery,
@@ -57,6 +60,7 @@ import type {
   ClientStaffInvitationAction,
   ClientStaffInvitationCreated,
   ClientStaffInvitationList,
+  CloseMissedCallCare,
   ConciergeConversation,
   ConciergeMessageRequest,
   ConciergeReply,
@@ -94,6 +98,7 @@ import type {
   GetMarketingSummaryParams,
   GetReferralLinkInfo200,
   GetRoiReportParams,
+  GetServiceCareParams,
   GoogleReviewsResponse,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
@@ -104,6 +109,10 @@ import type {
   InviteEmailResult,
   InviteUserInput,
   InvitedMember,
+  InvoiceDeliveryEvidence,
+  InvoiceDeliveryPreview,
+  InvoiceDeliveryPreviewRequest,
+  InvoiceDeliverySendRequest,
   InvoiceDetail,
   InvoiceList,
   InvoiceMutation,
@@ -146,6 +155,7 @@ import type {
   MessageTemplate,
   MessageTemplateInput,
   MessageTemplateUpdate,
+  MissedCallCareReadModel,
   MobileTokenExchangeRequest,
   MobileTokenExchangeSuccess,
   NextActionFeedbackInput,
@@ -187,14 +197,18 @@ import type {
   ReactivationSegmentPreset,
   ReactivationSegmentPreview,
   ReactivationSegmentPreviewRequest,
+  RecordServiceCareResponse,
   ReferralSubmissionInput,
   ResolveCustomerReply,
   ReverseInvoiceAllocation,
   ReviewCustomerReply,
   RoiReport,
   RotateWebhookSecretInput,
+  SaveMissedCallCarePolicy,
   SavedFilter,
   SavedFilterInput,
+  ServiceCareCommandResult,
+  ServiceCareReview,
   ServiceObligation,
   ServiceObligationListItem,
   ServiceRecurrenceCommand,
@@ -14328,5 +14342,912 @@ export const useSetServiceObligationRecurrence = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getSetServiceObligationRecurrenceMutationOptions(options));
+    }
+
+export const getGetInvoiceDeliveryUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/invoices/${id}/delivery`
+}
+
+/**
+ * Requires invoices.read. Provider acceptance does not establish delivery, customer receipt or payment.
+ * @summary Read invoice email evidence
+ */
+export const getInvoiceDelivery = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<InvoiceDeliveryEvidence> => {
+
+  return customFetch<InvoiceDeliveryEvidence>(getGetInvoiceDeliveryUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetInvoiceDeliveryQueryKey = (id: string,) => {
+    return [
+    `/api/v1/invoices/${id}/delivery`
+    ] as const;
+    }
+
+
+export const getGetInvoiceDeliveryQueryOptions = <TData = Awaited<ReturnType<typeof getInvoiceDelivery>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvoiceDelivery>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetInvoiceDeliveryQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInvoiceDelivery>>> = ({ signal }) => getInvoiceDelivery(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInvoiceDelivery>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetInvoiceDeliveryQueryResult = NonNullable<Awaited<ReturnType<typeof getInvoiceDelivery>>>
+export type GetInvoiceDeliveryQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read invoice email evidence
+ */
+
+export function useGetInvoiceDelivery<TData = Awaited<ReturnType<typeof getInvoiceDelivery>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvoiceDelivery>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetInvoiceDeliveryQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPreviewInvoiceDeliveryUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/invoices/${id}/delivery/preview`
+}
+
+/**
+ * Session-only invoices.manage. Ten-minute actor-bound approval preview freezes the immutable invoice, recipient and selected sender; no provider call.
+ * @summary Review exact issued invoice and selected mailbox
+ */
+export const previewInvoiceDelivery = async (id: string,
+    invoiceDeliveryPreviewRequest: InvoiceDeliveryPreviewRequest, options?: Parameters<typeof customFetch>[1]): Promise<InvoiceDeliveryPreview> => {
+
+  return customFetch<InvoiceDeliveryPreview>(getPreviewInvoiceDeliveryUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(invoiceDeliveryPreviewRequest)
+  }
+);}
+
+
+
+
+
+export const getPreviewInvoiceDeliveryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewInvoiceDelivery>>, TError,{id: string;data: BodyType<InvoiceDeliveryPreviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewInvoiceDelivery>>, TError,{id: string;data: BodyType<InvoiceDeliveryPreviewRequest>}, TContext> => {
+
+const mutationKey = ['previewInvoiceDelivery'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewInvoiceDelivery>>, {id: string;data: BodyType<InvoiceDeliveryPreviewRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  previewInvoiceDelivery(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewInvoiceDeliveryMutationResult = NonNullable<Awaited<ReturnType<typeof previewInvoiceDelivery>>>
+    export type PreviewInvoiceDeliveryMutationBody = BodyType<InvoiceDeliveryPreviewRequest>
+    export type PreviewInvoiceDeliveryMutationError = ErrorType<void>
+
+    /**
+ * @summary Review exact issued invoice and selected mailbox
+ */
+export const usePreviewInvoiceDelivery = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewInvoiceDelivery>>, TError,{id: string;data: BodyType<InvoiceDeliveryPreviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewInvoiceDelivery>>,
+        TError,
+        {id: string;data: BodyType<InvoiceDeliveryPreviewRequest>},
+        TContext
+      > => {
+      return useMutation(getPreviewInvoiceDeliveryMutationOptions(options));
+    }
+
+export const getSendInvoiceDeliveryUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/invoices/${id}/delivery/send`
+}
+
+/**
+ * Session-only invoices.manage. Rechecks identity, permission, content, recipient and holds at network dispatch. One logical send per invoice; timeout or unknown result cannot be bypassed by a new preview. No payment processor, public link or attachment.
+ * @summary Send the exact approved invoice once
+ */
+export const sendInvoiceDelivery = async (id: string,
+    invoiceDeliverySendRequest: InvoiceDeliverySendRequest, options?: Parameters<typeof customFetch>[1]): Promise<InvoiceDeliveryEvidence> => {
+
+  return customFetch<InvoiceDeliveryEvidence>(getSendInvoiceDeliveryUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(invoiceDeliverySendRequest)
+  }
+);}
+
+
+
+
+
+export const getSendInvoiceDeliveryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendInvoiceDelivery>>, TError,{id: string;data: BodyType<InvoiceDeliverySendRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendInvoiceDelivery>>, TError,{id: string;data: BodyType<InvoiceDeliverySendRequest>}, TContext> => {
+
+const mutationKey = ['sendInvoiceDelivery'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendInvoiceDelivery>>, {id: string;data: BodyType<InvoiceDeliverySendRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  sendInvoiceDelivery(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendInvoiceDeliveryMutationResult = NonNullable<Awaited<ReturnType<typeof sendInvoiceDelivery>>>
+    export type SendInvoiceDeliveryMutationBody = BodyType<InvoiceDeliverySendRequest>
+    export type SendInvoiceDeliveryMutationError = ErrorType<void>
+
+    /**
+ * @summary Send the exact approved invoice once
+ */
+export const useSendInvoiceDelivery = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendInvoiceDelivery>>, TError,{id: string;data: BodyType<InvoiceDeliverySendRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendInvoiceDelivery>>,
+        TError,
+        {id: string;data: BodyType<InvoiceDeliverySendRequest>},
+        TContext
+      > => {
+      return useMutation(getSendInvoiceDeliveryMutationOptions(options));
+    }
+
+export const getGetServiceCareUrl = (id: string,
+    params?: GetServiceCareParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/service-obligations/${id}/care?${stringifiedParams}` : `/api/v1/service-obligations/${id}/care`
+}
+
+/**
+ * Requires crm.read. Read-only preview of expected-service copy, configured sender, receipt, staff-attested response and native appointment. Does not infer warranty coverage.
+ * @summary Review service reminder and booking evidence
+ */
+export const getServiceCare = async (id: string,
+    params?: GetServiceCareParams, options?: Parameters<typeof customFetch>[1]): Promise<ServiceCareReview> => {
+
+  return customFetch<ServiceCareReview>(getGetServiceCareUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetServiceCareQueryKey = (id: string,
+    params?: GetServiceCareParams,) => {
+    return [
+    `/api/v1/service-obligations/${id}/care`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetServiceCareQueryOptions = <TData = Awaited<ReturnType<typeof getServiceCare>>, TError = ErrorType<void>>(id: string,
+    params?: GetServiceCareParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getServiceCare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetServiceCareQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getServiceCare>>> = ({ signal }) => getServiceCare(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getServiceCare>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetServiceCareQueryResult = NonNullable<Awaited<ReturnType<typeof getServiceCare>>>
+export type GetServiceCareQueryError = ErrorType<void>
+
+
+/**
+ * @summary Review service reminder and booking evidence
+ */
+
+export function useGetServiceCare<TData = Awaited<ReturnType<typeof getServiceCare>>, TError = ErrorType<void>>(
+ id: string,
+    params?: GetServiceCareParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getServiceCare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetServiceCareQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getApproveServiceCareUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/service-obligations/${id}/care/reminder`
+}
+
+/**
+ * Session-only crm.write. Agreement evidence and current version required. Queues a server-owned reminder; global holds or quiet hours defer without claiming a send. Imported marketing remains held.
+ * @summary Approve one expected-service reminder
+ */
+export const approveServiceCare = async (id: string,
+    approveServiceCare: ApproveServiceCare, options?: Parameters<typeof customFetch>[1]): Promise<ServiceCareCommandResult> => {
+
+  return customFetch<ServiceCareCommandResult>(getApproveServiceCareUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(approveServiceCare)
+  }
+);}
+
+
+
+
+
+export const getApproveServiceCareMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveServiceCare>>, TError,{id: string;data: BodyType<ApproveServiceCare>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveServiceCare>>, TError,{id: string;data: BodyType<ApproveServiceCare>}, TContext> => {
+
+const mutationKey = ['approveServiceCare'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveServiceCare>>, {id: string;data: BodyType<ApproveServiceCare>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  approveServiceCare(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveServiceCareMutationResult = NonNullable<Awaited<ReturnType<typeof approveServiceCare>>>
+    export type ApproveServiceCareMutationBody = BodyType<ApproveServiceCare>
+    export type ApproveServiceCareMutationError = ErrorType<void>
+
+    /**
+ * @summary Approve one expected-service reminder
+ */
+export const useApproveServiceCare = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveServiceCare>>, TError,{id: string;data: BodyType<ApproveServiceCare>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveServiceCare>>,
+        TError,
+        {id: string;data: BodyType<ApproveServiceCare>},
+        TContext
+      > => {
+      return useMutation(getApproveServiceCareMutationOptions(options));
+    }
+
+export const getRecordServiceCareResponseUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/service-obligations/${id}/care/response`
+}
+
+/**
+ * Session-only crm.write. This is an explicit staff attestation, not a provider-verified inbox event. Cancels unclaimed reminder work and leaves office follow-up.
+ * @summary Record a customer response reviewed by staff
+ */
+export const recordServiceCareResponse = async (id: string,
+    recordServiceCareResponse: RecordServiceCareResponse, options?: Parameters<typeof customFetch>[1]): Promise<ServiceCareCommandResult> => {
+
+  return customFetch<ServiceCareCommandResult>(getRecordServiceCareResponseUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(recordServiceCareResponse)
+  }
+);}
+
+
+
+
+
+export const getRecordServiceCareResponseMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordServiceCareResponse>>, TError,{id: string;data: BodyType<RecordServiceCareResponse>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordServiceCareResponse>>, TError,{id: string;data: BodyType<RecordServiceCareResponse>}, TContext> => {
+
+const mutationKey = ['recordServiceCareResponse'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordServiceCareResponse>>, {id: string;data: BodyType<RecordServiceCareResponse>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  recordServiceCareResponse(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordServiceCareResponseMutationResult = NonNullable<Awaited<ReturnType<typeof recordServiceCareResponse>>>
+    export type RecordServiceCareResponseMutationBody = BodyType<RecordServiceCareResponse>
+    export type RecordServiceCareResponseMutationError = ErrorType<void>
+
+    /**
+ * @summary Record a customer response reviewed by staff
+ */
+export const useRecordServiceCareResponse = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordServiceCareResponse>>, TError,{id: string;data: BodyType<RecordServiceCareResponse>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordServiceCareResponse>>,
+        TError,
+        {id: string;data: BodyType<RecordServiceCareResponse>},
+        TContext
+      > => {
+      return useMutation(getRecordServiceCareResponseMutationOptions(options));
+    }
+
+export const getBookServiceCareVisitUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/service-obligations/${id}/care/book`
+}
+
+/**
+ * Session-only crm.write. Requires latest ready-to-book response, current version, explicit customer confirmation and same-company staff. Shared crew/capacity checks apply. Recurrence/completion and warranty validity are not inferred.
+ * @summary Book an office-confirmed service visit
+ */
+export const bookServiceCareVisit = async (id: string,
+    bookServiceCareVisit: BookServiceCareVisit, options?: Parameters<typeof customFetch>[1]): Promise<ServiceCareCommandResult> => {
+
+  return customFetch<ServiceCareCommandResult>(getBookServiceCareVisitUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(bookServiceCareVisit)
+  }
+);}
+
+
+
+
+
+export const getBookServiceCareVisitMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookServiceCareVisit>>, TError,{id: string;data: BodyType<BookServiceCareVisit>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bookServiceCareVisit>>, TError,{id: string;data: BodyType<BookServiceCareVisit>}, TContext> => {
+
+const mutationKey = ['bookServiceCareVisit'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bookServiceCareVisit>>, {id: string;data: BodyType<BookServiceCareVisit>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  bookServiceCareVisit(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BookServiceCareVisitMutationResult = NonNullable<Awaited<ReturnType<typeof bookServiceCareVisit>>>
+    export type BookServiceCareVisitMutationBody = BodyType<BookServiceCareVisit>
+    export type BookServiceCareVisitMutationError = ErrorType<void>
+
+    /**
+ * @summary Book an office-confirmed service visit
+ */
+export const useBookServiceCareVisit = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookServiceCareVisit>>, TError,{id: string;data: BodyType<BookServiceCareVisit>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bookServiceCareVisit>>,
+        TError,
+        {id: string;data: BodyType<BookServiceCareVisit>},
+        TContext
+      > => {
+      return useMutation(getBookServiceCareVisitMutationOptions(options));
+    }
+
+export const getListMissedCallCareUrl = () => {
+
+
+
+
+  return `/api/v1/communications/missed-call-care`
+}
+
+/**
+ * Requires crm.read. Up to 50 newest cases with original call/handoff, dispatch evidence and up to five same-company same-phone inbound replies each. Replies are correlation candidates requiring staff review, not verified caller identity. Missing policy is disabled.
+ * @summary Read missed-call recovery work
+ */
+export const listMissedCallCare = async ( options?: Parameters<typeof customFetch>[1]): Promise<MissedCallCareReadModel> => {
+
+  return customFetch<MissedCallCareReadModel>(getListMissedCallCareUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMissedCallCareQueryKey = () => {
+    return [
+    `/api/v1/communications/missed-call-care`
+    ] as const;
+    }
+
+
+export const getListMissedCallCareQueryOptions = <TData = Awaited<ReturnType<typeof listMissedCallCare>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissedCallCare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMissedCallCareQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMissedCallCare>>> = ({ signal }) => listMissedCallCare({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMissedCallCare>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMissedCallCareQueryResult = NonNullable<Awaited<ReturnType<typeof listMissedCallCare>>>
+export type ListMissedCallCareQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read missed-call recovery work
+ */
+
+export function useListMissedCallCare<TData = Awaited<ReturnType<typeof listMissedCallCare>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMissedCallCare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMissedCallCareQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSaveMissedCallCarePolicyUrl = () => {
+
+
+
+
+  return `/api/v1/communications/missed-call-care/policy`
+}
+
+/**
+ * Session-only settings.manage. Explicit template approval, timezone, business days and named active accepted owners. Closing time must follow opening; enabled policy requires both owners. No provider activation or unknown-caller consent.
+ * @summary Approve missed-call owners and sending hours
+ */
+export const saveMissedCallCarePolicy = async (saveMissedCallCarePolicy: SaveMissedCallCarePolicy, options?: Parameters<typeof customFetch>[1]): Promise<MissedCallCareReadModel> => {
+
+  return customFetch<MissedCallCareReadModel>(getSaveMissedCallCarePolicyUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(saveMissedCallCarePolicy)
+  }
+);}
+
+
+
+
+
+export const getSaveMissedCallCarePolicyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveMissedCallCarePolicy>>, TError,{data: BodyType<SaveMissedCallCarePolicy>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveMissedCallCarePolicy>>, TError,{data: BodyType<SaveMissedCallCarePolicy>}, TContext> => {
+
+const mutationKey = ['saveMissedCallCarePolicy'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveMissedCallCarePolicy>>, {data: BodyType<SaveMissedCallCarePolicy>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveMissedCallCarePolicy(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveMissedCallCarePolicyMutationResult = NonNullable<Awaited<ReturnType<typeof saveMissedCallCarePolicy>>>
+    export type SaveMissedCallCarePolicyMutationBody = BodyType<SaveMissedCallCarePolicy>
+    export type SaveMissedCallCarePolicyMutationError = ErrorType<void>
+
+    /**
+ * @summary Approve missed-call owners and sending hours
+ */
+export const useSaveMissedCallCarePolicy = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveMissedCallCarePolicy>>, TError,{data: BodyType<SaveMissedCallCarePolicy>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveMissedCallCarePolicy>>,
+        TError,
+        {data: BodyType<SaveMissedCallCarePolicy>},
+        TContext
+      > => {
+      return useMutation(getSaveMissedCallCarePolicyMutationOptions(options));
+    }
+
+export const getPreviewMissedCallCareUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/communications/voice/${id}/care`
+}
+
+/**
+ * Requires crm.read. Reviewed caller and configured policy required. The returned exact snapshot includes current recipient, template and provider identity; caller ID alone is not consent.
+ * @summary Review exact missed-call response
+ */
+export const previewMissedCallCare = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<MissedCallCareReadModel> => {
+
+  return customFetch<MissedCallCareReadModel>(getPreviewMissedCallCareUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getPreviewMissedCallCareQueryKey = (id: string,) => {
+    return [
+    `/api/v1/communications/voice/${id}/care`
+    ] as const;
+    }
+
+
+export const getPreviewMissedCallCareQueryOptions = <TData = Awaited<ReturnType<typeof previewMissedCallCare>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof previewMissedCallCare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPreviewMissedCallCareQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof previewMissedCallCare>>> = ({ signal }) => previewMissedCallCare(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof previewMissedCallCare>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type PreviewMissedCallCareQueryResult = NonNullable<Awaited<ReturnType<typeof previewMissedCallCare>>>
+export type PreviewMissedCallCareQueryError = ErrorType<void>
+
+
+/**
+ * @summary Review exact missed-call response
+ */
+
+export function usePreviewMissedCallCare<TData = Awaited<ReturnType<typeof previewMissedCallCare>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof previewMissedCallCare>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getPreviewMissedCallCareQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getApproveMissedCallCareUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/communications/voice/${id}/care/approve`
+}
+
+/**
+ * Session-only crm.write. Pins exact server snapshot and version. The bounded worker respects purpose consent, STOP, hours, holds, frequency caps, replies and durable no-replay ownership.
+ * @summary Approve a reviewed missed-call follow-up
+ */
+export const approveMissedCallCare = async (id: string,
+    approveMissedCallCare: ApproveMissedCallCare, options?: Parameters<typeof customFetch>[1]): Promise<MissedCallCareReadModel> => {
+
+  return customFetch<MissedCallCareReadModel>(getApproveMissedCallCareUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(approveMissedCallCare)
+  }
+);}
+
+
+
+
+
+export const getApproveMissedCallCareMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveMissedCallCare>>, TError,{id: string;data: BodyType<ApproveMissedCallCare>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveMissedCallCare>>, TError,{id: string;data: BodyType<ApproveMissedCallCare>}, TContext> => {
+
+const mutationKey = ['approveMissedCallCare'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveMissedCallCare>>, {id: string;data: BodyType<ApproveMissedCallCare>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  approveMissedCallCare(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveMissedCallCareMutationResult = NonNullable<Awaited<ReturnType<typeof approveMissedCallCare>>>
+    export type ApproveMissedCallCareMutationBody = BodyType<ApproveMissedCallCare>
+    export type ApproveMissedCallCareMutationError = ErrorType<void>
+
+    /**
+ * @summary Approve a reviewed missed-call follow-up
+ */
+export const useApproveMissedCallCare = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveMissedCallCare>>, TError,{id: string;data: BodyType<ApproveMissedCallCare>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveMissedCallCare>>,
+        TError,
+        {id: string;data: BodyType<ApproveMissedCallCare>},
+        TContext
+      > => {
+      return useMutation(getApproveMissedCallCareMutationOptions(options));
+    }
+
+export const getCloseMissedCallCareUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/communications/voice/${id}/care/close`
+}
+
+/**
+ * Session-only crm.write. Uses current version and retains history. Unknown effects must first be reconciled; closure does not send or authorize replay.
+ * @summary Resolve or cancel a recovery case
+ */
+export const closeMissedCallCare = async (id: string,
+    closeMissedCallCare: CloseMissedCallCare, options?: Parameters<typeof customFetch>[1]): Promise<MissedCallCareReadModel> => {
+
+  return customFetch<MissedCallCareReadModel>(getCloseMissedCallCareUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(closeMissedCallCare)
+  }
+);}
+
+
+
+
+
+export const getCloseMissedCallCareMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeMissedCallCare>>, TError,{id: string;data: BodyType<CloseMissedCallCare>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof closeMissedCallCare>>, TError,{id: string;data: BodyType<CloseMissedCallCare>}, TContext> => {
+
+const mutationKey = ['closeMissedCallCare'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof closeMissedCallCare>>, {id: string;data: BodyType<CloseMissedCallCare>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  closeMissedCallCare(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CloseMissedCallCareMutationResult = NonNullable<Awaited<ReturnType<typeof closeMissedCallCare>>>
+    export type CloseMissedCallCareMutationBody = BodyType<CloseMissedCallCare>
+    export type CloseMissedCallCareMutationError = ErrorType<void>
+
+    /**
+ * @summary Resolve or cancel a recovery case
+ */
+export const useCloseMissedCallCare = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closeMissedCallCare>>, TError,{id: string;data: BodyType<CloseMissedCallCare>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof closeMissedCallCare>>,
+        TError,
+        {id: string;data: BodyType<CloseMissedCallCare>},
+        TContext
+      > => {
+      return useMutation(getCloseMissedCallCareMutationOptions(options));
     }
 

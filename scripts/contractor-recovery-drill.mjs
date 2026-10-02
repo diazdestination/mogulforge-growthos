@@ -11,6 +11,7 @@ import { reviewedSchema } from './pilot-staging-bootstrap.mjs';
 import { buildAll } from '../artifacts/api-server/build.mjs';
 import { fixtureRows, fixtureIds, credentialCodec, FAKE_REFRESH_TOKEN, assertFixtureRecords } from './restore-drill-fixture.mjs';
 import { nativeFixtureRows, nativeFixtureIds, sealNativeFixture, assertNativeFixture } from './native-contractor-recovery-fixture.mjs';
+import { careFixtureRows, careFixtureIds, assertCareFixture, assertCareTenantKeys } from './customer-care-recovery-fixture.mjs';
 
 const requireApi = createRequire(new URL('../artifacts/api-server/package.json', import.meta.url));
 const requireDb = createRequire(new URL('../lib/db/package.json', import.meta.url));
@@ -20,8 +21,8 @@ const { generateDrizzleJson } = requireDb('drizzle-kit/api');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const identifier = (name) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('contractor_identifier_invalid'); return `"${name}"`; };
-const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence']);
-const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql'];
+const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot']);
+const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql'];
 
 async function insert(database, table, row) {
   const fields = Object.keys(row);
@@ -106,6 +107,8 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       for (const [table,row] of nativeFixtureRows(slug)) await insert(source,table,row);
       await sealNativeFixture(source,slug);
       await assertNativeFixture(source,slug);
+      for (const [table, row] of careFixtureRows(slug)) await insert(source, table, row);
+      await assertCareFixture(source, slug);
       const id = fixtureIds(slug), emailSource = randomUUID();
       await insert(source, 'billing_checkouts', { organization_id: id.organization, intent: 'initial', state: 'reconcile', price_id: 'price_synthetic', plan_id: 'beta', success_url: 'https://example.invalid/success', cancel_url: 'https://example.invalid/cancel', provider_configuration_hash: sha('synthetic-provider'), recovery_reason: 'synthetic_acknowledgement_unknown' });
       await insert(source, 'customer_lifecycle', { organization_id: id.organization, state: 'paused', version: 2, reason: 'Synthetic recovery hold', updated_by_user_id: id.user });
@@ -115,24 +118,37 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       await insert(source, 'sessions', { sid: (index ? 'b' : 'a').repeat(64), sess: JSON.stringify({ user: { id: id.user, email: `${slug}.operator@example.invalid`, firstName: 'Synthetic', lastName: 'Recovery', profileImageUrl: null }, access_token: 'synthetic-no-provider' }), expire: new Date(Date.now() + 86_400_000) });
     }
     await source.exec('CREATE ROLE contractor_recovery_reader; GRANT USAGE ON SCHEMA public TO contractor_recovery_reader; GRANT SELECT ON ALL TABLES IN SCHEMA public TO contractor_recovery_reader;');
+    const careBaseline = await fingerprints(source);
+    await assertCareTenantKeys(source, slugs[0], slugs[1]);
+    assert.deepEqual(await fingerprints(source), careBaseline);
     // Prove the reviewed active-service exception cannot mask an unpaused
     // company or another active obligation. These transactions always roll back.
     const guardBaseline = await fingerprints(source);
     for (const slug of slugs) {
       const id=fixtureIds(slug), reviewedPausedServiceId=nativeFixtureIds(slug).nextService;
+      const careOptions={reviewedPausedServiceId,reviewedPausedCareExecutionId:careFixtureIds(slug).execution};
       const check=(options)=>assertFixtureRecords({query:(sql,values)=>source.query(sql,values)},{syntheticSlug:slug},codec,options);
       await assert.rejects(check(), /restore_fixture_outbound_or_identity_unsafe/);
       await source.exec('BEGIN');
       try {
         await source.query("UPDATE customer_lifecycle SET state='active' WHERE organization_id=$1",[id.organization]);
-        await assert.rejects(check({reviewedPausedServiceId}),/restore_fixture_outbound_or_identity_unsafe/);
+        await assert.rejects(check(careOptions),/restore_fixture_outbound_or_identity_unsafe/);
       } finally { await source.exec('ROLLBACK'); }
       await source.exec('BEGIN');
       try {
         await source.query("UPDATE service_obligations SET status='active' WHERE id=$1",[nativeFixtureIds(slug).priorService]);
-        await assert.rejects(check({reviewedPausedServiceId}),/restore_fixture_outbound_or_identity_unsafe/);
+        await assert.rejects(check(careOptions),/restore_fixture_outbound_or_identity_unsafe/);
       } finally { await source.exec('ROLLBACK'); }
-      await check({reviewedPausedServiceId});
+      await assert.rejects(check({reviewedPausedServiceId}),/restore_fixture_outbound_or_identity_unsafe/);
+      for (const query of [
+        "UPDATE missed_call_care_policies SET enabled=true WHERE organization_id=$1",
+        "UPDATE revenue_executions SET state='processing' WHERE organization_id=$1 AND kind='missed_call_care'",
+      ]) {
+        await source.exec('BEGIN');
+        try { await source.query(query,[id.organization]); await assert.rejects(check(careOptions),/restore_fixture_outbound_or_identity_unsafe/); }
+        finally { await source.exec('ROLLBACK'); }
+      }
+      await check(careOptions);
     }
     assert.deepEqual(await fingerprints(source),guardBaseline);
     const baseline = await fingerprints(source);
@@ -143,8 +159,9 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     restored = await PGlite.create({ loadDataDir: snapshot });
     assert.deepEqual(await fingerprints(restored), baseline);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM organizations WHERE slug='restore-drill-after-snapshot'")).rows[0].n, 0);
-    for (const slug of slugs) await assertFixtureRecords({ query: (sql, values) => restored.query(sql, values) }, { syntheticSlug: slug }, codec, { reviewedPausedServiceId: nativeFixtureIds(slug).nextService });
+    for (const slug of slugs) await assertFixtureRecords({ query: (sql, values) => restored.query(sql, values) }, { syntheticSlug: slug }, codec, { reviewedPausedServiceId: nativeFixtureIds(slug).nextService, reviewedPausedCareExecutionId: careFixtureIds(slug).execution });
     for (const slug of slugs) await assertNativeFixture(restored,slug);
+    for (const slug of slugs) await assertCareFixture(restored,slug);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM billing_checkouts WHERE state='reconcile'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM customer_lifecycle WHERE state='paused'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM staff_invitations WHERE state='pending' AND delivery_state='unconfirmed'")).rows[0].n, 2);
@@ -165,6 +182,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       replyHoldSurvivesRawDeletion: true, postSnapshotMarkerAbsent: true,
       issuedInvoiceSnapshotPreserved: true, invoiceNumberingPreserved: true, receiptReversalPreservesCash: true, recurringServiceSuccessorPreserved: true,
       pausedServiceExceptionVerified: true,
+      missedCallUncertaintyPreserved: true, careTenantForeignKeysVerified: true, disabledCarePoliciesPreserved: true,
       ...app, restoreVerificationMs: Date.now() - restoreStartedAt, elapsedMs: Date.now() - startedAt,
       providerCalls: 0, managedBackupRestoreVerified: false, productionRpoRtoEstablished: false,
     };

@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
 import {
   db,
   contactsTable,
@@ -18,6 +18,7 @@ export async function sendTwilioSms(
   to: string,
   body: string,
   context?: SmsSendContext,
+  beforeDispatch?: () => Promise<void>,
 ) {
   assertOutboundDeliveryAllowed();
   const phone = phoneE164(to);
@@ -62,7 +63,7 @@ export async function sendTwilioSms(
         eq(twilioConsentProofsTable.purpose, context.purpose),
       ),
     )
-    .orderBy(desc(twilioConsentProofsTable.recordedAt))
+    .orderBy(desc(twilioConsentProofsTable.recordedAt), asc(twilioConsentProofsTable.granted))
     .limit(1);
   if (!proof?.granted || proof.disclosureVersion !== config.smsDisclosureVersion)
     throw new Error(
@@ -146,22 +147,39 @@ export async function sendTwilioSms(
       `SMS operation is ${operation.status}; inspect the receipt before any new attempt`,
     );
   }
+  let dispatched = false;
   try {
+    // The workflow's approval may have changed while ownership was acquired.
+    await beforeDispatch?.();
     const current = await twilioForOrganization(context.organizationId);
     if (!current?.smsEnabled || current.id !== config.id ||
         current.accountSid !== config.accountSid ||
         current.phoneNumber !== config.phoneNumber ||
         current.messagingServiceSid !== config.messagingServiceSid ||
-        current.origin !== config.origin) {
+        current.origin !== config.origin || current.businessName !== config.businessName ||
+        current.smsDisclosureVersion !== config.smsDisclosureVersion ||
+        current.dailySmsLimit !== config.dailySmsLimit) {
       await db.update(twilioDispatchesTable)
         .set({ status: "cancelled", updatedAt: new Date() })
         .where(eq(twilioDispatchesTable.id, operation.id));
       throw new Error("SMS cancelled because the client binding is disabled or changed");
     }
-    // Recheck STOP immediately before handing the request to the network.
+    const [freshContact] = await db.select().from(contactsTable).where(and(
+      eq(contactsTable.organizationId, context.organizationId), eq(contactsTable.id, context.contactId),
+    ));
+    const [freshProof] = await db.select().from(twilioConsentProofsTable).where(and(
+      eq(twilioConsentProofsTable.organizationId, context.organizationId),
+      eq(twilioConsentProofsTable.contactId, context.contactId),
+      eq(twilioConsentProofsTable.phone, phone), eq(twilioConsentProofsTable.purpose, context.purpose),
+    )).orderBy(desc(twilioConsentProofsTable.recordedAt), asc(twilioConsentProofsTable.granted)).limit(1);
+    if (!freshContact || phoneE164(freshContact.phone ?? "") !== phone ||
+        !freshProof?.granted || freshProof.id !== proof.id ||
+        freshProof.disclosureVersion !== current.smsDisclosureVersion)
+      throw new Error("SMS cancelled because its recipient or purpose consent changed");
+    // Re-read contact flags as well as STOP immediately before network handoff.
     const latest = await checkSendEligibility({
       organizationId: context.organizationId,
-      contact,
+      contact: freshContact,
       channel: "sms",
       kind: "transactional",
     });
@@ -172,10 +190,14 @@ export async function sendTwilioSms(
         .where(eq(twilioDispatchesTable.id, operation.id));
       throw new Error("SMS cancelled by current consent/suppression policy");
     }
+    assertOutboundDeliveryAllowed();
+    dispatched = true;
     const response = await fetch(
       `https://api.twilio.com/2010-04-01/Accounts/${current.accountSid}/Messages.json`,
       {
         method: "POST",
+        // A 307/308 must not replay this irreversible POST outside our guard.
+        redirect: "error",
         signal: AbortSignal.timeout(10_000),
         headers: {
           "content-type": "application/x-www-form-urlencoded",
@@ -246,7 +268,7 @@ export async function sendTwilioSms(
   } catch (error) {
     await db
       .update(twilioDispatchesTable)
-      .set({ status: "uncertain", updatedAt: new Date() })
+      .set({ status: dispatched ? "uncertain" : "cancelled", updatedAt: new Date() })
       .where(
         and(
           eq(twilioDispatchesTable.id, operation.id),

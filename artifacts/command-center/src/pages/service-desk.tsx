@@ -3,6 +3,7 @@ import { useGetMe } from '@workspace/api-client-react';
 import ContactSelect from '@/components/contact-select';
 import { canWrite } from '@/lib/permissions';
 import ServiceObligationEditor, { type ServiceRow } from '@/components/service-obligation-editor';
+import ServiceCarePanel from '@/components/service-care-panel';
 
 type ServiceKind = 'warranty_check' | 'maintenance' | 'service_plan';
 type ServiceStatus = 'active' | 'completed' | 'cancelled';
@@ -56,6 +57,7 @@ export default function ServiceDesk() {
   const [defaultKind, setDefaultKind] = useState<ServiceKind>('maintenance');
   const [preview, setPreview] = useState<ImportResult | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [careId, setCareId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const loadSequence = useRef(0);
   const viewKey = `${me?.organization?.id ?? ''}:${recordStatus}:${offset}`;
@@ -83,7 +85,7 @@ export default function ServiceDesk() {
     }
   }
   useEffect(() => {
-    setRows([]); setReopening(null); setEditingId(null);
+    setRows([]); setReopening(null); setEditingId(null); setCareId(null);
     void refresh();
     return () => { ++loadSequence.current; };
   }, [recordStatus, offset, me?.organization?.id]);
@@ -165,7 +167,7 @@ export default function ServiceDesk() {
     (mapping.equipmentLabel !== undefined || !!defaultEquipment);
   const visible = rows.filter(row => row.obligation.status === recordStatus);
   return (
-    <div className="h-full overflow-auto p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="h-full w-full min-w-0 overflow-auto p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
       <header>
         <h1 className="text-2xl font-bold">Customer service desk</h1>
         <p className="text-sm text-muted-foreground">Warranty checks, maintenance, and plan visits stay with customers—not in the new-lead pipeline.</p>
@@ -196,6 +198,8 @@ export default function ServiceDesk() {
                   </div>}
                 </div>
                 {editable && recordStatus === 'active' && <button disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setEditingId(editingId === obligation.id ? null : obligation.id)}>Manage service</button>}
+                <button type="button" disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setCareId(careId === obligation.id ? null : obligation.id)}>Customer care & booking</button>
+                {careId === obligation.id && <ServiceCarePanel key={`${me?.organization?.id}:${obligation.id}`} obligationId={obligation.id} editable={editable} onClose={() => setCareId(null)} onChanged={refresh} />}
                 {editable && recordStatus === 'active' && editingId === obligation.id && <ServiceObligationEditor key={`${obligation.id}:${obligation.updatedAt}`} row={row} onClose={() => setEditingId(null)} onSaved={async message => { setNotice(message); await refresh(); }} />}
                 {editable && recordStatus === 'cancelled' && <button type="button" disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setReopening(row)}>Review reopening</button>}
                 {editable && recordStatus === 'cancelled' && reopening?.obligation.id === obligation.id && <div role="group" aria-label="Reopen service review" className="w-full space-y-2 border-t pt-3">
@@ -213,7 +217,7 @@ export default function ServiceDesk() {
           <div className="flex flex-wrap gap-2"><button type="button" disabled={busy || offset === 0} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setOffset(value => Math.max(0, value - SERVICE_PAGE_SIZE))}>Previous service page</button><button type="button" disabled={busy || !hasMore || offset >= 100_000} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setOffset(value => value + SERVICE_PAGE_SIZE)}>Next service page</button></div>
         </div>}
       </section>
-      {editable && <div className="grid gap-5 lg:grid-cols-2">
+      {editable && <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
         <form onSubmit={addService} className="rounded-xl border bg-card p-4 space-y-3">
           <h2 className="font-semibold">Add a service date</h2>
           <label className="block text-sm">Customer<ContactSelect value={contactId} onChange={setContactId} required testId="service-contact" /></label>
@@ -228,7 +232,7 @@ export default function ServiceDesk() {
         <section className="rounded-xl border bg-card p-4 space-y-3" aria-label="Import customers">
           <h2 className="font-semibold">Import customer service dates</h2>
           <p className="text-sm text-muted-foreground">Export a CSV from Housecall Pro. Map the customer, equipment, service kind, and next due date. Preview before saving.</p>
-          <input ref={fileRef} type="file" accept=".csv,text/csv" aria-label="Customer service CSV" onChange={event => void chooseFile(event.target.files?.[0])} />
+          <input ref={fileRef} type="file" className="block w-full min-w-0 max-w-full text-sm" accept=".csv,text/csv" aria-label="Customer service CSV" onChange={event => void chooseFile(event.target.files?.[0])} />
           {fileName && <p className="text-xs">{fileName}</p>}
           {csv && <>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -255,7 +259,7 @@ export default function ServiceDesk() {
           {preview?.errors?.length ? <ul className="text-sm text-muted-foreground list-disc pl-5">{preview.errors.map(error => <li key={error}>{error}</li>)}</ul> : null}
         </section>
       </div>}
-      <p className="text-xs text-muted-foreground">This desk creates staff follow-up tasks only. Customer email/text reminders require a verified sender, purpose-specific SMS consent, and activation for this contractor.</p>
+      <p className="text-xs text-muted-foreground">Service dates create staff follow-up tasks. Customer care adds one explicitly reviewed reminder and staff-confirmed office booking. Email/text dispatch still requires this contractor's approved sender, contact policy, SMS consent where applicable, and activation. No warranty terms or customer replies are inferred.</p>
     </div>
   );
 }

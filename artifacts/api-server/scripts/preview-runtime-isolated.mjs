@@ -11,6 +11,7 @@ import path from "node:path";
 import pg from "pg";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { buildAll } from "../build.mjs";
+import { seedCustomerCarePreview } from "./customer-care-preview-fixture.mjs";
 
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const database = path.resolve(api, "../../lib/db");
@@ -39,6 +40,7 @@ Object.assign(env, {
   AUTO_MIGRATE: "false",
   LOG_LEVEL: "warn",
   COMMUNICATIONS_ENABLED: "false",
+  GROWTHOS_OUTBOUND_HOLD: "true",
   RUNTIME_SYNTHETIC_PREVIEW: "loopback-only",
 });
 let child;
@@ -77,10 +79,11 @@ try {
     const salt = randomBytes(16).toString("hex");
     const password = "Local-QA-only-2026!";
     const hash = `scrypt$${salt}$${scryptSync(password, salt, 64).toString("hex")}`;
-    await client.query(
-      "INSERT INTO users(email,first_name,last_name,password_hash,email_verified_at,organization_id,role,is_platform_admin) VALUES ($1,'LOCAL','QA OPERATOR',$2,now(),$3,'owner',true)",
+    const { rows: [user] } = await client.query(
+      "INSERT INTO users(email,first_name,last_name,password_hash,email_verified_at,organization_id,role,is_platform_admin) VALUES ($1,'LOCAL','QA OPERATOR',$2,now(),$3,'owner',true) RETURNING id",
       ["runtime-qa@example.invalid", hash, org.id],
     );
+    if (process.argv.includes("--customer-care")) await seedCustomerCarePreview(client, org.id, user.id);
     await client.query(
       "INSERT INTO scheduled_actions(organization_id,action,context,run_at,status,attempts,last_error) VALUES ($1,$2,'{}',now()-interval '1 hour','failed',3,'Synthetic preparation failure for visual QA')",
       [

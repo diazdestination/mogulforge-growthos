@@ -6,6 +6,7 @@ import {
   integer,
   boolean,
   uniqueIndex,
+  unique,
 } from "drizzle-orm/pg-core";
 import { organizationsTable } from "./organizations";
 import { contactsTable } from "./contacts";
@@ -177,6 +178,7 @@ export const twilioCallsTable = pgTable(
       table.requestKey,
     ),
     uniqueIndex("twilio_call_sid").on(table.providerSid),
+    unique("twilio_calls_org_id_uq").on(table.organizationId, table.id),
   ],
 );
 

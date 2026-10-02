@@ -10,7 +10,7 @@ type Call = {
   contactId: string | null;
 };
 type Handoff = { callId: string; taskId: string; contactId: string | null; leadId: string | null; reviewedAt: string | null };
-export function VoiceDesk() {
+export function VoiceDesk({ onReviewed, canEdit = true }: { onReviewed?: () => void; canEdit?: boolean } = {}) {
   const [calls, setCalls] = useState<Call[]>([]),
     [handoffs, setHandoffs] = useState<Handoff[]>([]),
     [enabled, setEnabled] = useState(false),
@@ -72,6 +72,7 @@ export function VoiceDesk() {
     } finally {
       setBusy(false);
       await refresh();
+      onReviewed?.();
     }
   }
   async function reviewMissedCall() {
@@ -98,6 +99,7 @@ export function VoiceDesk() {
       setSelectedCall(null);
       reviewRequest.current = crypto.randomUUID();
       await refresh();
+      onReviewed?.();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Review could not be saved.');
     } finally { setBusy(false); }
@@ -147,7 +149,7 @@ export function VoiceDesk() {
       <button
         type="button"
         className="border rounded px-4 py-2 disabled:opacity-50"
-        disabled={!enabled || !contact || !requested || busy}
+        disabled={!canEdit || !enabled || !contact || !requested || busy}
         onClick={() => void call()}
       >
         Call through staff phone
@@ -159,7 +161,8 @@ export function VoiceDesk() {
       )}
       <p className="text-xs text-muted-foreground">
         No call recording or emergency calling. Missed calls create a staff
-        callback task, never an automatic text. A call does not grant SMS consent.
+        callback task. Customer texts require the separately approved recovery
+        policy, a reviewed caller and current SMS consent. A call does not grant SMS consent.
       </p>
       <ul className="text-sm space-y-2">
         {calls.map((item) => (
@@ -172,7 +175,7 @@ export function VoiceDesk() {
                 {handoffs.find(handoff => handoff.callId === item.id)?.reviewedAt ? ' · reviewed' : ' · needs review'}
               </span>
             )}
-            {handoffs.some(handoff => handoff.callId === item.id && !handoff.reviewedAt) && (
+            {canEdit && handoffs.some(handoff => handoff.callId === item.id && !handoff.reviewedAt) && (
               <button type="button" className="underline ml-2" onClick={() => {
                 setSelectedCall(item); setReviewContactId(item.contactId ?? '');
                 setReviewMode('create_opportunity'); setReviewFirstName(''); setReviewServiceType('');
