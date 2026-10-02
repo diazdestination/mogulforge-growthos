@@ -94,6 +94,12 @@ cumulative source must not be attributed to this old deployed image.
   target. Verify fresh backup, lock budget, original-column row preservation,
   defaults, constraints, tenant guards and negative Reader/Writer privileges.
   The older one-time 90-to-95 release script must not be reused or repinned.
+  Independent review counted eight new tables, fifteen existing-table columns,
+  thirty FKs, seventeen CHECKs, twenty secondary indexes (ten unique) and eight
+  PK indexes. No drop, type change or data backfill is present. Confirm the full
+  catalog, not only table names. Once new workflows are used, an old-image
+  rollback must stay stopped/maintenance or verified read-only; the old app
+  lacks the new hold/billing/invoice/recurrence controls even with additive SQL.
 - Apply only the reviewed schema to the isolated staging target, then deploy
   a green exact-source image with holds retained and verify hosted identity,
   normal-mode tenant isolation, scheduler restart/idle/failure and owned alerts.
