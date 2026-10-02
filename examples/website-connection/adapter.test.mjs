@@ -50,6 +50,114 @@ test('disabled capture and lifecycle pause are visible holds that require operat
   }
 });
 
+test('retention erases old payloads across destination partitions without allowing cross-site dispatch or lookup', async () => {
+  let clock = Date.now(); let calls = 0;
+  const c = config(); const p = payload();
+  const first = open(c, { now: () => clock, fetch: async () => { throw new Error('Synthetic unavailable'); } });
+  await first.submit(p); first.close();
+  clock += 8 * 86_400_000;
+  const other = open({ ...c, siteId: randomUUID() }, { now: () => clock, fetch: async () => { calls++; return response(ack(), 201); } });
+  await other.drain();
+  assert.throws(() => other.lookup(p.requestId), { code: 'request_unknown' });
+  assert.equal(calls, 0);
+  assert.equal(other.inspect().totalRecords, 1);
+  const db = new DatabaseSync(c.journalPath);
+  const old = db.prepare('SELECT state,encrypted FROM website_delivery WHERE request_id=?').get(p.requestId); db.close();
+  assert.equal(old.state, 'expired'); assert.equal(old.encrypted, null);
+});
+
+test('an observer cannot steal the live twentieth-attempt claim before its saved acknowledgement', async () => {
+  let clock = Date.now(), calls = 0, resolveLast;
+  const c = config(); const p = payload(); const receipt = ack();
+  const adapter = open(c, { now: () => clock, fetch: async () => {
+    calls++;
+    if (calls === 20) return new Promise((resolve) => { resolveLast = resolve; });
+    throw new Error('Synthetic unavailable');
+  } });
+  await adapter.submit(p);
+  for (let i = 2; i <= 19; i++) { clock += 3_600_001; await adapter.drain(); }
+  clock += 3_600_001;
+  const active = adapter.drain();
+  assert.equal(calls, 20);
+  const observer = open(c, { now: () => clock });
+  assert.equal(observer.lookup(p.requestId).status, 'queued');
+  assert.equal(observer.inspect().counts.processing, 1);
+  resolveLast(response(receipt, 201));
+  await active;
+  assert.equal(observer.lookup(p.requestId).status, 'saved');
+  assert.equal(observer.lookup(p.requestId).receiptId, receipt.receiptId);
+});
+
+test('ciphertext expiry preserves a live claim long enough to record its valid saved acknowledgement', async () => {
+  let clock = Date.now(), resolveLast;
+  const c = config(); const p = payload(); const receipt = ack();
+  const adapter = open(c, { now: () => clock, fetch: async () => { throw new Error('Synthetic initial failure'); } });
+  await adapter.submit(p); adapter.close();
+  clock += 7 * 86_400_000 - 10_000;
+  const resumed = open(c, { now: () => clock, fetch: async () => new Promise((resolve) => { resolveLast = resolve; }) });
+  resumed.inspect(); // Exhausted automatic window requires explicit review.
+  const active = resumed.drain({ retryRequestId: p.requestId });
+  clock += 20_000; // Beyond payload retention; still inside the 60-second live lease.
+  assert.equal(resumed.lookup(p.requestId).status, 'queued');
+  const db = new DatabaseSync(c.journalPath);
+  const row = db.prepare('SELECT state,encrypted,claim FROM website_delivery WHERE request_id=?').get(p.requestId); db.close();
+  assert.equal(row.encrypted, null); assert.equal(row.state, 'processing'); assert.ok(row.claim);
+  resolveLast(response(receipt, 201)); await active;
+  assert.equal(resumed.lookup(p.requestId).status, 'saved');
+});
+
+test('a failed in-flight response after ciphertext expiry settles as expired, never queued without its payload', async () => {
+  let clock = Date.now(), rejectLast;
+  const c = config(); const p = payload();
+  const initial = open(c, { now: () => clock, fetch: async () => { throw new Error('Synthetic initial failure'); } });
+  await initial.submit(p); initial.close();
+  clock += 7 * 86_400_000 - 10_000;
+  const adapter = open(c, { now: () => clock, fetch: async () => new Promise((_resolve, reject) => { rejectLast = reject; }) });
+  adapter.inspect();
+  const active = adapter.drain({ retryRequestId: p.requestId });
+  clock += 20_000;
+  assert.equal(adapter.lookup(p.requestId).retained, false);
+  rejectLast(new Error('Synthetic delivery failure after erasure'));
+  await active;
+  assert.deepEqual(adapter.lookup(p.requestId), { status: 'needs-review', requestId: p.requestId, retained: false, reason: 'retention_expired', appointmentStatus: 'pending_office_approval' });
+  assert.equal(adapter.inspect().counts.expired, 1);
+});
+
+test('a crashed live claim expires after payload erasure and cannot later replace the terminal state', async () => {
+  let clock = Date.now(), resolveLast;
+  const c = config(); const p = payload();
+  const initial = open(c, { now: () => clock, fetch: async () => { throw new Error('Synthetic initial failure'); } });
+  await initial.submit(p); initial.close();
+  clock += 7 * 86_400_000 - 10_000;
+  const adapter = open(c, { now: () => clock, fetch: async () => new Promise((resolve) => { resolveLast = resolve; }) });
+  adapter.inspect();
+  const active = adapter.drain({ retryRequestId: p.requestId });
+  clock += 20_000;
+  assert.equal(adapter.lookup(p.requestId).status, 'queued');
+  clock += 60_000;
+  assert.equal(adapter.inspect().counts.expired, 1);
+  resolveLast(response(ack(), 201)); await active;
+  assert.equal(adapter.lookup(p.requestId).reason, 'retention_expired');
+  assert.equal(adapter.lookup(p.requestId).retained, false);
+});
+
+test('expired tombstones cannot hide actionable review items and truncated health is explicit', async () => {
+  let clock = Date.now(); let held = false;
+  const c = config();
+  const adapter = open(c, { now: () => clock, fetch: async () => {
+    if (held) return response({ error: 'site_staffing_unavailable' }, 503);
+    throw new Error('Synthetic unavailable');
+  } });
+  for (let i = 0; i < 25; i++) await adapter.submit(payload());
+  clock += 8 * 86_400_000; held = true;
+  const actionable = payload(); await adapter.submit(actionable);
+  const health = adapter.inspect();
+  assert.equal(health.counts.expired, 25); assert.equal(health.counts['needs-review'], 1);
+  assert.equal(health.review[0].requestId, actionable.requestId);
+  assert.equal(health.review[0].state, 'needs-review');
+  assert.equal(health.review.length, 25); assert.equal(health.reviewTotal, 26); assert.equal(health.reviewTruncated, true);
+});
+
 test('only explicit contact permission is normalized; no tracking or tenant fields accepted', () => {
   const p = payload();
   assert.equal(normalizeWebsiteIntake({ ...p, contact: { ...p.contact, email: ' QA@example.invalid ' } }).contact.email, 'qa@example.invalid');

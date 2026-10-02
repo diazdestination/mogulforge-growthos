@@ -42,7 +42,9 @@ and $1,500 flagship direction without changing either customer's agreement.
 Independent review found and repaired cancellation suppression, held-company
 scheduler starvation, consumed playbook steps, lost outcome hooks, referral and
 voice bypasses, transaction-wait races, export cross-origin reads and incomplete
-export deadlines. Billing retry/replacement received an independent source review.
+export deadlines. Final adapter review also repaired cross-partition payload
+expiry, live final-attempt claim loss, and actionable review-list starvation.
+Billing retry/replacement received an independent source review.
 
 Local evidence (overlapping selections are not additive):
 
@@ -50,7 +52,7 @@ Local evidence (overlapping selections are not additive):
 | --- | --- |
 | Full Command Center suite | 393 passed in 66 files |
 | Shared API/schema/inventory/tenant/source selection | 115 passed in 10 files |
-| Reusable adapter | 12 Node tests passed; also exercised over the real local GrowthOS HTTP server |
+| Reusable adapter | 18 Node tests passed after independent corrective review; also exercised over the real local GrowthOS HTTP server |
 | Workspace | All typechecks; API and Command Center production builds passed |
 | Browser | 8 actual-component cases: 1440/390/320 light and 390 dark for lifecycle/billing; zero overflow, page errors or scoped axe violations after two contrast fixes |
 | Specialized billing/export/voice/capture | See lane reports for focused tests, concurrency limitations and exact evidence |

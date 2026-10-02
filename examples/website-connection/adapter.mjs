@@ -99,10 +99,16 @@ export function createWebsiteAdapter(rawConfig, dependencies = {}) {
 
   const get = (requestId) => db.prepare('SELECT * FROM website_delivery WHERE partition=? AND request_id=?').get(partition, requestId);
   function expire() {
-    db.prepare("UPDATE website_delivery SET state='expired', encrypted=NULL, claim=NULL, claim_until=NULL, reason='retention_expired', updated_at=? WHERE partition=? AND encrypted IS NOT NULL AND received_at<?")
-      .run(now(), partition, now() - 7 * DAY);
-    db.prepare("UPDATE website_delivery SET state='needs-review', claim=NULL, claim_until=NULL, reason='retry_window_exhausted', updated_at=? WHERE partition=? AND state IN ('queued','processing') AND (received_at<? OR attempts>=20) AND coalesce(reason,'')<>'operator_retry'")
-      .run(now(), partition, now() - 3 * DAY);
+    const timestamp = now();
+    // Retention covers the entire journal even after destination configuration
+    // changes. Erase old ciphertext, but do not steal a live delivery claim:
+    // its already-sent body may still receive a valid acknowledgement.
+    db.prepare("UPDATE website_delivery SET encrypted=NULL, updated_at=? WHERE encrypted IS NOT NULL AND received_at<?")
+      .run(timestamp, timestamp - 7 * DAY);
+    db.prepare("UPDATE website_delivery SET state='expired', claim=NULL, claim_until=NULL, reason='retention_expired', updated_at=? WHERE state NOT IN ('saved','expired') AND received_at<? AND (state<>'processing' OR coalesce(claim_until,0)<=?)")
+      .run(timestamp, timestamp - 7 * DAY, timestamp);
+    db.prepare("UPDATE website_delivery SET state='needs-review', claim=NULL, claim_until=NULL, reason='retry_window_exhausted', updated_at=? WHERE partition=? AND (state='queued' OR (state='processing' AND coalesce(claim_until,0)<=?)) AND (received_at<? OR attempts>=20) AND coalesce(reason,'')<>'operator_retry'")
+      .run(timestamp, partition, timestamp, timestamp - 3 * DAY);
   }
   function seal(body, requestId) {
     const iv = randomBytes(12);
@@ -178,6 +184,7 @@ export function createWebsiteAdapter(rawConfig, dependencies = {}) {
     db.prepare("UPDATE website_delivery SET state=?, reason=?, encrypted=CASE WHEN ?='saved' THEN NULL ELSE encrypted END, lead_id=?, receipt_id=?, claim=NULL, claim_until=NULL, next_attempt_at=?, updated_at=? WHERE partition=? AND request_id=? AND state='processing' AND claim=?")
       .run(status, reason, status, receipt?.leadId ?? null, receipt?.receiptId ?? null,
         now() + Math.min(3_600_000, 30_000 * 2 ** Math.min(claimed.attempts - 1, 7)), now(), partition, requestId, token);
+    expire();
     return result(get(requestId));
   }
   return {
@@ -237,8 +244,9 @@ export function createWebsiteAdapter(rawConfig, dependencies = {}) {
       expire();
       const counts = { queued: 0, processing: 0, saved: 0, 'needs-review': 0, expired: 0 };
       for (const row of db.prepare('SELECT state,count(*) AS count FROM website_delivery WHERE partition=? GROUP BY state').all(partition)) counts[row.state] = row.count;
-      const review = db.prepare("SELECT request_id AS requestId, state, reason, attempts, received_at AS receivedAt FROM website_delivery WHERE partition=? AND state IN ('needs-review','expired') ORDER BY received_at LIMIT 25").all(partition);
-      return { contract: ADAPTER_VERSION, counts, review, capacity, totalRecords: db.prepare('SELECT count(*) AS count FROM website_delivery').get().count };
+      const review = db.prepare("SELECT request_id AS requestId, state, reason, attempts, received_at AS receivedAt FROM website_delivery WHERE partition=? AND state IN ('needs-review','expired') ORDER BY CASE state WHEN 'needs-review' THEN 0 ELSE 1 END, received_at LIMIT 25").all(partition);
+      const reviewTotal = counts['needs-review'] + counts.expired;
+      return { contract: ADAPTER_VERSION, counts, review, reviewTotal, reviewTruncated: reviewTotal > review.length, capacity, totalRecords: db.prepare('SELECT count(*) AS count FROM website_delivery').get().count };
     },
     close() { db.close(); },
   };

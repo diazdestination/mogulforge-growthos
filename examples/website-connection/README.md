@@ -32,7 +32,7 @@ The default allowed API origin is `https://app.mogulforge.ai`. An approved alter
 | `lookup(requestId)` | Read only the current destination/site partition's delivery state. No network request. Internal result includes IDs; public wrappers must strip them. |
 | `drain()` | Attempt up to five due requests; return safe journal health. Run through an authenticated operator endpoint or a private supervised worker. |
 | `drain({ retryRequestId })` | One explicit review retry for an unexpired held request. The request, destination, and original receive time stay fixed. |
-| `inspect()` | Counts plus opaque held-request references/reasons/attempt counts. Never returns contact details, request body, or credentials. |
+| `inspect()` | Counts plus opaque held-request references/reasons/attempt counts, actionable holds first. `reviewTotal` / `reviewTruncated` disclose the 25-item listing limit. Never returns contact details, request body, or credentials. |
 | `close()` | Release this adapter's SQLite handle. |
 
 `adapter.d.mts` contains the complete types. `WebsiteAdapterError` exposes safe `code`/`status` fields; do not return raw exception messages or stacks from a website handler.
@@ -98,7 +98,7 @@ The journal partition includes API origin and site ID. Reconfiguring either cann
 
 - Uncertain failures retry after 30 seconds, backing off to one hour.
 - Automatic retries stop after 20 attempts or three days and require review.
-- Encrypted payloads expire after seven days; inspect/status exposes expiry rather than inventing delivery. Saved payload ciphertext is removed immediately.
+- Encrypted payloads expire after seven days across all journal partitions, even after destination settings change. An in-flight claim can still record a valid saved acknowledgement inside its lease; failure or lease expiry settles as expired without retained payload. Saved payload ciphertext is removed immediately.
 - Minimal idempotency/receipt metadata is retained until a reviewed archive/deletion procedure; it is **not** automatically purged to free capacity. The journal has a hard maximum of 10,000 records and a 256 MiB SQLite page cap. Capacity exhaustion refuses new intake visibly. Monitor both available disk and journal health.
 - The adapter never starts a background task by itself. Configure a supervised private worker or authenticated drain schedule and an office/operator review process before accepting real requests.
 - Restoring an old journal without the matching encryption key and destination configuration is not a valid recovery. Pending journal records also belong in customer export/deletion and incident procedures; the main GrowthOS database export does not include an external website's local volume.

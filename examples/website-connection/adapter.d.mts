@@ -15,6 +15,7 @@ export type DeliveryResult = { status: "saved"; requestId: string; leadId: strin
 export interface JournalHealth {
   contract: string; counts: { queued: number; processing: number; saved: number; "needs-review": number; expired: number };
   review: { requestId: string; state: string; reason: string; attempts: number; receivedAt: number }[];
+  reviewTotal: number; reviewTruncated: boolean;
   capacity: number; totalRecords: number;
 }
 export interface WebsiteAdapter {
