@@ -189,6 +189,15 @@ function checkedDocument(row: Invoice) {
       row.issuedDocumentSha256 !== fingerprint(row.issuedDocument))
   )
     throw unavailable();
+  if (
+    row.balanceBasis === "opening_receivable" &&
+    (!row.historicalSource ||
+      !row.openingAsOf ||
+      !Number.isSafeInteger(row.openingReceivableCents) ||
+      row.openingReceivableCents! < 0 ||
+      row.openingReceivableCents! > document.totalCents)
+  )
+    throw unavailable();
   return document;
 }
 
@@ -301,7 +310,11 @@ async function financial(reader: Reader, org: string, leadId: string) {
 }
 type Financial = Awaited<ReturnType<typeof financial>>;
 function money(row: Invoice, data: Financial) {
-  const total = checkedDocument(row).totalCents;
+  const documentTotal = checkedDocument(row).totalCents;
+  const total =
+    row.balanceBasis === "opening_receivable"
+      ? row.openingReceivableCents!
+      : documentTotal;
   const recordedPaidCents = data.active
     .filter((a) => a.invoiceId === row.id)
     .reduce(
@@ -359,6 +372,10 @@ function summary(row: Invoice, data: Financial): InvoiceSummary {
     voidReason: row.voidReason,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    balanceBasis: row.balanceBasis,
+    openingReceivableCents: row.openingReceivableCents,
+    openingAsOf: row.openingAsOf?.toISOString() ?? null,
+    historicalSource: row.historicalSource,
     ...money(row, data),
   };
 }
@@ -801,6 +818,14 @@ async function applyValue(
       "invoice_receipt_unavailable",
       "The source entry is unavailable or does not have enough unallocated value.",
     );
+  if (
+    row.balanceBasis === "opening_receivable" &&
+    value.occurredAt <= row.openingAsOf!
+  )
+    return conflict(
+      "invoice_opening_cutoff",
+      "Only evidenced receipts/refunds after the opening cutoff can be applied. Prior cash is unknown, not inferred from the opening balance.",
+    );
   const totals = money(row, data);
   if (value.kind === "payment" && amountCents > totals.recordedBalanceCents)
     return conflict(
@@ -860,6 +885,14 @@ export async function recordInvoicePayment(
       return conflict(
         "invoice_transition_unavailable",
         "Record a receipt only after issuing the invoice.",
+      );
+    if (
+      row.balanceBasis === "opening_receivable" &&
+      new Date(input.occurredAt) <= row.openingAsOf!
+    )
+      return conflict(
+        "invoice_opening_cutoff",
+        "This receipt predates the opening cutoff. Reconcile it separately; the opening receivable is not cash.",
       );
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${`value-entry:${org}:${input.sourceReference}`}))`,
@@ -952,7 +985,10 @@ export async function reverseInvoiceAllocation(
           : original.amountCents);
       if (
         nextPaid < 0 ||
-        nextPaid > (row.issuedDocument ?? row.draftDocument).totalCents
+        nextPaid >
+          (row.balanceBasis === "opening_receivable"
+            ? row.openingReceivableCents!
+            : (row.issuedDocument ?? row.draftDocument).totalCents)
       )
         return conflict(
           "invoice_payment_conflict",
@@ -979,3 +1015,12 @@ export async function reverseInvoiceAllocation(
     },
   );
 }
+
+/** Internal transaction primitives for the reviewed importer, never an HTTP bypass. */
+export const financialMigrationInvoiceTools = {
+  budget,
+  lock,
+  detail,
+  applyValue,
+  event,
+};

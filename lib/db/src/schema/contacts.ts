@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { organizationsTable } from "./organizations";
@@ -33,6 +33,7 @@ export const contactsTable = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
+    unique("contacts_org_id_uq").on(table.organizationId, table.id),
     index("contacts_org_phone_idx").on(table.organizationId, table.phone),
     index("contacts_org_email_idx").on(table.organizationId, table.email),
   ],

@@ -3,11 +3,13 @@
 These are exact source snapshots from `git show c050067000f3ea1f2d94aa53b3a9c4f71f0d3b41:<path>`:
 
 - `index.ts.txt`: `artifacts/api-server/src/index.ts`
+- `app.ts.txt`: `artifacts/api-server/src/app.ts`
 - `automation.ts.txt`: `artifacts/api-server/src/services/automation.ts`
 - `scheduler-runtime.ts.txt`: `artifacts/api-server/src/services/scheduler-runtime.ts`
 - `reactivation.ts.txt`: `artifacts/api-server/src/services/reactivation.ts`
 - `durable-execution.ts.txt`: `artifacts/api-server/src/services/durable-execution.ts`
 - `schema-automations.ts.txt`: `lib/db/src/schema/automations.ts`
+- `schema-revenue-workspace.ts.txt`: `lib/db/src/schema/revenue-workspace.ts`
 
 The reactivation snapshot's LF-normalized SHA-256 is
 `972a2a3ee396aa81811fdad6e2ef664ccede6dad2ddeb448b2ac1c6d0ded9327`,
@@ -64,3 +66,32 @@ Verification: all frozen manifest hashes passed, and
 passed **62 tests in 3 files**, exit 0, 66.08 seconds. The actual timed idle
 runtime ran only against disposable loopback PGlite with provider/network deny.
 No hosted drill, migration, provider call or external write occurred.
+
+## App and revenue schema fixture repair — October 2, 2026
+
+The operations wave adds a bounded financial-import parser to current `app.ts`
+and a tenant-scoped parent key to the current revenue schema. Neither change
+belongs to the historical release. Comparing those current bytes with its pins
+correctly failed the source-attestation test and stopped the missing-bundle test
+before that test reached its intended assertion.
+
+Both new fixtures above were recovered verbatim with read-only `git show` from
+the same historical commit, then verified against the unchanged manifest:
+
+- `app.ts.txt` LF-normalized SHA-256:
+  `9ea0d5845888d8e1569b783158bce7e66e97e2a10a0e8ed068046e5fb97b13b8`
+- `schema-revenue-workspace.ts.txt` LF-normalized SHA-256:
+  `91170ea70914b2303cb901b5461237d35205d2a87a92e37fef83a7f05c744a25`
+
+Only the historical test-support reader/bundler maps these files. New
+regressions require those exact hashes, prove the frozen files are read and
+reject actual evolved app/schema bytes under the old pins. No hosted harness,
+release SHA, image reference, source manifest, helper guard or bundle guard was
+changed. The initial focused guard run had 8 passing and 2 failing tests; after
+repair and two new regressions it passed all 12 selected guard tests (7 other
+tests were unselected by the focused name filter, not newly skipped).
+
+The complete three-file historical regression command shown above then passed
+**64 tests in 3 files**, exit 0, 71.35 seconds, with no skips. This includes the
+timed idle check and crash recovery on fresh disposable loopback PGlite. No
+current-release, real PostgreSQL, hosted or provider acceptance is implied.

@@ -68,6 +68,36 @@ describe('push-only service worker', () => {
     listeners.get('notificationclick')!({ notification: { data: { url: '//evil.test/' }, close: vi.fn() }, waitUntil });
     expect(waitUntil).not.toHaveBeenCalled(); expect(openWindow).not.toHaveBeenCalled();
   });
+  it('renders and opens the typed service target without customer content or an invented lead', async () => {
+    const { listeners, showNotification, openWindow } = worker();
+    const serviceUrl = `/service?serviceObligationId=${leadId}&organizationId=${organizationId}`;
+    const waitUntil = vi.fn();
+    listeners.get('push')!({ data: { json: () => ({ serviceObligationId: leadId, organizationId, url: serviceUrl, body: 'Private equipment location' }) }, waitUntil });
+    await waitUntil.mock.calls[0][0];
+    expect(showNotification).toHaveBeenCalledWith('GrowthOS', expect.objectContaining({ body: 'A service follow-up needs your attention. Open GrowthOS to review it.', data: { url: serviceUrl } }));
+    expect(JSON.stringify(showNotification.mock.calls)).not.toContain('Private');
+    const clickWait = vi.fn();
+    listeners.get('notificationclick')!({ notification: { data: { url: serviceUrl }, close: vi.fn() }, waitUntil: clickWait });
+    await clickWait.mock.calls[0][0];
+    expect(openWindow).toHaveBeenCalledWith(`https://growthos.example.test${serviceUrl}`);
+  });
+  it.each([
+    `/service?serviceObligationId=${leadId}`,
+    `/service?serviceObligationId=${leadId}&organizationId=${organizationId}&redirect=/logout`,
+    `/service?serviceObligationId=${leadId}&serviceObligationId=${leadId}&organizationId=${organizationId}`,
+    `/service?serviceObligationId=not-a-uuid&organizationId=${organizationId}`,
+  ])('rejects malformed service paths %s', bad => {
+    const { listeners, showNotification } = worker();
+    listeners.get('push')!({ data: { json: () => ({ serviceObligationId: leadId, organizationId, url: bad }) }, waitUntil: vi.fn() });
+    expect(showNotification).not.toHaveBeenCalled();
+  });
+  it('rejects mixed or mismatching target types', () => {
+    const { listeners, showNotification } = worker();
+    for (const extra of [{ leadId }, { serviceObligationId: organizationId }]) {
+      listeners.get('push')!({ data: { json: () => ({ serviceObligationId: leadId, organizationId, url: `/service?serviceObligationId=${leadId}&organizationId=${organizationId}`, ...extra }) }, waitUntil: vi.fn() });
+    }
+    expect(showNotification).not.toHaveBeenCalled();
+  });
 });
 
 describe('install assets', () => {

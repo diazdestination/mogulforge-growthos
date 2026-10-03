@@ -122,6 +122,9 @@ export function mockApi(role: string, options: MockApiOptions = {}) {
     if (path.endsWith('/api/v1/communications/voice')) {
       return json({ enabled: false, calls: [] });
     }
+    if (path.endsWith('/api/v1/source-adoption')) {
+      return json({ candidates: [], campaigns: [], page: 0, campaignPage: 0, hasMore: false, hasMoreCampaigns: false, limits: { cohort: 10, rollingCompanyLimit: 25, oneAddressLifetimeTouch: true }, detail: 'Synthetic reviewed source work only.' });
+    }
     if (path.endsWith('/api/v1/contacts')) return json([sampleContact]);
     if (path.endsWith('/api/v1/tasks')) return json([sampleTask]);
     if (path.endsWith('/api/v1/appointments')) return json([sampleAppointment]);

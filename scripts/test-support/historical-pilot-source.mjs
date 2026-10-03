@@ -15,11 +15,13 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const frozen = new Map([
   [resolve(root, "scripts/restore-drill-fixture.mjs"), "restore-drill-fixture.mjs"],
   [resolve(root, "artifacts/api-server/src/index.ts"), "index.ts"],
+  [resolve(root, "artifacts/api-server/src/app.ts"), "app.ts"],
   [resolve(root, "artifacts/api-server/src/services/automation.ts"), "automation.ts"],
   [resolve(root, "artifacts/api-server/src/services/scheduler-runtime.ts"), "scheduler-runtime.ts"],
   [resolve(root, "artifacts/api-server/src/services/reactivation.ts"), "reactivation.ts"],
   [resolve(root, "artifacts/api-server/src/services/durable-execution.ts"), "durable-execution.ts"],
   [resolve(root, "lib/db/src/schema/automations.ts"), "schema-automations.ts"],
+  [resolve(root, "lib/db/src/schema/revenue-workspace.ts"), "schema-revenue-workspace.ts"],
 ]);
 export const historicalSourcePath = (path) => frozen.has(path)
   ? fileURLToPath(new URL(`./fixtures/c050067/${frozen.get(path)}.txt`, import.meta.url)) : path;

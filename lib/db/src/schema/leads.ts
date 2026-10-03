@@ -6,6 +6,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  unique,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -127,6 +128,7 @@ export const leadsTable = pgTable(
   },
   (table) => [
     index("leads_org_status_idx").on(table.organizationId, table.status),
+    unique("leads_org_id_uq").on(table.organizationId, table.id),
     index("leads_org_assigned_idx").on(
       table.organizationId,
       table.assignedUserId,

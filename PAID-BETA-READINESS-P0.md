@@ -7,6 +7,17 @@
 
 ## Mission
 
+**October 2 operations-wave continuation:** the owner authorized the next wave
+after customer-care PR14/main602131d passed exact-main CI37074053979. The contract
+is `reports/operations-wave-contract-2026-10-02.md`; current evidence is in its
+integration report. Service-watch/typed staff alerts, audited source adoption
+and bounded separately reviewed email, and normalized historical finance are
+the specific exception to earlier feature freeze. Schema is now111tables (`0008`
+after `0007`), not yet hosted. Prior 103-table managed or105-table source evidence
+must not be relabelled as this release. Payment collection stays deferred;
+staging credentials/schema, providers, devices and both actual contractor
+replacement acceptance gates remain. Azure first sign-in stays owner-deferred.
+
 **October 2 customer-care candidate:** reviewed service reminders and office
 booking, individual missed-call recovery and invoice email delivery are now
 implemented for synthetic verification. See

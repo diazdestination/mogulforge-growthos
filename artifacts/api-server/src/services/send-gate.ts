@@ -221,6 +221,8 @@ export interface SendGateInput {
   kind: SendKind;
   /** Pass pre-fetched settings to avoid a duplicate read in hot paths. */
   sendingHours?: SendingHoursSettings;
+  /** Server-resolved, exact approved adoption-email item. Never a generic import override. */
+  sourceOutreachItemId?: string;
 }
 
 export async function checkSendEligibility(
@@ -290,8 +292,16 @@ export async function checkSendEligibility(
       eq(leadsTable.contactId, contact.id),
     )).limit(1);
     if (!lead) return { ok: false, outcome: "blocked", reason: "source_opportunity_unavailable" };
-    if (lead.creationMethod === "import" || lead.importedHistory !== null)
-      return { ok: false, outcome: "blocked", reason: "imported_source_requires_current_review" };
+    if (lead.creationMethod === "import" || lead.importedHistory !== null) {
+      if (!input.sourceOutreachItemId || channel !== "email")
+        return { ok: false, outcome: "blocked", reason: "imported_source_requires_current_review" };
+      try {
+        const { approvedSourceItem } = await import("./source-adoption-state");
+        await approvedSourceItem(organizationId, input.leadId, contact.id, input.sourceOutreachItemId);
+      } catch {
+        return { ok: false, outcome: "blocked", reason: "imported_source_requires_current_review" };
+      }
+    }
   } else {
     const [imported] = await db.select({ id: leadsTable.id }).from(leadsTable).where(and(
       eq(leadsTable.organizationId, organizationId),
@@ -302,6 +312,12 @@ export async function checkSendEligibility(
       return { ok: false, outcome: "blocked", reason: "imported_source_requires_current_review" };
   }
 
+  return checkOutreachTiming(input);
+}
+
+/** Reused by exact source-campaign review, which must not bypass timing behind a source hold. */
+export async function checkOutreachTiming(input: Pick<SendGateInput, "organizationId" | "contact" | "sendingHours">): Promise<SendGateResult> {
+  const { organizationId, contact } = input;
   const cfg = input.sendingHours ?? (await getSendingHours(organizationId));
 
   // 5. Quiet hours: pause (defer), never drop.

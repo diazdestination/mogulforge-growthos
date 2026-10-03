@@ -3,6 +3,18 @@
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 
+Current operations wave: `reports/operations-wave-integration-2026-10-02.md`
+and `reports/operations-wave-operator-guide-2026-10-02.md`. Service watch adds
+internal next actions and separately opted-in current-owner notifications;
+source adoption adds no consent, and reviewed outreach is one bounded email
+touch with permanent uncertain-effect reservations. Financial migration accepts
+only reconciled normalized v1 records; opening receivables are not cash.
+`node scripts/operations-wave-schema-preview.mjs` generates offline-reviewed
+`0008_operations-wave.sql` from main602131d. It adds six tables (105 to111),
+composite tenant keys and invoice basis columns. Only lead_id nullability on
+staff push is relaxed, guarded by an exact lead/service target XOR constraint.
+No migration, provider activation or hosted credential operation is authorized.
+
 - Product and scope: `GROWTHOS-CONTRACTOR-OPERATIONS.md` and `GROWTHOS-CONTRACTOR-PRODUCT.md`.
 - New customer-care candidate: `reports/customer-care-integration-2026-10-02.md`,
   with service, calls and invoice lane reports beside it. Contractor payment
@@ -45,7 +57,7 @@ Real PostgreSQL full CI remains required for multi-session lock/concurrency
 acceptance. No provider credentials or production data belong in test fixtures.
 
 `node scripts/contractor-recovery-drill.mjs` creates only in-memory synthetic
-databases. It upgrades the old90-table schema, checks current105-table/column
+databases. It upgrades the old90-table schema, checks current111-table/column
 coverage, snapshots/restores both companies and boots the real app through the
 production bundler under a SELECT-only role. It verifies tenant isolation, blocked
 writes and unchanged fingerprints, issued snapshot hashes, retained cash allocation
@@ -55,7 +67,10 @@ negative checks reject a removed pause, omitted exception or extra active record
 It also retains disabled missed-call policies and the exact reviewed uncertain
 care execution; the narrow exception additionally requires that paused company,
 disabled policy and correlated case. Six negative cross-company foreign-key
-probes and 15 restricted real-app reads exercise the new scope. Do not generalize
+probes remain; thirteen additional tenant-key negatives, cloned claimed-send
+reservation rejection and 22 restricted real-app reads cover the operations
+wave. Retained service plans, revoked source reviews/claimed batches, non-cash
+opening invoices and typed indeterminate push survive restore. Do not generalize
 the synthetic exception to a hosted queue or another receipt.
 It accepts no target URL and cannot validate a
 managed backup, live keys, hosting or production RPO/RTO. Historical hosted pilot
@@ -64,7 +79,7 @@ attestations remain frozen and cannot be relabelled as current-source acceptance
 Preserve indeterminate execution history. Do not replay an uncertain external
 effect until reconciled with evidence. Roll back application code without
 automatically dropping newly stored source history or entitlement audit records.
-After adopting the 103/105-table workflows, the older 77f6d63 application is not a
+After adopting the 103/105/111-table workflows, the older 77f6d63 application is not a
 normal-write fallback: it does not enforce the new lifecycle/reply holds,
 durable billing attempts, invoice retention or agreed service recurrence. Keep
 an old-image fallback stopped/under maintenance or independently verified

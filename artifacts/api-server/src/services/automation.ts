@@ -1073,6 +1073,10 @@ export async function processScheduledWork(organizationId?: string, observe?: St
     const { processMissedCallCare } = await import("./missed-call-care");
     await processMissedCallCare(organizationId);
   });
+  await stage("service-watch", async () => {
+    const { processServiceWatch } = await import("./service-watch");
+    await processServiceWatch(organizationId);
+  });
   await stage("staff-lead-notifications", async () => {
     const { processStaffLeadPush } = await import("./staff-push");
     await processStaffLeadPush(organizationId);

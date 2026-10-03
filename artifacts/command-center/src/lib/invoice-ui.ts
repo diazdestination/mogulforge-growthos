@@ -45,6 +45,16 @@ export interface InvoiceSummary {
   paymentState: "unpaid" | "partial" | "paid" | "reconciliation_required";
   reconciliationRequired: boolean;
   unallocatedRefundCents: number;
+  balanceBasis?: "full_history" | "opening_receivable";
+  openingReceivableCents?: number | null;
+  openingAsOf?: string | null;
+  historicalSource?: {
+    sourceSystem: string;
+    sourceAccount: string;
+    externalId: string;
+    cutoffAt: string;
+    recordSha256: string;
+  } | null;
 }
 export interface InvoiceAllocation {
   id: string;
@@ -124,6 +134,10 @@ export function paymentLabel(invoice: InvoiceSummary): string {
     return "Needs reconciliation";
   if (invoice.status === "draft") return "Draft";
   if (invoice.status === "void") return "Void";
+  if (invoice.balanceBasis === "opening_receivable")
+    return invoice.recordedBalanceCents === 0
+      ? "Opening balance cleared"
+      : "Opening receivable";
   return (
     {
       unpaid: "Unpaid",

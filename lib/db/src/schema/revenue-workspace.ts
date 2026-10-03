@@ -6,6 +6,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 import { organizationsTable } from "./organizations";
@@ -170,6 +171,7 @@ export const valueEntriesTable = pgTable(
       t.sourceReference,
     ),
     index("value_entry_org_lead").on(t.organizationId, t.leadId),
+    unique("value_entry_org_id_uq").on(t.organizationId, t.id),
   ],
 );
 

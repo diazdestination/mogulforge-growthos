@@ -1,5 +1,22 @@
 # Next acceptance work
 
+Current wave: `reports/operations-wave-integration-2026-10-02.md`, based on
+customer-care PR14/main602131d with green exact-main CI37074053979. Finish this
+operations candidate's exact-head PostgreSQL CI, builds/Docker and exact-main
+verification before release selection. Service-watch/typed staff alerts,
+reviewed source adoption/email and normalized historical finance are implemented;
+they do not yet establish live replacement acceptance. Current expected schema
+is **111 tables**, reviewed `0008` after `0007`; no hosted schema push is authorized.
+Use `reports/operations-wave-operator-guide-2026-10-02.md` for the actual screens.
+
+Next engineering: trusted incoming-mail integration over the existing reply
+review/hold contract, then remaining critical customer-history/workday gaps.
+Obtain actual approved export formats before guessing further migration adapters.
+Azure first sign-in and the separately pending held-staging upgrade/rotation
+remain owner gates. Do not clear outbound holds or infer Housecall Pro cancellation.
+
+### Historical customer-care candidate notes
+
 Newest candidate: `agent/growthos-customer-care-20261002`, documented in
 `reports/customer-care-integration-2026-10-02.md`. Finish exact-head CI (real
 PostgreSQL concurrency, all tests, types, builds and Docker) before integration.

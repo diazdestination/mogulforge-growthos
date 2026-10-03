@@ -81,7 +81,7 @@ export function MobileNotificationsCard() {
 
   return <section className="rounded-xl border border-border bg-card p-5 space-y-4" aria-labelledby="mobile-notifications-title">
     <h2 id="mobile-notifications-title" className="text-lg font-bold flex items-center gap-2"><Smartphone className="w-5 h-5" /> GrowthOS on your phone</h2>
-    <p className="text-sm text-muted-foreground">Save GrowthOS to your Home Screen. A new-lead notification opens the lead card after sign-in; customer details stay off the lock screen.</p>
+    <p className="text-sm text-muted-foreground">Save GrowthOS to your Home Screen. Lead alerts open the lead card; enabled service alerts open the assigned service follow-up after sign-in. Customer details stay off the lock screen.</p>
     {!installed && <div className="rounded-lg bg-muted/40 p-3 text-sm space-y-2">
       <p><strong>iPhone / iPad:</strong> open this site in Safari, tap Share, choose Add to Home Screen, then open the new GrowthOS tile. Web push requires iOS / iPadOS 16.4 or later.</p>
       <p><strong>Android:</strong> use your browser menu → Install app or Add to Home screen. Desktop browsers may offer an install icon in the address bar.</p>
@@ -94,6 +94,7 @@ export function MobileNotificationsCard() {
     {status.data?.eligible === false && <p className="text-sm">Your current role or session is not eligible for lead-response notifications.</p>}
     {status.data && !status.data.enabled && <p className="text-sm">Live push is held or not configured by your operator. Installation is available, but delivery is not active.</p>}
     {status.data && !status.data.policyConfigured && <p className="text-sm">Company lead-alert hours and responders still need to be configured. Registering a device alone does not turn routing on.</p>}
+    {status.data?.serviceAlertsConfigured && <p className="text-sm">Service-owner alerts are also enabled by your company. Only follow-ups assigned to you can notify this device.</p>}
     <div className="flex flex-wrap gap-2">
       <button type="button" onClick={enable} disabled={busy || subscribed || !workerReady || !supported || appleNeedsInstall || permission === 'denied' || !status.data?.supported || status.data?.eligible === false || !status.data?.publicKey} className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"><Bell className="w-4 h-4" />{busy ? 'Working…' : subscribed ? 'Device registered' : 'Enable lead notifications'}</button>
       {subscribed && <button type="button" onClick={disable} disabled={busy} className="rounded-md border px-3 py-2 text-sm">Disable on this device</button>}

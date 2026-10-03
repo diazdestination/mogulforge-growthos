@@ -1,5 +1,23 @@
 # GrowthOS project state
 
+## October 2 operations wave (current)
+
+Customer-care PR14 merged as main `602131d1b0311ea5933633fedc2c25b5af218238`;
+exact-main CI37074053979 passed. The next owner-authorized candidate is
+`agent/growthos-operations-wave-20261002`: bounded service-watch follow-up and
+typed staff alerts, versioned imported-source adoption with separately reviewed
+one-touch email, and strict normalized historical invoice/non-cash opening-balance
+migration. See `reports/operations-wave-integration-2026-10-02.md` and the
+operator guide beside it. This supersedes the candidate status below, not its
+historical evidence. The candidate expects **111 tables**, with reviewed `0008`
+after `0007`. Local recovery is not the older managed 103-table proof.
+
+Payment collection remains deferred. Hosted upgrade/admin-credential rotation
+approval is still unanswered. Azure first sign-in is an owner-return item.
+No provider, device, actual source migration or contractor cutover was accepted.
+Trusted incoming-mail integration and observed customer-workday gaps remain next
+engineering; both Housecall Pro replacement acceptance cards are still open.
+
 ## October 2 customer-care continuation (newer candidate)
 
 The owner deferred contractor payment collection to a future add-on. The

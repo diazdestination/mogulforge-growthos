@@ -27,8 +27,9 @@ import {
   type ReactivationSegment,
   type ReactivationSegmentPreset,
   type ReactivationCampaign,
+  useGetMe,
 } from '@workspace/api-client-react';
-import { Shell } from '@/components/shell';
+import { SourceAdoptionPanel } from '@/components/source-adoption-panel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -210,7 +211,7 @@ export function ImportCard() {
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
           Bring in an approved export for analysis and staff tasks. A CSV is a snapshot, not live sync.
-          Imported opportunities remain blocked from automated outreach until current source verification is supported.
+          Importing alone never enables outreach. Review source cutover and independent customer permission below before preparing exact recovery emails; automatic playbooks and SMS remain held.
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <Input
@@ -661,19 +662,19 @@ function CampaignList() {
 }
 
 export default function Reactivation() {
+  const { data: me } = useGetMe();
   return (
-    <Shell>
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <div>
           <h1 className="text-2xl font-semibold">Win-back</h1>
           <p className="text-muted-foreground">
-            Import old leads and re-engage them with throttled outreach campaigns.
+            Review imported opportunities, preserve their history, and prepare approved follow-up.
           </p>
         </div>
         <ImportCard />
+        {me?.organization && <SourceAdoptionPanel key={me.organization.id} organizationId={me.organization.id} businessName={me.organization.name} timezone={me.organization.timezone || 'America/New_York'} canManage={Boolean(me.isActive && ['owner', 'admin'].includes(me.role ?? ''))} />}
         <CampaignBuilder />
         <CampaignList />
       </div>
-    </Shell>
   );
 }

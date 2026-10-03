@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 import {
   auditEventsTable, db, leadsTable, sessionsTable, staffPushDeliveriesTable as deliveries,
-  staffPushPoliciesTable as policies, staffPushSubscriptionsTable as subscriptions, usersTable,
+  staffPushPoliciesTable as policies, staffPushSubscriptionsTable as subscriptions, usersTable, serviceWatchCasesTable,
   type StaffPushDeliveryState,
 } from "@workspace/db";
 import { and, asc, desc, eq, gt, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { decryptSecret, encryptSecret, sha256Base64Url } from "../lib/token-encryption";
 import { hasPermission } from "../lib/permissions";
-import { pushConfiguration, pushSubscriptionSchema, staffLeadPayload, staffPushAllowed, staffPushPolicySchema, staffPushRecipients } from "./staff-push-policy";
-import { sendStaffPush } from "./staff-push-transport";
+import { pushConfiguration, pushSubscriptionSchema, staffLeadPayload, staffServicePayload, staffPushAllowed, staffPushPolicySchema, staffPushRecipients } from "./staff-push-policy";
+import { sendStaffPush, StaffPushDispatchBlockedError } from "./staff-push-transport";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Store = Transaction | typeof db;
@@ -25,7 +25,7 @@ async function sessionMember(store: Store, organizationId: string, userId: strin
   const [user] = await store.select().from(usersTable).where(and(
     eq(usersTable.id, userId), eq(usersTable.organizationId, organizationId), eq(usersTable.isActive, true),
   ));
-  if (!user || !hasPermission(user.role, "crm.write")) return null;
+  if (!user || !user.emailVerifiedAt || user.id.startsWith("invite:") || !hasPermission(user.role, "crm.write")) return null;
   const [session] = await store.select().from(sessionsTable).where(and(eq(sessionsTable.sid, sid), gt(sessionsTable.expire, now)));
   const data = session?.sess as { user?: { id?: unknown }; expires_at?: unknown; refresh_token?: unknown } | undefined;
   // Background work never refreshes OAuth. A stale provider session waits for
@@ -44,7 +44,7 @@ export async function getStaffPushStatus(organizationId: string, userId: string,
     .from(subscriptions).where(and(eq(subscriptions.organizationId, organizationId), eq(subscriptions.userId, userId),
       eq(subscriptions.sessionId, sid), isNull(subscriptions.revokedAt), gt(subscriptions.expiresAt, now)));
   return { supported: Boolean(configuration) && eligible, enabled: eligible && staffPushAllowed(userId), publicKey: eligible ? configuration?.publicKey ?? null : null, eligible,
-    organizationId, userId, subscriptions: devices, policyConfigured: Boolean(policy?.enabled),
+    organizationId, userId, subscriptions: devices, policyConfigured: Boolean(policy?.enabled), serviceAlertsConfigured: Boolean(policy?.serviceAlertsEnabled),
     permissionRequired: true, receiptMeaning: "provider_accepted_not_received_or_read" };
 }
 
@@ -60,18 +60,18 @@ export async function saveStaffPushPolicy(organizationId: string, actorUserId: s
   return db.transaction(async (tx) => {
     const [actor] = await tx.select().from(usersTable).where(and(eq(usersTable.id, actorUserId),
       eq(usersTable.organizationId, organizationId), eq(usersTable.isActive, true))).for("share");
-    if (!actor || !hasPermission(actor.role, "settings.manage")) throw new StaffPushError("active_owner_or_admin_required", 403);
+    if (!actor || !actor.emailVerifiedAt || actor.id.startsWith("invite:") || !hasPermission(actor.role, "settings.manage")) throw new StaffPushError("active_owner_or_admin_required", 403);
     const ids = [...new Set([...parsed.data.businessHoursUserIds, ...parsed.data.afterHoursUserIds])];
     const members = await tx.select().from(usersTable).where(and(eq(usersTable.organizationId, organizationId),
       eq(usersTable.isActive, true), inArray(usersTable.id, ids))).for("share");
-    if (members.length !== ids.length || members.some((u) => !hasPermission(u.role, "crm.write"))) {
+    if (members.length !== ids.length || members.some((u) => !u.emailVerifiedAt || u.id.startsWith("invite:") || !hasPermission(u.role, "crm.write"))) {
       throw new StaffPushError("recipients_must_be_active_organization_responders");
     }
     await tx.insert(policies).values({ organizationId, policy: parsed.data }).onConflictDoUpdate({
       target: policies.organizationId, set: { policy: parsed.data, updatedAt: new Date() },
     });
     await tx.insert(auditEventsTable).values({ organizationId, actorUserId, action: "staff_push.policy_saved", entityType: "staff_push_policy",
-      metadata: { enabled: parsed.data.enabled, daytimeRecipientCount: parsed.data.businessHoursUserIds.length,
+      metadata: { enabled: parsed.data.enabled, serviceAlertsEnabled: parsed.data.serviceAlertsEnabled, daytimeRecipientCount: parsed.data.businessHoursUserIds.length,
         afterHoursRecipientCount: parsed.data.afterHoursUserIds.length } });
     return parsed.data;
   });
@@ -148,8 +148,56 @@ export async function enqueueStaffLeadPush(tx: Transaction, organizationId: stri
   }
 }
 
+/** Called within the service-watch reconciliation transaction. No outbound work here. */
+export async function enqueueStaffServiceNotice(input: {
+  organizationId: string; serviceObligationId: string; caseId: string; assignedUserId: string | null;
+  eventKey: string; noticeRevision: number; occurredAt: Date;
+}, tx: Transaction) {
+  if (!input.assignedUserId || input.noticeRevision < 1 || input.eventKey !== `service-watch:${input.caseId}:${input.noticeRevision}`) return;
+  const [row] = await tx.select().from(policies).where(eq(policies.organizationId, input.organizationId));
+  const policy = staffPushPolicySchema.safeParse(row?.policy);
+  // This switch is independent of new-lead coverage. It explicitly opts in the
+  // current service owner at any time, with no fallback to an invented owner.
+  if (!policy.success || !policy.data.serviceAlertsEnabled) return;
+  const now = new Date();
+  if (!Number.isFinite(input.occurredAt.getTime()) || input.occurredAt.getTime() + QUEUE_TTL_MS <= now.getTime()) return;
+  const devices = await tx.select().from(subscriptions).where(and(eq(subscriptions.organizationId, input.organizationId),
+    eq(subscriptions.userId, input.assignedUserId), isNull(subscriptions.revokedAt), gt(subscriptions.expiresAt, now))).limit(5);
+  for (const device of devices) {
+    if (!device.sessionId || !device.encryptedSubscription || !await sessionMember(tx, input.organizationId, device.userId, device.sessionId, now)) continue;
+    await tx.insert(deliveries).values({ organizationId: input.organizationId, leadId: null,
+      serviceObligationId: input.serviceObligationId, serviceWatchCaseId: input.caseId, serviceOwnerId: input.assignedUserId,
+      serviceNoticeRevision: input.noticeRevision, eventKey: input.eventKey, subscriptionId: device.id,
+      createdAt: input.occurredAt, expiresAt: new Date(input.occurredAt.getTime() + QUEUE_TTL_MS),
+    }).onConflictDoNothing({ target: [deliveries.organizationId, deliveries.eventKey, deliveries.subscriptionId] });
+  }
+}
+
+type PushClaim = typeof deliveries.$inferSelect;
+async function authorizedPushTarget(claim: PushClaim) {
+  if (claim.expiresAt <= new Date()) return null;
+  const [device] = await db.select().from(subscriptions).where(and(eq(subscriptions.id, claim.subscriptionId),
+    eq(subscriptions.organizationId, claim.organizationId), isNull(subscriptions.revokedAt), gt(subscriptions.expiresAt, new Date())));
+  if (!device?.sessionId || !device.encryptedSubscription || !staffPushAllowed(device.userId) ||
+    !await sessionMember(db, claim.organizationId, device.userId, device.sessionId, new Date())) return null;
+  const policy = await getStaffPushPolicy(claim.organizationId);
+  if (claim.leadId) {
+    const [lead] = await db.select({ id: leadsTable.id }).from(leadsTable).where(and(eq(leadsTable.id, claim.leadId), eq(leadsTable.organizationId, claim.organizationId)));
+    if (!lead || !staffPushRecipients(policy, claim.createdAt).includes(device.userId)) return null;
+    return { device, payload: staffLeadPayload(claim.organizationId, claim.leadId) };
+  }
+  if (!claim.serviceObligationId || !claim.serviceWatchCaseId || !claim.serviceNoticeRevision || claim.serviceOwnerId !== device.userId || !policy?.serviceAlertsEnabled) return null;
+  const [linkedCase] = await db.select({ id: serviceWatchCasesTable.id }).from(serviceWatchCasesTable).where(and(
+    eq(serviceWatchCasesTable.organizationId, claim.organizationId), eq(serviceWatchCasesTable.id, claim.serviceWatchCaseId),
+    eq(serviceWatchCasesTable.serviceObligationId, claim.serviceObligationId)));
+  if (!linkedCase) return null;
+  const { serviceWatchNoticeCurrent } = await import("./service-watch");
+  if (!await serviceWatchNoticeCurrent(claim.organizationId, claim.serviceWatchCaseId, claim.serviceNoticeRevision, device.userId)) return null;
+  return { device, payload: staffServicePayload(claim.organizationId, claim.serviceObligationId) };
+}
+
 export async function listStaffPushDeliveries(organizationId: string) {
-  return db.select({ id: deliveries.id, leadId: deliveries.leadId, state: deliveries.state, reason: deliveries.reason,
+  return db.select({ id: deliveries.id, leadId: deliveries.leadId, serviceObligationId: deliveries.serviceObligationId, state: deliveries.state, reason: deliveries.reason,
     createdAt: deliveries.createdAt, claimedAt: deliveries.claimedAt, completedAt: deliveries.completedAt, providerStatus: deliveries.providerStatus })
     .from(deliveries).where(eq(deliveries.organizationId, organizationId)).orderBy(desc(deliveries.createdAt)).limit(100);
 }
@@ -183,16 +231,12 @@ export async function processStaffLeadPush(organizationId?: string): Promise<voi
         .where(and(eq(deliveries.id, claim.id), eq(deliveries.organizationId, claim.organizationId), eq(deliveries.state, "dispatching")));
     };
     try {
-      const [device] = await db.select().from(subscriptions).where(and(eq(subscriptions.id, claim.subscriptionId),
-        eq(subscriptions.organizationId, claim.organizationId), isNull(subscriptions.revokedAt), gt(subscriptions.expiresAt, new Date())));
-      const policy = await getStaffPushPolicy(claim.organizationId);
-      const [lead] = await db.select({ id: leadsTable.id }).from(leadsTable).where(and(eq(leadsTable.id, claim.leadId), eq(leadsTable.organizationId, claim.organizationId)));
-      if (!lead || !device?.sessionId || !device.encryptedSubscription || !staffPushAllowed(device.userId) ||
-        !staffPushRecipients(policy, claim.createdAt).includes(device.userId) ||
-        !(await sessionMember(db, claim.organizationId, device.userId, device.sessionId, new Date()))) {
+      const target = await authorizedPushTarget(claim);
+      if (!target) {
         await complete("cancelled", "recipient_or_policy_unavailable"); continue;
       }
-      const subscription = pushSubscriptionSchema.safeParse(JSON.parse(decryptSecret(device.encryptedSubscription, context(claim.organizationId, device.userId))));
+      const { device, payload } = target;
+      const subscription = pushSubscriptionSchema.safeParse(JSON.parse(decryptSecret(device.encryptedSubscription!, context(claim.organizationId, device.userId))));
       if (!subscription.success) { await complete("cancelled", "subscription_unavailable"); continue; }
       // Recheck the kill switch immediately before entering the only network path.
       if (!staffPushAllowed(device.userId)) { await complete("cancelled", "sending_held"); continue; }
@@ -201,19 +245,24 @@ export async function processStaffLeadPush(organizationId?: string): Promise<voi
           .where(and(eq(deliveries.id, claim.id), eq(deliveries.state, "dispatching")));
         continue;
       }
-      const status = await sendStaffPush(subscription.data, JSON.stringify(staffLeadPayload(claim.organizationId, claim.leadId)), device.userId);
+      const status = await sendStaffPush(subscription.data, JSON.stringify(payload), device.userId, async () => {
+        if (await customerWorkHeld(claim.organizationId)) return false;
+        const current = await authorizedPushTarget(claim);
+        return Boolean(current && current.device.sessionId === device.sessionId && current.device.encryptedSubscription === device.encryptedSubscription);
+      });
       if (status === 404 || status === 410) {
         await db.update(subscriptions).set({ revokedAt: new Date(), encryptedSubscription: null, sessionId: null })
           .where(and(eq(subscriptions.id, device.id), eq(subscriptions.organizationId, claim.organizationId), eq(subscriptions.userId, device.userId),
-            eq(subscriptions.encryptedSubscription, device.encryptedSubscription)));
+            eq(subscriptions.encryptedSubscription, device.encryptedSubscription!)));
       }
       if (status >= 200 && status < 300) await complete("accepted", "provider_accepted_not_received_or_read", status);
       else if (status >= 300 && status < 500) await complete("rejected", status === 404 || status === 410 ? "subscription_expired_at_provider" : "provider_rejected", status);
       else await complete("indeterminate", "provider_outcome_unknown", Number.isInteger(status) ? status : undefined);
-    } catch {
+    } catch (error) {
       // No endpoint, keys, provider body, raw exception, lead content or session
       // can enter logs/audit. Failure after claim may already have been accepted.
-      await complete("indeterminate", "dispatch_outcome_unknown");
+      if (error instanceof StaffPushDispatchBlockedError) await complete("cancelled", "dispatch_authorization_changed");
+      else await complete("indeterminate", "dispatch_outcome_unknown");
     }
   }
 }

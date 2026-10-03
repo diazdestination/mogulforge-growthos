@@ -6,6 +6,7 @@ export type PushStatus = {
   userId: string;
   subscriptions: { id: string; expiresAt: string | null; createdAt: string }[];
   policyConfigured: boolean;
+  serviceAlertsConfigured?: boolean;
   eligible?: boolean;
 };
 

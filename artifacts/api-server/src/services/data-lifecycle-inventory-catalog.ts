@@ -3,8 +3,8 @@
  * deletion order, retention policy, or proof of complete account ownership.
  * Every new table must receive an explicit classification before preview runs.
  */
-export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-02.inventory-v5";
-export const DATA_LIFECYCLE_EXPECTED_TABLES = 105;
+export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-02.inventory-v6";
+export const DATA_LIFECYCLE_EXPECTED_TABLES = 111;
 export const DATA_LIFECYCLE_ROW_LIMIT = 10_000;
 
 export type InventoryCategory =
@@ -67,6 +67,8 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("email_sender_preferences", "configuration"),
   direct("engagement_links", "account_access"),
   direct("estimates", "crm"),
+  direct("financial_migration_items", "audit"),
+  direct("financial_migration_reviews", "audit"),
   direct("form_submissions", "acquisition"),
   direct("forms", "acquisition"),
   direct("gmail_connections", "account_access"),
@@ -110,11 +112,15 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("scheduled_actions", "automation"),
   excluded("scheduler_runtime", "shared_runtime"),
   direct("service_obligations", "crm"),
+  direct("service_watch_cases", "automation"),
   excluded("sessions", "account_access"),
   direct("smart_site_followups", "acquisition"),
   direct("smart_site_onboardings", "acquisition"),
   direct("smart_site_submissions", "acquisition"),
   direct("smart_sites", "acquisition"),
+  direct("source_adoptions", "audit"),
+  direct("source_outreach_batches", "automation"),
+  direct("source_outreach_items", "communications"),
   direct("staff_push_deliveries", "communications"),
   direct("staff_push_policies", "configuration"),
   direct("staff_push_subscriptions", "account_access"),
