@@ -1,0 +1,95 @@
+import { sql } from "drizzle-orm";
+import { boolean, check, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { organizationsTable } from "./organizations";
+import { contactsTable } from "./contacts";
+import { leadsTable } from "./leads";
+import { serviceObligationsTable } from "./service-obligations";
+import { usersTable } from "./auth";
+import { mailboxConnectorsTable } from "./mailbox-connectors";
+
+/** Frozen before dispatch. Observing a sent message is evidence, never resend authority. */
+export const mailboxCommunicationParentsTable = pgTable("mailbox_communication_parents", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizationsTable.id),
+  contactId: uuid("contact_id").notNull(),
+  leadId: uuid("lead_id"),
+  serviceObligationId: uuid("service_obligation_id"),
+  contextSnapshot: jsonb("context_snapshot").$type<{ dueAt: string; occurrenceIndex: number; createdAt: string; updatedAt: string; approvalId: string; scheduledActionId: string }>().notNull(),
+  provider: text("provider").notNull(),
+  senderUserId: varchar("sender_user_id").notNull(),
+  connectionId: uuid("connection_id").notNull(),
+  connectionRevision: text("connection_revision").notNull(),
+  mailboxAccountId: text("mailbox_account_id").notNull(),
+  mailboxEmail: text("mailbox_email").notNull(),
+  connectorId: uuid("connector_id").notNull(),
+  connectorVersion: integer("connector_version").notNull(),
+  policyVersion: integer("policy_version").notNull(),
+  connectorStartedAt: text("connector_started_at").notNull(),
+  recipient: text("recipient").notNull(),
+  contentSha256: text("content_sha256").notNull(),
+  subjectSha256: text("subject_sha256").notNull(),
+  bodySha256: text("body_sha256").notNull(),
+  correlationHeader: text("correlation_header").notNull(),
+  actionKey: text("action_key").notNull(),
+  executionFingerprint: text("execution_fingerprint").notNull(),
+  reservedAt: timestamp("reserved_at", { withTimezone: true }).notNull().defaultNow(),
+  dispatchStartedAt: timestamp("dispatch_started_at", { withTimezone: true }),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  observedAt: timestamp("observed_at", { withTimezone: true }),
+  providerMessageId: text("provider_message_id"),
+  internetMessageId: text("internet_message_id"),
+  providerSentAt: timestamp("provider_sent_at", { withTimezone: true }),
+}, t => [
+  unique("mailbox_parent_org_id_uq").on(t.organizationId, t.id),
+  unique("mailbox_parent_exact_service_uq").on(t.organizationId, t.id, t.serviceObligationId, t.contactId, t.connectorId),
+  uniqueIndex("mailbox_parent_header_uq").on(t.correlationHeader),
+  uniqueIndex("mailbox_parent_action_uq").on(t.organizationId, t.actionKey),
+  uniqueIndex("mailbox_parent_service_uq").on(t.organizationId, t.serviceObligationId).where(sql`${t.serviceObligationId} is not null`),
+  uniqueIndex("mailbox_parent_provider_id_uq").on(t.organizationId, t.connectorId, t.providerMessageId).where(sql`${t.providerMessageId} is not null`),
+  uniqueIndex("mailbox_parent_rfc_id_uq").on(t.organizationId, t.connectorId, t.internetMessageId).where(sql`${t.internetMessageId} is not null`),
+  check("mailbox_parent_one_context", sql`(${t.leadId} is not null)::int + (${t.serviceObligationId} is not null)::int = 1`),
+  check("mailbox_parent_format_ck", sql`${t.provider} = 'microsoft' and ${t.connectorVersion} > 0 and ${t.policyVersion} = 1 and ${t.correlationHeader} ~ '^[a-f0-9]{64}$' and ${t.contentSha256} ~ '^[a-f0-9]{64}$'`),
+  foreignKey({ columns: [t.organizationId, t.connectorId], foreignColumns: [mailboxConnectorsTable.organizationId, mailboxConnectorsTable.id], name: "mailbox_parent_connector_fk" }),
+  foreignKey({ columns: [t.organizationId, t.contactId], foreignColumns: [contactsTable.organizationId, contactsTable.id], name: "mailbox_parent_contact_fk" }),
+  foreignKey({ columns: [t.organizationId, t.leadId], foreignColumns: [leadsTable.organizationId, leadsTable.id], name: "mailbox_parent_lead_fk" }),
+  foreignKey({ columns: [t.organizationId, t.serviceObligationId], foreignColumns: [serviceObligationsTable.organizationId, serviceObligationsTable.id], name: "mailbox_parent_service_fk" }),
+  foreignKey({ columns: [t.organizationId, t.senderUserId], foreignColumns: [usersTable.organizationId, usersTable.id], name: "mailbox_parent_sender_fk" }),
+]);
+
+/** Exact service occurrence evidence; retained identity/hash survives raw-content purge. */
+export const mailboxServiceRepliesTable = pgTable("mailbox_service_replies", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizationsTable.id),
+  parentId: uuid("parent_id").notNull(),
+  serviceObligationId: uuid("service_obligation_id").notNull(),
+  contactId: uuid("contact_id").notNull(),
+  connectorId: uuid("connector_id").notNull(),
+  providerMessageId: text("provider_message_id").notNull(),
+  internetMessageId: text("internet_message_id").notNull(),
+  payloadSha256: text("payload_sha256").notNull(),
+  replyAt: timestamp("reply_at", { withTimezone: true }).notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+  state: text("state").$type<"needs_review" | "reviewed" | "dismissed">().notNull().default("needs_review"),
+  historical: boolean("historical").notNull().default(false),
+  holdActive: boolean("hold_active").notNull().default(false),
+  version: integer("version").notNull().default(1),
+  encryptedText: text("encrypted_text"),
+  rawExpiresAt: timestamp("raw_expires_at", { withTimezone: true }).notNull(),
+  rawPurgedAt: timestamp("raw_purged_at", { withTimezone: true }),
+  reviewedByUserId: varchar("reviewed_by_user_id"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  reviewNote: text("review_note"),
+  reviewRequestId: uuid("review_request_id"),
+  reviewFingerprint: text("review_fingerprint"),
+}, t => [
+  uniqueIndex("mailbox_reply_provider_id_uq").on(t.organizationId, t.connectorId, t.providerMessageId),
+  index("mailbox_reply_service_review_idx").on(t.organizationId, t.serviceObligationId, t.state, t.recordedAt),
+  index("mailbox_reply_raw_expiry_idx").on(t.rawExpiresAt),
+  foreignKey({ columns: [t.organizationId, t.parentId, t.serviceObligationId, t.contactId, t.connectorId], foreignColumns: [mailboxCommunicationParentsTable.organizationId, mailboxCommunicationParentsTable.id, mailboxCommunicationParentsTable.serviceObligationId, mailboxCommunicationParentsTable.contactId, mailboxCommunicationParentsTable.connectorId], name: "mailbox_reply_exact_parent_fk" }),
+  foreignKey({ columns: [t.organizationId, t.connectorId], foreignColumns: [mailboxConnectorsTable.organizationId, mailboxConnectorsTable.id], name: "mailbox_reply_connector_fk" }),
+  check("mailbox_reply_state_ck", sql`${t.state} in ('needs_review','reviewed','dismissed') and ${t.version} > 0 and ${t.payloadSha256} ~ '^[a-f0-9]{64}$' and (not ${t.historical} or not ${t.holdActive})`),
+  foreignKey({ columns: [t.organizationId, t.serviceObligationId], foreignColumns: [serviceObligationsTable.organizationId, serviceObligationsTable.id], name: "mailbox_reply_service_fk" }),
+  foreignKey({ columns: [t.organizationId, t.contactId], foreignColumns: [contactsTable.organizationId, contactsTable.id], name: "mailbox_reply_contact_fk" }),
+  foreignKey({ columns: [t.organizationId, t.reviewedByUserId], foreignColumns: [usersTable.organizationId, usersTable.id], name: "mailbox_reply_reviewer_fk" }),
+]);

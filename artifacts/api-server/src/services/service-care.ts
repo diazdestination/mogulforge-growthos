@@ -20,6 +20,8 @@ import { phoneE164, twilioForOrganization } from "./twilio-controls";
 import { sendTwilioSms } from "./twilio-delivery";
 import { serviceNoticeAt } from "./service-obligations";
 import { approveServiceCareSchema, careFingerprint, serviceCareBookingSchema, serviceCareMessage, serviceCareResponseSchema } from "./service-care-policy";
+import { hasServiceMailboxReplyHold, recordMailboxParentAcceptance, reserveServiceMailboxParent } from "./mailbox-communication";
+import type { MailboxIdentity } from "./mailbox-contract";
 
 const APPROVED = "service.care_reminder_approved";
 const RESPONSE = "service.care_response_recorded";
@@ -33,6 +35,7 @@ type Snapshot = {
   obligationId: string; updatedAt: string; contactId: string; recipient: string;
   channel: Channel; subject: string; body: string; noticeAt: string;
   sender: CustomerEmailSender | null; smsBinding: string | null;
+  mailboxIdentity?: MailboxIdentity;
 };
 type Approval = { snapshot: Snapshot; requestId: string; requestFingerprint: string; scheduledActionId: string; agreementNote: string };
 export class ServiceCareError extends Error {
@@ -74,7 +77,11 @@ async function isBooked(org: string, obligation: Obligation, reader: Reader = db
   return !!row && ["scheduled", "confirmed"].includes(row.status);
 }
 async function transport(org: string, contact: Contact, channel: Channel) {
-  if (channel === "email") return { sender: await resolveCustomerEmailSender({ organizationId: org }), smsBinding: null };
+  if (channel === "email") {
+    const sender = await resolveCustomerEmailSender({ organizationId: org });
+    const mailboxIdentity = sender.provider === "microsoft" ? await (await import("./mailbox-connector")).getMicrosoftMailboxIdentity(org, sender.userId) : null;
+    return { sender, smsBinding: null, ...(mailboxIdentity ? { mailboxIdentity } : {}) };
+  }
   const config = await twilioForOrganization(org);
   if (!config?.smsEnabled) fail("sms_not_ready", "This company's SMS registration and sender must be activated before approving a reminder.");
   const phone = phoneE164(contact.phone ?? "");
@@ -105,6 +112,7 @@ export async function getServiceCare(org: string, id: string, channel: Channel =
   let deferredReason: string | null = null;
   try {
     activeUnbooked(obligation);
+    if (await hasServiceMailboxReplyHold(org, id)) fail("service_reply_held", "A reply to this service reminder requires office follow-up. Review the retained mailbox evidence; no reminder is rearmed.");
     if (await isBooked(org, obligation)) fail("already_booked", "A visit is already scheduled. Manage it in Appointments.");
     const current = await snapshot(org, obligation, contact, channel);
     const gate = await eligibility(org, contact, channel);
@@ -154,6 +162,7 @@ export async function approveServiceCare(org: string, actor: string, id: string,
     if (await isBooked(org, current.obligation, tx)) fail("already_booked", "A visit is already scheduled.");
     if (await latest(org, id, APPROVED, tx)) fail("reminder_exists", "This service already has a reminder receipt. Review it; another key or channel cannot resend it.");
     if (await latest(org, id, RESPONSE, tx)) fail("response_exists", "A customer response is already recorded. Continue office follow-up instead of another automated reminder.");
+    if (await hasServiceMailboxReplyHold(org, id, tx)) fail("service_reply_held", "Review the reply to this exact service before further customer work.");
     const approvalId = randomUUID(), scheduledActionId = randomUUID();
     await tx.insert(auditEventsTable).values({ id: approvalId, organizationId: org, actorUserId: actor, action: APPROVED, entityType: "service_obligation", entityId: id,
       metadata: { snapshot: saved, requestId: input.requestId, requestFingerprint: careFingerprint(input), agreementNote: input.agreementNote, scheduledActionId } });
@@ -174,6 +183,7 @@ async function approvedClaim(org: string, params: Record<string, unknown>, conte
 async function reviewCurrent(org: string, claim: Awaited<ReturnType<typeof approvedClaim>>) {
   const saved = claim.approval.snapshot;
   const { obligation, contact } = await readService(org, saved.obligationId);
+  if (await hasServiceMailboxReplyHold(org, obligation.id)) return { blocked: "A reply to this service was received. Office review is required; no automated reminder is rearmed.", resumeAt: null };
   if (!await actorActive(org, claim.audit.actorUserId!)) return { blocked: "Approving staff access is no longer valid.", resumeAt: null };
   if (obligation.status !== "active" || await isBooked(org, obligation) || await latest(org, obligation.id, RESPONSE)) return { blocked: "Service is inactive, already booked, or has an office-reviewed response.", resumeAt: null };
   if (obligation.updatedAt.toISOString() !== saved.updatedAt) return { blocked: "Service details changed after approval. Review the service; no reminder was sent.", resumeAt: null };
@@ -210,8 +220,13 @@ export async function executeServiceCareReminder(org: string, params: Record<str
   let evidence: Record<string, unknown>;
   try {
     if (saved.channel === "email") {
-      const result = await sendCustomerEmail({ organizationId: org, to: saved.recipient, subject: saved.subject, body: saved.body, expectedSender: saved.sender!, beforeDispatch });
+      const message = { to: saved.recipient, subject: saved.subject, body: saved.body };
+      const outboundParentId = saved.mailboxIdentity ? await reserveServiceMailboxParent({ identity: saved.mailboxIdentity, serviceObligationId: saved.obligationId,
+        contactId: saved.contactId, approvalId: claim.audit.id, scheduledActionId, expectedUpdatedAt: saved.updatedAt, executionFingerprint: ownership.fingerprint, message }) : undefined;
+      const result = await sendCustomerEmail({ organizationId: org, ...message, expectedSender: saved.sender!, beforeDispatch, ...(outboundParentId ? { outboundParentId } : {}) });
+      if (outboundParentId) await recordMailboxParentAcceptance(outboundParentId, org);
       evidence = emailAcceptanceEvidence(result);
+      if (outboundParentId) evidence = { ...evidence, outboundParentId, replyMonitoring: "original_mailbox_observation_required" };
     } else {
       const result = await sendTwilioSms(saved.recipient, saved.body, { organizationId: org, contactId: saved.contactId, purpose: "customer_care", idempotencyKey: `service-care:${saved.obligationId}` }, beforeDispatch);
       evidence = { provider: result.provider, providerMessageId: result.id, acceptance: "accepted", deliveryConfirmed: false };

@@ -1,5 +1,16 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## October 2 fixed launch-completion authorization
+
+The owner approved completing the documented remaining engineering, not just
+provider tests. `LAUNCH-COMPLETION.md` is the fixed required/conditional checklist.
+The active bounded slice is L1/L2 under
+`reports/launch-communications-contract-2026-10-02.md`: typed service replies,
+explicitly opted-in Microsoft mailbox reading, and platform identity delivery
+evidence. This supersedes the earlier three-slice-only scope restriction, not
+any hosted/provider/customer-contact or release approval requirement. Do not
+claim the other checklist items complete or silently accept manual substitutes.
+
 ## October 2 replacement acceptance requirement
 
 The owner's latest scope clarification defers contractor card/bank payment

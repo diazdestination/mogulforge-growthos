@@ -12,6 +12,7 @@ import { and, eq, sql } from "drizzle-orm";
 export const SCHEDULER_NAME = "automation";
 export const SCHEDULER_STALE_MS = 5 * 60_000;
 export const SCHEDULER_STAGES = [
+  "mailbox-replies",
   "scheduled-actions",
   "missed-call-care",
   "service-watch",
@@ -22,6 +23,7 @@ export const SCHEDULER_STAGES = [
   "abandoned-chat-sweep",
   "portal-credential-cleanup",
   "email-intelligence-retention",
+  "service-reply-retention",
   "api-key-expiry-reminders",
   "upload-cleanup",
 ] as const;

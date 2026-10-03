@@ -1,5 +1,6 @@
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { randomUUID } from "node:crypto";
 
 import {
   db,
@@ -42,6 +43,7 @@ beforeEach(async () => {
   vi.stubEnv("APP_ORIGIN", "https://app.mogulforge.test");
   vi.stubEnv("RESEND_API_KEY", "test-resend-key");
   vi.stubEnv("RESEND_FROM_EMAIL", "MogulForge <account@mogulforge.ai>");
+  vi.stubEnv("PLATFORM_EMAIL_DELIVERY_CONTEXT", "synthetic-identity-http");
 
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   email = `identity-auth-${suffix}@example.com`;
@@ -83,7 +85,7 @@ describe("password recovery", () => {
   it("is enumeration-safe, rotates the password, consumes the token, and revokes sessions", async () => {
     const send = vi
       .spyOn(resendEmailProvider, "send")
-      .mockResolvedValue({ id: "reset-test", provider: "resend" });
+      .mockResolvedValue({ id: randomUUID(), provider: "resend" });
 
     const unknown = await fetch(`${baseUrl}/api/auth/forgot-password`, {
       method: "POST",

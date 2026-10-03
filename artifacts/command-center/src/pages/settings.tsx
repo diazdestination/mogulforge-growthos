@@ -4,6 +4,7 @@ import { CustomerEmailSender } from '@/components/customer-email-sender';
 import { LeadAlertRouting } from '@/components/lead-alert-routing';
 import { DataLifecycleInventory } from '@/components/data-lifecycle-inventory';
 import { CustomerLifecycle } from '@/components/customer-lifecycle';
+import { PlatformEmailDeliveryPanel } from '@/components/platform-email-delivery-panel';
 import { useEffect, useRef, useState } from 'react';
 import {
   useGetMe,
@@ -1415,6 +1416,7 @@ function TeamTab({ meId, meRole }: { meId: string; meRole: UserRole }) {
 
   return (
     <div className="space-y-6">
+      {(meRole === 'owner' || meRole === 'admin') && <PlatformEmailDeliveryPanel actorId={meId} scope="member" />}
       <Card>
         <CardHeader>
           <CardTitle>Invite a team member</CardTitle>

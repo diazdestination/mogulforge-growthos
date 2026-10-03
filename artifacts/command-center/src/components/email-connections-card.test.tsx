@@ -141,7 +141,20 @@ it("shows status-load errors rather than enabling an unverified sender", async (
     vi.fn(async () => new Response(null, { status: 503 })),
   );
   render(<EmailConnectionsCard callbackState={null} returnPath="/account" />);
-  await screen.findByRole("alert");
+  expect(
+    (
+      await screen.findByText(
+        "Email connection status could not be loaded. Refresh before making changes.",
+      )
+    ).getAttribute("role"),
+  ).toBe("alert");
+  expect(
+    (
+      await screen.findByText(
+        "Reply-monitoring status could not be loaded. Refresh before changing access.",
+      )
+    ).getAttribute("role"),
+  ).toBe("alert");
   expect(
     screen
       .getByRole("button", { name: "Save sending account" })
@@ -155,7 +168,20 @@ it("fails closed on an unexpected sender response without crashing account setti
     vi.fn(async () => json({ connected: true })),
   );
   render(<EmailConnectionsCard callbackState={null} returnPath="/account" />);
-  await screen.findByRole("alert");
+  expect(
+    (
+      await screen.findByText(
+        "Email connection status could not be loaded. Refresh before making changes.",
+      )
+    ).getAttribute("role"),
+  ).toBe("alert");
+  expect(
+    (
+      await screen.findByText(
+        "Reply-monitoring status could not be loaded. Refresh before changing access.",
+      )
+    ).getAttribute("role"),
+  ).toBe("alert");
   expect(
     screen
       .getByRole("button", { name: "Save sending account" })

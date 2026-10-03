@@ -1,6 +1,7 @@
 import { logger } from "../lib/logger";
-
-import { isSafeMailbox, transactionalEmailProvider } from "./providers";
+import { createHash } from "node:crypto";
+import { isSafeMailbox } from "./providers";
+import { PlatformEmailDeliveryError, sendPlatformIdentityEmail, type PlatformEmailSource } from "./platform-email-delivery";
 
 function appOrigin(): string {
   const origin = process.env.APP_ORIGIN?.trim() || process.env.APP_URL?.trim();
@@ -26,26 +27,27 @@ async function sendIdentityEmail(params: {
   to: string;
   subject: string;
   body: string;
-}): Promise<{ id: string; provider: string }> {
+  source: PlatformEmailSource;
+}) {
   if (!isSafeMailbox(params.to)) {
     throw new Error("Refusing to send identity email to an invalid mailbox");
   }
-  return transactionalEmailProvider.send(
-    params.to,
-    params.subject,
-    params.body,
-  );
+  const receipt = await sendPlatformIdentityEmail(params);
+  if (receipt.outcome !== "accepted") throw new PlatformEmailDeliveryError(receipt.outcomeCode ?? "identity_delivery_unconfirmed");
+  return receipt;
 }
 
 export async function sendEmailVerification(params: {
   to: string;
   token: string;
+  tokenRecordId: string;
   firstName?: string | null;
-}): Promise<{ id: string; provider: string }> {
+}) {
   const url = identityActionUrl("/verify-email", params.token);
   return sendIdentityEmail({
     to: params.to,
     subject: "Verify your MogulForge GrowthOS email",
+    source: { purpose: "email_verification", tokenRecordId: params.tokenRecordId, tokenDigest: createHash("sha256").update(params.token).digest("hex") },
     body: [
       `Hi ${params.firstName?.trim() || "there"},`,
       "",
@@ -63,12 +65,14 @@ export async function sendEmailVerification(params: {
 export async function sendPasswordReset(params: {
   to: string;
   token: string;
+  tokenRecordId: string;
   firstName?: string | null;
-}): Promise<{ id: string; provider: string }> {
+}) {
   const url = identityActionUrl("/reset-password", params.token);
   return sendIdentityEmail({
     to: params.to,
     subject: "Reset your MogulForge GrowthOS password",
+    source: { purpose: "password_reset", tokenRecordId: params.tokenRecordId, tokenDigest: createHash("sha256").update(params.token).digest("hex") },
     body: [
       `Hi ${params.firstName?.trim() || "there"},`,
       "",
@@ -88,7 +92,7 @@ export function reportIdentityEmailFailure(
   error: unknown,
 ): void {
   logger.error(
-    { purpose, errorName: error instanceof Error ? error.name : typeof error },
+    { purpose, errorCode: error instanceof PlatformEmailDeliveryError ? error.code : "identity_delivery_unconfirmed" },
     "identity email delivery failed",
   );
 }

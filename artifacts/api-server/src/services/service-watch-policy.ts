@@ -24,6 +24,7 @@ export type WatchFacts = {
   approval: boolean; approvalChanged: boolean; scheduledState: string | null;
   receiptState: string | null; receiptExpiresAt: Date | null;
   acceptedAt: Date | null; responseRecorded: boolean; ownerValid: boolean;
+  mailboxReplyNeedsReview?: boolean;
   nextActionAt: Date | null;
 };
 
@@ -32,12 +33,13 @@ export function serviceWatchReasons(f: WatchFacts, now: Date): ServiceWatchReaso
   const reasons: ServiceWatchReason[] = [];
   if (f.receiptState === "indeterminate" || (f.receiptState === "processing" && !!f.receiptExpiresAt && f.receiptExpiresAt <= now)) reasons.push("send_unknown");
   if (f.active) {
+    if (f.mailboxReplyNeedsReview) reasons.push("reply_received_review");
     if (f.dueDate < f.today) reasons.push("service_overdue");
     if (!f.booked) {
       if (f.appointmentStatus === "cancelled") reasons.push("visit_cancelled");
       if (f.appointmentStatus === "no_show") reasons.push("visit_no_show");
       if (f.responseRecorded) reasons.push("response_needs_action");
-      else if (f.acceptedAt && f.acceptedAt.getTime() + RESPONSE_REVIEW_MS <= now.getTime()) reasons.push("no_response_recorded");
+      else if (!f.mailboxReplyNeedsReview && f.acceptedAt && f.acceptedAt.getTime() + RESPONSE_REVIEW_MS <= now.getTime()) reasons.push("no_response_recorded");
       else if (!f.approval && f.noticeAt <= now) reasons.push("reminder_needs_review");
       if (f.approval && !f.responseRecorded && (f.approvalChanged || ["blocked", "failed", "confirmed_not_performed"].includes(f.receiptState ?? "") || (!f.receiptState && (!f.scheduledState || ["failed", "cancelled"].includes(f.scheduledState))))) reasons.push("reminder_blocked");
     }

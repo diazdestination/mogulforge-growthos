@@ -13,6 +13,7 @@ import { fixtureRows, fixtureIds, credentialCodec, FAKE_REFRESH_TOKEN, assertFix
 import { nativeFixtureRows, nativeFixtureIds, sealNativeFixture, assertNativeFixture } from './native-contractor-recovery-fixture.mjs';
 import { careFixtureRows, careFixtureIds, assertCareFixture, assertCareTenantKeys } from './customer-care-recovery-fixture.mjs';
 import { operationsFixtureRows, sealOperationsFixture, assertOperationsFixture, assertOperationsTenantKeys } from './operations-wave-recovery-fixture.mjs';
+import { launchCommunicationRows, sealLaunchCommunicationFixture, assertLaunchCommunications, assertLaunchCommunicationKeys } from './launch-communications-recovery-fixture.mjs';
 
 const requireApi = createRequire(new URL('../artifacts/api-server/package.json', import.meta.url));
 const requireDb = createRequire(new URL('../lib/db/package.json', import.meta.url));
@@ -22,8 +23,8 @@ const { generateDrizzleJson } = requireDb('drizzle-kit/api');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const identifier = (name) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('contractor_identifier_invalid'); return `"${name}"`; };
-const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot', 'reasons', 'snapshot', 'settings', 'result', 'historical_source', 'policy']);
-const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql'];
+const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot', 'reasons', 'snapshot', 'settings', 'result', 'historical_source', 'policy', 'context_snapshot']);
+const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql'];
 
 async function insert(database, table, row) {
   const fields = Object.keys(row);
@@ -117,6 +118,9 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       for (const [table,row] of operationsFixtureRows(slug)) await insert(source,table,row);
       await sealOperationsFixture(source,slug);
       await assertOperationsFixture(source,slug);
+      for (const [table, row] of launchCommunicationRows(slug)) await insert(source, table, row);
+      await sealLaunchCommunicationFixture(source, slug);
+      await assertLaunchCommunications(source, slug);
       const id = fixtureIds(slug), emailSource = randomUUID();
       await insert(source, 'billing_checkouts', { organization_id: id.organization, intent: 'initial', state: 'reconcile', price_id: 'price_synthetic', plan_id: 'beta', success_url: 'https://example.invalid/success', cancel_url: 'https://example.invalid/cancel', provider_configuration_hash: sha('synthetic-provider'), recovery_reason: 'synthetic_acknowledgement_unknown' });
       await insert(source, 'customer_lifecycle', { organization_id: id.organization, state: 'paused', version: 2, reason: 'Synthetic recovery hold', updated_by_user_id: id.user });
@@ -129,6 +133,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     const careBaseline = await fingerprints(source);
     await assertCareTenantKeys(source, slugs[0], slugs[1]);
     const operationsTenantChecks = await assertOperationsTenantKeys(source, slugs[0], slugs[1]);
+    const launchCommunicationTenantChecks = await assertLaunchCommunicationKeys(source, slugs[0], slugs[1]);
     assert.deepEqual(await fingerprints(source), careBaseline);
     // Prove the reviewed active-service exception cannot mask an unpaused
     // company or another active obligation. These transactions always roll back.
@@ -172,6 +177,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     for (const slug of slugs) await assertNativeFixture(restored,slug);
     for (const slug of slugs) await assertCareFixture(restored,slug);
     for (const slug of slugs) await assertOperationsFixture(restored,slug);
+    for (const slug of slugs) await assertLaunchCommunications(restored,slug);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM billing_checkouts WHERE state='reconcile'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM customer_lifecycle WHERE state='paused'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM staff_invitations WHERE state='pending' AND delivery_state='unconfirmed'")).rows[0].n, 2);
@@ -195,6 +201,8 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       missedCallUncertaintyPreserved: true, careTenantForeignKeysVerified: true, disabledCarePoliciesPreserved: true,
       operationsTenantChecks, heldServiceWatchPreserved: true, revokedSourceAdoptionPreserved: true, permanentSourceReservationPreserved: true,
       noncashOpeningReceivablePreserved: true, typedPushUncertaintyPreserved: true,
+      launchCommunicationTenantChecks, serviceReplyHoldAfterPurgePreserved: true,
+      disabledMailboxPreserved: true, platformIdentityUncertaintyPreserved: true,
       ...app, restoreVerificationMs: Date.now() - restoreStartedAt, elapsedMs: Date.now() - startedAt,
       providerCalls: 0, managedBackupRestoreVerified: false, productionRpoRtoEstablished: false,
     };

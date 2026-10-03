@@ -25,7 +25,7 @@ export interface ServiceWatchDetail {
   /** @pattern ^[a-f0-9]{64}$ */
   expectedFingerprint: string;
   state: ServiceWatchDetailState;
-  /** @maxItems 11 */
+  /** @maxItems 12 */
   reasons: ServiceWatchDetailReasonsItem[];
   /** @nullable */
   recordedState: string | null;

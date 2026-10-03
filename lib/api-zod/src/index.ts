@@ -4,3 +4,5 @@ export * from "./generated/types";
 // type. Keep the public query type and expose the path validator explicitly.
 export type { GetServiceCareParams } from "./generated/types/getServiceCareParams";
 export { GetServiceCareParams as GetServiceCarePathParams } from "./generated/api";
+export type { ListServiceMailboxRepliesParams } from "./generated/types/listServiceMailboxRepliesParams";
+export { ListServiceMailboxRepliesParams as ListServiceMailboxRepliesPathParams } from "./generated/api";

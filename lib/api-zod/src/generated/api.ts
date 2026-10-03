@@ -6398,7 +6398,7 @@ export const ListServiceWatchQueryParams = zod.object({
 
 export const listServiceWatchResponseItemsItemVersionMax = 2147483646;
 
-export const listServiceWatchResponseItemsItemReasonsMax = 11;
+export const listServiceWatchResponseItemsItemReasonsMax = 12;
 
 export const listServiceWatchResponseItemsItemEpisodeMin = 0;
 export const listServiceWatchResponseItemsItemEpisodeMax = 2147483646;
@@ -6426,7 +6426,7 @@ export const ListServiceWatchResponse = zod.object({
   "serviceObligationId": zod.uuid(),
   "version": zod.int().min(1).max(listServiceWatchResponseItemsItemVersionMax),
   "state": zod.enum(['clear', 'open', 'acknowledged', 'resolved', 'held']),
-  "reasons": zod.array(zod.enum(['reminder_needs_review', 'no_response_recorded', 'reminder_blocked', 'send_unknown', 'visit_cancelled', 'visit_no_show', 'service_overdue', 'response_needs_action', 'next_action_overdue', 'owner_required', 'source_review_required'])).max(listServiceWatchResponseItemsItemReasonsMax),
+  "reasons": zod.array(zod.enum(['reminder_needs_review', 'no_response_recorded', 'reminder_blocked', 'send_unknown', 'visit_cancelled', 'visit_no_show', 'service_overdue', 'response_needs_action', 'next_action_overdue', 'owner_required', 'source_review_required', 'reply_received_review'])).max(listServiceWatchResponseItemsItemReasonsMax),
   "observedFingerprint": zod.string(),
   "episode": zod.int().min(listServiceWatchResponseItemsItemEpisodeMin).max(listServiceWatchResponseItemsItemEpisodeMax),
   "assignedUserId": zod.string().nullable(),
@@ -6463,7 +6463,7 @@ export const getServiceWatchResponseExpectedVersionMin = 0;
 export const getServiceWatchResponseExpectedVersionMax = 2147483646;
 
 export const getServiceWatchResponseExpectedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
-export const getServiceWatchResponseReasonsMax = 11;
+export const getServiceWatchResponseReasonsMax = 12;
 
 export const getServiceWatchResponseHistoryMax = 50;
 
@@ -6479,7 +6479,7 @@ export const GetServiceWatchResponse = zod.object({
   "expectedVersion": zod.int().min(getServiceWatchResponseExpectedVersionMin).max(getServiceWatchResponseExpectedVersionMax),
   "expectedFingerprint": zod.string().regex(getServiceWatchResponseExpectedFingerprintRegExp),
   "state": zod.enum(['clear', 'open', 'acknowledged', 'resolved', 'held']),
-  "reasons": zod.array(zod.enum(['reminder_needs_review', 'no_response_recorded', 'reminder_blocked', 'send_unknown', 'visit_cancelled', 'visit_no_show', 'service_overdue', 'response_needs_action', 'next_action_overdue', 'owner_required', 'source_review_required'])).max(getServiceWatchResponseReasonsMax),
+  "reasons": zod.array(zod.enum(['reminder_needs_review', 'no_response_recorded', 'reminder_blocked', 'send_unknown', 'visit_cancelled', 'visit_no_show', 'service_overdue', 'response_needs_action', 'next_action_overdue', 'owner_required', 'source_review_required', 'reply_received_review'])).max(getServiceWatchResponseReasonsMax),
   "recordedState": zod.string().nullable(),
   "monitorPending": zod.boolean(),
   "assignedUserId": zod.string().nullable(),
@@ -8732,5 +8732,239 @@ export const CloseMissedCallCareBody = zod.object({
 })
 
 export const CloseMissedCallCareResponse = zod.record(zod.string(), zod.unknown()).describe('Company-scoped recovery evidence. The snapshot is server-rendered; return it unchanged with the expected version for approval. Provider acceptance, confirmed delivery, staff-reviewed caller identity and customer response are distinct evidence.')
+
+
+export const ListServiceMailboxRepliesParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const listServiceMailboxRepliesQueryOffsetDefault = 0;
+export const listServiceMailboxRepliesQueryOffsetMin = 0;
+export const listServiceMailboxRepliesQueryOffsetMax = 100000;
+
+
+
+export const ListServiceMailboxRepliesQueryParams = zod.object({
+  "offset": zod.coerce.number().int().min(listServiceMailboxRepliesQueryOffsetMin).max(listServiceMailboxRepliesQueryOffsetMax).default(listServiceMailboxRepliesQueryOffsetDefault)
+})
+
+
+export const listServiceMailboxRepliesResponseItemsMax = 25;
+
+export const listServiceMailboxRepliesResponseOffsetMin = 0;
+
+
+
+export const ListServiceMailboxRepliesResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "serviceObligationId": zod.uuid(),
+  "version": zod.int().min(1),
+  "state": zod.enum(['needs_review', 'reviewed', 'dismissed']),
+  "historical": zod.boolean(),
+  "holdActive": zod.boolean(),
+  "replyAt": zod.coerce.date(),
+  "receivedAt": zod.coerce.date(),
+  "rawExpiresAt": zod.coerce.date(),
+  "content": zod.union([zod.object({
+  "subject": zod.string(),
+  "text": zod.string()
+}),zod.null()]),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewNote": zod.string().nullable(),
+  "evidence": zod.enum(['original_mailbox_observation'])
+})).max(listServiceMailboxRepliesResponseItemsMax),
+  "hasMore": zod.boolean(),
+  "offset": zod.int().min(listServiceMailboxRepliesResponseOffsetMin),
+  "limit": zod.literal(25),
+  "held": zod.boolean()
+})
+
+
+export const ReviewServiceMailboxReplyParams = zod.object({
+  "id": zod.uuid(),
+  "replyId": zod.uuid()
+})
+
+
+export const reviewServiceMailboxReplyBodyNoteMin = 10;
+export const reviewServiceMailboxReplyBodyNoteMax = 1000;
+
+
+
+export const ReviewServiceMailboxReplyBody = zod.object({
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(1),
+  "decision": zod.enum(['office_follow_up', 'not_customer_reply']),
+  "note": zod.string().min(reviewServiceMailboxReplyBodyNoteMin).max(reviewServiceMailboxReplyBodyNoteMax),
+  "reviewed": zod.literal(true)
+})
+
+
+
+
+export const ReviewServiceMailboxReplyResponse = zod.object({
+  "replyId": zod.uuid(),
+  "version": zod.int().min(1),
+  "replayed": zod.boolean()
+})
+
+
+export const listPlatformIdentityDeliveriesQueryPageDefault = 1;
+export const listPlatformIdentityDeliveriesQueryPageMax = 100000;
+
+
+
+export const ListPlatformIdentityDeliveriesQueryParams = zod.object({
+  "page": zod.coerce.number().int().min(1).max(listPlatformIdentityDeliveriesQueryPageMax).default(listPlatformIdentityDeliveriesQueryPageDefault),
+  "organizationId": zod.uuid().optional(),
+  "invitationId": zod.uuid().optional()
+})
+
+export const listPlatformIdentityDeliveriesResponseDeliveriesMax = 25;
+
+
+export const listPlatformIdentityDeliveriesResponseUnmatchedCallbackCountMin = 0;
+
+
+
+export const ListPlatformIdentityDeliveriesResponse = zod.object({
+  "deliveries": zod.array(zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid().nullable(),
+  "invitationId": zod.uuid().nullable(),
+  "recipientLabel": zod.string().nullable(),
+  "purpose": zod.enum(['email_verification', 'password_reset', 'staff_invitation']),
+  "outcome": zod.enum(['claimed', 'accepted', 'rejected', 'unknown', 'not_attempted']),
+  "outcomeCode": zod.string().nullable(),
+  "provider": zod.enum(['resend']),
+  "providerMessageId": zod.uuid().nullable(),
+  "deliveryState": zod.enum(['unconfirmed', 'delivered', 'delayed', 'failed', 'bounced', 'complained', 'needs_review']),
+  "deliveryConfirmed": zod.boolean(),
+  "retryAllowed": zod.literal(false),
+  "claimedAt": zod.coerce.date(),
+  "finishedAt": zod.coerce.date().nullable(),
+  "lastEventAt": zod.coerce.date().nullable()
+})).max(listPlatformIdentityDeliveriesResponseDeliveriesMax),
+  "page": zod.int().min(1),
+  "pageSize": zod.literal(25),
+  "hasMore": zod.boolean(),
+  "unmatchedCallbackCount": zod.int().min(listPlatformIdentityDeliveriesResponseUnmatchedCallbackCountMin).nullable(),
+  "unmatchedCallbackLimit": zod.literal(1000)
+})
+
+
+export const listInvitationEmailDeliveriesQueryPageDefault = 1;
+export const listInvitationEmailDeliveriesQueryPageMax = 100000;
+
+
+
+export const ListInvitationEmailDeliveriesQueryParams = zod.object({
+  "page": zod.coerce.number().int().min(1).max(listInvitationEmailDeliveriesQueryPageMax).default(listInvitationEmailDeliveriesQueryPageDefault),
+  "invitationId": zod.uuid().optional()
+})
+
+export const listInvitationEmailDeliveriesResponseDeliveriesMax = 25;
+
+
+export const listInvitationEmailDeliveriesResponseUnmatchedCallbackCountMin = 0;
+
+
+
+export const ListInvitationEmailDeliveriesResponse = zod.object({
+  "deliveries": zod.array(zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid().nullable(),
+  "invitationId": zod.uuid().nullable(),
+  "recipientLabel": zod.string().nullable(),
+  "purpose": zod.enum(['email_verification', 'password_reset', 'staff_invitation']),
+  "outcome": zod.enum(['claimed', 'accepted', 'rejected', 'unknown', 'not_attempted']),
+  "outcomeCode": zod.string().nullable(),
+  "provider": zod.enum(['resend']),
+  "providerMessageId": zod.uuid().nullable(),
+  "deliveryState": zod.enum(['unconfirmed', 'delivered', 'delayed', 'failed', 'bounced', 'complained', 'needs_review']),
+  "deliveryConfirmed": zod.boolean(),
+  "retryAllowed": zod.literal(false),
+  "claimedAt": zod.coerce.date(),
+  "finishedAt": zod.coerce.date().nullable(),
+  "lastEventAt": zod.coerce.date().nullable()
+})).max(listInvitationEmailDeliveriesResponseDeliveriesMax),
+  "page": zod.int().min(1),
+  "pageSize": zod.literal(25),
+  "hasMore": zod.boolean(),
+  "unmatchedCallbackCount": zod.int().min(listInvitationEmailDeliveriesResponseUnmatchedCallbackCountMin).nullable(),
+  "unmatchedCallbackLimit": zod.literal(1000)
+})
+
+
+export const getMicrosoftMailboxStatusResponseVersionMin = 0;
+
+export const getMicrosoftMailboxStatusResponsePendingParentCountMin = 0;
+
+export const getMicrosoftMailboxStatusResponseReviewCountMin = 0;
+
+
+
+export const GetMicrosoftMailboxStatusResponse = zod.object({
+  "enabled": zod.boolean(),
+  "configured": zod.boolean(),
+  "version": zod.int().min(getMicrosoftMailboxStatusResponseVersionMin),
+  "state": zod.enum(['pending', 'active', 'disabled', 'gap', 'revoked']),
+  "usable": zod.boolean(),
+  "mailboxEmail": zod.string().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "lastSuccessAt": zod.coerce.date().nullable(),
+  "lastErrorAt": zod.coerce.date().nullable(),
+  "reason": zod.string().nullable(),
+  "pendingParentCount": zod.int().min(getMicrosoftMailboxStatusResponsePendingParentCountMin),
+  "reviewCount": zod.int().min(getMicrosoftMailboxStatusResponseReviewCountMin),
+  "scopes": zod.array(zod.string()),
+  "folders": zod.array(zod.string()),
+  "historicalCrawl": zod.literal(false),
+  "attachmentsRead": zod.literal(false),
+  "remoteConsentRevoked": zod.literal(false)
+})
+
+
+export const connectMicrosoftMailboxBodyExpectedVersionMin = 0;
+
+export const connectMicrosoftMailboxBodyReturnPathDefault = `/account`;
+
+export const ConnectMicrosoftMailboxBody = zod.object({
+  "expectedVersion": zod.int().min(connectMicrosoftMailboxBodyExpectedVersionMin),
+  "readAcknowledged": zod.literal(true),
+  "retentionAcknowledged": zod.literal(true),
+  "returnPath": zod.enum(['/account', '/settings']).default(connectMicrosoftMailboxBodyReturnPathDefault)
+})
+
+export const ConnectMicrosoftMailboxResponse = zod.object({
+  "authorizationUrl": zod.url()
+})
+
+
+
+
+
+export const DisableMicrosoftMailboxBody = zod.object({
+  "expectedVersion": zod.int().min(1),
+  "confirmed": zod.literal(true)
+})
+
+export const DisableMicrosoftMailboxResponse = zod.object({
+  "disabled": zod.literal(true),
+  "remoteConsentRevoked": zod.literal(false)
+})
+
+
+/**
+ * Session-bound state and PKCE; distinct opt-in read credential. Never log authorization codes.
+ */
+export const CompleteMicrosoftMailboxOAuthQueryParams = zod.object({
+  "state": zod.coerce.string().optional(),
+  "code": zod.coerce.string().optional(),
+  "error": zod.coerce.string().optional()
+})
+
+export const CompleteMicrosoftMailboxOAuthResponse = zod.void()
 
 

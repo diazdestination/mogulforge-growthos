@@ -481,6 +481,7 @@ describe("founding beta registration gate", () => {
     const originalAllowlist = process.env.BETA_SIGNUP_ALLOWLIST;
     const originalResendKey = process.env.RESEND_API_KEY;
     const originalResendFrom = process.env.RESEND_FROM_EMAIL;
+    const originalEmailContext = process.env.PLATFORM_EMAIL_DELIVERY_CONTEXT;
     const originalAppOrigin = process.env.APP_ORIGIN;
     const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const blockedEmail = `blocked-${suffix}@example.com`;
@@ -492,10 +493,11 @@ describe("founding beta registration gate", () => {
       process.env.NODE_ENV = "production";
       process.env.RESEND_API_KEY = "test-resend-key";
       process.env.RESEND_FROM_EMAIL = "MogulForge <account@mogulforge.ai>";
+      process.env.PLATFORM_EMAIL_DELIVERY_CONTEXT = "synthetic-onboarding-identity";
       process.env.APP_ORIGIN = "https://app.mogulforge.test";
       const sendVerification = vi
         .spyOn(resendEmailProvider, "send")
-        .mockResolvedValue({ id: "verification-test", provider: "resend" });
+        .mockResolvedValue({ id: crypto.randomUUID(), provider: "resend" });
       delete process.env.BETA_SIGNUP_ALLOWLIST;
 
       const blocked = await fetch(`${baseUrl}/api/auth/register`, {
@@ -684,6 +686,8 @@ describe("founding beta registration gate", () => {
       if (originalResendFrom === undefined)
         delete process.env.RESEND_FROM_EMAIL;
       else process.env.RESEND_FROM_EMAIL = originalResendFrom;
+      if (originalEmailContext === undefined) delete process.env.PLATFORM_EMAIL_DELIVERY_CONTEXT;
+      else process.env.PLATFORM_EMAIL_DELIVERY_CONTEXT = originalEmailContext;
       if (originalAppOrigin === undefined) delete process.env.APP_ORIGIN;
       else process.env.APP_ORIGIN = originalAppOrigin;
     }

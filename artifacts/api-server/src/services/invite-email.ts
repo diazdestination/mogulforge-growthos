@@ -5,10 +5,10 @@
  */
 import { logger } from "../lib/logger";
 
-import { isSafeMailbox, transactionalEmailProvider } from "./providers";
+import { isSafeMailbox } from "./providers";
 import { getOrgSettings } from "./settings";
 import { createInviteToken } from "./invite-token";
-import { ResendSendError } from "./resend-delivery";
+import { sendPlatformIdentityEmail } from "./platform-email-delivery";
 
 /**
  * Absolute URL of the CRM app the invitee should sign in to.
@@ -55,6 +55,8 @@ export async function sendInviteEmail(params: {
   invitedUserId: string;
   organizationId: string;
   to: string;
+  invitationId?: string;
+  actorUserId?: string;
   inviteeFirstName?: string | null;
   inviterName: string;
   role: string;
@@ -95,26 +97,24 @@ export async function sendInviteEmail(params: {
         error:
           "Invitation delivery is no longer authorized. Refresh the invitation status.",
       };
-    await transactionalEmailProvider.send(
-      params.to,
-      `You've been invited to the ${businessName} team`,
-      body,
-    );
-    return { sent: true, error: null };
+    if (!params.invitationId || !params.tokenRevision || !params.actorUserId) return { sent: false, error: "This legacy invitation needs durable staff review before email can be sent." };
+    const receipt = await sendPlatformIdentityEmail({
+      source: { purpose: "staff_invitation", invitationId: params.invitationId, tokenRevision: params.tokenRevision, actorUserId: params.actorUserId },
+      to: params.to, subject: `You've been invited to the ${businessName} team`, body, beforeDispatch: params.shouldSend,
+    });
+    return receipt.outcome === "accepted" ? { sent: true, error: null } : {
+      sent: false, error: receipt.outcome === "rejected"
+        ? "Invitation email was rejected by the provider. Review delivery status and configuration; this attempt will not be retried."
+        : "Invitation email was not confirmed. Review delivery status before requesting any new invitation; this attempt will not be retried.",
+    };
   } catch (err) {
-    const failure = err instanceof ResendSendError ? err : undefined;
     logger.error(
-      {
-        errorCode: failure?.code ?? "invite_email_unconfirmed",
-        outcome: failure?.outcome ?? "unknown",
-        httpStatus: failure?.httpStatus,
-      },
+      { errorCode: "invite_email_unconfirmed" },
       "invite: email delivery was not confirmed",
     );
     return {
       sent: false,
       error:
-        failure?.message ??
         "Invitation email was not confirmed. Ask an administrator to check email configuration and delivery status before sending again.",
     };
   }

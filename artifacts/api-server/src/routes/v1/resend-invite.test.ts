@@ -32,7 +32,7 @@ import * as providers from "../../services/providers";
  *  - 400 for already-active (non-invite) members
  *  - 404 for members of other organizations (no cross-org existence leak)
  *  - 403 for callers without users.manage (e.g. sales_rep)
- *  - success records a `user.invite_resent` audit event
+ *  - untracked historical invitations require explicit durable review (409), never a blind resend
  */
 
 let server: Server;
@@ -208,18 +208,16 @@ describe("POST /v1/users/:id/resend-invite", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("resends to a pending invite and records a user.invite_resent audit event", async () => {
+  it("requires durable review for a legacy invitation without inventing a send or delivery audit", async () => {
     const send = vi
       .spyOn(providers.transactionalEmailProvider, "send")
       .mockResolvedValue({ id: "x", provider: "mock-email" });
 
     const res = await resend(pendingInvite.id, adminSid);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { sent: boolean; error: string | null };
-    expect(body).toEqual({ sent: true, error: null });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "LEGACY_INVITATION_REVIEW_REQUIRED", error: expect.stringMatching(/No email was sent/) });
 
-    expect(send).toHaveBeenCalledOnce();
-    expect(send.mock.calls[0][0]).toBe(pendingInvite.email);
+    expect(send).not.toHaveBeenCalled();
 
     const events = await db
       .select()
@@ -231,19 +229,10 @@ describe("POST /v1/users/:id/resend-invite", () => {
           sql`${auditEventsTable.metadata} ->> 'invitedUserId' = ${pendingInvite.id}`,
         ),
       );
-    expect(events).toHaveLength(1);
-    expect(events[0].actorUserId).toBe(admin.id);
-    expect(events[0].entityType).toBe("user");
-    expect(
-      (events[0].metadata as Record<string, unknown>).inviteEmailSent,
-    ).toBe(true);
-    expect((events[0].metadata as Record<string, unknown>).email).toBe(
-      pendingInvite.email,
-    );
+    expect(events).toHaveLength(0);
   });
 
-  it("rejects a rapid repeat resend with 429 and allows again after the cooldown", async () => {
-    // Fresh invite so this test owns its cooldown window.
+  it("cannot bypass the legacy review requirement by waiting or repeating the endpoint", async () => {
     const [invite] = await db
       .insert(usersTable)
       .values({
@@ -259,15 +248,13 @@ describe("POST /v1/users/:id/resend-invite", () => {
       .mockResolvedValue({ id: "x", provider: "mock-email" });
 
     const first = await resend(invite.id, adminSid);
-    expect(first.status).toBe(200);
+    expect(first.status).toBe(409);
 
     const second = await resend(invite.id, adminSid);
-    expect(second.status).toBe(429);
-    expect(Number(second.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(second.status).toBe(409);
     const body = (await second.json()) as { error: string };
-    expect(body.error).toMatch(/wait/i);
-    // Only the first request actually emailed the invitee.
-    expect(send).toHaveBeenCalledOnce();
+    expect(body.error).toMatch(/durable delivery history/i);
+    expect(send).not.toHaveBeenCalled();
 
     // No audit event for the throttled attempt.
     const events = await db
@@ -280,9 +267,9 @@ describe("POST /v1/users/:id/resend-invite", () => {
           sql`${auditEventsTable.metadata} ->> 'invitedUserId' = ${invite.id}`,
         ),
       );
-    expect(events).toHaveLength(1);
+    expect(events).toHaveLength(0);
 
-    // Expire the shared cooldown window, then the resend goes through again.
+    // Changing the old cooldown cannot bypass the new durable ownership gate.
     await db
       .update(rateLimitCountersTable)
       .set({ resetAt: new Date(Date.now() - 1000) })
@@ -291,7 +278,7 @@ describe("POST /v1/users/:id/resend-invite", () => {
       );
 
     const third = await resend(invite.id, adminSid);
-    expect(third.status).toBe(200);
-    expect(send).toHaveBeenCalledTimes(2);
+    expect(third.status).toBe(409);
+    expect(send).not.toHaveBeenCalled();
   });
 });

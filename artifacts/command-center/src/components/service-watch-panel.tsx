@@ -7,6 +7,7 @@ const reasonNames: Record<string, string> = {
   reminder_blocked: 'Reminder held or changed — review its receipt', send_unknown: 'Unknown send result — do not resend',
   visit_cancelled: 'Visit cancelled — arrange the next office step', visit_no_show: 'Visit recorded as no-show', service_overdue: 'Service date is overdue',
   response_needs_action: 'Recorded conversation needs an office next step', next_action_overdue: 'Promised office next action is overdue',
+  reply_received_review: 'Reply received for this service — office review and follow-up needed',
   owner_required: 'Accepted responsible staff member required', source_review_required: 'Source record needs operator review',
 };
 const label = (reason: string) => reasonNames[reason] ?? 'Operator review required';

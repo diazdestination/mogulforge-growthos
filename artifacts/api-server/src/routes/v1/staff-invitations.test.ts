@@ -225,11 +225,14 @@ beforeEach(async () => {
   vi.stubEnv("APP_URL", "");
   vi.stubEnv("APP_ORIGIN", "http://localhost:3001");
   vi.stubEnv("REPLIT_DOMAINS", "");
+  vi.stubEnv("RESEND_API_KEY", "synthetic-no-network");
+  vi.stubEnv("RESEND_FROM_EMAIL", "account@platform.example");
+  vi.stubEnv("PLATFORM_EMAIL_DELIVERY_CONTEXT", "synthetic-staff-http");
   mail.length = 0;
   vi.spyOn(transactionalEmailProvider, "send").mockImplementation(
     async (to, _subject, body) => {
       mail.push({ to, body });
-      return { id: randomUUID(), provider: "synthetic-mail-sink" };
+      return { id: randomUUID(), provider: "resend" };
     },
   );
   // Each case owns only its synthetic loopback/process abuse counters.

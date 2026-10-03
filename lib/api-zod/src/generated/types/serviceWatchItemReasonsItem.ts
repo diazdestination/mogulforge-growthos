@@ -21,4 +21,5 @@ export const ServiceWatchItemReasonsItem = {
   next_action_overdue: 'next_action_overdue',
   owner_required: 'owner_required',
   source_review_required: 'source_review_required',
+  reply_received_review: 'reply_received_review',
 } as const;

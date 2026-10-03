@@ -7,6 +7,17 @@
 
 ## Mission
 
+**October 2 launch-completion authorization:** the owner approved closing the
+remaining engineering against `LAUNCH-COMPLETION.md`. The current L1/L2 contract
+is `reports/launch-communications-contract-2026-10-02.md`; local integration is in
+`reports/launch-communications-integration-2026-10-02.md`. The first tracked
+Microsoft-service reply loop and platform delivery ledger are implemented;
+general lead/Gmail coverage remains actual engineering, not merely provider
+setup. All later exact-release, hosted, provider and contractor gates
+remain required; no new scope may be silently added or a manual substitute
+treated as accepted. Main c01bea0 passed its exact-main release gate; this new
+candidate requires its own evidence. No activation is authorized by this note.
+
 **October 2 operations-wave continuation:** the owner authorized the next wave
 after customer-care PR14/main602131d passed exact-main CI37074053979. The contract
 is `reports/operations-wave-contract-2026-10-02.md`; current evidence is in its

@@ -21,11 +21,11 @@ import {
 } from '../services/identity-email';
 import {
   consumeIdentityToken,
-  issueIdentityToken,
+  issueIdentityTokenRecord,
 } from '../services/identity-token';
 import { acceptPendingStaffInvitation, StaffInvitationError } from '../services/staff-invitations';
 import { ensureMembership } from '../services/org';
-import { isTransactionalEmailConfigured } from '../services/providers';
+import { isPlatformIdentityDeliveryConfigured } from '../services/platform-email-delivery';
 import { reportCallbackBruteForceBlock } from '../services/security-alerts';
 import {
   clearSession,
@@ -647,7 +647,7 @@ router.post('/auth/register', async (req: Request, res: Response) => {
   if (
     !existing &&
     process.env.NODE_ENV === 'production' &&
-    !isTransactionalEmailConfigured()
+    !isPlatformIdentityDeliveryConfigured()
   ) {
     transactionalEmailUnavailable(res);
     return;
@@ -688,7 +688,7 @@ router.post('/auth/register', async (req: Request, res: Response) => {
   // registrations must verify their email before we mint an authenticated
   // session in production.
   if (!existing && process.env.NODE_ENV === 'production') {
-    const token = await issueIdentityToken({
+    const { token, tokenRecordId } = await issueIdentityTokenRecord({
       userId: dbUser.id,
       purpose: 'email_verification',
     });
@@ -696,6 +696,7 @@ router.post('/auth/register', async (req: Request, res: Response) => {
       await sendEmailVerification({
         to: email,
         token,
+        tokenRecordId,
         firstName: dbUser.firstName,
       });
       if (dbUser.organizationId) {
@@ -779,7 +780,7 @@ router.post('/auth/login', async (req: Request, res: Response) => {
 router.post('/auth/forgot-password', async (req: Request, res: Response) => {
   if (
     process.env.NODE_ENV === 'production' &&
-    !isTransactionalEmailConfigured()
+    !isPlatformIdentityDeliveryConfigured()
   ) {
     transactionalEmailUnavailable(res);
     return;
@@ -811,13 +812,14 @@ router.post('/auth/forgot-password', async (req: Request, res: Response) => {
 
   if (user?.isActive && user.passwordHash) {
     try {
-      const token = await issueIdentityToken({
+      const { token, tokenRecordId } = await issueIdentityTokenRecord({
         userId: user.id,
         purpose: 'password_reset',
       });
       await sendPasswordReset({
         to: email,
         token,
+        tokenRecordId,
         firstName: user.firstName,
       });
       if (user.organizationId) {
@@ -842,7 +844,7 @@ router.post(
   async (req: Request, res: Response) => {
     if (
       process.env.NODE_ENV === 'production' &&
-      !isTransactionalEmailConfigured()
+      !isPlatformIdentityDeliveryConfigured()
     ) {
       transactionalEmailUnavailable(res);
       return;
@@ -873,13 +875,14 @@ router.post(
 
     if (user?.isActive && user.passwordHash && !user.emailVerifiedAt) {
       try {
-        const token = await issueIdentityToken({
+        const { token, tokenRecordId } = await issueIdentityTokenRecord({
           userId: user.id,
           purpose: 'email_verification',
         });
         await sendEmailVerification({
           to: email,
           token,
+          tokenRecordId,
           firstName: user.firstName,
         });
         if (user.organizationId) {

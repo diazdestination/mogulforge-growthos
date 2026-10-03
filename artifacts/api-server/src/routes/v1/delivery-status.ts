@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 import { rateLimit } from "../../lib/rateLimit";
 import {
@@ -7,6 +7,7 @@ import {
   recordTouchDelivery,
 } from "../../services/delivery-events";
 import { isSafeMailbox } from "../../services/providers";
+import { PlatformEmailDeliveryError, recordVerifiedPlatformEmailEvent } from "../../services/platform-email-delivery";
 /**
  * Provider delivery webhooks (public — providers are not CRM users):
  *
@@ -75,6 +76,7 @@ export function resendSignatureValid(req: Request): boolean {
 }
 
 const DELIVERY_EVENTS = new Set([
+  "email.sent",
   "email.delivered",
   "email.bounced",
   "email.complained",
@@ -132,6 +134,19 @@ router.post(
       channel: "email" as const,
       address: recipients[0],
     };
+    try {
+      await recordVerifiedPlatformEmailEvent({ eventId: String(req.headers["svix-id"]),
+        payloadHash: createHash("sha256").update((req as Request & { rawBody: Buffer }).rawBody).digest("hex"), payload });
+    } catch (error) {
+      if (!(error instanceof PlatformEmailDeliveryError)) throw error;
+      res.status(error.status).json({ error: error.code });
+      return;
+    }
+    // Platform acceptance evidence must not turn into a failed playbook touch.
+    if (type === "email.sent") {
+      res.status(200).json({ received: true });
+      return;
+    }
     const bounceType = record(data?.bounce)?.type;
     if (type === "email.delivered") {
       await recordTouchDelivery({ ...correlation, signal: "delivered" });

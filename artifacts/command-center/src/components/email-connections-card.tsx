@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { GmailConnectionCard } from "./gmail-connection-card";
+import { MailboxConnectionCard } from "./mailbox-connection-card";
 import {
   Card,
   CardContent,
@@ -299,8 +300,9 @@ export function EmailConnectionsCard({
           </div>
           <p className="text-sm text-muted-foreground">
             Permissions: send mail as you, read your basic account profile, and
-            maintain offline access. GrowthOS does not request inbox reading,
-            mail editing, or shared-mailbox send-as access.
+            maintain offline access. This send-only connection does not request
+            inbox reading, mail editing, or shared-mailbox send-as access.
+            Optional reply reading below requires a separate explicit approval.
           </p>
           <p className="text-sm text-muted-foreground">
             Disconnect removes the local credential and cancels pending GrowthOS
@@ -324,6 +326,7 @@ export function EmailConnectionsCard({
           </p>
         </CardContent>
       </Card>
+      <MailboxConnectionCard returnPath={returnPath} />
       <GmailConnectionCard
         callbackState={callbackState}
         returnPath={returnPath}

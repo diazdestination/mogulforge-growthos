@@ -125,6 +125,8 @@ export async function sendEmailForUser(input: {
   body: string;
   expectedSender?: EmailDispatchIdentity;
   beforeDispatch?: () => Promise<void>;
+  /** Server-reserved communication identity; never accepted from message content. */
+  outboundParentId?: string;
 }): Promise<UserEmailResult> {
   const { assertCustomerLifecycleActive } = await import("./customer-lifecycle");
   await assertCustomerLifecycleActive(input.organizationId);

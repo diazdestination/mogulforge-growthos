@@ -15,8 +15,16 @@ import {
 import { hasPermission } from "../lib/permissions";
 import { isSafeMailbox } from "./providers";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
-import { assertCustomerLifecycleActive, CustomerLifecycleHoldError } from "./customer-lifecycle";
-import { EmailDispatchBlockedError, runEmailDispatchGuard, type EmailDispatchGuard } from "./email-dispatch-guard";
+import {
+  assertCustomerLifecycleActive,
+  CustomerLifecycleHoldError,
+} from "./customer-lifecycle";
+import {
+  EmailDispatchBlockedError,
+  runEmailDispatchGuard,
+  type EmailDispatchGuard,
+} from "./email-dispatch-guard";
+import { mailboxConnectorsTable } from "../../../../lib/db/src/schema/mailbox-connectors";
 
 export const MICROSOFT_SCOPES = [
   "https://graph.microsoft.com/Mail.Send",
@@ -221,18 +229,16 @@ export async function beginMicrosoftOAuth(
     // Superseding a pending flow also prevents an older in-flight callback from
     // reconnecting a mailbox after the user starts a newer flow/disconnects.
     await tx.delete(oauthTransactionsTable).where(transactionWhere(input));
-    await tx
-      .insert(oauthTransactionsTable)
-      .values({
-        ...input,
-        provider: "microsoft",
-        module: "mail_send",
-        requestedScopes: MICROSOFT_SCOPES,
-        stateHash: sha256Base64Url(state),
-        encryptedCodeVerifier,
-        returnPath: returnPath(input.returnPath),
-        expiresAt: new Date(Date.now() + TTL_MS),
-      });
+    await tx.insert(oauthTransactionsTable).values({
+      ...input,
+      provider: "microsoft",
+      module: "mail_send",
+      requestedScopes: MICROSOFT_SCOPES,
+      stateHash: sha256Base64Url(state),
+      encryptedCodeVerifier,
+      returnPath: returnPath(input.returnPath),
+      expiresAt: new Date(Date.now() + TTL_MS),
+    });
   });
   const url = new URL(`${config.authority}/authorize`);
   url.search = new URLSearchParams({
@@ -452,6 +458,30 @@ export async function disconnectMicrosoft(
   return db.transaction(async (tx) => {
     await tx.execute(lock(actor));
     await tx.delete(oauthTransactionsTable).where(transactionWhere(actor));
+    await tx
+      .delete(oauthTransactionsTable)
+      .where(
+        and(
+          eq(oauthTransactionsTable.organizationId, organizationId),
+          eq(oauthTransactionsTable.userId, userId),
+          eq(oauthTransactionsTable.provider, "microsoft_mailbox"),
+        ),
+      );
+    await tx
+      .update(mailboxConnectorsTable)
+      .set({
+        state: "disabled",
+        encryptedRefreshToken: null,
+        leaseToken: null,
+        leaseExpiresAt: null,
+        version: sql`${mailboxConnectorsTable.version} + 1`,
+      })
+      .where(
+        and(
+          eq(mailboxConnectorsTable.organizationId, organizationId),
+          eq(mailboxConnectorsTable.userId, userId),
+        ),
+      );
     const removed = await tx
       .update(microsoftConnectionsTable)
       .set({
@@ -469,7 +499,13 @@ export async function disconnectMicrosoft(
 }
 
 export async function sendMicrosoftForUser(
-  input: Actor & { to: string; subject: string; body: string; beforeDispatch?: EmailDispatchGuard },
+  input: Actor & {
+    to: string;
+    subject: string;
+    body: string;
+    beforeDispatch?: EmailDispatchGuard;
+    outboundParentId?: string;
+  },
 ) {
   assertOutboundDeliveryAllowed({ channel: "email", recipient: input.to });
   if (
@@ -534,7 +570,10 @@ export async function sendMicrosoftForUser(
       .returning();
     if (!updated) throw revoked();
     selected = updated;
-    await runEmailDispatchGuard(input.beforeDispatch, { provider: "microsoft", senderEmail: selected.email });
+    await runEmailDispatchGuard(input.beforeDispatch, {
+      provider: "microsoft",
+      senderEmail: selected.email,
+    });
     await requireMember(input);
     const current = await getMicrosoftConnection(
       input.organizationId,
@@ -550,6 +589,76 @@ export async function sendMicrosoftForUser(
     // They are preparation, not acceptance of the customer email by Microsoft.
     await assertCustomerLifecycleActive(input.organizationId);
     assertOutboundDeliveryAllowed({ channel: "email", recipient: input.to });
+    let parentHeader: { name: string; value: string } | undefined;
+    if (input.outboundParentId) {
+      try {
+        const { getMicrosoftMailboxIdentity } =
+          await import("./mailbox-connector");
+        const { assertMailboxOutboundParentDispatch } =
+          await import("./mailbox-communication");
+        const pinned = await getMicrosoftMailboxIdentity(
+          input.organizationId,
+          input.userId,
+        ).catch(() => {
+          throw new EmailDispatchBlockedError();
+        });
+        if (
+          !pinned ||
+          pinned.connectionId !== selected.id ||
+          pinned.connectionRevision !== selected.connectedAt.toISOString() ||
+          pinned.mailboxAccountId !== selected.accountId ||
+          pinned.mailboxEmail !== selected.email
+        )
+          throw new EmailDispatchBlockedError();
+        parentHeader = await assertMailboxOutboundParentDispatch(
+          input.outboundParentId,
+          pinned,
+          { to: input.to, subject: input.subject, body: input.body },
+        );
+        // The one-time parent claim awaits database work. Recheck the complete
+        // approval/consent guard after it; rejection retains that permanent claim
+        // and is a known no-effect outcome, never permission to replay the parent.
+        await runEmailDispatchGuard(input.beforeDispatch, {
+          provider: "microsoft",
+          senderEmail: selected.email,
+        });
+        const stillPinned = await getMicrosoftMailboxIdentity(
+          input.organizationId,
+          input.userId,
+        );
+        if (
+          !stillPinned ||
+          stillPinned.connectorId !== pinned.connectorId ||
+          stillPinned.connectorVersion !== pinned.connectorVersion ||
+          stillPinned.connectionId !== pinned.connectionId ||
+          stillPinned.connectionRevision !== pinned.connectionRevision ||
+          stillPinned.mailboxAccountId !== pinned.mailboxAccountId ||
+          stillPinned.mailboxEmail !== pinned.mailboxEmail
+        )
+          throw new EmailDispatchBlockedError();
+        await requireMember(input);
+        const dispatchConnection = await getMicrosoftConnection(
+          input.organizationId,
+          input.userId,
+        );
+        if (
+          !dispatchConnection ||
+          dispatchConnection.id !== selected.id ||
+          dispatchConnection.connectedAt.getTime() !==
+            selected.connectedAt.getTime() ||
+          dispatchConnection.encryptedRefreshToken !==
+            selected.encryptedRefreshToken
+        )
+          throw new EmailDispatchBlockedError();
+        await assertCustomerLifecycleActive(input.organizationId);
+        assertOutboundDeliveryAllowed({
+          channel: "email",
+          recipient: input.to,
+        });
+      } catch {
+        throw new EmailDispatchBlockedError();
+      }
+    }
     const clientRequestId = randomUUID();
     dispatched = true;
     const response = await request(`${GRAPH}/me/sendMail`, {
@@ -565,6 +674,7 @@ export async function sendMicrosoftForUser(
           subject: input.subject,
           body: { contentType: "Text", content: input.body },
           toRecipients: [{ emailAddress: { address: input.to } }],
+          ...(parentHeader ? { internetMessageHeaders: [parentHeader] } : {}),
         },
         saveToSentItems: true,
       }),

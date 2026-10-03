@@ -3,8 +3,8 @@
  * deletion order, retention policy, or proof of complete account ownership.
  * Every new table must receive an explicit classification before preview runs.
  */
-export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-02.inventory-v6";
-export const DATA_LIFECYCLE_EXPECTED_TABLES = 111;
+export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-02.inventory-v7";
+export const DATA_LIFECYCLE_EXPECTED_TABLES = 117;
 export const DATA_LIFECYCLE_ROW_LIMIT = 10_000;
 
 export type InventoryCategory =
@@ -84,6 +84,10 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("lead_imports", "acquisition"),
   direct("lead_tags", "crm"),
   direct("leads", "crm"),
+  direct("mailbox_communication_parents", "communications"),
+  direct("mailbox_connectors", "account_access"),
+  direct("mailbox_receipts", "communications"),
+  direct("mailbox_service_replies", "communications"),
   direct("message_templates", "communications"),
   direct("microsoft_connections", "account_access"),
   direct("missed_call_care_cases", "communications"),
@@ -98,6 +102,10 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("playbook_enrollments", "automation"),
   direct("playbook_touches", "communications"),
   direct("playbooks", "automation"),
+  // Pre-organization identity sends and unmatched callbacks have global scope.
+  // A nullable organization column is not complete tenant ownership evidence.
+  excluded("platform_email_dispatches", "account_access"),
+  excluded("platform_email_events", "account_access"),
   direct("portal_login_codes", "account_access"),
   direct("portal_sessions", "account_access"),
   direct("project_stories", "crm"),
@@ -146,6 +154,7 @@ export const DATA_LIFECYCLE_BLOCKERS = [
   { code: "global_identity_sessions_unresolved", detail: "Unscoped session JSON and global identities are excluded. User and identity-token counts cover current organization association only, not all identity history." },
   { code: "media_ownership_unresolved", detail: "Only explicitly organization-owned database object rows are counted. Null-owned, externally stored, orphaned or shared media and reference ownership remain unresolved; no object IDs or bytes are read." },
   { code: "restricted_email_content", detail: "Email records are counted without reading or decrypting raw email. Raw-content inclusion and derived-record retention require separate review." },
+  { code: "platform_identity_delivery_excluded", detail: "Platform identity delivery claims and signed callbacks can exist before company membership. They are classified but excluded from tenant counts/export; retained security evidence needs separate lifecycle review." },
   { code: "shared_runtime_excluded", detail: "Shared rate-limit counters and scheduler runtime are classified but never counted or read for tenant data." },
   { code: "providers_backups_outside_preview", detail: "Provider copies, mailbox contents, billing systems, logs, archives and backups are not inventoried by this database preview." },
   { code: "retention_revocation_unresolved", detail: "Audit, replay prevention, consent/suppression, account closure and credential revocation need an approved lifecycle design. This preview defines no retention policy." },

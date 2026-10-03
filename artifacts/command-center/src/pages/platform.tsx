@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ClientLaunchpad } from "@/components/client-launchpad";
 import { ClientOperations } from "@/components/revenue-workspace";
 import { RuntimeHealthPanel } from "@/components/runtime-health";
+import { PlatformEmailDeliveryPanel } from "@/components/platform-email-delivery-panel";
 
 /**
  * Platform super-admin console (MogulForge operators): list every
@@ -20,11 +21,13 @@ import { RuntimeHealthPanel } from "@/components/runtime-health";
  * Deliberately minimal — org-level administration happens inside each org.
  */
 export default function Platform() {
+  const { data: session } = useGetSession({ query: { queryKey: getGetSessionQueryKey() } });
   return (
     <div className="mx-auto w-full max-w-6xl min-w-0 space-y-6 p-4 md:p-8">
       <RuntimeHealthPanel />
       <ClientOperations />
       <ClientLaunchpad />
+      {session?.isPlatformAdmin && session.id && <PlatformEmailDeliveryPanel actorId={session.id} scope="platform" />}
       <details className="rounded-xl border bg-card p-4">
         <summary className="cursor-pointer text-sm text-muted-foreground">
           Advanced organization administration

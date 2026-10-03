@@ -9,12 +9,10 @@ import { and, eq } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { z } from "zod";
 
-import { consumeCooldown } from "../../lib/rateLimit";
 import { hasPermission } from "../../lib/permissions";
 import { requireMember } from "../../middlewares/requireMember";
 import { recordAudit } from "../../services/audit";
 import { listMembers } from "../../services/crm";
-import { sendInviteEmail } from "../../services/invite-email";
 import { isTransactionalEmailConfigured } from "../../services/providers";
 import {
   createStaffInvitation,
@@ -337,50 +335,10 @@ router.post(
         });
       return;
     }
-    // Cooldown: one resend per invite per minute, shared across instances,
-    // so a stuck button or rapid clicks can't spam the invitee.
-    const cooldown = await consumeCooldown({
-      key: `invite-resend:${actor.organizationId}:${target.id}`,
-      windowMs: 60_000,
-    });
-    if (!cooldown.allowed) {
-      res
-        .status(429)
-        .setHeader(
-          "Retry-After",
-          String(Math.ceil(cooldown.retryAfterMs / 1000)),
-        )
-        .json({
-          error:
-            "Invite was just resent. Please wait a minute before trying again.",
-        });
-      return;
-    }
-    const inviterName =
-      [actor.user.firstName, actor.user.lastName].filter(Boolean).join(" ") ||
-      actor.user.email ||
-      "A teammate";
-    const result = await sendInviteEmail({
-      invitedUserId: target.id,
-      organizationId: actor.organizationId,
-      to: target.email,
-      inviteeFirstName: target.firstName,
-      inviterName,
-      role: target.role,
-    });
-    await recordAudit({
-      organizationId: actor.organizationId,
-      actorUserId: actor.user.id,
-      action: "user.invite_resent",
-      entityType: "user",
-      metadata: {
-        invitedUserId: target.id,
-        email: target.email,
-        inviteEmailSent: result.sent,
-        ...(result.error ? { inviteEmailError: result.error } : {}),
-      },
-    });
-    res.json(result);
+    // Historical untracked sends have no logical receipt/revision. Do not
+    // invent one by resending. An explicit no-send adoption review is required.
+    res.status(409).json({ code: "LEGACY_INVITATION_REVIEW_REQUIRED",
+      error: "This legacy invitation has no durable delivery history. Ask a platform administrator to review and adopt the pending access before sending a new link. No email was sent." });
   },
 );
 

@@ -61,6 +61,7 @@ import type {
   ClientStaffInvitationCreated,
   ClientStaffInvitationList,
   CloseMissedCallCare,
+  CompleteMicrosoftMailboxOAuthParams,
   ConciergeConversation,
   ConciergeMessageRequest,
   ConciergeReply,
@@ -142,10 +143,13 @@ import type {
   ListContactsParams,
   ListCustomerRepliesParams,
   ListEstimatesParams,
+  ListInvitationEmailDeliveriesParams,
   ListInvoicesParams,
   ListLeadsParams,
+  ListPlatformIdentityDeliveriesParams,
   ListProjectsParams,
   ListPropertiesParams,
+  ListServiceMailboxRepliesParams,
   ListServiceObligationsParams,
   ListServiceWatchParams,
   ListSourceAdoptionsParams,
@@ -162,6 +166,11 @@ import type {
   MessageTemplate,
   MessageTemplateInput,
   MessageTemplateUpdate,
+  MicrosoftMailboxConnect,
+  MicrosoftMailboxConnectResult,
+  MicrosoftMailboxDisable,
+  MicrosoftMailboxDisableResult,
+  MicrosoftMailboxStatus,
   MissedCallCareReadModel,
   MobileTokenExchangeRequest,
   MobileTokenExchangeSuccess,
@@ -172,6 +181,7 @@ import type {
   OrgEnvelope,
   OrgSettings,
   OrgSettingsInput,
+  PlatformEmailDeliveryPage,
   PlatformOrgList,
   Playbook,
   PlaybookEnrollment,
@@ -209,6 +219,7 @@ import type {
   ResolveCustomerReply,
   ReverseInvoiceAllocation,
   ReviewCustomerReply,
+  ReviewServiceMailboxReply,
   RoiReport,
   RotateWebhookSecretInput,
   SaveMissedCallCarePolicy,
@@ -216,6 +227,8 @@ import type {
   SavedFilterInput,
   ServiceCareCommandResult,
   ServiceCareReview,
+  ServiceMailboxReplyPage,
+  ServiceMailboxReplyReviewResult,
   ServiceObligation,
   ServiceObligationListItem,
   ServiceRecurrenceCommand,
@@ -16633,3 +16646,585 @@ export const useCloseMissedCallCare = <TError = ErrorType<void>,
       return useMutation(getCloseMissedCallCareMutationOptions(options));
     }
 
+export const getListServiceMailboxRepliesUrl = (id: string,
+    params?: ListServiceMailboxRepliesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/service-obligations/${id}/mailbox-replies?${stringifiedParams}` : `/api/v1/service-obligations/${id}/mailbox-replies`
+}
+
+export const listServiceMailboxReplies = async (id: string,
+    params?: ListServiceMailboxRepliesParams, options?: Parameters<typeof customFetch>[1]): Promise<ServiceMailboxReplyPage> => {
+
+  return customFetch<ServiceMailboxReplyPage>(getListServiceMailboxRepliesUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListServiceMailboxRepliesQueryKey = (id: string,
+    params?: ListServiceMailboxRepliesParams,) => {
+    return [
+    `/api/v1/service-obligations/${id}/mailbox-replies`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListServiceMailboxRepliesQueryOptions = <TData = Awaited<ReturnType<typeof listServiceMailboxReplies>>, TError = ErrorType<void>>(id: string,
+    params?: ListServiceMailboxRepliesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceMailboxReplies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListServiceMailboxRepliesQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listServiceMailboxReplies>>> = ({ signal }) => listServiceMailboxReplies(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listServiceMailboxReplies>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListServiceMailboxRepliesQueryResult = NonNullable<Awaited<ReturnType<typeof listServiceMailboxReplies>>>
+export type ListServiceMailboxRepliesQueryError = ErrorType<void>
+
+
+
+export function useListServiceMailboxReplies<TData = Awaited<ReturnType<typeof listServiceMailboxReplies>>, TError = ErrorType<void>>(
+ id: string,
+    params?: ListServiceMailboxRepliesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceMailboxReplies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListServiceMailboxRepliesQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReviewServiceMailboxReplyUrl = (id: string,
+    replyId: string,) => {
+
+
+
+
+  return `/api/v1/service-obligations/${id}/mailbox-replies/${replyId}/review`
+}
+
+export const reviewServiceMailboxReply = async (id: string,
+    replyId: string,
+    reviewServiceMailboxReply: ReviewServiceMailboxReply, options?: Parameters<typeof customFetch>[1]): Promise<ServiceMailboxReplyReviewResult> => {
+
+  return customFetch<ServiceMailboxReplyReviewResult>(getReviewServiceMailboxReplyUrl(id,replyId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(reviewServiceMailboxReply)
+  }
+);}
+
+
+
+
+
+export const getReviewServiceMailboxReplyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewServiceMailboxReply>>, TError,{id: string;replyId: string;data: BodyType<ReviewServiceMailboxReply>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewServiceMailboxReply>>, TError,{id: string;replyId: string;data: BodyType<ReviewServiceMailboxReply>}, TContext> => {
+
+const mutationKey = ['reviewServiceMailboxReply'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewServiceMailboxReply>>, {id: string;replyId: string;data: BodyType<ReviewServiceMailboxReply>}> = (props) => {
+          const {id,replyId,data} = props ?? {};
+
+          return  reviewServiceMailboxReply(id,replyId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewServiceMailboxReplyMutationResult = NonNullable<Awaited<ReturnType<typeof reviewServiceMailboxReply>>>
+    export type ReviewServiceMailboxReplyMutationBody = BodyType<ReviewServiceMailboxReply>
+    export type ReviewServiceMailboxReplyMutationError = ErrorType<void>
+
+    export const useReviewServiceMailboxReply = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewServiceMailboxReply>>, TError,{id: string;replyId: string;data: BodyType<ReviewServiceMailboxReply>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewServiceMailboxReply>>,
+        TError,
+        {id: string;replyId: string;data: BodyType<ReviewServiceMailboxReply>},
+        TContext
+      > => {
+      return useMutation(getReviewServiceMailboxReplyMutationOptions(options));
+    }
+
+export const getListPlatformIdentityDeliveriesUrl = (params?: ListPlatformIdentityDeliveriesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/platform/email-deliveries?${stringifiedParams}` : `/api/v1/platform/email-deliveries`
+}
+
+export const listPlatformIdentityDeliveries = async (params?: ListPlatformIdentityDeliveriesParams, options?: Parameters<typeof customFetch>[1]): Promise<PlatformEmailDeliveryPage> => {
+
+  return customFetch<PlatformEmailDeliveryPage>(getListPlatformIdentityDeliveriesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPlatformIdentityDeliveriesQueryKey = (params?: ListPlatformIdentityDeliveriesParams,) => {
+    return [
+    `/api/v1/platform/email-deliveries`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListPlatformIdentityDeliveriesQueryOptions = <TData = Awaited<ReturnType<typeof listPlatformIdentityDeliveries>>, TError = ErrorType<void>>(params?: ListPlatformIdentityDeliveriesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPlatformIdentityDeliveries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPlatformIdentityDeliveriesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPlatformIdentityDeliveries>>> = ({ signal }) => listPlatformIdentityDeliveries(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPlatformIdentityDeliveries>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPlatformIdentityDeliveriesQueryResult = NonNullable<Awaited<ReturnType<typeof listPlatformIdentityDeliveries>>>
+export type ListPlatformIdentityDeliveriesQueryError = ErrorType<void>
+
+
+
+export function useListPlatformIdentityDeliveries<TData = Awaited<ReturnType<typeof listPlatformIdentityDeliveries>>, TError = ErrorType<void>>(
+ params?: ListPlatformIdentityDeliveriesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPlatformIdentityDeliveries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPlatformIdentityDeliveriesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListInvitationEmailDeliveriesUrl = (params?: ListInvitationEmailDeliveriesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/staff-invitations/email-deliveries?${stringifiedParams}` : `/api/v1/staff-invitations/email-deliveries`
+}
+
+export const listInvitationEmailDeliveries = async (params?: ListInvitationEmailDeliveriesParams, options?: Parameters<typeof customFetch>[1]): Promise<PlatformEmailDeliveryPage> => {
+
+  return customFetch<PlatformEmailDeliveryPage>(getListInvitationEmailDeliveriesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListInvitationEmailDeliveriesQueryKey = (params?: ListInvitationEmailDeliveriesParams,) => {
+    return [
+    `/api/v1/staff-invitations/email-deliveries`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListInvitationEmailDeliveriesQueryOptions = <TData = Awaited<ReturnType<typeof listInvitationEmailDeliveries>>, TError = ErrorType<void>>(params?: ListInvitationEmailDeliveriesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInvitationEmailDeliveries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListInvitationEmailDeliveriesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInvitationEmailDeliveries>>> = ({ signal }) => listInvitationEmailDeliveries(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInvitationEmailDeliveries>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListInvitationEmailDeliveriesQueryResult = NonNullable<Awaited<ReturnType<typeof listInvitationEmailDeliveries>>>
+export type ListInvitationEmailDeliveriesQueryError = ErrorType<void>
+
+
+
+export function useListInvitationEmailDeliveries<TData = Awaited<ReturnType<typeof listInvitationEmailDeliveries>>, TError = ErrorType<void>>(
+ params?: ListInvitationEmailDeliveriesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInvitationEmailDeliveries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListInvitationEmailDeliveriesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMicrosoftMailboxStatusUrl = () => {
+
+
+
+
+  return `/api/v1/mailbox/microsoft`
+}
+
+export const getMicrosoftMailboxStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<MicrosoftMailboxStatus> => {
+
+  return customFetch<MicrosoftMailboxStatus>(getGetMicrosoftMailboxStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMicrosoftMailboxStatusQueryKey = () => {
+    return [
+    `/api/v1/mailbox/microsoft`
+    ] as const;
+    }
+
+
+export const getGetMicrosoftMailboxStatusQueryOptions = <TData = Awaited<ReturnType<typeof getMicrosoftMailboxStatus>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMicrosoftMailboxStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMicrosoftMailboxStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMicrosoftMailboxStatus>>> = ({ signal }) => getMicrosoftMailboxStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMicrosoftMailboxStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMicrosoftMailboxStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getMicrosoftMailboxStatus>>>
+export type GetMicrosoftMailboxStatusQueryError = ErrorType<void>
+
+
+
+export function useGetMicrosoftMailboxStatus<TData = Awaited<ReturnType<typeof getMicrosoftMailboxStatus>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMicrosoftMailboxStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMicrosoftMailboxStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getConnectMicrosoftMailboxUrl = () => {
+
+
+
+
+  return `/api/v1/mailbox/microsoft/connect`
+}
+
+export const connectMicrosoftMailbox = async (microsoftMailboxConnect: MicrosoftMailboxConnect, options?: Parameters<typeof customFetch>[1]): Promise<MicrosoftMailboxConnectResult> => {
+
+  return customFetch<MicrosoftMailboxConnectResult>(getConnectMicrosoftMailboxUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(microsoftMailboxConnect)
+  }
+);}
+
+
+
+
+
+export const getConnectMicrosoftMailboxMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof connectMicrosoftMailbox>>, TError,{data: BodyType<MicrosoftMailboxConnect>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof connectMicrosoftMailbox>>, TError,{data: BodyType<MicrosoftMailboxConnect>}, TContext> => {
+
+const mutationKey = ['connectMicrosoftMailbox'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof connectMicrosoftMailbox>>, {data: BodyType<MicrosoftMailboxConnect>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  connectMicrosoftMailbox(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConnectMicrosoftMailboxMutationResult = NonNullable<Awaited<ReturnType<typeof connectMicrosoftMailbox>>>
+    export type ConnectMicrosoftMailboxMutationBody = BodyType<MicrosoftMailboxConnect>
+    export type ConnectMicrosoftMailboxMutationError = ErrorType<void>
+
+    export const useConnectMicrosoftMailbox = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof connectMicrosoftMailbox>>, TError,{data: BodyType<MicrosoftMailboxConnect>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof connectMicrosoftMailbox>>,
+        TError,
+        {data: BodyType<MicrosoftMailboxConnect>},
+        TContext
+      > => {
+      return useMutation(getConnectMicrosoftMailboxMutationOptions(options));
+    }
+
+export const getDisableMicrosoftMailboxUrl = () => {
+
+
+
+
+  return `/api/v1/mailbox/microsoft/disable`
+}
+
+export const disableMicrosoftMailbox = async (microsoftMailboxDisable: MicrosoftMailboxDisable, options?: Parameters<typeof customFetch>[1]): Promise<MicrosoftMailboxDisableResult> => {
+
+  return customFetch<MicrosoftMailboxDisableResult>(getDisableMicrosoftMailboxUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(microsoftMailboxDisable)
+  }
+);}
+
+
+
+
+
+export const getDisableMicrosoftMailboxMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disableMicrosoftMailbox>>, TError,{data: BodyType<MicrosoftMailboxDisable>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof disableMicrosoftMailbox>>, TError,{data: BodyType<MicrosoftMailboxDisable>}, TContext> => {
+
+const mutationKey = ['disableMicrosoftMailbox'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof disableMicrosoftMailbox>>, {data: BodyType<MicrosoftMailboxDisable>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  disableMicrosoftMailbox(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DisableMicrosoftMailboxMutationResult = NonNullable<Awaited<ReturnType<typeof disableMicrosoftMailbox>>>
+    export type DisableMicrosoftMailboxMutationBody = BodyType<MicrosoftMailboxDisable>
+    export type DisableMicrosoftMailboxMutationError = ErrorType<void>
+
+    export const useDisableMicrosoftMailbox = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disableMicrosoftMailbox>>, TError,{data: BodyType<MicrosoftMailboxDisable>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof disableMicrosoftMailbox>>,
+        TError,
+        {data: BodyType<MicrosoftMailboxDisable>},
+        TContext
+      > => {
+      return useMutation(getDisableMicrosoftMailboxMutationOptions(options));
+    }
+
+export const getCompleteMicrosoftMailboxOAuthUrl = (params?: CompleteMicrosoftMailboxOAuthParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/mailbox/microsoft/callback?${stringifiedParams}` : `/api/v1/mailbox/microsoft/callback`
+}
+
+/**
+ * Session-bound state and PKCE; distinct opt-in read credential. Never log authorization codes.
+ */
+export const completeMicrosoftMailboxOAuth = async (params?: CompleteMicrosoftMailboxOAuthParams, options?: Parameters<typeof customFetch>[1]): Promise<unknown> => {
+
+  return customFetch<unknown>(getCompleteMicrosoftMailboxOAuthUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCompleteMicrosoftMailboxOAuthQueryKey = (params?: CompleteMicrosoftMailboxOAuthParams,) => {
+    return [
+    `/api/v1/mailbox/microsoft/callback`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getCompleteMicrosoftMailboxOAuthQueryOptions = <TData = Awaited<ReturnType<typeof completeMicrosoftMailboxOAuth>>, TError = ErrorType<void>>(params?: CompleteMicrosoftMailboxOAuthParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof completeMicrosoftMailboxOAuth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCompleteMicrosoftMailboxOAuthQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof completeMicrosoftMailboxOAuth>>> = ({ signal }) => completeMicrosoftMailboxOAuth(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof completeMicrosoftMailboxOAuth>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CompleteMicrosoftMailboxOAuthQueryResult = NonNullable<Awaited<ReturnType<typeof completeMicrosoftMailboxOAuth>>>
+export type CompleteMicrosoftMailboxOAuthQueryError = ErrorType<void>
+
+
+
+export function useCompleteMicrosoftMailboxOAuth<TData = Awaited<ReturnType<typeof completeMicrosoftMailboxOAuth>>, TError = ErrorType<void>>(
+ params?: CompleteMicrosoftMailboxOAuthParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof completeMicrosoftMailboxOAuth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCompleteMicrosoftMailboxOAuthQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
