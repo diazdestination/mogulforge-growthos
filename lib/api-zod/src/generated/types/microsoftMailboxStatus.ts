@@ -33,4 +33,11 @@ export interface MicrosoftMailboxStatus {
   historicalCrawl: false;
   attachmentsRead: false;
   remoteConsentRevoked: false;
+  leadMonitoringEnabled: boolean;
+  /** @minimum 0 */
+  leadMonitoringVersion: number;
+  /** @nullable */
+  leadMonitoringApprovedAt: Date | null;
+  /** @nullable */
+  leadMonitoringChangedAt: Date | null;
 }

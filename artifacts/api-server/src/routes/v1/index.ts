@@ -56,6 +56,7 @@ import financialMigrationRouter from "./financial-migration";
 import sourceAdoptionRouter from "./source-adoption";
 import platformEmailDeliveryRouter from "./platform-email-delivery";
 import serviceMailboxRepliesRouter from "./service-mailbox-replies";
+import leadMailboxRepliesRouter from "./lead-mailbox-replies";
 import mailboxIntegrationsRouter from "./mailbox-integrations";
 
 const router: IRouter = Router();
@@ -103,6 +104,7 @@ router.use(reactivationRouter);
 router.use(sourceAdoptionRouter);
 router.use(platformEmailDeliveryRouter);
 router.use(serviceMailboxRepliesRouter);
+router.use(leadMailboxRepliesRouter);
 router.use(mailboxIntegrationsRouter);
 router.use(captureRouter);
 router.use(smartSitesRouter);

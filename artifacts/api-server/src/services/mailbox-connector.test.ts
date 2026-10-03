@@ -24,6 +24,9 @@ import {
   getMailboxStatus,
   getMicrosoftMailboxIdentity,
   processMailboxConnectors,
+  getLeadMonitoringApproval,
+  assertLeadMonitoringApproval,
+  setLeadMonitoringApproval,
 } from "./mailbox-connector";
 import { MAILBOX_READ_SCOPES } from "./mailbox-contract";
 import { MICROSOFT_SCOPES, disconnectMicrosoft } from "./microsoft-oauth";
@@ -147,18 +150,16 @@ beforeEach(async () => {
       })
       .returning()
   ).map((v) => v.id);
-  await db
-    .insert(microsoftConnectionsTable)
-    .values({
-      ...actor(),
-      accountId: profile.id,
-      email: profile.mail,
-      encryptedRefreshToken: encryptSecret(
-        "synthetic-send-refresh",
-        `${org}:${user}:microsoft`,
-      ),
-      grantedScopes: ["mail.send", "user.read"],
-    });
+  await db.insert(microsoftConnectionsTable).values({
+    ...actor(),
+    accountId: profile.id,
+    email: profile.mail,
+    encryptedRefreshToken: encryptSecret(
+      "synthetic-send-refresh",
+      `${org}:${user}:microsoft`,
+    ),
+    grantedScopes: ["mail.send", "user.read"],
+  });
   await db
     .insert(emailSenderPreferencesTable)
     .values({ ...actor(), provider: "microsoft" });
@@ -224,14 +225,12 @@ describe("separate explicit Microsoft read opt-in", () => {
   });
   it("rechecks a pause after initial approval before exchanging its callback", async () => {
     const state = await start();
-    await db
-      .insert(customerLifecycleTable)
-      .values({
-        organizationId: org,
-        state: "paused",
-        version: 1,
-        reason: "Synthetic hold",
-      });
+    await db.insert(customerLifecycleTable).values({
+      organizationId: org,
+      state: "paused",
+      version: 1,
+      reason: "Synthetic hold",
+    });
     const transport = vi.fn<typeof fetch>();
     await expect(
       completeMailboxOAuth(actor(), state, "synthetic", transport),
@@ -349,7 +348,9 @@ describe("durable bounded mailbox cursors", () => {
       state: "unmatched",
       reason: "parent_not_observed",
     });
-    const transport = poll([], [inbox]).mockResolvedValueOnce(respond(inbox));
+    const transport = poll([], [inbox])
+      .mockResolvedValueOnce(respond(inbox))
+      .mockResolvedValueOnce(respond(inbox));
     await processMailboxConnectors(org, { transport });
     expect(ingestMailboxReply).toHaveBeenCalledTimes(2);
     expect(String(transport.mock.calls[4][0])).toContain(
@@ -363,14 +364,12 @@ describe("durable bounded mailbox cursors", () => {
   });
   it("honors pause/disable/lease before reading and serializes independent ticks", async () => {
     await activate();
-    await db
-      .insert(customerLifecycleTable)
-      .values({
-        organizationId: org,
-        state: "paused",
-        version: 1,
-        reason: "Synthetic hold",
-      });
+    await db.insert(customerLifecycleTable).values({
+      organizationId: org,
+      state: "paused",
+      version: 1,
+      reason: "Synthetic hold",
+    });
     const transport = vi.fn<typeof fetch>();
     await processMailboxConnectors(org, { transport });
     expect(transport).not.toHaveBeenCalled();
@@ -489,5 +488,125 @@ describe("durable bounded mailbox cursors", () => {
     }
     expect(transport).toHaveBeenCalledTimes(4);
     expect((await connector()).leaseToken).toBeNull();
+  });
+});
+describe("explicit tracked lead context", () => {
+  const command = async (enabled: boolean) => ({
+    expectedConnectorVersion: (await connector()).version,
+    expectedLeadMonitoringVersion: (await connector()).leadMonitoringVersion,
+    enabled,
+    leadContextAcknowledged: true,
+  });
+  it("defaults to service-only and preserves exact service identity/cursor when lead context changes", async () => {
+    await activate();
+    const before = await connector(),
+      original = (await getMicrosoftMailboxIdentity(org, user))!;
+    expect(await getLeadMonitoringApproval(original)).toBeNull();
+    await setLeadMonitoringApproval(actor(), await command(true));
+    const approval = await getLeadMonitoringApproval(original);
+    expect(approval).toMatchObject({ version: 1 });
+    expect(await getMicrosoftMailboxIdentity(org, user)).toEqual(original);
+    const after = await connector();
+    expect(after.encryptedCursors).toBe(before.encryptedCursors);
+    expect(after.version).toBe(before.version);
+    expect(after.startedAt).toEqual(before.startedAt);
+    await assertLeadMonitoringApproval(original, approval!);
+    await setLeadMonitoringApproval(actor(), await command(false));
+    await expect(
+      assertLeadMonitoringApproval(original, approval!),
+    ).rejects.toMatchObject({ code: "mailbox_lead_approval_changed" });
+    await setLeadMonitoringApproval(actor(), await command(true));
+    expect((await getLeadMonitoringApproval(original))?.version).toBe(3);
+    await expect(
+      assertLeadMonitoringApproval(original, approval!),
+    ).rejects.toMatchObject({ code: "mailbox_lead_approval_changed" });
+  });
+  it("rejects missing confirmation, stale versions, foreign owner and inactive connector", async () => {
+    await activate();
+    const input = await command(true);
+    await expect(
+      setLeadMonitoringApproval(actor(), {
+        ...input,
+        leadContextAcknowledged: false,
+      }),
+    ).rejects.toThrow();
+    await expect(
+      setLeadMonitoringApproval(
+        { ...actor(), organizationId: randomUUID() },
+        input,
+      ),
+    ).rejects.toMatchObject({ code: "mailbox_staff_required" });
+    await expect(
+      setLeadMonitoringApproval(actor(), {
+        ...input,
+        expectedConnectorVersion: input.expectedConnectorVersion + 1,
+      }),
+    ).rejects.toMatchObject({ code: "mailbox_lead_version_changed" });
+    await setLeadMonitoringApproval(actor(), input);
+    await expect(
+      setLeadMonitoringApproval(actor(), input),
+    ).rejects.toMatchObject({ code: "mailbox_lead_version_changed" });
+    await setLeadMonitoringApproval(actor(), await command(false));
+    await disableMailboxConnector(actor(), {
+      expectedVersion: (await connector()).version,
+      confirmed: true,
+    });
+    await expect(
+      setLeadMonitoringApproval(actor(), await command(true)),
+    ).rejects.toMatchObject({ code: "mailbox_grant_changed" });
+  });
+  it("allows local lead revoke while globally held and a new read opt-in starts service-only", async () => {
+    await activate();
+    await setLeadMonitoringApproval(actor(), await command(true));
+    vi.stubEnv("MICROSOFT_MAILBOX_READ_ENABLED", "false");
+    const status = await setLeadMonitoringApproval(
+      actor(),
+      await command(false),
+    );
+    expect(status.leadMonitoringEnabled).toBe(false);
+    await expect(
+      setLeadMonitoringApproval(actor(), await command(true)),
+    ).rejects.toMatchObject({ code: "mailbox_feature_disabled" });
+    vi.stubEnv("MICROSOFT_MAILBOX_READ_ENABLED", "true");
+    await setLeadMonitoringApproval(actor(), await command(true));
+    await activate();
+    expect((await getMailboxStatus(org, user)).leadMonitoringEnabled).toBe(
+      false,
+    );
+  });
+  it("rechecks a pending candidate before body fetch while valid service pending evidence continues", async () => {
+    await activate();
+    const lead = message("inbox", "lead_pending"),
+      service = message("inbox", "service_pending");
+    vi.mocked(ingestMailboxReply)
+      .mockResolvedValueOnce({
+        state: "unmatched",
+        reason: "parent_not_observed",
+      })
+      .mockResolvedValueOnce({
+        state: "unmatched",
+        reason: "parent_not_observed",
+      });
+    vi.mocked(isMailboxReplyCandidate)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    const transport = poll([], [lead, service])
+      .mockResolvedValueOnce(respond(lead))
+      .mockResolvedValueOnce(respond(service))
+      .mockResolvedValueOnce(respond(service));
+    await processMailboxConnectors(org, { transport });
+    const reads = transport.mock.calls.filter(([url]) =>
+      String(url).includes("/messages/"),
+    );
+    const leadReads = reads.filter(([url]) =>
+      String(url).includes("/lead_pending?"),
+    );
+    expect(leadReads).toHaveLength(2);
+    expect(String(leadReads[0][0])).toContain(",body");
+    expect(String(leadReads[1][0])).not.toContain(",body");
+    expect(ingestMailboxReply).toHaveBeenCalledTimes(3);
+    expect((await connector()).state).toBe("active");
   });
 });

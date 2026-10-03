@@ -34,7 +34,7 @@ beforeAll(async () => {
 });
 beforeEach(() => {
   vi.clearAllMocks();
-  email.status.mockResolvedValue({ configured: true, connected: true, senderActive: true });
+  email.status.mockResolvedValue({ configured: true, connected: true, senderActive: true, provider: 'gmail', email: 'synthetic-sender@example.test' });
   email.send.mockResolvedValue({ id: 'synthetic-playbook-message', provider: 'gmail', senderEmail: 'synthetic-sender@example.test' });
   effects.draft.mockResolvedValue({ body: 'Synthetic approved test message' });
   effects.sms.mockResolvedValue({ id: 'synthetic-sms', provider: 'mock-sms' });

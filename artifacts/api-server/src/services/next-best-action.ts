@@ -3,6 +3,7 @@ import {
   appointmentsTable,
   contactsTable,
   db,
+  emailResponseReviewsTable,
   leadsTable,
   nextActionFeedbackTable,
   type Lead,
@@ -23,6 +24,7 @@ import { getBusinessName, getOrgSettings } from "./settings";
  */
 
 export type NextActionType =
+  | "review_customer_reply"
   | "reply_portal_message"
   | "call_now"
   | "send_message"
@@ -59,6 +61,7 @@ const OUTREACH_STATUSES = [
 const QUEUE_STATUSES = [...OUTREACH_STATUSES, "estimate_sent", "claim_pending"];
 
 interface LeadSignals {
+  hasCustomerReplyHold: boolean;
   hasUnreadPortalMessage: boolean;
   lastActivityAt: Date | null;
   hasUpcomingAppointment: boolean;
@@ -105,7 +108,7 @@ async function loadSignals(
   const leadIds = leads.map((l) => l.id);
   const contactIds = [...new Set(leads.map((l) => l.contactId))];
 
-  const [activityRows, apptRows, contactRows] = await Promise.all([
+  const [activityRows, apptRows, contactRows, replyRows] = await Promise.all([
     db
       .select({
         leadId: activitiesTable.leadId,
@@ -150,16 +153,22 @@ async function loadSignals(
           inArray(contactsTable.id, contactIds),
         ),
       ),
+    db.select({ leadId: emailResponseReviewsTable.leadId })
+      .from(emailResponseReviewsTable)
+      .where(and(eq(emailResponseReviewsTable.organizationId, organizationId),
+        inArray(emailResponseReviewsTable.leadId, leadIds), eq(emailResponseReviewsTable.holdActive, true))),
   ]);
 
   const activityByLead = new Map(activityRows.map((r) => [r.leadId, r]));
   const upcoming = new Set(apptRows.map((r) => r.leadId));
   const contactById = new Map(contactRows.map((r) => [r.id, r]));
+  const replyHeld = new Set(replyRows.map(row => row.leadId));
 
   for (const lead of leads) {
     const act = activityByLead.get(lead.id);
     const contact = contactById.get(lead.contactId);
     map.set(lead.id, {
+      hasCustomerReplyHold: replyHeld.has(lead.id),
       hasUnreadPortalMessage: Boolean(act?.unread),
       lastActivityAt: act?.lastActivityAt ? new Date(act.lastActivityAt) : null,
       hasUpcomingAppointment: upcoming.has(lead.id),
@@ -196,6 +205,14 @@ function rankLeadCandidates(
     score: lead.score,
   };
   const quietDays = daysSince(signals.lastActivityAt, new Date(lead.createdAt));
+
+  // The canonical reply hold outranks a sales nudge, AI draft or appointment
+  // suggestion. Snoozing a recommendation cannot hide or release this work.
+  if (signals.hasCustomerReplyHold) return [{
+    ...base, actionType: "review_customer_reply", title: "Review the customer's reply",
+    reasons: ["A customer reply needs office review on this lead.", "Follow-up is held. Open Messages and handle the reply before considering any new outreach."],
+    priority: 120,
+  }];
 
   if (signals.hasUnreadPortalMessage) {
     candidates.push({
@@ -307,7 +324,7 @@ function pickAction(
 ): Omit<NextBestAction, "draft"> {
   const candidates = rankLeadCandidates(lead, signals);
   const eligible = candidates.find(
-    (c) => c.actionType === "none" || !suppressed.has(c.actionType),
+    (c) => c.actionType === "none" || c.actionType === "review_customer_reply" || !suppressed.has(c.actionType),
   );
   if (eligible) return eligible;
   return {

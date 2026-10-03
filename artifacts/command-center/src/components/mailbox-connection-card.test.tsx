@@ -20,6 +20,10 @@ const status = (extra = {}) => ({
   reason: null,
   pendingParentCount: 0,
   reviewCount: 0,
+  leadMonitoringEnabled: false,
+  leadMonitoringVersion: 0,
+  leadMonitoringApprovedAt: null,
+  leadMonitoringChangedAt: null,
   ...extra,
 });
 const json = (value: unknown, code = 200) =>
@@ -144,4 +148,123 @@ it("fails closed on invalid status and refuses an arbitrary authorization URL", 
   expect(
     screen.queryByRole("button", { name: "Review Microsoft read permission" }),
   ).toBeNull();
+});
+it("requires separate tracked-lead acknowledgement and freezes both current versions", async () => {
+  const before = status({
+    state: "active",
+    usable: true,
+    version: 4,
+    mailboxEmail: "staff@example.invalid",
+    leadMonitoringVersion: 2,
+  });
+  const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) =>
+    init?.method === "POST"
+      ? json({
+          ...before,
+          leadMonitoringEnabled: true,
+          leadMonitoringVersion: 3,
+          leadMonitoringApprovedAt: "2026-10-02T12:00:00Z",
+          leadMonitoringChangedAt: "2026-10-02T12:00:00Z",
+        })
+      : json(before),
+  );
+  vi.stubGlobal("fetch", request);
+  render(<MailboxConnectionCard returnPath="/account" />);
+  const enable = await screen.findByRole("button", {
+    name: "Enable tracked lead replies",
+  });
+  expect(enable.hasAttribute("disabled")).toBe(true);
+  fireEvent.click(
+    screen.getByLabelText(/I explicitly approve tracked BIE lead replies/),
+  );
+  fireEvent.click(enable);
+  await screen.findByText(/Lead context approved at version 3/);
+  const post = request.mock.calls.find(([, init]) => init?.method === "POST")!;
+  expect(post[0]).toBe("/api/v1/mailbox/microsoft/lead-monitoring");
+  expect(JSON.parse(String(post[1]?.body))).toEqual({
+    expectedConnectorVersion: 4,
+    expectedLeadMonitoringVersion: 2,
+    enabled: true,
+    leadContextAcknowledged: true,
+  });
+  expect(screen.getByText(/adds no Microsoft scope/)).toBeTruthy();
+});
+it("permits local lead revoke while global reading is held without reconnecting the sender", async () => {
+  const before = status({
+    enabled: false,
+    state: "active",
+    version: 5,
+    leadMonitoringEnabled: true,
+    leadMonitoringVersion: 7,
+  });
+  const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) =>
+    json(
+      init?.method === "POST"
+        ? { ...before, leadMonitoringEnabled: false, leadMonitoringVersion: 8 }
+        : before,
+    ),
+  );
+  vi.stubGlobal("fetch", request);
+  render(<MailboxConnectionCard returnPath="/settings" />);
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Stop tracked lead replies" }),
+  );
+  await screen.findByText(/Lead context is off/);
+  expect(
+    JSON.parse(
+      String(
+        request.mock.calls.find(([, init]) => init?.method === "POST")?.[1]
+          ?.body,
+      ),
+    ),
+  ).toEqual({
+    expectedConnectorVersion: 5,
+    expectedLeadMonitoringVersion: 7,
+    enabled: false,
+    leadContextAcknowledged: true,
+  });
+  expect(
+    screen
+      .getByRole("button", { name: "Enable tracked lead replies" })
+      .hasAttribute("disabled"),
+  ).toBe(true);
+});
+it("requires explicit refresh and renewed acknowledgement after a stale approval", async () => {
+  let version = 1;
+  const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) =>
+    init?.method === "POST"
+      ? json({}, 409)
+      : json(
+          status({
+            state: "active",
+            usable: true,
+            version,
+            mailboxEmail: "staff@example.invalid",
+          }),
+        ),
+  );
+  vi.stubGlobal("fetch", request);
+  render(<MailboxConnectionCard returnPath="/account" />);
+  await screen.findByRole("button", { name: "Enable tracked lead replies" });
+  fireEvent.click(screen.getByLabelText(/I explicitly approve/));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Enable tracked lead replies" }),
+  );
+  await screen.findByText(/approval was not confirmed or its version changed/);
+  expect(
+    screen
+      .getByRole("button", { name: "Enable tracked lead replies" })
+      .hasAttribute("disabled"),
+  ).toBe(true);
+  version = 2;
+  fireEvent.click(
+    screen.getByRole("button", { name: "Refresh reply-monitoring status" }),
+  );
+  await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  expect(
+    (screen.getByLabelText(/I explicitly approve/) as HTMLInputElement).checked,
+  ).toBe(false);
+  expect(
+    request.mock.calls.filter(([, init]) => init?.method === "POST"),
+  ).toHaveLength(1);
 });

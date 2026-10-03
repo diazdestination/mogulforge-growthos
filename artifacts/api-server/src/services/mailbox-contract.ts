@@ -38,6 +38,15 @@ export type MailboxMessage = {
   references: string[];
   automated: boolean;
 };
+export type LeadMonitoringApproval = { version: number; approvedAt: string };
+export const leadMonitoringInput = z
+  .object({
+    expectedConnectorVersion: z.number().int().positive(),
+    expectedLeadMonitoringVersion: z.number().int().nonnegative(),
+    enabled: z.boolean(),
+    leadContextAcknowledged: z.literal(true),
+  })
+  .strict();
 export const mailboxConnectInput = z
   .object({
     expectedVersion: z.number().int().min(0),

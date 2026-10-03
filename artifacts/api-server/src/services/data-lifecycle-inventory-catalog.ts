@@ -3,7 +3,7 @@
  * deletion order, retention policy, or proof of complete account ownership.
  * Every new table must receive an explicit classification before preview runs.
  */
-export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-02.inventory-v7";
+export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-02.inventory-v8";
 export const DATA_LIFECYCLE_EXPECTED_TABLES = 117;
 export const DATA_LIFECYCLE_ROW_LIMIT = 10_000;
 

@@ -19,6 +19,7 @@ import {
   usersTable,
   appointmentsTable,
   estimatesTable,
+  revenueExecutionsTable,
   type BieActionProposal,
   type BieActionStatus,
   type BieActionType,
@@ -38,6 +39,11 @@ import { isDeepStrictEqual } from "node:util";
 import { assertCapabilityForActor, CapabilityAccessError, getEntitlements } from "./entitlements";
 import { needsSourceVerification, originalOpportunityDate, sourceLastContactDate } from "./source-history";
 import { hasCustomerReplyHold } from "./response-correlation";
+import { z } from "zod/v4";
+import { EmailDispatchBlockedError } from "./email-dispatch-guard";
+import { mailboxDigest } from "./mailbox-contract";
+import { getMicrosoftMailboxIdentity, getLeadMonitoringApproval, assertLeadMonitoringApproval } from "./mailbox-connector";
+import { reserveLeadMailboxParent, recordMailboxParentAcceptance, leadReplySendSnapshotSchema, type LeadReplySendSnapshot } from "./mailbox-communication";
 
 const SOURCES: BieSource[] = [
   "google_ads",
@@ -708,6 +714,94 @@ async function getProposal(organizationId: string, actionId: string) {
   return proposal ?? null;
 }
 
+export const prepareBieEmailInput = z.object({ expectedPayload: z.record(z.string(), z.unknown()) }).strict();
+const emailReviewSchema = z.object({
+  version: z.literal(1), preparedByUserId: z.string().min(1), preparedAt: z.iso.datetime(),
+  leadId: z.uuid(), contactId: z.uuid(), leadCreatedAt: z.iso.datetime(), leadUpdatedAt: z.iso.datetime(),
+  recipient: z.email(), sender: z.object({ provider: z.enum(["gmail", "microsoft"]), senderEmail: z.email() }).strict(),
+}).strict();
+export type BieEmailReview = z.infer<typeof emailReviewSchema>;
+export class BieEmailReviewError extends Error {
+  constructor(readonly code: string, readonly status = 409) { super("Email review changed or is unavailable. Refresh the saved draft and prepare its exact recipient and sender again; no message was sent."); }
+}
+function emailReviewFail(code: string, status = 409): never { throw new BieEmailReviewError(code, status); }
+const normalizeMailbox = (value: string) => value.trim().toLowerCase();
+async function bieEmailActor(org: string, actorId: string, requireVerified: boolean) {
+  const [actor] = await db.select().from(usersTable).where(and(eq(usersTable.organizationId, org), eq(usersTable.id, actorId)));
+  if (!actor?.isActive || actor.id.startsWith("invite:") || !hasPermission(actor.role, "crm.write") || (requireVerified && !actor.emailVerifiedAt)) emailReviewFail("accepted_staff_required", 403);
+  return actor;
+}
+async function bieEmailLead(org: string, proposal: BieActionProposal) {
+  const [lead] = await db.select().from(leadsTable).where(and(eq(leadsTable.organizationId, org), eq(leadsTable.id, proposal.leadId)));
+  const [contact] = lead ? await db.select().from(contactsTable).where(and(eq(contactsTable.organizationId, org), eq(contactsTable.id, lead.contactId))) : [];
+  if (!lead || !contact?.email || !z.email().safeParse(normalizeMailbox(contact.email)).success) emailReviewFail("lead_email_unavailable");
+  if (["won", "lost", "scheduled", "inspection_scheduled", "production_scheduled", "in_progress", "completed", "review_requested"].includes(lead.status)) emailReviewFail("lead_workflow_changed");
+  if (needsSourceVerification(lead)) emailReviewFail("imported_source_requires_current_review");
+  return { lead, contact, recipient: normalizeMailbox(contact.email) };
+}
+function bieEmailMessage(proposal: BieActionProposal) {
+  const parsed = z.object({ subject: z.string().min(1).max(200), body: z.string().min(1).max(5000) }).safeParse(proposal.payload);
+  if (!parsed.success) emailReviewFail("email_content_review_required");
+  return parsed.data;
+}
+
+/** Explicit write before review; never runs on GET or silently during approval. */
+export async function prepareBieEmailProposal(org: string, id: string, actorId: string, raw: unknown) {
+  const input = prepareBieEmailInput.parse(raw), proposal = await getProposal(org, id);
+  if (!proposal || proposal.actionType !== "send_email" || proposal.status !== "proposed" || !isDeepStrictEqual(proposal.payload, input.expectedPayload)) emailReviewFail("proposal_changed");
+  await bieEmailActor(org, actorId, true);
+  const message = bieEmailMessage(proposal), { lead, contact, recipient } = await bieEmailLead(org, proposal);
+  const gate = await checkSendEligibility({ organizationId: org, leadId: lead.id, contact, channel: "email", kind: "outreach" });
+  if (!gate.ok && gate.outcome !== "deferred") emailReviewFail(gate.reason);
+  const status = await getUserEmailStatus(org, actorId);
+  if (!status.configured || !status.connected || !status.provider || !status.email) emailReviewFail("selected_email_unavailable");
+  const emailReview: BieEmailReview = { version: 1, preparedByUserId: actorId, preparedAt: new Date().toISOString(),
+    leadId: lead.id, contactId: contact.id, leadCreatedAt: lead.createdAt.toISOString(), leadUpdatedAt: lead.updatedAt.toISOString(), recipient,
+    sender: { provider: status.provider, senderEmail: normalizeMailbox(status.email) } };
+  const identity = status.provider === "microsoft" ? await getMicrosoftMailboxIdentity(org, actorId) : null;
+  const monitoring = identity ? await getLeadMonitoringApproval(identity) : null;
+  const deliverySnapshot: LeadReplySendSnapshot | null = identity && monitoring ? { version: 1, kind: "bie_lead_email", leadId: lead.id, contactId: contact.id,
+    leadCreatedAt: emailReview.leadCreatedAt, leadUpdatedAt: emailReview.leadUpdatedAt, recipient, mailboxIdentity: identity, leadMonitoringApproval: monitoring } : null;
+  const payload = { ...message, emailReview, ...(deliverySnapshot ? { deliverySnapshot } : {}) };
+  return db.transaction(async tx => {
+    const [owned] = await tx.select({ id: revenueExecutionsTable.id }).from(revenueExecutionsTable).where(and(eq(revenueExecutionsTable.organizationId, org), eq(revenueExecutionsTable.actionKey, `bie:${id}`)));
+    if (owned) emailReviewFail("execution_already_owned");
+    const [updated] = await tx.update(bieActionProposalsTable).set({ payload }).where(and(eq(bieActionProposalsTable.organizationId, org), eq(bieActionProposalsTable.id, id),
+      eq(bieActionProposalsTable.status, "proposed"), eq(bieActionProposalsTable.payload, input.expectedPayload))).returning();
+    if (!updated) emailReviewFail("proposal_changed");
+    await tx.insert(auditEventsTable).values({ organizationId: org, actorUserId: actorId, action: "bie.email_prepared", entityType: "bie_action_proposal", entityId: id,
+      metadata: { leadId: lead.id, provider: status.provider, trackedOriginalMailbox: Boolean(deliverySnapshot), payloadFingerprint: mailboxDigest(payload) } });
+    return updated;
+  });
+}
+
+/** Prepared sender/recipient/source is immutable through approval and dispatch. */
+async function assertBieEmailReviewCurrent(org: string, proposal: BieActionProposal, actorId: string) {
+  const parsed = emailReviewSchema.safeParse(proposal.payload.emailReview);
+  if (!parsed.success || parsed.data.preparedByUserId !== actorId) emailReviewFail("prepare_email_review_required");
+  const review = parsed.data;
+  await bieEmailActor(org, actorId, true);
+  const current = await bieEmailLead(org, proposal);
+  if (review.leadId !== current.lead.id || review.contactId !== current.contact.id || review.recipient !== current.recipient ||
+      review.leadCreatedAt !== current.lead.createdAt.toISOString() || review.leadUpdatedAt !== current.lead.updatedAt.toISOString()) emailReviewFail("lead_review_changed");
+  bieEmailMessage(proposal);
+  const status = await getUserEmailStatus(org, actorId);
+  if (!status.configured || !status.connected || status.provider !== review.sender.provider || !status.email || normalizeMailbox(status.email) !== review.sender.senderEmail) emailReviewFail("selected_sender_changed");
+  if (proposal.payload.deliverySnapshot !== undefined) {
+    const snapshot = leadReplySendSnapshotSchema.safeParse(proposal.payload.deliverySnapshot);
+    if (!snapshot.success) emailReviewFail("mailbox_review_changed");
+    const saved = snapshot.data;
+    if (
+        saved.leadId !== review.leadId || saved.contactId !== review.contactId || saved.recipient !== review.recipient || saved.leadCreatedAt !== review.leadCreatedAt ||
+        saved.leadUpdatedAt !== review.leadUpdatedAt || saved.mailboxIdentity.senderUserId !== actorId || saved.mailboxIdentity.organizationId !== org ||
+        saved.mailboxIdentity.mailboxEmail !== review.sender.senderEmail || review.sender.provider !== "microsoft") emailReviewFail("mailbox_review_changed");
+    await assertLeadMonitoringApproval(saved.mailboxIdentity, saved.leadMonitoringApproval);
+  }
+  const gate = await checkSendEligibility({ organizationId: org, leadId: current.lead.id, contact: current.contact, channel: "email", kind: "outreach" });
+  if (!gate.ok && gate.outcome !== "deferred") emailReviewFail(gate.reason);
+  return review;
+}
+
 export async function reviewBieProposal(
   organizationId: string,
   actionId: string,
@@ -719,6 +813,11 @@ export async function reviewBieProposal(
   if (!proposal || proposal.status !== "proposed") return null;
   if (expectedPayload && !isDeepStrictEqual(expectedPayload, proposal.payload))
     return null;
+  if (decision === "approve" && proposal.actionType === "send_email") {
+    if (!expectedPayload) return null;
+    try { await assertBieEmailReviewCurrent(organizationId, proposal, actorUserId); }
+    catch { return null; }
+  }
   const nextStatus: BieActionStatus =
     decision === "approve" ? "approved" : "rejected";
   return db.transaction(async (tx) => {
@@ -786,6 +885,38 @@ async function emailCapRemaining(
   return Number(rows.rows[0]?.count ?? 0) <= cap;
 }
 
+async function assertBieEmailDispatchCurrent(org: string, frozen: BieActionProposal, actorId: string,
+  recipient: string, sender: { provider: "gmail" | "microsoft"; senderEmail: string }, automated: boolean) {
+  try {
+    const proposal = await getProposal(org, frozen.id);
+    if (!proposal || proposal.status !== "approved" || !isDeepStrictEqual(proposal.payload, frozen.payload) || proposal.reviewedByUserId !== frozen.reviewedByUserId) emailReviewFail("proposal_changed");
+    const prepared = proposal.payload.emailReview !== undefined;
+    await bieEmailActor(org, actorId, prepared);
+    if (prepared) {
+      if (proposal.reviewedByUserId !== actorId) emailReviewFail("reviewing_sender_changed");
+      await assertBieEmailReviewCurrent(org, proposal, actorId);
+    } else if (proposal.payload.deliverySnapshot !== undefined) emailReviewFail("unreviewed_mailbox_context");
+    const { lead, contact, recipient: currentRecipient } = await bieEmailLead(org, proposal);
+    if (currentRecipient !== recipient) emailReviewFail("recipient_changed");
+    const channel = await getUserEmailStatus(org, actorId);
+    if (!channel.configured || !channel.connected || channel.provider !== sender.provider || !channel.email || normalizeMailbox(channel.email) !== sender.senderEmail) emailReviewFail("selected_sender_changed");
+    const [recent] = await db.select({ id: activitiesTable.id }).from(activitiesTable).where(and(eq(activitiesTable.organizationId, org), eq(activitiesTable.leadId, lead.id),
+      gte(activitiesTable.occurredAt, proposal.createdAt), inArray(activitiesTable.type, ["portal_message", "customer_reply", "email_received", "sms_received", "contact_attempt_logged", "smart_site_contact_attempt"]))).limit(1);
+    const [visit] = await db.select({ id: appointmentsTable.id }).from(appointmentsTable).where(and(eq(appointmentsTable.organizationId, org), eq(appointmentsTable.leadId, lead.id), inArray(appointmentsTable.status, ["scheduled", "confirmed"]))).limit(1);
+    if (recent || visit || await hasCustomerReplyHold(org, lead.id)) emailReviewFail("customer_activity_changed");
+    const policy = await getAutopilotPolicy(org);
+    if (automated) {
+      if (!policy.enabled || policy.pausedAt || !policy.allowedActions.includes("send_email")) emailReviewFail("autopilot_policy_changed");
+      await assertCapabilityForActor(org, actorId, "revenue.autopilot", "crm.write");
+    }
+    if (!await emailCapRemaining(org, policy.dailyEmailCap)) emailReviewFail("email_cap_reached");
+    const gate = await checkSendEligibility({ organizationId: org, leadId: lead.id, contact, channel: "email", kind: "outreach" });
+    if (!gate.ok) emailReviewFail(gate.reason);
+    const [owned] = await db.select().from(revenueExecutionsTable).where(and(eq(revenueExecutionsTable.organizationId, org), eq(revenueExecutionsTable.actionKey, `bie:${proposal.id}`)));
+    if (!owned || owned.state !== "processing" || owned.kind !== "send_email" || owned.actorUserId !== actorId || owned.expiresAt.getTime() <= Date.now() || owned.fingerprint !== mailboxDigest(frozen.payload)) emailReviewFail("execution_not_owned");
+  } catch { throw new EmailDispatchBlockedError(); }
+}
+
 /** Execute an approved proposal. Manual approval is required unless a later worker invokes this under enabled autopilot. */
 export async function executeBieProposal(
   organizationId: string,
@@ -796,6 +927,11 @@ export async function executeBieProposal(
   const proposal = await getProposal(organizationId, actionId);
   if (!proposal) return null;
   if (proposal.status !== "approved") return proposal;
+  if (proposal.actionType === "send_email" && proposal.payload.emailReview !== undefined) {
+    const review = emailReviewSchema.safeParse(proposal.payload.emailReview);
+    if (!review.success || review.data.preparedByUserId !== actorUserId || proposal.reviewedByUserId !== actorUserId)
+      emailReviewFail("reviewing_sender_required", 403);
+  }
   const { customerWorkHeld } = await import("./customer-lifecycle-runtime");
   if (await customerWorkHeld(organizationId))
     return { ...proposal, executionDetail: "Company operations are paused. Approved work is retained for review." };
@@ -1035,7 +1171,7 @@ async function executeBieProposalEffect(
       );
     }
     const channel = await getUserEmailStatus(organizationId, actorUserId);
-    if (!channel.configured || !channel.connected)
+    if (!channel.configured || !channel.connected || !channel.provider || !channel.email)
       return markAction(
         proposal.id,
         "blocked",
@@ -1080,13 +1216,24 @@ async function executeBieProposalEffect(
       typeof proposal.payload.body === "string"
         ? proposal.payload.body
         : proposal.rationale;
+    const recipient = normalizeMailbox(contact.email);
+    const expectedSender = { provider: channel.provider, senderEmail: normalizeMailbox(channel.email) };
+    const beforeDispatch = () => assertBieEmailDispatchCurrent(organizationId, proposal, actorUserId, recipient, expectedSender, Boolean(options.automated));
+    await beforeDispatch();
+    const saved = proposal.payload.deliverySnapshot as LeadReplySendSnapshot | undefined;
+    const outboundParentId = saved ? await reserveLeadMailboxParent({ identity: saved.mailboxIdentity, leadId: lead.id, contactId: contact.id, proposalId: proposal.id,
+      executionFingerprint: mailboxDigest(proposal.payload), message: { to: recipient, subject, body } }) : undefined;
     const sent = await sendEmailForUser({
       organizationId,
       userId: actorUserId,
-      to: contact.email,
+      to: recipient,
       subject,
       body,
+      expectedSender,
+      beforeDispatch,
+      ...(outboundParentId ? { outboundParentId } : {}),
     });
+    if (outboundParentId) await recordMailboxParentAcceptance(outboundParentId, organizationId);
     await crm.createActivity(organizationId, {
       leadId: lead.id,
       contactId: contact.id,
@@ -1100,6 +1247,7 @@ async function executeBieProposalEffect(
         from: sent.senderEmail,
         ...emailAcceptanceEvidence(sent, { organizationId, leadId: lead.id, recipientEmail: contact.email }),
         source: "bie.revenue_recovery",
+        ...(outboundParentId ? { outboundParentId, replyMonitoring: "original_mailbox_observation_required" } : { replyMonitoring: "untracked" }),
       },
     });
     await recordAudit({
@@ -1116,6 +1264,7 @@ async function executeBieProposalEffect(
       `Accepted by ${sent.provider}; delivery and reply are not yet confirmed.`,
     );
   } catch (error) {
+    if (error instanceof EmailDispatchBlockedError) return markAction(proposal.id, "blocked", "Final email guard changed before provider dispatch. Review the retained action; no automatic retry is permitted.");
     throw error; // Durable executor records uncertainty without an unsafe automatic retry.
   }
 }

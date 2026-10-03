@@ -82,6 +82,8 @@ beforeEach(() => {
     configured: true,
     connected: true,
     senderActive: true,
+    provider: "gmail",
+    email: "assigned-sender@example.com",
   });
   sendGmailForUserMock.mockReset();
   sendGmailForUserMock.mockResolvedValue({
@@ -265,6 +267,7 @@ describe("closer engine playbooks", () => {
   });
 
   it("keeps Microsoft request correlations distinct from message and delivery receipts", async () => {
+    getGmailStatusMock.mockResolvedValue({ configured: true, connected: true, senderActive: true, provider: "microsoft", email: "selected@example.invalid" });
     sendGmailForUserMock.mockResolvedValue({
       id: null,
       provider: "microsoft",
@@ -302,6 +305,7 @@ describe("closer engine playbooks", () => {
   });
 
   it("does not send a claimed Microsoft step again after an ambiguous provider result", async () => {
+    getGmailStatusMock.mockResolvedValue({ configured: true, connected: true, senderActive: true, provider: "microsoft", email: "selected@example.invalid" });
     sendGmailForUserMock.mockRejectedValue(
       new MicrosoftMailError(
         "microsoft_send_outcome_unknown",

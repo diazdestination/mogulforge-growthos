@@ -15,7 +15,7 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.tableCounts.staff_invitations).toBe(2);
   expect(result.tableCounts.invoices).toBe(4);
   expect(result.tableCounts.invoice_receipt_allocations).toBe(4);
-  expect(result.readChecks).toBe(24);
+  expect(result.readChecks).toBe(25);
   expect(result.operationsTenantChecks).toBe(13);
   expect(result.heldServiceWatchPreserved).toBe(true);
   expect(result.permanentSourceReservationPreserved).toBe(true);
@@ -25,7 +25,12 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.serviceReplyHoldAfterPurgePreserved).toBe(true);
   expect(result.disabledMailboxPreserved).toBe(true);
   expect(result.platformIdentityUncertaintyPreserved).toBe(true);
-  for (const name of ['mailbox_connectors', 'mailbox_receipts', 'mailbox_communication_parents', 'mailbox_service_replies', 'platform_email_dispatches', 'platform_email_events']) expect(result.tableCounts[name]).toBe(2);
+  for (const name of ['mailbox_connectors', 'mailbox_service_replies', 'platform_email_dispatches', 'platform_email_events']) expect(result.tableCounts[name]).toBe(2);
+  for (const name of ['mailbox_receipts', 'mailbox_communication_parents', 'email_response_reviews']) expect(result.tableCounts[name]).toBe(4);
+  expect(result.leadReplyTenantChecks).toBe(6);
+  expect(result.leadReplyHoldAfterPurgePreserved).toBe(true);
+  expect(result.leadReplyOfficeTaskPreserved).toBe(true);
+  expect(result.leadMonitoringRemainsDisabled).toBe(true);
   expect(result.tableCounts.financial_migration_items).toBe(4);
   expect(result.tableCounts.source_outreach_items).toBe(2);
   expect(result.tableCounts.missed_call_care_cases).toBe(2);

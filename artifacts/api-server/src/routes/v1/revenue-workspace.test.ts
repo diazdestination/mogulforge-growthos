@@ -93,7 +93,7 @@ beforeAll(async () => {
   const session = async (role: "owner" | "viewer") => {
     const [u] = await db
       .insert(usersTable)
-      .values({ organizationId: org, role, firstName: "Local QA" })
+      .values({ organizationId: org, role, firstName: "Local QA", emailVerifiedAt: new Date() })
       .returning();
     if (role === "owner") actor = u.id;
     return createSession({
@@ -455,14 +455,16 @@ describe("tenant-scoped revenue workspace", () => {
         title: "LOCAL QA no provider",
         rationale: "Test channel",
         payload: { subject: "QA", body: "No real message" },
+        // Historical approvals remain untracked; new approvals must prepare.
+        status: "approved",
+        reviewedByUserId: actor,
       })
       .returning();
-    await reviewBieProposal(org, p.id, actor, "approve");
     const result = await executeBieProposal(org, p.id, actor);
     expect(result?.status).toBe("blocked");
     expect(result?.executionDetail).toContain("not ready");
   });
-  it("rejects stale approval content, then stops a reviewed action on a new customer reply", async () => {
+  it("rejects stale and unprepared email approvals, then stops a historical reviewed action on a new reply", async () => {
     const payload = {
       subject: "LOCAL QA current draft",
       body: "Current reviewed content",
@@ -489,7 +491,10 @@ describe("tenant-scoped revenue workspace", () => {
     expect(
       (await call(`/bie/actions/${p.id}/approve`, { expectedPayload: payload }))
         .status,
-    ).toBe(200);
+    ).toBe(409);
+    // Preserve the separate existing-approval safety test; no new email may
+    // silently acquire a review or mailbox snapshot from this transition.
+    await db.update(bieActionProposalsTable).set({ status: "approved", reviewedByUserId: actor }).where(eq(bieActionProposalsTable.id, p.id));
     await db.insert(activitiesTable).values({
       organizationId: org,
       leadId: lead,

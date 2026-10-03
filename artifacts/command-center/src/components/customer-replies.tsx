@@ -10,6 +10,7 @@ export interface CustomerReply {
   leadId: string | null; replyAt: string | null; receivedAt: string; holdActive: boolean;
   subject: string | null; fromEmail: string | null; leadSummary: string | null; releasedAt: string | null;
   effectSummary: { pausedEnrollments: number; cancelledActions: number; blockedProposals: number; reconciliationRequired: number } | null;
+  mailboxParentId?: string | null;
 }
 interface ReplyPage { items: CustomerReply[]; total: number; page: number; pageSize: number }
 interface Opportunity { id: string; contactName: string | null; summary: string | null; status: string; createdAt: string }
@@ -56,13 +57,14 @@ function ReplyItem({ reply, canReview }: { reply: CustomerReply; canReview: bool
         <p className="text-sm font-medium">{reply.holdActive ? 'Follow-up held for staff review' : reply.state === 'needs_review' ? 'Opportunity not confirmed' : reply.state === 'dismissed' ? 'Dismissed' : reply.releasedAt ? 'Reply handled' : 'Historical reply'}</p>
         {reply.state === 'needs_review' && <p className="text-sm text-muted-foreground">Follow-up is unchanged until the correct opportunity is confirmed.</p>}
         <p className="max-w-prose text-sm text-muted-foreground">{reasons[reply.reason] || (reply.holdActive ? 'Check the customer’s reply, then record how the office handled it.' : 'Review decision saved.')}</p>
-        {reply.leadId && <Link href={`/leads/${reply.leadId}`} className="inline-block max-w-full break-words text-sm font-semibold underline underline-offset-4">Open opportunity{reply.leadSummary ? `: ${reply.leadSummary}` : ''}</Link>}
+        {reply.leadId && <Link href={`/leads/${encodeURIComponent(reply.leadId)}${reply.mailboxParentId ? '?tab=messages#mailbox-replies' : ''}`} className="inline-block max-w-full break-words text-sm font-semibold underline underline-offset-4">{reply.mailboxParentId ? 'Review original-mailbox evidence' : 'Open opportunity'}{reply.leadSummary ? `: ${reply.leadSummary}` : ''}</Link>}
+        {reply.mailboxParentId && <p className="text-sm text-muted-foreground">Tracked lead reply. Use its exact, versioned lead review to handle the saved task; this queue cannot relink or release it.</p>}
         {reply.effectSummary && <p className="text-sm text-muted-foreground">{reply.effectSummary.pausedEnrollments} sequences paused · {reply.effectSummary.cancelledActions} pending follow-ups cancelled · {reply.effectSummary.blockedProposals} proposed actions blocked</p>}
         {Boolean(reply.effectSummary?.reconciliationRequired) && <p className="max-w-prose text-sm font-medium">{reply.effectSummary!.reconciliationRequired} already claimed or uncertain action(s) still need reconciliation in Revenue Desk. A message may already have been sent.</p>}
       </div>
-      {canReview && (reply.state === 'needs_review' || reply.holdActive) && <Button variant="outline" className="min-h-10 shrink-0 self-start" onClick={() => setEditing(value => !value)} aria-expanded={editing} aria-controls={`reply-form-${reply.id}`}>{editing ? 'Close review' : reply.holdActive ? 'Handle reply' : 'Review reply'}</Button>}
+      {canReview && !reply.mailboxParentId && (reply.state === 'needs_review' || reply.holdActive) && <Button variant="outline" className="min-h-10 shrink-0 self-start" onClick={() => setEditing(value => !value)} aria-expanded={editing} aria-controls={`reply-form-${reply.id}`}>{editing ? 'Close review' : reply.holdActive ? 'Handle reply' : 'Review reply'}</Button>}
     </div>
-    {editing && <form id={`reply-form-${reply.id}`} className="mt-4 max-w-2xl space-y-4" onSubmit={event => { event.preventDefault(); mutation.mutate(reply.holdActive ? 'resolve' : 'confirm'); }}>
+    {editing && !reply.mailboxParentId && <form id={`reply-form-${reply.id}`} className="mt-4 max-w-2xl space-y-4" onSubmit={event => { event.preventDefault(); mutation.mutate(reply.holdActive ? 'resolve' : 'confirm'); }}>
       {reply.state === 'needs_review' && <>
         <div className="space-y-2"><label htmlFor={`reply-search-${reply.id}`} className="block text-sm font-medium">Find the customer’s opportunity</label><Input id={`reply-search-${reply.id}`} value={search} onChange={event => { setSearch(event.target.value); setLeadId(''); setChecked(false); }} placeholder="Search customer or job (at least 2 characters)" /></div>
         {options.isFetching && <p role="status" className="text-sm text-muted-foreground">Searching opportunities…</p>}

@@ -127,6 +127,125 @@ describe("Revenue Desk workflows", () => {
       ).disabled,
     ).toBe(false);
   });
+  it("requires explicit prepare, displays exact frozen recipient and sender, then approves the complete saved payload", async () => {
+    const { saved, spy } = await openProposal();
+    const original = spy.getMockImplementation()!,
+      originalPayload = { ...saved.payload };
+    const emailReview = {
+      version: 1,
+      preparedByUserId: "staff-one",
+      preparedAt: "2026-10-02T12:00:00Z",
+      recipient: "customer@example.invalid",
+      sender: { provider: "microsoft", senderEmail: "staff@example.invalid" },
+      leadId: saved.leadId,
+      contactId: "contact-one",
+      leadCreatedAt: "2026-10-01T12:00:00Z",
+      leadUpdatedAt: "2026-10-01T12:00:00Z",
+    };
+    const snapshot = {
+      version: 1,
+      kind: "bie_lead_email",
+      recipient: emailReview.recipient,
+      mailboxIdentity: {
+        provider: "microsoft",
+        mailboxEmail: emailReview.sender.senderEmail,
+      },
+      leadMonitoringApproval: {
+        version: 3,
+        approvedAt: "2026-10-02T11:00:00Z",
+      },
+    };
+    spy.mockImplementation(async (url, init) => {
+      if (String(url).endsWith("/prepare-email")) {
+        Object.assign(saved.payload, {
+          emailReview,
+          deliverySnapshot: snapshot,
+        });
+        return response(saved);
+      }
+      if (String(url).endsWith("/approve")) {
+        saved.status = "approved";
+        return response(saved);
+      }
+      return original(url, init);
+    });
+    expect(
+      screen
+        .getByRole("button", { name: "Approve saved action" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Prepare recipient and sender" }),
+    );
+    await screen.findByText(/customer@example.invalid/);
+    expect(screen.getByText(/staff@example.invalid/)).toBeTruthy();
+    await screen.findByText(/Tracked Microsoft lead reply/);
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "Approve saved action" })
+          .hasAttribute("disabled"),
+      ).toBe(false),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Approve saved action" }),
+    );
+    await screen.findByText("Action approved; not yet executed.");
+    expect(
+      JSON.parse(
+        String(
+          spy.mock.calls.find(([url]) =>
+            String(url).endsWith("/prepare-email"),
+          )?.[1]?.body,
+        ),
+      ),
+    ).toEqual({ expectedPayload: originalPayload });
+    expect(
+      JSON.parse(
+        String(
+          spy.mock.calls.find(([url]) => String(url).endsWith("/approve"))?.[1]
+            ?.body,
+        ),
+      ),
+    ).toEqual({
+      expectedPayload: {
+        ...originalPayload,
+        emailReview,
+        deliverySnapshot: snapshot,
+      },
+    });
+    expect(
+      spy.mock.calls.some(([url]) => String(url).endsWith("/execute")),
+    ).toBe(false);
+  });
+  it("stops stale prepare after a conflict until an explicit workspace refresh", async () => {
+    const { spy } = await openProposal(),
+      original = spy.getMockImplementation()!;
+    spy.mockImplementation(async (url, init) =>
+      String(url).endsWith("/prepare-email")
+        ? response({ error: "Saved email changed. Review again." }, 409)
+        : original(url, init),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Prepare recipient and sender" }),
+    );
+    await screen.findByText("Saved email changed. Review again.");
+    expect(
+      screen
+        .getByRole("button", { name: "Prepare recipient and sender" })
+        .matches(":disabled"),
+    ).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh workspace" }));
+    await screen.findByText("Workspace refreshed.");
+    expect(
+      screen
+        .getByRole("button", { name: "Prepare recipient and sender" })
+        .hasAttribute("disabled"),
+    ).toBe(false);
+    expect(
+      spy.mock.calls.filter(([url]) => String(url).endsWith("/prepare-email")),
+    ).toHaveLength(1);
+  });
   it("freezes the reviewed draft while a save is pending and sends it only once", async () => {
     const { spy } = await openProposal();
     const original = spy.getMockImplementation()!;
@@ -198,7 +317,7 @@ describe("Revenue Desk workflows", () => {
           name: "Approve saved action",
         }) as HTMLButtonElement
       ).disabled,
-    ).toBe(false);
+    ).toBe(true);
   });
   it.each([false, true])(
     "blocks sending when local edits outlive external approval (payload changed: %s)",
@@ -252,7 +371,7 @@ describe("Revenue Desk workflows", () => {
           name: "Approve saved action",
         }) as HTMLButtonElement
       ).disabled,
-    ).toBe(false);
+    ).toBe(true);
     await update({
       ...saved,
       status: "approved",
@@ -420,7 +539,7 @@ describe("Revenue Desk workflows", () => {
       });
     fireEvent.click(screen.getByRole("checkbox"));
     fireEvent.click(save);
-    await screen.findByRole("alert");
+    await screen.findByText("Profile changed. Refresh.");
     expect(
       (screen.getByLabelText("Services offered") as HTMLTextAreaElement).value,
     ).toBe("LOCAL QA Services offered");

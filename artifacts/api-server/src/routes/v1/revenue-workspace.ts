@@ -313,6 +313,8 @@ router.patch(
     const row = await db.transaction(async (tx) => {
       const [updated] = await tx
         .update(bieActionProposalsTable)
+        // Replacing (not merging) clears any frozen email/mailbox review.
+        // The edited draft must be explicitly prepared and reviewed again.
         .set({ payload: input })
         .where(
           and(

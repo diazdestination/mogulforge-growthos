@@ -21,6 +21,7 @@ import {
   type AutomationAction,
 } from "@workspace/db";
 import { and, asc, desc, eq, inArray, lte, notExists, notInArray, sql } from "drizzle-orm";
+import { isDeepStrictEqual } from "node:util";
 import type { SchedulerStage, StageObserver } from "./scheduler-runtime";
 import { recordAudit } from "./audit";
 import { runDurableAction } from "./durable-execution";
@@ -37,6 +38,8 @@ import { recordLeadOutcome } from "./playbook-learning";
 import { classifyWonLead, handlePostSaleTransition } from "./post-sale";
 import { providers } from "./providers";
 import { emailAcceptanceEvidence } from "./user-email";
+import { EmailDispatchBlockedError } from "./email-dispatch-guard";
+import { mailboxDigest } from "./mailbox-contract";
 import {
   checkSendEligibility,
   handleProviderFailure,
@@ -268,6 +271,33 @@ async function executeRule(
 
 // ---------- actions ----------
 
+/** Recheck the original claim; cancellation or an expired/changed receipt never creates a new key. */
+async function assertAutomatedEmailOwnership(organizationId: string, action: AutomationAction, context: EventContext,
+  automationId: string, scheduledActionId?: string, frozenRule?: Automation) {
+  if (await customerWorkHeld(organizationId)) throw new EmailDispatchBlockedError();
+  if (scheduledActionId) {
+    const [scheduled] = await db.select().from(scheduledActionsTable).where(and(eq(scheduledActionsTable.organizationId, organizationId), eq(scheduledActionsTable.id, scheduledActionId)));
+    const [receipt] = await db.select().from(revenueExecutionsTable).where(and(eq(revenueExecutionsTable.organizationId, organizationId), eq(revenueExecutionsTable.actionKey, `scheduled:${scheduledActionId}`)));
+    if (!scheduled || scheduled.status !== "pending" || !isDeepStrictEqual(scheduled.action, action) || !isDeepStrictEqual(scheduled.context, context) ||
+        !receipt || receipt.state !== "processing" || receipt.kind !== action.type || receipt.expiresAt.getTime() <= Date.now() || receipt.fingerprint !== mailboxDigest({ action, context }))
+      throw new EmailDispatchBlockedError();
+    // Manually scheduled work has no rule. Work queued by a rule must still have that enabled rule.
+    if (!scheduled.automationId) return;
+    automationId = scheduled.automationId;
+  }
+  const [rule] = await db.select().from(automationsTable).where(and(eq(automationsTable.organizationId, organizationId), eq(automationsTable.id, automationId)));
+  if (!rule?.isActive || (!scheduledActionId && !rule.actions.some(item => isDeepStrictEqual(item, action)))) throw new EmailDispatchBlockedError();
+  if (frozenRule && (rule.event !== frozenRule.event || !isDeepStrictEqual(rule.conditions, frozenRule.conditions) || !isDeepStrictEqual(rule.actions, frozenRule.actions)))
+    throw new EmailDispatchBlockedError();
+}
+
+async function assertAutomatedEmailLead(organizationId: string, leadId: string | undefined, contactId: string) {
+  if (!leadId) return;
+  const [lead] = await db.select({ contactId: leadsTable.contactId }).from(leadsTable).where(and(eq(leadsTable.organizationId, organizationId), eq(leadsTable.id, leadId)));
+  const { hasCustomerReplyHold } = await import("./response-correlation");
+  if (!lead || lead.contactId !== contactId || await hasCustomerReplyHold(organizationId, leadId)) throw new EmailDispatchBlockedError();
+}
+
 async function executeAction(
   organizationId: string,
   action: AutomationAction,
@@ -306,6 +336,7 @@ async function executeAction(
     case "send_email":
     case "send_sms": {
       const channel = action.type === "send_email" ? "email" : "sms";
+      const [emailRule] = channel === "email" ? await db.select().from(automationsTable).where(and(eq(automationsTable.organizationId, organizationId), eq(automationsTable.id, automationId))) : [];
       const rendered = await renderTemplate(organizationId, action, context);
       if (!rendered.contact) {
         return { type: action.type, status: "skipped", detail: "no contact" };
@@ -368,16 +399,34 @@ async function executeAction(
       }
       let res: { id: string | null; provider: string; providerRequestId?: string | null; clientRequestId?: string };
       try {
+        const subject = rendered.subject ?? `${await getBusinessName(organizationId)} update`;
+        const body = rendered.body + unsubscribeFooter(organizationId, contact.id);
+        const beforeDispatch = async () => {
+          try {
+            await assertAutomatedEmailOwnership(organizationId, action, context, automationId, scheduledActionId, emailRule);
+            const current = await renderTemplate(organizationId, action, context);
+            if (!current.contact || current.contact.id !== contact.id || current.contact.email !== contact.email ||
+                (current.subject ?? `${await getBusinessName(organizationId)} update`) !== subject ||
+                current.body + unsubscribeFooter(organizationId, current.contact.id) !== body) throw new EmailDispatchBlockedError();
+            await assertAutomatedEmailLead(organizationId, context.leadId, current.contact.id);
+            if (!(await checkSendEligibility({ organizationId, leadId: context.leadId, contact: current.contact, channel: "email", kind: "outreach" })).ok)
+              throw new EmailDispatchBlockedError();
+          } catch { throw new EmailDispatchBlockedError(); }
+        };
         res =
           channel === "email"
             ? await providers.email.send(
                 contact.email!,
-                rendered.subject ?? `${await getBusinessName(organizationId)} update`,
-                rendered.body + unsubscribeFooter(organizationId, contact.id),
-                { organizationId, leadId: context.leadId },
+                subject,
+                body,
+                { organizationId, leadId: context.leadId, beforeDispatch },
               )
             : await providers.sms.send(contact.phone!, rendered.body, { organizationId, contactId: contact.id, purpose: 'marketing', idempotencyKey: `automation:${automationId}:${context.leadId ?? contact.id}:${JSON.stringify(action.params)}` });
       } catch (err) {
+        if (err instanceof EmailDispatchBlockedError) {
+          await recordBlockedSend({ organizationId, channel, reason: "final_email_guard_changed", outcome: "blocked", source: "automation", leadId: context.leadId ?? null, contactId: contact.id });
+          return { type: action.type, status: "skipped", detail: "blocked: final_email_guard_changed; retained claim cannot replay" };
+        }
         // Permanently bad address → suppress so nothing retries it.
         const suppressed = await handleProviderFailure({
           organizationId,
@@ -738,10 +787,34 @@ async function executeAction(
           detail: "no reachable channel (missing details or SMS consent)",
         };
       }
-      const res =
-        channel === "email"
-          ? await providers.email.send(contact.email!, emailSubject, emailBody, { organizationId, leadId: appointment.leadId })
+      const [emailRule] = channel === "email" ? await db.select().from(automationsTable).where(and(eq(automationsTable.organizationId, organizationId), eq(automationsTable.id, automationId))) : [];
+      const beforeDispatch = async () => {
+        try {
+          await assertAutomatedEmailOwnership(organizationId, action, context, automationId, scheduledActionId, emailRule);
+          const [currentAppointment] = await db.select().from(appointmentsTable).where(and(eq(appointmentsTable.organizationId, organizationId), eq(appointmentsTable.id, appointmentId)));
+          const [currentContact] = await db.select().from(contactsTable).where(and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, contact.id)));
+          if (!currentAppointment || !currentContact || !["scheduled", "confirmed"].includes(currentAppointment.status) ||
+              currentAppointment.scheduledStart.getTime() <= Date.now() || currentAppointment.scheduledStart.getTime() !== appointment.scheduledStart.getTime() ||
+              currentAppointment.scheduledEnd?.getTime() !== appointment.scheduledEnd?.getTime() || currentAppointment.contactId !== appointment.contactId ||
+              currentAppointment.leadId !== appointment.leadId || currentContact.email !== contact.email || currentContact.firstName !== contact.firstName ||
+              !isDeepStrictEqual(await getAppointmentReminderSettings(organizationId), reminderSettings) ||
+              await getBusinessName(organizationId) !== businessName) throw new EmailDispatchBlockedError();
+          const currentSettings = await getOrgSettings(organizationId);
+          if (currentSettings.businessProfile.phone !== settings.businessProfile.phone || currentSettings.inspectionAvailability?.timezone !== configuredZone) throw new EmailDispatchBlockedError();
+          await assertAutomatedEmailLead(organizationId, appointment.leadId ?? undefined, contact.id);
+          if (!(await checkSendEligibility({ organizationId, leadId: appointment.leadId ?? undefined, contact: currentContact, channel: "email", kind: "transactional" })).ok) throw new EmailDispatchBlockedError();
+        } catch { throw new EmailDispatchBlockedError(); }
+      };
+      let res: { id: string | null; provider: string; providerRequestId?: string | null; clientRequestId?: string };
+      try {
+        res = channel === "email"
+          ? await providers.email.send(contact.email!, emailSubject, emailBody, { organizationId, leadId: appointment.leadId, beforeDispatch })
           : await providers.sms.send(contact.phone!, smsBody, { organizationId, contactId: contact.id, purpose: 'appointments', idempotencyKey: `appointment:${appointmentId}:reminder:${appointment.scheduledStart.toISOString()}` });
+      } catch (error) {
+        if (!(error instanceof EmailDispatchBlockedError)) throw error;
+        await recordBlockedSend({ organizationId, channel, reason: "final_email_guard_changed", outcome: "blocked", source: "appointment_reminder", leadId: appointment.leadId, contactId: contact.id });
+        return { type: action.type, status: "skipped", detail: "blocked: final_email_guard_changed; retained claim cannot replay" };
+      }
       if (appointment.leadId) {
         await db.insert(activitiesTable).values({
           organizationId,
@@ -1126,6 +1199,10 @@ export async function processScheduledWork(organizationId?: string, observe?: St
   await stage("service-reply-retention", async () => {
     const { purgeExpiredServiceReplyContent } = await import("./mailbox-communication");
     await purgeExpiredServiceReplyContent();
+  });
+  await stage("lead-reply-retention", async () => {
+    const { purgeExpiredLeadReplyContent } = await import("./mailbox-communication");
+    await purgeExpiredLeadReplyContent();
   });
   // Email org admins once when an active API key nears its expiry date.
   await stage("api-key-expiry-reminders", async () => {

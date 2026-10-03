@@ -3778,7 +3778,7 @@ export const GetLeadNextActionParams = zod.object({
 
 export const GetLeadNextActionResponse = zod.object({
   "leadId": zod.uuid(),
-  "actionType": zod.enum(['reply_portal_message', 'call_now', 'send_message', 'follow_up_estimate', 'schedule_follow_up', 'none']),
+  "actionType": zod.enum(['reply_portal_message', 'review_customer_reply', 'call_now', 'send_message', 'follow_up_estimate', 'schedule_follow_up', 'none']),
   "title": zod.string(),
   "reasons": zod.array(zod.string()),
   "priority": zod.number(),
@@ -3820,7 +3820,7 @@ export const ListTodayActionsQueryParams = zod.object({
 
 export const ListTodayActionsResponseItem = zod.object({
   "leadId": zod.uuid(),
-  "actionType": zod.enum(['reply_portal_message', 'call_now', 'send_message', 'follow_up_estimate', 'schedule_follow_up', 'none']),
+  "actionType": zod.enum(['reply_portal_message', 'review_customer_reply', 'call_now', 'send_message', 'follow_up_estimate', 'schedule_follow_up', 'none']),
   "title": zod.string(),
   "reasons": zod.array(zod.string()),
   "priority": zod.number(),
@@ -8903,6 +8903,8 @@ export const getMicrosoftMailboxStatusResponsePendingParentCountMin = 0;
 
 export const getMicrosoftMailboxStatusResponseReviewCountMin = 0;
 
+export const getMicrosoftMailboxStatusResponseLeadMonitoringVersionMin = 0;
+
 
 
 export const GetMicrosoftMailboxStatusResponse = zod.object({
@@ -8922,7 +8924,11 @@ export const GetMicrosoftMailboxStatusResponse = zod.object({
   "folders": zod.array(zod.string()),
   "historicalCrawl": zod.literal(false),
   "attachmentsRead": zod.literal(false),
-  "remoteConsentRevoked": zod.literal(false)
+  "remoteConsentRevoked": zod.literal(false),
+  "leadMonitoringEnabled": zod.boolean(),
+  "leadMonitoringVersion": zod.int().min(getMicrosoftMailboxStatusResponseLeadMonitoringVersionMin),
+  "leadMonitoringApprovedAt": zod.coerce.date().nullable(),
+  "leadMonitoringChangedAt": zod.coerce.date().nullable()
 })
 
 
@@ -8966,5 +8972,190 @@ export const CompleteMicrosoftMailboxOAuthQueryParams = zod.object({
 })
 
 export const CompleteMicrosoftMailboxOAuthResponse = zod.void()
+
+
+/**
+ * SELECT-only retained original-mailbox evidence, including after raw-content expiry or reader disconnection.
+ */
+export const ListLeadMailboxRepliesParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const listLeadMailboxRepliesQueryOffsetDefault = 0;
+export const listLeadMailboxRepliesQueryOffsetMin = 0;
+export const listLeadMailboxRepliesQueryOffsetMax = 100000;
+
+
+
+export const ListLeadMailboxRepliesQueryParams = zod.object({
+  "offset": zod.coerce.number().int().min(listLeadMailboxRepliesQueryOffsetMin).max(listLeadMailboxRepliesQueryOffsetMax).default(listLeadMailboxRepliesQueryOffsetDefault)
+})
+
+
+export const listLeadMailboxRepliesResponseItemsItemEffectSummaryOnePausedEnrollmentsMin = 0;
+
+export const listLeadMailboxRepliesResponseItemsItemEffectSummaryOneCancelledActionsMin = 0;
+
+export const listLeadMailboxRepliesResponseItemsItemEffectSummaryOneBlockedProposalsMin = 0;
+
+export const listLeadMailboxRepliesResponseItemsItemEffectSummaryOneReconciliationRequiredMin = 0;
+
+export const listLeadMailboxRepliesResponseItemsMax = 25;
+
+export const listLeadMailboxRepliesResponseOffsetMin = 0;
+
+
+
+export const ListLeadMailboxRepliesResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "leadId": zod.uuid(),
+  "version": zod.int().min(1),
+  "state": zod.enum(['needs_review', 'confirmed', 'dismissed']),
+  "reason": zod.string(),
+  "replyAt": zod.coerce.date().nullable(),
+  "receivedAt": zod.coerce.date(),
+  "historical": zod.boolean(),
+  "holdActive": zod.boolean(),
+  "taskId": zod.uuid().nullable(),
+  "taskTitle": zod.string().nullable(),
+  "taskStatus": zod.string().nullable(),
+  "assignedUserId": zod.string().nullable(),
+  "assignedUserName": zod.string().nullable(),
+  "content": zod.union([zod.object({
+  "subject": zod.string(),
+  "text": zod.string()
+}),zod.null()]),
+  "rawExpiresAt": zod.coerce.date().nullable(),
+  "releasedAt": zod.coerce.date().nullable(),
+  "releaseNote": zod.string().nullable(),
+  "effectSummary": zod.union([zod.object({
+  "pausedEnrollments": zod.int().min(listLeadMailboxRepliesResponseItemsItemEffectSummaryOnePausedEnrollmentsMin),
+  "cancelledActions": zod.int().min(listLeadMailboxRepliesResponseItemsItemEffectSummaryOneCancelledActionsMin),
+  "blockedProposals": zod.int().min(listLeadMailboxRepliesResponseItemsItemEffectSummaryOneBlockedProposalsMin),
+  "reconciliationRequired": zod.int().min(listLeadMailboxRepliesResponseItemsItemEffectSummaryOneReconciliationRequiredMin)
+}),zod.null()]),
+  "evidence": zod.enum(['original_mailbox_observation']),
+  "monitoringCurrent": zod.boolean().describe('Current original reader and lead-context permission; false does not erase retained evidence or prevent an explicit staff handling decision.')
+})).max(listLeadMailboxRepliesResponseItemsMax),
+  "hasMore": zod.boolean(),
+  "offset": zod.int().min(listLeadMailboxRepliesResponseOffsetMin),
+  "limit": zod.literal(25)
+})
+
+
+/**
+ * Accepted staff handle one known reply and linked office task. No canceled work is resumed and unknown executions remain reserved.
+ */
+export const ReviewLeadMailboxReplyParams = zod.object({
+  "id": zod.uuid(),
+  "replyId": zod.uuid()
+})
+
+
+export const reviewLeadMailboxReplyBodyNoteMin = 10;
+export const reviewLeadMailboxReplyBodyNoteMax = 1000;
+
+
+
+export const ReviewLeadMailboxReplyBody = zod.object({
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(1),
+  "decision": zod.enum(['handled']),
+  "note": zod.string().min(reviewLeadMailboxReplyBodyNoteMin).max(reviewLeadMailboxReplyBodyNoteMax),
+  "reviewed": zod.literal(true)
+})
+
+
+
+
+export const ReviewLeadMailboxReplyResponse = zod.object({
+  "replyId": zod.uuid(),
+  "version": zod.int().min(1),
+  "replayed": zod.boolean()
+})
+
+
+/**
+ * Separately acknowledge or revoke lead monitoring on the exact owned connector. Service identity, cursors and Graph scopes remain unchanged.
+ */
+
+export const setMicrosoftLeadMonitoringBodyExpectedLeadMonitoringVersionMin = 0;
+
+
+
+export const SetMicrosoftLeadMonitoringBody = zod.object({
+  "expectedConnectorVersion": zod.int().min(1),
+  "expectedLeadMonitoringVersion": zod.int().min(setMicrosoftLeadMonitoringBodyExpectedLeadMonitoringVersionMin),
+  "enabled": zod.boolean(),
+  "leadContextAcknowledged": zod.literal(true)
+})
+
+export const setMicrosoftLeadMonitoringResponseVersionMin = 0;
+
+export const setMicrosoftLeadMonitoringResponsePendingParentCountMin = 0;
+
+export const setMicrosoftLeadMonitoringResponseReviewCountMin = 0;
+
+export const setMicrosoftLeadMonitoringResponseLeadMonitoringVersionMin = 0;
+
+
+
+export const SetMicrosoftLeadMonitoringResponse = zod.object({
+  "enabled": zod.boolean(),
+  "configured": zod.boolean(),
+  "version": zod.int().min(setMicrosoftLeadMonitoringResponseVersionMin),
+  "state": zod.enum(['pending', 'active', 'disabled', 'gap', 'revoked']),
+  "usable": zod.boolean(),
+  "mailboxEmail": zod.string().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "lastSuccessAt": zod.coerce.date().nullable(),
+  "lastErrorAt": zod.coerce.date().nullable(),
+  "reason": zod.string().nullable(),
+  "pendingParentCount": zod.int().min(setMicrosoftLeadMonitoringResponsePendingParentCountMin),
+  "reviewCount": zod.int().min(setMicrosoftLeadMonitoringResponseReviewCountMin),
+  "scopes": zod.array(zod.string()),
+  "folders": zod.array(zod.string()),
+  "historicalCrawl": zod.literal(false),
+  "attachmentsRead": zod.literal(false),
+  "remoteConsentRevoked": zod.literal(false),
+  "leadMonitoringEnabled": zod.boolean(),
+  "leadMonitoringVersion": zod.int().min(setMicrosoftLeadMonitoringResponseLeadMonitoringVersionMin),
+  "leadMonitoringApprovedAt": zod.coerce.date().nullable(),
+  "leadMonitoringChangedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * Freeze displayed recipient, selected sender and message on the exact proposed action before approval. Explicit lead monitoring is required for tracked Microsoft context; preparation sends nothing.
+ */
+export const PrepareBieLeadEmailParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const PrepareBieLeadEmailBody = zod.object({
+  "expectedPayload": zod.record(zod.string(), zod.unknown())
+})
+
+export const PrepareBieLeadEmailResponse = zod.object({
+  "id": zod.uuid(),
+  "organizationId": zod.uuid(),
+  "runId": zod.uuid().nullable(),
+  "leadId": zod.uuid(),
+  "actionType": zod.enum(['send_email']),
+  "status": zod.enum(['proposed']),
+  "title": zod.string(),
+  "rationale": zod.string(),
+  "evidence": zod.record(zod.string(), zod.unknown()),
+  "payload": zod.record(zod.string(), zod.unknown()),
+  "estimatedValueCents": zod.int().nullable(),
+  "createdByUserId": zod.string().nullable(),
+  "reviewedByUserId": zod.string().nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "executedAt": zod.coerce.date().nullable(),
+  "executionDetail": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
 
 

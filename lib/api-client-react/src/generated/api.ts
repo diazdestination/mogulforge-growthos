@@ -134,6 +134,8 @@ import type {
   LeadImport,
   LeadImportRequest,
   LeadInput,
+  LeadMailboxReplyPage,
+  LeadMailboxReplyReviewResult,
   LeadSendEmailInput,
   LeadUpdate,
   ListAppointmentsParams,
@@ -145,6 +147,7 @@ import type {
   ListEstimatesParams,
   ListInvitationEmailDeliveriesParams,
   ListInvoicesParams,
+  ListLeadMailboxRepliesParams,
   ListLeadsParams,
   ListPlatformIdentityDeliveriesParams,
   ListProjectsParams,
@@ -166,6 +169,7 @@ import type {
   MessageTemplate,
   MessageTemplateInput,
   MessageTemplateUpdate,
+  MicrosoftLeadMonitoring,
   MicrosoftMailboxConnect,
   MicrosoftMailboxConnectResult,
   MicrosoftMailboxDisable,
@@ -197,6 +201,8 @@ import type {
   PortalOverview,
   PortalPhotosAttached,
   PortalSession,
+  PrepareBieLeadEmail,
+  PreparedBieLeadEmail,
   Project,
   ProjectInput,
   ProjectUpdate,
@@ -219,6 +225,7 @@ import type {
   ResolveCustomerReply,
   ReverseInvoiceAllocation,
   ReviewCustomerReply,
+  ReviewLeadMailboxReply,
   ReviewServiceMailboxReply,
   RoiReport,
   RotateWebhookSecretInput,
@@ -17228,3 +17235,303 @@ export function useCompleteMicrosoftMailboxOAuth<TData = Awaited<ReturnType<type
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+
+export const getListLeadMailboxRepliesUrl = (id: string,
+    params?: ListLeadMailboxRepliesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/leads/${id}/mailbox-replies?${stringifiedParams}` : `/api/v1/leads/${id}/mailbox-replies`
+}
+
+/**
+ * SELECT-only retained original-mailbox evidence, including after raw-content expiry or reader disconnection.
+ */
+export const listLeadMailboxReplies = async (id: string,
+    params?: ListLeadMailboxRepliesParams, options?: Parameters<typeof customFetch>[1]): Promise<LeadMailboxReplyPage> => {
+
+  return customFetch<LeadMailboxReplyPage>(getListLeadMailboxRepliesUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListLeadMailboxRepliesQueryKey = (id: string,
+    params?: ListLeadMailboxRepliesParams,) => {
+    return [
+    `/api/v1/leads/${id}/mailbox-replies`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListLeadMailboxRepliesQueryOptions = <TData = Awaited<ReturnType<typeof listLeadMailboxReplies>>, TError = ErrorType<void>>(id: string,
+    params?: ListLeadMailboxRepliesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLeadMailboxReplies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListLeadMailboxRepliesQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listLeadMailboxReplies>>> = ({ signal }) => listLeadMailboxReplies(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listLeadMailboxReplies>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListLeadMailboxRepliesQueryResult = NonNullable<Awaited<ReturnType<typeof listLeadMailboxReplies>>>
+export type ListLeadMailboxRepliesQueryError = ErrorType<void>
+
+
+
+export function useListLeadMailboxReplies<TData = Awaited<ReturnType<typeof listLeadMailboxReplies>>, TError = ErrorType<void>>(
+ id: string,
+    params?: ListLeadMailboxRepliesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLeadMailboxReplies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListLeadMailboxRepliesQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReviewLeadMailboxReplyUrl = (id: string,
+    replyId: string,) => {
+
+
+
+
+  return `/api/v1/leads/${id}/mailbox-replies/${replyId}/review`
+}
+
+/**
+ * Accepted staff handle one known reply and linked office task. No canceled work is resumed and unknown executions remain reserved.
+ */
+export const reviewLeadMailboxReply = async (id: string,
+    replyId: string,
+    reviewLeadMailboxReply: ReviewLeadMailboxReply, options?: Parameters<typeof customFetch>[1]): Promise<LeadMailboxReplyReviewResult> => {
+
+  return customFetch<LeadMailboxReplyReviewResult>(getReviewLeadMailboxReplyUrl(id,replyId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(reviewLeadMailboxReply)
+  }
+);}
+
+
+
+
+
+export const getReviewLeadMailboxReplyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewLeadMailboxReply>>, TError,{id: string;replyId: string;data: BodyType<ReviewLeadMailboxReply>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewLeadMailboxReply>>, TError,{id: string;replyId: string;data: BodyType<ReviewLeadMailboxReply>}, TContext> => {
+
+const mutationKey = ['reviewLeadMailboxReply'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewLeadMailboxReply>>, {id: string;replyId: string;data: BodyType<ReviewLeadMailboxReply>}> = (props) => {
+          const {id,replyId,data} = props ?? {};
+
+          return  reviewLeadMailboxReply(id,replyId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewLeadMailboxReplyMutationResult = NonNullable<Awaited<ReturnType<typeof reviewLeadMailboxReply>>>
+    export type ReviewLeadMailboxReplyMutationBody = BodyType<ReviewLeadMailboxReply>
+    export type ReviewLeadMailboxReplyMutationError = ErrorType<void>
+
+    export const useReviewLeadMailboxReply = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewLeadMailboxReply>>, TError,{id: string;replyId: string;data: BodyType<ReviewLeadMailboxReply>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewLeadMailboxReply>>,
+        TError,
+        {id: string;replyId: string;data: BodyType<ReviewLeadMailboxReply>},
+        TContext
+      > => {
+      return useMutation(getReviewLeadMailboxReplyMutationOptions(options));
+    }
+
+export const getSetMicrosoftLeadMonitoringUrl = () => {
+
+
+
+
+  return `/api/v1/mailbox/microsoft/lead-monitoring`
+}
+
+/**
+ * Separately acknowledge or revoke lead monitoring on the exact owned connector. Service identity, cursors and Graph scopes remain unchanged.
+ */
+export const setMicrosoftLeadMonitoring = async (microsoftLeadMonitoring: MicrosoftLeadMonitoring, options?: Parameters<typeof customFetch>[1]): Promise<MicrosoftMailboxStatus> => {
+
+  return customFetch<MicrosoftMailboxStatus>(getSetMicrosoftLeadMonitoringUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(microsoftLeadMonitoring)
+  }
+);}
+
+
+
+
+
+export const getSetMicrosoftLeadMonitoringMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setMicrosoftLeadMonitoring>>, TError,{data: BodyType<MicrosoftLeadMonitoring>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setMicrosoftLeadMonitoring>>, TError,{data: BodyType<MicrosoftLeadMonitoring>}, TContext> => {
+
+const mutationKey = ['setMicrosoftLeadMonitoring'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setMicrosoftLeadMonitoring>>, {data: BodyType<MicrosoftLeadMonitoring>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  setMicrosoftLeadMonitoring(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetMicrosoftLeadMonitoringMutationResult = NonNullable<Awaited<ReturnType<typeof setMicrosoftLeadMonitoring>>>
+    export type SetMicrosoftLeadMonitoringMutationBody = BodyType<MicrosoftLeadMonitoring>
+    export type SetMicrosoftLeadMonitoringMutationError = ErrorType<void>
+
+    export const useSetMicrosoftLeadMonitoring = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setMicrosoftLeadMonitoring>>, TError,{data: BodyType<MicrosoftLeadMonitoring>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setMicrosoftLeadMonitoring>>,
+        TError,
+        {data: BodyType<MicrosoftLeadMonitoring>},
+        TContext
+      > => {
+      return useMutation(getSetMicrosoftLeadMonitoringMutationOptions(options));
+    }
+
+export const getPrepareBieLeadEmailUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/bie/actions/${id}/prepare-email`
+}
+
+/**
+ * Freeze displayed recipient, selected sender and message on the exact proposed action before approval. Explicit lead monitoring is required for tracked Microsoft context; preparation sends nothing.
+ */
+export const prepareBieLeadEmail = async (id: string,
+    prepareBieLeadEmail: PrepareBieLeadEmail, options?: Parameters<typeof customFetch>[1]): Promise<PreparedBieLeadEmail> => {
+
+  return customFetch<PreparedBieLeadEmail>(getPrepareBieLeadEmailUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(prepareBieLeadEmail)
+  }
+);}
+
+
+
+
+
+export const getPrepareBieLeadEmailMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof prepareBieLeadEmail>>, TError,{id: string;data: BodyType<PrepareBieLeadEmail>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof prepareBieLeadEmail>>, TError,{id: string;data: BodyType<PrepareBieLeadEmail>}, TContext> => {
+
+const mutationKey = ['prepareBieLeadEmail'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof prepareBieLeadEmail>>, {id: string;data: BodyType<PrepareBieLeadEmail>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  prepareBieLeadEmail(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PrepareBieLeadEmailMutationResult = NonNullable<Awaited<ReturnType<typeof prepareBieLeadEmail>>>
+    export type PrepareBieLeadEmailMutationBody = BodyType<PrepareBieLeadEmail>
+    export type PrepareBieLeadEmailMutationError = ErrorType<void>
+
+    export const usePrepareBieLeadEmail = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof prepareBieLeadEmail>>, TError,{id: string;data: BodyType<PrepareBieLeadEmail>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof prepareBieLeadEmail>>,
+        TError,
+        {id: string;data: BodyType<PrepareBieLeadEmail>},
+        TContext
+      > => {
+      return useMutation(getPrepareBieLeadEmailMutationOptions(options));
+    }

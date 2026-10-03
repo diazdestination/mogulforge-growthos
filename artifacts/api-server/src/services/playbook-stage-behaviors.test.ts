@@ -76,6 +76,8 @@ beforeEach(async () => {
     configured: true,
     connected: true,
     senderActive: true,
+    provider: "gmail",
+    email: "stage-behavior-sender@example.com",
   });
   sendGmailForUserMock.mockReset();
   sendGmailForUserMock.mockResolvedValue({

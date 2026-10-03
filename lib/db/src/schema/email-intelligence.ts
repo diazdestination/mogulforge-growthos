@@ -1,5 +1,7 @@
 import {
   boolean,
+  check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -10,12 +12,16 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { usersTable } from "./auth";
 import { organizationsTable } from "./organizations";
 import { leadsTable } from "./leads";
 import { contactsTable } from "./contacts";
 import { activitiesTable } from "./activities";
+import { mailboxCommunicationParentsTable } from "./mailbox-communication";
+import { mailboxConnectorsTable } from "./mailbox-connectors";
+import { crmTasksTable } from "./crm-tasks";
 
 export type EmailIntelligenceSourceStatus = "pending" | "active" | "paused" | "error";
 export type EmailIntelligenceMessageStatus = "processed" | "raw_purged";
@@ -148,7 +154,17 @@ export type EmailIntelligenceFact = typeof emailIntelligenceFactsTable.$inferSel
 export const emailResponseReviewsTable = pgTable("email_response_reviews", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => organizationsTable.id),
-  sourceId: uuid("source_id").notNull().references(() => emailIntelligenceSourcesTable.id),
+  sourceId: uuid("source_id").references(() => emailIntelligenceSourcesTable.id),
+  mailboxParentId: uuid("mailbox_parent_id"),
+  mailboxConnectorId: uuid("mailbox_connector_id"),
+  internetMessageId: text("internet_message_id"),
+  encryptedText: text("encrypted_text"),
+  rawExpiresAt: timestamp("raw_expires_at", { withTimezone: true }),
+  rawPurgedAt: timestamp("raw_purged_at", { withTimezone: true }),
+  version: integer("version").notNull().default(1),
+  reviewRequestId: uuid("review_request_id"),
+  reviewFingerprint: text("review_fingerprint"),
+  taskId: uuid("task_id"),
   messageId: uuid("message_id").references(() => emailIntelligenceMessagesTable.id, { onDelete: "set null" }),
   externalMessageId: text("external_message_id").notNull(),
   payloadSha256: text("payload_sha256").notNull(),
@@ -169,6 +185,13 @@ export const emailResponseReviewsTable = pgTable("email_response_reviews", {
   releaseNote: text("release_note"),
 }, (table) => [
   uniqueIndex("email_response_source_external_uniq").on(table.sourceId, table.externalMessageId),
+  uniqueIndex("email_response_mailbox_external_uq").on(table.organizationId, table.mailboxConnectorId, table.externalMessageId).where(sql`${table.mailboxConnectorId} is not null`),
+  check("email_response_provenance_ck", sql`(${table.sourceId} is not null and ${table.mailboxParentId} is null and ${table.mailboxConnectorId} is null) or (${table.sourceId} is null and ${table.messageId} is null and ${table.mailboxParentId} is not null and ${table.mailboxConnectorId} is not null and ${table.leadId} is not null and ${table.contactId} is not null and ${table.internetMessageId} is not null and ${table.rawExpiresAt} is not null)`),
+  check("email_response_version_ck", sql`${table.version} > 0`),
+  foreignKey({ columns: [table.organizationId, table.mailboxParentId, table.leadId, table.contactId, table.mailboxConnectorId], foreignColumns: [mailboxCommunicationParentsTable.organizationId, mailboxCommunicationParentsTable.id, mailboxCommunicationParentsTable.leadId, mailboxCommunicationParentsTable.contactId, mailboxCommunicationParentsTable.connectorId], name: "email_response_exact_parent_fk" }),
+  foreignKey({ columns: [table.organizationId, table.mailboxConnectorId], foreignColumns: [mailboxConnectorsTable.organizationId, mailboxConnectorsTable.id], name: "email_response_connector_fk" }),
+  foreignKey({ columns: [table.organizationId, table.taskId], foreignColumns: [crmTasksTable.organizationId, crmTasksTable.id], name: "email_response_task_fk" }),
+  index("email_response_raw_expiry_idx").on(table.rawExpiresAt),
   index("email_response_org_review_idx").on(table.organizationId, table.state, table.receivedAt),
   index("email_response_org_lead_hold_idx").on(table.organizationId, table.leadId, table.holdActive),
 ]);

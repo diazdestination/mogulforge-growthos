@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { canManageSettings, canWrite } from "@/lib/permissions";
+import { BieEmailReviewSummary, preparedBieEmail } from "./bie-email-review";
 
 export async function revenueRequest<T>(
   path: string,
@@ -26,8 +27,11 @@ export async function revenueRequest<T>(
   });
   const value = await response.json();
   if (!response.ok)
-    throw new Error(
-      value.error || "The workspace could not complete this request.",
+    throw Object.assign(
+      new Error(
+        value.error || "The workspace could not complete this request.",
+      ),
+      { status: response.status },
     );
   return value;
 }
@@ -61,7 +65,7 @@ interface Proposal {
   status: string;
   rationale: string;
   executionDetail: string | null;
-  payload: { subject?: string; body?: string };
+  payload: Record<string, unknown> & { subject?: string; body?: string };
 }
 interface Profile {
   version: number;
@@ -282,6 +286,13 @@ export function RevenueWorkspace() {
           "The action completed, but updated data could not be loaded. Refresh the workspace before taking another action.",
         );
     } catch (e) {
+      if (
+        e &&
+        typeof e === "object" &&
+        "status" in e &&
+        (e.status === 409 || e.status === 412)
+      )
+        setRefreshFailed(true);
       setError(
         e instanceof Error
           ? e.message
@@ -695,12 +706,39 @@ function ProposalCard({
         </details>
       )}
       {p.executionDetail && <p className="mt-3 text-sm">{p.executionDetail}</p>}
+      {p.actionType === "send_email" && (
+        <BieEmailReviewSummary payload={p.payload} status={p.status} />
+      )}
       <div className="mt-3 flex flex-wrap gap-2">
+        {writer && p.status === "proposed" && p.actionType === "send_email" && (
+          <button
+            className={button}
+            disabled={busy || needsReview || dirty}
+            onClick={() =>
+              work(
+                () =>
+                  revenueRequest(`/bie/actions/${p.id}/prepare-email`, {
+                    expectedPayload: p.payload,
+                  }),
+                "Recipient and sender frozen. Review the saved email before approval.",
+              )
+            }
+          >
+            {preparedBieEmail(p.payload)
+              ? "Refresh recipient and sender"
+              : "Prepare recipient and sender"}
+          </button>
+        )}
         {writer && p.status === "proposed" && (
           <>
             <button
               className={button}
-              disabled={busy || needsReview || dirty}
+              disabled={
+                busy ||
+                needsReview ||
+                dirty ||
+                (p.actionType === "send_email" && !preparedBieEmail(p.payload))
+              }
               onClick={() =>
                 work(
                   () =>
@@ -1204,7 +1242,13 @@ export function ValueLedger({
 }) {
   const ledger = useQuery({
     queryKey: ["revenue", "value", period ?? "all_time"],
-    queryFn: () => revenueRequest<Ledger>("/revenue/value" + (period ? `?${new URLSearchParams({ startAt: period.startAt, endAt: period.endAt })}` : "")),
+    queryFn: () =>
+      revenueRequest<Ledger>(
+        "/revenue/value" +
+          (period
+            ? `?${new URLSearchParams({ startAt: period.startAt, endAt: period.endAt })}`
+            : ""),
+      ),
   });
   const [leadId, setLeadId] = useState("");
   const [amount, setAmount] = useState("");
@@ -1247,8 +1291,10 @@ export function ValueLedger({
           Trace the value. See the evidence.
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          {period ? "Selected UTC period · USD records" : "All-time USD records"} · {data.entryCount} financial entries · latest
-          200 shown
+          {period
+            ? "Selected UTC period · USD records"
+            : "All-time USD records"}{" "}
+          · {data.entryCount} financial entries · latest 200 shown
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1286,11 +1332,16 @@ export function ValueLedger({
         />
       </div>
       <Note>{data.boundary}</Note>
-      {period && ((data.undatedAcceptedEstimateCount ?? 0) > 0 || (data.undatedCompletedProjectCount ?? 0) > 0) && (
-        <Note>
-          Dates need attention: {data.undatedAcceptedEstimateCount ?? 0} accepted estimates and {data.undatedCompletedProjectCount ?? 0} completed projects have no event date and are excluded from this period.
-        </Note>
-      )}
+      {period &&
+        ((data.undatedAcceptedEstimateCount ?? 0) > 0 ||
+          (data.undatedCompletedProjectCount ?? 0) > 0) && (
+          <Note>
+            Dates need attention: {data.undatedAcceptedEstimateCount ?? 0}{" "}
+            accepted estimates and {data.undatedCompletedProjectCount ?? 0}{" "}
+            completed projects have no event date and are excluded from this
+            period.
+          </Note>
+        )}
       {records.length > 0 && (
         <div className="space-y-3 rounded-xl border p-4">
           <h4 className="font-semibold">Follow a customer’s evidence chain</h4>
@@ -1432,7 +1483,11 @@ export function ValueLedger({
                 {e.sourceReference}
               </Link>
               <p className="text-xs text-muted-foreground">
-                {e.kind.replaceAll("_", " ")} · {new Date(e.occurredAt).toLocaleDateString("en-US", { timeZone: "UTC" })} (UTC)
+                {e.kind.replaceAll("_", " ")} ·{" "}
+                {new Date(e.occurredAt).toLocaleDateString("en-US", {
+                  timeZone: "UTC",
+                })}{" "}
+                (UTC)
               </p>
             </div>
             <strong>{money(e.amountCents)}</strong>

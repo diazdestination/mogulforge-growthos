@@ -35,6 +35,7 @@ vi.mock("./mailbox-connector", () => ({ processMailboxConnectors: vi.fn(async ()
 vi.mock("./mailbox-communication", async (importOriginal) => ({
   ...await importOriginal<typeof import("./mailbox-communication")>(),
   purgeExpiredServiceReplyContent: vi.fn(async () => {}),
+  purgeExpiredLeadReplyContent: vi.fn(async () => {}),
 }));
 
 // The notification stage intentionally retires expired subscriptions and
@@ -52,7 +53,7 @@ import { processStaffLeadPush } from "./staff-push";
 import { processMissedCallCare } from "./missed-call-care";
 import { processServiceWatch } from "./service-watch";
 import { processMailboxConnectors } from "./mailbox-connector";
-import { purgeExpiredServiceReplyContent } from "./mailbox-communication";
+import { purgeExpiredServiceReplyContent, purgeExpiredLeadReplyContent } from "./mailbox-communication";
 import {
   cleanupExpiredPreviousSecrets,
   processPendingDeliveries,
@@ -97,6 +98,7 @@ describe("scheduler stage isolation", () => {
     expect(observe).toHaveBeenCalledWith("mailbox-replies", "failed");
     expect(observe).toHaveBeenCalledWith("scheduled-actions", "succeeded");
     expect(purgeExpiredServiceReplyContent).toHaveBeenCalledOnce();
+    expect(purgeExpiredLeadReplyContent).toHaveBeenCalledOnce();
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("PRIVATE_MAILBOX_CONTENT");
   });
 
@@ -104,6 +106,18 @@ describe("scheduler stage isolation", () => {
     await processScheduledWork("00000000-0000-4000-8000-000000000001");
     expect(processMailboxConnectors).toHaveBeenCalledExactlyOnceWith("00000000-0000-4000-8000-000000000001");
     expect(purgeExpiredServiceReplyContent).not.toHaveBeenCalled();
+    expect(purgeExpiredLeadReplyContent).not.toHaveBeenCalled();
+  });
+  it("isolates lead content expiry from service retention and never exposes raw reply text", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(purgeExpiredLeadReplyContent).mockRejectedValueOnce(new Error("PRIVATE_LEAD_REPLY_BODY"));
+    const observe = vi.fn(async () => {});
+    await processScheduledWork(undefined, observe);
+    expect(purgeExpiredServiceReplyContent).toHaveBeenCalledOnce();
+    expect(observe).toHaveBeenCalledWith("lead-reply-retention", "failed");
+    expect(observe).toHaveBeenCalledWith("upload-cleanup", "succeeded");
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("PRIVATE_LEAD_REPLY_BODY");
+    expect(JSON.stringify(observe.mock.calls)).not.toContain("PRIVATE_LEAD_REPLY_BODY");
   });
   it("reports failed stages without exposing raw exceptions to logs or heartbeat", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});

@@ -22,6 +22,10 @@ const statusSchema = z.object({
   reason: z.string().nullable(),
   pendingParentCount: z.number().int().nonnegative(),
   reviewCount: z.number().int().nonnegative(),
+  leadMonitoringEnabled: z.boolean(),
+  leadMonitoringVersion: z.number().int().nonnegative(),
+  leadMonitoringApprovedAt: z.string().nullable(),
+  leadMonitoringChangedAt: z.string().nullable(),
 });
 type Status = z.infer<typeof statusSchema>;
 export function MailboxConnectionCard({
@@ -34,6 +38,8 @@ export function MailboxConnectionCard({
     [busy, setBusy] = useState(false);
   const [readApproved, setReadApproved] = useState(false),
     [retentionApproved, setRetentionApproved] = useState(false);
+  const [leadApproved, setLeadApproved] = useState(false),
+    [leadStale, setLeadStale] = useState(false);
   async function load() {
     try {
       const response = await fetch("/api/v1/mailbox/microsoft", {
@@ -45,6 +51,8 @@ export function MailboxConnectionCard({
       setError("");
       setReadApproved(false);
       setRetentionApproved(false);
+      setLeadApproved(false);
+      setLeadStale(false);
     } catch {
       setStatus(null);
       setError(
@@ -96,6 +104,44 @@ export function MailboxConnectionCard({
     } catch {
       setError(
         "The change was not confirmed. Refresh status; no alternative mailbox or automatic retry was used.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function setLeadContext(enabled: boolean) {
+    if (
+      !status ||
+      busy ||
+      leadStale ||
+      (enabled && (!status.usable || !leadApproved))
+    )
+      return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(
+        "/api/v1/mailbox/microsoft/lead-monitoring",
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            expectedConnectorVersion: status.version,
+            expectedLeadMonitoringVersion: status.leadMonitoringVersion,
+            enabled,
+            leadContextAcknowledged: true,
+          }),
+        },
+      );
+      if (!response.ok) throw new Error();
+      setStatus(statusSchema.parse(await response.json()));
+      setLeadApproved(false);
+    } catch {
+      setLeadStale(true);
+      setLeadApproved(false);
+      setError(
+        "Lead-monitoring approval was not confirmed or its version changed. Refresh reply-monitoring status and review again; no automatic retry was used.",
       );
     } finally {
       setBusy(false);
@@ -163,10 +209,11 @@ export function MailboxConnectionCard({
               send-only access is unchanged.
             </p>
             <p className="text-sm">
-              This first version tracks only replies to GrowthOS service
-              reminders sent from this opted-in Microsoft mailbox. It is not a
-              general inbox: lead conversations, Gmail and older/untracked
-              messages are not connected here.
+              Service reminders are the default tracked context. Individual BIE
+              lead emails require the separate approval below and a new frozen
+              send review. This is not a general inbox: Gmail, invoice replies,
+              direct-compose and older/untracked messages are not connected
+              here.
             </p>
             <p className="text-sm">
               Exact GrowthOS service-reminder replies become office review
@@ -174,6 +221,66 @@ export function MailboxConnectionCard({
               decisions. Unmatched or ambiguous messages do not become trusted
               replies. Message IDs and retained digests are not delivery proof.
             </p>
+            <section
+              aria-label="Tracked lead reply permission"
+              className="space-y-3 rounded-lg border border-border p-3"
+            >
+              <h3 className="font-semibold">Optional tracked lead replies</h3>
+              <p className="break-words text-sm">
+                {status.leadMonitoringEnabled
+                  ? `Lead context approved at version ${status.leadMonitoringVersion}${status.usable ? "" : " — monitoring currently held"}.`
+                  : "Lead context is off. Service-reminder monitoring is unchanged."}
+              </p>
+              {status.leadMonitoringApprovedAt && (
+                <p className="text-xs text-muted-foreground">
+                  Approved{" "}
+                  {new Date(status.leadMonitoringApprovedAt).toLocaleString()}{" "}
+                  for {status.mailboxEmail}.
+                </p>
+              )}
+              <p className="text-sm">
+                This local permission adds no Microsoft scope and does not reset
+                mailbox history or service parents. Only newly prepared and
+                individually approved BIE lead emails can be tracked. Replies
+                hold follow-up and create office-review evidence; they do not
+                authorize instructions or restore cancelled work.
+              </p>
+              {status.leadMonitoringEnabled ? (
+                <Button
+                  variant="outline"
+                  disabled={busy || leadStale}
+                  onClick={() => void setLeadContext(false)}
+                >
+                  Stop tracked lead replies
+                </Button>
+              ) : (
+                <>
+                  <label className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      disabled={busy || leadStale || !status.usable}
+                      checked={leadApproved}
+                      onChange={(event) =>
+                        setLeadApproved(event.target.checked)
+                      }
+                    />
+                    <span>
+                      I explicitly approve tracked BIE lead replies for this
+                      exact selected Microsoft mailbox. A later re-enable will
+                      not adopt earlier lead conversations.
+                    </span>
+                  </label>
+                  <Button
+                    disabled={
+                      busy || leadStale || !status.usable || !leadApproved
+                    }
+                    onClick={() => void setLeadContext(true)}
+                  >
+                    Enable tracked lead replies
+                  </Button>
+                </>
+              )}
+            </section>
             <fieldset
               disabled={busy || !status.enabled || !status.configured}
               className="space-y-3"

@@ -17,6 +17,7 @@ import {
   type StageBehavior,
 } from "@workspace/db";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { isDeepStrictEqual } from "node:util";
 import { isLegacyDefaultOrg } from "../lib/orgFlavor";
 import { recordAudit } from "./audit";
 import { needsSourceVerification } from "./source-history";
@@ -26,6 +27,7 @@ import {
   getOrCreateEngagementLink,
 } from "./engagement-links";
 import { getUserEmailStatus, sendEmailForUser, emailAcceptanceEvidence } from "./user-email";
+import { EmailDispatchBlockedError } from "./email-dispatch-guard";
 import {
   adjustSendTime,
   chooseVariant,
@@ -553,6 +555,7 @@ export async function executePlaybookStep(
   }
   let gateSkipReason: string | null = null;
   let emailSenderUserId: string | null = null;
+  let expectedEmailSender: { provider: "gmail" | "microsoft"; senderEmail: string } | undefined;
   if (!gate.ok) {
     if (gate.outcome === "deferred") {
       // Quiet hours / frequency cap: pause, never drop. Re-queue the exact
@@ -658,7 +661,7 @@ export async function executePlaybookStep(
       });
       return { status: "skipped", detail: `paused: ${reason}` };
     }
-    if (!gmail.configured || !gmail.connected) {
+    if (!gmail.configured || !gmail.connected || !gmail.provider || !gmail.email) {
       const reason = gmail.configured
         ? "assigned_sender_email_not_connected"
         : "email_provider_not_configured";
@@ -681,6 +684,7 @@ export async function executePlaybookStep(
       return { status: "skipped", detail: `paused: ${reason}` };
     }
     emailSenderUserId = lead.assignedUserId;
+    expectedEmailSender = { provider: gmail.provider, senderEmail: gmail.email.trim().toLowerCase() };
   }
 
   // Atomically CLAIM this step before any external side effect: advance
@@ -745,6 +749,7 @@ export async function executePlaybookStep(
   if (!claimed) {
     return { status: "skipped", detail: "step already claimed" };
   }
+  const claimExpiresAt = Date.now() + 15 * 60_000;
   if (windowDeferred && nextRunAt) {
     await appendHistory(enrollment.id, {
       at: new Date().toISOString(),
@@ -809,6 +814,32 @@ export async function executePlaybookStep(
   } else {
     try {
       if (step.channel === "email") {
+        const beforeDispatch = async () => {
+          try {
+            const [currentEnrollment] = await db.select().from(playbookEnrollmentsTable).where(and(eq(playbookEnrollmentsTable.organizationId, organizationId), eq(playbookEnrollmentsTable.id, enrollment.id)));
+            const [currentLead] = await db.select().from(leadsTable).where(and(eq(leadsTable.organizationId, organizationId), eq(leadsTable.id, lead.id)));
+            const [currentContact] = await db.select().from(contactsTable).where(and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, contact.id)));
+            const [currentPlaybook] = await db.select().from(playbooksTable).where(and(eq(playbooksTable.organizationId, organizationId), eq(playbooksTable.id, playbook.id)));
+            // The claimed final step is already completed; require its exact
+            // claimed state rather than pretending it is still unclaimed work.
+            if (Date.now() >= claimExpiresAt || !currentEnrollment || currentEnrollment.status !== claimed.status || currentEnrollment.currentStep !== claimed.currentStep ||
+                currentEnrollment.playbookId !== playbook.id || currentEnrollment.leadId !== lead.id || currentEnrollment.pauseReason !== claimed.pauseReason ||
+                !currentLead || currentLead.contactId !== contact.id || currentLead.assignedUserId !== emailSenderUserId ||
+                currentLead.status !== lead.status || currentLead.updatedAt.getTime() !== lead.updatedAt.getTime() ||
+                !currentContact || currentContact.email !== contact.email || currentContact.firstName !== contact.firstName ||
+                !currentPlaybook?.isActive || !isDeepStrictEqual(currentPlaybook.steps, playbook.steps) || currentPlaybook.kind !== playbook.kind || currentPlaybook.category !== playbook.category ||
+                await customerWorkHeld(organizationId) || needsSourceVerification(currentLead) || await hasCustomerReplyHold(organizationId, lead.id) ||
+                await getBusinessName(organizationId) !== businessName) throw new EmailDispatchBlockedError();
+            if (currentPlaybook.kind !== "post_sale" && currentPlaybook.category === "acquisition") {
+              const behavior = (await getPlaybookStageBehaviors(organizationId))[currentLead.status] ?? { action: "complete" };
+              if (behavior.action !== "continue" && !(behavior.action === "enroll" && behavior.enrollPlaybookId === playbook.id)) throw new EmailDispatchBlockedError();
+            }
+            const sender = await getUserEmailStatus(organizationId, emailSenderUserId!);
+            if (!sender.senderActive || !sender.configured || !sender.connected || sender.provider !== expectedEmailSender?.provider ||
+                sender.email?.trim().toLowerCase() !== expectedEmailSender?.senderEmail ||
+                !(await checkSendEligibility({ organizationId, leadId: lead.id, contact: currentContact, channel: "email", kind: "outreach" })).ok) throw new EmailDispatchBlockedError();
+          } catch { throw new EmailDispatchBlockedError(); }
+        };
         sendResult = await sendEmailForUser({
           organizationId,
           userId: emailSenderUserId!,
@@ -819,6 +850,8 @@ export async function executePlaybookStep(
             draft.body +
             linkSuffix +
             unsubscribeFooter(organizationId, contact.id),
+          expectedSender: expectedEmailSender,
+          beforeDispatch,
         });
       } else {
         sendResult = await providers.sms.send(
@@ -828,6 +861,16 @@ export async function executePlaybookStep(
         );
       }
     } catch (err) {
+      if (err instanceof EmailDispatchBlockedError) {
+        const reason = "Final email guard changed before dispatch; this claimed touch is retained and will not replay";
+        const entry: EnrollmentHistoryEntry = { at: new Date().toISOString(), kind: "paused", stepIndex, channel: step.channel, detail: reason };
+        await db.update(playbookEnrollmentsTable).set({ status: "paused", pauseReason: reason, nextRunAt: null,
+          history: sql`${playbookEnrollmentsTable.history} || ${JSON.stringify([entry])}::jsonb`,
+        }).where(and(eq(playbookEnrollmentsTable.organizationId, organizationId), eq(playbookEnrollmentsTable.id, enrollment.id),
+          eq(playbookEnrollmentsTable.status, claimed.status), eq(playbookEnrollmentsTable.currentStep, claimed.currentStep)));
+        await recordBlockedSend({ organizationId, channel: "email", reason: "final_email_guard_changed", outcome: "blocked", source: "playbook", leadId: lead.id, contactId: contact.id });
+        return { status: "skipped", detail: "blocked: final_email_guard_changed; claimed step cannot replay" };
+      }
       // Permanently bad address → suppress it and stop the sequence so
       // nothing keeps hammering a dead mailbox/number. Transient/provider
       // config failures rethrow (step is already claimed; no double send).

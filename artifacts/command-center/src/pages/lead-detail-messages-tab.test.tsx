@@ -64,9 +64,10 @@ const noteActivity = {
 // API returns activities newest-first.
 const activitiesDesc = [newerTeamMsg, olderPortalMsg, noteActivity];
 
-function setup(role: string) {
+function setup(role: string, search = '') {
   const fetchMock = mockApi(role, {
     handler: (method, path) => {
+      if (method === 'GET' && path.endsWith('/mailbox-replies')) return new Response(JSON.stringify({ items: [], hasMore: false, offset: 0, limit: 25 }), { status: 200 });
       if (
         method === 'GET' &&
         path.endsWith(`/api/v1/leads/${sampleLead.id}/activities`)
@@ -120,7 +121,7 @@ function setup(role: string) {
 
   const { hook } = memoryLocation({ path: `/leads/${sampleLead.id}` });
   renderWithQuery(
-    <Router hook={hook}>
+    <Router hook={hook} searchHook={() => search}>
       <Route path="/leads/:id" component={LeadDetail} />
     </Router>,
   );
@@ -134,6 +135,12 @@ async function openMessagesTab() {
 }
 
 describe('lead detail – Messages tab', () => {
+  it('opens the canonical Messages evidence panel from a validated tab query without scrolling away', async () => {
+    setup('sales_rep', '?tab=messages');
+    await screen.findByRole('region', { name: 'Original-mailbox lead replies' });
+    expect(screen.getByText(/This is not a general inbox/)).toBeTruthy();
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
   it('shows both portal_message and team_message in the Messages tab', async () => {
     setup('sales_rep');
 

@@ -30,7 +30,7 @@ export const CUSTOMER_EXPORT_DATASETS: readonly Dataset[] = [
 ] as const;
 export const CUSTOMER_EXPORT_EXCLUSIONS = [
   "Credentials, passwords, sessions, identity tokens, API keys and provider/billing configuration are excluded.",
-  "Mailbox read credentials/cursors, provider identities, raw reply content, immutable parent/receipt/review evidence and platform identity-email delivery records are excluded. They remain in inventory/backups and require a separately reviewed communications/security export; this core export is not a complete mailbox or identity archive.",
+  "Mailbox read credentials/cursors, separate lead-monitoring permissions, provider identities, raw reply content, immutable lead/service parent/receipt/review evidence and platform identity-email delivery records are excluded. They remain in inventory/backups and require a separately reviewed communications/security export; this core export is not a complete mailbox or identity archive. Linked office tasks are included without raw email content.",
   "Opaque activity/import/attribution metadata, provider error details, staff identities and device/IP data are excluded.",
   "Invoice numbering configuration and command retry fingerprints are excluded. Invoice receipt allocations reference value_entries; do not count them as additional cash transactions. An allocation reversal is not a cash refund.",
   "Opening receivables are non-cash balances at a documented cutoff, never payments or collected revenue. Historical invoice source fields and fixed migration identities are included; raw migration reviews/normalized payloads and staff approval identities are excluded.",

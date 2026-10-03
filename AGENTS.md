@@ -1,5 +1,16 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## October 2 two-wave continuation
+
+The owner explicitly requested the next two launch-critical waves after PR16
+and exact-main CI37085822984 passed at c2d999b. First complete tracked Microsoft
+lead replies and final dispatch guards; then complete invoice delivery exception
+visibility and safe separately reviewed retries of proven no-effect attempts.
+Use `reports/lead-replies-contract-2026-10-02.md` for first-wave ownership and
+scope. This supersedes the previous service-only active slice, not any hosted,
+provider, customer-contact, financial or release approval gate. Integrate and
+verify each bounded wave before adopting the next. Preserve unknown effects.
+
 ## October 2 fixed launch-completion authorization
 
 The owner approved completing the documented remaining engineering, not just

@@ -17,6 +17,7 @@ import { NextActionDraftComposer } from '@/components/next-best-action-card';
 const ACTION_META: Record<string, { icon: typeof Phone; label: string }> = {
   call_now: { icon: Phone, label: 'Call' },
   reply_portal_message: { icon: MessageSquareText, label: 'Reply' },
+  review_customer_reply: { icon: MessageSquareText, label: 'Review held reply' },
   send_message: { icon: Send, label: 'Message' },
   follow_up_estimate: { icon: Send, label: 'Follow up' },
   schedule_follow_up: { icon: CalendarClock, label: 'Schedule' },
@@ -106,13 +107,14 @@ function TodayActionRow({ action: a, canEdit }: { action: NextBestAction; canEdi
     refresh();
   };
 
-  const expandable = canEdit && MESSAGE_TYPES.has(a.actionType);
+  const replyHeld = String(a.actionType) === 'review_customer_reply';
+  const expandable = canEdit && !replyHeld && MESSAGE_TYPES.has(a.actionType);
 
   return (
     <div className="bg-card border border-border/60 rounded-xl hover:border-primary/40 hover:shadow-sm transition-all">
       <div className="flex items-center gap-3 px-3 py-2">
         <Link
-          href={`/leads/${a.leadId}`}
+          href={`/leads/${encodeURIComponent(a.leadId)}${replyHeld ? '?tab=messages#mailbox-replies' : ''}`}
           className="flex items-center gap-3 min-w-0 flex-1 group"
         >
           <span className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
@@ -131,7 +133,7 @@ function TodayActionRow({ action: a, canEdit }: { action: NextBestAction; canEdi
           </span>
           <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0 hidden sm:block" aria-hidden />
         </Link>
-        {canEdit && (
+        {canEdit && !replyHeld && (
           <span className="flex items-center gap-1 shrink-0">
             {expandable && (
               <button
@@ -204,6 +206,7 @@ function ExpandedDraft({
       </div>
     );
   }
+  if (action && String(action.actionType) === 'review_customer_reply') return <div className="px-3 pb-3 text-sm">Follow-up is held for office review. <Link href={`/leads/${encodeURIComponent(leadId)}?tab=messages#mailbox-replies`} className="font-semibold underline">Review held customer reply</Link></div>;
   if (!action || action.actionType === 'none' || !action.draft) {
     return (
       <div className="px-3 pb-3 text-xs text-muted-foreground">

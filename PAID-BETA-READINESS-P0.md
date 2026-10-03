@@ -7,6 +7,15 @@
 
 ## Mission
 
+**October 2 two-wave continuation:** owner authorized tracked lead replies then
+invoice delivery exceptions/reviewed recovery. First-wave contract and evidence:
+`reports/lead-replies-contract-2026-10-02.md` and its integration report. Native
+individually reviewed Microsoft BIE sends now use separate lead permission,
+canonical reply holds/tasks and final-dispatch checks. Schema remains117tables
+with reviewed0010after0009. Base mainc2d999b passed CI37085822984; require fresh
+candidate/main evidence. Hosted/provider/device/customer acceptance remains
+separate. This does not authorize rollout, sender activation or collection.
+
 **October 2 launch-completion authorization:** the owner approved closing the
 remaining engineering against `LAUNCH-COMPLETION.md`. The current L1/L2 contract
 is `reports/launch-communications-contract-2026-10-02.md`; local integration is in

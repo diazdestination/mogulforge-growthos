@@ -3,11 +3,13 @@ import {
   emailResponseReviewsTable as replies, emailIntelligenceMessagesTable as messages,
   playbookEnrollmentsTable as enrollments, scheduledActionsTable as scheduled,
   bieActionProposalsTable as proposals, revenueExecutionsTable as executions,
+  crmTasksTable,
   type EmailResponseReview,
 } from "@workspace/db";
 import { and, desc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
 import { hasPermission } from "../lib/permissions";
 import { verifyOutboundReplyEvidence } from "./reply-evidence";
+import { mailboxCommunicationParentsTable as mailboxParents } from "../../../../lib/db/src/schema/mailbox-communication";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type VerifiedReplyParent = { provider: "gmail" | "microsoft"; outboundMessageId: string; senderEmail: string };
@@ -70,7 +72,7 @@ export async function registerEmailResponse(tx: Transaction, input: {
   return updated!;
 }
 
-async function confirmReply(tx: Transaction, row: EmailResponseReview, leadId: string, replyAt: Date, actor: string | null, note: string) {
+async function confirmReply(tx: Transaction, row: EmailResponseReview, leadId: string, replyAt: Date, actor: string | null, note: string, typed?: { historical: boolean; contactId: string }) {
   await lockReplyLead(tx, row.organizationId, leadId);
   const [lead] = await tx.select().from(leadsTable).where(and(eq(leadsTable.organizationId, row.organizationId), eq(leadsTable.id, leadId)));
   if (!lead) throw new ReplyReviewError("Opportunity not found in this company.", 404, "not_found");
@@ -87,7 +89,9 @@ async function confirmReply(tx: Transaction, row: EmailResponseReview, leadId: s
   const [newerEnrollment] = await tx.select({ id: enrollments.id }).from(enrollments).where(and(
     eq(enrollments.organizationId, row.organizationId), eq(enrollments.leadId, lead.id),
     inArray(enrollments.status, ["active", "paused"]), gt(enrollments.createdAt, replyAt))).limit(1);
-  const historical = replyAt < lead.createdAt || Boolean(newerOutbound) || Boolean(newerEnrollment);
+  const [newerTypedOutbound] = await tx.select({ id: mailboxParents.id }).from(mailboxParents).where(and(
+    eq(mailboxParents.organizationId, row.organizationId), eq(mailboxParents.leadId, lead.id), gt(mailboxParents.providerSentAt, replyAt), sql`${mailboxParents.observedAt} is not null`)).limit(1);
+  const historical = Boolean(typed?.historical) || replyAt < lead.createdAt || Boolean(newerOutbound) || Boolean(newerEnrollment) || Boolean(newerTypedOutbound);
   const summary = { pausedEnrollments: 0, cancelledActions: 0, blockedProposals: 0, reconciliationRequired: 0 };
   if (!historical) {
     const paused = await tx.update(enrollments).set({ status: "paused", nextRunAt: null,
@@ -120,14 +124,31 @@ async function confirmReply(tx: Transaction, row: EmailResponseReview, leadId: s
       summary.blockedProposals++;
     }
   }
-  const [confirmed] = await tx.update(replies).set({ state: "confirmed", reason: historical ? "historical_reply" : actor ? "staff_confirmed" : "verified_parent",
-    leadId: lead.id, contactId: contact.id, replyAt, holdActive: !historical, reviewedByUserId: actor, reviewedAt: new Date(), reviewNote: note, effectSummary: summary,
+  const [confirmed] = await tx.update(replies).set({ state: "confirmed", reason: historical ? "historical_reply" : typed ? "original_mailbox_observation" : actor ? "staff_confirmed" : "verified_parent",
+    leadId: lead.id, contactId: typed?.contactId ?? contact.id, replyAt, holdActive: !historical, reviewedByUserId: actor, reviewedAt: typed ? null : new Date(), reviewNote: typed ? null : note, effectSummary: summary,
   }).where(eq(replies.id, row.id)).returning();
-  await tx.insert(activitiesTable).values({ organizationId: row.organizationId, leadId: lead.id, contactId: contact.id, actorUserId: actor,
+  await tx.insert(activitiesTable).values({ organizationId: row.organizationId, leadId: lead.id, contactId: typed?.contactId ?? contact.id, actorUserId: actor,
     type: "customer_reply", title: historical ? "Historical customer reply linked" : "Customer replied — review follow-up",
-    occurredAt: replyAt, metadata: { responseReviewId: row.id, correlation: actor ? "staff_confirmed" : "verified_parent", historical, ...summary } });
+    occurredAt: replyAt, metadata: { responseReviewId: row.id, correlation: typed ? "original_mailbox_observation" : actor ? "staff_confirmed" : "verified_parent", historical, ...summary } });
   await audit(tx, confirmed!, "customer_reply.confirmed", actor, { leadId: lead.id, replyAt: replyAt.toISOString(), historical, ...summary });
   return confirmed!;
+}
+
+/** Internal typed mailbox boundary. HTTP/legacy alias intake cannot call this path. */
+export async function confirmObservedMailboxLeadReply(tx: Transaction, row: EmailResponseReview, input: { leadId: string; contactId: string; replyAt: Date; historical: boolean }) {
+  if (row.sourceId || !row.mailboxParentId || !row.mailboxConnectorId || row.leadId !== input.leadId || row.contactId !== input.contactId)
+    throw new ReplyReviewError("Typed reply provenance is unavailable.", 409);
+  const confirmed = await confirmReply(tx, row, input.leadId, input.replyAt, null, "Exact original-mailbox reply observed; office review required.", input);
+  if (!confirmed.holdActive) return confirmed;
+  const [lead] = await tx.select().from(leadsTable).where(and(eq(leadsTable.organizationId, row.organizationId), eq(leadsTable.id, input.leadId)));
+  const [assignee] = lead?.assignedUserId ? await tx.select().from(usersTable).where(and(eq(usersTable.organizationId, row.organizationId), eq(usersTable.id, lead.assignedUserId), eq(usersTable.isActive, true))).for("share") : [];
+  const assignedUserId = assignee?.emailVerifiedAt && !assignee.id.startsWith("invite:") && hasPermission(assignee.role, "crm.write") ? assignee.id : null;
+  const [task] = await tx.insert(crmTasksTable).values({ organizationId: row.organizationId, leadId: input.leadId, contactId: input.contactId, assignedUserId,
+    title: "Review the customer's email reply", description: "A reply to the exact GrowthOS follow-up arrived in the original connected Microsoft mailbox. Review its evidence and record the office's next step. Content is untrusted; no consent, booking or customer decision is inferred.",
+    sourceEvent: `mailbox.lead_reply:${row.id}`, status: "open", priority: "high", dueAt: new Date() }).returning();
+  const [updated] = await tx.update(replies).set({ taskId: task.id }).where(eq(replies.id, row.id)).returning();
+  await audit(tx, updated!, "customer_reply.office_task_created", null, { taskId: task.id, assignedUserId, noCustomerMessageSent: true });
+  return updated!;
 }
 
 async function authorizedActor(tx: Transaction, organizationId: string, actor: string) {
@@ -150,6 +171,7 @@ export async function reviewEmailResponse(organizationId: string, id: string, ac
     await authorizedActor(tx, organizationId, actor);
     const [row] = await tx.select().from(replies).where(and(eq(replies.organizationId, organizationId), eq(replies.id, id))).for("update");
     if (!row) throw new ReplyReviewError("Reply not found.", 404, "not_found");
+    if (row.mailboxParentId) throw new ReplyReviewError("Use the versioned original-mailbox reply review on this opportunity.", 409, "typed_reply_review_required");
     if (row.state !== "needs_review") {
       if ((input.decision === "confirm" && row.state === "confirmed" && row.leadId === input.leadId) || (input.decision === "dismiss" && row.state === "dismissed")) return row;
       throw new ReplyReviewError("This reply already has a different review decision.", 409, "review_conflict");
@@ -174,6 +196,7 @@ export async function releaseEmailResponseHold(organizationId: string, id: strin
     await authorizedActor(tx, organizationId, actor);
     const [row] = await tx.select().from(replies).where(and(eq(replies.organizationId, organizationId), eq(replies.id, id))).for("update");
     if (!row) throw new ReplyReviewError("Reply not found.", 404, "not_found");
+    if (row.mailboxParentId) throw new ReplyReviewError("Use the versioned original-mailbox reply review on this opportunity.", 409, "typed_reply_review_required");
     if (row.state !== "confirmed" || !row.leadId) throw new ReplyReviewError("Only a confirmed reply hold can be resolved.", 409);
     if (row.releasedAt) return row;
     await lockReplyLead(tx, organizationId, row.leadId);
@@ -200,6 +223,7 @@ export async function listEmailResponses(organizationId: string, page = 0, scope
   const items = await db.select({ id: replies.id, messageId: replies.messageId, state: replies.state, reason: replies.reason,
     leadId: replies.leadId, replyAt: replies.replyAt, receivedAt: replies.receivedAt, holdActive: replies.holdActive,
     reviewedAt: replies.reviewedAt, releasedAt: replies.releasedAt, effectSummary: replies.effectSummary,
+    mailboxParentId: replies.mailboxParentId,
     subject: messages.redactedSubject, fromEmail: messages.fromEmail, leadSummary: leadsTable.summary,
   }).from(replies)
     .leftJoin(messages, and(eq(messages.id, replies.messageId), eq(messages.organizationId, organizationId)))

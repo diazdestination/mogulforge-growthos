@@ -28,6 +28,7 @@ import { canManageSettings, canWrite } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import { RevenueWorkspace } from '@/components/revenue-workspace';
 import { CustomerReplies } from '@/components/customer-replies';
+import { BieEmailReviewSummary, preparedBieEmail } from '@/components/bie-email-review';
 
 type SourceStatus = 'not_connected' | 'pending' | 'connected' | 'error';
 type ActionType = 'create_task' | 'change_stage' | 'send_email';
@@ -144,7 +145,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   const body = (await response.json().catch(() => ({}))) as T & { error?: string };
-  if (!response.ok) throw new Error(body.error || 'BIE could not complete that request.');
+  if (!response.ok) throw Object.assign(new Error(body.error || 'BIE could not complete that request.'), { status: response.status });
   return body;
 }
 
@@ -246,16 +247,19 @@ function ActionButtons({
   busy,
   onReview,
   onExecute,
+  onPrepare,
 }: {
   proposal: Proposal;
   busy: boolean;
   onReview: (id: string, decision: 'approve' | 'reject') => void;
   onExecute: (id: string) => void;
+  onPrepare: (id: string) => void;
 }) {
   if (proposal.status === 'proposed') {
     return (
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => onReview(proposal.id, 'approve')} disabled={busy} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
+        {proposal.actionType === 'send_email' && <button disabled={busy} onClick={() => onPrepare(proposal.id)} className="min-h-10 rounded-md border border-border px-3 text-xs font-semibold">{preparedBieEmail(proposal.payload) ? 'Refresh recipient and sender' : 'Prepare recipient and sender'}</button>}
+        <button onClick={() => onReview(proposal.id, 'approve')} disabled={busy || (proposal.actionType === 'send_email' && !preparedBieEmail(proposal.payload))} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
           <CheckCircle2 className="h-3.5 w-3.5" /> Approve
         </button>
         <button onClick={() => onReview(proposal.id, 'reject')} disabled={busy} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-semibold hover:bg-muted disabled:opacity-60">
@@ -278,8 +282,10 @@ export default function Bie() {
   const queryClient = useQueryClient();
   const { data: profile } = useGetMe();
   const canManage = canManageSettings(profile?.role as UserRole | undefined);
+  const canAct = canWrite(profile?.role as UserRole | undefined);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [staleActions, setStaleActions] = useState<string[]>([]);
 
   const briefingQuery = useQuery({
     queryKey: ['bie', 'briefing'],
@@ -335,12 +341,15 @@ export default function Bie() {
     onError: (err) => setError(err instanceof Error ? err.message : 'BIE could not build the action queue.'),
   });
   const actionMutation = useMutation({
-    mutationFn: ({ id, path }: { id: string; path: 'approve' | 'reject' | 'execute' }) => request<Proposal>(`/bie/actions/${id}/${path}`, { method: 'POST', ...(path === 'approve' ? { body: JSON.stringify({ expectedPayload: actionsQuery.data?.find(p => p.id === id)?.payload }) } : {}) }),
+    mutationFn: ({ id, path, expectedPayload }: { id: string; path: 'approve' | 'reject' | 'execute' | 'prepare-email'; expectedPayload?: Record<string, unknown> }) => request<Proposal>(`/bie/actions/${id}/${path}`, { method: 'POST', body: JSON.stringify(['approve', 'prepare-email'].includes(path) ? { expectedPayload } : {}) }),
     onSuccess: async () => {
       await refresh();
       setNotice('Action queue updated.');
     },
-    onError: (err) => setError(err instanceof Error ? err.message : 'BIE could not update this action.'),
+    onError: (err, input) => {
+      if ('status' in err && (err.status === 409 || err.status === 412)) setStaleActions(ids => [...new Set([...ids, input.id])]);
+      setError(err instanceof Error ? err.message : 'BIE could not update this action.');
+    },
   });
   const policyMutation = useMutation({
     mutationFn: (policy: Partial<BiePolicy>) => request<BiePolicy>('/bie/autopilot', { method: 'PUT', body: JSON.stringify(policy) }),
@@ -615,7 +624,9 @@ export default function Bie() {
           {(actionsQuery.data ?? []).map((proposal) => (
             <div key={proposal.id} className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-3xl"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{proposal.title}</p><StatusPill status={proposal.status} /><span className="text-xs text-muted-foreground">{actionNames[proposal.actionType]}</span></div><p className="mt-1 text-sm text-muted-foreground">{proposal.rationale}</p>{proposal.estimatedValueCents != null && <p className="mt-1 text-xs font-medium text-muted-foreground">Known lead value: {dollars(proposal.estimatedValueCents)}</p>}</div>
-              <ActionButtons proposal={proposal} busy={busy} onReview={(id, decision) => { setError(null); setNotice(null); actionMutation.mutate({ id, path: decision }); }} onExecute={(id) => { setError(null); setNotice(null); actionMutation.mutate({ id, path: 'execute' }); }} />
+              {proposal.actionType === 'send_email' && <BieEmailReviewSummary payload={proposal.payload} status={proposal.status} showContent />}
+              {staleActions.includes(proposal.id) && <div className="space-y-2 text-sm"><p role="alert">The saved action changed. Refresh and review the current sender, recipient and message before another decision.</p><button disabled={busy || actionsQuery.isFetching} className="min-h-10 rounded-md border border-border px-3" onClick={async () => { const result = await actionsQuery.refetch(); if (!result.isError) setStaleActions(ids => ids.filter(id => id !== proposal.id)); }}>Refresh saved action for review</button></div>}
+              <ActionButtons proposal={proposal} busy={busy || !canAct || staleActions.includes(proposal.id)} onPrepare={(id) => { setError(null); setNotice(null); actionMutation.mutate({ id, path: 'prepare-email', expectedPayload: proposal.payload }); }} onReview={(id, decision) => { setError(null); setNotice(null); actionMutation.mutate({ id, path: decision, expectedPayload: proposal.payload }); }} onExecute={(id) => { setError(null); setNotice(null); actionMutation.mutate({ id, path: 'execute' }); }} />
             </div>
           ))}
         </div>
