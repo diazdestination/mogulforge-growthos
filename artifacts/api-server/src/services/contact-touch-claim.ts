@@ -46,8 +46,10 @@ export async function contactTouchTimes(reader: Pick<typeof db, "select">, org: 
   const retain = (key: string, at: Date) => { if (key !== excludeKey && at > since) byKey.set(key, new Date(Math.max(byKey.get(key)?.getTime() ?? 0, at.getTime()))); };
   const activity = await reader.select().from(activitiesTable).where(and(eq(activitiesTable.organizationId, org), inArray(activitiesTable.contactId, ids),
     inArray(activitiesTable.type, ["playbook_touch_sent", "automation_message_sent", "bie_email_sent"]), gt(activitiesTable.occurredAt, since)));
+  const { serviceActivityTouchKeys, servicePendingTouchTimes } = await import("./service-care-budget");
+  const legacyServiceKeys = await serviceActivityTouchKeys(reader, org, activity);
   for (const row of activity) {
-    const key = activityTouchKey(row);
+    const key = legacyServiceKeys.get(row.id) ?? activityTouchKey(row);
     if (key === excludeKey) continue;
     // An accepted activity can survive a crash before acceptedAt was written.
     // It advances the same logical touch; it never adds a second allowance.
@@ -117,7 +119,6 @@ export async function contactTouchTimes(reader: Pick<typeof db, "select">, org: 
       }
     }
   }
-  const { servicePendingTouchTimes } = await import("./service-care-budget");
   const service = (await Promise.all(ids.map(id => servicePendingTouchTimes(reader, org, id, since, excludeKey)))).flat();
   return [...byKey.values(), ...service];
 }

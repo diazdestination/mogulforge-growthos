@@ -126,3 +126,39 @@ read/send identities and fresh complete-scan evidence, current source and
 marketing-permission review, explicit finite campaign review/start, and the
 contractor's real workday walkthrough. No live list was enrolled, no real email
 or SMS was sent, and no paid or hosted setting was changed by this lane.
+
+## First candidate CI repair
+
+Candidate `7c6d8f5c195b3903834646cf373eb72156cd0d70`, run `37152487067`,
+failed existing integration assertions and was not merge-ready. The runtime lane
+inspected filtered failed-job logs using the CI-repair skill and addressed three
+assigned causes without loosening provider or allowance guards:
+
+- The concierge fire-and-forget test stopped polling when the newly persisted
+  original run first appeared. Both poll sites now wait for completed action
+  results. Its original success, consent and callback-task assertions remain.
+- Legacy service activity had an exact approval reference but predated the
+  shared touch key, so the same reminder was counted twice. Historical mapping
+  now binds the tenant, exact contact, service-obligation audit, original
+  scheduled ID and canonical action/context. A different scheduled receipt or
+  conflicting explicit activity key remains separate uncertainty. No receipt is
+  reclassified and no authority is created by this read-only mapping.
+- The durable wrapper obscured a known local SMS-purpose refusal. The unchanged
+  pre-provider purpose gate now throws a narrow typed refusal, allowing a safe
+  fixed explanation and permanently blocked receipt. Plain/provider exceptions,
+  including an identical error message after an attempted effect, remain
+  indeterminate and cannot replay. No generic error-text classifier was retained.
+
+Final repair command:
+
+```text
+node artifacts/api-server/scripts/test-scheduler-isolated.mjs src/services/concierge-abandon.test.ts src/services/service-standing.test.ts src/services/sms-delivery.test.ts src/services/automated-email-final-guard.test.ts src/services/shared-contact-lanes.test.ts src/services/twilio-dispatch-guard.test.ts
+```
+
+Exit 0: **93 passed, 4 PostgreSQL-only skips** across six files. This overlaps
+earlier results and must not be added to them. API TypeScript and `git diff
+--check` also passed. A related three-file standing/service/nurture selection
+passed 76 with six PostgreSQL-only skips before the final extra negative case.
+The coordinator owns the other two CI repairs, full workspace checks and the
+new exact-candidate PostgreSQL run. Local success does not change the failed
+first candidate's release status.

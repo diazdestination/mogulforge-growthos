@@ -97,6 +97,26 @@ exact navigation gaps; it does not implement or expand this release contract.
 
 ## Remaining fixed finish line
 
+Initial full PostgreSQL CI37152487067 on7c6d8f5 did not pass: API2614passed,
+5failed,15existing skips. All four new independent-session race/writer tests
+executed successfully (48/48 across their three files), but that does not waive
+the five regressions. Repairs cover the old route inventory table count, a poll
+that mistook an admitted unfinished run for completion, exact legacy service
+acceptance/claim deduplication, a safe typed pre-provider SMS purpose refusal,
+and the older reply test's direct-blocker assumption after shared-lock ordering.
+The latter must assert the actual writer -> intake -> scheduler PostgreSQL lock
+chain while preserving no-effect and cancellation assertions. Matching arbitrary
+provider error text is not proof that no effect happened. Fresh complete
+candidate CI and exact-main CI are still required after these repairs.
+
+Repair verification before the second candidate: inventory route13passed;
+reply/mailbox/durable/recovery selection68passed/6PostgreSQL-only skips;
+service/shared-contact/final-email/concierge/Twilio/SMS selection93passed/
+4PostgreSQL-only skips. These selections overlap earlier results and are not
+added together. API typecheck and whitespace checks pass. Independent review
+confirmed exact-key service deduplication and typed pre-provider refusal only;
+a plain provider error with identical wording remains indeterminate/no-replay.
+
 This is not all of L6 and does not close both Housecall Pro replacement cards.
 Confirm the contractors' required campaign behavior and remaining L1/L4 scope;
 finish necessary unified customer-history/workday gaps (L7); accept approved

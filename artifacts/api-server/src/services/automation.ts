@@ -42,6 +42,7 @@ import { providers } from "./providers";
 import { emailAcceptanceEvidence } from "./user-email";
 import { EmailDispatchBlockedError } from "./email-dispatch-guard";
 import { mailboxDigest } from "./mailbox-contract";
+import { TwilioPurposeNotEnabledError } from "./twilio-controls";
 import {
   checkSendEligibility,
   handleProviderFailure,
@@ -247,7 +248,19 @@ async function executeRule(
         let result: ActionResult | undefined;
         const receipt = await runDurableAction({ organizationId: rule.organizationId, actionKey: key, kind: action.type, payload: { action, context }, leadId: context.leadId,
           actorUserId: context.actorUserId, contactTouch: prepared.touch, execute: async () => {
-            result = await executeAction(rule.organizationId, action, context, rule.id, undefined, key);
+            try {
+              result = await executeAction(rule.organizationId, action, context, rule.id, undefined, key);
+            } catch (error) {
+              // A fixed local pre-provider refusal is safe to explain. Never
+              // retain arbitrary provider error text or classify uncertainty as
+              // a known no-effect attempt. The original receipt stays owned.
+              const purposeRefusal = "This SMS purpose is not enabled for the initial program";
+              if (action.type === "send_sms" && error instanceof TwilioPurposeNotEnabledError) {
+                result = { type: action.type, status: "failed", detail: purposeRefusal };
+                return { state: "blocked", detail: purposeRefusal };
+              }
+              throw error;
+            }
             if (result.status === "failed") throw new Error("Original action effect needs reconciliation.");
             return { state: result.status === "skipped" ? "blocked" : "succeeded", detail: "Original automation action completed; inspect retained provider evidence." };
           } });

@@ -5,6 +5,12 @@ import { validateRequest } from "twilio";
 import { db, twilioClientBindingsTable } from "@workspace/db";
 
 export const SMS_DISCLOSURE_VERSION = "mogulforge-sms-2026-09-27.v1";
+/** Created only by the local purpose gate before reserving or posting an SMS. */
+export class TwilioPurposeNotEnabledError extends Error {
+  readonly code = "sms_purpose_not_enabled";
+  readonly effectNotAttempted = true;
+  constructor() { super("This SMS purpose is not enabled for the initial program"); }
+}
 export type SmsPurpose =
   "customer_care" | "appointments" | "marketing" | "authentication";
 export type SmsSendContext = {

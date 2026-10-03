@@ -11,6 +11,7 @@ import {
   digest,
   phoneE164,
   twilioForOrganization,
+  TwilioPurposeNotEnabledError,
   type SmsSendContext,
 } from "./twilio-controls";
 import { callieOwnsSmsOperation, countTwilioSmsOperations, lockTwilioSmsBudget } from "./twilio-sms-budget";
@@ -41,7 +42,7 @@ export async function sendTwilioSms(
   // Legacy marketing and portal authentication flows require their own reviewed
   // purpose/registration; they cannot borrow customer-care consent.
   if (!["customer_care", "appointments"].includes(context.purpose))
-    throw new Error("This SMS purpose is not enabled for the initial program");
+    throw new TwilioPurposeNotEnabledError();
   const [contact] = await db
     .select()
     .from(contactsTable)
