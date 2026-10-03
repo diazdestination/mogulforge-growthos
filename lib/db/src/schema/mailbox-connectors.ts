@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   foreignKey,
   index,
@@ -39,6 +40,19 @@ export const mailboxConnectorsTable = pgTable(
     // Folder IDs and opaque continuations are encrypted; no body is retained here.
     encryptedCursors: text("encrypted_cursors"),
     startedAt: timestamp("started_at", { withTimezone: true }),
+    // Separate local context permission; changing it preserves service identity.
+    leadMonitoringEnabled: boolean("lead_monitoring_enabled")
+      .notNull()
+      .default(false),
+    leadMonitoringVersion: integer("lead_monitoring_version")
+      .notNull()
+      .default(0),
+    leadMonitoringApprovedAt: timestamp("lead_monitoring_approved_at", {
+      withTimezone: true,
+    }),
+    leadMonitoringChangedAt: timestamp("lead_monitoring_changed_at", {
+      withTimezone: true,
+    }),
     leaseToken: uuid("lease_token"),
     leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
     lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
@@ -72,6 +86,10 @@ export const mailboxConnectorsTable = pgTable(
       sql`${t.state} <> 'active' or (${t.encryptedRefreshToken} is not null and ${t.encryptedCursors} is not null and ${t.startedAt} is not null)`,
     ),
     index("mailbox_connector_poll_idx").on(t.state, t.lastSuccessAt),
+    check(
+      "mailbox_connector_lead_monitoring_ck",
+      sql`${t.leadMonitoringVersion} >= 0 and (not ${t.leadMonitoringEnabled} or (${t.leadMonitoringVersion} > 0 and ${t.leadMonitoringApprovedAt} is not null and ${t.leadMonitoringChangedAt} is not null))`,
+    ),
   ],
 );
 

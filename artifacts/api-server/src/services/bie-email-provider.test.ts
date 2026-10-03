@@ -53,6 +53,7 @@ beforeEach(() => {
       provider: "microsoft",
       configured: true,
       connected: true,
+      email: "selected@example.invalid",
     });
   send
     .mockReset()
@@ -112,6 +113,8 @@ it("executes an approved Microsoft email once and labels acceptance without inve
     to: contact.email,
     subject: "Test",
     body: "No real send",
+    expectedSender: { provider: "microsoft", senderEmail: "selected@example.invalid" },
+    beforeDispatch: expect.any(Function),
   });
   const [activity] = await db
     .select()

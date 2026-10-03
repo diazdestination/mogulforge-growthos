@@ -7,6 +7,9 @@ import { serviceObligationsTable } from "./service-obligations";
 import { usersTable } from "./auth";
 import { mailboxConnectorsTable } from "./mailbox-connectors";
 
+export type ServiceMailboxContext = { dueAt: string; occurrenceIndex: number; createdAt: string; updatedAt: string; approvalId: string; scheduledActionId: string };
+export type LeadMailboxContext = { kind: "bie_lead_email"; version: 1; leadId: string; contactId: string; leadCreatedAt: string; leadUpdatedAt: string; proposalId: string; leadMonitoringApproval: { version: number; approvedAt: string } };
+
 /** Frozen before dispatch. Observing a sent message is evidence, never resend authority. */
 export const mailboxCommunicationParentsTable = pgTable("mailbox_communication_parents", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -14,7 +17,7 @@ export const mailboxCommunicationParentsTable = pgTable("mailbox_communication_p
   contactId: uuid("contact_id").notNull(),
   leadId: uuid("lead_id"),
   serviceObligationId: uuid("service_obligation_id"),
-  contextSnapshot: jsonb("context_snapshot").$type<{ dueAt: string; occurrenceIndex: number; createdAt: string; updatedAt: string; approvalId: string; scheduledActionId: string }>().notNull(),
+  contextSnapshot: jsonb("context_snapshot").$type<ServiceMailboxContext | LeadMailboxContext>().notNull(),
   provider: text("provider").notNull(),
   senderUserId: varchar("sender_user_id").notNull(),
   connectionId: uuid("connection_id").notNull(),
@@ -42,6 +45,7 @@ export const mailboxCommunicationParentsTable = pgTable("mailbox_communication_p
 }, t => [
   unique("mailbox_parent_org_id_uq").on(t.organizationId, t.id),
   unique("mailbox_parent_exact_service_uq").on(t.organizationId, t.id, t.serviceObligationId, t.contactId, t.connectorId),
+  unique("mailbox_parent_exact_lead_uq").on(t.organizationId, t.id, t.leadId, t.contactId, t.connectorId),
   uniqueIndex("mailbox_parent_header_uq").on(t.correlationHeader),
   uniqueIndex("mailbox_parent_action_uq").on(t.organizationId, t.actionKey),
   uniqueIndex("mailbox_parent_service_uq").on(t.organizationId, t.serviceObligationId).where(sql`${t.serviceObligationId} is not null`),

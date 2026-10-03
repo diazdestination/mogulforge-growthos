@@ -4,6 +4,7 @@ import {
   text,
   timestamp,
   uuid,
+  unique,
   varchar,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -43,6 +44,7 @@ export const crmTasksTable = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
+    unique("crm_tasks_org_id_uq").on(table.organizationId, table.id),
     index("crm_tasks_org_status_idx").on(table.organizationId, table.status),
     index("crm_tasks_org_assigned_idx").on(
       table.organizationId,

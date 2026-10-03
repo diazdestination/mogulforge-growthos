@@ -162,6 +162,7 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   send_message: 'Send a check-in',
   follow_up_estimate: 'Follow up on estimate',
   schedule_follow_up: 'Schedule a follow-up',
+  review_customer_reply: 'Review held customer reply',
 };
 
 function CopilotPerformanceSection({ copilot }: { copilot: CopilotPerformance }) {

@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request, type Response } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 
 import { requireMember } from "../../middlewares/requireMember";
 import {
@@ -12,12 +12,30 @@ import {
   runAutopilot,
   runRevenueRecoveryBriefing,
   updateAutopilotPolicy,
+  prepareBieEmailProposal,
+  prepareBieEmailInput,
+  BieEmailReviewError,
 } from "../../services/bie";
-import type { BieActionType, BieAutopilotPolicy } from "@workspace/db";
+import { db, bieActionProposalsTable, type BieActionType, type BieAutopilotPolicy } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod/v4";
 import { assertCapabilityForActor, CapabilityAccessError } from "../../services/entitlements";
+import { contractorMutation } from "../../middlewares/contractor-mutation";
 
 const router: IRouter = Router();
+
+/** Preserve other proposal workflows; email approval is an explicit human decision. */
+async function humanEmailAction(req: Request, res: Response, next: NextFunction) {
+  const id = z.uuid().safeParse(req.params.id);
+  if (!id.success) return next();
+  const [proposal] = await db.select({ type: bieActionProposalsTable.actionType }).from(bieActionProposalsTable)
+    .where(and(eq(bieActionProposalsTable.organizationId, req.member!.organizationId), eq(bieActionProposalsTable.id, id.data)));
+  if (proposal?.type !== "send_email") return next();
+  if (req.get("x-api-key") || !req.isAuthenticated() || req.member!.user.id.startsWith("invite:") || !req.member!.user.emailVerifiedAt) {
+    res.status(403).json({ error: "An accepted, verified staff session must review and send this email." }); return;
+  }
+  contractorMutation(req, res, next);
+}
 
 const ACTION_TYPES: BieActionType[] = [
   "create_task",
@@ -63,6 +81,23 @@ router.get(
 );
 
 router.post(
+  "/bie/actions/:id/prepare-email",
+  contractorMutation,
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    res.set("Cache-Control", "no-store");
+    if (req.get("x-api-key") || !req.isAuthenticated()) { res.status(403).json({ error: "Accepted staff session required." }); return; }
+    const id = z.uuid().safeParse(req.params.id), input = prepareBieEmailInput.safeParse(req.body);
+    if (!id.success || !input.success) { res.status(400).json({ error: "Refresh and prepare the exact saved email draft." }); return; }
+    try { res.json(await prepareBieEmailProposal(req.member!.organizationId, id.data, req.member!.user.id, input.data)); }
+    catch (error) {
+      if (!(error instanceof BieEmailReviewError)) throw error;
+      res.status(error.status).json({ error: error.message, code: error.code });
+    }
+  },
+);
+
+router.post(
   "/bie/actions/generate",
   requireMember("crm.write"),
   async (req: Request, res: Response): Promise<void> => {
@@ -81,6 +116,7 @@ for (const decision of ["approve", "reject"] as const) {
   router.post(
     `/bie/actions/:id/${decision}`,
     requireMember("crm.write"),
+    humanEmailAction,
     async (req: Request, res: Response): Promise<void> => {
       const input = z
         .object({ expectedPayload: z.record(z.string(), z.unknown()) })
@@ -118,12 +154,19 @@ for (const decision of ["approve", "reject"] as const) {
 router.post(
   "/bie/actions/:id/execute",
   requireMember("crm.write"),
+  humanEmailAction,
   async (req: Request, res: Response): Promise<void> => {
-    const result = await executeBieProposal(
-      req.member!.organizationId,
-      String(req.params.id),
-      req.member!.user.id,
-    );
+    let result;
+    try {
+      result = await executeBieProposal(
+        req.member!.organizationId,
+        String(req.params.id),
+        req.member!.user.id,
+      );
+    } catch (error) {
+      if (!(error instanceof BieEmailReviewError)) throw error;
+      res.status(error.status).json({ error: error.message, code: error.code }); return;
+    }
     if (!result) {
       res
         .status(404)

@@ -11,6 +11,7 @@ export type NextBestActionActionType = typeof NextBestActionActionType[keyof typ
 
 export const NextBestActionActionType = {
   reply_portal_message: 'reply_portal_message',
+  review_customer_reply: 'review_customer_reply',
   call_now: 'call_now',
   send_message: 'send_message',
   follow_up_estimate: 'follow_up_estimate',

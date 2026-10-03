@@ -1,0 +1,26 @@
+-- REVIEW ONLY. Lead replies after 0009 at c2d999b0c32e349e3f70cf6c642782d1c603b582. No hosted approval.
+ALTER TABLE "crm_tasks" ADD CONSTRAINT "crm_tasks_org_id_uq" UNIQUE("organization_id","id");
+ALTER TABLE "mailbox_communication_parents" ADD CONSTRAINT "mailbox_parent_exact_lead_uq" UNIQUE("organization_id","id","lead_id","contact_id","connector_id");
+ALTER TABLE "email_response_reviews" ALTER COLUMN "source_id" DROP NOT NULL;
+ALTER TABLE "email_response_reviews" ADD COLUMN "mailbox_parent_id" uuid;
+ALTER TABLE "email_response_reviews" ADD COLUMN "mailbox_connector_id" uuid;
+ALTER TABLE "email_response_reviews" ADD COLUMN "internet_message_id" text;
+ALTER TABLE "email_response_reviews" ADD COLUMN "encrypted_text" text;
+ALTER TABLE "email_response_reviews" ADD COLUMN "raw_expires_at" timestamp with time zone;
+ALTER TABLE "email_response_reviews" ADD COLUMN "raw_purged_at" timestamp with time zone;
+ALTER TABLE "email_response_reviews" ADD COLUMN "version" integer DEFAULT 1 NOT NULL;
+ALTER TABLE "email_response_reviews" ADD COLUMN "review_request_id" uuid;
+ALTER TABLE "email_response_reviews" ADD COLUMN "review_fingerprint" text;
+ALTER TABLE "email_response_reviews" ADD COLUMN "task_id" uuid;
+ALTER TABLE "mailbox_connectors" ADD COLUMN "lead_monitoring_enabled" boolean DEFAULT false NOT NULL;
+ALTER TABLE "mailbox_connectors" ADD COLUMN "lead_monitoring_version" integer DEFAULT 0 NOT NULL;
+ALTER TABLE "mailbox_connectors" ADD COLUMN "lead_monitoring_approved_at" timestamp with time zone;
+ALTER TABLE "mailbox_connectors" ADD COLUMN "lead_monitoring_changed_at" timestamp with time zone;
+ALTER TABLE "email_response_reviews" ADD CONSTRAINT "email_response_exact_parent_fk" FOREIGN KEY ("organization_id","mailbox_parent_id","lead_id","contact_id","mailbox_connector_id") REFERENCES "public"."mailbox_communication_parents"("organization_id","id","lead_id","contact_id","connector_id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "email_response_reviews" ADD CONSTRAINT "email_response_connector_fk" FOREIGN KEY ("organization_id","mailbox_connector_id") REFERENCES "public"."mailbox_connectors"("organization_id","id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "email_response_reviews" ADD CONSTRAINT "email_response_task_fk" FOREIGN KEY ("organization_id","task_id") REFERENCES "public"."crm_tasks"("organization_id","id") ON DELETE no action ON UPDATE no action;
+CREATE UNIQUE INDEX "email_response_mailbox_external_uq" ON "email_response_reviews" USING btree ("organization_id","mailbox_connector_id","external_message_id") WHERE "email_response_reviews"."mailbox_connector_id" is not null;
+CREATE INDEX "email_response_raw_expiry_idx" ON "email_response_reviews" USING btree ("raw_expires_at");
+ALTER TABLE "email_response_reviews" ADD CONSTRAINT "email_response_provenance_ck" CHECK (("email_response_reviews"."source_id" is not null and "email_response_reviews"."mailbox_parent_id" is null and "email_response_reviews"."mailbox_connector_id" is null) or ("email_response_reviews"."source_id" is null and "email_response_reviews"."message_id" is null and "email_response_reviews"."mailbox_parent_id" is not null and "email_response_reviews"."mailbox_connector_id" is not null and "email_response_reviews"."lead_id" is not null and "email_response_reviews"."contact_id" is not null and "email_response_reviews"."internet_message_id" is not null and "email_response_reviews"."raw_expires_at" is not null));
+ALTER TABLE "email_response_reviews" ADD CONSTRAINT "email_response_version_ck" CHECK ("email_response_reviews"."version" > 0);
+ALTER TABLE "mailbox_connectors" ADD CONSTRAINT "mailbox_connector_lead_monitoring_ck" CHECK ("mailbox_connectors"."lead_monitoring_version" >= 0 and (not "mailbox_connectors"."lead_monitoring_enabled" or ("mailbox_connectors"."lead_monitoring_version" > 0 and "mailbox_connectors"."lead_monitoring_approved_at" is not null and "mailbox_connectors"."lead_monitoring_changed_at" is not null)));

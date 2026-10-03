@@ -24,6 +24,7 @@ export const SCHEDULER_STAGES = [
   "portal-credential-cleanup",
   "email-intelligence-retention",
   "service-reply-retention",
+  "lead-reply-retention",
   "api-key-expiry-reminders",
   "upload-cleanup",
 ] as const;

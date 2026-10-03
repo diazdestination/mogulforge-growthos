@@ -14,6 +14,7 @@ import { nativeFixtureRows, nativeFixtureIds, sealNativeFixture, assertNativeFix
 import { careFixtureRows, careFixtureIds, assertCareFixture, assertCareTenantKeys } from './customer-care-recovery-fixture.mjs';
 import { operationsFixtureRows, sealOperationsFixture, assertOperationsFixture, assertOperationsTenantKeys } from './operations-wave-recovery-fixture.mjs';
 import { launchCommunicationRows, sealLaunchCommunicationFixture, assertLaunchCommunications, assertLaunchCommunicationKeys } from './launch-communications-recovery-fixture.mjs';
+import { seedLeadReplyFixture, assertLeadReplyFixture, assertLeadReplyTenantKeys } from './lead-replies-recovery-fixture.mjs';
 
 const requireApi = createRequire(new URL('../artifacts/api-server/package.json', import.meta.url));
 const requireDb = createRequire(new URL('../lib/db/package.json', import.meta.url));
@@ -24,7 +25,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const identifier = (name) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('contractor_identifier_invalid'); return `"${name}"`; };
 const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot', 'reasons', 'snapshot', 'settings', 'result', 'historical_source', 'policy', 'context_snapshot']);
-const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql'];
+const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql', '0010_lead-replies.sql'];
 
 async function insert(database, table, row) {
   const fields = Object.keys(row);
@@ -121,6 +122,8 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       for (const [table, row] of launchCommunicationRows(slug)) await insert(source, table, row);
       await sealLaunchCommunicationFixture(source, slug);
       await assertLaunchCommunications(source, slug);
+      await seedLeadReplyFixture(source, slug);
+      await assertLeadReplyFixture(source, slug);
       const id = fixtureIds(slug), emailSource = randomUUID();
       await insert(source, 'billing_checkouts', { organization_id: id.organization, intent: 'initial', state: 'reconcile', price_id: 'price_synthetic', plan_id: 'beta', success_url: 'https://example.invalid/success', cancel_url: 'https://example.invalid/cancel', provider_configuration_hash: sha('synthetic-provider'), recovery_reason: 'synthetic_acknowledgement_unknown' });
       await insert(source, 'customer_lifecycle', { organization_id: id.organization, state: 'paused', version: 2, reason: 'Synthetic recovery hold', updated_by_user_id: id.user });
@@ -134,6 +137,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     await assertCareTenantKeys(source, slugs[0], slugs[1]);
     const operationsTenantChecks = await assertOperationsTenantKeys(source, slugs[0], slugs[1]);
     const launchCommunicationTenantChecks = await assertLaunchCommunicationKeys(source, slugs[0], slugs[1]);
+    const leadReplyTenantChecks = await assertLeadReplyTenantKeys(source, slugs[0], slugs[1]);
     assert.deepEqual(await fingerprints(source), careBaseline);
     // Prove the reviewed active-service exception cannot mask an unpaused
     // company or another active obligation. These transactions always roll back.
@@ -178,10 +182,11 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     for (const slug of slugs) await assertCareFixture(restored,slug);
     for (const slug of slugs) await assertOperationsFixture(restored,slug);
     for (const slug of slugs) await assertLaunchCommunications(restored,slug);
+    for (const slug of slugs) await assertLeadReplyFixture(restored,slug);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM billing_checkouts WHERE state='reconcile'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM customer_lifecycle WHERE state='paused'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM staff_invitations WHERE state='pending' AND delivery_state='unconfirmed'")).rows[0].n, 2);
-    assert.equal((await restored.query('SELECT count(*)::int AS n FROM email_response_reviews WHERE hold_active=true AND message_id IS NULL')).rows[0].n, 2);
+    assert.equal((await restored.query('SELECT count(*)::int AS n FROM email_response_reviews WHERE hold_active=true AND message_id IS NULL')).rows[0].n, 4);
     const app = await probeApp(restored);
     assert.deepEqual(await fingerprints(restored), baseline);
     const evidence = {
@@ -203,6 +208,8 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       noncashOpeningReceivablePreserved: true, typedPushUncertaintyPreserved: true,
       launchCommunicationTenantChecks, serviceReplyHoldAfterPurgePreserved: true,
       disabledMailboxPreserved: true, platformIdentityUncertaintyPreserved: true,
+      leadReplyTenantChecks, leadReplyHoldAfterPurgePreserved: true, leadReplyOfficeTaskPreserved: true,
+      leadMonitoringRemainsDisabled: true,
       ...app, restoreVerificationMs: Date.now() - restoreStartedAt, elapsedMs: Date.now() - startedAt,
       providerCalls: 0, managedBackupRestoreVerified: false, productionRpoRtoEstablished: false,
     };

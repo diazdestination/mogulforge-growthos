@@ -1,5 +1,15 @@
 # Next acceptance work
 
+Newest authorized continuation is two waves: tracked Microsoft lead replies,
+then invoice delivery exceptions/reviewed recovery. First-wave integration:
+`reports/lead-replies-integration-2026-10-02.md`, based on c2d999b with green
+exact-main CI37085822984. Close its exact candidate/main release gate, then
+finish the second wave. Schema remains117tables with reviewed0010after0009.
+Do not infer hosted rollout or provider/client activation from these changes.
+
+The communications candidate-pending text below is historical; PR16 has merged
+and its exact main passed. Keep original evidence instead of rewriting its pins.
+
 Current authorized work is the fixed `LAUNCH-COMPLETION.md` checklist. Complete
 the communications release gate using
 `reports/launch-communications-integration-2026-10-02.md` (117tables), then finish

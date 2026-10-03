@@ -25,6 +25,11 @@ import { authMiddleware } from "../../middlewares/authMiddleware";
 import { createApiKey } from "../../services/api-keys";
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
 import router from "./mailbox-integrations";
+import {
+  beginMailboxOAuth,
+  completeMailboxOAuth,
+  getMailboxStatus,
+} from "../../services/mailbox-connector";
 const httpFetch = fetch;
 let server: Server,
   base: string,
@@ -69,19 +74,17 @@ beforeAll(async () => {
         access_token: "synthetic",
       }),
     );
-  await db
-    .insert(microsoftConnectionsTable)
-    .values({
-      organizationId: org,
-      userId: owner,
-      accountId: "synthetic_account",
-      email: "staff@example.invalid",
-      grantedScopes: ["mail.send", "user.read"],
-      encryptedRefreshToken: encryptSecret(
-        "synthetic",
-        `${org}:${owner}:microsoft`,
-      ),
-    });
+  await db.insert(microsoftConnectionsTable).values({
+    organizationId: org,
+    userId: owner,
+    accountId: "synthetic_account",
+    email: "staff@example.invalid",
+    grantedScopes: ["mail.send", "user.read"],
+    encryptedRefreshToken: encryptSecret(
+      "synthetic",
+      `${org}:${owner}:microsoft`,
+    ),
+  });
   await db
     .insert(emailSenderPreferencesTable)
     .values({ organizationId: org, userId: owner, provider: "microsoft" });
@@ -207,4 +210,116 @@ it("begins only the explicit read flow for the exact authenticated current sende
   expect(url.searchParams.get("redirect_uri")).toBe(
     "https://growth.example/api/v1/mailbox/microsoft/callback",
   );
+});
+it("requires an exact human-session lead acknowledgement, returns versioned status and locally revokes under global hold", async () => {
+  vi.stubEnv("MICROSOFT_MAILBOX_READ_ENABLED", "true");
+  vi.stubEnv("MICROSOFT_OAUTH_CLIENT_ID", "synthetic-client");
+  vi.stubEnv("MICROSOFT_OAUTH_CLIENT_SECRET", "synthetic-secret");
+  vi.stubEnv("APP_ORIGIN", "https://growth.example");
+  const actor = { organizationId: org, userId: owner };
+  const before = await getMailboxStatus(org, owner);
+  const state = new URL(
+    await beginMailboxOAuth(actor, {
+      ...input,
+      expectedVersion: before.version,
+    }),
+  ).searchParams.get("state")!;
+  const provider = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          token_type: "Bearer",
+          access_token: "synthetic-access",
+          refresh_token: "synthetic-read",
+          scope: "Mail.Read User.Read",
+        }),
+      ),
+    )
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: "synthetic_account",
+          mail: "staff@example.invalid",
+        }),
+      ),
+    )
+    .mockResolvedValueOnce(new Response(JSON.stringify({ id: "inbox_id" })))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ id: "sent_id" })));
+  await completeMailboxOAuth(actor, state, "synthetic-code", provider);
+  const active = await getMailboxStatus(org, owner);
+  const approval = {
+    expectedConnectorVersion: active.version,
+    expectedLeadMonitoringVersion: active.leadMonitoringVersion,
+    enabled: true,
+    leadContextAcknowledged: true,
+  };
+  const headers = { ...auth(), origin: "https://growth.example" };
+  const submit = (body: unknown, override: Record<string, string> = headers) =>
+    httpFetch(`${base}/lead-monitoring`, {
+      method: "POST",
+      headers: override,
+      body: JSON.stringify(body),
+    });
+  const noProvider = vi.fn<typeof fetch>();
+  vi.stubGlobal("fetch", noProvider);
+  expect(
+    (await submit(approval, { ...headers, origin: "https://foreign.example" }))
+      .status,
+  ).toBe(403);
+  expect(
+    (
+      await submit(approval, {
+        "content-type": "application/json",
+        cookie: `sid=${sessions[0]}`,
+        authorization: "Basic arbitrary",
+      })
+    ).status,
+  ).toBe(403);
+  expect(
+    (
+      await submit(approval, {
+        "content-type": "application/json",
+        "x-api-key": key,
+      })
+    ).status,
+  ).toBe(403);
+  expect(
+    (
+      await submit(approval, {
+        ...headers,
+        authorization: `Bearer ${sessions[1]}`,
+      })
+    ).status,
+  ).toBe(403);
+  expect(
+    (await submit({ ...approval, leadContextAcknowledged: false })).status,
+  ).toBe(400);
+  expect((await submit({ ...approval, userId: office })).status).toBe(400);
+  const accepted = await submit(approval);
+  expect(accepted.status).toBe(200);
+  expect(await accepted.json()).toMatchObject({
+    version: active.version,
+    leadMonitoringEnabled: true,
+    leadMonitoringVersion: active.leadMonitoringVersion + 1,
+    leadMonitoringApprovedAt: expect.any(String),
+    leadMonitoringChangedAt: expect.any(String),
+  });
+  expect((await submit(approval)).status).toBe(409);
+  vi.stubEnv("MICROSOFT_MAILBOX_READ_ENABLED", "false");
+  const revoked = await submit({
+    ...approval,
+    expectedLeadMonitoringVersion: active.leadMonitoringVersion + 1,
+    enabled: false,
+  });
+  expect(revoked.status).toBe(200);
+  expect(await revoked.json()).toMatchObject({
+    version: active.version,
+    state: "active",
+    usable: false,
+    leadMonitoringEnabled: false,
+    leadMonitoringApprovedAt: null,
+    leadMonitoringVersion: active.leadMonitoringVersion + 2,
+  });
+  expect(noProvider).not.toHaveBeenCalled();
 });

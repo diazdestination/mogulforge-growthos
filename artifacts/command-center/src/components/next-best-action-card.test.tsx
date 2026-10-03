@@ -8,6 +8,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { NextBestActionCard } from '@/components/next-best-action-card';
+import { TodayActionsPanel } from '@/components/today-actions';
 import { Toaster } from '@/components/ui/toaster';
 import { renderWithQuery } from '@/test/render';
 import { mockApi } from '@/test/mock-api';
@@ -120,6 +121,27 @@ describe('NextBestActionCard', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+  });
+
+  it('replaces a stale sendable draft with held reply review and no generic feedback controls', async () => {
+    let held = false;
+    const fetchMock = renderCard(happyHandler(() => held ? { ...emailAction, actionType: 'review_customer_reply', title: 'Office reply review required' } : emailAction));
+    await waitForReadyDraft(); held = true; invalidateNextAction();
+    const link = await screen.findByRole('link', { name: 'Review held customer reply' });
+    expect(link.getAttribute('href')).toBe(`/leads/${LEAD_ID}?tab=messages#mailbox-replies`);
+    expect(screen.queryByLabelText('Draft message')).toBeNull();
+    for (const name of [/^send$/i, /Snooze/, /Dismiss/, /Mark as called/, /Copy text/]) expect(screen.queryByRole('button', { name })).toBeNull();
+    expect(callsTo(fetchMock, 'POST', FEEDBACK_PATH)).toHaveLength(0);
+    expect(callsTo(fetchMock, 'POST', SEND_EMAIL_PATH)).toHaveLength(0);
+  });
+
+  it('links held Today actions directly to evidence without draft, snooze or dismiss', async () => {
+    const fetchMock = mockApi('admin', { handler: (method, path) => method === 'GET' && path.endsWith('/next-actions') ? jsonResponse([{ ...emailAction, actionType: 'review_customer_reply', contactName: 'Synthetic customer', title: 'Office reply review required' }]) : undefined });
+    renderWithQuery(<TodayActionsPanel />);
+    const link = await screen.findByRole('link', { name: /Synthetic customer/ });
+    expect(link.getAttribute('href')).toBe(`/leads/${LEAD_ID}?tab=messages#mailbox-replies`);
+    for (const name of [/Snooze/, /Dismiss/, /Show draft/]) expect(screen.queryByRole('button', { name })).toBeNull();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
   });
 
   it('sends the draft unchanged and records "sent" feedback', async () => {

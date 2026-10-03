@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { and, asc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
 import {
   db,
+  auditEventsTable,
   emailSenderPreferencesTable,
   microsoftConnectionsTable,
   oauthTransactionsTable,
@@ -30,6 +31,8 @@ import {
   mailboxConnectInput,
   mailboxDisableInput,
   mailboxDigest,
+  leadMonitoringInput,
+  type LeadMonitoringApproval,
   type MailboxIdentity,
   type MailboxMessage,
 } from "./mailbox-contract";
@@ -192,6 +195,95 @@ export async function getMicrosoftMailboxIdentity(
   await assertMailboxIdentityCurrent(value);
   return value;
 }
+/** Local, explicitly approved lead context. Never broadens provider scope. */
+export async function getLeadMonitoringApproval(
+  expected: MailboxIdentity,
+  reader: Reader = db,
+): Promise<LeadMonitoringApproval | null> {
+  await assertMailboxIdentityCurrent(expected, reader);
+  const query = reader
+    .select()
+    .from(connectors)
+    .where(
+      and(
+        eq(connectors.organizationId, expected.organizationId),
+        eq(connectors.id, expected.connectorId),
+        eq(connectors.version, expected.connectorVersion),
+      ),
+    );
+  const [row] = await (reader === db ? query : query.for("share"));
+  if (!row || !row.leadMonitoringEnabled || !row.leadMonitoringApprovedAt)
+    return null;
+  return {
+    version: row.leadMonitoringVersion,
+    approvedAt: row.leadMonitoringApprovedAt.toISOString(),
+  };
+}
+export async function assertLeadMonitoringApproval(
+  expected: MailboxIdentity,
+  approval: LeadMonitoringApproval,
+  reader: Reader = db,
+): Promise<void> {
+  const current = await getLeadMonitoringApproval(expected, reader);
+  if (!current || mailboxDigest(current) !== mailboxDigest(approval))
+    throw new MailboxError("mailbox_lead_approval_changed");
+}
+export async function setLeadMonitoringApproval(actor: Actor, raw: unknown) {
+  const input = leadMonitoringInput.parse(raw);
+  await db.transaction(async (tx) => {
+    await tx.execute(lock(actor));
+    await staff(tx, actor);
+    const [row] = await tx
+      .select()
+      .from(connectors)
+      .where(selected(actor))
+      .for("update");
+    if (
+      !row ||
+      row.version !== input.expectedConnectorVersion ||
+      row.leadMonitoringVersion !== input.expectedLeadMonitoringVersion
+    )
+      throw new MailboxError("mailbox_lead_version_changed");
+    if (row.leadMonitoringEnabled === input.enabled)
+      throw new MailboxError("mailbox_lead_state_unchanged");
+    if (input.enabled) await assertMailboxIdentityCurrent(identity(row), tx);
+    const now = new Date();
+    await tx
+      .update(connectors)
+      .set({
+        leadMonitoringEnabled: input.enabled,
+        leadMonitoringVersion: row.leadMonitoringVersion + 1,
+        leadMonitoringApprovedAt: input.enabled ? now : null,
+        leadMonitoringChangedAt: now,
+      })
+      .where(
+        and(
+          selected(actor),
+          eq(connectors.version, row.version),
+          eq(connectors.leadMonitoringVersion, row.leadMonitoringVersion),
+        ),
+      );
+    await tx
+      .insert(auditEventsTable)
+      .values({
+        organizationId: actor.organizationId,
+        actorUserId: actor.userId,
+        action: input.enabled
+          ? "mailbox.lead_context_enabled"
+          : "mailbox.lead_context_disabled",
+        entityType: "mailbox_connector",
+        entityId: row.id,
+        metadata: {
+          connectorVersion: row.version,
+          priorLeadMonitoringVersion: row.leadMonitoringVersion,
+          leadMonitoringVersion: row.leadMonitoringVersion + 1,
+          scopesChanged: false,
+          serviceIdentityChanged: false,
+        },
+      });
+  });
+  return getMailboxStatus(actor.organizationId, actor.userId);
+}
 export async function getMailboxStatus(organizationId: string, userId: string) {
   await staff(db, { organizationId, userId });
   const [row] = await db
@@ -235,6 +327,10 @@ export async function getMailboxStatus(organizationId: string, userId: string) {
     reason,
     pendingParentCount: counts?.pending ?? 0,
     reviewCount: counts?.review ?? 0,
+    leadMonitoringEnabled: row?.leadMonitoringEnabled ?? false,
+    leadMonitoringVersion: row?.leadMonitoringVersion ?? 0,
+    leadMonitoringApprovedAt: row?.leadMonitoringApprovedAt ?? null,
+    leadMonitoringChangedAt: row?.leadMonitoringChangedAt ?? null,
     scopes: ["Mail.Read", "User.Read", "offline_access"],
     folders: ["Inbox", "Sent Items"],
     historicalCrawl: false,
@@ -279,6 +375,10 @@ export async function beginMailboxOAuth(actor: Actor, raw: unknown) {
       encryptedRefreshToken: null,
       encryptedCursors: null,
       startedAt: null,
+      leadMonitoringEnabled: false,
+      leadMonitoringVersion: old ? old.leadMonitoringVersion + 1 : 0,
+      leadMonitoringApprovedAt: null,
+      leadMonitoringChangedAt: old ? new Date() : null,
       leaseToken: null,
       leaseExpiresAt: null,
       lastErrorAt: null,
@@ -292,18 +392,16 @@ export async function beginMailboxOAuth(actor: Actor, raw: unknown) {
           .returning()
       : await tx.insert(connectors).values(value).returning();
     await tx.delete(oauthTransactionsTable).where(oauthWhere(actor));
-    await tx
-      .insert(oauthTransactionsTable)
-      .values({
-        ...actor,
-        provider: "microsoft_mailbox",
-        module: `${row.id}:${row.version}`,
-        requestedScopes: MAILBOX_READ_SCOPES,
-        stateHash: sha256Base64Url(state),
-        encryptedCodeVerifier: encryptSecret(verifier, `${aad(row)}:oauth`),
-        returnPath: input.returnPath,
-        expiresAt: new Date(Date.now() + 10 * 60_000),
-      });
+    await tx.insert(oauthTransactionsTable).values({
+      ...actor,
+      provider: "microsoft_mailbox",
+      module: `${row.id}:${row.version}`,
+      requestedScopes: MAILBOX_READ_SCOPES,
+      stateHash: sha256Base64Url(state),
+      encryptedCodeVerifier: encryptSecret(verifier, `${aad(row)}:oauth`),
+      returnPath: input.returnPath,
+      expiresAt: new Date(Date.now() + 10 * 60_000),
+    });
   });
   const url = new URL(`${config.authority}/authorize`);
   url.search = new URLSearchParams({
@@ -732,7 +830,6 @@ export async function processMailboxConnectors(
         folder: MailboxFolder,
         message: MailboxMessage,
         retry = false,
-        bodyLoaded = false,
       ) => {
         await guard();
         const digest = mailboxMetadataDigest(message);
@@ -788,14 +885,12 @@ export async function processMailboxConnectors(
               await guard();
               let full: MailboxMessage | null = null;
               try {
-                full = bodyLoaded
-                  ? message
-                  : await readMailboxPendingMessage(
-                      token.access,
-                      cursors.inbox.folderId,
-                      message.providerMessageId,
-                      transport,
-                    );
+                full = await readMailboxPendingMessage(
+                  token.access,
+                  cursors.inbox.folderId,
+                  message.providerMessageId,
+                  transport,
+                );
               } catch (error) {
                 if (!boundedContentFailure(error)) throw error;
               }
@@ -904,11 +999,12 @@ export async function processMailboxConnectors(
               cursors.inbox.folderId,
               row.providerMessageId,
               transport,
+              true,
             );
           } catch (error) {
             if (!boundedContentFailure(error)) throw error;
           }
-          if (message) await consume("inbox", message, true, true);
+          if (message) await consume("inbox", message, true);
           else
             await reviewMessage("inbox", {
               providerMessageId: row.providerMessageId,

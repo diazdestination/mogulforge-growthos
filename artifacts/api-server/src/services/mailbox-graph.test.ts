@@ -95,17 +95,15 @@ describe("fixed Graph read-only adapter", () => {
     );
   });
   it("ignores old filter-leak records and tombstones without fetching history", async () => {
-    const transport = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        response({
-          value: [
-            message({ receivedDateTime: "2026-10-01T12:00:00Z" }),
-            { id: "removed", "@removed": { reason: "deleted" } },
-          ],
-          "@odata.deltaLink": url(),
-        }),
-      );
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(
+      response({
+        value: [
+          message({ receivedDateTime: "2026-10-01T12:00:00Z" }),
+          { id: "removed", "@removed": { reason: "deleted" } },
+        ],
+        "@odata.deltaLink": url(),
+      }),
+    );
     expect(
       (
         await readMailboxDelta(
@@ -139,17 +137,15 @@ describe("fixed Graph read-only adapter", () => {
     }
   });
   it("retains metadata-only review for a malformed known ID while preserving the valid page cursor", async () => {
-    const transport = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        response({
-          value: [
-            message({ receivedDateTime: "not a date" }),
-            message({ id: "good" }),
-          ],
-          "@odata.deltaLink": url(),
-        }),
-      );
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(
+      response({
+        value: [
+          message({ receivedDateTime: "not a date" }),
+          message({ id: "good" }),
+        ],
+        "@odata.deltaLink": url(),
+      }),
+    );
     const page = await readMailboxDelta(
       { token: "synthetic", accountId: "account_a", cursor, startedAt: start },
       transport,
@@ -193,14 +189,12 @@ describe("fixed Graph read-only adapter", () => {
   ])(
     "reviews malformed provider metadata without discarding the following good message: %j",
     async (extra) => {
-      const transport = vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(
-          response({
-            value: [message(extra), message({ id: "good" })],
-            "@odata.deltaLink": url(),
-          }),
-        );
+      const transport = vi.fn<typeof fetch>().mockResolvedValue(
+        response({
+          value: [message(extra), message({ id: "good" })],
+          "@odata.deltaLink": url(),
+        }),
+      );
       const page = await readMailboxDelta(
         {
           token: "synthetic",
@@ -266,5 +260,19 @@ describe("fixed Graph read-only adapter", () => {
       ),
     ).rejects.toThrow();
     expect(transport).toHaveBeenCalledOnce();
+  });
+  it("can recheck pending metadata without requesting or retaining body before current context authorization", async () => {
+    const transport = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(response(message()));
+    const metadata = await readMailboxPendingMessage(
+      "synthetic",
+      "inbox_id",
+      "immutable_message_1",
+      transport,
+      true,
+    );
+    expect(String(transport.mock.calls[0][0])).not.toContain(",body");
+    expect(metadata?.text).toBe("");
   });
 });

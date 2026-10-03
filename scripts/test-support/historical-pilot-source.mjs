@@ -22,6 +22,7 @@ const frozen = new Map([
   [resolve(root, "artifacts/api-server/src/services/durable-execution.ts"), "durable-execution.ts"],
   [resolve(root, "lib/db/src/schema/automations.ts"), "schema-automations.ts"],
   [resolve(root, "lib/db/src/schema/revenue-workspace.ts"), "schema-revenue-workspace.ts"],
+  [resolve(root, "lib/db/src/schema/crm-tasks.ts"), "schema-crm-tasks.ts"],
 ]);
 export const historicalSourcePath = (path) => frozen.has(path)
   ? fileURLToPath(new URL(`./fixtures/c050067/${frozen.get(path)}.txt`, import.meta.url)) : path;

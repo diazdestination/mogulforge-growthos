@@ -1,7 +1,7 @@
 import { twilioForOrganization, type SmsSendContext } from "./twilio-controls";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
 import { sendResendEmail } from "./resend-delivery";
-import type { CustomerEmailContext } from "./customer-email";
+import type { CustomerEmailContext, CustomerEmailSender } from "./customer-email";
 /**
  * Provider adapters. Mocks are clearly labeled and used only when real
  * credentials are absent in local development. Production SMS requires the
@@ -49,7 +49,7 @@ export interface CustomerEmailProvider {
     to: string,
     subject: string,
     body: string,
-    context: CustomerEmailContext,
+    context: CustomerEmailContext & { expectedSender?: CustomerEmailSender; beforeDispatch?: () => Promise<void> },
   ): Promise<{ id: string | null; provider: string; providerRequestId?: string | null; clientRequestId?: string }>;
 }
 

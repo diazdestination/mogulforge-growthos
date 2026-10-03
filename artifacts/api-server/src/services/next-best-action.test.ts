@@ -2,6 +2,8 @@ import {
   activitiesTable,
   appointmentsTable,
   db,
+  emailIntelligenceSourcesTable,
+  emailResponseReviewsTable,
   nextActionFeedbackTable,
   organizationsTable,
 } from "@workspace/db";
@@ -58,6 +60,21 @@ async function makeLead(opts: {
 }
 
 describe("next-best-action copilot", () => {
+  it("prioritizes a retained reply hold without a draft or snooze fallthrough, then respects explicit resolution", async () => {
+    const { lead, contact } = await makeLead({ status: "estimate_sent", score: 95 });
+    const [source] = await db.insert(emailIntelligenceSourcesTable).values({organizationId:org.id, intakeAlias:`reply-${org.id}@example.invalid`}).returning();
+    const [reply] = await db.insert(emailResponseReviewsTable).values({ organizationId:org.id, sourceId:source.id,
+      externalMessageId:`reply-${lead.id}`, payloadSha256:"a".repeat(64), state:"confirmed", reason:"staff_confirmed",
+      leadId:lead.id, contactId:contact.id, replyAt:new Date(), holdActive:true }).returning();
+    const action = await getNextBestAction(org.id, lead.id);
+    expect(action).toMatchObject({actionType:"review_customer_reply",priority:120});
+    expect(action?.draft).toBeUndefined(); expect(action?.channel).toBeUndefined();
+    await recordActionFeedback(org.id, lead.id, null, {actionType:"review_customer_reply",response:"dismissed"});
+    expect((await getNextBestAction(org.id, lead.id))?.actionType).toBe("review_customer_reply");
+    expect((await listTodayActions(org.id)).find(row=>row.leadId===lead.id)?.actionType).toBe("review_customer_reply");
+    await db.update(emailResponseReviewsTable).set({holdActive:false,releasedAt:new Date()}).where(eq(emailResponseReviewsTable.id,reply.id));
+    expect((await getNextBestAction(org.id, lead.id))?.actionType).toBe("follow_up_estimate");
+  });
   it("recommends replying when the homeowner has an unanswered portal message", async () => {
     const { lead, contact } = await makeLead({ score: 10 });
     await crm.createActivity(org.id, {

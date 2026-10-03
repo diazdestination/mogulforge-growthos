@@ -10,6 +10,7 @@ These are exact source snapshots from `git show c050067000f3ea1f2d94aa53b3a9c4f7
 - `durable-execution.ts.txt`: `artifacts/api-server/src/services/durable-execution.ts`
 - `schema-automations.ts.txt`: `lib/db/src/schema/automations.ts`
 - `schema-revenue-workspace.ts.txt`: `lib/db/src/schema/revenue-workspace.ts`
+- `schema-crm-tasks.ts.txt`: `lib/db/src/schema/crm-tasks.ts`
 
 The reactivation snapshot's LF-normalized SHA-256 is
 `972a2a3ee396aa81811fdad6e2ef664ccede6dad2ddeb448b2ac1c6d0ded9327`,
@@ -28,6 +29,18 @@ Only the test-support reader/loopback test bundler uses these files. Hosted
 readers continue to read the actual deployed application, require the old image
 identity and refuse changed sources. Do not repin the old image, weaken its
 guards, import these fixtures into a hosted probe, or replay its completed nonce.
+
+## Lead-reply task schema fixture — October 2, 2026
+
+The lead-reply wave adds an exact organization/task key to the current task
+schema. The historical crash manifest must still reject those changed bytes.
+The added task fixture was recovered verbatim from the same c050067 Git object;
+its LF-normalized SHA-256 is
+`390f0765acbeafc9d404e892d48df665442392f7ef5563e7b0f50ef00ba15b5c`.
+The test-only reader now freezes that file and explicitly rejects the current
+source under the historical pin. No hosted reader, release, manifest, bundle,
+helper guard or original hash was changed. Current schema/restore checks are
+separate and do not authorize a hosted crash drill.
 
 ## Reactivation fixture repair verification — October 1, 2026
 

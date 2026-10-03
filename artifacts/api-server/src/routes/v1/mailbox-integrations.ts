@@ -6,6 +6,7 @@ import {
   completeMailboxOAuth,
   disableMailboxConnector,
   getMailboxStatus,
+  setLeadMonitoringApproval,
 } from "../../services/mailbox-connector";
 import { MailboxError } from "../../services/mailbox-contract";
 import { recordAudit } from "../../services/audit";
@@ -19,11 +20,9 @@ const session: RequestHandler = (req, res, next) => {
     !req.user ||
     req.user.id !== req.member?.user.id
   ) {
-    res
-      .status(403)
-      .json({
-        error: "Use your own accepted staff session to manage mailbox reading.",
-      });
+    res.status(403).json({
+      error: "Use your own accepted staff session to manage mailbox reading.",
+    });
     return;
   }
   next();
@@ -37,11 +36,9 @@ const mutation: RequestHandler = (req, res, next) => {
     site === "same-site" ||
     (!origin && !/^Bearer [^\s]+$/.test(req.get("authorization") ?? ""))
   ) {
-    res
-      .status(403)
-      .json({
-        error: "Use the trusted GrowthOS page to approve mailbox reading.",
-      });
+    res.status(403).json({
+      error: "Use the trusted GrowthOS page to approve mailbox reading.",
+    });
     return;
   }
   if (!req.is("application/json")) {
@@ -70,6 +67,19 @@ const failure = (res: Parameters<RequestHandler>[1], error: unknown) =>
           : "mailbox_request_unavailable",
       error: "Mailbox reply monitoring needs review. No email was sent.",
     });
+router.post(
+  "/mailbox/microsoft/lead-monitoring",
+  requireMember("crm.write"),
+  session,
+  mutation,
+  async (req, res) => {
+    try {
+      res.json(await setLeadMonitoringApproval(actor(req), req.body));
+    } catch (e) {
+      failure(res, e);
+    }
+  },
+);
 router.get(
   "/mailbox/microsoft",
   requireMember("crm.write"),

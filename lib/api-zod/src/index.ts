@@ -6,3 +6,5 @@ export type { GetServiceCareParams } from "./generated/types/getServiceCareParam
 export { GetServiceCareParams as GetServiceCarePathParams } from "./generated/api";
 export type { ListServiceMailboxRepliesParams } from "./generated/types/listServiceMailboxRepliesParams";
 export { ListServiceMailboxRepliesParams as ListServiceMailboxRepliesPathParams } from "./generated/api";
+export type { ListLeadMailboxRepliesParams } from "./generated/types/listLeadMailboxRepliesParams";
+export { ListLeadMailboxRepliesParams as ListLeadMailboxRepliesPathParams } from "./generated/api";

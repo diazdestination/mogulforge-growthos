@@ -11,10 +11,12 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Sparkles, Phone, Send, Clock, X, CalendarClock, MessageSquareText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Link } from 'wouter';
 
 const ACTION_ICONS: Record<string, typeof Phone> = {
   call_now: Phone,
   reply_portal_message: MessageSquareText,
+  review_customer_reply: MessageSquareText,
   send_message: Send,
   follow_up_estimate: Send,
   schedule_follow_up: CalendarClock,
@@ -53,7 +55,7 @@ export function NextActionDraftComposer({
 
   const isEmailDraft = !!action.draft && action.channel === 'email';
   const isSmsDraft = !!action.draft && action.channel === 'sms';
-  if (!isEmailDraft && !isSmsDraft) return null;
+  if (String(action.actionType) === 'review_customer_reply' || (!isEmailDraft && !isSmsDraft)) return null;
 
   const handleSend = async () => {
     if (!body.trim()) return;
@@ -180,6 +182,7 @@ export function NextBestActionCard({
   };
 
   const Icon = ACTION_ICONS[action.actionType] ?? Sparkles;
+  const replyHeld = String(action.actionType) === 'review_customer_reply';
 
   return (
     <section data-testid="next-best-action-card">
@@ -201,11 +204,13 @@ export function NextBestActionCard({
           </div>
         </div>
 
-        {canWrite && (
+        {replyHeld && <Link href={`/leads/${encodeURIComponent(leadId)}?tab=messages#mailbox-replies`} className="inline-flex min-h-10 items-center rounded-lg border border-primary/30 px-3 text-sm font-semibold text-primary">Review held customer reply</Link>}
+        {replyHeld && <p className="text-xs text-muted-foreground">Handle the exact saved reply and office task first. This hold cannot be snoozed, dismissed or treated as a send.</p>}
+        {canWrite && !replyHeld && (
           <NextActionDraftComposer leadId={leadId} action={action} onRecorded={record} />
         )}
 
-        {canWrite && (
+        {canWrite && !replyHeld && (
           <div className="flex gap-2 flex-wrap">
             {action.actionType === 'call_now' && (
               <button

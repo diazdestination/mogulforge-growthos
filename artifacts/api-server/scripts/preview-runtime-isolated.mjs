@@ -14,6 +14,7 @@ import { buildAll } from "../build.mjs";
 import { seedCustomerCarePreview } from "./customer-care-preview-fixture.mjs";
 import { seedOperationsPreview } from "./operations-preview-fixture.mjs";
 import { seedLaunchCommunicationsPreview } from "./launch-communications-preview-fixture.mjs";
+import { seedLeadRepliesPreview } from "./lead-replies-preview-fixture.mjs";
 
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const database = path.resolve(api, "../../lib/db");
@@ -85,9 +86,10 @@ try {
       "INSERT INTO users(email,first_name,last_name,password_hash,email_verified_at,organization_id,role,is_platform_admin) VALUES ($1,'LOCAL','QA OPERATOR',$2,now(),$3,'owner',true) RETURNING id",
       ["runtime-qa@example.invalid", hash, org.id],
     );
-    if (process.argv.includes("--customer-care") || process.argv.includes("--operations") || process.argv.includes("--communications")) await seedCustomerCarePreview(client, org.id, user.id);
+    if (process.argv.includes("--customer-care") || process.argv.includes("--operations") || process.argv.includes("--communications") || process.argv.includes("--lead-replies")) await seedCustomerCarePreview(client, org.id, user.id);
     if (process.argv.includes("--operations")) await seedOperationsPreview(client, org.id, user.id);
-    if (process.argv.includes("--communications")) await seedLaunchCommunicationsPreview(client, org.id, user.id);
+    if (process.argv.includes("--communications") || process.argv.includes("--lead-replies")) await seedLaunchCommunicationsPreview(client, org.id, user.id);
+    if (process.argv.includes("--lead-replies")) await seedLeadRepliesPreview(client, org.id, user.id);
     await client.query(
       "INSERT INTO scheduled_actions(organization_id,action,context,run_at,status,attempts,last_error) VALUES ($1,$2,'{}',now()-interval '1 hour','failed',3,'Synthetic preparation failure for visual QA')",
       [

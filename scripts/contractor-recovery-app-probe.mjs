@@ -5,6 +5,7 @@ import { basename, dirname, resolve } from 'node:path';
 import { nativeFixtureIds } from './native-contractor-recovery-fixture.mjs';
 import { careFixtureIds } from './customer-care-recovery-fixture.mjs';
 import { operationsFixtureIds } from './operations-wave-recovery-fixture.mjs';
+import { leadReplyFixtureIds } from './lead-replies-recovery-fixture.mjs';
 
 const target = new URL(process.env.DATABASE_URL ?? '');
 if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.hostname !== '127.0.0.1' || target.pathname !== '/postgres' || process.env.CONTRACTOR_SYNTHETIC_RECOVERY !== 'true' || process.env.NODE_ENV !== 'test') throw new Error('contractor_probe_target_invalid');
@@ -41,6 +42,7 @@ try {
   good.push('/api/v1/service-watch', `/api/v1/service-obligations/${native.nextService}/watch`, '/api/v1/source-adoption',
     `/api/v1/source-adoption/outreach/${operations.batch}`, '/api/v1/financial-migrations', `/api/v1/financial-migrations/${operations.review}`, `/api/v1/invoices/${operations.invoice}`);
   good.push(`/api/v1/service-obligations/${native.nextService}/mailbox-replies`, '/api/v1/staff-invitations/email-deliveries');
+  good.push(`/api/v1/leads/${id.lead}/mailbox-replies`);
   for (const route of good) {
     check = `read_${good.indexOf(route)}`;
     const response = await fetch(`${origin}${route}`, { headers });
@@ -60,6 +62,14 @@ try {
   assert.equal(serviceReplies.items[0].holdActive, true);
   assert.equal(serviceReplies.items[0].content, null);
   assert.equal(serviceReplies.items[0].state, 'needs_review');
+  check = 'lead_reply_evidence';
+  const leadReplies = await (await fetch(`${origin}/api/v1/leads/${id.lead}/mailbox-replies`, { headers })).json();
+  assert.equal(leadReplies.items.length, 1);
+  assert.equal(leadReplies.items[0].id, leadReplyFixtureIds('restore-drill-contractor-a').reply);
+  assert.equal(leadReplies.items[0].holdActive, true);
+  assert.equal(leadReplies.items[0].content, null);
+  assert.equal(leadReplies.items[0].taskId, leadReplyFixtureIds('restore-drill-contractor-a').task);
+  assert.equal(leadReplies.items[0].evidence, 'original_mailbox_observation');
   for (const route of [`/api/v1/contacts/${other.contact}`, `/api/v1/leads/${other.lead}`, `/api/v1/projects/${other.project}`, `/api/v1/invoices/${otherNative.invoice}`, `/api/v1/service-obligations/${otherNative.nextService}/care`, `/api/v1/communications/voice/${careFixtureIds('restore-drill-contractor-b').call}/care`, `/api/v1/invoices/${otherNative.invoice}/delivery`]) {
     check = 'tenant_boundary';
     const response = await fetch(`${origin}${route}`, { headers });
@@ -70,6 +80,7 @@ try {
     const response = await fetch(`${origin}${route}`,{headers}); assert.equal(response.status,404,route); await response.arrayBuffer();
   }
   assert.equal((await fetch(`${origin}/api/v1/service-obligations/${otherNative.nextService}/mailbox-replies`, { headers })).status, 404);
+  assert.equal((await fetch(`${origin}/api/v1/leads/${other.lead}/mailbox-replies`, { headers })).status, 404);
   const mutation = await fetch(`${origin}/api/v1/contacts/${id.contact}`, { method: 'PATCH', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify({ firstName: 'Forbidden' }) });
   assert.equal(mutation.status, 405); await mutation.arrayBuffer();
   process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, tenantBoundariesVerified: true, readChecks: good.length, writeBlocked: true })}\n`);

@@ -241,10 +241,7 @@ export function normalizeMailboxMessage(
     headers.set(key, [...(headers.get(key) ?? []), h.value]);
   }
   const parent = headers.get(MAILBOX_HEADER) ?? [];
-  if (
-    parent.length > 1 ||
-    parent.some((v) => !/^[a-f0-9]{64}$/.test(v))
-  )
+  if (parent.length > 1 || parent.some((v) => !/^[a-f0-9]{64}$/.test(v)))
     throw new MailboxError("mailbox_parent_header_invalid");
   return {
     providerMessageId: m.id,
@@ -352,12 +349,13 @@ export async function readMailboxPendingMessage(
   inboxFolderId: string,
   messageId: string,
   transport: typeof fetch = fetch,
+  metadataOnly = false,
 ) {
   if (!identifier(inboxFolderId) || !identifier(messageId))
     throw new MailboxError("mailbox_message_invalid");
   return normalizeMailboxMessage(
     await get(
-      `${GRAPH}/me/mailFolders/${encodeURIComponent(inboxFolderId)}/messages/${encodeURIComponent(messageId)}?$select=${fields},body`,
+      `${GRAPH}/me/mailFolders/${encodeURIComponent(inboxFolderId)}/messages/${encodeURIComponent(messageId)}?$select=${fields}${metadataOnly ? "" : ",body"}`,
       token,
       async (url, init) => {
         const response = await transport(url, init);
@@ -368,5 +366,6 @@ export async function readMailboxPendingMessage(
         return response;
       },
     ),
+    metadataOnly,
   );
 }

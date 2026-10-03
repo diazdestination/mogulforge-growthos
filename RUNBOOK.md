@@ -3,6 +3,13 @@
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 
+Newest candidate: `reports/lead-replies-integration-2026-10-02.md`. Exact reviewed
+BIE Microsoft lead sends now have a separately opted-in original-mailbox reply
+loop, canonical lead hold/task and explicit staff handling. The lead Messages
+section is the office entry point; no new general Inbox is introduced. Review
+0010after0009 with `node scripts/lead-replies-schema-preview.mjs`; no hosted
+approval is implied. The next authorized wave is invoice delivery recovery.
+
 Newest implementation: `reports/launch-communications-integration-2026-10-02.md`
 and its three lane reports. The117-table source adds tracked Microsoft service
 replies and platform identity delivery evidence. It is not general inbox support.

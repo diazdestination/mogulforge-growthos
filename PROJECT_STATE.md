@@ -1,6 +1,22 @@
 # GrowthOS project state
 
-## October 2 launch communications (newest implementation)
+## October 2 tracked lead replies (newest candidate)
+
+The owner requested two consecutive waves. First:
+`reports/lead-replies-integration-2026-10-02.md`, based on green mainc2d999b /
+CI37085822984. Individually reviewed native BIE Microsoft emails can now feed
+the canonical lead reply hold and accountable office task, with separate
+lead-context permission and final post-OAuth send guards. The second wave is
+invoice delivery exceptions and explicitly reviewed recovery. Neither activates
+providers or accepts contractor cutover. Require exact candidate/main CI.
+
+Source schema remains117tables; reviewed0010after0009 adds typed lead provenance
+and separate permission without a new mailbox/inbox store. The compatible local
+restore includes purged lead evidence and office tasks. Hosted schema/backup,
+Azure owner return, live communications/phones and both replacement cards remain
+separate and unfinished. Payment collection remains deferred.
+
+## October 2 launch communications (historical implementation)
 
 Base operations mainc01bea0 passed exact-main CI37081202257. The owner approved
 the fixed `LAUNCH-COMPLETION.md` finish line. The communications implementation

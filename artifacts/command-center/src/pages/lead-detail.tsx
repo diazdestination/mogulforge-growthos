@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useParams } from 'wouter';
+import { useParams, useSearch } from 'wouter';
 import { 
   useGetLead, 
   useUpdateLead, 
@@ -47,6 +47,7 @@ import { extractPhotoPaths, flattenPhotoPaths, photoUrl } from '@/lib/photos';
 import { LeadContactActions } from '@/components/lead-contact-actions';
 import { ManualLeadSms } from '@/components/manual-lead-sms';
 import { NextBestActionCard } from '@/components/next-best-action-card';
+import { LeadMailboxRepliesPanel } from '@/components/lead-mailbox-replies-panel';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -62,7 +63,10 @@ export default function LeadDetail() {
   const updateLead = useUpdateLead();
   const { toast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'activity' | 'messages'>('activity');
+  const search = useSearch();
+  const replyDeepLink = new URLSearchParams(search).get('tab') === 'messages';
+  const [activeTab, setActiveTab] = useState<'activity' | 'messages'>(() => replyDeepLink ? 'messages' : 'activity');
+  useEffect(() => { if (replyDeepLink) setActiveTab('messages'); }, [id, replyDeepLink]);
   const [sampleBannerDismissed, setSampleBannerDismissed] = useState(false);
 
   const duplicateMatches = (duplicateGroups || [])
@@ -337,7 +341,10 @@ export default function LeadDetail() {
           </>
         ) : (
           <>
-            <MessageThread leadId={lead.id} />
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <LeadMailboxRepliesPanel key={lead.id} leadId={lead.id} canReview={canWrite(me?.role)} />
+              <MessageThread leadId={lead.id} preserveReplyFocus={replyDeepLink} />
+            </div>
             <MessageComposer leadId={lead.id} />
           </>
         )}
@@ -1105,7 +1112,7 @@ function ActivityComposer({ leadId }: { leadId: string }) {
   );
 }
 
-function MessageThread({ leadId }: { leadId: string }) {
+function MessageThread({ leadId, preserveReplyFocus = false }: { leadId: string; preserveReplyFocus?: boolean }) {
   const { data: activities, isLoading } = useListLeadActivities(leadId, {
     query: { enabled: !!leadId, queryKey: getListLeadActivitiesQueryKey(leadId) },
   });
@@ -1117,8 +1124,8 @@ function MessageThread({ leadId }: { leadId: string }) {
     .reverse(); // API returns desc; we want oldest-first for a chat layout
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    if (!preserveReplyFocus) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length, preserveReplyFocus]);
 
   if (isLoading) {
     return (

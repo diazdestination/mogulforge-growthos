@@ -80,6 +80,8 @@ beforeEach(() => {
     configured: true,
     connected: true,
     senderActive: true,
+    provider: "gmail",
+    email: "learning-sender@example.com",
   });
   sendGmailForUserMock.mockReset();
   sendGmailForUserMock.mockResolvedValue({

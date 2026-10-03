@@ -5,6 +5,177 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+export type LeadMailboxReplyState = typeof LeadMailboxReplyState[keyof typeof LeadMailboxReplyState];
+
+
+export const LeadMailboxReplyState = {
+  needs_review: 'needs_review',
+  confirmed: 'confirmed',
+  dismissed: 'dismissed',
+} as const;
+
+export type LeadMailboxReplyContent = {
+  subject: string;
+  text: string;
+} | null;
+
+export type LeadMailboxReplyEffectSummary = {
+  /** @minimum 0 */
+  pausedEnrollments: number;
+  /** @minimum 0 */
+  cancelledActions: number;
+  /** @minimum 0 */
+  blockedProposals: number;
+  /** @minimum 0 */
+  reconciliationRequired: number;
+} | null;
+
+export type LeadMailboxReplyEvidence = typeof LeadMailboxReplyEvidence[keyof typeof LeadMailboxReplyEvidence];
+
+
+export const LeadMailboxReplyEvidence = {
+  original_mailbox_observation: 'original_mailbox_observation',
+} as const;
+
+export interface LeadMailboxReply {
+  id: string;
+  leadId: string;
+  /** @minimum 1 */
+  version: number;
+  state: LeadMailboxReplyState;
+  reason: string;
+  /** @nullable */
+  replyAt: string | null;
+  receivedAt: string;
+  historical: boolean;
+  holdActive: boolean;
+  /** @nullable */
+  taskId: string | null;
+  /** @nullable */
+  taskTitle: string | null;
+  /** @nullable */
+  taskStatus: string | null;
+  /** @nullable */
+  assignedUserId: string | null;
+  /** @nullable */
+  assignedUserName: string | null;
+  content: LeadMailboxReplyContent;
+  /** @nullable */
+  rawExpiresAt: string | null;
+  /** @nullable */
+  releasedAt: string | null;
+  /** @nullable */
+  releaseNote: string | null;
+  effectSummary: LeadMailboxReplyEffectSummary;
+  evidence: LeadMailboxReplyEvidence;
+  /** Current original reader and lead-context permission; false does not erase retained evidence or prevent an explicit staff handling decision. */
+  monitoringCurrent: boolean;
+}
+
+export type LeadMailboxReplyPageLimit = typeof LeadMailboxReplyPageLimit[keyof typeof LeadMailboxReplyPageLimit];
+
+
+export const LeadMailboxReplyPageLimit = {
+  NUMBER_25: 25,
+} as const;
+
+export interface LeadMailboxReplyPage {
+  /** @maxItems 25 */
+  items: LeadMailboxReply[];
+  hasMore: boolean;
+  /** @minimum 0 */
+  offset: number;
+  limit: LeadMailboxReplyPageLimit;
+}
+
+export type ReviewLeadMailboxReplyDecision = typeof ReviewLeadMailboxReplyDecision[keyof typeof ReviewLeadMailboxReplyDecision];
+
+
+export const ReviewLeadMailboxReplyDecision = {
+  handled: 'handled',
+} as const;
+
+export interface ReviewLeadMailboxReply {
+  requestId: string;
+  /** @minimum 1 */
+  expectedVersion: number;
+  decision: ReviewLeadMailboxReplyDecision;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  note: string;
+  reviewed: true;
+}
+
+export interface LeadMailboxReplyReviewResult {
+  replyId: string;
+  /** @minimum 1 */
+  version: number;
+  replayed: boolean;
+}
+
+export interface MicrosoftLeadMonitoring {
+  /** @minimum 1 */
+  expectedConnectorVersion: number;
+  /** @minimum 0 */
+  expectedLeadMonitoringVersion: number;
+  enabled: boolean;
+  leadContextAcknowledged: true;
+}
+
+export type PrepareBieLeadEmailExpectedPayload = { [key: string]: unknown };
+
+export interface PrepareBieLeadEmail {
+  expectedPayload: PrepareBieLeadEmailExpectedPayload;
+}
+
+export type PreparedBieLeadEmailActionType = typeof PreparedBieLeadEmailActionType[keyof typeof PreparedBieLeadEmailActionType];
+
+
+export const PreparedBieLeadEmailActionType = {
+  send_email: 'send_email',
+} as const;
+
+export type PreparedBieLeadEmailStatus = typeof PreparedBieLeadEmailStatus[keyof typeof PreparedBieLeadEmailStatus];
+
+
+export const PreparedBieLeadEmailStatus = {
+  proposed: 'proposed',
+} as const;
+
+export type PreparedBieLeadEmailEvidence = { [key: string]: unknown };
+
+export type PreparedBieLeadEmailPayload = { [key: string]: unknown };
+
+export interface PreparedBieLeadEmail {
+  id: string;
+  organizationId: string;
+  /** @nullable */
+  runId: string | null;
+  leadId: string;
+  actionType: PreparedBieLeadEmailActionType;
+  status: PreparedBieLeadEmailStatus;
+  title: string;
+  rationale: string;
+  evidence: PreparedBieLeadEmailEvidence;
+  payload: PreparedBieLeadEmailPayload;
+  /** @nullable */
+  estimatedValueCents: number | null;
+  /** @nullable */
+  createdByUserId: string | null;
+  /** @nullable */
+  reviewedByUserId: string | null;
+  /** @nullable */
+  reviewedAt: string | null;
+  /** @nullable */
+  executedAt: string | null;
+  /** @nullable */
+  executionDetail: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ServiceMailboxReplyState = typeof ServiceMailboxReplyState[keyof typeof ServiceMailboxReplyState];
 
 
@@ -221,6 +392,13 @@ export interface MicrosoftMailboxStatus {
   historicalCrawl: false;
   attachmentsRead: false;
   remoteConsentRevoked: false;
+  leadMonitoringEnabled: boolean;
+  /** @minimum 0 */
+  leadMonitoringVersion: number;
+  /** @nullable */
+  leadMonitoringApprovedAt: string | null;
+  /** @nullable */
+  leadMonitoringChangedAt: string | null;
 }
 
 export type MicrosoftMailboxConnectReturnPath = typeof MicrosoftMailboxConnectReturnPath[keyof typeof MicrosoftMailboxConnectReturnPath];
@@ -2889,6 +3067,7 @@ export type NextBestActionActionType = typeof NextBestActionActionType[keyof typ
 
 export const NextBestActionActionType = {
   reply_portal_message: 'reply_portal_message',
+  review_customer_reply: 'review_customer_reply',
   call_now: 'call_now',
   send_message: 'send_message',
   follow_up_estimate: 'follow_up_estimate',
@@ -5752,5 +5931,13 @@ export type CompleteMicrosoftMailboxOAuthParams = {
 state?: string;
 code?: string;
 error?: string;
+};
+
+export type ListLeadMailboxRepliesParams = {
+/**
+ * @minimum 0
+ * @maximum 100000
+ */
+offset?: number;
 };
 
