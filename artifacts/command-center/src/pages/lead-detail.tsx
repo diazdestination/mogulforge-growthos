@@ -48,6 +48,7 @@ import { LeadContactActions } from '@/components/lead-contact-actions';
 import { ManualLeadSms } from '@/components/manual-lead-sms';
 import { NextBestActionCard } from '@/components/next-best-action-card';
 import { LeadMailboxRepliesPanel } from '@/components/lead-mailbox-replies-panel';
+import { memberAuthorityScope } from '@/lib/member-authority-scope';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -58,7 +59,7 @@ export default function LeadDetail() {
   const { data: property } = useGetProperty(lead?.propertyId!, { query: { enabled: !!lead?.propertyId, queryKey: getGetPropertyQueryKey(lead?.propertyId!) } });
   
   const { data: duplicateGroups } = useListDuplicateLeads();
-  const { data: me } = useGetMe();
+  const { data: me, isError: memberError } = useGetMe();
   const queryClient = useQueryClient();
   const updateLead = useUpdateLead();
   const { toast } = useToast();
@@ -342,7 +343,7 @@ export default function LeadDetail() {
         ) : (
           <>
             <div className="flex-1 min-h-0 overflow-y-auto">
-              <LeadMailboxRepliesPanel key={lead.id} leadId={lead.id} canReview={canWrite(me?.role)} />
+              {memberError || !me?.id || !me.organization?.id || !me.isActive ? <p role="alert" className="p-4">Current member access could not be verified. Reply evidence and handling are unavailable until access is refreshed.</p> : <LeadMailboxRepliesPanel key={`${memberAuthorityScope(me)}:${lead.id}`} scopeKey={memberAuthorityScope(me)} leadId={lead.id} canReview={canWrite(me.role)} />}
               <MessageThread leadId={lead.id} preserveReplyFocus={replyDeepLink} />
             </div>
             <MessageComposer leadId={lead.id} />

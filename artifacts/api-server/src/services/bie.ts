@@ -34,6 +34,7 @@ import { getBusinessName } from "./settings";
 import { sendEmailForUser, getUserEmailStatus, emailAcceptanceEvidence } from "./user-email";
 import { checkSendEligibility, recordBlockedSend } from "./send-gate";
 import { runDurableAction } from "./durable-execution";
+import { acceptContactTouch, assertContactTouchCurrent, ContactTouchDeferredError, markContactTouchDispatchStarted, type ContactTouchClaim } from "./contact-touch-claim";
 import { hasPermission } from "../lib/permissions";
 import { isDeepStrictEqual } from "node:util";
 import { assertCapabilityForActor, CapabilityAccessError, getEntitlements } from "./entitlements";
@@ -797,7 +798,7 @@ async function assertBieEmailReviewCurrent(org: string, proposal: BieActionPropo
         saved.mailboxIdentity.mailboxEmail !== review.sender.senderEmail || review.sender.provider !== "microsoft") emailReviewFail("mailbox_review_changed");
     await assertLeadMonitoringApproval(saved.mailboxIdentity, saved.leadMonitoringApproval);
   }
-  const gate = await checkSendEligibility({ organizationId: org, leadId: current.lead.id, contact: current.contact, channel: "email", kind: "outreach" });
+  const gate = await checkSendEligibility({ organizationId: org, leadId: current.lead.id, contact: current.contact, channel: "email", kind: "outreach", touchLogicalKey: `bie:${proposal.id}` });
   if (!gate.ok && gate.outcome !== "deferred") emailReviewFail(gate.reason);
   return review;
 }
@@ -910,11 +911,17 @@ async function assertBieEmailDispatchCurrent(org: string, frozen: BieActionPropo
       await assertCapabilityForActor(org, actorId, "revenue.autopilot", "crm.write");
     }
     if (!await emailCapRemaining(org, policy.dailyEmailCap)) emailReviewFail("email_cap_reached");
-    const gate = await checkSendEligibility({ organizationId: org, leadId: lead.id, contact, channel: "email", kind: "outreach" });
+    const gate = await checkSendEligibility({ organizationId: org, leadId: lead.id, contact, channel: "email", kind: "outreach", touchLogicalKey: `bie:${proposal.id}` });
     if (!gate.ok) emailReviewFail(gate.reason);
     const [owned] = await db.select().from(revenueExecutionsTable).where(and(eq(revenueExecutionsTable.organizationId, org), eq(revenueExecutionsTable.actionKey, `bie:${proposal.id}`)));
     if (!owned || owned.state !== "processing" || owned.kind !== "send_email" || owned.actorUserId !== actorId || owned.expiresAt.getTime() <= Date.now() || owned.fingerprint !== mailboxDigest(frozen.payload)) emailReviewFail("execution_not_owned");
+    await assertContactTouchCurrent(db, bieContactTouch(org, frozen, contact));
   } catch { throw new EmailDispatchBlockedError(); }
+}
+
+function bieContactTouch(organizationId: string, proposal: BieActionProposal, contact: { id: string; email: string | null }): ContactTouchClaim {
+  return { organizationId, logicalKey: `bie:${proposal.id}`, contactId: contact.id,
+    address: normalizeMailbox(contact.email ?? ""), channel: "email", sourceKind: "bie", payload: proposal.payload, leadId: proposal.leadId };
 }
 
 /** Execute an approved proposal. Manual approval is required unless a later worker invokes this under enabled autopilot. */
@@ -958,13 +965,22 @@ export async function executeBieProposal(
       "blocked",
       "An active, authorized responder must own this action.",
     );
-  const execution = await runDurableAction({
+  let contactTouch: ContactTouchClaim | undefined;
+  if (proposal.actionType === "send_email") {
+    const [lead] = await db.select().from(leadsTable).where(and(eq(leadsTable.organizationId, organizationId), eq(leadsTable.id, proposal.leadId)));
+    const [contact] = lead ? await db.select().from(contactsTable).where(and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, lead.contactId))) : [];
+    if (contact?.email) contactTouch = bieContactTouch(organizationId, proposal, contact);
+  }
+  let execution: Awaited<ReturnType<typeof runDurableAction>>;
+  try {
+    execution = await runDurableAction({
     organizationId,
     actionKey: `bie:${actionId}`,
     leadId: proposal.leadId,
     kind: proposal.actionType,
     payload: proposal.payload,
     actorUserId,
+    ...(contactTouch ? { contactTouch } : {}),
     execute: async () => {
       const result = await executeBieProposalEffect(
         organizationId,
@@ -979,7 +995,12 @@ export async function executeBieProposal(
           "The approved action is no longer executable.",
       };
     },
-  });
+    });
+  } catch (error) {
+    if (error instanceof ContactTouchDeferredError)
+      return { ...proposal, executionDetail: `Contact allowance held until ${error.resumeAt.toISOString()}. The original action is not claimed; review before it runs.` };
+    throw error;
+  }
   if (execution.state === "indeterminate")
     return markAction(
       actionId,
@@ -1190,6 +1211,7 @@ async function executeBieProposalEffect(
       contact,
       channel: "email",
       kind: "outreach",
+      touchLogicalKey: `bie:${proposal.id}`,
     });
     if (!eligibility.ok) {
       await recordBlockedSend({
@@ -1230,10 +1252,14 @@ async function executeBieProposalEffect(
       subject,
       body,
       expectedSender,
-      beforeDispatch,
+      beforeDispatch: async () => {
+        await beforeDispatch();
+        await markContactTouchDispatchStarted(organizationId, `bie:${proposal.id}`);
+      },
       ...(outboundParentId ? { outboundParentId } : {}),
     });
     if (outboundParentId) await recordMailboxParentAcceptance(outboundParentId, organizationId);
+    await acceptContactTouch(organizationId, `bie:${proposal.id}`);
     await crm.createActivity(organizationId, {
       leadId: lead.id,
       contactId: contact.id,
@@ -1247,6 +1273,8 @@ async function executeBieProposalEffect(
         from: sent.senderEmail,
         ...emailAcceptanceEvidence(sent, { organizationId, leadId: lead.id, recipientEmail: contact.email }),
         source: "bie.revenue_recovery",
+        touchLogicalKey: `bie:${proposal.id}`,
+        proposalId: proposal.id,
         ...(outboundParentId ? { outboundParentId, replyMonitoring: "original_mailbox_observation_required" } : { replyMonitoring: "untracked" }),
       },
     });

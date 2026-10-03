@@ -3,7 +3,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { db, pool, organizationsTable, usersTable, contactsTable, leadsTable, activitiesTable, emailIntelligenceSourcesTable,
   emailResponseReviewsTable as reviews, scheduledActionsTable as actions, playbooksTable, playbookEnrollmentsTable as enrollments,
-  bieActionProposalsTable as proposals, revenueExecutionsTable as executions, auditEventsTable, customerLifecycleTable } from "@workspace/db";
+  bieActionProposalsTable as proposals, revenueExecutionsTable as executions, auditEventsTable, customerLifecycleTable, orgSettingsTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import app from "../../app";
@@ -314,25 +314,62 @@ it("fresh scheduled follow-up after a held reply is blocked by the runtime witho
 it.skipIf(process.env.SCHEDULER_TEST_BACKEND === "pglite")("a reply queued before a durable claim cancels before dispatch across PostgreSQL sessions", async () => {
   const f = await fixture(), work = await pendingWork(f.lead.id);
   await db.update(actions).set({ runAt: new Date(Date.now() - 1000) }).where(eq(actions.id, work.action.id));
+  const [previousSettings] = await db.select().from(orgSettingsTable).where(eq(orgSettingsTable.organizationId, org));
+  // This race must reach the claim boundary at any CI wall-clock time. Quiet
+  // hours and contact-budget deferrals have their own separate tests.
+  const sendingHours = { quietHoursEnabled: false, timezone: "UTC", startHour: 0, endHour: 24, days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], maxTouchesPerDay: 0 };
+  await db.insert(orgSettingsTable).values({ organizationId: org, sendingHours }).onConflictDoUpdate({ target: orgSettingsTable.organizationId, set: { sendingHours } });
   const writer = await pool.connect();
   let intake: Promise<Response> | undefined, scheduled: Promise<void> | undefined;
   try {
     await writer.query("BEGIN");
     const { rows: [{ pid }] } = await writer.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
-    await writer.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`customer-reply:${org}:${f.lead.id}`]);
-    const waiting = async (minimum: number) => {
+    const replyKey = `customer-reply:${org}:${f.lead.id}`;
+    await writer.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [replyKey]);
+    const waitingOn = async (blockerPid: number, key: string, boundary: string) => {
       const deadline = Date.now() + 8000;
       while (Date.now() < deadline) {
-        const { rows: [{ count }] } = await pool.query<{ count: number }>("SELECT count(*)::int AS count FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))", [pid]);
-        if (count >= minimum) return;
+        // Prove the exact exclusive bigint-key advisory lock and its granted
+        // owner, not a count of unrelated or transitive database waiters.
+        const { rows } = await pool.query<{ pid: number }>(`
+          SELECT waiting.pid
+          FROM pg_locks waiting
+          JOIN pg_locks held ON held.locktype = waiting.locktype
+            AND held.database IS NOT DISTINCT FROM waiting.database
+            AND held.classid = waiting.classid AND held.objid = waiting.objid
+            AND held.objsubid = waiting.objsubid
+          JOIN pg_stat_activity activity ON activity.pid = waiting.pid
+          WHERE waiting.locktype = 'advisory' AND NOT waiting.granted
+            AND waiting.mode = 'ExclusiveLock' AND held.granted
+            AND held.mode = 'ExclusiveLock' AND held.pid = $1
+            AND $1 = ANY(pg_blocking_pids(waiting.pid))
+            AND waiting.classid::bigint = ((hashtextextended($2, 0) >> 32) & 4294967295)
+            AND waiting.objid::bigint = (hashtextextended($2, 0) & 4294967295)
+            AND waiting.objsubid = 1 AND activity.state = 'active'
+            AND activity.wait_event_type = 'Lock' AND activity.wait_event = 'advisory'
+        `, [blockerPid, key]);
+        if (rows.length) {
+          expect(rows).toHaveLength(1);
+          return rows[0].pid;
+        }
         await new Promise(resolve => setTimeout(resolve, 20));
       }
-      throw new Error("Expected independent PostgreSQL sessions waiting on the reply boundary.");
+      throw new Error(`Expected an independent PostgreSQL session waiting on the exact ${boundary} lock held by backend ${blockerPid}.`);
     };
     intake = ingest(payload(f.outboundId));
-    await waiting(1);
+    const intakePid = await waitingOn(pid, replyKey, "customer-reply");
     scheduled = processDueScheduledActions(org);
-    await waiting(2);
+    // Intake owns the shared company prefix before it waits for the reply lock.
+    // The real scheduler claim therefore waits on intake's first prefix lock,
+    // not directly on the test writer: writer -> intake -> scheduler.
+    const schedulerPid = await waitingOn(intakePid, `customer-lifecycle:${org}`, "customer-lifecycle");
+    expect(new Set([pid, intakePid, schedulerPid]).size).toBe(3);
+    const { rows: [{ blockers }] } = await pool.query<{ blockers: number[] }>("SELECT pg_blocking_pids($1) AS blockers", [schedulerPid]);
+    expect(blockers).toContain(intakePid);
+    expect(blockers).not.toContain(pid);
+    expect(await db.select().from(executions).where(eq(executions.actionKey, `scheduled:${work.action.id}`))).toHaveLength(0);
+    expect((await db.select().from(actions).where(eq(actions.id, work.action.id)))[0]).toMatchObject({ status: "pending", attempts: 0 });
+    expect(externalRequests).toBe(0);
     await writer.query("COMMIT");
     expect((await intake).status).toBe(201);
     await scheduled;
@@ -342,6 +379,8 @@ it.skipIf(process.env.SCHEDULER_TEST_BACKEND === "pglite")("a reply queued befor
   } finally {
     await writer.query("ROLLBACK"); writer.release();
     await Promise.allSettled([...(intake ? [intake] : []), ...(scheduled ? [scheduled] : [])]);
+    if (previousSettings) await db.update(orgSettingsTable).set({ sendingHours: previousSettings.sendingHours }).where(eq(orgSettingsTable.organizationId, org));
+    else await db.delete(orgSettingsTable).where(eq(orgSettingsTable.organizationId, org));
   }
 });
 

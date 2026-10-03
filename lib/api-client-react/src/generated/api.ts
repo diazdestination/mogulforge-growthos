@@ -170,6 +170,7 @@ import type {
   ListServiceSmsRepliesParams,
   ListServiceWatchParams,
   ListSourceAdoptionsParams,
+  ListSourceNurtureParams,
   ListTasksParams,
   ListTodayActionsParams,
   ListWebhookDeliveriesParams,
@@ -189,6 +190,7 @@ import type {
   MicrosoftMailboxDisable,
   MicrosoftMailboxDisableResult,
   MicrosoftMailboxStatus,
+  MicrosoftNurtureMonitoring,
   MissedCallCareReadModel,
   MobileTokenExchangeRequest,
   MobileTokenExchangeSuccess,
@@ -277,6 +279,13 @@ import type {
   SourceAdoptionReviewInput,
   SourceAdoptionRevokeInput,
   SourceEmailPermissionInput,
+  SourceNurtureApprovalRequest,
+  SourceNurtureCommandResult,
+  SourceNurtureDetail,
+  SourceNurtureList,
+  SourceNurturePreviewRequest,
+  SourceNurtureStartRequest,
+  SourceNurtureStopRequest,
   SourceOutreachApproval,
   SourceOutreachDetail,
   SourceOutreachDraft,
@@ -333,6 +342,532 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getListSourceNurtureUrl = (params?: ListSourceNurtureParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/source-nurture?${stringifiedParams}` : `/api/v1/source-nurture`
+}
+
+/**
+ * Accepted staff session only; no API-key authority. Finite imported-source nurture requires separate source adoption, address-specific marketing permission, Microsoft sender/read grant, exact approval and explicit start. Maximum ten addresses, two fixed emails, at least 72 hours after actual predecessor acceptance and a fresh complete reply scan, expiring within fourteen days. Permanent ownership and unknown effects never permit replacement keys or automatic replay. Provider acceptance is not delivery, consent, customer confirmation or collected revenue.
+ * @summary Find oldest bounded nurture attention, waiting work or history
+ */
+export const listSourceNurture = async (params?: ListSourceNurtureParams, options?: Parameters<typeof customFetch>[1]): Promise<SourceNurtureList> => {
+
+  return customFetch<SourceNurtureList>(getListSourceNurtureUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSourceNurtureQueryKey = (params?: ListSourceNurtureParams,) => {
+    return [
+    `/api/v1/source-nurture`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSourceNurtureQueryOptions = <TData = Awaited<ReturnType<typeof listSourceNurture>>, TError = ErrorType<void>>(params?: ListSourceNurtureParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSourceNurture>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSourceNurtureQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSourceNurture>>> = ({ signal }) => listSourceNurture(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSourceNurture>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSourceNurtureQueryResult = NonNullable<Awaited<ReturnType<typeof listSourceNurture>>>
+export type ListSourceNurtureQueryError = ErrorType<void>
+
+
+/**
+ * @summary Find oldest bounded nurture attention, waiting work or history
+ */
+
+export function useListSourceNurture<TData = Awaited<ReturnType<typeof listSourceNurture>>, TError = ErrorType<void>>(
+ params?: ListSourceNurtureParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSourceNurture>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSourceNurtureQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetSourceNurtureUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/source-nurture/${id}`
+}
+
+/**
+ * Accepted staff session only; no API-key authority. Finite imported-source nurture requires separate source adoption, address-specific marketing permission, Microsoft sender/read grant, exact approval and explicit start. Maximum ten addresses, two fixed emails, at least 72 hours after actual predecessor acceptance and a fresh complete reply scan, expiring within fourteen days. Permanent ownership and unknown effects never permit replacement keys or automatic replay. Provider acceptance is not delivery, consent, customer confirmation or collected revenue.
+ * @summary Review exact immutable nurture and original outcome evidence
+ */
+export const getSourceNurture = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<SourceNurtureDetail> => {
+
+  return customFetch<SourceNurtureDetail>(getGetSourceNurtureUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSourceNurtureQueryKey = (id: string,) => {
+    return [
+    `/api/v1/source-nurture/${id}`
+    ] as const;
+    }
+
+
+export const getGetSourceNurtureQueryOptions = <TData = Awaited<ReturnType<typeof getSourceNurture>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSourceNurture>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSourceNurtureQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSourceNurture>>> = ({ signal }) => getSourceNurture(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSourceNurture>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSourceNurtureQueryResult = NonNullable<Awaited<ReturnType<typeof getSourceNurture>>>
+export type GetSourceNurtureQueryError = ErrorType<void>
+
+
+/**
+ * @summary Review exact immutable nurture and original outcome evidence
+ */
+
+export function useGetSourceNurture<TData = Awaited<ReturnType<typeof getSourceNurture>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSourceNurture>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSourceNurtureQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPreviewSourceNurtureUrl = () => {
+
+
+
+
+  return `/api/v1/source-nurture/preview`
+}
+
+/**
+ * Accepted staff session only; no API-key authority. Finite imported-source nurture requires separate source adoption, address-specific marketing permission, Microsoft sender/read grant, exact approval and explicit start. Maximum ten addresses, two fixed emails, at least 72 hours after actual predecessor acceptance and a fresh complete reply scan, expiring within fourteen days. Permanent ownership and unknown effects never permit replacement keys or automatic replay. Provider acceptance is not delivery, consent, customer confirmation or collected revenue.
+ * @summary Freeze a ten-minute actor-bound two-message review without sending
+ */
+export const previewSourceNurture = async (sourceNurturePreviewRequest: SourceNurturePreviewRequest, options?: Parameters<typeof customFetch>[1]): Promise<SourceNurtureDetail> => {
+
+  return customFetch<SourceNurtureDetail>(getPreviewSourceNurtureUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceNurturePreviewRequest)
+  }
+);}
+
+
+
+
+
+export const getPreviewSourceNurtureMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewSourceNurture>>, TError,{data: BodyType<SourceNurturePreviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewSourceNurture>>, TError,{data: BodyType<SourceNurturePreviewRequest>}, TContext> => {
+
+const mutationKey = ['previewSourceNurture'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewSourceNurture>>, {data: BodyType<SourceNurturePreviewRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewSourceNurture(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewSourceNurtureMutationResult = NonNullable<Awaited<ReturnType<typeof previewSourceNurture>>>
+    export type PreviewSourceNurtureMutationBody = BodyType<SourceNurturePreviewRequest>
+    export type PreviewSourceNurtureMutationError = ErrorType<void>
+
+    /**
+ * @summary Freeze a ten-minute actor-bound two-message review without sending
+ */
+export const usePreviewSourceNurture = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewSourceNurture>>, TError,{data: BodyType<SourceNurturePreviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewSourceNurture>>,
+        TError,
+        {data: BodyType<SourceNurturePreviewRequest>},
+        TContext
+      > => {
+      return useMutation(getPreviewSourceNurtureMutationOptions(options));
+    }
+
+export const getApproveSourceNurtureUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/source-nurture/${id}/approve`
+}
+
+/**
+ * Accepted staff session only; no API-key authority. Finite imported-source nurture requires separate source adoption, address-specific marketing permission, Microsoft sender/read grant, exact approval and explicit start. Maximum ten addresses, two fixed emails, at least 72 hours after actual predecessor acceptance and a fresh complete reply scan, expiring within fourteen days. Permanent ownership and unknown effects never permit replacement keys or automatic replay. Provider acceptance is not delivery, consent, customer confirmation or collected revenue.
+ * @summary Approve the exact saved review without scheduling a send
+ */
+export const approveSourceNurture = async (id: string,
+    sourceNurtureApprovalRequest: SourceNurtureApprovalRequest, options?: Parameters<typeof customFetch>[1]): Promise<SourceNurtureCommandResult> => {
+
+  return customFetch<SourceNurtureCommandResult>(getApproveSourceNurtureUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceNurtureApprovalRequest)
+  }
+);}
+
+
+
+
+
+export const getApproveSourceNurtureMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveSourceNurture>>, TError,{id: string;data: BodyType<SourceNurtureApprovalRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveSourceNurture>>, TError,{id: string;data: BodyType<SourceNurtureApprovalRequest>}, TContext> => {
+
+const mutationKey = ['approveSourceNurture'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveSourceNurture>>, {id: string;data: BodyType<SourceNurtureApprovalRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  approveSourceNurture(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveSourceNurtureMutationResult = NonNullable<Awaited<ReturnType<typeof approveSourceNurture>>>
+    export type ApproveSourceNurtureMutationBody = BodyType<SourceNurtureApprovalRequest>
+    export type ApproveSourceNurtureMutationError = ErrorType<void>
+
+    /**
+ * @summary Approve the exact saved review without scheduling a send
+ */
+export const useApproveSourceNurture = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveSourceNurture>>, TError,{id: string;data: BodyType<SourceNurtureApprovalRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveSourceNurture>>,
+        TError,
+        {id: string;data: BodyType<SourceNurtureApprovalRequest>},
+        TContext
+      > => {
+      return useMutation(getApproveSourceNurtureMutationOptions(options));
+    }
+
+export const getStartSourceNurtureUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/source-nurture/${id}/start`
+}
+
+/**
+ * Accepted staff session only; no API-key authority. Finite imported-source nurture requires separate source adoption, address-specific marketing permission, Microsoft sender/read grant, exact approval and explicit start. Maximum ten addresses, two fixed emails, at least 72 hours after actual predecessor acceptance and a fresh complete reply scan, expiring within fourteen days. Permanent ownership and unknown effects never permit replacement keys or automatic replay. Provider acceptance is not delivery, consent, customer confirmation or collected revenue.
+ * @summary Explicitly admit the original finite sequence once
+ */
+export const startSourceNurture = async (id: string,
+    sourceNurtureStartRequest: SourceNurtureStartRequest, options?: Parameters<typeof customFetch>[1]): Promise<SourceNurtureCommandResult> => {
+
+  return customFetch<SourceNurtureCommandResult>(getStartSourceNurtureUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceNurtureStartRequest)
+  }
+);}
+
+
+
+
+
+export const getStartSourceNurtureMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startSourceNurture>>, TError,{id: string;data: BodyType<SourceNurtureStartRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startSourceNurture>>, TError,{id: string;data: BodyType<SourceNurtureStartRequest>}, TContext> => {
+
+const mutationKey = ['startSourceNurture'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startSourceNurture>>, {id: string;data: BodyType<SourceNurtureStartRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  startSourceNurture(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartSourceNurtureMutationResult = NonNullable<Awaited<ReturnType<typeof startSourceNurture>>>
+    export type StartSourceNurtureMutationBody = BodyType<SourceNurtureStartRequest>
+    export type StartSourceNurtureMutationError = ErrorType<void>
+
+    /**
+ * @summary Explicitly admit the original finite sequence once
+ */
+export const useStartSourceNurture = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startSourceNurture>>, TError,{id: string;data: BodyType<SourceNurtureStartRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startSourceNurture>>,
+        TError,
+        {id: string;data: BodyType<SourceNurtureStartRequest>},
+        TContext
+      > => {
+      return useMutation(getStartSourceNurtureMutationOptions(options));
+    }
+
+export const getStopSourceNurtureUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/source-nurture/${id}/stop`
+}
+
+/**
+ * Accepted staff session only; no API-key authority. Finite imported-source nurture requires separate source adoption, address-specific marketing permission, Microsoft sender/read grant, exact approval and explicit start. Maximum ten addresses, two fixed emails, at least 72 hours after actual predecessor acceptance and a fresh complete reply scan, expiring within fourteen days. Permanent ownership and unknown effects never permit replacement keys or automatic replay. Provider acceptance is not delivery, consent, customer confirmation or collected revenue.
+ * @summary Stop unclaimed future work without releasing original reservations
+ */
+export const stopSourceNurture = async (id: string,
+    sourceNurtureStopRequest: SourceNurtureStopRequest, options?: Parameters<typeof customFetch>[1]): Promise<SourceNurtureCommandResult> => {
+
+  return customFetch<SourceNurtureCommandResult>(getStopSourceNurtureUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(sourceNurtureStopRequest)
+  }
+);}
+
+
+
+
+
+export const getStopSourceNurtureMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof stopSourceNurture>>, TError,{id: string;data: BodyType<SourceNurtureStopRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof stopSourceNurture>>, TError,{id: string;data: BodyType<SourceNurtureStopRequest>}, TContext> => {
+
+const mutationKey = ['stopSourceNurture'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof stopSourceNurture>>, {id: string;data: BodyType<SourceNurtureStopRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  stopSourceNurture(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StopSourceNurtureMutationResult = NonNullable<Awaited<ReturnType<typeof stopSourceNurture>>>
+    export type StopSourceNurtureMutationBody = BodyType<SourceNurtureStopRequest>
+    export type StopSourceNurtureMutationError = ErrorType<void>
+
+    /**
+ * @summary Stop unclaimed future work without releasing original reservations
+ */
+export const useStopSourceNurture = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof stopSourceNurture>>, TError,{id: string;data: BodyType<SourceNurtureStopRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof stopSourceNurture>>,
+        TError,
+        {id: string;data: BodyType<SourceNurtureStopRequest>},
+        TContext
+      > => {
+      return useMutation(getStopSourceNurtureMutationOptions(options));
+    }
+
+export const getSetMicrosoftNurtureMonitoringUrl = () => {
+
+
+
+
+  return `/api/v1/mailbox/microsoft/nurture-monitoring`
+}
+
+/**
+ * Own accepted active staff session and exact connector/context versions required. This local context permission is default-off and independent of service and BIE reading. Graph scopes are unchanged. A reconnect or revoke does not adopt old nurture parents. Completed bounded synchronization is explicit evidence, not certainty that the real mailbox contains no customer reply.
+ * @summary Separately acknowledge or revoke tracked nurture reading on the owned connector
+ */
+export const setMicrosoftNurtureMonitoring = async (microsoftNurtureMonitoring: MicrosoftNurtureMonitoring, options?: Parameters<typeof customFetch>[1]): Promise<MicrosoftMailboxStatus> => {
+
+  return customFetch<MicrosoftMailboxStatus>(getSetMicrosoftNurtureMonitoringUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(microsoftNurtureMonitoring)
+  }
+);}
+
+
+
+
+
+export const getSetMicrosoftNurtureMonitoringMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setMicrosoftNurtureMonitoring>>, TError,{data: BodyType<MicrosoftNurtureMonitoring>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setMicrosoftNurtureMonitoring>>, TError,{data: BodyType<MicrosoftNurtureMonitoring>}, TContext> => {
+
+const mutationKey = ['setMicrosoftNurtureMonitoring'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setMicrosoftNurtureMonitoring>>, {data: BodyType<MicrosoftNurtureMonitoring>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  setMicrosoftNurtureMonitoring(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetMicrosoftNurtureMonitoringMutationResult = NonNullable<Awaited<ReturnType<typeof setMicrosoftNurtureMonitoring>>>
+    export type SetMicrosoftNurtureMonitoringMutationBody = BodyType<MicrosoftNurtureMonitoring>
+    export type SetMicrosoftNurtureMonitoringMutationError = ErrorType<void>
+
+    /**
+ * @summary Separately acknowledge or revoke tracked nurture reading on the owned connector
+ */
+export const useSetMicrosoftNurtureMonitoring = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setMicrosoftNurtureMonitoring>>, TError,{data: BodyType<MicrosoftNurtureMonitoring>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setMicrosoftNurtureMonitoring>>,
+        TError,
+        {data: BodyType<MicrosoftNurtureMonitoring>},
+        TContext
+      > => {
+      return useMutation(getSetMicrosoftNurtureMonitoringMutationOptions(options));
+    }
 
 export const getGetServiceStandingPolicyUrl = (id: string,) => {
 

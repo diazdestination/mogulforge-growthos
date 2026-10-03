@@ -159,7 +159,9 @@ describe("markAbandonedConversations", () => {
         .select()
         .from(automationRunsTable)
         .where(eq(automationRunsTable.automationId, rule.id));
-      if (runs.length) break;
+      // Original run ownership is now persisted before dispatch. An admitted
+      // row with empty results is not completion of this fire-and-forget event.
+      if (runs.length && runs.every(run => run.error === null && run.actionResults.length > 0)) break;
       await new Promise((r) => setTimeout(r, 100));
     }
     expect(runs.length).toBeGreaterThanOrEqual(1);
@@ -229,7 +231,8 @@ describe("seeded abandoned-chat follow-up end to end", () => {
         .select()
         .from(automationRunsTable)
         .where(eq(automationRunsTable.automationId, automationId));
-      if (runs.length) break;
+      // Admission is visible before this async rule finishes all its actions.
+      if (runs.length && runs.every(run => run.error === null && run.actionResults.length > 0)) break;
       await new Promise((r) => setTimeout(r, 100));
     }
     return runs;

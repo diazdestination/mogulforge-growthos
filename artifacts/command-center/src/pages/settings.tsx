@@ -102,6 +102,7 @@ import { Loader2, Settings2, Trash2, Copy, Zap, RefreshCw, Pencil, ShieldAlert }
 import { canManageSettings } from '@/lib/permissions';
 import { toLocalDateInputValue } from '@/lib/date-input';
 import { EmailConnectionsCard } from '@/components/email-connections-card';
+import { memberAuthorityScope } from '@/lib/member-authority-scope';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -1089,13 +1090,14 @@ function TagsTab() {
 }
 
 export default function Settings() {
-  const { data: me, isLoading } = useGetMe();
+  const { data: me, isLoading, isError } = useGetMe();
   const gmailReturn = new URLSearchParams(window.location.search).get('gmail');
 
   if (isLoading) {
     return <div className="flex h-full items-center justify-center bg-background"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   }
-  if (!me || !canManageSettings(me.role)) return <Redirect to="/" />;
+  if (isError) return <p role="alert" className="p-6">Current account access could not be verified. Refresh before changing settings.</p>;
+  if (!me?.isActive || !me.organization?.id || !canManageSettings(me.role)) return <Redirect to="/" />;
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -1130,7 +1132,7 @@ export default function Settings() {
             <TabsTrigger value="data-privacy">Data & privacy</TabsTrigger>
           </TabsList>
           <TabsContent value="business" className="space-y-6"><BusinessProfileTab /><FallbackInboxTab /></TabsContent>
-          <TabsContent value="integrations"><EmailConnectionsCard callbackState={gmailReturn} returnPath="/settings" /></TabsContent>
+          <TabsContent value="integrations"><EmailConnectionsCard key={memberAuthorityScope(me)} scopeKey={memberAuthorityScope(me)} callbackState={gmailReturn} returnPath="/settings" /></TabsContent>
           <TabsContent value="team"><TeamTab meId={me.id} meRole={me.role} /></TabsContent>
           <TabsContent value="services"><ServicesTab /></TabsContent>
           <TabsContent value="scheduling" className="space-y-6"><SchedulingTab /><ReminderTab /><LeadAlertRouting /></TabsContent>

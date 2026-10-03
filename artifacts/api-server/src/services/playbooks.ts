@@ -28,6 +28,9 @@ import {
 } from "./engagement-links";
 import { getUserEmailStatus, sendEmailForUser, emailAcceptanceEvidence } from "./user-email";
 import { EmailDispatchBlockedError } from "./email-dispatch-guard";
+import { acceptContactTouch, assertContactTouchCurrent, ContactTouchDeferredError, ContactTouchError, markContactTouchDispatchStarted, reserveContactTouch, type ContactTouchClaim } from "./contact-touch-claim";
+import { acquireNurtureLocks } from "./source-outreach-ownership";
+import { sourceFingerprint } from "./source-adoption-contract";
 import {
   adjustSendTime,
   chooseVariant,
@@ -710,7 +713,25 @@ export async function executePlaybookStep(
       windowDeferred = true;
     }
   }
-  const claimed = await db.transaction(async (tx) => {
+  const touchLogicalKey = `playbook:${enrollment.id}:${stepIndex}`;
+  const contactTouch: ContactTouchClaim = { organizationId, logicalKey: touchLogicalKey, contactId: contact.id,
+    address: (step.channel === "email" ? contact.email : contact.phone) ?? "", channel: step.channel, sourceKind: "playbook", leadId: lead.id,
+    // This reserves the original playbook effect, not a new approval of AI copy.
+    payload: { enrollmentId: enrollment.id, stepIndex, playbookId: playbook.id, step, leadId: lead.id, contactId: contact.id,
+      recipient: (step.channel === "email" ? contact.email : contact.phone) ?? "" } };
+  let claimed: PlaybookEnrollment | null;
+  try {
+    claimed = await db.transaction(async (tx) => {
+    await acquireNurtureLocks(tx, organizationId, [lead.id]);
+    const [current] = await tx.select().from(playbookEnrollmentsTable).where(and(eq(playbookEnrollmentsTable.organizationId, organizationId),
+      eq(playbookEnrollmentsTable.id, enrollment.id))).for("update");
+    if (!current || current.status !== "active" || current.currentStep !== stepIndex) return null;
+    if (!gateSkipReason) {
+      const reservation = await reserveContactTouch(tx, contactTouch);
+      // A reservation without this original CAS can be a crash, never permission
+      // to recreate the effect after a retry, restore or operator reconciliation.
+      if (!reservation.created) throw new ContactTouchError("playbook_touch_already_owned");
+    }
     const [row] = await tx
       .update(playbookEnrollmentsTable)
       .set(
@@ -745,7 +766,28 @@ export async function executePlaybookStep(
       });
     }
     return row;
-  });
+    });
+  } catch (error) {
+    if (error instanceof ContactTouchDeferredError) {
+      await db.transaction(async tx => {
+        await acquireNurtureLocks(tx, organizationId, [lead.id]);
+        const [current] = await tx.select().from(playbookEnrollmentsTable).where(and(eq(playbookEnrollmentsTable.organizationId, organizationId),
+          eq(playbookEnrollmentsTable.id, enrollment.id))).for("update");
+        if (!current || current.status !== "active" || current.currentStep !== stepIndex) return;
+        await tx.insert(scheduledActionsTable).values({ organizationId, action: { type: "playbook_step", params: { enrollmentId: enrollment.id, stepIndex } },
+          context: { leadId: enrollment.leadId }, runAt: error.resumeAt });
+        await tx.update(playbookEnrollmentsTable).set({ nextRunAt: error.resumeAt,
+          history: sql`${playbookEnrollmentsTable.history} || ${JSON.stringify([{ at: new Date().toISOString(), kind: "deferred", stepIndex, channel: step.channel, detail: `shared contact allowance until ${error.resumeAt.toISOString()}` }])}::jsonb`,
+        }).where(and(eq(playbookEnrollmentsTable.organizationId, organizationId), eq(playbookEnrollmentsTable.id, enrollment.id)));
+      });
+      return { status: "skipped", detail: "deferred: shared_contact_allowance" };
+    }
+    if (error instanceof ContactTouchError) {
+      await pauseEnrollment(enrollment.id, "Original touch ownership requires review; no replacement key or automatic replay.");
+      return { status: "skipped", detail: "paused: original_touch_owned" };
+    }
+    throw error;
+  }
   if (!claimed) {
     return { status: "skipped", detail: "step already claimed" };
   }
@@ -837,7 +879,8 @@ export async function executePlaybookStep(
             const sender = await getUserEmailStatus(organizationId, emailSenderUserId!);
             if (!sender.senderActive || !sender.configured || !sender.connected || sender.provider !== expectedEmailSender?.provider ||
                 sender.email?.trim().toLowerCase() !== expectedEmailSender?.senderEmail ||
-                !(await checkSendEligibility({ organizationId, leadId: lead.id, contact: currentContact, channel: "email", kind: "outreach" })).ok) throw new EmailDispatchBlockedError();
+                !(await checkSendEligibility({ organizationId, leadId: lead.id, contact: currentContact, channel: "email", kind: "outreach", touchLogicalKey })).ok) throw new EmailDispatchBlockedError();
+            await assertContactTouchCurrent(db, contactTouch);
           } catch { throw new EmailDispatchBlockedError(); }
         };
         sendResult = await sendEmailForUser({
@@ -851,13 +894,18 @@ export async function executePlaybookStep(
             linkSuffix +
             unsubscribeFooter(organizationId, contact.id),
           expectedSender: expectedEmailSender,
-          beforeDispatch,
+          beforeDispatch: async () => {
+            await beforeDispatch();
+            await markContactTouchDispatchStarted(organizationId, touchLogicalKey);
+          },
         });
       } else {
+        await assertContactTouchCurrent(db, contactTouch);
         sendResult = await providers.sms.send(
           contact.phone!,
           draft.body + linkSuffix,
-          { organizationId, contactId: contact.id, purpose: 'marketing', idempotencyKey: `playbook:${enrollment.id}:${stepIndex}` },
+          { organizationId, contactId: contact.id, purpose: 'marketing', idempotencyKey: touchLogicalKey,
+            contactTouch: { logicalKey: touchLogicalKey, payloadHash: sourceFingerprint(contactTouch.payload) } },
         );
       }
     } catch (err) {
@@ -904,6 +952,7 @@ export async function executePlaybookStep(
 
   const now = new Date().toISOString();
   if (sendResult) {
+    await acceptContactTouch(organizationId, touchLogicalKey);
     // Learning loop: record the touch so downstream outcomes (reply,
     // booking, won/lost) can be attributed to this step + variant.
     await recordTouch({
@@ -930,6 +979,7 @@ export async function executePlaybookStep(
         enrollmentId: enrollment.id,
         stepIndex,
         channel: step.channel,
+        touchLogicalKey,
         ...(step.channel === "email" ? emailAcceptanceEvidence(sendResult, { organizationId, leadId: lead.id, recipientEmail: contact.email! }) : { provider: sendResult.provider, providerMessageId: sendResult.id }),
         senderUserId: emailSenderUserId,
         from: sendResult.senderEmail ?? null,

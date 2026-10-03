@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GmailConnectionCard } from "./gmail-connection-card";
 import { MailboxConnectionCard } from "./mailbox-connection-card";
 import {
@@ -59,17 +59,24 @@ function validMicrosoft(value: unknown): value is MicrosoftStatus {
 export function EmailConnectionsCard({
   callbackState,
   returnPath,
+  scopeKey = "isolated-component",
 }: {
   callbackState: string | null;
   returnPath: "/account" | "/settings";
+  scopeKey?: string;
 }) {
+  return <EmailConnectionsContent key={scopeKey} callbackState={callbackState} returnPath={returnPath} scopeKey={scopeKey} />;
+}
+function EmailConnectionsContent({ callbackState, returnPath, scopeKey }: { callbackState: string | null; returnPath: "/account" | "/settings"; scopeKey: string }) {
   const [microsoft, setMicrosoft] = useState<MicrosoftStatus | null>(null);
   const [sender, setSender] = useState<SenderStatus | null>(null);
   const [selected, setSelected] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const mounted = useRef(true), generation = useRef(0);
   async function load() {
+    const run = ++generation.current;
     try {
       const [mailResponse, senderResponse] = await Promise.all([
         fetch("/api/v1/integrations/microsoft", { credentials: "include" }),
@@ -81,11 +88,13 @@ export function EmailConnectionsCard({
       const choice: unknown = await senderResponse.json();
       if (!validSender(choice) || !validMicrosoft(mailbox))
         throw new Error("Invalid sender status");
+      if (!mounted.current || run !== generation.current) return;
       setMicrosoft(mailbox);
       setSender(choice);
       setSelected(choice.provider ?? "");
       setError(null);
     } catch {
+      if (!mounted.current || run !== generation.current) return;
       setMicrosoft(null);
       setSender(null);
       setError(
@@ -94,6 +103,7 @@ export function EmailConnectionsCard({
     }
   }
   useEffect(() => {
+    mounted.current = true;
     void load();
     const callback = new URLSearchParams(window.location.search).get(
       "microsoft",
@@ -106,10 +116,13 @@ export function EmailConnectionsCard({
       });
     }
     if (callback) window.history.replaceState({}, "", returnPath);
+    return () => { mounted.current = false; generation.current++; };
     // Connection status, never the query-string hint, determines readiness.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   async function connect() {
+    if (busy) return;
+    const run = generation.current;
     setBusy(true);
     try {
       const response = await fetch("/api/v1/integrations/microsoft/connect", {
@@ -119,6 +132,7 @@ export function EmailConnectionsCard({
         body: JSON.stringify({ returnPath }),
       });
       const result = (await response.json()) as { authorizationUrl?: string };
+      if (!mounted.current || run !== generation.current) return;
       if (!response.ok || !result.authorizationUrl) throw new Error();
       const target = new URL(result.authorizationUrl);
       if (
@@ -128,6 +142,7 @@ export function EmailConnectionsCard({
         throw new Error();
       window.location.assign(target.toString());
     } catch {
+      if (!mounted.current || run !== generation.current) return;
       setError(
         "Could not start Microsoft authorization. Check configuration or try a new connection.",
       );
@@ -135,6 +150,8 @@ export function EmailConnectionsCard({
     }
   }
   async function disconnect() {
+    if (busy) return;
+    const run = generation.current;
     if (
       !window.confirm(
         "Remove this Microsoft credential from GrowthOS? Future sends will stop; already accepted messages may still arrive. Remote Microsoft consent is not revoked by this action.",
@@ -148,18 +165,22 @@ export function EmailConnectionsCard({
         credentials: "include",
       });
       if (!response.ok) throw new Error();
+      if (!mounted.current || run !== generation.current) return;
       toast({
         title:
           "Microsoft disconnected locally. Review Microsoft app permissions separately to revoke consent.",
       });
       await load();
     } catch {
+      if (!mounted.current || run !== generation.current) return;
       setError("Microsoft could not be disconnected. Refresh and try again.");
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   }
   async function saveSender() {
+    if (busy) return;
+    const run = generation.current;
     setBusy(true);
     try {
       const response = await fetch("/api/v1/integrations/email-sender", {
@@ -169,12 +190,15 @@ export function EmailConnectionsCard({
         body: JSON.stringify({ provider: selected }),
       });
       if (!response.ok) throw new Error();
+      if (!mounted.current || run !== generation.current) return;
       await load();
+      if (!mounted.current) return;
       toast({ title: "Your email sending account was saved" });
     } catch {
+      if (!mounted.current) return;
       setError("Connect the selected mailbox before saving your sender.");
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   }
   return (
@@ -326,7 +350,7 @@ export function EmailConnectionsCard({
           </p>
         </CardContent>
       </Card>
-      <MailboxConnectionCard returnPath={returnPath} />
+      <MailboxConnectionCard returnPath={returnPath} scopeKey={scopeKey} />
       <GmailConnectionCard
         callbackState={callbackState}
         returnPath={returnPath}

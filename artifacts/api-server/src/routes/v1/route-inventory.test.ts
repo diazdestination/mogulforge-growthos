@@ -72,6 +72,12 @@ const SESSION_ONLY_ROUTES = new Set([
  * - settings.manage — org configuration surfaces (owner/admin)
  */
 const EXPECTED_PERMISSIONS: Record<string, Permission> = {
+  "GET /source-nurture": "crm.read",
+  "GET /source-nurture/:id": "crm.read",
+  "POST /source-nurture/preview": "settings.manage",
+  "POST /source-nurture/:id/approve": "settings.manage",
+  "POST /source-nurture/:id/start": "settings.manage",
+  "POST /source-nurture/:id/stop": "settings.manage",
   "GET /service-obligations/:id/standing-reminders": "crm.read",
   "POST /service-obligations/:id/standing-reminders/preview": "settings.manage",
   "POST /service-obligations/:id/standing-reminders/approve": "settings.manage",
@@ -96,6 +102,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /mailbox/microsoft/callback": "crm.write",
   "POST /mailbox/microsoft/disable": "crm.write",
   "POST /mailbox/microsoft/lead-monitoring": "crm.write",
+  "POST /mailbox/microsoft/nurture-monitoring": "crm.write",
   "GET /contractor/today": "crm.read",
   "GET /tasks/:id": "crm.read",
   "GET /invoices": "invoices.read",

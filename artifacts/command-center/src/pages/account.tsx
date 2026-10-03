@@ -10,9 +10,10 @@ import { MobileNotificationsCard } from '@/components/mobile-notifications-card'
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { memberAuthorityScope } from '@/lib/member-authority-scope';
 
 export default function Account() {
-  const { data: profile, isLoading } = useGetMe();
+  const { data: profile, isLoading, isError } = useGetMe();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [firstName, setFirstName] = useState('');
@@ -63,6 +64,7 @@ export default function Account() {
       </div>
     );
   }
+  if (isError || !profile?.id || !profile.organization?.id || !profile.isActive) return <p role="alert" className="p-6">Current account access could not be verified. Refresh your account before changing connections.</p>;
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6 p-4 md:p-8">
@@ -134,7 +136,7 @@ export default function Account() {
             These connections belong to your user account. They never grant access to organization settings or another team member's mailbox.
           </p>
         </div>
-        <EmailConnectionsCard callbackState={gmailReturn} returnPath="/account" />
+        <EmailConnectionsCard key={memberAuthorityScope(profile)} scopeKey={memberAuthorityScope(profile)} callbackState={gmailReturn} returnPath="/account" />
         <MobileNotificationsCard />
       </section>
     </div>

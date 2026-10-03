@@ -39,6 +39,15 @@ export type MailboxMessage = {
   automated: boolean;
 };
 export type LeadMonitoringApproval = { version: number; approvedAt: string };
+export type NurtureMonitoringApproval = { version: number; approvedAt: string };
+export type NurtureMailboxReadiness = { ready: boolean; reason: string | null; completedCycleId: string | null; startedAt: string | null; completedAt: string | null };
+export const NURTURE_MAILBOX_FRESHNESS_MS = 5 * 60_000;
+export const nurtureMonitoringInput = z.object({
+  expectedConnectorVersion: z.number().int().positive(),
+  expectedNurtureMonitoringVersion: z.number().int().nonnegative(),
+  enabled: z.boolean(),
+  nurtureContextAcknowledged: z.literal(true),
+}).strict();
 export const leadMonitoringInput = z
   .object({
     expectedConnectorVersion: z.number().int().positive(),

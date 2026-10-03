@@ -13,14 +13,15 @@ import { resolveCustomerEmailSender, sendCustomerEmail } from "./customer-email"
 import { emailAcceptanceEvidence } from "./user-email";
 import { EmailDispatchBlockedError } from "./email-dispatch-guard";
 import { runDurableAction } from "./durable-execution";
+import { acquireNurtureLocks, assertSourceSlotAvailable } from "./source-outreach-ownership";
+import { assertContactTouchCurrent, reserveContactTouch, acceptContactTouch, markContactTouchDispatchStarted } from "./contact-touch-claim";
+import { sourceNurtureItemsTable } from "../../../../lib/db/src/schema/source-nurture";
 
 const HOUR = 3_600_000, DAY = 24 * HOUR, REVIEW_MS = 10 * 60_000;
 const decisionPreviewAction = "source_adoption.previewed";
 async function sourceLock(tx: SourceStore, org: string) {
   await tx.execute(sql`select set_config('lock_timeout', '3000ms', true), set_config('statement_timeout', '15000ms', true)`);
-  // Same order in every adoption/permission/campaign mutation; import takes only its own lock.
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`lead-import:${org}`}))`);
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`source-outreach:${org}`}, 0))`);
+  await acquireNurtureLocks(tx, org);
 }
 function reviewChanged(): never { return adoptionDeny("source_review_changed", "This exact review changed or expired. Refresh and review it again."); }
 async function audit(store: SourceStore, org: string, actor: string, action: string, entityType: string, entityId: string, metadata: Record<string, unknown>) {
@@ -90,7 +91,8 @@ export async function approveSourceAdoption(org: string, actor: string, leadId: 
 export async function revokeSourceAdoption(org: string, actor: string, leadId: string, raw: unknown) {
   const input = sourceRevokeSchema.parse(raw);
   await db.transaction(async tx => {
-    await sourceLock(tx, org); await sourceManager(org, actor, tx); await currentSource(org, leadId, tx);
+    await sourceLock(tx, org); await sourceManager(org, actor, tx); const source = await currentSource(org, leadId, tx);
+    await (await import("./source-nurture-authority")).stopSourceNurtureForContact(tx, org, source.contact.id, "source_adoption_revoked");
     const decision = await sourceDecision(org, leadId, tx);
     if (!decision || decision.version !== input.expectedVersion || decision.state !== "active") reviewChanged();
     await tx.update(adoptions).set({ state: "revoked", version: decision.version + 1, revokedAt: new Date() }).where(eq(adoptions.id, decision.id));
@@ -106,6 +108,7 @@ export async function recordSourceEmailPermission(org: string, actor: string, le
     const source = await currentSource(org, leadId, tx), previous = await latestEmailConsent(org, source.contact.id, tx);
     if (input.expectedSourceSha256 !== source.snapshot.sourceSha256 || input.expectedRecipient.trim().toLowerCase() !== source.snapshot.recipient ||
         input.expectedConsentId !== (previous?.id ?? null)) reviewChanged();
+    await (await import("./source-nurture-authority")).stopSourceNurtureForContact(tx, org, source.contact.id, "source_permission_changed");
     const [consent] = await tx.insert(consentRecordsTable).values({ organizationId: org, contactId: source.contact.id, channel: "email",
       granted: input.granted, disclosureVersion: SOURCE_EMAIL_DISCLOSURE }).returning();
     await audit(tx, org, actor, "source_email.permission_recorded", "consent", consent!.id, { version: 1, contactId: source.contact.id,
@@ -126,7 +129,7 @@ function batchWindow(batch: Pick<typeof batches.$inferSelect, "settings" | "expi
   if (!isWithinWindow({ ...batch.settings, quietHoursEnabled: true, maxTouchesPerDay: 1 }, new Date()))
     adoptionDeny("source_campaign_quiet_hours", "This campaign is outside its explicitly approved sending window.");
 }
-async function currentCampaignSource(org: string, actor: string, leadId: string) {
+async function currentCampaignSource(org: string, actor: string, leadId: string, touchLogicalKey?: string) {
   await campaignAuthority(org, actor);
   const source = await activeSourceDecision(org, leadId);
   if (["won", "disqualified"].includes(source.lead.status)) adoptionDeny("source_stage_ineligible", "This opportunity is not eligible for recovery outreach.");
@@ -136,7 +139,7 @@ async function currentCampaignSource(org: string, actor: string, leadId: string)
   // A draft cannot satisfy the approved-source gate. All other gate failures remain fatal.
   const gate = await checkSendEligibility({ organizationId: org, leadId, contact: source.contact, channel: "email", kind: "outreach" });
   if (!gate.ok && gate.reason !== "imported_source_requires_current_review") adoptionDeny("source_outreach_held", `Outreach is held (${gate.reason}).`);
-  const timing = await checkOutreachTiming({ organizationId: org, contact: source.contact });
+  const timing = await checkOutreachTiming({ organizationId: org, contact: source.contact, touchLogicalKey });
   if (!timing.ok) adoptionDeny("source_outreach_held", `Outreach is held (${timing.reason}).`);
   let sender: Awaited<ReturnType<typeof resolveCustomerEmailSender>>;
   try { sender = await resolveCustomerEmailSender({ organizationId: org, leadId }); }
@@ -148,11 +151,7 @@ async function execution(org: string, leadId: string) {
   return row;
 }
 async function assertUnreserved(org: string, leadId: string, recipient: string, store: SourceStore = db) {
-  const [owned] = await store.select({ id: items.id }).from(items).where(and(eq(items.organizationId, org), isNotNull(items.claimedAt),
-    or(eq(items.leadId, leadId), eq(items.recipient, recipient)))).limit(1);
-  const [receipt] = await store.select({ id: revenueExecutionsTable.id }).from(revenueExecutionsTable).where(and(eq(revenueExecutionsTable.organizationId, org),
-    eq(revenueExecutionsTable.actionKey, sourceOutreachKey(leadId)))).limit(1);
-  if (owned || receipt) adoptionDeny("source_touch_reserved", "This opportunity or address already owns its one email touch. Review evidence; another campaign cannot resend it.");
+  await assertSourceSlotAvailable(store, org, leadId, recipient);
 }
 export async function previewSourceOutreach(org: string, actor: string, raw: unknown) {
   const input = outreachDraftSchema.parse(raw), expiresAt = new Date(input.expiresAt);
@@ -193,13 +192,14 @@ export async function getSourceOutreach(org: string, id: string) {
     const receipt = await execution(org, item.leadId);
     const [otherOwner] = await db.select({ id: items.id }).from(items).where(and(eq(items.organizationId, org), ne(items.id, item.id), isNotNull(items.claimedAt),
       or(eq(items.leadId, item.leadId), eq(items.recipient, item.recipient)))).limit(1);
-    const state = !item.claimedAt ? otherOwner || receipt ? "reserved_elsewhere" : "not_sent" : !receipt || receipt.state === "indeterminate" || (receipt.state === "processing" && receipt.expiresAt.getTime() <= Date.now()) ? "uncertain" :
+    const [nurtureOwner] = await db.select({ id: sourceNurtureItemsTable.id }).from(sourceNurtureItemsTable).where(and(eq(sourceNurtureItemsTable.organizationId, org), isNotNull(sourceNurtureItemsTable.admittedAt), or(eq(sourceNurtureItemsTable.leadId, item.leadId), eq(sourceNurtureItemsTable.recipient, item.recipient)))).limit(1);
+    const state = !item.claimedAt ? otherOwner || nurtureOwner || receipt ? "reserved_elsewhere" : "not_sent" : !receipt || receipt.state === "indeterminate" || (receipt.state === "processing" && receipt.expiresAt.getTime() <= Date.now()) ? "uncertain" :
       receipt.state === "processing" ? "processing" : receipt.state === "blocked" ? "held" : receipt.state === "succeeded" ? "accepted" : "reconciled";
     return { ...item, delivery: { state, executionId: receipt?.id ?? null, detail: state === "reserved_elsewhere" ? "Another campaign already owns this opportunity or address. Inspect its evidence; this campaign cannot resend it." : receipt?.detail ?? (item.claimedAt ? "Reserved before provider execution; outcome uncertain. Never retry." : "No send is reserved for this item."), deliveryConfirmed: false } };
   })), detail: "Exact reviewed one-touch email. Provider acceptance is not inbox delivery. Reserved/unknown effects cannot be retried or reset with a new campaign." };
 }
 async function checkFrozenItem(org: string, actor: string, batch: typeof batches.$inferSelect, item: typeof items.$inferSelect, approved: boolean) {
-  const { source, consent, sender } = await currentCampaignSource(org, actor, item.leadId);
+  const { source, consent, sender } = await currentCampaignSource(org, actor, item.leadId, approved ? sourceOutreachKey(item.leadId) : undefined);
   const [company] = await db.select().from(organizationsTable).where(eq(organizationsTable.id, org));
   if (company?.name !== batch.settings.businessName || source.decision.id !== item.adoptionId || sourceFingerprint(source.decision) !== item.snapshot.adoptionSha256 ||
       consent.id !== item.snapshot.permissionRecordId || sourceFingerprint(sender) !== sourceFingerprint(item.snapshot.sender) ||
@@ -210,7 +210,7 @@ async function checkFrozenItem(org: string, actor: string, batch: typeof batches
     const verified = await approvedSourceItem(org, item.leadId, item.contactId, item.id);
     if (verified.batch.version !== batch.version || verified.batch.payloadSha256 !== batch.payloadSha256) reviewChanged();
     batchWindow(verified.batch);
-    const gate = await checkSendEligibility({ organizationId: org, leadId: item.leadId, contact: source.contact, channel: "email", kind: "outreach", sourceOutreachItemId: item.id });
+    const gate = await checkSendEligibility({ organizationId: org, leadId: item.leadId, contact: source.contact, channel: "email", kind: "outreach", sourceOutreachItemId: item.id, touchLogicalKey: sourceOutreachKey(item.leadId) });
     if (!gate.ok) adoptionDeny("source_outreach_held", `Outreach is held (${gate.reason}).`);
   }
   return source;
@@ -269,8 +269,11 @@ export async function sendSourceOutreach(org: string, actor: string, id: string,
           await sourceContactReplyHeld(org, item.contactId, tx)) reviewChanged();
       batchWindow(freshBatch);
       await assertUnreserved(org, item.leadId, item.recipient, tx);
-      const reserved = await tx.select({ id: items.id }).from(items).where(and(eq(items.organizationId, org), gt(items.claimedAt, new Date(Date.now() - DAY))));
-      if (reserved.length >= Math.min(SOURCE_DAILY_MAX, batch.settings.dailyLimit)) adoptionDeny("source_daily_limit", "The rolling company send reservation limit is reached.");
+      const { sourceCompanyTouchCount } = await import("./source-nurture-authority");
+      if (await sourceCompanyTouchCount(tx, org) >= Math.min(SOURCE_DAILY_MAX, batch.settings.dailyLimit)) adoptionDeny("source_daily_limit", "The rolling company send reservation limit is reached.");
+      const allowance = await reserveContactTouch(tx, { organizationId: org, logicalKey: sourceOutreachKey(item.leadId), contactId: item.contactId, address: item.recipient, channel: "email", sourceKind: "source", leadId: item.leadId,
+        payload: { itemId: item.id, batchId: id, payloadSha256: batch.payloadSha256 } });
+      if (!allowance.created) adoptionDeny("source_touch_reserved", "Original allowance is already owned; no automatic replay.");
       const [owned] = await tx.update(items).set({ claimedAt: new Date() }).where(and(eq(items.id, item.id), eq(items.organizationId, org), isNull(items.claimedAt))).returning();
       if (owned) await audit(tx, org, actor, "source_outreach.reserved", "source_outreach_item", item.id, { batchId: id, leadId: item.leadId, payloadSha256: batch.payloadSha256 });
       return !!owned;
@@ -282,6 +285,8 @@ export async function sendSourceOutreach(org: string, actor: string, id: string,
         let dispatchRejected = false;
         const check = async () => {
           await checkFrozenItem(org, actor, batch, item, true);
+          await assertContactTouchCurrent(db, { organizationId: org, logicalKey: sourceOutreachKey(item.leadId), contactId: item.contactId, address: item.recipient, channel: "email", sourceKind: "source", leadId: item.leadId,
+            payload: { itemId: item.id, batchId: id, payloadSha256: batch.payloadSha256 } });
           const receipt = await execution(org, item.leadId);
           if (!receipt || receipt.state !== "processing" || receipt.expiresAt.getTime() <= Date.now() ||
               receipt.fingerprint !== sourceFingerprint({ itemId: item.id, batchId: id, payloadSha256: batch.payloadSha256 }))
@@ -294,7 +299,7 @@ export async function sendSourceOutreach(org: string, actor: string, id: string,
         let result: Awaited<ReturnType<typeof sendCustomerEmail>>;
         try {
           result = await sendCustomerEmail({ organizationId: org, leadId: item.leadId, to: item.recipient, subject: item.snapshot.subject, body: item.snapshot.body,
-            expectedSender: item.snapshot.sender, beforeDispatch: async () => { try { await check(); } catch (error) { dispatchRejected = true; throw error; } } });
+            expectedSender: item.snapshot.sender, beforeDispatch: async () => { try { await check(); await markContactTouchDispatchStarted(org, sourceOutreachKey(item.leadId)); } catch (error) { dispatchRejected = true; throw error; } } });
         } catch (error) {
           if (dispatchRejected || error instanceof EmailDispatchBlockedError) return { state: "blocked", detail: "Current review/permission/hold changed at provider boundary. No email sent; reservation retained." };
           throw error;
@@ -307,8 +312,9 @@ export async function sendSourceOutreach(org: string, actor: string, id: string,
             type: "email_sent", title: "Reviewed recovery email accepted by provider (delivery unconfirmed)", metadata: evidence });
           // Existing outreach timing counts this family, while email_sent supplies canonical reply correlation.
           await tx.insert(activitiesTable).values({ organizationId: org, leadId: item.leadId, contactId: item.contactId, actorUserId: actor,
-            type: "automation_message_sent", title: "Reviewed source recovery touch", metadata: { channel: "email", sourceOutreachItemId: item.id, batchId: id } });
+            type: "automation_message_sent", title: "Reviewed source recovery touch", metadata: { channel: "email", sourceOutreachItemId: item.id, batchId: id, touchLogicalKey: sourceOutreachKey(item.leadId) } });
         });
+        await acceptContactTouch(org, sourceOutreachKey(item.leadId));
         return { state: "succeeded", detail: "Selected provider accepted the reviewed email. Inbox delivery is unconfirmed." };
       } });
   }

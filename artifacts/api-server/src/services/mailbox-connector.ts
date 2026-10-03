@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { and, asc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import {
   db,
   auditEventsTable,
@@ -11,6 +11,7 @@ import {
 import {
   mailboxConnectorsTable as connectors,
   mailboxReceiptsTable as receipts,
+  mailboxSyncCyclesTable as cycles,
   type MailboxConnector,
 } from "../../../../lib/db/src/schema/mailbox-connectors";
 import {
@@ -19,6 +20,7 @@ import {
   sha256Base64Url,
 } from "../lib/token-encryption";
 import { hasPermission } from "../lib/permissions";
+import { decryptEmailContent, encryptEmailContent } from "../lib/email-content-encryption";
 import {
   microsoftOAuthConfig,
   microsoftOAuthConfigured,
@@ -35,6 +37,10 @@ import {
   type LeadMonitoringApproval,
   type MailboxIdentity,
   type MailboxMessage,
+  nurtureMonitoringInput,
+  NURTURE_MAILBOX_FRESHNESS_MS,
+  type NurtureMonitoringApproval,
+  type NurtureMailboxReadiness,
 } from "./mailbox-contract";
 import {
   mailboxJson,
@@ -184,15 +190,16 @@ export async function assertMailboxIdentityCurrent(
 export async function getMicrosoftMailboxIdentity(
   organizationId: string,
   userId: string,
+  reader: Reader = db,
 ): Promise<MailboxIdentity | null> {
   if (!mailboxReadEnabled()) return null;
-  const [row] = await db
+  const [row] = await reader
     .select()
     .from(connectors)
     .where(selected({ organizationId, userId }));
   if (!row || row.state !== "active") return null;
   const value = identity(row);
-  await assertMailboxIdentityCurrent(value);
+  await assertMailboxIdentityCurrent(value, reader);
   return value;
 }
 /** Local, explicitly approved lead context. Never broadens provider scope. */
@@ -284,6 +291,69 @@ export async function setLeadMonitoringApproval(actor: Actor, raw: unknown) {
   });
   return getMailboxStatus(actor.organizationId, actor.userId);
 }
+/** Independent local grant for exact nurture parents. Service/BIE grants are unchanged. */
+export async function getNurtureMonitoringApproval(expected: MailboxIdentity, reader: Reader = db): Promise<NurtureMonitoringApproval | null> {
+  await assertMailboxIdentityCurrent(expected, reader);
+  const query = reader.select().from(connectors).where(and(eq(connectors.organizationId, expected.organizationId), eq(connectors.id, expected.connectorId), eq(connectors.version, expected.connectorVersion)));
+  const [row] = await (reader === db ? query : query.for("share"));
+  return row?.nurtureMonitoringEnabled && row.nurtureMonitoringApprovedAt ? { version: row.nurtureMonitoringVersion, approvedAt: row.nurtureMonitoringApprovedAt.toISOString() } : null;
+}
+export async function assertNurtureMonitoringApproval(expected: MailboxIdentity, approval: NurtureMonitoringApproval, reader: Reader = db): Promise<void> {
+  const current = await getNurtureMonitoringApproval(expected, reader);
+  if (!current || mailboxDigest(current) !== mailboxDigest(approval)) throw new MailboxError("mailbox_nurture_approval_changed");
+}
+export async function setNurtureMonitoringApproval(actor: Actor, raw: unknown) {
+  const input = nurtureMonitoringInput.parse(raw);
+  await db.transaction(async tx => {
+    await tx.execute(lock(actor)); await staff(tx, actor);
+    const [row] = await tx.select().from(connectors).where(selected(actor)).for("update");
+    if (!row || row.version !== input.expectedConnectorVersion || row.nurtureMonitoringVersion !== input.expectedNurtureMonitoringVersion) throw new MailboxError("mailbox_nurture_version_changed");
+    if (row.nurtureMonitoringEnabled === input.enabled) throw new MailboxError("mailbox_nurture_state_unchanged");
+    if (input.enabled) await assertMailboxIdentityCurrent(identity(row), tx);
+    const now = new Date();
+    await tx.update(connectors).set({ nurtureMonitoringEnabled: input.enabled, nurtureMonitoringVersion: row.nurtureMonitoringVersion + 1,
+      nurtureMonitoringApprovedAt: input.enabled ? now : null, nurtureMonitoringChangedAt: now }).where(and(selected(actor), eq(connectors.version, row.version), eq(connectors.nurtureMonitoringVersion, row.nurtureMonitoringVersion)));
+    await tx.update(cycles).set({ state: "failed", failedAt: now, errorCode: "mailbox_nurture_approval_changed" })
+      .where(and(eq(cycles.organizationId, actor.organizationId), eq(cycles.connectorId, row.id), eq(cycles.state, "scanning")));
+    await tx.insert(auditEventsTable).values({ organizationId: actor.organizationId, actorUserId: actor.userId,
+      action: input.enabled ? "mailbox.nurture_context_enabled" : "mailbox.nurture_context_disabled", entityType: "mailbox_connector", entityId: row.id,
+      metadata: { connectorVersion: row.version, priorNurtureMonitoringVersion: row.nurtureMonitoringVersion,
+        nurtureMonitoringVersion: row.nurtureMonitoringVersion + 1, scopesChanged: false, serviceIdentityChanged: false, leadContextChanged: false } });
+  });
+  return getMailboxStatus(actor.organizationId, actor.userId);
+}
+/** SELECT-only bounded observation evidence; no provider reads or progress writes. */
+export async function getNurtureMailboxReadiness(expected: MailboxIdentity, options: { approval: NurtureMonitoringApproval; notBefore?: Date | string; at?: Date }, reader: Reader = db): Promise<NurtureMailboxReadiness> {
+  const result: NurtureMailboxReadiness = { ready: false, reason: null, completedCycleId: null, startedAt: null, completedAt: null };
+  try { await assertNurtureMonitoringApproval(expected, options.approval, reader); }
+  catch (e) { if (e instanceof MailboxError) return { ...result, reason: e.code }; throw e; }
+  // No stored ciphertext or key is returned. A bounded reply context must be
+  // able to retain encrypted evidence before it can authorize new outreach.
+  try {
+    const context = "growthos:nurture-mailbox-storage-readiness";
+    if (decryptEmailContent(encryptEmailContent("ready", context), context) !== "ready") throw new Error("codec");
+  } catch { return { ...result, reason: "mailbox_nurture_storage_unavailable" }; }
+  const at = options.at ?? new Date();
+  const [row] = await reader.select().from(connectors).where(and(eq(connectors.organizationId, expected.organizationId), eq(connectors.id, expected.connectorId), eq(connectors.version, expected.connectorVersion)));
+  const [latest] = await reader.select().from(cycles).where(and(eq(cycles.organizationId, expected.organizationId), eq(cycles.connectorId, expected.connectorId),
+    eq(cycles.connectorVersion, expected.connectorVersion), eq(cycles.nurtureMonitoringVersion, options.approval.version), eq(cycles.nurtureMonitoringApprovedAt, new Date(options.approval.approvedAt))))
+    .orderBy(desc(cycles.sequence)).limit(1);
+  if (latest) Object.assign(result, { completedCycleId: latest.state === "complete" ? latest.id : null, startedAt: latest.startedAt.toISOString(), completedAt: latest.completedAt?.toISOString() ?? null });
+  if (!row || (row.leaseToken && row.leaseExpiresAt && row.leaseExpiresAt > at)) return { ...result, reason: "mailbox_sync_in_progress" };
+  if (row.lastErrorCode || row.lastErrorAt && (!latest?.completedAt || row.lastErrorAt >= latest.completedAt)) return { ...result, reason: row.lastErrorCode ?? "mailbox_sync_failed" };
+  if (!latest || latest.state !== "complete" || !latest.completedAt) return { ...result, reason: latest?.errorCode ?? "mailbox_sync_incomplete" };
+  if (options.notBefore && (!Number.isFinite(new Date(options.notBefore).getTime()) || latest.startedAt <= new Date(options.notBefore))) return { ...result, reason: "mailbox_sync_predates_predecessor" };
+  if (latest.completedAt > at || at.getTime() - latest.completedAt.getTime() > NURTURE_MAILBOX_FRESHNESS_MS) return { ...result, reason: "mailbox_sync_stale" };
+  const [unresolved] = await reader.select({ id: receipts.id }).from(receipts).where(and(eq(receipts.organizationId, expected.organizationId), eq(receipts.connectorId, expected.connectorId),
+    eq(receipts.connectorVersion, expected.connectorVersion), inArray(receipts.state, ["pending", "review"]))).limit(1);
+  if (unresolved) return { ...result, reason: "mailbox_sync_receipts_unresolved" };
+  return { ...result, ready: true };
+}
+export async function assertNurtureMailboxReady(expected: MailboxIdentity, options: { approval: NurtureMonitoringApproval; notBefore?: Date | string; at?: Date }, reader: Reader = db) {
+  const readiness = await getNurtureMailboxReadiness(expected, options, reader);
+  if (!readiness.ready) throw new MailboxError(readiness.reason ?? "mailbox_sync_incomplete");
+  return readiness;
+}
 export async function getMailboxStatus(organizationId: string, userId: string) {
   await staff(db, { organizationId, userId });
   const [row] = await db
@@ -331,6 +401,12 @@ export async function getMailboxStatus(organizationId: string, userId: string) {
     leadMonitoringVersion: row?.leadMonitoringVersion ?? 0,
     leadMonitoringApprovedAt: row?.leadMonitoringApprovedAt ?? null,
     leadMonitoringChangedAt: row?.leadMonitoringChangedAt ?? null,
+    nurtureMonitoringEnabled: row?.nurtureMonitoringEnabled ?? false,
+    nurtureMonitoringVersion: row?.nurtureMonitoringVersion ?? 0,
+    nurtureMonitoringApprovedAt: row?.nurtureMonitoringApprovedAt ?? null,
+    nurtureMonitoringChangedAt: row?.nurtureMonitoringChangedAt ?? null,
+    nurtureSync: row?.state === "active" && row.nurtureMonitoringApprovedAt ? await getNurtureMailboxReadiness(identity(row), { approval: { version: row.nurtureMonitoringVersion, approvedAt: row.nurtureMonitoringApprovedAt.toISOString() } })
+      : { ready: false, reason: "mailbox_nurture_approval_changed", completedCycleId: null, startedAt: null, completedAt: null },
     scopes: ["Mail.Read", "User.Read", "offline_access"],
     folders: ["Inbox", "Sent Items"],
     historicalCrawl: false,
@@ -379,6 +455,10 @@ export async function beginMailboxOAuth(actor: Actor, raw: unknown) {
       leadMonitoringVersion: old ? old.leadMonitoringVersion + 1 : 0,
       leadMonitoringApprovedAt: null,
       leadMonitoringChangedAt: old ? new Date() : null,
+      nurtureMonitoringEnabled: false,
+      nurtureMonitoringVersion: old ? old.nurtureMonitoringVersion + 1 : 0,
+      nurtureMonitoringApprovedAt: null,
+      nurtureMonitoringChangedAt: old ? new Date() : null,
       leaseToken: null,
       leaseExpiresAt: null,
       lastErrorAt: null,
@@ -756,8 +836,32 @@ export async function processMailboxConnectors(
         );
       if (!leaseRow) throw new MailboxError("mailbox_lease_lost");
     };
+    let cycle: typeof cycles.$inferSelect | null = null;
+    // A cycle is fenced by both read identity and the separate context grant.
+    // Holding this short connector lock never encloses OAuth or Graph I/O.
+    const cycleConnector = async (tx: Tx) => {
+      const [row] = await tx.select().from(connectors).where(owned()).for("update");
+      if (!row) throw new MailboxError("mailbox_lease_lost");
+      if (!row.nurtureMonitoringEnabled || row.nurtureMonitoringVersion !== claimed.nurtureMonitoringVersion ||
+        row.nurtureMonitoringApprovedAt?.getTime() !== claimed.nurtureMonitoringApprovedAt?.getTime()) throw new MailboxError("mailbox_nurture_approval_changed");
+      return row;
+    };
     try {
       await guard();
+      const cursors = JSON.parse(decryptSecret(claimed.encryptedCursors!, `${aad(claimed)}:cursor`)) as MailboxCursors;
+      if (claimed.nurtureMonitoringEnabled && claimed.nurtureMonitoringApprovedAt) {
+        cycle = await db.transaction(async tx => {
+          await cycleConnector(tx);
+          const [prior] = await tx.select().from(cycles).where(and(eq(cycles.organizationId, claimed.organizationId), eq(cycles.connectorId, claimed.id), eq(cycles.connectorVersion, claimed.version)))
+            .orderBy(desc(cycles.sequence)).limit(1);
+          if (prior?.state === "scanning" && prior.nurtureMonitoringVersion === claimed.nurtureMonitoringVersion && prior.nurtureMonitoringApprovedAt.getTime() === claimed.nurtureMonitoringApprovedAt!.getTime()) return prior;
+          if (prior?.state === "scanning") await tx.update(cycles).set({ state: "failed", failedAt: new Date(), errorCode: "mailbox_nurture_approval_changed" }).where(eq(cycles.id, prior.id));
+          const [created] = await tx.insert(cycles).values({ organizationId: claimed.organizationId, connectorId: claimed.id, connectorVersion: claimed.version,
+            sequence: (prior?.sequence ?? 0) + 1, freshBoundary: Object.values(cursors).every(cursor => !cursor.continuation || cursor.complete),
+            nurtureMonitoringVersion: claimed.nurtureMonitoringVersion, nurtureMonitoringApprovedAt: claimed.nurtureMonitoringApprovedAt!, startedAt: new Date() }).returning();
+          return created;
+        });
+      }
       const token = await readToken(
         {
           grant_type: "refresh_token",
@@ -784,9 +888,6 @@ export async function processMailboxConnectors(
             grantedScopes: token.scopes,
           })
           .where(owned());
-      const cursors = JSON.parse(
-        decryptSecret(claimed.encryptedCursors!, `${aad(claimed)}:cursor`),
-      ) as MailboxCursors;
       const handlers = await import("./mailbox-communication");
       const reviewMessage = async (
         folder: MailboxFolder,
@@ -939,7 +1040,10 @@ export async function processMailboxConnectors(
           });
       };
       for (const folder of ["sentitems", "inbox"] as const) {
-        if (folder === "inbox" && !cursors.sentitems.complete) break;
+        // Opaque delta cursors may carry complete=true from an older round.
+        // Only this cycle's folder timestamps can establish its new boundary.
+        if (cycle && (folder === "sentitems" ? cycle.sentCompletedAt : cycle.inboxCompletedAt)) continue;
+        if (folder === "inbox" && (cycle ? !cycle.sentCompletedAt : !cursors.sentitems.complete)) break;
         for (
           let page = 0;
           page < MAILBOX_PAGES_PER_FOLDER && Date.now() < deadline;
@@ -959,20 +1063,28 @@ export async function processMailboxConnectors(
           for (const message of result.messages) await consume(folder, message);
           await guard();
           cursors[folder] = result.cursor;
-          const [saved] = await db
+          const checkpoint = {
+            encryptedCursors: encryptSecret(JSON.stringify(cursors), `${aad(claimed)}:cursor`),
+            lastSuccessAt: new Date(), lastErrorAt: null, lastErrorCode: null,
+          };
+          if (cycle) {
+            const cycleId = cycle.id;
+            cycle = await db.transaction(async tx => {
+              await cycleConnector(tx);
+              await tx.update(connectors).set(checkpoint).where(owned());
+              const [updated] = await tx.update(cycles).set(result.cursor.complete ? folder === "sentitems" ? { sentCompletedAt: new Date() } : { inboxCompletedAt: new Date() } : { state: "scanning" })
+                .where(and(eq(cycles.organizationId, claimed.organizationId), eq(cycles.id, cycleId), eq(cycles.state, "scanning"))).returning();
+              if (!updated) throw new MailboxError("mailbox_nurture_approval_changed");
+              return updated;
+            });
+          } else {
+            const [saved] = await db
             .update(connectors)
-            .set({
-              encryptedCursors: encryptSecret(
-                JSON.stringify(cursors),
-                `${aad(claimed)}:cursor`,
-              ),
-              lastSuccessAt: new Date(),
-              lastErrorAt: null,
-              lastErrorCode: null,
-            })
+            .set(checkpoint)
             .where(owned())
             .returning({ id: connectors.id });
-          if (!saved) throw new MailboxError("mailbox_lease_lost");
+            if (!saved) throw new MailboxError("mailbox_lease_lost");
+          }
           if (result.cursor.complete) break;
         }
       }
@@ -1013,6 +1125,22 @@ export async function processMailboxConnectors(
             });
         }
       }
+      if (cycle?.sentCompletedAt && cycle.inboxCompletedAt) {
+        await guard();
+        const cycleId = cycle.id;
+        const freshBoundary = cycle.freshBoundary;
+        cycle = await db.transaction(async tx => {
+          await cycleConnector(tx);
+          const [unresolved] = await tx.select({ id: receipts.id }).from(receipts).where(and(eq(receipts.organizationId, claimed.organizationId), eq(receipts.connectorId, claimed.id),
+            eq(receipts.connectorVersion, claimed.version), inArray(receipts.state, ["pending", "review"]))).limit(1);
+          const now = new Date();
+          const reason = unresolved ? "mailbox_sync_receipts_unresolved" : !freshBoundary ? "mailbox_sync_continuity_warmup" : null;
+          const [updated] = await tx.update(cycles).set(reason ? { state: "failed", failedAt: now, errorCode: reason } : { state: "complete", completedAt: now })
+            .where(and(eq(cycles.organizationId, claimed.organizationId), eq(cycles.id, cycleId), eq(cycles.state, "scanning"))).returning();
+          if (!updated) throw new MailboxError("mailbox_nurture_approval_changed");
+          return updated;
+        });
+      }
       checked++;
     } catch (error) {
       const code =
@@ -1027,7 +1155,10 @@ export async function processMailboxConnectors(
         "mailbox_feature_disabled",
         "mailbox_response_too_large",
         "mailbox_tick_budget",
+        "mailbox_nurture_approval_changed",
       ].includes(code);
+      if (cycle) await db.update(cycles).set({ state: "failed", failedAt: new Date(), errorCode: code })
+        .where(and(eq(cycles.organizationId, claimed.organizationId), eq(cycles.id, cycle.id), eq(cycles.state, "scanning")));
       await db
         .update(connectors)
         .set({

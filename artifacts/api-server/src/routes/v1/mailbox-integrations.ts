@@ -7,6 +7,7 @@ import {
   disableMailboxConnector,
   getMailboxStatus,
   setLeadMonitoringApproval,
+  setNurtureMonitoringApproval,
 } from "../../services/mailbox-connector";
 import { MailboxError } from "../../services/mailbox-contract";
 import { recordAudit } from "../../services/audit";
@@ -67,6 +68,16 @@ const failure = (res: Parameters<RequestHandler>[1], error: unknown) =>
           : "mailbox_request_unavailable",
       error: "Mailbox reply monitoring needs review. No email was sent.",
     });
+router.post(
+  "/mailbox/microsoft/nurture-monitoring",
+  requireMember("crm.write"), session, mutation,
+  async (req, res) => {
+    try {
+      if (Object.keys(req.query).length) throw new MailboxError("mailbox_request_invalid", 400);
+      res.json(await setNurtureMonitoringApproval(actor(req), req.body));
+    } catch (e) { failure(res, e); }
+  },
+);
 router.post(
   "/mailbox/microsoft/lead-monitoring",
   requireMember("crm.write"),

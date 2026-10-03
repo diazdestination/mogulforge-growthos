@@ -5,6 +5,1228 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+export type SourceNurtureDetailState = typeof SourceNurtureDetailState[keyof typeof SourceNurtureDetailState];
+
+
+export const SourceNurtureDetailState = {
+  draft: 'draft',
+  approved: 'approved',
+  running: 'running',
+  stopped: 'stopped',
+  finished: 'finished',
+  expired: 'expired',
+} as const;
+
+export type SourceNurtureDetailSettingsStepsItem = {
+  /**
+     * @minLength 3
+     * @maxLength 180
+     */
+  subject: string;
+  /**
+     * @minLength 10
+     * @maxLength 4000
+     */
+  body: string;
+};
+
+export type SourceNurtureDetailSettingsDaysItem = typeof SourceNurtureDetailSettingsDaysItem[keyof typeof SourceNurtureDetailSettingsDaysItem];
+
+
+export const SourceNurtureDetailSettingsDaysItem = {
+  Mon: 'Mon',
+  Tue: 'Tue',
+  Wed: 'Wed',
+  Thu: 'Thu',
+  Fri: 'Fri',
+  Sat: 'Sat',
+  Sun: 'Sun',
+} as const;
+
+export type SourceNurtureDetailSettings = {
+  /**
+     * @minLength 2
+     * @maxLength 150
+     */
+  businessName: string;
+  /**
+     * @minLength 10
+     * @maxLength 400
+     */
+  mailingAddress: string;
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  steps: SourceNurtureDetailSettingsStepsItem[];
+  /** @minLength 1 */
+  timezone: string;
+  /**
+     * @minItems 1
+     * @maxItems 7
+     */
+  days: SourceNurtureDetailSettingsDaysItem[];
+  /**
+     * @minimum 8
+     * @maximum 19
+     */
+  startHour: number;
+  /**
+     * @minimum 9
+     * @maximum 20
+     */
+  endHour: number;
+  /**
+     * @minimum 1
+     * @maximum 25
+     */
+  dailyLimit: number;
+};
+
+export type SourceNurtureDetailReadiness = {
+  ready: boolean;
+  reason: string | null;
+  nextCheckAt: string | null;
+};
+
+export type SourceNurtureDetailLimitsMaxRecipients = typeof SourceNurtureDetailLimitsMaxRecipients[keyof typeof SourceNurtureDetailLimitsMaxRecipients];
+
+
+export const SourceNurtureDetailLimitsMaxRecipients = {
+  NUMBER_10: 10,
+} as const;
+
+export type SourceNurtureDetailLimitsSteps = typeof SourceNurtureDetailLimitsSteps[keyof typeof SourceNurtureDetailLimitsSteps];
+
+
+export const SourceNurtureDetailLimitsSteps = {
+  NUMBER_2: 2,
+} as const;
+
+export type SourceNurtureDetailLimitsMinSpacingHours = typeof SourceNurtureDetailLimitsMinSpacingHours[keyof typeof SourceNurtureDetailLimitsMinSpacingHours];
+
+
+export const SourceNurtureDetailLimitsMinSpacingHours = {
+  NUMBER_72: 72,
+} as const;
+
+export type SourceNurtureDetailLimitsMaxLifetimeDays = typeof SourceNurtureDetailLimitsMaxLifetimeDays[keyof typeof SourceNurtureDetailLimitsMaxLifetimeDays];
+
+
+export const SourceNurtureDetailLimitsMaxLifetimeDays = {
+  NUMBER_14: 14,
+} as const;
+
+export type SourceNurtureDetailLimits = {
+  maxRecipients: SourceNurtureDetailLimitsMaxRecipients;
+  steps: SourceNurtureDetailLimitsSteps;
+  minSpacingHours: SourceNurtureDetailLimitsMinSpacingHours;
+  maxLifetimeDays: SourceNurtureDetailLimitsMaxLifetimeDays;
+};
+
+export type SourceNurtureDetailItemsItemSnapshotVersion = typeof SourceNurtureDetailItemsItemSnapshotVersion[keyof typeof SourceNurtureDetailItemsItemSnapshotVersion];
+
+
+export const SourceNurtureDetailItemsItemSnapshotVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryVersion = typeof SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryVersion[keyof typeof SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryVersion];
+
+
+export const SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryKind = typeof SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryKind[keyof typeof SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryKind];
+
+
+export const SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryKind = {
+  csv_snapshot: 'csv_snapshot',
+} as const;
+
+export type SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryCurrency = typeof SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryCurrency[keyof typeof SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryCurrency] | null;
+
+
+export const SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryCurrency = {
+  USD: 'USD',
+} as const;
+
+export type SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistory = {
+  version: SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryVersion;
+  kind: SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryKind;
+  originalCreatedAt: string | null;
+  sourceUpdatedAt: string | null;
+  statusChangedAt: string | null;
+  lastContactAt: string | null;
+  snapshotAsOf: string | null;
+  firstImportedAt: string;
+  lastImportedAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  externalCustomerId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  externalEstimateId: string | null;
+  currency: SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistoryCurrency;
+  /** @pattern ^[a-f0-9]{64}$ */
+  fingerprint: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  appliedFingerprint: string;
+  /**
+     * @maxItems 30
+     * @items.minLength 1
+     * @items.maxLength 40
+     */
+  mappedFields: string[];
+};
+
+export type SourceNurtureDetailItemsItemSnapshotAdoption = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  importSourceKey: string;
+  externalOpportunityId: string;
+  importedHistory: SourceNurtureDetailItemsItemSnapshotAdoptionImportedHistory;
+  /** @pattern ^[a-f0-9]{64}$ */
+  sourceSha256: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  operationalSha256: string;
+  recipient: string;
+};
+
+export type SourceNurtureDetailItemsItemSnapshotSenderSource = typeof SourceNurtureDetailItemsItemSnapshotSenderSource[keyof typeof SourceNurtureDetailItemsItemSnapshotSenderSource];
+
+
+export const SourceNurtureDetailItemsItemSnapshotSenderSource = {
+  lead_assignee: 'lead_assignee',
+  company_default: 'company_default',
+} as const;
+
+export type SourceNurtureDetailItemsItemSnapshotSenderProvider = typeof SourceNurtureDetailItemsItemSnapshotSenderProvider[keyof typeof SourceNurtureDetailItemsItemSnapshotSenderProvider];
+
+
+export const SourceNurtureDetailItemsItemSnapshotSenderProvider = {
+  microsoft: 'microsoft',
+} as const;
+
+export type SourceNurtureDetailItemsItemSnapshotSender = {
+  userId: string;
+  source: SourceNurtureDetailItemsItemSnapshotSenderSource;
+  provider: SourceNurtureDetailItemsItemSnapshotSenderProvider;
+  /** @pattern ^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$ */
+  senderEmail: string;
+};
+
+export type SourceNurtureDetailItemsItemSnapshotMailboxIdentityProvider = typeof SourceNurtureDetailItemsItemSnapshotMailboxIdentityProvider[keyof typeof SourceNurtureDetailItemsItemSnapshotMailboxIdentityProvider];
+
+
+export const SourceNurtureDetailItemsItemSnapshotMailboxIdentityProvider = {
+  microsoft: 'microsoft',
+} as const;
+
+export type SourceNurtureDetailItemsItemSnapshotMailboxIdentityPolicyVersion = typeof SourceNurtureDetailItemsItemSnapshotMailboxIdentityPolicyVersion[keyof typeof SourceNurtureDetailItemsItemSnapshotMailboxIdentityPolicyVersion];
+
+
+export const SourceNurtureDetailItemsItemSnapshotMailboxIdentityPolicyVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type SourceNurtureDetailItemsItemSnapshotMailboxIdentity = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  senderUserId: string;
+  provider: SourceNurtureDetailItemsItemSnapshotMailboxIdentityProvider;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  connectionId: string;
+  connectionRevision: string;
+  mailboxAccountId: string;
+  /** @pattern ^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$ */
+  mailboxEmail: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  connectorId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  connectorVersion: number;
+  policyVersion: SourceNurtureDetailItemsItemSnapshotMailboxIdentityPolicyVersion;
+  startedAt: string;
+};
+
+export type SourceNurtureDetailItemsItemSnapshotNurtureMonitoringApproval = {
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  version: number;
+  approvedAt: string;
+};
+
+export type SourceNurtureDetailItemsItemSnapshot = {
+  version: SourceNurtureDetailItemsItemSnapshotVersion;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  adoptionId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  adoptionVersion: number;
+  /** @pattern ^[a-f0-9]{64}$ */
+  adoptionSha256: string;
+  adoption: SourceNurtureDetailItemsItemSnapshotAdoption;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  permissionRecordId: string;
+  ownerUserId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  leadCreatedAt: string;
+  sender: SourceNurtureDetailItemsItemSnapshotSender;
+  mailboxIdentity: SourceNurtureDetailItemsItemSnapshotMailboxIdentity;
+  nurtureMonitoringApproval: SourceNurtureDetailItemsItemSnapshotNurtureMonitoringApproval;
+};
+
+export type SourceNurtureDetailItemsItemReadiness = {
+  ready: boolean;
+  reason: string | null;
+  nextCheckAt: string | null;
+};
+
+export type SourceNurtureDetailItemsItemMailboxSync = {
+  ready: boolean;
+  reason: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  completedCycleId: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+};
+
+export const SourceNurtureDetailItemsItemStepsItemStepIndex = {  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const
+export type SourceNurtureDetailItemsItemStepsItemState = typeof SourceNurtureDetailItemsItemStepsItemState[keyof typeof SourceNurtureDetailItemsItemStepsItemState];
+
+
+export const SourceNurtureDetailItemsItemStepsItemState = {
+  not_started: 'not_started',
+  waiting: 'waiting',
+  ready: 'ready',
+  held: 'held',
+  processing: 'processing',
+  accepted: 'accepted',
+  uncertain: 'uncertain',
+  cancelled: 'cancelled',
+  finished: 'finished',
+} as const;
+
+export type SourceNurtureDetailItemsItemStepsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  stepIndex: typeof SourceNurtureDetailItemsItemStepsItemStepIndex[keyof typeof SourceNurtureDetailItemsItemStepsItemStepIndex];
+  subject: string;
+  body: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  messageHash: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  scheduledActionId: string | null;
+  notBefore: string | null;
+  expiresAt: string;
+  claimedAt: string | null;
+  acceptedAt: string | null;
+  state: SourceNurtureDetailItemsItemStepsItemState;
+  reason: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  executionId: string | null;
+  executionState: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  parentId: string | null;
+  observedAt: string | null;
+  dispatchStartedAt: string | null;
+  deliveryConfirmed: false;
+};
+
+export type SourceNurtureDetailItemsItemOutcomes = {
+  leadStatus: string;
+  /** @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  replyIds: string[];
+  /** @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  taskIds: string[];
+  /** @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentIds: string[];
+};
+
+export type SourceNurtureDetailItemsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  ownerUserId: string;
+  /** @pattern ^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$ */
+  recipient: string;
+  snapshot: SourceNurtureDetailItemsItemSnapshot;
+  admittedAt: string | null;
+  stoppedAt: string | null;
+  stopReason: string | null;
+  readiness: SourceNurtureDetailItemsItemReadiness;
+  mailboxSync: SourceNurtureDetailItemsItemMailboxSync;
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  steps: SourceNurtureDetailItemsItemStepsItem[];
+  outcomes: SourceNurtureDetailItemsItemOutcomes;
+};
+
+export interface SourceNurtureDetail {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  version: number;
+  state: SourceNurtureDetailState;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  settings: SourceNurtureDetailSettings;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  reviewId: string;
+  createdByUserId: string;
+  approvedByUserId: string | null;
+  createdAt: string;
+  previewExpiresAt: string;
+  startNotBefore: string;
+  expiresAt: string;
+  approvedAt: string | null;
+  startedAt: string | null;
+  stoppedAt: string | null;
+  stopReason: string | null;
+  readiness: SourceNurtureDetailReadiness;
+  limits: SourceNurtureDetailLimits;
+  /**
+     * @minItems 1
+     * @maxItems 10
+     */
+  items: SourceNurtureDetailItemsItem[];
+}
+
+export type SourceNurtureListBucket = typeof SourceNurtureListBucket[keyof typeof SourceNurtureListBucket];
+
+
+export const SourceNurtureListBucket = {
+  attention: 'attention',
+  waiting: 'waiting',
+  history: 'history',
+} as const;
+
+export type SourceNurtureListLimit = typeof SourceNurtureListLimit[keyof typeof SourceNurtureListLimit];
+
+
+export const SourceNurtureListLimit = {
+  NUMBER_25: 25,
+} as const;
+
+export type SourceNurtureListItemsItemState = typeof SourceNurtureListItemsItemState[keyof typeof SourceNurtureListItemsItemState];
+
+
+export const SourceNurtureListItemsItemState = {
+  draft: 'draft',
+  approved: 'approved',
+  running: 'running',
+  stopped: 'stopped',
+  finished: 'finished',
+  expired: 'expired',
+} as const;
+
+export type SourceNurtureListItemsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  version: number;
+  state: SourceNurtureListItemsItemState;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  createdAt: string;
+  expiresAt: string;
+  /**
+     * @minimum 1
+     * @maximum 10
+     */
+  recipientCount: number;
+  /**
+     * @minimum 0
+     * @maximum 20
+     */
+  acceptedSteps: number;
+  /**
+     * @minimum 0
+     * @maximum 20
+     */
+  uncertainSteps: number;
+  reason: string | null;
+  nextCheckAt: string | null;
+};
+
+export interface SourceNurtureList {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  bucket: SourceNurtureListBucket;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  offset: number;
+  limit: SourceNurtureListLimit;
+  hasMore: boolean;
+  /** @maxItems 25 */
+  items: SourceNurtureListItemsItem[];
+}
+
+export type SourceNurtureCommandResultDetailState = typeof SourceNurtureCommandResultDetailState[keyof typeof SourceNurtureCommandResultDetailState];
+
+
+export const SourceNurtureCommandResultDetailState = {
+  draft: 'draft',
+  approved: 'approved',
+  running: 'running',
+  stopped: 'stopped',
+  finished: 'finished',
+  expired: 'expired',
+} as const;
+
+export type SourceNurtureCommandResultDetailSettingsStepsItem = {
+  /**
+     * @minLength 3
+     * @maxLength 180
+     */
+  subject: string;
+  /**
+     * @minLength 10
+     * @maxLength 4000
+     */
+  body: string;
+};
+
+export type SourceNurtureCommandResultDetailSettingsDaysItem = typeof SourceNurtureCommandResultDetailSettingsDaysItem[keyof typeof SourceNurtureCommandResultDetailSettingsDaysItem];
+
+
+export const SourceNurtureCommandResultDetailSettingsDaysItem = {
+  Mon: 'Mon',
+  Tue: 'Tue',
+  Wed: 'Wed',
+  Thu: 'Thu',
+  Fri: 'Fri',
+  Sat: 'Sat',
+  Sun: 'Sun',
+} as const;
+
+export type SourceNurtureCommandResultDetailSettings = {
+  /**
+     * @minLength 2
+     * @maxLength 150
+     */
+  businessName: string;
+  /**
+     * @minLength 10
+     * @maxLength 400
+     */
+  mailingAddress: string;
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  steps: SourceNurtureCommandResultDetailSettingsStepsItem[];
+  /** @minLength 1 */
+  timezone: string;
+  /**
+     * @minItems 1
+     * @maxItems 7
+     */
+  days: SourceNurtureCommandResultDetailSettingsDaysItem[];
+  /**
+     * @minimum 8
+     * @maximum 19
+     */
+  startHour: number;
+  /**
+     * @minimum 9
+     * @maximum 20
+     */
+  endHour: number;
+  /**
+     * @minimum 1
+     * @maximum 25
+     */
+  dailyLimit: number;
+};
+
+export type SourceNurtureCommandResultDetailReadiness = {
+  ready: boolean;
+  reason: string | null;
+  nextCheckAt: string | null;
+};
+
+export type SourceNurtureCommandResultDetailLimitsMaxRecipients = typeof SourceNurtureCommandResultDetailLimitsMaxRecipients[keyof typeof SourceNurtureCommandResultDetailLimitsMaxRecipients];
+
+
+export const SourceNurtureCommandResultDetailLimitsMaxRecipients = {
+  NUMBER_10: 10,
+} as const;
+
+export type SourceNurtureCommandResultDetailLimitsSteps = typeof SourceNurtureCommandResultDetailLimitsSteps[keyof typeof SourceNurtureCommandResultDetailLimitsSteps];
+
+
+export const SourceNurtureCommandResultDetailLimitsSteps = {
+  NUMBER_2: 2,
+} as const;
+
+export type SourceNurtureCommandResultDetailLimitsMinSpacingHours = typeof SourceNurtureCommandResultDetailLimitsMinSpacingHours[keyof typeof SourceNurtureCommandResultDetailLimitsMinSpacingHours];
+
+
+export const SourceNurtureCommandResultDetailLimitsMinSpacingHours = {
+  NUMBER_72: 72,
+} as const;
+
+export type SourceNurtureCommandResultDetailLimitsMaxLifetimeDays = typeof SourceNurtureCommandResultDetailLimitsMaxLifetimeDays[keyof typeof SourceNurtureCommandResultDetailLimitsMaxLifetimeDays];
+
+
+export const SourceNurtureCommandResultDetailLimitsMaxLifetimeDays = {
+  NUMBER_14: 14,
+} as const;
+
+export type SourceNurtureCommandResultDetailLimits = {
+  maxRecipients: SourceNurtureCommandResultDetailLimitsMaxRecipients;
+  steps: SourceNurtureCommandResultDetailLimitsSteps;
+  minSpacingHours: SourceNurtureCommandResultDetailLimitsMinSpacingHours;
+  maxLifetimeDays: SourceNurtureCommandResultDetailLimitsMaxLifetimeDays;
+};
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshotVersion = typeof SourceNurtureCommandResultDetailItemsItemSnapshotVersion[keyof typeof SourceNurtureCommandResultDetailItemsItemSnapshotVersion];
+
+
+export const SourceNurtureCommandResultDetailItemsItemSnapshotVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryVersion = typeof SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryVersion[keyof typeof SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryVersion];
+
+
+export const SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryKind = typeof SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryKind[keyof typeof SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryKind];
+
+
+export const SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryKind = {
+  csv_snapshot: 'csv_snapshot',
+} as const;
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryCurrency = typeof SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryCurrency[keyof typeof SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryCurrency] | null;
+
+
+export const SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryCurrency = {
+  USD: 'USD',
+} as const;
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistory = {
+  version: SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryVersion;
+  kind: SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryKind;
+  originalCreatedAt: string | null;
+  sourceUpdatedAt: string | null;
+  statusChangedAt: string | null;
+  lastContactAt: string | null;
+  snapshotAsOf: string | null;
+  firstImportedAt: string;
+  lastImportedAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  externalCustomerId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  externalEstimateId: string | null;
+  currency: SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistoryCurrency;
+  /** @pattern ^[a-f0-9]{64}$ */
+  fingerprint: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  appliedFingerprint: string;
+  /**
+     * @maxItems 30
+     * @items.minLength 1
+     * @items.maxLength 40
+     */
+  mappedFields: string[];
+};
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshotAdoption = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  importSourceKey: string;
+  externalOpportunityId: string;
+  importedHistory: SourceNurtureCommandResultDetailItemsItemSnapshotAdoptionImportedHistory;
+  /** @pattern ^[a-f0-9]{64}$ */
+  sourceSha256: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  operationalSha256: string;
+  recipient: string;
+};
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshotSenderSource = typeof SourceNurtureCommandResultDetailItemsItemSnapshotSenderSource[keyof typeof SourceNurtureCommandResultDetailItemsItemSnapshotSenderSource];
+
+
+export const SourceNurtureCommandResultDetailItemsItemSnapshotSenderSource = {
+  lead_assignee: 'lead_assignee',
+  company_default: 'company_default',
+} as const;
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshotSenderProvider = typeof SourceNurtureCommandResultDetailItemsItemSnapshotSenderProvider[keyof typeof SourceNurtureCommandResultDetailItemsItemSnapshotSenderProvider];
+
+
+export const SourceNurtureCommandResultDetailItemsItemSnapshotSenderProvider = {
+  microsoft: 'microsoft',
+} as const;
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshotSender = {
+  userId: string;
+  source: SourceNurtureCommandResultDetailItemsItemSnapshotSenderSource;
+  provider: SourceNurtureCommandResultDetailItemsItemSnapshotSenderProvider;
+  /** @pattern ^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$ */
+  senderEmail: string;
+};
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshotMailboxIdentityProvider = typeof SourceNurtureCommandResultDetailItemsItemSnapshotMailboxIdentityProvider[keyof typeof SourceNurtureCommandResultDetailItemsItemSnapshotMailboxIdentityProvider];
+
+
+export const SourceNurtureCommandResultDetailItemsItemSnapshotMailboxIdentityProvider = {
+  microsoft: 'microsoft',
+} as const;
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshotMailboxIdentityPolicyVersion = typeof SourceNurtureCommandResultDetailItemsItemSnapshotMailboxIdentityPolicyVersion[keyof typeof SourceNurtureCommandResultDetailItemsItemSnapshotMailboxIdentityPolicyVersion];
+
+
+export const SourceNurtureCommandResultDetailItemsItemSnapshotMailboxIdentityPolicyVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshotMailboxIdentity = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  senderUserId: string;
+  provider: SourceNurtureCommandResultDetailItemsItemSnapshotMailboxIdentityProvider;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  connectionId: string;
+  connectionRevision: string;
+  mailboxAccountId: string;
+  /** @pattern ^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$ */
+  mailboxEmail: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  connectorId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  connectorVersion: number;
+  policyVersion: SourceNurtureCommandResultDetailItemsItemSnapshotMailboxIdentityPolicyVersion;
+  startedAt: string;
+};
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshotNurtureMonitoringApproval = {
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  version: number;
+  approvedAt: string;
+};
+
+export type SourceNurtureCommandResultDetailItemsItemSnapshot = {
+  version: SourceNurtureCommandResultDetailItemsItemSnapshotVersion;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  adoptionId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  adoptionVersion: number;
+  /** @pattern ^[a-f0-9]{64}$ */
+  adoptionSha256: string;
+  adoption: SourceNurtureCommandResultDetailItemsItemSnapshotAdoption;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  permissionRecordId: string;
+  ownerUserId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  leadCreatedAt: string;
+  sender: SourceNurtureCommandResultDetailItemsItemSnapshotSender;
+  mailboxIdentity: SourceNurtureCommandResultDetailItemsItemSnapshotMailboxIdentity;
+  nurtureMonitoringApproval: SourceNurtureCommandResultDetailItemsItemSnapshotNurtureMonitoringApproval;
+};
+
+export type SourceNurtureCommandResultDetailItemsItemReadiness = {
+  ready: boolean;
+  reason: string | null;
+  nextCheckAt: string | null;
+};
+
+export type SourceNurtureCommandResultDetailItemsItemMailboxSync = {
+  ready: boolean;
+  reason: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  completedCycleId: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+};
+
+export const SourceNurtureCommandResultDetailItemsItemStepsItemStepIndex = {  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const
+export type SourceNurtureCommandResultDetailItemsItemStepsItemState = typeof SourceNurtureCommandResultDetailItemsItemStepsItemState[keyof typeof SourceNurtureCommandResultDetailItemsItemStepsItemState];
+
+
+export const SourceNurtureCommandResultDetailItemsItemStepsItemState = {
+  not_started: 'not_started',
+  waiting: 'waiting',
+  ready: 'ready',
+  held: 'held',
+  processing: 'processing',
+  accepted: 'accepted',
+  uncertain: 'uncertain',
+  cancelled: 'cancelled',
+  finished: 'finished',
+} as const;
+
+export type SourceNurtureCommandResultDetailItemsItemStepsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  stepIndex: typeof SourceNurtureCommandResultDetailItemsItemStepsItemStepIndex[keyof typeof SourceNurtureCommandResultDetailItemsItemStepsItemStepIndex];
+  subject: string;
+  body: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  messageHash: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  scheduledActionId: string | null;
+  notBefore: string | null;
+  expiresAt: string;
+  claimedAt: string | null;
+  acceptedAt: string | null;
+  state: SourceNurtureCommandResultDetailItemsItemStepsItemState;
+  reason: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  executionId: string | null;
+  executionState: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  parentId: string | null;
+  observedAt: string | null;
+  dispatchStartedAt: string | null;
+  deliveryConfirmed: false;
+};
+
+export type SourceNurtureCommandResultDetailItemsItemOutcomes = {
+  leadStatus: string;
+  /** @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  replyIds: string[];
+  /** @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  taskIds: string[];
+  /** @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentIds: string[];
+};
+
+export type SourceNurtureCommandResultDetailItemsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  ownerUserId: string;
+  /** @pattern ^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$ */
+  recipient: string;
+  snapshot: SourceNurtureCommandResultDetailItemsItemSnapshot;
+  admittedAt: string | null;
+  stoppedAt: string | null;
+  stopReason: string | null;
+  readiness: SourceNurtureCommandResultDetailItemsItemReadiness;
+  mailboxSync: SourceNurtureCommandResultDetailItemsItemMailboxSync;
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  steps: SourceNurtureCommandResultDetailItemsItemStepsItem[];
+  outcomes: SourceNurtureCommandResultDetailItemsItemOutcomes;
+};
+
+export type SourceNurtureCommandResultDetail = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  version: number;
+  state: SourceNurtureCommandResultDetailState;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  settings: SourceNurtureCommandResultDetailSettings;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  reviewId: string;
+  createdByUserId: string;
+  approvedByUserId: string | null;
+  createdAt: string;
+  previewExpiresAt: string;
+  startNotBefore: string;
+  expiresAt: string;
+  approvedAt: string | null;
+  startedAt: string | null;
+  stoppedAt: string | null;
+  stopReason: string | null;
+  readiness: SourceNurtureCommandResultDetailReadiness;
+  limits: SourceNurtureCommandResultDetailLimits;
+  /**
+     * @minItems 1
+     * @maxItems 10
+     */
+  items: SourceNurtureCommandResultDetailItemsItem[];
+};
+
+export type SourceNurtureCommandResultCommandAction = typeof SourceNurtureCommandResultCommandAction[keyof typeof SourceNurtureCommandResultCommandAction];
+
+
+export const SourceNurtureCommandResultCommandAction = {
+  approve: 'approve',
+  start: 'start',
+  stop: 'stop',
+} as const;
+
+export type SourceNurtureCommandResultCommand = {
+  action: SourceNurtureCommandResultCommandAction;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string | null;
+  replayed: boolean;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  appliedVersion: number;
+};
+
+export interface SourceNurtureCommandResult {
+  detail: SourceNurtureCommandResultDetail;
+  command: SourceNurtureCommandResultCommand;
+}
+
+export type SourceNurturePreviewRequestStepsItem = {
+  /**
+     * @minLength 3
+     * @maxLength 180
+     */
+  subject: string;
+  /**
+     * @minLength 10
+     * @maxLength 4000
+     */
+  body: string;
+};
+
+export type SourceNurturePreviewRequestDaysItem = typeof SourceNurturePreviewRequestDaysItem[keyof typeof SourceNurturePreviewRequestDaysItem];
+
+
+export const SourceNurturePreviewRequestDaysItem = {
+  Mon: 'Mon',
+  Tue: 'Tue',
+  Wed: 'Wed',
+  Thu: 'Thu',
+  Fri: 'Fri',
+  Sat: 'Sat',
+  Sun: 'Sun',
+} as const;
+
+export interface SourceNurturePreviewRequest {
+  /**
+     * @minLength 2
+     * @maxLength 150
+     */
+  businessName: string;
+  /**
+     * @minLength 10
+     * @maxLength 400
+     */
+  mailingAddress: string;
+  /**
+     * @minItems 2
+     * @maxItems 2
+     */
+  steps: SourceNurturePreviewRequestStepsItem[];
+  /** @minLength 1 */
+  timezone: string;
+  /**
+     * @minItems 1
+     * @maxItems 7
+     */
+  days: SourceNurturePreviewRequestDaysItem[];
+  /**
+     * @minimum 8
+     * @maximum 19
+     */
+  startHour: number;
+  /**
+     * @minimum 9
+     * @maximum 20
+     */
+  endHour: number;
+  /**
+     * @minimum 1
+     * @maximum 25
+     */
+  dailyLimit: number;
+  /**
+     * @minItems 1
+     * @maxItems 10
+     * @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  leadIds: string[];
+  startNotBefore: string;
+  expiresAt: string;
+}
+
+export interface SourceNurtureApprovalRequest {
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  expectedVersion: number;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  confirmed: true;
+}
+
+export interface SourceNurtureStartRequest {
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  expectedVersion: number;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  confirmed: true;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+}
+
+export interface SourceNurtureStopRequest {
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  expectedVersion: number;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  confirmed: true;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  reason: string;
+}
+
+export interface MicrosoftNurtureMonitoring {
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  expectedConnectorVersion: number;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedNurtureMonitoringVersion: number;
+  enabled: boolean;
+  nurtureContextAcknowledged: true;
+}
+
+export interface NurtureMailboxSync {
+  ready: boolean;
+  reason: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  completedCycleId: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export type MicrosoftMailboxStatusState = typeof MicrosoftMailboxStatusState[keyof typeof MicrosoftMailboxStatusState];
+
+
+export const MicrosoftMailboxStatusState = {
+  pending: 'pending',
+  active: 'active',
+  disabled: 'disabled',
+  gap: 'gap',
+  revoked: 'revoked',
+} as const;
+
+export interface MicrosoftMailboxStatus {
+  enabled: boolean;
+  configured: boolean;
+  /** @minimum 0 */
+  version: number;
+  state: MicrosoftMailboxStatusState;
+  usable: boolean;
+  /** @nullable */
+  mailboxEmail: string | null;
+  /** @nullable */
+  startedAt: string | null;
+  /** @nullable */
+  lastSuccessAt: string | null;
+  /** @nullable */
+  lastErrorAt: string | null;
+  /** @nullable */
+  reason: string | null;
+  /** @minimum 0 */
+  pendingParentCount: number;
+  /** @minimum 0 */
+  reviewCount: number;
+  scopes: string[];
+  folders: string[];
+  historicalCrawl: false;
+  attachmentsRead: false;
+  remoteConsentRevoked: false;
+  leadMonitoringEnabled: boolean;
+  /** @minimum 0 */
+  leadMonitoringVersion: number;
+  /** @nullable */
+  leadMonitoringApprovedAt: string | null;
+  /** @nullable */
+  leadMonitoringChangedAt: string | null;
+  nurtureMonitoringEnabled: boolean;
+  /** @minimum 0 */
+  nurtureMonitoringVersion: number;
+  /** @nullable */
+  nurtureMonitoringApprovedAt: string | null;
+  /** @nullable */
+  nurtureMonitoringChangedAt: string | null;
+  nurtureSync: NurtureMailboxSync;
+}
+
+export type LeadMailboxReplyContext = {
+  kind: 'bie_lead_email';
+} | {
+  kind: 'source_nurture_email';
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  planId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  itemId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  stepId: string;
+  stepIndex: 1 | 2;
+};
+
+export type LeadMailboxReplyState = typeof LeadMailboxReplyState[keyof typeof LeadMailboxReplyState];
+
+
+export const LeadMailboxReplyState = {
+  needs_review: 'needs_review',
+  confirmed: 'confirmed',
+  dismissed: 'dismissed',
+} as const;
+
+export type LeadMailboxReplyContent = {
+  subject: string;
+  text: string;
+} | null;
+
+export type LeadMailboxReplyEffectSummary = {
+  /** @minimum 0 */
+  pausedEnrollments: number;
+  /** @minimum 0 */
+  cancelledActions: number;
+  /** @minimum 0 */
+  blockedProposals: number;
+  /** @minimum 0 */
+  reconciliationRequired: number;
+} | null;
+
+export type LeadMailboxReplyEvidence = typeof LeadMailboxReplyEvidence[keyof typeof LeadMailboxReplyEvidence];
+
+
+export const LeadMailboxReplyEvidence = {
+  original_mailbox_observation: 'original_mailbox_observation',
+} as const;
+
+export interface LeadMailboxReply {
+  id: string;
+  leadId: string;
+  /** @minimum 1 */
+  version: number;
+  state: LeadMailboxReplyState;
+  reason: string;
+  /** @nullable */
+  replyAt: string | null;
+  receivedAt: string;
+  historical: boolean;
+  holdActive: boolean;
+  /** @nullable */
+  taskId: string | null;
+  /** @nullable */
+  taskTitle: string | null;
+  /** @nullable */
+  taskStatus: string | null;
+  /** @nullable */
+  assignedUserId: string | null;
+  /** @nullable */
+  assignedUserName: string | null;
+  content: LeadMailboxReplyContent;
+  /** @nullable */
+  rawExpiresAt: string | null;
+  /** @nullable */
+  releasedAt: string | null;
+  /** @nullable */
+  releaseNote: string | null;
+  effectSummary: LeadMailboxReplyEffectSummary;
+  evidence: LeadMailboxReplyEvidence;
+  /** Current original reader and lead-context permission; false does not erase retained evidence or prevent an explicit staff handling decision. */
+  monitoringCurrent: boolean;
+  context: LeadMailboxReplyContext;
+}
+
 export type ServiceStandingViewPolicyChannel = typeof ServiceStandingViewPolicyChannel[keyof typeof ServiceStandingViewPolicyChannel];
 
 
@@ -1531,73 +2753,6 @@ export interface CallieOfficeCommandResult {
   replayed: boolean;
 }
 
-export type LeadMailboxReplyState = typeof LeadMailboxReplyState[keyof typeof LeadMailboxReplyState];
-
-
-export const LeadMailboxReplyState = {
-  needs_review: 'needs_review',
-  confirmed: 'confirmed',
-  dismissed: 'dismissed',
-} as const;
-
-export type LeadMailboxReplyContent = {
-  subject: string;
-  text: string;
-} | null;
-
-export type LeadMailboxReplyEffectSummary = {
-  /** @minimum 0 */
-  pausedEnrollments: number;
-  /** @minimum 0 */
-  cancelledActions: number;
-  /** @minimum 0 */
-  blockedProposals: number;
-  /** @minimum 0 */
-  reconciliationRequired: number;
-} | null;
-
-export type LeadMailboxReplyEvidence = typeof LeadMailboxReplyEvidence[keyof typeof LeadMailboxReplyEvidence];
-
-
-export const LeadMailboxReplyEvidence = {
-  original_mailbox_observation: 'original_mailbox_observation',
-} as const;
-
-export interface LeadMailboxReply {
-  id: string;
-  leadId: string;
-  /** @minimum 1 */
-  version: number;
-  state: LeadMailboxReplyState;
-  reason: string;
-  /** @nullable */
-  replyAt: string | null;
-  receivedAt: string;
-  historical: boolean;
-  holdActive: boolean;
-  /** @nullable */
-  taskId: string | null;
-  /** @nullable */
-  taskTitle: string | null;
-  /** @nullable */
-  taskStatus: string | null;
-  /** @nullable */
-  assignedUserId: string | null;
-  /** @nullable */
-  assignedUserName: string | null;
-  content: LeadMailboxReplyContent;
-  /** @nullable */
-  rawExpiresAt: string | null;
-  /** @nullable */
-  releasedAt: string | null;
-  /** @nullable */
-  releaseNote: string | null;
-  effectSummary: LeadMailboxReplyEffectSummary;
-  evidence: LeadMailboxReplyEvidence;
-  /** Current original reader and lead-context permission; false does not erase retained evidence or prevent an explicit staff handling decision. */
-  monitoringCurrent: boolean;
-}
-
 export type LeadMailboxReplyPageLimit = typeof LeadMailboxReplyPageLimit[keyof typeof LeadMailboxReplyPageLimit];
 
 
@@ -1879,52 +3034,6 @@ export interface PlatformEmailDeliveryPage {
      */
   unmatchedCallbackCount: number | null;
   unmatchedCallbackLimit: PlatformEmailDeliveryPageUnmatchedCallbackLimit;
-}
-
-export type MicrosoftMailboxStatusState = typeof MicrosoftMailboxStatusState[keyof typeof MicrosoftMailboxStatusState];
-
-
-export const MicrosoftMailboxStatusState = {
-  pending: 'pending',
-  active: 'active',
-  disabled: 'disabled',
-  gap: 'gap',
-  revoked: 'revoked',
-} as const;
-
-export interface MicrosoftMailboxStatus {
-  enabled: boolean;
-  configured: boolean;
-  /** @minimum 0 */
-  version: number;
-  state: MicrosoftMailboxStatusState;
-  usable: boolean;
-  /** @nullable */
-  mailboxEmail: string | null;
-  /** @nullable */
-  startedAt: string | null;
-  /** @nullable */
-  lastSuccessAt: string | null;
-  /** @nullable */
-  lastErrorAt: string | null;
-  /** @nullable */
-  reason: string | null;
-  /** @minimum 0 */
-  pendingParentCount: number;
-  /** @minimum 0 */
-  reviewCount: number;
-  scopes: string[];
-  folders: string[];
-  historicalCrawl: false;
-  attachmentsRead: false;
-  remoteConsentRevoked: false;
-  leadMonitoringEnabled: boolean;
-  /** @minimum 0 */
-  leadMonitoringVersion: number;
-  /** @nullable */
-  leadMonitoringApprovedAt: string | null;
-  /** @nullable */
-  leadMonitoringChangedAt: string | null;
 }
 
 export type MicrosoftMailboxConnectReturnPath = typeof MicrosoftMailboxConnectReturnPath[keyof typeof MicrosoftMailboxConnectReturnPath];
@@ -7341,6 +8450,24 @@ export type AuthorizationSessionHeaderParameter = string;
  * Opaque homeowner portal session token.
  */
 export type PortalTokenHeaderParameter = string;
+
+export type ListSourceNurtureParams = {
+bucket?: ListSourceNurtureBucket;
+/**
+ * @minimum 0
+ * @maximum 100000
+ */
+offset?: number;
+};
+
+export type ListSourceNurtureBucket = typeof ListSourceNurtureBucket[keyof typeof ListSourceNurtureBucket];
+
+
+export const ListSourceNurtureBucket = {
+  attention: 'attention',
+  waiting: 'waiting',
+  history: 'history',
+} as const;
 
 export type ListServiceSmsRepliesParams = {
 /**

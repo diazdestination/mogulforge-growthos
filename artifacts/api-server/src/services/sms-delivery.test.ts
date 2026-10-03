@@ -11,6 +11,7 @@ import {
   contactsTable,
   db,
   organizationsTable,
+  revenueExecutionsTable,
   DEFAULT_SENDING_HOURS,
   twilioClientBindingsTable,
   twilioConsentProofsTable,
@@ -23,6 +24,7 @@ import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import { updateOrgSettings } from "./settings";
 
 import { createAutomation, runEvent } from "./automation";
+import { runDurableAction } from "./durable-execution";
 import * as crm from "./crm";
 import { providers, twilioSmsProvider } from "./providers";
 import { SMS_DISCLOSURE_VERSION } from "./twilio-controls";
@@ -263,5 +265,25 @@ describe("automation → send_sms → Twilio round-trip", () => {
     const res = await providers.sms.send("+15551112222", "mock check");
     expect(res.provider).toBe("mock-sms");
     expect(calls).toHaveLength(0);
+  });
+
+  it("does not downgrade an unknown provider error that copies the local purpose-refusal message", async () => {
+    const original = providers.sms;
+    let attempts = 0;
+    providers.sms = { ...original, send: vi.fn(async () => { attempts++; throw new Error("This SMS purpose is not enabled for the initial program"); }) };
+    try {
+      const action = { type: "send_sms" as const, params: { body: "Synthetic original unknown SMS" } };
+      const rule = await createAutomation(org.id, { name: "Synthetic unknown SMS provenance", event: "assessment.abandoned", actions: [action] });
+      const { lead } = await makeLead("+15557654329", "Uncertain");
+      const context = { leadId: lead.id, event: "assessment.abandoned" };
+      await runEvent(org.id, "assessment.abandoned", { leadId: lead.id });
+      const [run] = await db.select().from(automationRunsTable).where(eq(automationRunsTable.automationId, rule.id));
+      const [receipt] = await db.select().from(revenueExecutionsTable).where(eq(revenueExecutionsTable.actionKey, `automation-run:${run.id}:0`));
+      expect(attempts).toBe(1); expect(run.status).toBe("failed"); expect(receipt.state).toBe("indeterminate");
+      expect(run.actionResults[0].detail).not.toContain("purpose is not enabled");
+      await runDurableAction({ organizationId: org.id, actionKey: receipt.actionKey, kind: "send_sms", payload: { action, context },
+        execute: async () => { attempts++; return { state: "succeeded", detail: "Must not replay" }; } });
+      expect(attempts).toBe(1);
+    } finally { providers.sms = original; }
   });
 });

@@ -3,6 +3,24 @@
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 
+Current L6 candidate: `reports/source-nurture-integration-2026-10-03.md` and
+`reports/source-nurture-operator-guide-2026-10-03.md`. Entry: More tools → Win-back
+→ Reviewed two-message follow-up. Source adoption, exact-address permission,
+selected Microsoft sender, explicit nurture reading, preview/approval/start are
+separate. At most ten addresses/two fixed messages/fourteen days; step two waits
+at least72hours after actual acceptance plus exact observation and fresh complete
+mailbox evidence. Original unknown effects cannot retry or advance. Stop never
+releases permanent ownership or recalls an in-flight provider request.
+
+Offline review: `node scripts/source-nurture-schema-preview.mjs` produces0014
+after0013 (five new tables,130total), without opening a database. API projection:
+`node scripts/source-nurture-api-spec.mjs`, then API-spec codegen. The compatible
+synthetic recovery drill now has36SELECT-only app probes and15new negative
+constraints. `preview-runtime-isolated.mjs --source-nurture` creates a loopback
+fictional stopped/unknown plan and purged-content reply. Readers/providers stay
+disabled, outbound held, all contacts DNC and scheduler off. Preview credentials
+are disposable; never use these fixtures/configuration for real outreach.
+
 Current L5 candidate: `reports/standing-service-integration-2026-10-03.md` and
 `reports/standing-service-operator-guide-2026-10-03.md`. Entry: Warranties & Service
 → Customer care & booking → Review automatic series reminders. Review service SMS

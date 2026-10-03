@@ -33,6 +33,7 @@ vi.mock("./missed-call-care", () => ({
 vi.mock("./callie-runtime", () => ({ processCallieIntakes: vi.fn(async () => {}) }));
 vi.mock("./service-watch", () => ({ processServiceWatch: vi.fn(async () => {}) }));
 vi.mock("./service-standing-runtime", () => ({ processStandingServiceReminders: vi.fn(async () => {}) }));
+vi.mock("./source-nurture-runtime", async (importOriginal) => ({ ...await importOriginal<typeof import("./source-nurture-runtime")>(), processSourceNurture: vi.fn(async () => {}) }));
 vi.mock("./service-sms", async (importOriginal) => ({ ...await importOriginal<typeof import("./service-sms")>(), purgeExpiredServiceSmsReplyContent: vi.fn(async () => {}) }));
 // A global scheduler test must not poll or purge another suite's reply fixtures.
 vi.mock("./mailbox-connector", () => ({ processMailboxConnectors: vi.fn(async () => {}) }));
@@ -58,6 +59,7 @@ import { processMissedCallCare } from "./missed-call-care";
 import { processCallieIntakes } from "./callie-runtime";
 import { processServiceWatch } from "./service-watch";
 import { processStandingServiceReminders } from "./service-standing-runtime";
+import { processSourceNurture } from "./source-nurture-runtime";
 import { purgeExpiredServiceSmsReplyContent } from "./service-sms";
 import { processMailboxConnectors } from "./mailbox-connector";
 import { purgeExpiredServiceReplyContent, purgeExpiredLeadReplyContent } from "./mailbox-communication";
@@ -101,7 +103,7 @@ describe("scheduler stage isolation", () => {
     vi.mocked(processStandingServiceReminders).mockRejectedValueOnce(new Error("PRIVATE_SERVICE_AGREEMENT"));
     const observe = vi.fn(async () => {});
     await processScheduledWork(undefined, observe);
-    expect(observe.mock.calls.slice(0, 6)).toEqual([["mailbox-replies", "running"], ["mailbox-replies", "succeeded"], ["service-standing", "running"], ["service-standing", "failed"], ["scheduled-actions", "running"], ["scheduled-actions", "succeeded"]]);
+    expect(observe.mock.calls.slice(0, 8)).toEqual([["mailbox-replies", "running"], ["mailbox-replies", "succeeded"], ["source-nurture", "running"], ["source-nurture", "succeeded"], ["service-standing", "running"], ["service-standing", "failed"], ["scheduled-actions", "running"], ["scheduled-actions", "succeeded"]]);
     expect(processServiceWatch).toHaveBeenCalledOnce(); expect(purgeExpiredServiceSmsReplyContent).toHaveBeenCalledOnce();
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("PRIVATE_SERVICE_AGREEMENT");
   });
@@ -122,6 +124,7 @@ describe("scheduler stage isolation", () => {
   it("scopes mailbox work to one company and skips global raw-content retention", async () => {
     await processScheduledWork("00000000-0000-4000-8000-000000000001");
     expect(processMailboxConnectors).toHaveBeenCalledExactlyOnceWith("00000000-0000-4000-8000-000000000001");
+    expect(processSourceNurture).toHaveBeenCalledExactlyOnceWith("00000000-0000-4000-8000-000000000001");
     expect(processStandingServiceReminders).toHaveBeenCalledExactlyOnceWith("00000000-0000-4000-8000-000000000001");
     expect(purgeExpiredServiceSmsReplyContent).not.toHaveBeenCalled();
     expect(purgeExpiredServiceReplyContent).not.toHaveBeenCalled();
@@ -137,6 +140,17 @@ describe("scheduler stage isolation", () => {
     expect(observe).toHaveBeenCalledWith("upload-cleanup", "succeeded");
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("PRIVATE_LEAD_REPLY_BODY");
     expect(JSON.stringify(observe.mock.calls)).not.toContain("PRIVATE_LEAD_REPLY_BODY");
+  });
+  it("checks finite nurture after mailbox sync and isolates a failed monitor without leaking source evidence", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(processSourceNurture).mockRejectedValueOnce(new Error("PRIVATE_NURTURE_SOURCE"));
+    const observe = vi.fn(async () => {});
+    await processScheduledWork(undefined, observe);
+    expect(observe.mock.calls.slice(0, 4)).toEqual([["mailbox-replies", "running"], ["mailbox-replies", "succeeded"], ["source-nurture", "running"], ["source-nurture", "failed"]]);
+    expect(observe).toHaveBeenCalledWith("scheduled-actions", "succeeded");
+    expect(observe).toHaveBeenCalledWith("upload-cleanup", "succeeded");
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("PRIVATE_NURTURE_SOURCE");
+    expect(JSON.stringify(observe.mock.calls)).not.toContain("PRIVATE_NURTURE_SOURCE");
   });
   it("reports failed stages without exposing raw exceptions to logs or heartbeat", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});

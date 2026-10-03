@@ -9,6 +9,1541 @@ import * as zod from 'zod';
 
 
 /**
+ * Accepted staff session only; no API-key authority. Finite imported-source nurture requires separate source adoption, address-specific marketing permission, Microsoft sender/read grant, exact approval and explicit start. Maximum ten addresses, two fixed emails, at least 72 hours after actual predecessor acceptance and a fresh complete reply scan, expiring within fourteen days. Permanent ownership and unknown effects never permit replacement keys or automatic replay. Provider acceptance is not delivery, consent, customer confirmation or collected revenue.
+ * @summary Find oldest bounded nurture attention, waiting work or history
+ */
+export const listSourceNurtureQueryBucketDefault = `attention`;
+export const listSourceNurtureQueryOffsetDefault = 0;
+export const listSourceNurtureQueryOffsetMin = 0;
+export const listSourceNurtureQueryOffsetMax = 100000;
+
+
+
+export const ListSourceNurtureQueryParams = zod.object({
+  "bucket": zod.enum(['attention', 'waiting', 'history']).default(listSourceNurtureQueryBucketDefault),
+  "offset": zod.coerce.number().int().min(listSourceNurtureQueryOffsetMin).max(listSourceNurtureQueryOffsetMax).default(listSourceNurtureQueryOffsetDefault)
+})
+
+export const listSourceNurtureResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listSourceNurtureResponseOffsetMin = 0;
+export const listSourceNurtureResponseOffsetMax = 9007199254740991;
+
+export const listSourceNurtureResponseItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listSourceNurtureResponseItemsItemVersionExclusiveMin = 0;
+export const listSourceNurtureResponseItemsItemVersionMax = 9007199254740991;
+
+export const listSourceNurtureResponseItemsItemPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const listSourceNurtureResponseItemsItemRecipientCountMax = 10;
+
+export const listSourceNurtureResponseItemsItemAcceptedStepsMin = 0;
+export const listSourceNurtureResponseItemsItemAcceptedStepsMax = 20;
+
+export const listSourceNurtureResponseItemsItemUncertainStepsMin = 0;
+export const listSourceNurtureResponseItemsItemUncertainStepsMax = 20;
+
+export const listSourceNurtureResponseItemsMax = 25;
+
+
+
+export const ListSourceNurtureResponse = zod.object({
+  "organizationId": zod.uuid().regex(listSourceNurtureResponseOrganizationIdRegExp),
+  "bucket": zod.enum(['attention', 'waiting', 'history']),
+  "offset": zod.int().min(listSourceNurtureResponseOffsetMin).max(listSourceNurtureResponseOffsetMax),
+  "limit": zod.literal(25),
+  "hasMore": zod.boolean(),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(listSourceNurtureResponseItemsItemIdRegExp),
+  "version": zod.int().gt(listSourceNurtureResponseItemsItemVersionExclusiveMin).max(listSourceNurtureResponseItemsItemVersionMax),
+  "state": zod.enum(['draft', 'approved', 'running', 'stopped', 'finished', 'expired']),
+  "payloadSha256": zod.string().regex(listSourceNurtureResponseItemsItemPayloadSha256RegExp),
+  "createdAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "recipientCount": zod.int().min(1).max(listSourceNurtureResponseItemsItemRecipientCountMax),
+  "acceptedSteps": zod.int().min(listSourceNurtureResponseItemsItemAcceptedStepsMin).max(listSourceNurtureResponseItemsItemAcceptedStepsMax),
+  "uncertainSteps": zod.int().min(listSourceNurtureResponseItemsItemUncertainStepsMin).max(listSourceNurtureResponseItemsItemUncertainStepsMax),
+  "reason": zod.string().nullable(),
+  "nextCheckAt": zod.coerce.date().nullable()
+})).max(listSourceNurtureResponseItemsMax)
+})
+
+
+/**
+ * Accepted staff session only; no API-key authority. Finite imported-source nurture requires separate source adoption, address-specific marketing permission, Microsoft sender/read grant, exact approval and explicit start. Maximum ten addresses, two fixed emails, at least 72 hours after actual predecessor acceptance and a fresh complete reply scan, expiring within fourteen days. Permanent ownership and unknown effects never permit replacement keys or automatic replay. Provider acceptance is not delivery, consent, customer confirmation or collected revenue.
+ * @summary Review exact immutable nurture and original outcome evidence
+ */
+export const GetSourceNurtureParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const getSourceNurtureResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseVersionExclusiveMin = 0;
+export const getSourceNurtureResponseVersionMax = 9007199254740991;
+
+export const getSourceNurtureResponsePayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceNurtureResponseSettingsBusinessNameMin = 2;
+export const getSourceNurtureResponseSettingsBusinessNameMax = 150;
+
+export const getSourceNurtureResponseSettingsMailingAddressMin = 10;
+export const getSourceNurtureResponseSettingsMailingAddressMax = 400;
+
+export const getSourceNurtureResponseSettingsStepsItemOneSubjectMin = 3;
+export const getSourceNurtureResponseSettingsStepsItemOneSubjectMax = 180;
+
+export const getSourceNurtureResponseSettingsStepsItemOneBodyMin = 10;
+export const getSourceNurtureResponseSettingsStepsItemOneBodyMax = 4000;
+
+export const getSourceNurtureResponseSettingsStepsItemTwoSubjectMin = 3;
+export const getSourceNurtureResponseSettingsStepsItemTwoSubjectMax = 180;
+
+export const getSourceNurtureResponseSettingsStepsItemTwoBodyMin = 10;
+export const getSourceNurtureResponseSettingsStepsItemTwoBodyMax = 4000;
+
+export const getSourceNurtureResponseSettingsStepsMin = 2;
+export const getSourceNurtureResponseSettingsStepsMax = 2;
+
+
+export const getSourceNurtureResponseSettingsDaysMax = 7;
+
+export const getSourceNurtureResponseSettingsStartHourMin = 8;
+export const getSourceNurtureResponseSettingsStartHourMax = 19;
+
+export const getSourceNurtureResponseSettingsEndHourMin = 9;
+export const getSourceNurtureResponseSettingsEndHourMax = 20;
+
+export const getSourceNurtureResponseSettingsDailyLimitMax = 25;
+
+export const getSourceNurtureResponseReviewIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemRecipientRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionVersionExclusiveMin = 0;
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionVersionMax = 9007199254740991;
+
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryExternalCustomerIdMax = 200;
+
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryExternalEstimateIdMax = 200;
+
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryAppliedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryMappedFieldsItemMax = 40;
+
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryMappedFieldsMax = 30;
+
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceNurtureResponseItemsItemSnapshotAdoptionOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceNurtureResponseItemsItemSnapshotPermissionRecordIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemSnapshotPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemSnapshotSenderSenderEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const getSourceNurtureResponseItemsItemSnapshotMailboxIdentityOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemSnapshotMailboxIdentityMailboxEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const getSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectorIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectorVersionExclusiveMin = 0;
+export const getSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectorVersionMax = 9007199254740991;
+
+export const getSourceNurtureResponseItemsItemSnapshotNurtureMonitoringApprovalVersionExclusiveMin = 0;
+export const getSourceNurtureResponseItemsItemSnapshotNurtureMonitoringApprovalVersionMax = 9007199254740991;
+
+export const getSourceNurtureResponseItemsItemMailboxSyncCompletedCycleIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemStepsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemStepsItemMessageHashRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSourceNurtureResponseItemsItemStepsItemScheduledActionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemStepsItemExecutionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemStepsItemParentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemStepsMin = 2;
+export const getSourceNurtureResponseItemsItemStepsMax = 2;
+
+export const getSourceNurtureResponseItemsItemOutcomesReplyIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemOutcomesTaskIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsItemOutcomesAppointmentIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSourceNurtureResponseItemsMax = 10;
+
+
+
+export const GetSourceNurtureResponse = zod.object({
+  "organizationId": zod.uuid().regex(getSourceNurtureResponseOrganizationIdRegExp),
+  "id": zod.uuid().regex(getSourceNurtureResponseIdRegExp),
+  "version": zod.int().gt(getSourceNurtureResponseVersionExclusiveMin).max(getSourceNurtureResponseVersionMax),
+  "state": zod.enum(['draft', 'approved', 'running', 'stopped', 'finished', 'expired']),
+  "payloadSha256": zod.string().regex(getSourceNurtureResponsePayloadSha256RegExp),
+  "settings": zod.object({
+  "businessName": zod.string().min(getSourceNurtureResponseSettingsBusinessNameMin).max(getSourceNurtureResponseSettingsBusinessNameMax),
+  "mailingAddress": zod.string().min(getSourceNurtureResponseSettingsMailingAddressMin).max(getSourceNurtureResponseSettingsMailingAddressMax),
+  "steps": zod.array(zod.union([zod.object({
+  "subject": zod.string().min(getSourceNurtureResponseSettingsStepsItemOneSubjectMin).max(getSourceNurtureResponseSettingsStepsItemOneSubjectMax),
+  "body": zod.string().min(getSourceNurtureResponseSettingsStepsItemOneBodyMin).max(getSourceNurtureResponseSettingsStepsItemOneBodyMax)
+}),zod.object({
+  "subject": zod.string().min(getSourceNurtureResponseSettingsStepsItemTwoSubjectMin).max(getSourceNurtureResponseSettingsStepsItemTwoSubjectMax),
+  "body": zod.string().min(getSourceNurtureResponseSettingsStepsItemTwoBodyMin).max(getSourceNurtureResponseSettingsStepsItemTwoBodyMax)
+})])).min(getSourceNurtureResponseSettingsStepsMin).max(getSourceNurtureResponseSettingsStepsMax),
+  "timezone": zod.string().min(1),
+  "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])).min(1).max(getSourceNurtureResponseSettingsDaysMax),
+  "startHour": zod.int().min(getSourceNurtureResponseSettingsStartHourMin).max(getSourceNurtureResponseSettingsStartHourMax),
+  "endHour": zod.int().min(getSourceNurtureResponseSettingsEndHourMin).max(getSourceNurtureResponseSettingsEndHourMax),
+  "dailyLimit": zod.int().min(1).max(getSourceNurtureResponseSettingsDailyLimitMax)
+}),
+  "reviewId": zod.uuid().regex(getSourceNurtureResponseReviewIdRegExp),
+  "createdByUserId": zod.string(),
+  "approvedByUserId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "previewExpiresAt": zod.coerce.date(),
+  "startNotBefore": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "stoppedAt": zod.coerce.date().nullable(),
+  "stopReason": zod.string().nullable(),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "nextCheckAt": zod.coerce.date().nullable()
+}),
+  "limits": zod.object({
+  "maxRecipients": zod.literal(10),
+  "steps": zod.literal(2),
+  "minSpacingHours": zod.literal(72),
+  "maxLifetimeDays": zod.literal(14)
+}),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getSourceNurtureResponseItemsItemIdRegExp),
+  "leadId": zod.uuid().regex(getSourceNurtureResponseItemsItemLeadIdRegExp),
+  "contactId": zod.uuid().regex(getSourceNurtureResponseItemsItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(getSourceNurtureResponseItemsItemPropertyIdRegExp).nullable(),
+  "ownerUserId": zod.string(),
+  "recipient": zod.email().regex(getSourceNurtureResponseItemsItemRecipientRegExp),
+  "snapshot": zod.object({
+  "version": zod.literal(1),
+  "adoptionId": zod.uuid().regex(getSourceNurtureResponseItemsItemSnapshotAdoptionIdRegExp),
+  "adoptionVersion": zod.int().gt(getSourceNurtureResponseItemsItemSnapshotAdoptionVersionExclusiveMin).max(getSourceNurtureResponseItemsItemSnapshotAdoptionVersionMax),
+  "adoptionSha256": zod.string().regex(getSourceNurtureResponseItemsItemSnapshotAdoptionSha256RegExp),
+  "adoption": zod.object({
+  "leadId": zod.uuid().regex(getSourceNurtureResponseItemsItemSnapshotAdoptionLeadIdRegExp),
+  "contactId": zod.uuid().regex(getSourceNurtureResponseItemsItemSnapshotAdoptionContactIdRegExp),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "importedHistory": zod.object({
+  "version": zod.literal(1),
+  "kind": zod.enum(['csv_snapshot']),
+  "originalCreatedAt": zod.coerce.date().nullable(),
+  "sourceUpdatedAt": zod.coerce.date().nullable(),
+  "statusChangedAt": zod.coerce.date().nullable(),
+  "lastContactAt": zod.coerce.date().nullable(),
+  "snapshotAsOf": zod.coerce.date().nullable(),
+  "firstImportedAt": zod.coerce.date(),
+  "lastImportedAt": zod.coerce.date(),
+  "externalCustomerId": zod.string().min(1).max(getSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryExternalCustomerIdMax).nullable(),
+  "externalEstimateId": zod.string().min(1).max(getSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryExternalEstimateIdMax).nullable(),
+  "currency": zod.enum(['USD']).nullable(),
+  "fingerprint": zod.string().regex(getSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryFingerprintRegExp),
+  "appliedFingerprint": zod.string().regex(getSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryAppliedFingerprintRegExp),
+  "mappedFields": zod.array(zod.string().min(1).max(getSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryMappedFieldsItemMax)).max(getSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryMappedFieldsMax)
+}),
+  "sourceSha256": zod.string().regex(getSourceNurtureResponseItemsItemSnapshotAdoptionSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(getSourceNurtureResponseItemsItemSnapshotAdoptionOperationalSha256RegExp),
+  "recipient": zod.string()
+}),
+  "permissionRecordId": zod.uuid().regex(getSourceNurtureResponseItemsItemSnapshotPermissionRecordIdRegExp),
+  "ownerUserId": zod.string(),
+  "propertyId": zod.uuid().regex(getSourceNurtureResponseItemsItemSnapshotPropertyIdRegExp).nullable(),
+  "leadCreatedAt": zod.coerce.date(),
+  "sender": zod.object({
+  "userId": zod.string(),
+  "source": zod.enum(['lead_assignee', 'company_default']),
+  "provider": zod.enum(['microsoft']),
+  "senderEmail": zod.email().regex(getSourceNurtureResponseItemsItemSnapshotSenderSenderEmailRegExp)
+}),
+  "mailboxIdentity": zod.object({
+  "organizationId": zod.uuid().regex(getSourceNurtureResponseItemsItemSnapshotMailboxIdentityOrganizationIdRegExp),
+  "senderUserId": zod.string(),
+  "provider": zod.enum(['microsoft']),
+  "connectionId": zod.uuid().regex(getSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectionIdRegExp),
+  "connectionRevision": zod.coerce.date(),
+  "mailboxAccountId": zod.string(),
+  "mailboxEmail": zod.email().regex(getSourceNurtureResponseItemsItemSnapshotMailboxIdentityMailboxEmailRegExp),
+  "connectorId": zod.uuid().regex(getSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectorIdRegExp),
+  "connectorVersion": zod.int().gt(getSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectorVersionExclusiveMin).max(getSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectorVersionMax),
+  "policyVersion": zod.literal(1),
+  "startedAt": zod.coerce.date()
+}),
+  "nurtureMonitoringApproval": zod.object({
+  "version": zod.int().gt(getSourceNurtureResponseItemsItemSnapshotNurtureMonitoringApprovalVersionExclusiveMin).max(getSourceNurtureResponseItemsItemSnapshotNurtureMonitoringApprovalVersionMax),
+  "approvedAt": zod.coerce.date()
+})
+}),
+  "admittedAt": zod.coerce.date().nullable(),
+  "stoppedAt": zod.coerce.date().nullable(),
+  "stopReason": zod.string().nullable(),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "nextCheckAt": zod.coerce.date().nullable()
+}),
+  "mailboxSync": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "completedCycleId": zod.uuid().regex(getSourceNurtureResponseItemsItemMailboxSyncCompletedCycleIdRegExp).nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable()
+}),
+  "steps": zod.array(zod.object({
+  "id": zod.uuid().regex(getSourceNurtureResponseItemsItemStepsItemIdRegExp),
+  "stepIndex": zod.union([zod.literal(1),zod.literal(2)]),
+  "subject": zod.string(),
+  "body": zod.string(),
+  "messageHash": zod.string().regex(getSourceNurtureResponseItemsItemStepsItemMessageHashRegExp),
+  "scheduledActionId": zod.uuid().regex(getSourceNurtureResponseItemsItemStepsItemScheduledActionIdRegExp).nullable(),
+  "notBefore": zod.coerce.date().nullable(),
+  "expiresAt": zod.coerce.date(),
+  "claimedAt": zod.coerce.date().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "state": zod.enum(['not_started', 'waiting', 'ready', 'held', 'processing', 'accepted', 'uncertain', 'cancelled', 'finished']),
+  "reason": zod.string().nullable(),
+  "executionId": zod.uuid().regex(getSourceNurtureResponseItemsItemStepsItemExecutionIdRegExp).nullable(),
+  "executionState": zod.string().nullable(),
+  "parentId": zod.uuid().regex(getSourceNurtureResponseItemsItemStepsItemParentIdRegExp).nullable(),
+  "observedAt": zod.coerce.date().nullable(),
+  "dispatchStartedAt": zod.coerce.date().nullable(),
+  "deliveryConfirmed": zod.literal(false)
+})).min(getSourceNurtureResponseItemsItemStepsMin).max(getSourceNurtureResponseItemsItemStepsMax),
+  "outcomes": zod.object({
+  "leadStatus": zod.string(),
+  "replyIds": zod.array(zod.uuid().regex(getSourceNurtureResponseItemsItemOutcomesReplyIdsItemRegExp)),
+  "taskIds": zod.array(zod.uuid().regex(getSourceNurtureResponseItemsItemOutcomesTaskIdsItemRegExp)),
+  "appointmentIds": zod.array(zod.uuid().regex(getSourceNurtureResponseItemsItemOutcomesAppointmentIdsItemRegExp))
+})
+})).min(1).max(getSourceNurtureResponseItemsMax)
+})
+
+
+/**
+ * Accepted staff session only; no API-key authority. Finite imported-source nurture requires separate source adoption, address-specific marketing permission, Microsoft sender/read grant, exact approval and explicit start. Maximum ten addresses, two fixed emails, at least 72 hours after actual predecessor acceptance and a fresh complete reply scan, expiring within fourteen days. Permanent ownership and unknown effects never permit replacement keys or automatic replay. Provider acceptance is not delivery, consent, customer confirmation or collected revenue.
+ * @summary Freeze a ten-minute actor-bound two-message review without sending
+ */
+export const previewSourceNurtureBodyBusinessNameMin = 2;
+export const previewSourceNurtureBodyBusinessNameMax = 150;
+
+export const previewSourceNurtureBodyMailingAddressMin = 10;
+export const previewSourceNurtureBodyMailingAddressMax = 400;
+
+export const previewSourceNurtureBodyStepsItemOneSubjectMin = 3;
+export const previewSourceNurtureBodyStepsItemOneSubjectMax = 180;
+
+export const previewSourceNurtureBodyStepsItemOneBodyMin = 10;
+export const previewSourceNurtureBodyStepsItemOneBodyMax = 4000;
+
+export const previewSourceNurtureBodyStepsItemTwoSubjectMin = 3;
+export const previewSourceNurtureBodyStepsItemTwoSubjectMax = 180;
+
+export const previewSourceNurtureBodyStepsItemTwoBodyMin = 10;
+export const previewSourceNurtureBodyStepsItemTwoBodyMax = 4000;
+
+export const previewSourceNurtureBodyStepsMin = 2;
+export const previewSourceNurtureBodyStepsMax = 2;
+
+
+export const previewSourceNurtureBodyDaysMax = 7;
+
+export const previewSourceNurtureBodyStartHourMin = 8;
+export const previewSourceNurtureBodyStartHourMax = 19;
+
+export const previewSourceNurtureBodyEndHourMin = 9;
+export const previewSourceNurtureBodyEndHourMax = 20;
+
+export const previewSourceNurtureBodyDailyLimitMax = 25;
+
+export const previewSourceNurtureBodyLeadIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureBodyLeadIdsMax = 10;
+
+
+
+export const PreviewSourceNurtureBody = zod.object({
+  "businessName": zod.string().min(previewSourceNurtureBodyBusinessNameMin).max(previewSourceNurtureBodyBusinessNameMax),
+  "mailingAddress": zod.string().min(previewSourceNurtureBodyMailingAddressMin).max(previewSourceNurtureBodyMailingAddressMax),
+  "steps": zod.array(zod.union([zod.object({
+  "subject": zod.string().min(previewSourceNurtureBodyStepsItemOneSubjectMin).max(previewSourceNurtureBodyStepsItemOneSubjectMax),
+  "body": zod.string().min(previewSourceNurtureBodyStepsItemOneBodyMin).max(previewSourceNurtureBodyStepsItemOneBodyMax)
+}),zod.object({
+  "subject": zod.string().min(previewSourceNurtureBodyStepsItemTwoSubjectMin).max(previewSourceNurtureBodyStepsItemTwoSubjectMax),
+  "body": zod.string().min(previewSourceNurtureBodyStepsItemTwoBodyMin).max(previewSourceNurtureBodyStepsItemTwoBodyMax)
+})])).min(previewSourceNurtureBodyStepsMin).max(previewSourceNurtureBodyStepsMax),
+  "timezone": zod.string().min(1),
+  "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])).min(1).max(previewSourceNurtureBodyDaysMax),
+  "startHour": zod.int().min(previewSourceNurtureBodyStartHourMin).max(previewSourceNurtureBodyStartHourMax),
+  "endHour": zod.int().min(previewSourceNurtureBodyEndHourMin).max(previewSourceNurtureBodyEndHourMax),
+  "dailyLimit": zod.int().min(1).max(previewSourceNurtureBodyDailyLimitMax),
+  "leadIds": zod.array(zod.uuid().regex(previewSourceNurtureBodyLeadIdsItemRegExp)).min(1).max(previewSourceNurtureBodyLeadIdsMax),
+  "startNotBefore": zod.coerce.date(),
+  "expiresAt": zod.coerce.date()
+})
+
+export const previewSourceNurtureResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseVersionExclusiveMin = 0;
+export const previewSourceNurtureResponseVersionMax = 9007199254740991;
+
+export const previewSourceNurtureResponsePayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceNurtureResponseSettingsBusinessNameMin = 2;
+export const previewSourceNurtureResponseSettingsBusinessNameMax = 150;
+
+export const previewSourceNurtureResponseSettingsMailingAddressMin = 10;
+export const previewSourceNurtureResponseSettingsMailingAddressMax = 400;
+
+export const previewSourceNurtureResponseSettingsStepsItemOneSubjectMin = 3;
+export const previewSourceNurtureResponseSettingsStepsItemOneSubjectMax = 180;
+
+export const previewSourceNurtureResponseSettingsStepsItemOneBodyMin = 10;
+export const previewSourceNurtureResponseSettingsStepsItemOneBodyMax = 4000;
+
+export const previewSourceNurtureResponseSettingsStepsItemTwoSubjectMin = 3;
+export const previewSourceNurtureResponseSettingsStepsItemTwoSubjectMax = 180;
+
+export const previewSourceNurtureResponseSettingsStepsItemTwoBodyMin = 10;
+export const previewSourceNurtureResponseSettingsStepsItemTwoBodyMax = 4000;
+
+export const previewSourceNurtureResponseSettingsStepsMin = 2;
+export const previewSourceNurtureResponseSettingsStepsMax = 2;
+
+
+export const previewSourceNurtureResponseSettingsDaysMax = 7;
+
+export const previewSourceNurtureResponseSettingsStartHourMin = 8;
+export const previewSourceNurtureResponseSettingsStartHourMax = 19;
+
+export const previewSourceNurtureResponseSettingsEndHourMin = 9;
+export const previewSourceNurtureResponseSettingsEndHourMax = 20;
+
+export const previewSourceNurtureResponseSettingsDailyLimitMax = 25;
+
+export const previewSourceNurtureResponseReviewIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemRecipientRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionVersionExclusiveMin = 0;
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionVersionMax = 9007199254740991;
+
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryExternalCustomerIdMax = 200;
+
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryExternalEstimateIdMax = 200;
+
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryAppliedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryMappedFieldsItemMax = 40;
+
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryMappedFieldsMax = 30;
+
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceNurtureResponseItemsItemSnapshotAdoptionOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceNurtureResponseItemsItemSnapshotPermissionRecordIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemSnapshotPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemSnapshotSenderSenderEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const previewSourceNurtureResponseItemsItemSnapshotMailboxIdentityOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemSnapshotMailboxIdentityMailboxEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const previewSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectorIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectorVersionExclusiveMin = 0;
+export const previewSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectorVersionMax = 9007199254740991;
+
+export const previewSourceNurtureResponseItemsItemSnapshotNurtureMonitoringApprovalVersionExclusiveMin = 0;
+export const previewSourceNurtureResponseItemsItemSnapshotNurtureMonitoringApprovalVersionMax = 9007199254740991;
+
+export const previewSourceNurtureResponseItemsItemMailboxSyncCompletedCycleIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemStepsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemStepsItemMessageHashRegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewSourceNurtureResponseItemsItemStepsItemScheduledActionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemStepsItemExecutionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemStepsItemParentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemStepsMin = 2;
+export const previewSourceNurtureResponseItemsItemStepsMax = 2;
+
+export const previewSourceNurtureResponseItemsItemOutcomesReplyIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemOutcomesTaskIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsItemOutcomesAppointmentIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewSourceNurtureResponseItemsMax = 10;
+
+
+
+export const PreviewSourceNurtureResponse = zod.object({
+  "organizationId": zod.uuid().regex(previewSourceNurtureResponseOrganizationIdRegExp),
+  "id": zod.uuid().regex(previewSourceNurtureResponseIdRegExp),
+  "version": zod.int().gt(previewSourceNurtureResponseVersionExclusiveMin).max(previewSourceNurtureResponseVersionMax),
+  "state": zod.enum(['draft', 'approved', 'running', 'stopped', 'finished', 'expired']),
+  "payloadSha256": zod.string().regex(previewSourceNurtureResponsePayloadSha256RegExp),
+  "settings": zod.object({
+  "businessName": zod.string().min(previewSourceNurtureResponseSettingsBusinessNameMin).max(previewSourceNurtureResponseSettingsBusinessNameMax),
+  "mailingAddress": zod.string().min(previewSourceNurtureResponseSettingsMailingAddressMin).max(previewSourceNurtureResponseSettingsMailingAddressMax),
+  "steps": zod.array(zod.union([zod.object({
+  "subject": zod.string().min(previewSourceNurtureResponseSettingsStepsItemOneSubjectMin).max(previewSourceNurtureResponseSettingsStepsItemOneSubjectMax),
+  "body": zod.string().min(previewSourceNurtureResponseSettingsStepsItemOneBodyMin).max(previewSourceNurtureResponseSettingsStepsItemOneBodyMax)
+}),zod.object({
+  "subject": zod.string().min(previewSourceNurtureResponseSettingsStepsItemTwoSubjectMin).max(previewSourceNurtureResponseSettingsStepsItemTwoSubjectMax),
+  "body": zod.string().min(previewSourceNurtureResponseSettingsStepsItemTwoBodyMin).max(previewSourceNurtureResponseSettingsStepsItemTwoBodyMax)
+})])).min(previewSourceNurtureResponseSettingsStepsMin).max(previewSourceNurtureResponseSettingsStepsMax),
+  "timezone": zod.string().min(1),
+  "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])).min(1).max(previewSourceNurtureResponseSettingsDaysMax),
+  "startHour": zod.int().min(previewSourceNurtureResponseSettingsStartHourMin).max(previewSourceNurtureResponseSettingsStartHourMax),
+  "endHour": zod.int().min(previewSourceNurtureResponseSettingsEndHourMin).max(previewSourceNurtureResponseSettingsEndHourMax),
+  "dailyLimit": zod.int().min(1).max(previewSourceNurtureResponseSettingsDailyLimitMax)
+}),
+  "reviewId": zod.uuid().regex(previewSourceNurtureResponseReviewIdRegExp),
+  "createdByUserId": zod.string(),
+  "approvedByUserId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "previewExpiresAt": zod.coerce.date(),
+  "startNotBefore": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "stoppedAt": zod.coerce.date().nullable(),
+  "stopReason": zod.string().nullable(),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "nextCheckAt": zod.coerce.date().nullable()
+}),
+  "limits": zod.object({
+  "maxRecipients": zod.literal(10),
+  "steps": zod.literal(2),
+  "minSpacingHours": zod.literal(72),
+  "maxLifetimeDays": zod.literal(14)
+}),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(previewSourceNurtureResponseItemsItemIdRegExp),
+  "leadId": zod.uuid().regex(previewSourceNurtureResponseItemsItemLeadIdRegExp),
+  "contactId": zod.uuid().regex(previewSourceNurtureResponseItemsItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(previewSourceNurtureResponseItemsItemPropertyIdRegExp).nullable(),
+  "ownerUserId": zod.string(),
+  "recipient": zod.email().regex(previewSourceNurtureResponseItemsItemRecipientRegExp),
+  "snapshot": zod.object({
+  "version": zod.literal(1),
+  "adoptionId": zod.uuid().regex(previewSourceNurtureResponseItemsItemSnapshotAdoptionIdRegExp),
+  "adoptionVersion": zod.int().gt(previewSourceNurtureResponseItemsItemSnapshotAdoptionVersionExclusiveMin).max(previewSourceNurtureResponseItemsItemSnapshotAdoptionVersionMax),
+  "adoptionSha256": zod.string().regex(previewSourceNurtureResponseItemsItemSnapshotAdoptionSha256RegExp),
+  "adoption": zod.object({
+  "leadId": zod.uuid().regex(previewSourceNurtureResponseItemsItemSnapshotAdoptionLeadIdRegExp),
+  "contactId": zod.uuid().regex(previewSourceNurtureResponseItemsItemSnapshotAdoptionContactIdRegExp),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "importedHistory": zod.object({
+  "version": zod.literal(1),
+  "kind": zod.enum(['csv_snapshot']),
+  "originalCreatedAt": zod.coerce.date().nullable(),
+  "sourceUpdatedAt": zod.coerce.date().nullable(),
+  "statusChangedAt": zod.coerce.date().nullable(),
+  "lastContactAt": zod.coerce.date().nullable(),
+  "snapshotAsOf": zod.coerce.date().nullable(),
+  "firstImportedAt": zod.coerce.date(),
+  "lastImportedAt": zod.coerce.date(),
+  "externalCustomerId": zod.string().min(1).max(previewSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryExternalCustomerIdMax).nullable(),
+  "externalEstimateId": zod.string().min(1).max(previewSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryExternalEstimateIdMax).nullable(),
+  "currency": zod.enum(['USD']).nullable(),
+  "fingerprint": zod.string().regex(previewSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryFingerprintRegExp),
+  "appliedFingerprint": zod.string().regex(previewSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryAppliedFingerprintRegExp),
+  "mappedFields": zod.array(zod.string().min(1).max(previewSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryMappedFieldsItemMax)).max(previewSourceNurtureResponseItemsItemSnapshotAdoptionImportedHistoryMappedFieldsMax)
+}),
+  "sourceSha256": zod.string().regex(previewSourceNurtureResponseItemsItemSnapshotAdoptionSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(previewSourceNurtureResponseItemsItemSnapshotAdoptionOperationalSha256RegExp),
+  "recipient": zod.string()
+}),
+  "permissionRecordId": zod.uuid().regex(previewSourceNurtureResponseItemsItemSnapshotPermissionRecordIdRegExp),
+  "ownerUserId": zod.string(),
+  "propertyId": zod.uuid().regex(previewSourceNurtureResponseItemsItemSnapshotPropertyIdRegExp).nullable(),
+  "leadCreatedAt": zod.coerce.date(),
+  "sender": zod.object({
+  "userId": zod.string(),
+  "source": zod.enum(['lead_assignee', 'company_default']),
+  "provider": zod.enum(['microsoft']),
+  "senderEmail": zod.email().regex(previewSourceNurtureResponseItemsItemSnapshotSenderSenderEmailRegExp)
+}),
+  "mailboxIdentity": zod.object({
+  "organizationId": zod.uuid().regex(previewSourceNurtureResponseItemsItemSnapshotMailboxIdentityOrganizationIdRegExp),
+  "senderUserId": zod.string(),
+  "provider": zod.enum(['microsoft']),
+  "connectionId": zod.uuid().regex(previewSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectionIdRegExp),
+  "connectionRevision": zod.coerce.date(),
+  "mailboxAccountId": zod.string(),
+  "mailboxEmail": zod.email().regex(previewSourceNurtureResponseItemsItemSnapshotMailboxIdentityMailboxEmailRegExp),
+  "connectorId": zod.uuid().regex(previewSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectorIdRegExp),
+  "connectorVersion": zod.int().gt(previewSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectorVersionExclusiveMin).max(previewSourceNurtureResponseItemsItemSnapshotMailboxIdentityConnectorVersionMax),
+  "policyVersion": zod.literal(1),
+  "startedAt": zod.coerce.date()
+}),
+  "nurtureMonitoringApproval": zod.object({
+  "version": zod.int().gt(previewSourceNurtureResponseItemsItemSnapshotNurtureMonitoringApprovalVersionExclusiveMin).max(previewSourceNurtureResponseItemsItemSnapshotNurtureMonitoringApprovalVersionMax),
+  "approvedAt": zod.coerce.date()
+})
+}),
+  "admittedAt": zod.coerce.date().nullable(),
+  "stoppedAt": zod.coerce.date().nullable(),
+  "stopReason": zod.string().nullable(),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "nextCheckAt": zod.coerce.date().nullable()
+}),
+  "mailboxSync": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "completedCycleId": zod.uuid().regex(previewSourceNurtureResponseItemsItemMailboxSyncCompletedCycleIdRegExp).nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable()
+}),
+  "steps": zod.array(zod.object({
+  "id": zod.uuid().regex(previewSourceNurtureResponseItemsItemStepsItemIdRegExp),
+  "stepIndex": zod.union([zod.literal(1),zod.literal(2)]),
+  "subject": zod.string(),
+  "body": zod.string(),
+  "messageHash": zod.string().regex(previewSourceNurtureResponseItemsItemStepsItemMessageHashRegExp),
+  "scheduledActionId": zod.uuid().regex(previewSourceNurtureResponseItemsItemStepsItemScheduledActionIdRegExp).nullable(),
+  "notBefore": zod.coerce.date().nullable(),
+  "expiresAt": zod.coerce.date(),
+  "claimedAt": zod.coerce.date().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "state": zod.enum(['not_started', 'waiting', 'ready', 'held', 'processing', 'accepted', 'uncertain', 'cancelled', 'finished']),
+  "reason": zod.string().nullable(),
+  "executionId": zod.uuid().regex(previewSourceNurtureResponseItemsItemStepsItemExecutionIdRegExp).nullable(),
+  "executionState": zod.string().nullable(),
+  "parentId": zod.uuid().regex(previewSourceNurtureResponseItemsItemStepsItemParentIdRegExp).nullable(),
+  "observedAt": zod.coerce.date().nullable(),
+  "dispatchStartedAt": zod.coerce.date().nullable(),
+  "deliveryConfirmed": zod.literal(false)
+})).min(previewSourceNurtureResponseItemsItemStepsMin).max(previewSourceNurtureResponseItemsItemStepsMax),
+  "outcomes": zod.object({
+  "leadStatus": zod.string(),
+  "replyIds": zod.array(zod.uuid().regex(previewSourceNurtureResponseItemsItemOutcomesReplyIdsItemRegExp)),
+  "taskIds": zod.array(zod.uuid().regex(previewSourceNurtureResponseItemsItemOutcomesTaskIdsItemRegExp)),
+  "appointmentIds": zod.array(zod.uuid().regex(previewSourceNurtureResponseItemsItemOutcomesAppointmentIdsItemRegExp))
+})
+})).min(1).max(previewSourceNurtureResponseItemsMax)
+})
+
+
+/**
+ * Accepted staff session only; no API-key authority. Finite imported-source nurture requires separate source adoption, address-specific marketing permission, Microsoft sender/read grant, exact approval and explicit start. Maximum ten addresses, two fixed emails, at least 72 hours after actual predecessor acceptance and a fresh complete reply scan, expiring within fourteen days. Permanent ownership and unknown effects never permit replacement keys or automatic replay. Provider acceptance is not delivery, consent, customer confirmation or collected revenue.
+ * @summary Approve the exact saved review without scheduling a send
+ */
+export const ApproveSourceNurtureParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const approveSourceNurtureBodyExpectedVersionExclusiveMin = 0;
+export const approveSourceNurtureBodyExpectedVersionMax = 9007199254740991;
+
+export const approveSourceNurtureBodyPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const ApproveSourceNurtureBody = zod.object({
+  "expectedVersion": zod.int().gt(approveSourceNurtureBodyExpectedVersionExclusiveMin).max(approveSourceNurtureBodyExpectedVersionMax),
+  "payloadSha256": zod.string().regex(approveSourceNurtureBodyPayloadSha256RegExp),
+  "confirmed": zod.literal(true)
+})
+
+export const approveSourceNurtureResponseDetailOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailVersionExclusiveMin = 0;
+export const approveSourceNurtureResponseDetailVersionMax = 9007199254740991;
+
+export const approveSourceNurtureResponseDetailPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceNurtureResponseDetailSettingsBusinessNameMin = 2;
+export const approveSourceNurtureResponseDetailSettingsBusinessNameMax = 150;
+
+export const approveSourceNurtureResponseDetailSettingsMailingAddressMin = 10;
+export const approveSourceNurtureResponseDetailSettingsMailingAddressMax = 400;
+
+export const approveSourceNurtureResponseDetailSettingsStepsItemOneSubjectMin = 3;
+export const approveSourceNurtureResponseDetailSettingsStepsItemOneSubjectMax = 180;
+
+export const approveSourceNurtureResponseDetailSettingsStepsItemOneBodyMin = 10;
+export const approveSourceNurtureResponseDetailSettingsStepsItemOneBodyMax = 4000;
+
+export const approveSourceNurtureResponseDetailSettingsStepsItemTwoSubjectMin = 3;
+export const approveSourceNurtureResponseDetailSettingsStepsItemTwoSubjectMax = 180;
+
+export const approveSourceNurtureResponseDetailSettingsStepsItemTwoBodyMin = 10;
+export const approveSourceNurtureResponseDetailSettingsStepsItemTwoBodyMax = 4000;
+
+export const approveSourceNurtureResponseDetailSettingsStepsMin = 2;
+export const approveSourceNurtureResponseDetailSettingsStepsMax = 2;
+
+
+export const approveSourceNurtureResponseDetailSettingsDaysMax = 7;
+
+export const approveSourceNurtureResponseDetailSettingsStartHourMin = 8;
+export const approveSourceNurtureResponseDetailSettingsStartHourMax = 19;
+
+export const approveSourceNurtureResponseDetailSettingsEndHourMin = 9;
+export const approveSourceNurtureResponseDetailSettingsEndHourMax = 20;
+
+export const approveSourceNurtureResponseDetailSettingsDailyLimitMax = 25;
+
+export const approveSourceNurtureResponseDetailReviewIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemRecipientRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionVersionExclusiveMin = 0;
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionVersionMax = 9007199254740991;
+
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryExternalCustomerIdMax = 200;
+
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryExternalEstimateIdMax = 200;
+
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryAppliedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryMappedFieldsItemMax = 40;
+
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryMappedFieldsMax = 30;
+
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotPermissionRecordIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotSenderSenderEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityMailboxEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorVersionExclusiveMin = 0;
+export const approveSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorVersionMax = 9007199254740991;
+
+export const approveSourceNurtureResponseDetailItemsItemSnapshotNurtureMonitoringApprovalVersionExclusiveMin = 0;
+export const approveSourceNurtureResponseDetailItemsItemSnapshotNurtureMonitoringApprovalVersionMax = 9007199254740991;
+
+export const approveSourceNurtureResponseDetailItemsItemMailboxSyncCompletedCycleIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemStepsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemStepsItemMessageHashRegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveSourceNurtureResponseDetailItemsItemStepsItemScheduledActionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemStepsItemExecutionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemStepsItemParentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemStepsMin = 2;
+export const approveSourceNurtureResponseDetailItemsItemStepsMax = 2;
+
+export const approveSourceNurtureResponseDetailItemsItemOutcomesReplyIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemOutcomesTaskIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsItemOutcomesAppointmentIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseDetailItemsMax = 10;
+
+export const approveSourceNurtureResponseCommandRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveSourceNurtureResponseCommandAppliedVersionExclusiveMin = 0;
+export const approveSourceNurtureResponseCommandAppliedVersionMax = 9007199254740991;
+
+
+
+export const ApproveSourceNurtureResponse = zod.object({
+  "detail": zod.object({
+  "organizationId": zod.uuid().regex(approveSourceNurtureResponseDetailOrganizationIdRegExp),
+  "id": zod.uuid().regex(approveSourceNurtureResponseDetailIdRegExp),
+  "version": zod.int().gt(approveSourceNurtureResponseDetailVersionExclusiveMin).max(approveSourceNurtureResponseDetailVersionMax),
+  "state": zod.enum(['draft', 'approved', 'running', 'stopped', 'finished', 'expired']),
+  "payloadSha256": zod.string().regex(approveSourceNurtureResponseDetailPayloadSha256RegExp),
+  "settings": zod.object({
+  "businessName": zod.string().min(approveSourceNurtureResponseDetailSettingsBusinessNameMin).max(approveSourceNurtureResponseDetailSettingsBusinessNameMax),
+  "mailingAddress": zod.string().min(approveSourceNurtureResponseDetailSettingsMailingAddressMin).max(approveSourceNurtureResponseDetailSettingsMailingAddressMax),
+  "steps": zod.array(zod.union([zod.object({
+  "subject": zod.string().min(approveSourceNurtureResponseDetailSettingsStepsItemOneSubjectMin).max(approveSourceNurtureResponseDetailSettingsStepsItemOneSubjectMax),
+  "body": zod.string().min(approveSourceNurtureResponseDetailSettingsStepsItemOneBodyMin).max(approveSourceNurtureResponseDetailSettingsStepsItemOneBodyMax)
+}),zod.object({
+  "subject": zod.string().min(approveSourceNurtureResponseDetailSettingsStepsItemTwoSubjectMin).max(approveSourceNurtureResponseDetailSettingsStepsItemTwoSubjectMax),
+  "body": zod.string().min(approveSourceNurtureResponseDetailSettingsStepsItemTwoBodyMin).max(approveSourceNurtureResponseDetailSettingsStepsItemTwoBodyMax)
+})])).min(approveSourceNurtureResponseDetailSettingsStepsMin).max(approveSourceNurtureResponseDetailSettingsStepsMax),
+  "timezone": zod.string().min(1),
+  "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])).min(1).max(approveSourceNurtureResponseDetailSettingsDaysMax),
+  "startHour": zod.int().min(approveSourceNurtureResponseDetailSettingsStartHourMin).max(approveSourceNurtureResponseDetailSettingsStartHourMax),
+  "endHour": zod.int().min(approveSourceNurtureResponseDetailSettingsEndHourMin).max(approveSourceNurtureResponseDetailSettingsEndHourMax),
+  "dailyLimit": zod.int().min(1).max(approveSourceNurtureResponseDetailSettingsDailyLimitMax)
+}),
+  "reviewId": zod.uuid().regex(approveSourceNurtureResponseDetailReviewIdRegExp),
+  "createdByUserId": zod.string(),
+  "approvedByUserId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "previewExpiresAt": zod.coerce.date(),
+  "startNotBefore": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "stoppedAt": zod.coerce.date().nullable(),
+  "stopReason": zod.string().nullable(),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "nextCheckAt": zod.coerce.date().nullable()
+}),
+  "limits": zod.object({
+  "maxRecipients": zod.literal(10),
+  "steps": zod.literal(2),
+  "minSpacingHours": zod.literal(72),
+  "maxLifetimeDays": zod.literal(14)
+}),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemIdRegExp),
+  "leadId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemLeadIdRegExp),
+  "contactId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemPropertyIdRegExp).nullable(),
+  "ownerUserId": zod.string(),
+  "recipient": zod.email().regex(approveSourceNurtureResponseDetailItemsItemRecipientRegExp),
+  "snapshot": zod.object({
+  "version": zod.literal(1),
+  "adoptionId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionIdRegExp),
+  "adoptionVersion": zod.int().gt(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionVersionExclusiveMin).max(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionVersionMax),
+  "adoptionSha256": zod.string().regex(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionSha256RegExp),
+  "adoption": zod.object({
+  "leadId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionLeadIdRegExp),
+  "contactId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionContactIdRegExp),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "importedHistory": zod.object({
+  "version": zod.literal(1),
+  "kind": zod.enum(['csv_snapshot']),
+  "originalCreatedAt": zod.coerce.date().nullable(),
+  "sourceUpdatedAt": zod.coerce.date().nullable(),
+  "statusChangedAt": zod.coerce.date().nullable(),
+  "lastContactAt": zod.coerce.date().nullable(),
+  "snapshotAsOf": zod.coerce.date().nullable(),
+  "firstImportedAt": zod.coerce.date(),
+  "lastImportedAt": zod.coerce.date(),
+  "externalCustomerId": zod.string().min(1).max(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryExternalCustomerIdMax).nullable(),
+  "externalEstimateId": zod.string().min(1).max(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryExternalEstimateIdMax).nullable(),
+  "currency": zod.enum(['USD']).nullable(),
+  "fingerprint": zod.string().regex(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryFingerprintRegExp),
+  "appliedFingerprint": zod.string().regex(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryAppliedFingerprintRegExp),
+  "mappedFields": zod.array(zod.string().min(1).max(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryMappedFieldsItemMax)).max(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryMappedFieldsMax)
+}),
+  "sourceSha256": zod.string().regex(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(approveSourceNurtureResponseDetailItemsItemSnapshotAdoptionOperationalSha256RegExp),
+  "recipient": zod.string()
+}),
+  "permissionRecordId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemSnapshotPermissionRecordIdRegExp),
+  "ownerUserId": zod.string(),
+  "propertyId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemSnapshotPropertyIdRegExp).nullable(),
+  "leadCreatedAt": zod.coerce.date(),
+  "sender": zod.object({
+  "userId": zod.string(),
+  "source": zod.enum(['lead_assignee', 'company_default']),
+  "provider": zod.enum(['microsoft']),
+  "senderEmail": zod.email().regex(approveSourceNurtureResponseDetailItemsItemSnapshotSenderSenderEmailRegExp)
+}),
+  "mailboxIdentity": zod.object({
+  "organizationId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityOrganizationIdRegExp),
+  "senderUserId": zod.string(),
+  "provider": zod.enum(['microsoft']),
+  "connectionId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectionIdRegExp),
+  "connectionRevision": zod.coerce.date(),
+  "mailboxAccountId": zod.string(),
+  "mailboxEmail": zod.email().regex(approveSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityMailboxEmailRegExp),
+  "connectorId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorIdRegExp),
+  "connectorVersion": zod.int().gt(approveSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorVersionExclusiveMin).max(approveSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorVersionMax),
+  "policyVersion": zod.literal(1),
+  "startedAt": zod.coerce.date()
+}),
+  "nurtureMonitoringApproval": zod.object({
+  "version": zod.int().gt(approveSourceNurtureResponseDetailItemsItemSnapshotNurtureMonitoringApprovalVersionExclusiveMin).max(approveSourceNurtureResponseDetailItemsItemSnapshotNurtureMonitoringApprovalVersionMax),
+  "approvedAt": zod.coerce.date()
+})
+}),
+  "admittedAt": zod.coerce.date().nullable(),
+  "stoppedAt": zod.coerce.date().nullable(),
+  "stopReason": zod.string().nullable(),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "nextCheckAt": zod.coerce.date().nullable()
+}),
+  "mailboxSync": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "completedCycleId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemMailboxSyncCompletedCycleIdRegExp).nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable()
+}),
+  "steps": zod.array(zod.object({
+  "id": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemStepsItemIdRegExp),
+  "stepIndex": zod.union([zod.literal(1),zod.literal(2)]),
+  "subject": zod.string(),
+  "body": zod.string(),
+  "messageHash": zod.string().regex(approveSourceNurtureResponseDetailItemsItemStepsItemMessageHashRegExp),
+  "scheduledActionId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemStepsItemScheduledActionIdRegExp).nullable(),
+  "notBefore": zod.coerce.date().nullable(),
+  "expiresAt": zod.coerce.date(),
+  "claimedAt": zod.coerce.date().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "state": zod.enum(['not_started', 'waiting', 'ready', 'held', 'processing', 'accepted', 'uncertain', 'cancelled', 'finished']),
+  "reason": zod.string().nullable(),
+  "executionId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemStepsItemExecutionIdRegExp).nullable(),
+  "executionState": zod.string().nullable(),
+  "parentId": zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemStepsItemParentIdRegExp).nullable(),
+  "observedAt": zod.coerce.date().nullable(),
+  "dispatchStartedAt": zod.coerce.date().nullable(),
+  "deliveryConfirmed": zod.literal(false)
+})).min(approveSourceNurtureResponseDetailItemsItemStepsMin).max(approveSourceNurtureResponseDetailItemsItemStepsMax),
+  "outcomes": zod.object({
+  "leadStatus": zod.string(),
+  "replyIds": zod.array(zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemOutcomesReplyIdsItemRegExp)),
+  "taskIds": zod.array(zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemOutcomesTaskIdsItemRegExp)),
+  "appointmentIds": zod.array(zod.uuid().regex(approveSourceNurtureResponseDetailItemsItemOutcomesAppointmentIdsItemRegExp))
+})
+})).min(1).max(approveSourceNurtureResponseDetailItemsMax)
+}),
+  "command": zod.object({
+  "action": zod.enum(['approve', 'start', 'stop']),
+  "requestId": zod.uuid().regex(approveSourceNurtureResponseCommandRequestIdRegExp).nullable(),
+  "replayed": zod.boolean(),
+  "appliedVersion": zod.int().gt(approveSourceNurtureResponseCommandAppliedVersionExclusiveMin).max(approveSourceNurtureResponseCommandAppliedVersionMax)
+})
+})
+
+
+/**
+ * Accepted staff session only; no API-key authority. Finite imported-source nurture requires separate source adoption, address-specific marketing permission, Microsoft sender/read grant, exact approval and explicit start. Maximum ten addresses, two fixed emails, at least 72 hours after actual predecessor acceptance and a fresh complete reply scan, expiring within fourteen days. Permanent ownership and unknown effects never permit replacement keys or automatic replay. Provider acceptance is not delivery, consent, customer confirmation or collected revenue.
+ * @summary Explicitly admit the original finite sequence once
+ */
+export const StartSourceNurtureParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const startSourceNurtureBodyExpectedVersionExclusiveMin = 0;
+export const startSourceNurtureBodyExpectedVersionMax = 9007199254740991;
+
+export const startSourceNurtureBodyPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const startSourceNurtureBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const StartSourceNurtureBody = zod.object({
+  "expectedVersion": zod.int().gt(startSourceNurtureBodyExpectedVersionExclusiveMin).max(startSourceNurtureBodyExpectedVersionMax),
+  "payloadSha256": zod.string().regex(startSourceNurtureBodyPayloadSha256RegExp),
+  "confirmed": zod.literal(true),
+  "requestId": zod.uuid().regex(startSourceNurtureBodyRequestIdRegExp)
+})
+
+export const startSourceNurtureResponseDetailOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailVersionExclusiveMin = 0;
+export const startSourceNurtureResponseDetailVersionMax = 9007199254740991;
+
+export const startSourceNurtureResponseDetailPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const startSourceNurtureResponseDetailSettingsBusinessNameMin = 2;
+export const startSourceNurtureResponseDetailSettingsBusinessNameMax = 150;
+
+export const startSourceNurtureResponseDetailSettingsMailingAddressMin = 10;
+export const startSourceNurtureResponseDetailSettingsMailingAddressMax = 400;
+
+export const startSourceNurtureResponseDetailSettingsStepsItemOneSubjectMin = 3;
+export const startSourceNurtureResponseDetailSettingsStepsItemOneSubjectMax = 180;
+
+export const startSourceNurtureResponseDetailSettingsStepsItemOneBodyMin = 10;
+export const startSourceNurtureResponseDetailSettingsStepsItemOneBodyMax = 4000;
+
+export const startSourceNurtureResponseDetailSettingsStepsItemTwoSubjectMin = 3;
+export const startSourceNurtureResponseDetailSettingsStepsItemTwoSubjectMax = 180;
+
+export const startSourceNurtureResponseDetailSettingsStepsItemTwoBodyMin = 10;
+export const startSourceNurtureResponseDetailSettingsStepsItemTwoBodyMax = 4000;
+
+export const startSourceNurtureResponseDetailSettingsStepsMin = 2;
+export const startSourceNurtureResponseDetailSettingsStepsMax = 2;
+
+
+export const startSourceNurtureResponseDetailSettingsDaysMax = 7;
+
+export const startSourceNurtureResponseDetailSettingsStartHourMin = 8;
+export const startSourceNurtureResponseDetailSettingsStartHourMax = 19;
+
+export const startSourceNurtureResponseDetailSettingsEndHourMin = 9;
+export const startSourceNurtureResponseDetailSettingsEndHourMax = 20;
+
+export const startSourceNurtureResponseDetailSettingsDailyLimitMax = 25;
+
+export const startSourceNurtureResponseDetailReviewIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemRecipientRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionVersionExclusiveMin = 0;
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionVersionMax = 9007199254740991;
+
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryExternalCustomerIdMax = 200;
+
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryExternalEstimateIdMax = 200;
+
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryAppliedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryMappedFieldsItemMax = 40;
+
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryMappedFieldsMax = 30;
+
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotAdoptionOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotPermissionRecordIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotSenderSenderEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityMailboxEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorVersionExclusiveMin = 0;
+export const startSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorVersionMax = 9007199254740991;
+
+export const startSourceNurtureResponseDetailItemsItemSnapshotNurtureMonitoringApprovalVersionExclusiveMin = 0;
+export const startSourceNurtureResponseDetailItemsItemSnapshotNurtureMonitoringApprovalVersionMax = 9007199254740991;
+
+export const startSourceNurtureResponseDetailItemsItemMailboxSyncCompletedCycleIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemStepsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemStepsItemMessageHashRegExp = new RegExp('^[a-f0-9]{64}$');
+export const startSourceNurtureResponseDetailItemsItemStepsItemScheduledActionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemStepsItemExecutionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemStepsItemParentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemStepsMin = 2;
+export const startSourceNurtureResponseDetailItemsItemStepsMax = 2;
+
+export const startSourceNurtureResponseDetailItemsItemOutcomesReplyIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemOutcomesTaskIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsItemOutcomesAppointmentIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseDetailItemsMax = 10;
+
+export const startSourceNurtureResponseCommandRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const startSourceNurtureResponseCommandAppliedVersionExclusiveMin = 0;
+export const startSourceNurtureResponseCommandAppliedVersionMax = 9007199254740991;
+
+
+
+export const StartSourceNurtureResponse = zod.object({
+  "detail": zod.object({
+  "organizationId": zod.uuid().regex(startSourceNurtureResponseDetailOrganizationIdRegExp),
+  "id": zod.uuid().regex(startSourceNurtureResponseDetailIdRegExp),
+  "version": zod.int().gt(startSourceNurtureResponseDetailVersionExclusiveMin).max(startSourceNurtureResponseDetailVersionMax),
+  "state": zod.enum(['draft', 'approved', 'running', 'stopped', 'finished', 'expired']),
+  "payloadSha256": zod.string().regex(startSourceNurtureResponseDetailPayloadSha256RegExp),
+  "settings": zod.object({
+  "businessName": zod.string().min(startSourceNurtureResponseDetailSettingsBusinessNameMin).max(startSourceNurtureResponseDetailSettingsBusinessNameMax),
+  "mailingAddress": zod.string().min(startSourceNurtureResponseDetailSettingsMailingAddressMin).max(startSourceNurtureResponseDetailSettingsMailingAddressMax),
+  "steps": zod.array(zod.union([zod.object({
+  "subject": zod.string().min(startSourceNurtureResponseDetailSettingsStepsItemOneSubjectMin).max(startSourceNurtureResponseDetailSettingsStepsItemOneSubjectMax),
+  "body": zod.string().min(startSourceNurtureResponseDetailSettingsStepsItemOneBodyMin).max(startSourceNurtureResponseDetailSettingsStepsItemOneBodyMax)
+}),zod.object({
+  "subject": zod.string().min(startSourceNurtureResponseDetailSettingsStepsItemTwoSubjectMin).max(startSourceNurtureResponseDetailSettingsStepsItemTwoSubjectMax),
+  "body": zod.string().min(startSourceNurtureResponseDetailSettingsStepsItemTwoBodyMin).max(startSourceNurtureResponseDetailSettingsStepsItemTwoBodyMax)
+})])).min(startSourceNurtureResponseDetailSettingsStepsMin).max(startSourceNurtureResponseDetailSettingsStepsMax),
+  "timezone": zod.string().min(1),
+  "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])).min(1).max(startSourceNurtureResponseDetailSettingsDaysMax),
+  "startHour": zod.int().min(startSourceNurtureResponseDetailSettingsStartHourMin).max(startSourceNurtureResponseDetailSettingsStartHourMax),
+  "endHour": zod.int().min(startSourceNurtureResponseDetailSettingsEndHourMin).max(startSourceNurtureResponseDetailSettingsEndHourMax),
+  "dailyLimit": zod.int().min(1).max(startSourceNurtureResponseDetailSettingsDailyLimitMax)
+}),
+  "reviewId": zod.uuid().regex(startSourceNurtureResponseDetailReviewIdRegExp),
+  "createdByUserId": zod.string(),
+  "approvedByUserId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "previewExpiresAt": zod.coerce.date(),
+  "startNotBefore": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "stoppedAt": zod.coerce.date().nullable(),
+  "stopReason": zod.string().nullable(),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "nextCheckAt": zod.coerce.date().nullable()
+}),
+  "limits": zod.object({
+  "maxRecipients": zod.literal(10),
+  "steps": zod.literal(2),
+  "minSpacingHours": zod.literal(72),
+  "maxLifetimeDays": zod.literal(14)
+}),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemIdRegExp),
+  "leadId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemLeadIdRegExp),
+  "contactId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemPropertyIdRegExp).nullable(),
+  "ownerUserId": zod.string(),
+  "recipient": zod.email().regex(startSourceNurtureResponseDetailItemsItemRecipientRegExp),
+  "snapshot": zod.object({
+  "version": zod.literal(1),
+  "adoptionId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionIdRegExp),
+  "adoptionVersion": zod.int().gt(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionVersionExclusiveMin).max(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionVersionMax),
+  "adoptionSha256": zod.string().regex(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionSha256RegExp),
+  "adoption": zod.object({
+  "leadId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionLeadIdRegExp),
+  "contactId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionContactIdRegExp),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "importedHistory": zod.object({
+  "version": zod.literal(1),
+  "kind": zod.enum(['csv_snapshot']),
+  "originalCreatedAt": zod.coerce.date().nullable(),
+  "sourceUpdatedAt": zod.coerce.date().nullable(),
+  "statusChangedAt": zod.coerce.date().nullable(),
+  "lastContactAt": zod.coerce.date().nullable(),
+  "snapshotAsOf": zod.coerce.date().nullable(),
+  "firstImportedAt": zod.coerce.date(),
+  "lastImportedAt": zod.coerce.date(),
+  "externalCustomerId": zod.string().min(1).max(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryExternalCustomerIdMax).nullable(),
+  "externalEstimateId": zod.string().min(1).max(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryExternalEstimateIdMax).nullable(),
+  "currency": zod.enum(['USD']).nullable(),
+  "fingerprint": zod.string().regex(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryFingerprintRegExp),
+  "appliedFingerprint": zod.string().regex(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryAppliedFingerprintRegExp),
+  "mappedFields": zod.array(zod.string().min(1).max(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryMappedFieldsItemMax)).max(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryMappedFieldsMax)
+}),
+  "sourceSha256": zod.string().regex(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(startSourceNurtureResponseDetailItemsItemSnapshotAdoptionOperationalSha256RegExp),
+  "recipient": zod.string()
+}),
+  "permissionRecordId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemSnapshotPermissionRecordIdRegExp),
+  "ownerUserId": zod.string(),
+  "propertyId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemSnapshotPropertyIdRegExp).nullable(),
+  "leadCreatedAt": zod.coerce.date(),
+  "sender": zod.object({
+  "userId": zod.string(),
+  "source": zod.enum(['lead_assignee', 'company_default']),
+  "provider": zod.enum(['microsoft']),
+  "senderEmail": zod.email().regex(startSourceNurtureResponseDetailItemsItemSnapshotSenderSenderEmailRegExp)
+}),
+  "mailboxIdentity": zod.object({
+  "organizationId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityOrganizationIdRegExp),
+  "senderUserId": zod.string(),
+  "provider": zod.enum(['microsoft']),
+  "connectionId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectionIdRegExp),
+  "connectionRevision": zod.coerce.date(),
+  "mailboxAccountId": zod.string(),
+  "mailboxEmail": zod.email().regex(startSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityMailboxEmailRegExp),
+  "connectorId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorIdRegExp),
+  "connectorVersion": zod.int().gt(startSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorVersionExclusiveMin).max(startSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorVersionMax),
+  "policyVersion": zod.literal(1),
+  "startedAt": zod.coerce.date()
+}),
+  "nurtureMonitoringApproval": zod.object({
+  "version": zod.int().gt(startSourceNurtureResponseDetailItemsItemSnapshotNurtureMonitoringApprovalVersionExclusiveMin).max(startSourceNurtureResponseDetailItemsItemSnapshotNurtureMonitoringApprovalVersionMax),
+  "approvedAt": zod.coerce.date()
+})
+}),
+  "admittedAt": zod.coerce.date().nullable(),
+  "stoppedAt": zod.coerce.date().nullable(),
+  "stopReason": zod.string().nullable(),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "nextCheckAt": zod.coerce.date().nullable()
+}),
+  "mailboxSync": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "completedCycleId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemMailboxSyncCompletedCycleIdRegExp).nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable()
+}),
+  "steps": zod.array(zod.object({
+  "id": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemStepsItemIdRegExp),
+  "stepIndex": zod.union([zod.literal(1),zod.literal(2)]),
+  "subject": zod.string(),
+  "body": zod.string(),
+  "messageHash": zod.string().regex(startSourceNurtureResponseDetailItemsItemStepsItemMessageHashRegExp),
+  "scheduledActionId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemStepsItemScheduledActionIdRegExp).nullable(),
+  "notBefore": zod.coerce.date().nullable(),
+  "expiresAt": zod.coerce.date(),
+  "claimedAt": zod.coerce.date().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "state": zod.enum(['not_started', 'waiting', 'ready', 'held', 'processing', 'accepted', 'uncertain', 'cancelled', 'finished']),
+  "reason": zod.string().nullable(),
+  "executionId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemStepsItemExecutionIdRegExp).nullable(),
+  "executionState": zod.string().nullable(),
+  "parentId": zod.uuid().regex(startSourceNurtureResponseDetailItemsItemStepsItemParentIdRegExp).nullable(),
+  "observedAt": zod.coerce.date().nullable(),
+  "dispatchStartedAt": zod.coerce.date().nullable(),
+  "deliveryConfirmed": zod.literal(false)
+})).min(startSourceNurtureResponseDetailItemsItemStepsMin).max(startSourceNurtureResponseDetailItemsItemStepsMax),
+  "outcomes": zod.object({
+  "leadStatus": zod.string(),
+  "replyIds": zod.array(zod.uuid().regex(startSourceNurtureResponseDetailItemsItemOutcomesReplyIdsItemRegExp)),
+  "taskIds": zod.array(zod.uuid().regex(startSourceNurtureResponseDetailItemsItemOutcomesTaskIdsItemRegExp)),
+  "appointmentIds": zod.array(zod.uuid().regex(startSourceNurtureResponseDetailItemsItemOutcomesAppointmentIdsItemRegExp))
+})
+})).min(1).max(startSourceNurtureResponseDetailItemsMax)
+}),
+  "command": zod.object({
+  "action": zod.enum(['approve', 'start', 'stop']),
+  "requestId": zod.uuid().regex(startSourceNurtureResponseCommandRequestIdRegExp).nullable(),
+  "replayed": zod.boolean(),
+  "appliedVersion": zod.int().gt(startSourceNurtureResponseCommandAppliedVersionExclusiveMin).max(startSourceNurtureResponseCommandAppliedVersionMax)
+})
+})
+
+
+/**
+ * Accepted staff session only; no API-key authority. Finite imported-source nurture requires separate source adoption, address-specific marketing permission, Microsoft sender/read grant, exact approval and explicit start. Maximum ten addresses, two fixed emails, at least 72 hours after actual predecessor acceptance and a fresh complete reply scan, expiring within fourteen days. Permanent ownership and unknown effects never permit replacement keys or automatic replay. Provider acceptance is not delivery, consent, customer confirmation or collected revenue.
+ * @summary Stop unclaimed future work without releasing original reservations
+ */
+export const StopSourceNurtureParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const stopSourceNurtureBodyExpectedVersionExclusiveMin = 0;
+export const stopSourceNurtureBodyExpectedVersionMax = 9007199254740991;
+
+export const stopSourceNurtureBodyPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const stopSourceNurtureBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureBodyReasonMin = 10;
+export const stopSourceNurtureBodyReasonMax = 1000;
+
+
+
+export const StopSourceNurtureBody = zod.object({
+  "expectedVersion": zod.int().gt(stopSourceNurtureBodyExpectedVersionExclusiveMin).max(stopSourceNurtureBodyExpectedVersionMax),
+  "payloadSha256": zod.string().regex(stopSourceNurtureBodyPayloadSha256RegExp),
+  "confirmed": zod.literal(true),
+  "requestId": zod.uuid().regex(stopSourceNurtureBodyRequestIdRegExp),
+  "reason": zod.string().min(stopSourceNurtureBodyReasonMin).max(stopSourceNurtureBodyReasonMax)
+})
+
+export const stopSourceNurtureResponseDetailOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailVersionExclusiveMin = 0;
+export const stopSourceNurtureResponseDetailVersionMax = 9007199254740991;
+
+export const stopSourceNurtureResponseDetailPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const stopSourceNurtureResponseDetailSettingsBusinessNameMin = 2;
+export const stopSourceNurtureResponseDetailSettingsBusinessNameMax = 150;
+
+export const stopSourceNurtureResponseDetailSettingsMailingAddressMin = 10;
+export const stopSourceNurtureResponseDetailSettingsMailingAddressMax = 400;
+
+export const stopSourceNurtureResponseDetailSettingsStepsItemOneSubjectMin = 3;
+export const stopSourceNurtureResponseDetailSettingsStepsItemOneSubjectMax = 180;
+
+export const stopSourceNurtureResponseDetailSettingsStepsItemOneBodyMin = 10;
+export const stopSourceNurtureResponseDetailSettingsStepsItemOneBodyMax = 4000;
+
+export const stopSourceNurtureResponseDetailSettingsStepsItemTwoSubjectMin = 3;
+export const stopSourceNurtureResponseDetailSettingsStepsItemTwoSubjectMax = 180;
+
+export const stopSourceNurtureResponseDetailSettingsStepsItemTwoBodyMin = 10;
+export const stopSourceNurtureResponseDetailSettingsStepsItemTwoBodyMax = 4000;
+
+export const stopSourceNurtureResponseDetailSettingsStepsMin = 2;
+export const stopSourceNurtureResponseDetailSettingsStepsMax = 2;
+
+
+export const stopSourceNurtureResponseDetailSettingsDaysMax = 7;
+
+export const stopSourceNurtureResponseDetailSettingsStartHourMin = 8;
+export const stopSourceNurtureResponseDetailSettingsStartHourMax = 19;
+
+export const stopSourceNurtureResponseDetailSettingsEndHourMin = 9;
+export const stopSourceNurtureResponseDetailSettingsEndHourMax = 20;
+
+export const stopSourceNurtureResponseDetailSettingsDailyLimitMax = 25;
+
+export const stopSourceNurtureResponseDetailReviewIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemRecipientRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionVersionExclusiveMin = 0;
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionVersionMax = 9007199254740991;
+
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryExternalCustomerIdMax = 200;
+
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryExternalEstimateIdMax = 200;
+
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryAppliedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryMappedFieldsItemMax = 40;
+
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryMappedFieldsMax = 30;
+
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionOperationalSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotPermissionRecordIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotSenderSenderEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityMailboxEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorVersionExclusiveMin = 0;
+export const stopSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorVersionMax = 9007199254740991;
+
+export const stopSourceNurtureResponseDetailItemsItemSnapshotNurtureMonitoringApprovalVersionExclusiveMin = 0;
+export const stopSourceNurtureResponseDetailItemsItemSnapshotNurtureMonitoringApprovalVersionMax = 9007199254740991;
+
+export const stopSourceNurtureResponseDetailItemsItemMailboxSyncCompletedCycleIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemStepsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemStepsItemMessageHashRegExp = new RegExp('^[a-f0-9]{64}$');
+export const stopSourceNurtureResponseDetailItemsItemStepsItemScheduledActionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemStepsItemExecutionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemStepsItemParentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemStepsMin = 2;
+export const stopSourceNurtureResponseDetailItemsItemStepsMax = 2;
+
+export const stopSourceNurtureResponseDetailItemsItemOutcomesReplyIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemOutcomesTaskIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsItemOutcomesAppointmentIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseDetailItemsMax = 10;
+
+export const stopSourceNurtureResponseCommandRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const stopSourceNurtureResponseCommandAppliedVersionExclusiveMin = 0;
+export const stopSourceNurtureResponseCommandAppliedVersionMax = 9007199254740991;
+
+
+
+export const StopSourceNurtureResponse = zod.object({
+  "detail": zod.object({
+  "organizationId": zod.uuid().regex(stopSourceNurtureResponseDetailOrganizationIdRegExp),
+  "id": zod.uuid().regex(stopSourceNurtureResponseDetailIdRegExp),
+  "version": zod.int().gt(stopSourceNurtureResponseDetailVersionExclusiveMin).max(stopSourceNurtureResponseDetailVersionMax),
+  "state": zod.enum(['draft', 'approved', 'running', 'stopped', 'finished', 'expired']),
+  "payloadSha256": zod.string().regex(stopSourceNurtureResponseDetailPayloadSha256RegExp),
+  "settings": zod.object({
+  "businessName": zod.string().min(stopSourceNurtureResponseDetailSettingsBusinessNameMin).max(stopSourceNurtureResponseDetailSettingsBusinessNameMax),
+  "mailingAddress": zod.string().min(stopSourceNurtureResponseDetailSettingsMailingAddressMin).max(stopSourceNurtureResponseDetailSettingsMailingAddressMax),
+  "steps": zod.array(zod.union([zod.object({
+  "subject": zod.string().min(stopSourceNurtureResponseDetailSettingsStepsItemOneSubjectMin).max(stopSourceNurtureResponseDetailSettingsStepsItemOneSubjectMax),
+  "body": zod.string().min(stopSourceNurtureResponseDetailSettingsStepsItemOneBodyMin).max(stopSourceNurtureResponseDetailSettingsStepsItemOneBodyMax)
+}),zod.object({
+  "subject": zod.string().min(stopSourceNurtureResponseDetailSettingsStepsItemTwoSubjectMin).max(stopSourceNurtureResponseDetailSettingsStepsItemTwoSubjectMax),
+  "body": zod.string().min(stopSourceNurtureResponseDetailSettingsStepsItemTwoBodyMin).max(stopSourceNurtureResponseDetailSettingsStepsItemTwoBodyMax)
+})])).min(stopSourceNurtureResponseDetailSettingsStepsMin).max(stopSourceNurtureResponseDetailSettingsStepsMax),
+  "timezone": zod.string().min(1),
+  "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])).min(1).max(stopSourceNurtureResponseDetailSettingsDaysMax),
+  "startHour": zod.int().min(stopSourceNurtureResponseDetailSettingsStartHourMin).max(stopSourceNurtureResponseDetailSettingsStartHourMax),
+  "endHour": zod.int().min(stopSourceNurtureResponseDetailSettingsEndHourMin).max(stopSourceNurtureResponseDetailSettingsEndHourMax),
+  "dailyLimit": zod.int().min(1).max(stopSourceNurtureResponseDetailSettingsDailyLimitMax)
+}),
+  "reviewId": zod.uuid().regex(stopSourceNurtureResponseDetailReviewIdRegExp),
+  "createdByUserId": zod.string(),
+  "approvedByUserId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "previewExpiresAt": zod.coerce.date(),
+  "startNotBefore": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "stoppedAt": zod.coerce.date().nullable(),
+  "stopReason": zod.string().nullable(),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "nextCheckAt": zod.coerce.date().nullable()
+}),
+  "limits": zod.object({
+  "maxRecipients": zod.literal(10),
+  "steps": zod.literal(2),
+  "minSpacingHours": zod.literal(72),
+  "maxLifetimeDays": zod.literal(14)
+}),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemIdRegExp),
+  "leadId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemLeadIdRegExp),
+  "contactId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemPropertyIdRegExp).nullable(),
+  "ownerUserId": zod.string(),
+  "recipient": zod.email().regex(stopSourceNurtureResponseDetailItemsItemRecipientRegExp),
+  "snapshot": zod.object({
+  "version": zod.literal(1),
+  "adoptionId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionIdRegExp),
+  "adoptionVersion": zod.int().gt(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionVersionExclusiveMin).max(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionVersionMax),
+  "adoptionSha256": zod.string().regex(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionSha256RegExp),
+  "adoption": zod.object({
+  "leadId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionLeadIdRegExp),
+  "contactId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionContactIdRegExp),
+  "importSourceKey": zod.string(),
+  "externalOpportunityId": zod.string(),
+  "importedHistory": zod.object({
+  "version": zod.literal(1),
+  "kind": zod.enum(['csv_snapshot']),
+  "originalCreatedAt": zod.coerce.date().nullable(),
+  "sourceUpdatedAt": zod.coerce.date().nullable(),
+  "statusChangedAt": zod.coerce.date().nullable(),
+  "lastContactAt": zod.coerce.date().nullable(),
+  "snapshotAsOf": zod.coerce.date().nullable(),
+  "firstImportedAt": zod.coerce.date(),
+  "lastImportedAt": zod.coerce.date(),
+  "externalCustomerId": zod.string().min(1).max(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryExternalCustomerIdMax).nullable(),
+  "externalEstimateId": zod.string().min(1).max(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryExternalEstimateIdMax).nullable(),
+  "currency": zod.enum(['USD']).nullable(),
+  "fingerprint": zod.string().regex(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryFingerprintRegExp),
+  "appliedFingerprint": zod.string().regex(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryAppliedFingerprintRegExp),
+  "mappedFields": zod.array(zod.string().min(1).max(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryMappedFieldsItemMax)).max(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionImportedHistoryMappedFieldsMax)
+}),
+  "sourceSha256": zod.string().regex(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionSourceSha256RegExp),
+  "operationalSha256": zod.string().regex(stopSourceNurtureResponseDetailItemsItemSnapshotAdoptionOperationalSha256RegExp),
+  "recipient": zod.string()
+}),
+  "permissionRecordId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemSnapshotPermissionRecordIdRegExp),
+  "ownerUserId": zod.string(),
+  "propertyId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemSnapshotPropertyIdRegExp).nullable(),
+  "leadCreatedAt": zod.coerce.date(),
+  "sender": zod.object({
+  "userId": zod.string(),
+  "source": zod.enum(['lead_assignee', 'company_default']),
+  "provider": zod.enum(['microsoft']),
+  "senderEmail": zod.email().regex(stopSourceNurtureResponseDetailItemsItemSnapshotSenderSenderEmailRegExp)
+}),
+  "mailboxIdentity": zod.object({
+  "organizationId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityOrganizationIdRegExp),
+  "senderUserId": zod.string(),
+  "provider": zod.enum(['microsoft']),
+  "connectionId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectionIdRegExp),
+  "connectionRevision": zod.coerce.date(),
+  "mailboxAccountId": zod.string(),
+  "mailboxEmail": zod.email().regex(stopSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityMailboxEmailRegExp),
+  "connectorId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorIdRegExp),
+  "connectorVersion": zod.int().gt(stopSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorVersionExclusiveMin).max(stopSourceNurtureResponseDetailItemsItemSnapshotMailboxIdentityConnectorVersionMax),
+  "policyVersion": zod.literal(1),
+  "startedAt": zod.coerce.date()
+}),
+  "nurtureMonitoringApproval": zod.object({
+  "version": zod.int().gt(stopSourceNurtureResponseDetailItemsItemSnapshotNurtureMonitoringApprovalVersionExclusiveMin).max(stopSourceNurtureResponseDetailItemsItemSnapshotNurtureMonitoringApprovalVersionMax),
+  "approvedAt": zod.coerce.date()
+})
+}),
+  "admittedAt": zod.coerce.date().nullable(),
+  "stoppedAt": zod.coerce.date().nullable(),
+  "stopReason": zod.string().nullable(),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "nextCheckAt": zod.coerce.date().nullable()
+}),
+  "mailboxSync": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "completedCycleId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemMailboxSyncCompletedCycleIdRegExp).nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable()
+}),
+  "steps": zod.array(zod.object({
+  "id": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemStepsItemIdRegExp),
+  "stepIndex": zod.union([zod.literal(1),zod.literal(2)]),
+  "subject": zod.string(),
+  "body": zod.string(),
+  "messageHash": zod.string().regex(stopSourceNurtureResponseDetailItemsItemStepsItemMessageHashRegExp),
+  "scheduledActionId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemStepsItemScheduledActionIdRegExp).nullable(),
+  "notBefore": zod.coerce.date().nullable(),
+  "expiresAt": zod.coerce.date(),
+  "claimedAt": zod.coerce.date().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "state": zod.enum(['not_started', 'waiting', 'ready', 'held', 'processing', 'accepted', 'uncertain', 'cancelled', 'finished']),
+  "reason": zod.string().nullable(),
+  "executionId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemStepsItemExecutionIdRegExp).nullable(),
+  "executionState": zod.string().nullable(),
+  "parentId": zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemStepsItemParentIdRegExp).nullable(),
+  "observedAt": zod.coerce.date().nullable(),
+  "dispatchStartedAt": zod.coerce.date().nullable(),
+  "deliveryConfirmed": zod.literal(false)
+})).min(stopSourceNurtureResponseDetailItemsItemStepsMin).max(stopSourceNurtureResponseDetailItemsItemStepsMax),
+  "outcomes": zod.object({
+  "leadStatus": zod.string(),
+  "replyIds": zod.array(zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemOutcomesReplyIdsItemRegExp)),
+  "taskIds": zod.array(zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemOutcomesTaskIdsItemRegExp)),
+  "appointmentIds": zod.array(zod.uuid().regex(stopSourceNurtureResponseDetailItemsItemOutcomesAppointmentIdsItemRegExp))
+})
+})).min(1).max(stopSourceNurtureResponseDetailItemsMax)
+}),
+  "command": zod.object({
+  "action": zod.enum(['approve', 'start', 'stop']),
+  "requestId": zod.uuid().regex(stopSourceNurtureResponseCommandRequestIdRegExp).nullable(),
+  "replayed": zod.boolean(),
+  "appliedVersion": zod.int().gt(stopSourceNurtureResponseCommandAppliedVersionExclusiveMin).max(stopSourceNurtureResponseCommandAppliedVersionMax)
+})
+})
+
+
+/**
+ * Own accepted active staff session and exact connector/context versions required. This local context permission is default-off and independent of service and BIE reading. Graph scopes are unchanged. A reconnect or revoke does not adopt old nurture parents. Completed bounded synchronization is explicit evidence, not certainty that the real mailbox contains no customer reply.
+ * @summary Separately acknowledge or revoke tracked nurture reading on the owned connector
+ */
+export const setMicrosoftNurtureMonitoringBodyExpectedConnectorVersionExclusiveMin = 0;
+export const setMicrosoftNurtureMonitoringBodyExpectedConnectorVersionMax = 9007199254740991;
+
+export const setMicrosoftNurtureMonitoringBodyExpectedNurtureMonitoringVersionMin = 0;
+export const setMicrosoftNurtureMonitoringBodyExpectedNurtureMonitoringVersionMax = 9007199254740991;
+
+
+
+export const SetMicrosoftNurtureMonitoringBody = zod.object({
+  "expectedConnectorVersion": zod.int().gt(setMicrosoftNurtureMonitoringBodyExpectedConnectorVersionExclusiveMin).max(setMicrosoftNurtureMonitoringBodyExpectedConnectorVersionMax),
+  "expectedNurtureMonitoringVersion": zod.int().min(setMicrosoftNurtureMonitoringBodyExpectedNurtureMonitoringVersionMin).max(setMicrosoftNurtureMonitoringBodyExpectedNurtureMonitoringVersionMax),
+  "enabled": zod.boolean(),
+  "nurtureContextAcknowledged": zod.literal(true)
+})
+
+export const setMicrosoftNurtureMonitoringResponseVersionMin = 0;
+
+export const setMicrosoftNurtureMonitoringResponsePendingParentCountMin = 0;
+
+export const setMicrosoftNurtureMonitoringResponseReviewCountMin = 0;
+
+export const setMicrosoftNurtureMonitoringResponseLeadMonitoringVersionMin = 0;
+
+export const setMicrosoftNurtureMonitoringResponseNurtureMonitoringVersionMin = 0;
+
+export const setMicrosoftNurtureMonitoringResponseNurtureSyncCompletedCycleIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const SetMicrosoftNurtureMonitoringResponse = zod.object({
+  "enabled": zod.boolean(),
+  "configured": zod.boolean(),
+  "version": zod.int().min(setMicrosoftNurtureMonitoringResponseVersionMin),
+  "state": zod.enum(['pending', 'active', 'disabled', 'gap', 'revoked']),
+  "usable": zod.boolean(),
+  "mailboxEmail": zod.string().nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "lastSuccessAt": zod.coerce.date().nullable(),
+  "lastErrorAt": zod.coerce.date().nullable(),
+  "reason": zod.string().nullable(),
+  "pendingParentCount": zod.int().min(setMicrosoftNurtureMonitoringResponsePendingParentCountMin),
+  "reviewCount": zod.int().min(setMicrosoftNurtureMonitoringResponseReviewCountMin),
+  "scopes": zod.array(zod.string()),
+  "folders": zod.array(zod.string()),
+  "historicalCrawl": zod.literal(false),
+  "attachmentsRead": zod.literal(false),
+  "remoteConsentRevoked": zod.literal(false),
+  "leadMonitoringEnabled": zod.boolean(),
+  "leadMonitoringVersion": zod.int().min(setMicrosoftNurtureMonitoringResponseLeadMonitoringVersionMin),
+  "leadMonitoringApprovedAt": zod.coerce.date().nullable(),
+  "leadMonitoringChangedAt": zod.coerce.date().nullable(),
+  "nurtureMonitoringEnabled": zod.boolean(),
+  "nurtureMonitoringVersion": zod.int().min(setMicrosoftNurtureMonitoringResponseNurtureMonitoringVersionMin),
+  "nurtureMonitoringApprovedAt": zod.coerce.date().nullable(),
+  "nurtureMonitoringChangedAt": zod.coerce.date().nullable(),
+  "nurtureSync": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "completedCycleId": zod.uuid().regex(setMicrosoftNurtureMonitoringResponseNurtureSyncCompletedCycleIdRegExp).nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable()
+})
+})
+
+
+/**
  * Accepted active staff session only; crm.read. Default-off exact service-series review. One fixed reminder per future eligible occurrence; no backlog, marketing permission, warranty decision or automatic booking. A held/unknown original effect cannot be retried with another policy or channel.
  * @summary Review standing reminder authority and current occurrence
  */
@@ -11075,6 +12610,9 @@ export const getMicrosoftMailboxStatusResponseReviewCountMin = 0;
 
 export const getMicrosoftMailboxStatusResponseLeadMonitoringVersionMin = 0;
 
+export const getMicrosoftMailboxStatusResponseNurtureMonitoringVersionMin = 0;
+
+export const getMicrosoftMailboxStatusResponseNurtureSyncCompletedCycleIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
 
 
 export const GetMicrosoftMailboxStatusResponse = zod.object({
@@ -11098,7 +12636,18 @@ export const GetMicrosoftMailboxStatusResponse = zod.object({
   "leadMonitoringEnabled": zod.boolean(),
   "leadMonitoringVersion": zod.int().min(getMicrosoftMailboxStatusResponseLeadMonitoringVersionMin),
   "leadMonitoringApprovedAt": zod.coerce.date().nullable(),
-  "leadMonitoringChangedAt": zod.coerce.date().nullable()
+  "leadMonitoringChangedAt": zod.coerce.date().nullable(),
+  "nurtureMonitoringEnabled": zod.boolean(),
+  "nurtureMonitoringVersion": zod.int().min(getMicrosoftMailboxStatusResponseNurtureMonitoringVersionMin),
+  "nurtureMonitoringApprovedAt": zod.coerce.date().nullable(),
+  "nurtureMonitoringChangedAt": zod.coerce.date().nullable(),
+  "nurtureSync": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "completedCycleId": zod.uuid().regex(getMicrosoftMailboxStatusResponseNurtureSyncCompletedCycleIdRegExp).nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable()
+})
 })
 
 
@@ -11170,6 +12719,9 @@ export const listLeadMailboxRepliesResponseItemsItemEffectSummaryOneBlockedPropo
 
 export const listLeadMailboxRepliesResponseItemsItemEffectSummaryOneReconciliationRequiredMin = 0;
 
+export const listLeadMailboxRepliesResponseItemsItemContextTwoPlanIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listLeadMailboxRepliesResponseItemsItemContextTwoItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listLeadMailboxRepliesResponseItemsItemContextTwoStepIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
 export const listLeadMailboxRepliesResponseItemsMax = 25;
 
 export const listLeadMailboxRepliesResponseOffsetMin = 0;
@@ -11206,7 +12758,16 @@ export const ListLeadMailboxRepliesResponse = zod.object({
   "reconciliationRequired": zod.int().min(listLeadMailboxRepliesResponseItemsItemEffectSummaryOneReconciliationRequiredMin)
 }),zod.null()]),
   "evidence": zod.enum(['original_mailbox_observation']),
-  "monitoringCurrent": zod.boolean().describe('Current original reader and lead-context permission; false does not erase retained evidence or prevent an explicit staff handling decision.')
+  "monitoringCurrent": zod.boolean().describe('Current original reader and lead-context permission; false does not erase retained evidence or prevent an explicit staff handling decision.'),
+  "context": zod.union([zod.object({
+  "kind": zod.enum(['bie_lead_email'])
+}),zod.object({
+  "kind": zod.enum(['source_nurture_email']),
+  "planId": zod.uuid().regex(listLeadMailboxRepliesResponseItemsItemContextTwoPlanIdRegExp),
+  "itemId": zod.uuid().regex(listLeadMailboxRepliesResponseItemsItemContextTwoItemIdRegExp),
+  "stepId": zod.uuid().regex(listLeadMailboxRepliesResponseItemsItemContextTwoStepIdRegExp),
+  "stepIndex": zod.union([zod.literal(1),zod.literal(2)])
+})])
 })).max(listLeadMailboxRepliesResponseItemsMax),
   "hasMore": zod.boolean(),
   "offset": zod.int().min(listLeadMailboxRepliesResponseOffsetMin),
@@ -11269,6 +12830,9 @@ export const setMicrosoftLeadMonitoringResponseReviewCountMin = 0;
 
 export const setMicrosoftLeadMonitoringResponseLeadMonitoringVersionMin = 0;
 
+export const setMicrosoftLeadMonitoringResponseNurtureMonitoringVersionMin = 0;
+
+export const setMicrosoftLeadMonitoringResponseNurtureSyncCompletedCycleIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
 
 
 export const SetMicrosoftLeadMonitoringResponse = zod.object({
@@ -11292,7 +12856,18 @@ export const SetMicrosoftLeadMonitoringResponse = zod.object({
   "leadMonitoringEnabled": zod.boolean(),
   "leadMonitoringVersion": zod.int().min(setMicrosoftLeadMonitoringResponseLeadMonitoringVersionMin),
   "leadMonitoringApprovedAt": zod.coerce.date().nullable(),
-  "leadMonitoringChangedAt": zod.coerce.date().nullable()
+  "leadMonitoringChangedAt": zod.coerce.date().nullable(),
+  "nurtureMonitoringEnabled": zod.boolean(),
+  "nurtureMonitoringVersion": zod.int().min(setMicrosoftLeadMonitoringResponseNurtureMonitoringVersionMin),
+  "nurtureMonitoringApprovedAt": zod.coerce.date().nullable(),
+  "nurtureMonitoringChangedAt": zod.coerce.date().nullable(),
+  "nurtureSync": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "completedCycleId": zod.uuid().regex(setMicrosoftLeadMonitoringResponseNurtureSyncCompletedCycleIdRegExp).nullable(),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable()
+})
 })
 
 

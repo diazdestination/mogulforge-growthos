@@ -3,8 +3,8 @@
  * deletion order, retention policy, or proof of complete account ownership.
  * Every new table must receive an explicit classification before preview runs.
  */
-export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-03.inventory-v11";
-export const DATA_LIFECYCLE_EXPECTED_TABLES = 125;
+export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-03.inventory-v12";
+export const DATA_LIFECYCLE_EXPECTED_TABLES = 130;
 export const DATA_LIFECYCLE_ROW_LIMIT = 10_000;
 
 export type InventoryCategory =
@@ -57,6 +57,7 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("claim_observations", "intelligence"),
   direct("claim_route_packets", "intelligence"),
   direct("consent_records", "communications"),
+  direct("contact_touch_reservations", "audit"),
   direct("contacts", "crm"),
   direct("conversation_messages", "communications"),
   direct("conversations", "communications"),
@@ -92,6 +93,7 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("mailbox_connectors", "account_access"),
   direct("mailbox_receipts", "communications"),
   direct("mailbox_service_replies", "communications"),
+  direct("mailbox_sync_cycles", "communications"),
   direct("message_templates", "communications"),
   direct("microsoft_connections", "account_access"),
   direct("missed_call_care_cases", "communications"),
@@ -135,6 +137,9 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("smart_site_submissions", "acquisition"),
   direct("smart_sites", "acquisition"),
   direct("source_adoptions", "audit"),
+  direct("source_nurture_plans", "automation"),
+  direct("source_nurture_items", "automation"),
+  direct("source_nurture_steps", "automation"),
   direct("source_outreach_batches", "automation"),
   direct("source_outreach_items", "communications"),
   direct("staff_push_deliveries", "communications"),

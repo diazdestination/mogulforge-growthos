@@ -16,4 +16,5 @@ export async function checkServiceClaimBudget(tx: Parameters<Parameters<typeof d
     // Expired authority proceeds to an owned BLOCKED receipt, never a delayed send.
     if (authority?.origin !== "standing" || timing.resumeAt.getTime() < Date.parse(authority.expiresAt)) throw new ServiceClaimDeferredError(timing.resumeAt);
   }
+  return claim;
 }

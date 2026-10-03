@@ -9,6 +9,7 @@ import { leadReplyFixtureIds } from './lead-replies-recovery-fixture.mjs';
 import { invoiceRecoveryIds } from './invoice-recovery-fixture.mjs';
 import { callieFixtureIds } from './callie-recovery-fixture.mjs';
 import { standingServiceIds } from './standing-service-recovery-fixture.mjs';
+import { sourceNurtureIds } from './source-nurture-recovery-fixture.mjs';
 
 const target = new URL(process.env.DATABASE_URL ?? '');
 if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.hostname !== '127.0.0.1' || target.pathname !== '/postgres' || process.env.CONTRACTOR_SYNTHETIC_RECOVERY !== 'true' || process.env.NODE_ENV !== 'test') throw new Error('contractor_probe_target_invalid');
@@ -50,6 +51,9 @@ try {
   const callie = callieFixtureIds('restore-drill-contractor-a'), foreignCallie = callieFixtureIds('restore-drill-contractor-b');
   good.push('/api/v1/communications/callie?scope=attention', '/api/v1/communications/callie/policy', `/api/v1/communications/callie/${callie.intake}`);
   good.push(`/api/v1/service-obligations/${native.nextService}/standing-reminders`, `/api/v1/service-obligations/${native.nextService}/sms-replies`);
+  const nurture = sourceNurtureIds('restore-drill-contractor-a'), foreignNurture = sourceNurtureIds('restore-drill-contractor-b');
+  good.push('/api/v1/source-nurture?bucket=attention', '/api/v1/source-nurture?bucket=waiting', '/api/v1/source-nurture?bucket=history',
+    `/api/v1/source-nurture/${nurture.plan}`, `/api/v1/leads/${nurture.lead}/mailbox-replies`);
   for (const route of good) {
     check = `read_${good.indexOf(route)}`;
     const response = await fetch(`${origin}${route}`, { headers });
@@ -57,6 +61,23 @@ try {
     assert.equal(databaseFailed, false);
   }
   const invoice = await (await fetch(`${origin}/api/v1/invoices/${native.invoice}`, { headers })).json();
+  check = 'nurture_stopped_unknown_original';
+  const nurtureDetail = await (await fetch(`${origin}/api/v1/source-nurture/${nurture.plan}`, { headers })).json();
+  assert.equal(nurtureDetail.state, 'stopped'); assert.equal(nurtureDetail.version, 4); assert.equal(nurtureDetail.readiness.ready, false);
+  assert.equal(nurtureDetail.items[0].id, nurture.item); assert.ok(nurtureDetail.items[0].admittedAt);
+  assert.equal(nurtureDetail.items[0].steps[0].executionId, nurture.execution); assert.equal(nurtureDetail.items[0].steps[0].executionState, 'indeterminate');
+  assert.equal(nurtureDetail.items[0].steps[0].acceptedAt, null); assert.equal(nurtureDetail.items[0].steps[1].state, 'cancelled');
+  assert.equal(nurtureDetail.items[0].steps[1].executionId, null); assert.equal(nurtureDetail.items[0].steps[1].claimedAt, null);
+  assert.equal((await fetch(`${origin}/api/v1/source-nurture/${foreignNurture.plan}`, { headers })).status, 404);
+  check = 'nurture_reply_hold_after_purge';
+  const nurtureReplies = await (await fetch(`${origin}/api/v1/leads/${nurture.lead}/mailbox-replies`, { headers })).json();
+  assert.equal(nurtureReplies.items.length, 1); assert.equal(nurtureReplies.items[0].id, nurture.reply);
+  assert.equal(nurtureReplies.items[0].holdActive, true); assert.equal(nurtureReplies.items[0].content, null);
+  assert.equal(nurtureReplies.items[0].context.kind, 'source_nurture_email'); assert.equal(nurtureReplies.items[0].context.planId, nurture.plan);
+  assert.equal(nurtureReplies.items[0].monitoringCurrent, false);
+  const nurtureToday = await (await fetch(`${origin}/api/v1/contractor/today?date=2026-10-03`, { headers })).json();
+  assert.equal(nurtureToday.tasks.items.find(task => task.id === nurture.task)?.actionPath, `/leads/${nurture.lead}?tab=messages`);
+  assert.equal((await fetch(`${origin}/api/v1/leads/${foreignNurture.lead}/mailbox-replies`, { headers })).status, 404);
   assert.equal(invoice.recordedPaidCents,0); assert.equal(invoice.balanceDueCents,10000);
   assert.equal(invoice.allocations.length,1); assert.ok(invoice.allocations[0].reversedAt);
   check = 'invoice_recovery_chain';

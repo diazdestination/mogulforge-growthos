@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { LeadMailboxReplyContent } from './leadMailboxReplyContent';
+import type { LeadMailboxReplyContext } from './leadMailboxReplyContext';
 import type { LeadMailboxReplyEffectSummary } from './leadMailboxReplyEffectSummary';
 import type { LeadMailboxReplyEvidence } from './leadMailboxReplyEvidence';
 import type { LeadMailboxReplyState } from './leadMailboxReplyState';
@@ -43,4 +44,5 @@ export interface LeadMailboxReply {
   evidence: LeadMailboxReplyEvidence;
   /** Current original reader and lead-context permission; false does not erase retained evidence or prevent an explicit staff handling decision. */
   monitoringCurrent: boolean;
+  context: LeadMailboxReplyContext;
 }

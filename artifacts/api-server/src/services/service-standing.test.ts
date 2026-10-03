@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import { and, eq } from "drizzle-orm";
 import { activitiesTable, auditEventsTable, contactsTable, crmTasksTable, customerLifecycleTable, db, gmailConnectionsTable, leadsTable, orgSettingsTable, revenueExecutionsTable, scheduledActionsTable, serviceObligationsTable, usersTable } from "@workspace/db";
 import { serviceStandingEnrollmentsTable as enrollments, serviceStandingPolicyRevisionsTable as revisions } from "../../../../lib/db/src/schema/service-standing";
+import { contactTouchReservationsTable } from "../../../../lib/db/src/schema/contact-touch-reservations";
 import { serviceStandingFixture } from "../test-helpers/service-standing-fixture";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import { approveServiceStanding, assertStandingAuthority, disableServiceStanding, getServiceStanding, lockServiceStanding, previewServiceStanding, readStandingService, serviceNoticeInstant } from "./service-standing-policy";
@@ -17,6 +18,7 @@ import { ServiceClaimDeferredError } from "./service-care-claim";
 import { checkOutreachTiming } from "./send-gate";
 import { assertServiceCareAuthorizationCurrent } from "./service-care-authorization";
 import { updateTask } from "./crm";
+import { contactTouchTimes } from "./contact-touch-claim";
 
 vi.mock("./customer-email", () => ({ resolveCustomerEmailSender: vi.fn(), sendCustomerEmail: vi.fn() }));
 const orgs: string[] = [], effects: string[] = [], senders = new Map<string, string>();
@@ -252,6 +254,36 @@ describe("shared pending/unknown service contact allowance", () => {
     expect((await checkOutreachTiming({ organizationId: f.org, contact: { id: f.contactId }, sendingHours: cfg })).ok).toBe(false);
     await db.insert(activitiesTable).values({ organizationId: f.org, contactId: f.contactId, type: "automation_message_sent", title: "Synthetic acceptance", occurredAt: new Date(), metadata: { approvalId: audit.id } });
     expect((await checkOutreachTiming({ organizationId: f.org, contact: { id: f.contactId }, sendingHours: { ...cfg, maxTouchesPerDay: 2 } })).ok).toBe(true);
+    expect(await contactTouchTimes(db, f.org, f.contactId, new Date(Date.now() - 86_400_000))).toHaveLength(1);
+    expect((await db.select().from(revenueExecutionsTable).where(eq(revenueExecutionsTable.organizationId, f.org)))[0].state).toBe("indeterminate");
+    // An unrelated approval reference cannot consume the original reservation.
+    await db.insert(activitiesTable).values({ organizationId: f.org, contactId: f.contactId, type: "automation_message_sent", title: "Unrelated synthetic legacy touch", occurredAt: new Date(), metadata: { approvalId: randomUUID() } });
+    expect((await checkOutreachTiming({ organizationId: f.org, contact: { id: f.contactId }, sendingHours: { ...cfg, maxTouchesPerDay: 2 } })).ok).toBe(false);
+  });
+  it("does not hide a different legacy unknown scheduled key merely because it repeats the same approval reference", async () => {
+    const f = await fixture(); await admitted(f); unknownEffect = true; await processDueScheduledActions(f.org);
+    const [audit] = await db.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, f.org), eq(auditEventsTable.action, "service.care_reminder_approved")));
+    const [original] = await db.select().from(scheduledActionsTable).where(eq(scheduledActionsTable.organizationId, f.org));
+    const [other] = await db.insert(scheduledActionsTable).values({ organizationId: f.org, action: original.action, context: original.context, runAt: new Date() }).returning();
+    await db.insert(revenueExecutionsTable).values({ organizationId: f.org, actionKey: `scheduled:${other.id}`, kind: "service_care_reminder",
+      fingerprint: "a".repeat(64), state: "indeterminate", createdAt: new Date(), expiresAt: new Date(Date.now() + 60_000) });
+    await db.insert(activitiesTable).values({ organizationId: f.org, contactId: f.contactId, type: "automation_message_sent", title: "Original synthetic acceptance",
+      occurredAt: new Date(), metadata: { approvalId: audit.id } });
+    expect(await contactTouchTimes(db, f.org, f.contactId, new Date(Date.now() - 86_400_000))).toHaveLength(2);
+    expect((await checkOutreachTiming({ organizationId: f.org, contact: { id: f.contactId }, sendingHours: { quietHoursEnabled: false, timezone: "America/New_York", startHour: 9, endHour: 18, days: ["Mon"], maxTouchesPerDay: 2 } })).ok).toBe(false);
+    expect((await db.select().from(revenueExecutionsTable).where(eq(revenueExecutionsTable.organizationId, f.org))).every(receipt => receipt.state === "indeterminate")).toBe(true);
+  });
+  it("does not use a conflicting explicit activity key to hide a pre-ledger unknown service receipt", async () => {
+    const f = await fixture(); await admitted(f); unknownEffect = true; await processDueScheduledActions(f.org);
+    const [audit] = await db.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, f.org), eq(auditEventsTable.action, "service.care_reminder_approved")));
+    // Synthetic downgrade models retained records from before this ledger existed.
+    await db.delete(contactTouchReservationsTable).where(eq(contactTouchReservationsTable.organizationId, f.org));
+    await db.update(revenueExecutionsTable).set({ createdAt: new Date() }).where(eq(revenueExecutionsTable.organizationId, f.org));
+    await db.insert(activitiesTable).values({ organizationId: f.org, contactId: f.contactId, type: "automation_message_sent", title: "Different keyed synthetic acceptance",
+      occurredAt: new Date(), metadata: { approvalId: audit.id, touchLogicalKey: `scheduled:${randomUUID()}` } });
+    expect(await contactTouchTimes(db, f.org, f.contactId, new Date(Date.now() - 86_400_000))).toHaveLength(2);
+    expect((await db.select().from(revenueExecutionsTable).where(eq(revenueExecutionsTable.organizationId, f.org)))[0].state).toBe("indeterminate");
+    expect(await db.select().from(contactTouchReservationsTable).where(eq(contactTouchReservationsTable.organizationId, f.org))).toHaveLength(0);
   });
   it.skipIf(process.env.SCHEDULER_TEST_BACKEND === "pglite")("serializes two independent service workers before either can consume the last contact slot", async () => {
     const f = await fixture(), second = await serviceStandingFixture("manual", f.contactId, f.org); senders.set(f.org, f.owner.id);
