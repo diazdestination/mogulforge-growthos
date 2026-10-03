@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  unique,
   integer,
   jsonb,
   pgTable,
@@ -136,7 +137,10 @@ export const scheduledActionsTable = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (table) => [index("scheduled_actions_status_run_idx").on(table.status, table.runAt)],
+  (table) => [
+    unique("scheduled_action_org_id_uq").on(table.organizationId, table.id),
+    index("scheduled_actions_status_run_idx").on(table.status, table.runAt),
+  ],
 );
 
 export const insertAutomationSchema = createInsertSchema(automationsTable).omit({

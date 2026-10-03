@@ -90,6 +90,7 @@ describe("one reviewed service reminder", () => {
   });
   it("uses the actual SMS adapter with purpose consent and a mocked network, once per obligation", async () => {
     const f = await fixture();
+    vi.stubEnv("EMAIL_INTELLIGENCE_ENCRYPTION_KEY", Buffer.alloc(32, 19).toString("base64"));
     vi.stubEnv("TWILIO_CLIENT_SERVICE_CARE_AUTH_TOKEN", "synthetic-webhook");
     vi.stubEnv("TWILIO_CLIENT_SERVICE_CARE_API_KEY_SECRET", "synthetic-secret");
     const provider = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ sid: `SM${"a".repeat(32)}` }), { status: 201 }));
@@ -102,6 +103,23 @@ describe("one reviewed service reminder", () => {
     expect(String(provider.mock.calls[0][1]?.body)).toContain("Reply+STOP");
     expect((await getServiceCare(f.org, f.obligation.id)).reminder).toMatchObject({ channel: "sms", state: "succeeded", providerEvidence: { provider: "twilio", deliveryConfirmed: false } });
     expect(effects).toHaveLength(0);
+  });
+  it("preserves the staff plan changed during provider handoff, adding acceptance evidence without erasing it", async () => {
+    const f = await fixture(); await queue(f);
+    const [other] = await db.insert(usersTable).values({ organizationId: f.org, role: "office", emailVerifiedAt: new Date() }).returning();
+    const deadline = new Date(Date.now() + 10 * 60_000);
+    vi.mocked(sendCustomerEmail).mockImplementationOnce(async input => {
+      await input.beforeDispatch?.();
+      // The provider has the payload; a simultaneous staff edit cannot be recalled.
+      await db.update(crmTasksTable).set({ status: "in_progress", assignedUserId: other.id, dueAt: deadline, description: "Office promised a callback in ten minutes. Keep this plan." }).where(eq(crmTasksTable.id, f.obligation.taskId));
+      return { provider: "gmail", id: "synthetic-accepted", acceptance: "accepted", senderEmail: "office@example.invalid", senderUserId: f.staff };
+    });
+    await processDueScheduledActions(f.org);
+    const [task] = await db.select().from(crmTasksTable).where(eq(crmTasksTable.id, f.obligation.taskId));
+    expect(task).toMatchObject({ status: "in_progress", assignedUserId: other.id, dueAt: deadline });
+    expect(task.description).toContain("Office promised a callback in ten minutes. Keep this plan.");
+    expect(task.description).toContain("delivery and response are unconfirmed");
+    expect((await getServiceCare(f.org, f.obligation.id)).reminder?.state).toBe("succeeded");
   });
   it("defers the global hold before permanent execution claim, then resumes the same action", async () => {
     const f = await fixture(); const q = await queue(f);

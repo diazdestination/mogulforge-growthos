@@ -33,7 +33,7 @@ import { and, asc, desc, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm
 
 import { isSafeMailbox } from "./providers";
 import { getSendingHours } from "./settings";
-import { customerWorkHeld } from "./customer-lifecycle-runtime";
+import { getCustomerLifecycleStatus } from "./customer-lifecycle";
 import { hasCustomerReplyHold, hasContactReplyHold } from "./response-correlation";
 
 export type SendChannel = "email" | "sms";
@@ -70,10 +70,11 @@ export async function getSuppression(
   organizationId: string,
   channel: SendChannel,
   rawValue: string,
+  reader: Pick<typeof db, "select"> = db,
 ): Promise<Suppression | null> {
   const value = normalizeAddress(channel, rawValue);
   if (!value) return null;
-  const [row] = await db
+  const [row] = await reader
     .select()
     .from(suppressionsTable)
     .where(
@@ -139,8 +140,9 @@ export async function hasChannelConsent(
   organizationId: string,
   contactId: string,
   channel: SendChannel,
+  reader: Pick<typeof db, "select"> = db,
 ): Promise<boolean> {
-  const [row] = await db
+  const [row] = await reader
     .select({ granted: consentRecordsTable.granted })
     .from(consentRecordsTable)
     .where(
@@ -223,14 +225,17 @@ export interface SendGateInput {
   sendingHours?: SendingHoursSettings;
   /** Server-resolved, exact approved adoption-email item. Never a generic import override. */
   sourceOutreachItemId?: string;
+  /** Original server-owned service claim, excluded only from its own final cap check. */
+  serviceCareActionKey?: string;
 }
 
 export async function checkSendEligibility(
   input: SendGateInput,
+  reader: Pick<typeof db, "select"> = db,
 ): Promise<SendGateResult> {
   const { organizationId, contact, channel, kind } = input;
 
-  if (await customerWorkHeld(organizationId)) {
+  if (!(await getCustomerLifecycleStatus(organizationId, reader)).automationAllowed) {
     return { ok: false, outcome: "blocked", reason: "customer_lifecycle_paused" };
   }
 
@@ -261,29 +266,29 @@ export async function checkSendEligibility(
   }
 
   // 3. Suppression list (unsubscribe / STOP / bounce / manual).
-  const suppression = await getSuppression(organizationId, channel, raw);
+  const suppression = await getSuppression(organizationId, channel, raw, reader);
   if (suppression) {
     return { ok: false, outcome: "blocked", reason: `suppressed:${suppression.reason}` };
   }
 
   // 4. Channel consent — SMS is opt-in on every path (matches existing
   //    behavior); email outreach is opt-out via the suppression list.
-  if (channel === "sms" && !(await hasChannelConsent(organizationId, contact.id, "sms"))) {
+  if (channel === "sms" && !(await hasChannelConsent(organizationId, contact.id, "sms", reader))) {
     return { ok: false, outcome: "blocked", reason: "no_sms_consent" };
   }
 
   if (kind !== "outreach") return { ok: true };
 
-  if (input.leadId && await hasCustomerReplyHold(organizationId, input.leadId))
+  if (input.leadId && await hasCustomerReplyHold(organizationId, input.leadId, reader))
     return { ok: false, outcome: "blocked", reason: "customer_reply_requires_review" };
-  if (!input.leadId && await hasContactReplyHold(organizationId, contact.id))
+  if (!input.leadId && await hasContactReplyHold(organizationId, contact.id, reader))
     return { ok: false, outcome: "blocked", reason: "reply_requires_opportunity_context" };
 
   // A CSV snapshot does not establish current status, replies or eligibility.
   // Read the current tenant-owned record here instead of trusting a caller flag.
   // Without opportunity context an imported contact is ambiguous, so hold it.
   if (input.leadId) {
-    const [lead] = await db.select({
+    const [lead] = await reader.select({
       creationMethod: leadsTable.creationMethod,
       importedHistory: leadsTable.importedHistory,
     }).from(leadsTable).where(and(
@@ -303,7 +308,7 @@ export async function checkSendEligibility(
       }
     }
   } else {
-    const [imported] = await db.select({ id: leadsTable.id }).from(leadsTable).where(and(
+    const [imported] = await reader.select({ id: leadsTable.id }).from(leadsTable).where(and(
       eq(leadsTable.organizationId, organizationId),
       eq(leadsTable.contactId, contact.id),
       or(eq(leadsTable.creationMethod, "import"), isNotNull(leadsTable.importedHistory)),
@@ -312,11 +317,11 @@ export async function checkSendEligibility(
       return { ok: false, outcome: "blocked", reason: "imported_source_requires_current_review" };
   }
 
-  return checkOutreachTiming(input);
+  return checkOutreachTiming(input, reader);
 }
 
 /** Reused by exact source-campaign review, which must not bypass timing behind a source hold. */
-export async function checkOutreachTiming(input: Pick<SendGateInput, "organizationId" | "contact" | "sendingHours">): Promise<SendGateResult> {
+export async function checkOutreachTiming(input: Pick<SendGateInput, "organizationId" | "contact" | "sendingHours" | "serviceCareActionKey">, reader: Pick<typeof db, "select"> = db): Promise<SendGateResult> {
   const { organizationId, contact } = input;
   const cfg = input.sendingHours ?? (await getSendingHours(organizationId));
 
@@ -329,7 +334,7 @@ export async function checkOutreachTiming(input: Pick<SendGateInput, "organizati
   // 6. Frequency cap over a rolling 24h per contact.
   if (cfg.maxTouchesPerDay > 0) {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const touches = await db
+    const touches = await reader
       .select({ occurredAt: activitiesTable.occurredAt })
       .from(activitiesTable)
       .where(
@@ -341,6 +346,10 @@ export async function checkOutreachTiming(input: Pick<SendGateInput, "organizati
         ),
       )
       .orderBy(desc(activitiesTable.occurredAt));
+    const { servicePendingTouchTimes } = await import("./service-care-budget");
+    const reserved = await servicePendingTouchTimes(reader, organizationId, contact.id, since, input.serviceCareActionKey);
+    touches.push(...reserved.map(occurredAt => ({ occurredAt })));
+    touches.sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime());
     if (touches.length >= cfg.maxTouchesPerDay) {
       // Defer until the touch that frees a slot ages out of the window
       // (the maxTouchesPerDay-th newest), plus a minute of slack, clamped

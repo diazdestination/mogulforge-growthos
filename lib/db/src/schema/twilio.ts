@@ -83,6 +83,8 @@ export const twilioDispatchesTable = pgTable(
       .defaultNow(),
   },
   (table) => [
+    unique("twilio_dispatch_org_id_uq").on(table.organizationId, table.id),
+    unique("twilio_dispatch_exact_service_uq").on(table.organizationId, table.id, table.idempotencyKey, table.accountSid, table.phone),
     uniqueIndex("twilio_dispatch_key").on(
       table.organizationId,
       table.idempotencyKey,

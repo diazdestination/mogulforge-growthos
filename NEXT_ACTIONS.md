@@ -1,5 +1,20 @@
 # Next acceptance work
 
+Current standing-service wave: `reports/standing-service-integration-2026-10-03.md`,
+from PR19/mainf91e1c3 and passed exact-main CI37134529680. Complete its exact
+PostgreSQL candidate/main CI before release selection. The125-table candidate
+adds reviewed0013after0012 and31SELECT-only synthetic restored-app reads; local
+recovery is not hosted acceptance. Existing Service Desk contains default-off
+forward-only series authority and exact/ambiguous SMS office evidence. The same
+original reminder receipt is permanent across individual/standing/channel paths.
+
+Next engineering follows L6 bounded ongoing nurture and L7 customer-history/
+workday gaps; actual approved migration exports are needed for L8. Preserve
+separate L1/L4 requirements and all Azure owner-return, current-release hosted
+staging/backup/admin rotation, real providers/phones and both contractor-workday
+gates. No customer messages, payment processing or subscription cancellation.
+The older candidate-pending entries below retain their historical evidence.
+
 Current October3 slice: `reports/callie-intake-integration-2026-10-03.md`, after
 green PR18/mainfa7c827 / exact-main CI37092275861. Complete the new CALLIE candidate's
 exact PostgreSQL CI and merged-main gate. The bounded standing-policy/keypad/

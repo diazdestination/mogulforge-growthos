@@ -3,6 +3,24 @@
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 
+Current L5 candidate: `reports/standing-service-integration-2026-10-03.md` and
+`reports/standing-service-operator-guide-2026-10-03.md`. Entry: Warranties & Service
+→ Customer care & booking → Review automatic series reminders. Review service SMS
+evidence separately; office handling does not authorize a resend or booking.
+Default-off policies are fixed, forward-only and explicitly finite. Disable works
+without provider readiness. Uncertain original receipts are never replayable.
+
+Offline review: `node scripts/standing-service-schema-preview.mjs` generates0013
+after0012 (four new tables,125total); no hosted database is opened. API projection:
+`node scripts/standing-service-api-spec.mjs`, then API-spec codegen. Synthetic
+`node scripts/contractor-recovery-drill.mjs` includes31SELECT-only app probes and
+14new constraint negatives. Preview flag `--standing-service` creates fictional
+services with DNC on, providers absent, outbound held and scheduler disabled.
+Its ephemeral encryption key only allows local reply-storage readiness checks.
+New referenced SMS needs stable encrypted-content storage in an approved hosted
+environment; never paste secrets into service agreement evidence. Require exact
+candidate/main CI and separately approved hosted/provider/company acceptance.
+
 Current October3 CALLIE candidate: `reports/callie-intake-integration-2026-10-03.md`
 and its operator guide. Calls is the entry point; the setup panel requires exact
 owner approval, while each visit needs actual staff-reviewed identity and an

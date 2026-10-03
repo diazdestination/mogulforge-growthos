@@ -4,7 +4,7 @@ import { runContractorRecoveryDrill } from './contractor-recovery-drill.mjs';
 it('upgrades the full prior schema, restores both synthetic companies, boots a read-only real app and preserves uncertainty/holds', async () => {
   const result = await runContractorRecoveryDrill({ emit: () => {} });
   expect(result.previousTableCount).toBe(90);
-  expect(result.tableCount).toBe(121);
+  expect(result.tableCount).toBe(125);
   expect(result.sourceFingerprint).toBe(result.restoredFingerprint);
   expect(result.appBootVerified).toBe(true);
   expect(result.readOnlyDatabaseVerified).toBe(true);
@@ -15,7 +15,7 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.tableCounts.staff_invitations).toBe(2);
   expect(result.tableCounts.invoices).toBe(4);
   expect(result.tableCounts.invoice_receipt_allocations).toBe(4);
-  expect(result.readChecks).toBe(29);
+  expect(result.readChecks).toBe(31);
   expect(result.invoiceRecoveryConstraintChecks).toBe(9);
   expect(result.invoiceUnknownChainPreserved).toBe(true);
   expect(result.typedNoDispatchProofPreserved).toBe(true);
@@ -27,6 +27,15 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.tableCounts.callie_policy_revisions).toBe(4);
   expect(result.tableCounts.callie_intakes).toBe(2);
   expect(result.tableCounts.callie_ack_dispatches).toBe(2);
+  expect(result.standingServiceConstraintChecks).toBe(14);
+  expect(result.standingDisabledHeadPreserved).toBe(true);
+  expect(result.standingUnknownSendPreserved).toBe(true);
+  expect(result.serviceSmsHoldAfterPurgePreserved).toBe(true);
+  expect(result.ambiguousServiceSmsPreserved).toBe(true);
+  expect(result.tableCounts.service_standing_enrollments).toBe(2);
+  expect(result.tableCounts.service_standing_policy_revisions).toBe(4);
+  expect(result.tableCounts.service_sms_parents).toBe(2);
+  expect(result.tableCounts.service_sms_replies).toBe(4);
   expect(result.tableCounts.invoice_delivery_attempts).toBe(4);
   expect(result.operationsTenantChecks).toBe(13);
   expect(result.heldServiceWatchPreserved).toBe(true);

@@ -32,6 +32,8 @@ vi.mock("./missed-call-care", () => ({
 // Never claim another suite's exact one-call SMS grant.
 vi.mock("./callie-runtime", () => ({ processCallieIntakes: vi.fn(async () => {}) }));
 vi.mock("./service-watch", () => ({ processServiceWatch: vi.fn(async () => {}) }));
+vi.mock("./service-standing-runtime", () => ({ processStandingServiceReminders: vi.fn(async () => {}) }));
+vi.mock("./service-sms", async (importOriginal) => ({ ...await importOriginal<typeof import("./service-sms")>(), purgeExpiredServiceSmsReplyContent: vi.fn(async () => {}) }));
 // A global scheduler test must not poll or purge another suite's reply fixtures.
 vi.mock("./mailbox-connector", () => ({ processMailboxConnectors: vi.fn(async () => {}) }));
 vi.mock("./mailbox-communication", async (importOriginal) => ({
@@ -55,6 +57,8 @@ import { processStaffLeadPush } from "./staff-push";
 import { processMissedCallCare } from "./missed-call-care";
 import { processCallieIntakes } from "./callie-runtime";
 import { processServiceWatch } from "./service-watch";
+import { processStandingServiceReminders } from "./service-standing-runtime";
+import { purgeExpiredServiceSmsReplyContent } from "./service-sms";
 import { processMailboxConnectors } from "./mailbox-connector";
 import { purgeExpiredServiceReplyContent, purgeExpiredLeadReplyContent } from "./mailbox-communication";
 import {
@@ -92,6 +96,15 @@ afterEach(() => {
 });
 
 describe("scheduler stage isolation", () => {
+  it("runs standing admission before scheduled sends and isolates failure without exposing agreement evidence", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(processStandingServiceReminders).mockRejectedValueOnce(new Error("PRIVATE_SERVICE_AGREEMENT"));
+    const observe = vi.fn(async () => {});
+    await processScheduledWork(undefined, observe);
+    expect(observe.mock.calls.slice(0, 6)).toEqual([["mailbox-replies", "running"], ["mailbox-replies", "succeeded"], ["service-standing", "running"], ["service-standing", "failed"], ["scheduled-actions", "running"], ["scheduled-actions", "succeeded"]]);
+    expect(processServiceWatch).toHaveBeenCalledOnce(); expect(purgeExpiredServiceSmsReplyContent).toHaveBeenCalledOnce();
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("PRIVATE_SERVICE_AGREEMENT");
+  });
   it("observes mailbox replies before due sends and isolates read failure without exposing message details", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(processMailboxConnectors).mockRejectedValueOnce(new Error("PRIVATE_MAILBOX_CONTENT"));
@@ -101,6 +114,7 @@ describe("scheduler stage isolation", () => {
     expect(observe).toHaveBeenCalledWith("mailbox-replies", "failed");
     expect(observe).toHaveBeenCalledWith("scheduled-actions", "succeeded");
     expect(purgeExpiredServiceReplyContent).toHaveBeenCalledOnce();
+    expect(purgeExpiredServiceSmsReplyContent).toHaveBeenCalledOnce();
     expect(purgeExpiredLeadReplyContent).toHaveBeenCalledOnce();
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("PRIVATE_MAILBOX_CONTENT");
   });
@@ -108,6 +122,8 @@ describe("scheduler stage isolation", () => {
   it("scopes mailbox work to one company and skips global raw-content retention", async () => {
     await processScheduledWork("00000000-0000-4000-8000-000000000001");
     expect(processMailboxConnectors).toHaveBeenCalledExactlyOnceWith("00000000-0000-4000-8000-000000000001");
+    expect(processStandingServiceReminders).toHaveBeenCalledExactlyOnceWith("00000000-0000-4000-8000-000000000001");
+    expect(purgeExpiredServiceSmsReplyContent).not.toHaveBeenCalled();
     expect(purgeExpiredServiceReplyContent).not.toHaveBeenCalled();
     expect(purgeExpiredLeadReplyContent).not.toHaveBeenCalled();
   });

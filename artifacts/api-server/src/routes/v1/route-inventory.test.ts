@@ -72,6 +72,12 @@ const SESSION_ONLY_ROUTES = new Set([
  * - settings.manage — org configuration surfaces (owner/admin)
  */
 const EXPECTED_PERMISSIONS: Record<string, Permission> = {
+  "GET /service-obligations/:id/standing-reminders": "crm.read",
+  "POST /service-obligations/:id/standing-reminders/preview": "settings.manage",
+  "POST /service-obligations/:id/standing-reminders/approve": "settings.manage",
+  "POST /service-obligations/:id/standing-reminders/disable": "settings.manage",
+  "GET /service-obligations/:id/sms-replies": "crm.read",
+  "POST /service-obligations/:id/sms-replies/:replyId/review": "crm.write",
   "GET /communications/callie": "crm.read",
   "GET /communications/callie/policy": "crm.read",
   "POST /communications/callie/policy/preview": "settings.manage",

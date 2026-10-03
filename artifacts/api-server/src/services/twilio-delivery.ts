@@ -183,6 +183,13 @@ export async function sendTwilioSms(
       throw new Error("SMS cancelled by current consent/suppression policy");
     }
     assertOutboundDeliveryAllowed();
+    if (context.serviceSmsParentId) {
+      // The original approval may have been revoked while transport consent was
+      // read. Retain exact parent/dispatch evidence before the irreversible POST.
+      await beforeDispatch?.();
+      const { assertServiceSmsParentDispatch } = await import("./service-sms");
+      await assertServiceSmsParentDispatch({ parentId: context.serviceSmsParentId, organizationId: context.organizationId, operationId: operation.id, body, binding: current, consentProofId: proof.id });
+    }
     dispatched = true;
     const response = await fetch(
       `https://api.twilio.com/2010-04-01/Accounts/${current.accountSid}/Messages.json`,
@@ -198,6 +205,9 @@ export async function sendTwilioSms(
         body: new URLSearchParams({
           To: phone,
           MessagingServiceSid: current.messagingServiceSid!,
+          // Typed service replies are bound to this exact shop line, not an
+          // arbitrary sender selected from a Messaging Service pool.
+          ...(context.serviceSmsParentId ? { From: current.phoneNumber } : {}),
           Body: message,
           StatusCallback: `${current.origin}/api/v1/public/sms/status?operation=${operation.id}`,
         }).toString(),

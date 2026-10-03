@@ -1,5 +1,25 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import type { CustomerEmailSender } from "./customer-email";
+import type { MailboxIdentity } from "./mailbox-contract";
+
+export type ServiceCareSnapshot = {
+  obligationId: string; updatedAt: string; contactId: string; recipient: string;
+  channel: "email" | "sms"; subject: string; body: string; noticeAt: string;
+  sender: CustomerEmailSender | null; smsBinding: string | null;
+  mailboxIdentity?: MailboxIdentity;
+  smsReply?: { version: 1; reference: string };
+};
+export type ServiceCareAuthorization = { origin: "individual"; version: 1 } | {
+  origin: "standing"; version: 1; policyRevisionId: string; anchorObligationId: string;
+  policyHash: string; seriesFingerprint: string; sourceReviewFingerprint: string;
+  admittedAt: string; expiresAt: string;
+};
+/** Missing legacy authorization remains individual; it is never a standing grant. */
+export type ServiceCareApproval = {
+  snapshot: ServiceCareSnapshot; scheduledActionId: string; agreementNote: string;
+  requestId?: string; requestFingerprint?: string; authorization?: ServiceCareAuthorization;
+};
 
 export const careChannel = z.enum(["email", "sms"]);
 const command = {

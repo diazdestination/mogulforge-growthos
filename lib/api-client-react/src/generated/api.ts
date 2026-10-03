@@ -167,6 +167,7 @@ import type {
   ListPropertiesParams,
   ListServiceMailboxRepliesParams,
   ListServiceObligationsParams,
+  ListServiceSmsRepliesParams,
   ListServiceWatchParams,
   ListSourceAdoptionsParams,
   ListTasksParams,
@@ -240,6 +241,7 @@ import type {
   ReviewCustomerReply,
   ReviewLeadMailboxReply,
   ReviewServiceMailboxReply,
+  ReviewServiceSmsReply,
   RoiReport,
   RotateWebhookSecretInput,
   SaveMissedCallCarePolicy,
@@ -252,6 +254,13 @@ import type {
   ServiceObligation,
   ServiceObligationListItem,
   ServiceRecurrenceCommand,
+  ServiceSmsReplyPage,
+  ServiceSmsReplyReviewResult,
+  ServiceStandingApprovalRequest,
+  ServiceStandingDisableRequest,
+  ServiceStandingPreview,
+  ServiceStandingPreviewRequest,
+  ServiceStandingView,
   ServiceWatchCommand,
   ServiceWatchCommandResult,
   ServiceWatchDetail,
@@ -324,6 +333,468 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetServiceStandingPolicyUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/service-obligations/${id}/standing-reminders`
+}
+
+/**
+ * Accepted active staff session only; crm.read. Default-off exact service-series review. One fixed reminder per future eligible occurrence; no backlog, marketing permission, warranty decision or automatic booking. A held/unknown original effect cannot be retried with another policy or channel.
+ * @summary Review standing reminder authority and current occurrence
+ */
+export const getServiceStandingPolicy = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<ServiceStandingView> => {
+
+  return customFetch<ServiceStandingView>(getGetServiceStandingPolicyUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetServiceStandingPolicyQueryKey = (id: string,) => {
+    return [
+    `/api/v1/service-obligations/${id}/standing-reminders`
+    ] as const;
+    }
+
+
+export const getGetServiceStandingPolicyQueryOptions = <TData = Awaited<ReturnType<typeof getServiceStandingPolicy>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getServiceStandingPolicy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetServiceStandingPolicyQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getServiceStandingPolicy>>> = ({ signal }) => getServiceStandingPolicy(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getServiceStandingPolicy>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetServiceStandingPolicyQueryResult = NonNullable<Awaited<ReturnType<typeof getServiceStandingPolicy>>>
+export type GetServiceStandingPolicyQueryError = ErrorType<void>
+
+
+/**
+ * @summary Review standing reminder authority and current occurrence
+ */
+
+export function useGetServiceStandingPolicy<TData = Awaited<ReturnType<typeof getServiceStandingPolicy>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getServiceStandingPolicy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetServiceStandingPolicyQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPreviewServiceStandingPolicyUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/service-obligations/${id}/standing-reminders/preview`
+}
+
+/**
+ * Accepted active staff session only; settings.manage. Default-off exact service-series review. One fixed reminder per future eligible occurrence; no backlog, marketing permission, warranty decision or automatic booking. A held/unknown original effect cannot be retried with another policy or channel.
+ * @summary Prepare an exact ten-minute service-series review
+ */
+export const previewServiceStandingPolicy = async (id: string,
+    serviceStandingPreviewRequest: ServiceStandingPreviewRequest, options?: Parameters<typeof customFetch>[1]): Promise<ServiceStandingPreview> => {
+
+  return customFetch<ServiceStandingPreview>(getPreviewServiceStandingPolicyUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(serviceStandingPreviewRequest)
+  }
+);}
+
+
+
+
+
+export const getPreviewServiceStandingPolicyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewServiceStandingPolicy>>, TError,{id: string;data: BodyType<ServiceStandingPreviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewServiceStandingPolicy>>, TError,{id: string;data: BodyType<ServiceStandingPreviewRequest>}, TContext> => {
+
+const mutationKey = ['previewServiceStandingPolicy'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewServiceStandingPolicy>>, {id: string;data: BodyType<ServiceStandingPreviewRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  previewServiceStandingPolicy(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewServiceStandingPolicyMutationResult = NonNullable<Awaited<ReturnType<typeof previewServiceStandingPolicy>>>
+    export type PreviewServiceStandingPolicyMutationBody = BodyType<ServiceStandingPreviewRequest>
+    export type PreviewServiceStandingPolicyMutationError = ErrorType<void>
+
+    /**
+ * @summary Prepare an exact ten-minute service-series review
+ */
+export const usePreviewServiceStandingPolicy = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewServiceStandingPolicy>>, TError,{id: string;data: BodyType<ServiceStandingPreviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewServiceStandingPolicy>>,
+        TError,
+        {id: string;data: BodyType<ServiceStandingPreviewRequest>},
+        TContext
+      > => {
+      return useMutation(getPreviewServiceStandingPolicyMutationOptions(options));
+    }
+
+export const getApproveServiceStandingPolicyUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/service-obligations/${id}/standing-reminders/approve`
+}
+
+/**
+ * Accepted active staff session only; settings.manage. Default-off exact service-series review. One fixed reminder per future eligible occurrence; no backlog, marketing permission, warranty decision or automatic booking. A held/unknown original effect cannot be retried with another policy or channel.
+ * @summary Approve unchanged forward-only service reminders
+ */
+export const approveServiceStandingPolicy = async (id: string,
+    serviceStandingApprovalRequest: ServiceStandingApprovalRequest, options?: Parameters<typeof customFetch>[1]): Promise<ServiceStandingView> => {
+
+  return customFetch<ServiceStandingView>(getApproveServiceStandingPolicyUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(serviceStandingApprovalRequest)
+  }
+);}
+
+
+
+
+
+export const getApproveServiceStandingPolicyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveServiceStandingPolicy>>, TError,{id: string;data: BodyType<ServiceStandingApprovalRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveServiceStandingPolicy>>, TError,{id: string;data: BodyType<ServiceStandingApprovalRequest>}, TContext> => {
+
+const mutationKey = ['approveServiceStandingPolicy'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveServiceStandingPolicy>>, {id: string;data: BodyType<ServiceStandingApprovalRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  approveServiceStandingPolicy(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveServiceStandingPolicyMutationResult = NonNullable<Awaited<ReturnType<typeof approveServiceStandingPolicy>>>
+    export type ApproveServiceStandingPolicyMutationBody = BodyType<ServiceStandingApprovalRequest>
+    export type ApproveServiceStandingPolicyMutationError = ErrorType<void>
+
+    /**
+ * @summary Approve unchanged forward-only service reminders
+ */
+export const useApproveServiceStandingPolicy = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveServiceStandingPolicy>>, TError,{id: string;data: BodyType<ServiceStandingApprovalRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveServiceStandingPolicy>>,
+        TError,
+        {id: string;data: BodyType<ServiceStandingApprovalRequest>},
+        TContext
+      > => {
+      return useMutation(getApproveServiceStandingPolicyMutationOptions(options));
+    }
+
+export const getDisableServiceStandingPolicyUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/service-obligations/${id}/standing-reminders/disable`
+}
+
+/**
+ * Accepted active staff session only; settings.manage. Default-off exact service-series review. One fixed reminder per future eligible occurrence; no backlog, marketing permission, warranty decision or automatic booking. A held/unknown original effect cannot be retried with another policy or channel.
+ * @summary Disable future reminders without freeing original receipts
+ */
+export const disableServiceStandingPolicy = async (id: string,
+    serviceStandingDisableRequest: ServiceStandingDisableRequest, options?: Parameters<typeof customFetch>[1]): Promise<ServiceStandingView> => {
+
+  return customFetch<ServiceStandingView>(getDisableServiceStandingPolicyUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(serviceStandingDisableRequest)
+  }
+);}
+
+
+
+
+
+export const getDisableServiceStandingPolicyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disableServiceStandingPolicy>>, TError,{id: string;data: BodyType<ServiceStandingDisableRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof disableServiceStandingPolicy>>, TError,{id: string;data: BodyType<ServiceStandingDisableRequest>}, TContext> => {
+
+const mutationKey = ['disableServiceStandingPolicy'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof disableServiceStandingPolicy>>, {id: string;data: BodyType<ServiceStandingDisableRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  disableServiceStandingPolicy(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DisableServiceStandingPolicyMutationResult = NonNullable<Awaited<ReturnType<typeof disableServiceStandingPolicy>>>
+    export type DisableServiceStandingPolicyMutationBody = BodyType<ServiceStandingDisableRequest>
+    export type DisableServiceStandingPolicyMutationError = ErrorType<void>
+
+    /**
+ * @summary Disable future reminders without freeing original receipts
+ */
+export const useDisableServiceStandingPolicy = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disableServiceStandingPolicy>>, TError,{id: string;data: BodyType<ServiceStandingDisableRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof disableServiceStandingPolicy>>,
+        TError,
+        {id: string;data: BodyType<ServiceStandingDisableRequest>},
+        TContext
+      > => {
+      return useMutation(getDisableServiceStandingPolicyMutationOptions(options));
+    }
+
+export const getListServiceSmsRepliesUrl = (id: string,
+    params?: ListServiceSmsRepliesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/service-obligations/${id}/sms-replies?${stringifiedParams}` : `/api/v1/service-obligations/${id}/sms-replies`
+}
+
+/**
+ * Accepted staff session; crm.read. Signed SMS origin does not verify customer identity. Exact reference and immutable sender/recipient evidence are distinguished from ambiguous phone-scope evidence. Content expires; retained receipt and hold remain. This is not a complete inbox.
+ * @summary Read retained exact-reference or ambiguous service text evidence
+ */
+export const listServiceSmsReplies = async (id: string,
+    params?: ListServiceSmsRepliesParams, options?: Parameters<typeof customFetch>[1]): Promise<ServiceSmsReplyPage> => {
+
+  return customFetch<ServiceSmsReplyPage>(getListServiceSmsRepliesUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListServiceSmsRepliesQueryKey = (id: string,
+    params?: ListServiceSmsRepliesParams,) => {
+    return [
+    `/api/v1/service-obligations/${id}/sms-replies`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListServiceSmsRepliesQueryOptions = <TData = Awaited<ReturnType<typeof listServiceSmsReplies>>, TError = ErrorType<void>>(id: string,
+    params?: ListServiceSmsRepliesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceSmsReplies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListServiceSmsRepliesQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listServiceSmsReplies>>> = ({ signal }) => listServiceSmsReplies(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listServiceSmsReplies>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListServiceSmsRepliesQueryResult = NonNullable<Awaited<ReturnType<typeof listServiceSmsReplies>>>
+export type ListServiceSmsRepliesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read retained exact-reference or ambiguous service text evidence
+ */
+
+export function useListServiceSmsReplies<TData = Awaited<ReturnType<typeof listServiceSmsReplies>>, TError = ErrorType<void>>(
+ id: string,
+    params?: ListServiceSmsRepliesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceSmsReplies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListServiceSmsRepliesQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReviewServiceSmsReplyUrl = (id: string,
+    replyId: string,) => {
+
+
+
+
+  return `/api/v1/service-obligations/${id}/sms-replies/${replyId}/review`
+}
+
+/**
+ * Accepted active staff session; crm.write. Exact version and replay-safe request required. Office follow-up retains the service hold; explicit handling complete or unrelated-evidence dismissal releases only this evidence hold. Separately authorized future work can resume, never an original owned send. No disposition creates customer confirmation, consent or a booking.
+ * @summary Record an office disposition without consent, booking or resend authority
+ */
+export const reviewServiceSmsReply = async (id: string,
+    replyId: string,
+    reviewServiceSmsReply: ReviewServiceSmsReply, options?: Parameters<typeof customFetch>[1]): Promise<ServiceSmsReplyReviewResult> => {
+
+  return customFetch<ServiceSmsReplyReviewResult>(getReviewServiceSmsReplyUrl(id,replyId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(reviewServiceSmsReply)
+  }
+);}
+
+
+
+
+
+export const getReviewServiceSmsReplyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewServiceSmsReply>>, TError,{id: string;replyId: string;data: BodyType<ReviewServiceSmsReply>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewServiceSmsReply>>, TError,{id: string;replyId: string;data: BodyType<ReviewServiceSmsReply>}, TContext> => {
+
+const mutationKey = ['reviewServiceSmsReply'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewServiceSmsReply>>, {id: string;replyId: string;data: BodyType<ReviewServiceSmsReply>}> = (props) => {
+          const {id,replyId,data} = props ?? {};
+
+          return  reviewServiceSmsReply(id,replyId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewServiceSmsReplyMutationResult = NonNullable<Awaited<ReturnType<typeof reviewServiceSmsReply>>>
+    export type ReviewServiceSmsReplyMutationBody = BodyType<ReviewServiceSmsReply>
+    export type ReviewServiceSmsReplyMutationError = ErrorType<void>
+
+    /**
+ * @summary Record an office disposition without consent, booking or resend authority
+ */
+export const useReviewServiceSmsReply = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewServiceSmsReply>>, TError,{id: string;replyId: string;data: BodyType<ReviewServiceSmsReply>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewServiceSmsReply>>,
+        TError,
+        {id: string;replyId: string;data: BodyType<ReviewServiceSmsReply>},
+        TContext
+      > => {
+      return useMutation(getReviewServiceSmsReplyMutationOptions(options));
+    }
 
 export const getGetCalliePolicyUrl = () => {
 

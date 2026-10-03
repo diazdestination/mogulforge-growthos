@@ -1069,6 +1069,7 @@ export async function processDueScheduledActions(organizationId?: string): Promi
         organizationId: item.organizationId, actionKey: `scheduled:${item.id}`,
         leadId: typeof item.context.leadId === "string" ? item.context.leadId : null,
         appointmentId: item.action.type === "appointment_reminder" && typeof item.context.appointmentId === "string" ? item.context.appointmentId : null,
+        ...(item.action.type === "service_care_reminder" && typeof item.action.params.approvalId === "string" ? { serviceCare: { approvalId: item.action.params.approvalId, scheduledActionId: item.id } } : {}),
         kind: item.action.type, payload: { action: item.action, context: item.context },
         execute: async () => {
           // Re-read cancellation after acquiring exclusive durable ownership.
@@ -1099,7 +1100,7 @@ export async function processDueScheduledActions(organizationId?: string): Promi
         .update(scheduledActionsTable)
         .set({ status: execution.state === "indeterminate" ? "failed" : "done", lastError: execution.state === "indeterminate" ? "Indeterminate result: reconcile in Revenue Desk; automatic replay blocked." : null })
         .where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.status, "pending")));
-    } catch {
+    } catch (error) {
       // A DB error can happen AFTER ownership or even after the effect. Inspect
       // the receipt first. Existing ownership is never treated as a safe retry.
       const [receipt] = await db.select({ state: revenueExecutionsTable.state }).from(revenueExecutionsTable)
@@ -1110,6 +1111,12 @@ export async function processDueScheduledActions(organizationId?: string): Promi
           lastError: "Execution receipt exists; inspect that receipt before any new action. Automatic replay is blocked.",
         }).where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.status, "pending")));
         // Even a payload conflict cannot spin forever or acquire a new effect.
+        continue;
+      }
+      const { ServiceClaimDeferredError } = await import("./service-care-claim");
+      if (error instanceof ServiceClaimDeferredError) {
+        await db.update(scheduledActionsTable).set({ runAt: error.resumeAt }).where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.organizationId, item.organizationId), eq(scheduledActionsTable.status, "pending"),
+          notExists(db.select({ id: revenueExecutionsTable.id }).from(revenueExecutionsTable).where(and(eq(revenueExecutionsTable.organizationId, item.organizationId), eq(revenueExecutionsTable.actionKey, `scheduled:${item.id}`))))));
         continue;
       }
       const attempts = item.attempts + 1;
@@ -1146,6 +1153,10 @@ export async function processScheduledWork(organizationId?: string, observe?: St
   await stage("mailbox-replies", async () => {
     const { processMailboxConnectors } = await import("./mailbox-connector");
     await processMailboxConnectors(organizationId);
+  });
+  await stage("service-standing", async () => {
+    const { processStandingServiceReminders } = await import("./service-standing-runtime");
+    await processStandingServiceReminders(organizationId);
   });
   await stage("scheduled-actions", () => processDueScheduledActions(organizationId));
   await stage("missed-call-care", async () => {
@@ -1203,6 +1214,8 @@ export async function processScheduledWork(organizationId?: string, observe?: St
   await stage("service-reply-retention", async () => {
     const { purgeExpiredServiceReplyContent } = await import("./mailbox-communication");
     await purgeExpiredServiceReplyContent();
+    const { purgeExpiredServiceSmsReplyContent } = await import("./service-sms");
+    await purgeExpiredServiceSmsReplyContent();
   });
   await stage("lead-reply-retention", async () => {
     const { purgeExpiredLeadReplyContent } = await import("./mailbox-communication");

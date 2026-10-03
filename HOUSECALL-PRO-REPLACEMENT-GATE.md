@@ -1,5 +1,15 @@
 # Housecall Pro replacement gate
 
+Current L5 source addendum: base PR19/mainf91e1c3 passed exact-main CI37134529680.
+`reports/standing-service-integration-2026-10-03.md` adds default-off exact
+forward-only series reminders and signed SMS office evidence/holds in the existing
+Service Desk. This supersedes the historical matrix's every-occurrence approval
+limitation only for a separately approved eligible service series. Individual
+review remains available; original send ownership, consent and all other holds
+remain. No catch-up sweep, automatic booking or warranty determination. Source
+schema125tables/reviewed0013 and local recovery are not hosted or contractor proof.
+Both company cards remain NOT ACCEPTED; use LAUNCH-COMPLETION for the fixed gaps.
+
 Current October3 source addendum: PR18/mainfa7c827 passed its exact-main gate.
 The new `reports/callie-intake-integration-2026-10-03.md` candidate adds separately
 approved automatic keypad intake, caller-originated one-call acknowledgment and

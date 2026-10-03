@@ -9,6 +9,7 @@ import { serviceNoticeAt } from "./service-obligations";
 import { enqueueStaffServiceNotice } from "./staff-push";
 import { serviceWatchCommand, serviceWatchQuery, serviceWatchReasons, WATCH_BATCH_SIZE, WATCH_PAGE_SIZE } from "./service-watch-policy";
 import { serviceMailboxReplyFacts } from "./mailbox-communication";
+import { serviceSmsReplyFacts } from "./service-sms";
 
 type Case = typeof cases.$inferSelect;
 type Reader = typeof db | ScheduleTransaction;
@@ -51,6 +52,7 @@ async function observe(reader: Reader, org: string, id: string, current: Case | 
   const accepted = await latest(reader, org, id, "service.care_reminder_accepted");
   const response = await latest(reader, org, id, "service.care_response_recorded");
   const mailboxReply = await serviceMailboxReplyFacts(org, id, reader);
+  const smsReply = await serviceSmsReplyFacts(org, id, reader);
   const saved = approval?.metadata as { scheduledActionId?: string; snapshot?: { updatedAt?: string } } | undefined;
   const [scheduled] = saved?.scheduledActionId ? await reader.select().from(scheduledActionsTable).where(and(eq(scheduledActionsTable.organizationId, org), eq(scheduledActionsTable.id, saved.scheduledActionId))) : [];
   const [receipt] = saved?.scheduledActionId ? await reader.select().from(revenueExecutionsTable).where(and(eq(revenueExecutionsTable.organizationId, org), eq(revenueExecutionsTable.actionKey, `scheduled:${saved.scheduledActionId}`))) : [];
@@ -63,13 +65,16 @@ async function observe(reader: Reader, org: string, id: string, current: Case | 
     appointmentStatus: appointment?.status ?? null, approval: !!approval,
     approvalChanged: !!approval && !receipt && saved?.snapshot?.updatedAt !== service.updatedAt.toISOString(),
     scheduledState: scheduled?.status ?? null, receiptState: receipt?.state ?? null, receiptExpiresAt: receipt?.expiresAt ?? null,
-    acceptedAt: accepted?.createdAt ?? null, responseRecorded: !!response, mailboxReplyNeedsReview: !!mailboxReply && (mailboxReply.state === "needs_review" || !response || response.createdAt < mailboxReply.recordedAt), ownerValid,
+    acceptedAt: accepted?.createdAt ?? null, responseRecorded: !!response,
+    mailboxReplyNeedsReview: !!mailboxReply && (mailboxReply.state === "needs_review" || !response || response.createdAt < mailboxReply.recordedAt) ||
+      !!smsReply && (smsReply.state === "needs_review" || !response || response.createdAt < smsReply.recordedAt), ownerValid,
     nextActionAt: current && ["open", "acknowledged", "held"].includes(current.state) ? current.nextActionAt : null,
   };
   const reasons = serviceWatchReasons(facts, now);
   const source = { serviceVersion: service.updatedAt.toISOString(), taskVersion: task.updatedAt.toISOString(), contactVersion: contact.updatedAt.toISOString(), appointmentVersion: appointment?.updatedAt.toISOString() ?? null,
     appointmentId: appointment?.id ?? null, approvalId: approval?.id ?? null, acceptedId: accepted?.id ?? null, responseId: response?.id ?? null,
     mailboxReplyId: mailboxReply?.id ?? null, mailboxReplyVersion: mailboxReply?.version ?? null,
+    smsReplyId: smsReply?.id ?? null, smsReplyVersion: smsReply?.version ?? null, smsReplyCorrelation: smsReply?.correlation ?? null,
     scheduledState: scheduled?.status ?? null, receiptState: receipt?.state ?? null, ownerId: owner?.id ?? null, ownerValid,
     lifecycleState: lifecycle.state, lifecycleVersion: lifecycle.version, reasons, nextActionAt: facts.nextActionAt?.toISOString() ?? null, timezone: calendar.timezone };
   return { service, task, contact, owner, ownerValid, reasons, fingerprint: careFingerprint(source), held: !lifecycle.automationAllowed,

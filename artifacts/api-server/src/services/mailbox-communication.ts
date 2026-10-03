@@ -10,6 +10,9 @@ import { getCustomerLifecycleStatus } from "./customer-lifecycle";
 import { EmailDispatchBlockedError } from "./email-dispatch-guard";
 import { MAILBOX_HEADER, MAILBOX_MAX_BODY, mailboxDigest, type MailboxIdentity } from "./mailbox-contract";
 import { confirmObservedMailboxLeadReply, hasCustomerReplyHold, lockReplyLead } from "./response-correlation";
+import { assertServiceCareAuthorizationCurrent } from "./service-care-authorization";
+import { careFingerprint } from "./service-care-policy";
+import { hasServiceSmsReplyHold } from "./service-sms";
 
 type Reader = typeof db | ScheduleTransaction;
 type Parent = typeof parents.$inferSelect;
@@ -63,7 +66,7 @@ async function executionCurrent(reader: Reader, parent: Parent) {
   if (!receipt || receipt.state !== "processing" || receipt.expiresAt <= new Date() || receipt.fingerprint !== parent.executionFingerprint) fail("execution_not_owned");
   if (parent.leadId && receipt.actorUserId !== parent.senderUserId) fail("execution_not_owned");
 }
-async function exactService(reader: Reader, parent: Parent, dispatch = false) {
+async function exactService(reader: Reader, parent: Parent, dispatch = false, options: { lockTask?: boolean } = {}) {
   if (!parent.serviceObligationId) fail("unsupported_context");
   const [service] = await reader.select().from(serviceObligationsTable).where(serviceWhere(parent.organizationId, parent.serviceObligationId));
   const [contact] = await reader.select().from(contactsTable).where(and(eq(contactsTable.organizationId, parent.organizationId), eq(contactsTable.id, parent.contactId)));
@@ -73,6 +76,12 @@ async function exactService(reader: Reader, parent: Parent, dispatch = false) {
   const historical = service.status !== "active" || service.contactId !== parent.contactId || contact.email?.trim().toLowerCase() !== parent.recipient ||
     service.dueAt.toISOString() !== snapshot.dueAt || service.occurrenceIndex !== snapshot.occurrenceIndex || service.createdAt.toISOString() !== snapshot.createdAt;
   if (dispatch && (historical || service.updatedAt.toISOString() !== snapshot.updatedAt || await hasServiceMailboxReplyHold(parent.organizationId, service.id, reader))) fail("service_changed_or_reply_held");
+  if (dispatch) {
+    const claim = await assertServiceCareAuthorizationCurrent(reader, parent.organizationId, snapshot.approvalId, snapshot.scheduledActionId, options);
+    const proof = { origin: claim.approval.authorization?.origin ?? "individual", fingerprint: careFingerprint(claim.approval.authorization ?? { origin: "individual" }) };
+    if ((snapshot.authorization ? careFingerprint(snapshot.authorization) !== careFingerprint(proof) : proof.origin !== "individual") ||
+        await hasServiceSmsReplyHold(parent.organizationId, service.id, reader)) fail("service_authorization_changed");
+  }
   return { service, contact, historical };
 }
 
@@ -135,6 +144,7 @@ export async function reserveServiceMailboxParent(input: { identity: MailboxIden
   email.parse(message.to);
   return db.transaction(async tx => {
     await lock(tx, identity.organizationId); await currentIdentity(identity, tx);
+    const authority = await assertServiceCareAuthorizationCurrent(tx, identity.organizationId, input.approvalId, input.scheduledActionId);
     const [service] = await tx.select().from(serviceObligationsTable).where(serviceWhere(identity.organizationId, input.serviceObligationId));
     if (!service || service.contactId !== input.contactId || service.updatedAt.toISOString() !== input.expectedUpdatedAt) fail("service_changed");
     const [approval] = await tx.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, identity.organizationId), eq(auditEventsTable.id, input.approvalId), eq(auditEventsTable.action, "service.care_reminder_approved"), eq(auditEventsTable.entityId, service.id)));
@@ -146,10 +156,11 @@ export async function reserveServiceMailboxParent(input: { identity: MailboxIden
       if (!sameIdentity(previous, identity) || previous.actionKey !== actionKey || previous.contentSha256 !== mailboxContentHash(message) || previous.executionFingerprint !== input.executionFingerprint) fail("parent_conflict");
       // A prior dispatch claim can never be reused, even without acceptance.
       if (previous.dispatchStartedAt) fail("dispatch_already_claimed");
-      await executionCurrent(tx, previous); return previous.id;
+      await executionCurrent(tx, previous); await exactService(tx, previous, true); return previous.id;
     }
     const [parent] = await tx.insert(parents).values({ organizationId: identity.organizationId, contactId: input.contactId, serviceObligationId: service.id,
-      contextSnapshot: { dueAt: service.dueAt.toISOString(), occurrenceIndex: service.occurrenceIndex, createdAt: service.createdAt.toISOString(), updatedAt: input.expectedUpdatedAt, approvalId: input.approvalId, scheduledActionId: input.scheduledActionId },
+      contextSnapshot: { dueAt: service.dueAt.toISOString(), occurrenceIndex: service.occurrenceIndex, createdAt: service.createdAt.toISOString(), updatedAt: input.expectedUpdatedAt, approvalId: input.approvalId, scheduledActionId: input.scheduledActionId,
+        authorization: { origin: authority.approval.authorization?.origin ?? "individual", fingerprint: careFingerprint(authority.approval.authorization ?? { origin: "individual" }) } },
       provider: identity.provider, senderUserId: identity.senderUserId, connectionId: identity.connectionId, connectionRevision: identity.connectionRevision,
       mailboxAccountId: identity.mailboxAccountId, mailboxEmail: identity.mailboxEmail, connectorId: identity.connectorId, connectorVersion: identity.connectorVersion, policyVersion: identity.policyVersion, connectorStartedAt: identity.startedAt,
       recipient: message.to.trim().toLowerCase(), contentSha256: mailboxContentHash(message), subjectSha256: hash(message.subject), bodySha256: hash(message.body),
@@ -167,7 +178,7 @@ export async function assertMailboxOutboundParentDispatch(parentId: string, iden
       if (!parent || !sameIdentity(parent, identity) || parent.dispatchStartedAt || parent.contentSha256 !== mailboxContentHash(message)) fail("parent_dispatch_mismatch");
       await executionCurrent(tx, parent);
       if (parent.leadId) { await lockReplyLead(tx, identity.organizationId, parent.leadId); await exactLead(tx, parent, true); }
-      else await exactService(tx, parent, true);
+      else await exactService(tx, parent, true, { lockTask: true });
       await tx.update(parents).set({ dispatchStartedAt: new Date() }).where(eq(parents.id, parent.id));
       return { name: MAILBOX_HEADER, value: parent.correlationHeader };
     });
@@ -269,7 +280,8 @@ export async function ingestMailboxReply(identity: MailboxIdentity, raw: z.input
       encryptedText: encryptEmailContent(JSON.stringify({ subject: input.subject, text: input.text }), `${identity.organizationId}:${id}:service-reply`), rawExpiresAt: expires }).returning();
     await tx.insert(auditEventsTable).values({ organizationId: identity.organizationId, action: "service.mailbox_reply_received", entityType: "service_obligation", entityId: service.id,
       metadata: { replyId: id, parentId: parent.id, historical, evidence: "original_mailbox_observation_requires_office_review", noBookingCreated: true, uncertainExecutionPreserved: true } });
-    if (!historical) await tx.update(crmTasksTable).set({ status: "open", completedAt: null, dueAt: new Date(), description: "A reply to this exact service reminder arrived in the original connected mailbox. Office review is required. Message content is untrusted; no customer decision, consent, appointment change or completed visit is inferred." }).where(and(eq(crmTasksTable.organizationId, identity.organizationId), eq(crmTasksTable.id, service.taskId)));
+    // The retained reply and MAINTAIN hold are the office-review work. An inbound
+    // message is not authority to reopen a task or replace its staff-owned plan.
     return { state: "needs_review", replyId: reply.id, reason: historical ? "historical_service_reply" : "exact_service_reply_review_required" };
   });
 }
