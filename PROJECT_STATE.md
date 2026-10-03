@@ -1,5 +1,26 @@
 # GrowthOS project state
 
+## October 3 bounded source nurture (current candidate)
+
+Base L5 PR20/main110f145 and exact-main CI37148428665 passed. The owner-requested
+next wave is the finite L6 slice in `reports/source-nurture-contract-2026-10-03.md`.
+See its integration report and operator guide. The existing Win-back, Account,
+lead Messages and Today screens now expose separately approved two-message
+Microsoft recovery, exact original receipts, completed-sync evidence and office
+reply work. Permanent ownership and shared contact allowances span existing
+automated sending lanes. Approval is not start, acceptance is not delivery, and
+uncertainty never creates retry or step-two authority.
+
+Current source expects130tables with reviewed-only0014after0013. The two-company
+synthetic90to130restore preserves stopped/unknown work with36SELECT-only app
+checks and15new constraint negatives. Local types/builds/UI/scripts pass; use
+the integration report for exact focused/PG/release evidence. Candidate/main CI
+must pass before selection. No hosted deployment, live contact, provider or
+credential change is authorized by this source work. Azure owner-return and
+both complete contractor replacement cards remain open. This finite slice does
+not close all L6, remaining L1/L4 scope, required L7 workday history or L8 migration.
+Older candidate labels below are historical, not the current release status.
+
 ## October 3 standing service reminders (current candidate)
 
 Base PR19/mainf91e1c3 and exact-main CI37134529680 passed. The owner-authorized

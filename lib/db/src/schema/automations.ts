@@ -29,6 +29,7 @@ export interface AutomationAction {
     | "schedule_followup"
     | "appointment_reminder"
     | "service_care_reminder"
+    | "source_nurture_email"
     | "playbook_step";
   /** Action-specific params, e.g. { templateId }, { status }, { assignedUserId }, { tagId }, { delayMinutes, action } */
   params: Record<string, unknown>;

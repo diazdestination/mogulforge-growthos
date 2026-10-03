@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   auditEventsTable,
   consentRecordsTable,
@@ -52,6 +53,7 @@ import {
 
 let org: { id: string };
 let assignedUser: { id: string };
+let contactSequence = 2000;
 
 beforeAll(async () => {
   const slug = `test-playbook-${Date.now()}`;
@@ -105,11 +107,13 @@ async function makeLead(opts?: {
   const contact = await crm.createContact(org.id, {
     firstName: "Play",
     lastName: "Book",
-    phone: "+15550002222",
+    // Distinct cases must not accidentally become aliases under the shared
+    // contact allowance. Dedicated shared-contact tests cover real aliases.
+    phone: `+1202555${contactSequence++}`,
     email:
       opts?.email === null
         ? undefined
-        : (opts?.email ?? "playbook@test.example"),
+        : (opts?.email ?? `${randomUUID()}@example.invalid`),
   });
   await db.insert(consentRecordsTable).values({
     organizationId: org.id,
@@ -172,7 +176,7 @@ describe("closer engine playbooks", () => {
   });
 
   it("executes a step: sends, logs a timeline touch, and schedules the next step", async () => {
-    const { lead } = await makeLead();
+    const { lead, contact } = await makeLead();
     const enrollment = await autoEnrollLead(org.id, lead.id);
     const result = await executePlaybookStep(org.id, {
       enrollmentId: enrollment!.id,
@@ -184,7 +188,7 @@ describe("closer engine playbooks", () => {
       expect.objectContaining({
         organizationId: org.id,
         userId: assignedUser.id,
-        to: "playbook@test.example",
+        to: contact.email,
       }),
     );
 

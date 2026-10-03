@@ -1,5 +1,17 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## October 3 bounded source-nurture continuation
+
+The owner requested the next wave after L5 PR20/main110f145 and exact-main
+CI37148428665 passed. The active bounded L6 slice is
+`reports/source-nurture-contract-2026-10-03.md`: finite exact-reviewed Microsoft
+source recovery, permanent legacy/nurture ownership, separately opted-in tracked
+replies and completed-sync proof before a second touch. Use coordinated runtime,
+intake and experience agents; the coordinator owns shared integration and release.
+No rolling campaign, invented permission, provider activation, hosted/schema
+change or contractor cutover is authorized. Do not mark full L6/replacement/launch
+complete from this slice. Earlier live gates and Azure owner-return remain open.
+
 ## October 3 standing-service continuation
 
 The owner requested the next big wave after CALLIE PR19/main f91e1c3 and

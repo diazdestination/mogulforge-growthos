@@ -9,6 +9,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -53,6 +54,11 @@ export const mailboxConnectorsTable = pgTable(
     leadMonitoringChangedAt: timestamp("lead_monitoring_changed_at", {
       withTimezone: true,
     }),
+    // Nurture is a separate exact-parent context, never inherited from BIE.
+    nurtureMonitoringEnabled: boolean("nurture_monitoring_enabled").notNull().default(false),
+    nurtureMonitoringVersion: integer("nurture_monitoring_version").notNull().default(0),
+    nurtureMonitoringApprovedAt: timestamp("nurture_monitoring_approved_at", { withTimezone: true }),
+    nurtureMonitoringChangedAt: timestamp("nurture_monitoring_changed_at", { withTimezone: true }),
     leaseToken: uuid("lease_token"),
     leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
     lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
@@ -90,8 +96,36 @@ export const mailboxConnectorsTable = pgTable(
       "mailbox_connector_lead_monitoring_ck",
       sql`${t.leadMonitoringVersion} >= 0 and (not ${t.leadMonitoringEnabled} or (${t.leadMonitoringVersion} > 0 and ${t.leadMonitoringApprovedAt} is not null and ${t.leadMonitoringChangedAt} is not null))`,
     ),
+    check("mailbox_connector_nurture_monitoring_ck", sql`${t.nurtureMonitoringVersion} >= 0 and (not ${t.nurtureMonitoringEnabled} or (${t.nurtureMonitoringVersion} > 0 and ${t.nurtureMonitoringApprovedAt} is not null and ${t.nurtureMonitoringChangedAt} is not null))`),
   ],
 );
+
+/** A finite two-folder observation round, not proof of absence of all replies. */
+export const mailboxSyncCyclesTable = pgTable("mailbox_sync_cycles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizationsTable.id, { onDelete: "cascade" }),
+  connectorId: uuid("connector_id").notNull(),
+  connectorVersion: integer("connector_version").notNull(),
+  sequence: integer("sequence").notNull(),
+  freshBoundary: boolean("fresh_boundary").notNull().default(true),
+  nurtureMonitoringVersion: integer("nurture_monitoring_version").notNull(),
+  nurtureMonitoringApprovedAt: timestamp("nurture_monitoring_approved_at", { withTimezone: true }).notNull(),
+  state: text("state").$type<"scanning" | "complete" | "failed">().notNull().default("scanning"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  sentCompletedAt: timestamp("sent_completed_at", { withTimezone: true }),
+  inboxCompletedAt: timestamp("inbox_completed_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  failedAt: timestamp("failed_at", { withTimezone: true }),
+  errorCode: text("error_code"),
+}, t => [
+  unique("mailbox_sync_cycle_org_id_uq").on(t.organizationId, t.id),
+  unique("mailbox_sync_cycle_sequence_uq").on(t.organizationId, t.connectorId, t.connectorVersion, t.sequence),
+  uniqueIndex("mailbox_sync_cycle_active_uq").on(t.organizationId, t.connectorId, t.connectorVersion).where(sql`${t.state} = 'scanning'`),
+  index("mailbox_sync_cycle_latest_idx").on(t.organizationId, t.connectorId, t.connectorVersion, t.sequence),
+  foreignKey({ columns: [t.organizationId, t.connectorId], foreignColumns: [mailboxConnectorsTable.organizationId, mailboxConnectorsTable.id], name: "mailbox_sync_cycle_connector_fk" }).onDelete("cascade"),
+  check("mailbox_sync_cycle_boundary_ck", sql`${t.state} <> 'complete' or ${t.freshBoundary}`),
+  check("mailbox_sync_cycle_shape_ck", sql`${t.sequence} > 0 and ${t.connectorVersion} > 0 and ${t.nurtureMonitoringVersion} > 0 and ${t.startedAt} >= ${t.nurtureMonitoringApprovedAt} and ${t.state} in ('scanning','complete','failed') and (${t.sentCompletedAt} is null or ${t.sentCompletedAt} >= ${t.startedAt}) and (${t.inboxCompletedAt} is null or (${t.sentCompletedAt} is not null and ${t.inboxCompletedAt} >= ${t.sentCompletedAt})) and ((${t.state} = 'complete' and ${t.completedAt} is not null and ${t.sentCompletedAt} is not null and ${t.inboxCompletedAt} is not null and ${t.completedAt} >= ${t.inboxCompletedAt} and ${t.failedAt} is null and ${t.errorCode} is null) or (${t.state} = 'scanning' and ${t.completedAt} is null and ${t.failedAt} is null and ${t.errorCode} is null) or (${t.state} = 'failed' and ${t.completedAt} is null and ${t.failedAt} is not null and ${t.failedAt} >= ${t.startedAt} and ${t.errorCode} is not null))`),
+]);
 
 /** Permanent content digests survive raw-body purge; changed redelivery is held. */
 export const mailboxReceiptsTable = pgTable(

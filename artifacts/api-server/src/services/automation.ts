@@ -25,6 +25,8 @@ import { isDeepStrictEqual } from "node:util";
 import type { SchedulerStage, StageObserver } from "./scheduler-runtime";
 import { recordAudit } from "./audit";
 import { runDurableAction } from "./durable-execution";
+import { assertContactTouchCurrent, acceptContactTouch, markContactTouchDispatchStarted, type ContactTouchClaim } from "./contact-touch-claim";
+import { sourceFingerprint } from "./source-adoption-contract";
 import { formatAppointmentWindow, lockContractorSchedule, type ScheduleTransaction } from "./contractor-scheduling";
 import { customerWorkAllowedSql, customerWorkHeld } from "./customer-lifecycle-runtime";
 import { isLegacyDefaultOrg } from "../lib/orgFlavor";
@@ -231,12 +233,26 @@ async function executeRule(
   event: string,
   context: EventContext,
 ): Promise<void> {
+  // Original event-run identity is retained BEFORE any action; ordinal keys
+  // cannot be recreated by retrying/reconciling an ambiguous provider effect.
+  const [originalRun] = await db.insert(automationRunsTable).values({ organizationId: rule.organizationId, automationId: rule.id, event,
+    entityType: context.leadId ? "lead" : context.appointmentId ? "appointment" : null, entityId: context.leadId ?? context.appointmentId ?? null,
+    status: "skipped", actionResults: [], error: "Original run admitted; unfinished external actions require reconciliation." }).returning();
   const results: ActionResult[] = [];
-  for (const action of rule.actions) {
+  for (const [ordinal, action] of rule.actions.entries()) {
     try {
-      results.push(
-        await executeAction(rule.organizationId, action, context, rule.id),
-      );
+      const key = `automation-run:${originalRun.id}:${ordinal}`;
+      const prepared = await prepareAutomationTouch(rule.organizationId, action, context, key);
+      if (prepared?.touch) {
+        let result: ActionResult | undefined;
+        const receipt = await runDurableAction({ organizationId: rule.organizationId, actionKey: key, kind: action.type, payload: { action, context }, leadId: context.leadId,
+          actorUserId: context.actorUserId, contactTouch: prepared.touch, execute: async () => {
+            result = await executeAction(rule.organizationId, action, context, rule.id, undefined, key);
+            if (result.status === "failed") throw new Error("Original action effect needs reconciliation.");
+            return { state: result.status === "skipped" ? "blocked" : "succeeded", detail: "Original automation action completed; inspect retained provider evidence." };
+          } });
+        results.push(result ?? { type: action.type, status: receipt.state === "succeeded" ? "success" : receipt.state === "blocked" ? "skipped" : "failed", detail: "Original action receipt retained; no automatic replay." });
+      } else results.push(await executeAction(rule.organizationId, action, context, rule.id));
     } catch (err) {
       results.push({
         type: action.type,
@@ -254,26 +270,14 @@ async function executeRule(
         : failed > 0
           ? "partial"
           : "success";
-  await db.insert(automationRunsTable).values({
-    organizationId: rule.organizationId,
-    automationId: rule.id,
-    event,
-    entityType: context.leadId
-      ? "lead"
-      : context.appointmentId
-        ? "appointment"
-        : null,
-    entityId: context.leadId ?? context.appointmentId ?? null,
-    status,
-    actionResults: results,
-  });
+  await db.update(automationRunsTable).set({ status, actionResults: results, error: null }).where(and(eq(automationRunsTable.organizationId, rule.organizationId), eq(automationRunsTable.id, originalRun.id)));
 }
 
 // ---------- actions ----------
 
 /** Recheck the original claim; cancellation or an expired/changed receipt never creates a new key. */
 async function assertAutomatedEmailOwnership(organizationId: string, action: AutomationAction, context: EventContext,
-  automationId: string, scheduledActionId?: string, frozenRule?: Automation) {
+  automationId: string, scheduledActionId?: string, frozenRule?: Automation, originalActionKey?: string) {
   if (await customerWorkHeld(organizationId)) throw new EmailDispatchBlockedError();
   if (scheduledActionId) {
     const [scheduled] = await db.select().from(scheduledActionsTable).where(and(eq(scheduledActionsTable.organizationId, organizationId), eq(scheduledActionsTable.id, scheduledActionId)));
@@ -285,10 +289,28 @@ async function assertAutomatedEmailOwnership(organizationId: string, action: Aut
     if (!scheduled.automationId) return;
     automationId = scheduled.automationId;
   }
+  if (!scheduledActionId && originalActionKey) {
+    const match = /^automation-run:([0-9a-f-]{36}):(\d+)$/.exec(originalActionKey);
+    if (!match) throw new EmailDispatchBlockedError();
+    const [run] = await db.select().from(automationRunsTable).where(and(eq(automationRunsTable.organizationId, organizationId), eq(automationRunsTable.id, match[1])));
+    const [receipt] = await db.select().from(revenueExecutionsTable).where(and(eq(revenueExecutionsTable.organizationId, organizationId), eq(revenueExecutionsTable.actionKey, originalActionKey)));
+    if (!run || run.automationId !== automationId || !receipt || receipt.state !== "processing" || receipt.expiresAt.getTime() <= Date.now() || receipt.fingerprint !== sourceFingerprint({ action, context }) || receipt.kind !== action.type ||
+      !frozenRule || !isDeepStrictEqual(frozenRule.actions[Number(match[2])], action)) throw new EmailDispatchBlockedError();
+  }
   const [rule] = await db.select().from(automationsTable).where(and(eq(automationsTable.organizationId, organizationId), eq(automationsTable.id, automationId)));
   if (!rule?.isActive || (!scheduledActionId && !rule.actions.some(item => isDeepStrictEqual(item, action)))) throw new EmailDispatchBlockedError();
   if (frozenRule && (rule.event !== frozenRule.event || !isDeepStrictEqual(rule.conditions, frozenRule.conditions) || !isDeepStrictEqual(rule.actions, frozenRule.actions)))
     throw new EmailDispatchBlockedError();
+}
+async function prepareAutomationTouch(organizationId: string, action: AutomationAction, context: EventContext, logicalKey: string) {
+  if (action.type !== "send_email" && action.type !== "send_sms") return null;
+  const channel = action.type === "send_email" ? "email" as const : "sms" as const;
+  const rendered = await renderTemplate(organizationId, action, context);
+  if (!rendered.contact) return null;
+  const gate = await checkSendEligibility({ organizationId, leadId: context.leadId, contact: rendered.contact, channel, kind: "outreach", touchLogicalKey: logicalKey });
+  const touch: ContactTouchClaim = { organizationId, logicalKey, contactId: rendered.contact.id, address: (channel === "email" ? rendered.contact.email : rendered.contact.phone) ?? "", channel,
+    sourceKind: "automation", leadId: context.leadId, payload: { action, context } };
+  return { gate, touch: gate.ok ? touch : null };
 }
 
 async function assertAutomatedEmailLead(organizationId: string, leadId: string | undefined, contactId: string) {
@@ -304,6 +326,7 @@ async function executeAction(
   context: EventContext,
   automationId: string,
   scheduledActionId?: string,
+  originalActionKey?: string,
 ): Promise<ActionResult> {
   if (context.leadId && ["send_email", "send_sms", "schedule_followup", "playbook_step"].includes(action.type)) {
     const { hasCustomerReplyHold } = await import("./response-correlation");
@@ -320,6 +343,11 @@ async function executeAction(
     });
 
   switch (action.type) {
+    case "source_nurture_email": {
+      if (!scheduledActionId) return { type: action.type, status: "skipped", detail: "Nurture requires its original scheduled action." };
+      const { executeSourceNurtureEmail } = await import("./source-nurture-runtime");
+      return executeSourceNurtureEmail(organizationId, action.params, context as Record<string, unknown>, scheduledActionId);
+    }
     case "service_care_reminder": {
       if (!scheduledActionId) return { type: action.type, status: "skipped", detail: "Service reminders require their owned scheduled action." };
       const { executeServiceCareReminder } = await import("./service-care");
@@ -336,7 +364,7 @@ async function executeAction(
     case "send_email":
     case "send_sms": {
       const channel = action.type === "send_email" ? "email" : "sms";
-      const [emailRule] = channel === "email" ? await db.select().from(automationsTable).where(and(eq(automationsTable.organizationId, organizationId), eq(automationsTable.id, automationId))) : [];
+      const [emailRule] = await db.select().from(automationsTable).where(and(eq(automationsTable.organizationId, organizationId), eq(automationsTable.id, automationId)));
       const rendered = await renderTemplate(organizationId, action, context);
       if (!rendered.contact) {
         return { type: action.type, status: "skipped", detail: "no contact" };
@@ -349,13 +377,16 @@ async function executeAction(
         contact,
         channel,
         kind: "outreach",
+        touchLogicalKey: originalActionKey ?? (scheduledActionId ? `scheduled:${scheduledActionId}` : undefined),
       });
       if (!gate.ok) {
         if (gate.outcome === "deferred") {
+          if (originalActionKey || scheduledActionId) return { type: action.type, status: "skipped", detail: "Final allowance changed; retained original claim cannot enqueue a replacement." };
           // Quiet hours / frequency cap: re-queue this exact action for the
           // next allowed window instead of dropping it.
           await db.insert(scheduledActionsTable).values({
             organizationId,
+            automationId,
             action,
             context: { ...context },
             runAt: gate.resumeAt,
@@ -397,20 +428,26 @@ async function executeAction(
           detail: `blocked: ${gate.reason}`,
         };
       }
+      const touchLogicalKey = originalActionKey ?? (scheduledActionId ? `scheduled:${scheduledActionId}` : null);
+      if (!touchLogicalKey) return { type: action.type, status: "skipped", detail: "No original automated send ownership is available." };
+      const touch: ContactTouchClaim = { organizationId, logicalKey: touchLogicalKey, contactId: contact.id, address: (channel === "email" ? contact.email : contact.phone) ?? "", channel, sourceKind: "automation", leadId: context.leadId, payload: { action, context } };
       let res: { id: string | null; provider: string; providerRequestId?: string | null; clientRequestId?: string };
       try {
+        await assertContactTouchCurrent(db, touch);
         const subject = rendered.subject ?? `${await getBusinessName(organizationId)} update`;
         const body = rendered.body + unsubscribeFooter(organizationId, contact.id);
         const beforeDispatch = async () => {
           try {
-            await assertAutomatedEmailOwnership(organizationId, action, context, automationId, scheduledActionId, emailRule);
+            await assertAutomatedEmailOwnership(organizationId, action, context, automationId, scheduledActionId, emailRule, originalActionKey);
+            await assertContactTouchCurrent(db, touch);
             const current = await renderTemplate(organizationId, action, context);
             if (!current.contact || current.contact.id !== contact.id || current.contact.email !== contact.email ||
                 (current.subject ?? `${await getBusinessName(organizationId)} update`) !== subject ||
                 current.body + unsubscribeFooter(organizationId, current.contact.id) !== body) throw new EmailDispatchBlockedError();
             await assertAutomatedEmailLead(organizationId, context.leadId, current.contact.id);
-            if (!(await checkSendEligibility({ organizationId, leadId: context.leadId, contact: current.contact, channel: "email", kind: "outreach" })).ok)
+            if (!(await checkSendEligibility({ organizationId, leadId: context.leadId, contact: current.contact, channel: "email", kind: "outreach", touchLogicalKey })).ok)
               throw new EmailDispatchBlockedError();
+            await markContactTouchDispatchStarted(organizationId, touchLogicalKey);
           } catch { throw new EmailDispatchBlockedError(); }
         };
         res =
@@ -421,7 +458,7 @@ async function executeAction(
                 body,
                 { organizationId, leadId: context.leadId, beforeDispatch },
               )
-            : await providers.sms.send(contact.phone!, rendered.body, { organizationId, contactId: contact.id, purpose: 'marketing', idempotencyKey: `automation:${automationId}:${context.leadId ?? contact.id}:${JSON.stringify(action.params)}` });
+            : await providers.sms.send(contact.phone!, rendered.body, { organizationId, contactId: contact.id, purpose: 'marketing', idempotencyKey: `automation:${automationId}:${context.leadId ?? contact.id}:${JSON.stringify(action.params)}`, contactTouch: { logicalKey: touchLogicalKey, payloadHash: sourceFingerprint(touch.payload) } });
       } catch (err) {
         if (err instanceof EmailDispatchBlockedError) {
           await recordBlockedSend({ organizationId, channel, reason: "final_email_guard_changed", outcome: "blocked", source: "automation", leadId: context.leadId ?? null, contactId: contact.id });
@@ -460,9 +497,10 @@ async function executeAction(
           contactId: contact.id,
           type: "automation_message_sent",
           title: `Automation ${channel === "email" ? "email" : "text"} sent`,
-          metadata: { automationId, channel, ...(channel === "email" ? emailAcceptanceEvidence(res, { organizationId, leadId: context.leadId, recipientEmail: contact.email! }) : { provider: res.provider, providerMessageId: res.id }) },
+          metadata: { automationId, channel, touchLogicalKey, ...(channel === "email" ? emailAcceptanceEvidence(res, { organizationId, leadId: context.leadId, recipientEmail: contact.email! }) : { provider: res.provider, providerMessageId: res.id }) },
         });
       }
+      await acceptContactTouch(organizationId, touchLogicalKey);
       await audit({
         provider: res.provider,
         to: channel === "email" ? contact.email : contact.phone,
@@ -1047,6 +1085,11 @@ export async function processDueScheduledActions(organizationId?: string): Promi
   for (const item of due) {
     try {
       if (await customerWorkHeld(item.organizationId)) continue;
+      if (item.action.type === "source_nurture_email") {
+        if (typeof item.action.params.stepId !== "string") throw new Error("Invalid original nurture step.");
+        const { preflightSourceNurture } = await import("./source-nurture-runtime");
+        if ((await preflightSourceNurture(item.organizationId, item.id, item.action.params.stepId)).held) continue;
+      }
       if (item.action.type === "service_care_reminder") {
         const { preflightServiceCareReminder } = await import("./service-care");
         const { resumeAt } = await preflightServiceCareReminder(item.organizationId, item.action.params, item.context, item.id);
@@ -1065,11 +1108,19 @@ export async function processDueScheduledActions(organizationId?: string): Promi
           continue;
         }
       }
+      const automatic = await prepareAutomationTouch(item.organizationId, item.action, item.context as EventContext, `scheduled:${item.id}`);
+      if (automatic && !automatic.gate.ok && automatic.gate.outcome === "deferred") {
+        await db.update(scheduledActionsTable).set({ runAt: automatic.gate.resumeAt }).where(and(eq(scheduledActionsTable.organizationId, item.organizationId), eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.status, "pending"),
+          notExists(db.select({ id: revenueExecutionsTable.id }).from(revenueExecutionsTable).where(and(eq(revenueExecutionsTable.organizationId, item.organizationId), eq(revenueExecutionsTable.actionKey, `scheduled:${item.id}`))))));
+        continue;
+      }
       const execution = await runDurableAction({
         organizationId: item.organizationId, actionKey: `scheduled:${item.id}`,
         leadId: typeof item.context.leadId === "string" ? item.context.leadId : null,
         appointmentId: item.action.type === "appointment_reminder" && typeof item.context.appointmentId === "string" ? item.context.appointmentId : null,
         ...(item.action.type === "service_care_reminder" && typeof item.action.params.approvalId === "string" ? { serviceCare: { approvalId: item.action.params.approvalId, scheduledActionId: item.id } } : {}),
+        ...(item.action.type === "source_nurture_email" && typeof item.action.params.stepId === "string" ? { sourceNurture: { stepId: item.action.params.stepId } } : {}),
+        ...(automatic?.touch ? { contactTouch: automatic.touch } : {}),
         kind: item.action.type, payload: { action: item.action, context: item.context },
         execute: async () => {
           // Re-read cancellation after acquiring exclusive durable ownership.
@@ -1114,7 +1165,9 @@ export async function processDueScheduledActions(organizationId?: string): Promi
         continue;
       }
       const { ServiceClaimDeferredError } = await import("./service-care-claim");
-      if (error instanceof ServiceClaimDeferredError) {
+      const { ContactTouchDeferredError } = await import("./contact-touch-claim");
+      const { NurtureDeferredError } = await import("./source-nurture-authority");
+      if (error instanceof ServiceClaimDeferredError || error instanceof ContactTouchDeferredError || error instanceof NurtureDeferredError) {
         await db.update(scheduledActionsTable).set({ runAt: error.resumeAt }).where(and(eq(scheduledActionsTable.id, item.id), eq(scheduledActionsTable.organizationId, item.organizationId), eq(scheduledActionsTable.status, "pending"),
           notExists(db.select({ id: revenueExecutionsTable.id }).from(revenueExecutionsTable).where(and(eq(revenueExecutionsTable.organizationId, item.organizationId), eq(revenueExecutionsTable.actionKey, `scheduled:${item.id}`))))));
         continue;
@@ -1153,6 +1206,10 @@ export async function processScheduledWork(organizationId?: string, observe?: St
   await stage("mailbox-replies", async () => {
     const { processMailboxConnectors } = await import("./mailbox-connector");
     await processMailboxConnectors(organizationId);
+  });
+  await stage("source-nurture", async () => {
+    const { processSourceNurture } = await import("./source-nurture-runtime");
+    await processSourceNurture(organizationId);
   });
   await stage("service-standing", async () => {
     const { processStandingServiceReminders } = await import("./service-standing-runtime");

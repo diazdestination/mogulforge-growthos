@@ -1,5 +1,6 @@
 import {
   cleanup,
+  act,
   fireEvent,
   render,
   screen,
@@ -24,6 +25,10 @@ const status = (extra = {}) => ({
   leadMonitoringVersion: 0,
   leadMonitoringApprovedAt: null,
   leadMonitoringChangedAt: null,
+  nurtureMonitoringEnabled: false,
+  nurtureMonitoringVersion: 0,
+  nurtureMonitoringApprovedAt: null,
+  nurtureSync: { ready: false, reason: "nurture_monitoring_disabled", completedCycleId: null, startedAt: null, completedAt: null },
   ...extra,
 });
 const json = (value: unknown, code = 200) =>
@@ -187,7 +192,68 @@ it("requires separate tracked-lead acknowledgement and freezes both current vers
     enabled: true,
     leadContextAcknowledged: true,
   });
-  expect(screen.getByText(/adds no Microsoft scope/)).toBeTruthy();
+  expect(screen.getAllByText(/adds no Microsoft scope/)).toHaveLength(2);
+});
+
+it("keeps nurture separate from BIE and submits only the exact two versioned grant fields", async () => {
+  const before = status({ state: "active", usable: true, version: 4, leadMonitoringEnabled: true, nurtureMonitoringVersion: 2, mailboxEmail: "staff@example.invalid" });
+  const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => json(init?.method === "POST" ? { ...before, nurtureMonitoringEnabled: true, nurtureMonitoringVersion: 3 } : before));
+  vi.stubGlobal("fetch", request);
+  render(<MailboxConnectionCard returnPath="/account" scopeKey="owner-one" />);
+  const enable = await screen.findByRole("button", { name: "Enable nurture reply monitoring" });
+  expect(enable.hasAttribute("disabled")).toBe(true);
+  expect(screen.getByText(/Nurture context is off/)).toBeTruthy();
+  fireEvent.click(screen.getByLabelText(/I separately approve tracked two-message nurture/));
+  fireEvent.click(enable);
+  await screen.findByText(/Nurture context approved at version 3/);
+  expect(screen.getByText(/Nurture reply permission saved separately/)).toBeTruthy();
+  const writes = request.mock.calls.filter(([, init]) => init?.method === "POST");
+  expect(writes).toHaveLength(1);
+  expect(writes[0][0]).toBe("/api/v1/mailbox/microsoft/nurture-monitoring");
+  expect(JSON.parse(String(writes[0][1]?.body))).toEqual({ expectedConnectorVersion: 4, expectedNurtureMonitoringVersion: 2, enabled: true, nurtureContextAcknowledged: true });
+  expect(screen.getByRole("button", { name: "Stop tracked lead replies" })).toBeTruthy();
+});
+
+it("allows nurture disable under global holds and does not infer complete sync from a successful page", async () => {
+  const before = status({ enabled: false, version: 3, nurtureMonitoringEnabled: true, nurtureMonitoringVersion: 5, lastSuccessAt: "2026-10-03T12:00:00Z", nurtureSync: { ready: false, reason: "mailbox_scan_incomplete", completedCycleId: null, startedAt: null, completedAt: null } });
+  const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => json(init?.method === "POST" ? { ...before, nurtureMonitoringEnabled: false, nurtureMonitoringVersion: 6 } : before));
+  vi.stubGlobal("fetch", request);
+  render(<MailboxConnectionCard returnPath="/account" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Stop nurture reply monitoring" }));
+  await screen.findByText(/Nurture reply monitoring stopped/);
+  expect(screen.getByText(/Nurture progression is held: mailbox scan incomplete/)).toBeTruthy();
+  expect(screen.getByText(/Last completed page/)).toBeTruthy();
+  expect(JSON.parse(String(request.mock.calls.find(([, init]) => init?.method === "POST")?.[1]?.body))).toEqual({ expectedConnectorVersion: 3, expectedNurtureMonitoringVersion: 5, enabled: false, nurtureContextAcknowledged: true });
+});
+
+it("preserves an unchanged semantic scope and ignores a late grant result after a real scope change", async () => {
+  const before = status({ state: "active", usable: true, version: 4, mailboxEmail: "old@example.invalid" });
+  let finish!: (response: Response) => void;
+  const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => init?.method === "POST" ? new Promise<Response>(resolve => { finish = resolve; }) : json(before));
+  vi.stubGlobal("fetch", request);
+  const view = render(<MailboxConnectionCard returnPath="/account" scopeKey="owner-one" />);
+  fireEvent.click(await screen.findByLabelText(/I separately approve tracked two-message nurture/));
+  view.rerender(<MailboxConnectionCard returnPath="/account" scopeKey="owner-one" />);
+  expect((screen.getByLabelText(/I separately approve tracked two-message nurture/) as HTMLInputElement).checked).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Enable nurture reply monitoring" }));
+  view.rerender(<MailboxConnectionCard returnPath="/account" scopeKey="owner-two" />);
+  await screen.findByLabelText(/I separately approve tracked two-message nurture/);
+  await act(async () => finish(json({ ...before, nurtureMonitoringEnabled: true, nurtureMonitoringVersion: 1 })));
+  expect(screen.queryByText(/Nurture reply permission saved separately/)).toBeNull();
+  expect((screen.getByLabelText(/I separately approve tracked two-message nurture/) as HTMLInputElement).checked).toBe(false);
+  expect(screen.getByText(/Nurture context is off/)).toBeTruthy();
+});
+
+it("requires explicit status refresh after an unknown nurture command result", async () => {
+  const before = status({ state: "active", usable: true, version: 4 });
+  const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => { if (init?.method === "POST") throw new Error("lost response"); return json(before); });
+  vi.stubGlobal("fetch", request);
+  render(<MailboxConnectionCard returnPath="/account" />);
+  fireEvent.click(await screen.findByLabelText(/I separately approve tracked two-message nurture/));
+  fireEvent.click(screen.getByRole("button", { name: "Enable nurture reply monitoring" }));
+  await screen.findByText(/Nurture permission was not confirmed/);
+  expect(screen.getByRole("button", { name: "Enable nurture reply monitoring" }).hasAttribute("disabled")).toBe(true);
+  expect(request.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
 });
 it("permits local lead revoke while global reading is held without reconnecting the sender", async () => {
   const before = status({

@@ -22,6 +22,7 @@ import {
   activitiesTable,
   auditEventsTable,
   consentRecordsTable,
+  contactsTable,
   db,
   leadsTable,
   suppressionsTable,
@@ -98,6 +99,16 @@ export async function addSuppression(input: {
 }): Promise<void> {
   const value = normalizeAddress(input.channel, input.value);
   if (!value) return;
+  if (input.channel === "email") {
+    await db.transaction(async tx => {
+      const { acquireNurtureLocks, stopSourceNurtureForContact } = await import("./source-nurture-authority");
+      await acquireNurtureLocks(tx, input.organizationId);
+      const contacts = await tx.select({ id: contactsTable.id }).from(contactsTable).where(and(eq(contactsTable.organizationId, input.organizationId), sql`lower(btrim(${contactsTable.email})) = ${value}`));
+      for (const contact of contacts) await stopSourceNurtureForContact(tx, input.organizationId, contact.id, "email_suppressed");
+      await tx.insert(suppressionsTable).values({ organizationId: input.organizationId, channel: input.channel, value, reason: input.reason, source: input.source ?? null, detail: input.detail ?? null }).onConflictDoNothing();
+    });
+    return;
+  }
   await db
     .insert(suppressionsTable)
     .values({
@@ -227,6 +238,10 @@ export interface SendGateInput {
   sourceOutreachItemId?: string;
   /** Original server-owned service claim, excluded only from its own final cap check. */
   serviceCareActionKey?: string;
+  /** Exact original common allowance claim, never a generic cap bypass. */
+  touchLogicalKey?: string;
+  /** Persisted, exact finite source-nurture step; the server rereads authority. */
+  sourceNurtureStepId?: string;
 }
 
 export async function checkSendEligibility(
@@ -298,11 +313,16 @@ export async function checkSendEligibility(
     )).limit(1);
     if (!lead) return { ok: false, outcome: "blocked", reason: "source_opportunity_unavailable" };
     if (lead.creationMethod === "import" || lead.importedHistory !== null) {
-      if (!input.sourceOutreachItemId || channel !== "email")
+      if ((!input.sourceOutreachItemId && !input.sourceNurtureStepId) || channel !== "email")
         return { ok: false, outcome: "blocked", reason: "imported_source_requires_current_review" };
       try {
-        const { approvedSourceItem } = await import("./source-adoption-state");
-        await approvedSourceItem(organizationId, input.leadId, contact.id, input.sourceOutreachItemId);
+        if (input.sourceNurtureStepId) {
+          const { assertNurtureStepSource } = await import("./source-nurture-authority");
+          await assertNurtureStepSource(reader, organizationId, input.leadId, contact.id, input.sourceNurtureStepId);
+        } else {
+          const { approvedSourceItem } = await import("./source-adoption-state");
+          await approvedSourceItem(organizationId, input.leadId, contact.id, input.sourceOutreachItemId!, reader);
+        }
       } catch {
         return { ok: false, outcome: "blocked", reason: "imported_source_requires_current_review" };
       }
@@ -321,9 +341,9 @@ export async function checkSendEligibility(
 }
 
 /** Reused by exact source-campaign review, which must not bypass timing behind a source hold. */
-export async function checkOutreachTiming(input: Pick<SendGateInput, "organizationId" | "contact" | "sendingHours" | "serviceCareActionKey">, reader: Pick<typeof db, "select"> = db): Promise<SendGateResult> {
+export async function checkOutreachTiming(input: Pick<SendGateInput, "organizationId" | "contact" | "sendingHours" | "serviceCareActionKey" | "touchLogicalKey">, reader: Pick<typeof db, "select"> = db): Promise<SendGateResult> {
   const { organizationId, contact } = input;
-  const cfg = input.sendingHours ?? (await getSendingHours(organizationId));
+  const cfg = input.sendingHours ?? (await (await import("./contact-touch-claim")).contactTouchHours(reader, organizationId));
 
   // 5. Quiet hours: pause (defer), never drop.
   const resumeAt = nextAllowedSendTime(cfg);
@@ -334,21 +354,8 @@ export async function checkOutreachTiming(input: Pick<SendGateInput, "organizati
   // 6. Frequency cap over a rolling 24h per contact.
   if (cfg.maxTouchesPerDay > 0) {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const touches = await reader
-      .select({ occurredAt: activitiesTable.occurredAt })
-      .from(activitiesTable)
-      .where(
-        and(
-          eq(activitiesTable.organizationId, organizationId),
-          eq(activitiesTable.contactId, contact.id),
-          inArray(activitiesTable.type, OUTREACH_ACTIVITY_TYPES),
-          gt(activitiesTable.occurredAt, since),
-        ),
-      )
-      .orderBy(desc(activitiesTable.occurredAt));
-    const { servicePendingTouchTimes } = await import("./service-care-budget");
-    const reserved = await servicePendingTouchTimes(reader, organizationId, contact.id, since, input.serviceCareActionKey);
-    touches.push(...reserved.map(occurredAt => ({ occurredAt })));
+    const { contactTouchTimes } = await import("./contact-touch-claim");
+    const touches = (await contactTouchTimes(reader, organizationId, contact.id, since, input.touchLogicalKey ?? input.serviceCareActionKey)).map(occurredAt => ({ occurredAt }));
     touches.sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime());
     if (touches.length >= cfg.maxTouchesPerDay) {
       // Defer until the touch that frees a slot ages out of the window

@@ -8,6 +8,9 @@ import {
 import { and, eq, lt } from "drizzle-orm";
 import { lockReplyLead } from "./response-correlation";
 import { lockContractorSchedule } from "./contractor-scheduling";
+import { acquireNurtureLocks } from "./source-outreach-ownership";
+import { reserveContactTouch, type ContactTouchClaim } from "./contact-touch-claim";
+import { sourceNurtureStepsTable } from "../../../../lib/db/src/schema/source-nurture";
 
 // Sorting makes retries independent of JSON key order. Only the digest is retained.
 function canonical(value: unknown): string {
@@ -30,20 +33,42 @@ export async function runDurableAction(input: {
   appointmentId?: string | null;
   /** Exact original service approval; serializes pending allowance with ownership. */
   serviceCare?: { approvalId: string; scheduledActionId: string };
+  /** Shared allowance for an exact original server-resolved effect. */
+  contactTouch?: ContactTouchClaim;
+  sourceNurture?: { stepId: string };
   execute: () => Promise<{ state: "succeeded" | "blocked"; detail: string }>;
 }) {
   const fingerprint = createHash("sha256")
     .update(canonical(input.payload))
     .digest("hex");
   const claimed = await db.transaction(async (tx) => {
+    let claimActor = input.actorUserId;
+    if (input.contactTouch || input.serviceCare || input.sourceNurture) await acquireNurtureLocks(tx, input.organizationId, input.leadId ? [input.leadId] : []);
+    const [prior] = await tx.select().from(executions).where(and(eq(executions.organizationId, input.organizationId), eq(executions.actionKey, input.actionKey)));
+    if (!prior && input.contactTouch) {
+      if (input.contactTouch.organizationId !== input.organizationId || input.contactTouch.logicalKey !== input.actionKey) throw new Error("Invalid shared allowance identity.");
+      const allowance = await reserveContactTouch(tx, input.contactTouch);
+      if (!allowance.created) throw new Error("An earlier allowance owns this effect. Reconciliation is required.");
+    }
+    if (!prior && input.sourceNurture) {
+      const { assertNurtureStepCurrent, nurtureTouch } = await import("./source-nurture-authority");
+      const current = await assertNurtureStepCurrent(tx, input.organizationId, input.sourceNurture.stepId, { phase: "claim" });
+      if (input.kind !== "source_nurture_email" || input.actionKey !== `scheduled:${current.scheduled.id}` || fingerprint !== current.executionFingerprint || input.leadId !== current.item.leadId) throw new Error("Invalid nurture claim identity.");
+      const allowance = await reserveContactTouch(tx, nurtureTouch(current));
+      if (!allowance.created) throw new Error("An earlier allowance owns this effect. Reconciliation is required.");
+      await tx.update(sourceNurtureStepsTable).set({ claimedAt: new Date(), reason: null }).where(and(eq(sourceNurtureStepsTable.organizationId, input.organizationId), eq(sourceNurtureStepsTable.id, current.step.id)));
+      claimActor = current.plan.approvedByUserId;
+    }
     if (input.serviceCare) {
       const { lockServiceStanding } = await import("./service-standing-policy");
       await lockServiceStanding(tx, input.organizationId);
-      const [existing] = await tx.select({ id: executions.id }).from(executions).where(and(eq(executions.organizationId, input.organizationId), eq(executions.actionKey, input.actionKey)));
-      if (!existing) {
+      if (!prior) {
         if (input.kind !== "service_care_reminder" || input.actionKey !== `scheduled:${input.serviceCare.scheduledActionId}`) throw new Error("Invalid service claim context.");
         const { checkServiceClaimBudget } = await import("./service-care-claim");
-        await checkServiceClaimBudget(tx, input.organizationId, input.serviceCare.approvalId, input.serviceCare.scheduledActionId);
+        const claim = await checkServiceClaimBudget(tx, input.organizationId, input.serviceCare.approvalId, input.serviceCare.scheduledActionId);
+        const allowance = await reserveContactTouch(tx, { organizationId: input.organizationId, logicalKey: input.actionKey, contactId: claim.contact.id, address: claim.approval.snapshot.recipient,
+          channel: claim.approval.snapshot.channel, sourceKind: "service", payload: input.payload });
+        if (!allowance.created) throw new Error("An earlier allowance owns this effect. Reconciliation is required.");
       }
     }
     if (input.appointmentId) await lockContractorSchedule(tx, input.organizationId);
@@ -55,7 +80,7 @@ export async function runDurableAction(input: {
         actionKey: input.actionKey,
         kind: input.kind,
         fingerprint,
-        actorUserId: input.actorUserId,
+        actorUserId: claimActor,
         expiresAt: new Date(Date.now() + 15 * 60_000),
       })
       .onConflictDoNothing()
@@ -66,7 +91,7 @@ export async function runDurableAction(input: {
         executionId: row.id,
         state: "processing",
         detail: "Execution ownership acquired.",
-        actorUserId: input.actorUserId,
+        actorUserId: claimActor,
       });
     return row;
   });

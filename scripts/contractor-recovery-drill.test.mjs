@@ -4,7 +4,7 @@ import { runContractorRecoveryDrill } from './contractor-recovery-drill.mjs';
 it('upgrades the full prior schema, restores both synthetic companies, boots a read-only real app and preserves uncertainty/holds', async () => {
   const result = await runContractorRecoveryDrill({ emit: () => {} });
   expect(result.previousTableCount).toBe(90);
-  expect(result.tableCount).toBe(125);
+  expect(result.tableCount).toBe(130);
   expect(result.sourceFingerprint).toBe(result.restoredFingerprint);
   expect(result.appBootVerified).toBe(true);
   expect(result.readOnlyDatabaseVerified).toBe(true);
@@ -15,7 +15,7 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.tableCounts.staff_invitations).toBe(2);
   expect(result.tableCounts.invoices).toBe(4);
   expect(result.tableCounts.invoice_receipt_allocations).toBe(4);
-  expect(result.readChecks).toBe(31);
+  expect(result.readChecks).toBe(36);
   expect(result.invoiceRecoveryConstraintChecks).toBe(9);
   expect(result.invoiceUnknownChainPreserved).toBe(true);
   expect(result.typedNoDispatchProofPreserved).toBe(true);
@@ -47,7 +47,14 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.disabledMailboxPreserved).toBe(true);
   expect(result.platformIdentityUncertaintyPreserved).toBe(true);
   for (const name of ['mailbox_connectors', 'mailbox_service_replies', 'platform_email_dispatches', 'platform_email_events']) expect(result.tableCounts[name]).toBe(2);
-  for (const name of ['mailbox_receipts', 'mailbox_communication_parents', 'email_response_reviews']) expect(result.tableCounts[name]).toBe(4);
+  for (const name of ['mailbox_receipts', 'mailbox_communication_parents', 'email_response_reviews']) expect(result.tableCounts[name]).toBe(6);
+  expect(result.nurtureConstraintChecks).toBe(15);
+  expect(result.nurtureStoppedOwnershipPreserved).toBe(true);
+  expect(result.nurtureUnknownNeverAdvanced).toBe(true);
+  expect(result.nurtureFailedSyncPreserved).toBe(true);
+  expect(result.nurtureReplyHoldAfterPurgePreserved).toBe(true);
+  for (const name of ['source_nurture_plans', 'source_nurture_items', 'contact_touch_reservations', 'mailbox_sync_cycles']) expect(result.tableCounts[name]).toBe(2);
+  expect(result.tableCounts.source_nurture_steps).toBe(4);
   expect(result.leadReplyTenantChecks).toBe(6);
   expect(result.leadReplyHoldAfterPurgePreserved).toBe(true);
   expect(result.leadReplyOfficeTaskPreserved).toBe(true);

@@ -45,8 +45,8 @@ function message(error: unknown) {
 }
 
 /** Deliberately separate management adoption, customer permission, review and send. */
-export function SourceAdoptionPanel({ organizationId, businessName, timezone, canManage }: {
-  organizationId: string; businessName: string; timezone: string; canManage: boolean;
+export function SourceAdoptionPanel({ organizationId, businessName, timezone, canManage, scopeKey = organizationId }: {
+  organizationId: string; businessName: string; timezone: string; canManage: boolean; scopeKey?: string;
 }) {
   const cache = useQueryClient();
   const [leadId, setLeadId] = useState(""), [review, setReview] = useState<Review | null>(null), [campaign, setCampaign] = useState<Campaign | null>(null);
@@ -59,16 +59,16 @@ export function SourceAdoptionPanel({ organizationId, businessName, timezone, ca
   const [campaignExpiry, setCampaignExpiry] = useState(localDate(new Date(Date.now() + 6 * 3_600_000))), [cohort, setCohort] = useState<string[]>([]);
   const [sendDays, setSendDays] = useState<string[]>([]), [startHour, setStartHour] = useState(9), [endHour, setEndHour] = useState(18), [dailyLimit, setDailyLimit] = useState(10);
   const [page, setPage] = useState(0), [campaignPage, setCampaignPage] = useState(0);
-  const index = useQuery({ queryKey: ["source-adoption", organizationId, page, campaignPage], queryFn: async ({ signal }): Promise<Index> =>
+  const index = useQuery({ queryKey: ["source-adoption", organizationId, scopeKey, page, campaignPage], queryFn: async ({ signal }): Promise<Index> =>
     indexSchema.parse(await contractorRequest<unknown>(page || campaignPage ? `/source-adoption?page=${page}&campaignPage=${campaignPage}` : "/source-adoption", { signal })), retry: false });
-  const detail = useQuery({ queryKey: ["source-adoption-lead", organizationId, leadId], enabled: !!leadId,
+  const detail = useQuery({ queryKey: ["source-adoption-lead", organizationId, scopeKey, leadId], enabled: !!leadId,
     queryFn: ({ signal }) => contractorRequest<SourceDetail>(`/source-adoption/leads/${leadId}`, { signal }), retry: false });
   useEffect(() => { setLeadId(""); setReview(null); setCampaign(null); setCohort([]); setSendDays([]); setPage(0); setCampaignPage(0); setStatusRequired(false); setError(""); }, [organizationId]);
   const clearReview = () => { setReview(null); setApproveAdoption(false); };
   const clearCampaign = () => { setCampaign(null); setEmailConfirmed(false); setSendConfirmed(false); };
   async function action(work: () => Promise<void>) {
     setBusy(true); setError("");
-    try { await work(); await cache.invalidateQueries({ queryKey: ["source-adoption", organizationId] }); await cache.invalidateQueries({ queryKey: ["source-adoption-lead", organizationId, leadId] }); }
+    try { await work(); await cache.invalidateQueries({ queryKey: ["source-adoption", organizationId, scopeKey] }); await cache.invalidateQueries({ queryKey: ["source-adoption-lead", organizationId, scopeKey, leadId] }); }
     catch (failure) { setError(message(failure)); } finally { setBusy(false); }
   }
   const post = <T,>(path: string, payload: unknown) => contractorRequest<T>(path, { method: "POST", body: payload });

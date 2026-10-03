@@ -187,6 +187,9 @@ export async function getContractorToday(
       const invoiceReader =
         hasPermission(actor.role, "invoices.read") &&
         hasPermission(effectiveRole ?? actor.role, "invoices.read");
+      const leadReader =
+        hasPermission(actor.role, "crm.read") &&
+        hasPermission(effectiveRole ?? actor.role, "crm.read");
       const tasks = await queue<DayTask>(
         tx,
         sql`
@@ -195,13 +198,19 @@ export async function getContractorToday(
         nullif(concat_ws(' ',coalesce(c.first_name,lc.first_name),coalesce(c.last_name,lc.last_name)),'') AS "customerLabel",
         u.id AS "assignedUserId",nullif(concat_ws(' ',u.first_name,u.last_name),'') AS "assigneeName",
         CASE WHEN ${invoiceReader} AND handoff.id IS NOT NULL
-          THEN '/invoices?projectId='||handoff.id::text ELSE '/tasks?taskId='||t.id::text END AS "actionPath"
+          THEN '/invoices?projectId='||handoff.id::text
+          WHEN ${leadReader} AND reply.id IS NOT NULL THEN '/leads/'||l.id::text||'?tab=messages'
+          ELSE '/tasks?taskId='||t.id::text END AS "actionPath"
       FROM crm_tasks t
       LEFT JOIN leads l ON l.id=t.lead_id AND l.organization_id=${organizationId}
       LEFT JOIN contacts c ON c.id=t.contact_id AND c.organization_id=${organizationId}
       LEFT JOIN contacts lc ON lc.id=l.contact_id AND lc.organization_id=${organizationId}
       LEFT JOIN users u ON u.id=t.assigned_user_id AND u.organization_id=${organizationId}
       LEFT JOIN projects handoff ON t.source_event='project.invoice_preparation:'||handoff.id::text AND handoff.organization_id=${organizationId}
+      LEFT JOIN email_response_reviews reply ON reply.organization_id=${organizationId}
+        AND reply.id::text=substring(t.source_event from '^mailbox[.]lead_reply:(.*)$')
+        AND reply.task_id=t.id AND reply.lead_id=l.id AND reply.contact_id=l.contact_id
+        AND reply.contact_id=t.contact_id AND reply.mailbox_parent_id IS NOT NULL AND reply.source_id IS NULL
       WHERE t.organization_id=${organizationId} AND t.status IN ('open','in_progress')
         AND (t.due_at IS NULL OR t.due_at<${endAt}::timestamptz)
         AND (NOT ${mine} OR t.assigned_user_id=${userId})

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { MicrosoftMailboxStatusState } from './microsoftMailboxStatusState';
+import type { NurtureMailboxSync } from './nurtureMailboxSync';
 
 export interface MicrosoftMailboxStatus {
   enabled: boolean;
@@ -40,4 +41,12 @@ export interface MicrosoftMailboxStatus {
   leadMonitoringApprovedAt: Date | null;
   /** @nullable */
   leadMonitoringChangedAt: Date | null;
+  nurtureMonitoringEnabled: boolean;
+  /** @minimum 0 */
+  nurtureMonitoringVersion: number;
+  /** @nullable */
+  nurtureMonitoringApprovedAt: Date | null;
+  /** @nullable */
+  nurtureMonitoringChangedAt: Date | null;
+  nurtureSync: NurtureMailboxSync;
 }

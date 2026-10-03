@@ -38,6 +38,10 @@ const itemSchema = z.object({
     .nullable(),
   monitoringCurrent: z.boolean(),
   evidence: z.literal("original_mailbox_observation"),
+  context: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("bie_lead_email") }).strict(),
+    z.object({ kind: z.literal("source_nurture_email"), planId: z.uuid(), itemId: z.uuid(), stepId: z.uuid(), stepIndex: z.union([z.literal(1), z.literal(2)]) }).strict(),
+  ]),
 });
 const pageSchema = z.object({
   items: z.array(itemSchema).max(25),
@@ -82,9 +86,12 @@ function ReplyEvidence({
   } | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
     [stale, setStale] = useState(false),
     [now, setNow] = useState(Date.now());
   const inFlight = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     if (!reply.rawExpiresAt) return;
     const until = Date.parse(reply.rawExpiresAt) - Date.now();
@@ -134,17 +141,22 @@ function ReplyEvidence({
         },
       );
       if (!response.ok) {
-        if (response.status === 409) setStale(true);
         throw new Error();
       }
+      const result = z.object({ replyId: z.string(), version: z.number().int(), replayed: z.boolean() }).parse(await response.json());
+      if (result.replyId !== reply.id || result.version !== draft.version + 1) throw new Error();
+      if (!mounted.current) return;
       setDraft(null);
+      setNotice("Office handling saved. Only this reply hold and task were handled; no cancelled email was restarted and no appointment was booked.");
       await refresh();
     } catch {
+      if (!mounted.current) return;
+      setStale(true);
       setError(
         "The handling decision was not confirmed. Refresh the evidence and review the current version; no customer message or sequence restart was requested.",
       );
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
       inFlight.current = false;
     }
   }
@@ -173,6 +185,7 @@ function ReplyEvidence({
           Exact association is evidence of this conversation, not verified
           customer intent or consent.
         </p>
+        <p className="text-sm">{reply.context.kind === "source_nurture_email" ? <><a className="underline" href={`/reactivation?nurtureId=${encodeURIComponent(reply.context.planId)}`}>Reviewed two-message nurture plan</a> · email {reply.context.stepIndex} of 2. A reply to either email stops remaining unclaimed plan work.</> : "Individually reviewed BIE lead email."}</p>
       </div>
       {!reply.monitoringCurrent && (
         <p className="text-sm">
@@ -221,6 +234,7 @@ function ReplyEvidence({
           Office handling: {reply.releaseNote}
         </p>
       )}
+      {notice && <p role="status" className="text-sm">{notice}</p>}
       {editable && !draft && (
         <Button
           variant="outline"
@@ -251,7 +265,7 @@ function ReplyEvidence({
               maxLength={1000}
               readOnly={busy || changed}
               onChange={(event) =>
-                setDraft({ ...draft, note: event.target.value })
+                setDraft({ ...draft, note: event.target.value, confirmed: false })
               }
             />
           </label>
@@ -292,7 +306,7 @@ function ReplyEvidence({
                 setDraft(null);
                 setStale(false);
                 setError("");
-                void refresh();
+                void refresh().catch(() => {});
               }}
             >
               Discard note and refresh evidence
@@ -311,19 +325,24 @@ function ReplyEvidence({
 export function LeadMailboxRepliesPanel({
   leadId,
   canReview,
+  scopeKey = "isolated-component",
 }: {
   leadId: string;
   canReview: boolean;
+  scopeKey?: string;
 }) {
+  return <LeadMailboxRepliesContent key={`${scopeKey}:${leadId}:${canReview}`} leadId={leadId} canReview={canReview} scopeKey={scopeKey} />;
+}
+function LeadMailboxRepliesContent({ leadId, canReview, scopeKey }: { leadId: string; canReview: boolean; scopeKey: string }) {
   const [offset, setOffset] = useState(0),
     client = useQueryClient();
   const query = useQuery({
-    queryKey: ["lead-mailbox-replies", leadId, offset],
+    queryKey: ["lead-mailbox-replies", scopeKey, leadId, offset],
     queryFn: () => readPage(leadId, offset),
     retry: false,
   });
   const refresh = async () => {
-    await Promise.all([
+    const [result] = await Promise.all([
       query.refetch(),
       client.invalidateQueries({ queryKey: ["customer-replies"] }),
       client.invalidateQueries({ queryKey: ["bie"] }),
@@ -335,6 +354,7 @@ export function LeadMailboxRepliesPanel({
       client.invalidateQueries({ queryKey: getListTasksQueryKey() }),
       client.invalidateQueries({ queryKey: ["contractor-day"] }),
     ]);
+    if (result.isError) throw new Error("Current reply evidence could not be refreshed.");
   };
   return (
     <section
@@ -346,7 +366,7 @@ export function LeadMailboxRepliesPanel({
         <div>
           <h2 className="font-semibold">Original-mailbox lead replies</h2>
           <p className="max-w-prose text-xs text-muted-foreground">
-            Only individually reviewed tracked Microsoft lead emails appear
+            Only exact tracked Microsoft BIE emails and approved two-message nurture emails appear
             here. This is not a general inbox. Email content cannot instruct
             agents, grant consent, book appointments or authorize another send.
           </p>
@@ -354,7 +374,7 @@ export function LeadMailboxRepliesPanel({
         <Button
           variant="outline"
           disabled={query.isFetching}
-          onClick={() => void refresh()}
+          onClick={() => void refresh().catch(() => {})}
         >
           Refresh lead reply evidence
         </Button>

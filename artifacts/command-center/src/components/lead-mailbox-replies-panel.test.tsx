@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, expect, it, vi } from "vitest";
 import { LeadMailboxRepliesPanel } from "./lead-mailbox-replies-panel";
 import { CustomerReplies } from "./customer-replies";
@@ -34,6 +35,7 @@ const evidence = (extra = {}) => ({
     reconciliationRequired: 1,
   },
   evidence: "original_mailbox_observation",
+  context: { kind: "bie_lead_email" },
   ...extra,
 });
 const page = (items = [evidence()], extra = {}) => ({
@@ -219,6 +221,7 @@ it.each([
   page([evidence({ leadId: "foreign-lead" })]),
   page([evidence()], { offset: 25 }),
   page([evidence({ monitoringCurrent: undefined })]),
+  page([evidence({ context: { kind: "source_nurture_email", planId: "wrong", stepIndex: 0 } })]),
 ])(
   "fails closed on mismatched lead, page or evidence contract",
   async (invalid) => {
@@ -233,6 +236,40 @@ it.each([
     ).toBeNull();
   },
 );
+it("labels exact nurture context and links the original saved plan without claiming consent or booking", async () => {
+  const context = { kind: "source_nurture_email", planId: "00000000-0000-4000-8000-000000000101", itemId: "00000000-0000-4000-8000-000000000102", stepId: "00000000-0000-4000-8000-000000000103", stepIndex: 1 };
+  vi.stubGlobal("fetch", vi.fn(async () => json(page([evidence({ context })]))));
+  renderWithQuery(<LeadMailboxRepliesPanel leadId="lead-one" canReview />);
+  expect((await screen.findByRole("link", { name: "Reviewed two-message nurture plan" })).getAttribute("href")).toBe(`/reactivation?nurtureId=${context.planId}`);
+  expect(screen.getByText(/A reply to either email stops remaining unclaimed plan work/)).toBeTruthy();
+});
+it("invalid or unknown handling receipts block another action until explicit review refresh", async () => {
+  const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => init?.method === "POST" ? json({ replyId: "other-reply", version: 2, replayed: false }) : json(page()));
+  vi.stubGlobal("fetch", request);
+  renderWithQuery(<LeadMailboxRepliesPanel leadId="lead-one" canReview />);
+  await fillReview(); fireEvent.click(screen.getByRole("button", { name: "Mark reply handled" }));
+  await screen.findByText(/The handling decision was not confirmed/);
+  expect(screen.getByRole("button", { name: "Mark reply handled" }).hasAttribute("disabled")).toBe(true);
+  expect(request.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+});
+it("clears fresh confirmation on changed handling text and ignores a late result after semantic member change", async () => {
+  let finish!: (response: Response) => void;
+  const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => init?.method === "POST" ? new Promise<Response>(resolve => { finish = resolve; }) : json(page()));
+  vi.stubGlobal("fetch", request);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const view = render(<LeadMailboxRepliesPanel leadId="lead-one" canReview scopeKey="owner-one" />, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+  await fillReview();
+  fireEvent.change(screen.getByLabelText("How did the office handle this reply?"), { target: { value: "Office called and documented the actual outcome." } });
+  expect((screen.getByLabelText(/I reviewed the original-mailbox evidence/) as HTMLInputElement).checked).toBe(false);
+  fireEvent.click(screen.getByLabelText(/I reviewed the original-mailbox evidence/));
+  fireEvent.click(screen.getByRole("button", { name: "Mark reply handled" }));
+  view.rerender(<LeadMailboxRepliesPanel leadId="lead-one" canReview={false} scopeKey="viewer-two" />);
+  await screen.findByText("Synthetic response");
+  await act(async () => finish(json({ replyId: "reply-one", version: 2, replayed: false })));
+  expect(screen.queryByText(/Office handling saved/)).toBeNull();
+  expect(screen.queryByLabelText("How did the office handle this reply?")).toBeNull();
+  expect(request.mock.calls.filter(([, init]) => init?.method !== "POST")).toHaveLength(2);
+});
 it("routes typed queue evidence only to the exact lead review, not legacy resolution", async () => {
   const request = vi.fn(async () =>
     json({

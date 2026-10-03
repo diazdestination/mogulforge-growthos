@@ -55,6 +55,19 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe("Today work day", () => {
+  it("opens a server-linked reply task at its exact lead Messages tab, never an arbitrary supplied destination", async () => {
+    const leadId = "00000000-0000-4000-8000-000000000456";
+    const base = { status: "open", dueAt: null, leadId, contactId: "c1", customerLabel: "Synthetic", assignedUserId: "u1", assigneeName: "Office" };
+    renderDay("office", () => json(day({ tasks: { total: 4, truncated: false, items: [
+      { ...base, id: "reply-1", title: "Review original reply", actionPath: `/leads/${leadId}?tab=messages` },
+      { ...base, id: "reply-2", title: "Wrong customer path", actionPath: "/leads/00000000-0000-4000-8000-000000000999?tab=messages" },
+      { ...base, id: "reply-3", title: "External path", actionPath: "https://example.invalid/" },
+      { ...base, id: "reply-4", title: "Extra query path", actionPath: `/leads/${leadId}?tab=messages&redirect=other` },
+    ] } })));
+    expect((await screen.findByRole("link", { name: /Review original reply/ })).getAttribute("href")).toBe(`/leads/${leadId}?tab=messages`);
+    for (const [title, id] of [["Wrong customer path", "reply-2"], ["External path", "reply-3"], ["Extra query path", "reply-4"]])
+      expect(screen.getByRole("link", { name: new RegExp(title) }).getAttribute("href")).toBe(`/tasks?taskId=${id}`);
+  });
   it("shows real snapshot work, exact truncation and explicit timezone without downloading all-time lists", async () => {
     const requests = renderDay("office", () =>
       json(

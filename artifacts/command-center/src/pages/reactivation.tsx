@@ -28,8 +28,11 @@ import {
   type ReactivationSegmentPreset,
   type ReactivationCampaign,
   useGetMe,
+  type MemberProfile,
 } from '@workspace/api-client-react';
 import { SourceAdoptionPanel } from '@/components/source-adoption-panel';
+import { SourceNurturePanel } from '@/components/source-nurture-panel';
+import { memberAuthorityScope } from '@/lib/member-authority-scope';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -662,7 +665,15 @@ function CampaignList() {
 }
 
 export default function Reactivation() {
-  const { data: me } = useGetMe();
+  const profile = useGetMe();
+  if (profile.isError) return <div role="alert" className="space-y-3 p-4">Current company access could not be verified. Win-back review controls are unavailable.<button className="block min-h-11 underline" onClick={() => void profile.refetch()}>Check Win-back access</button></div>;
+  if (profile.isLoading) return <div role="status" className="flex items-center gap-2 p-4"><Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /><p>Checking company access before opening Win-back…</p></div>;
+  if (!profile.data?.id || !profile.data.organization?.id || !profile.data.isActive) return <p role="alert">Active company membership is required to review Win-back work.</p>;
+  const scopeKey = memberAuthorityScope(profile.data);
+  return <ReactivationContent key={scopeKey} me={profile.data} scopeKey={scopeKey} />;
+}
+function ReactivationContent({ me, scopeKey }: { me: MemberProfile; scopeKey: string }) {
+  const canManage = Boolean(me.isActive && ['owner', 'admin'].includes(me.role ?? ''));
   return (
       <div className="min-w-0 space-y-6">
         <div>
@@ -672,7 +683,8 @@ export default function Reactivation() {
           </p>
         </div>
         <ImportCard />
-        {me?.organization && <SourceAdoptionPanel key={me.organization.id} organizationId={me.organization.id} businessName={me.organization.name} timezone={me.organization.timezone || 'America/New_York'} canManage={Boolean(me.isActive && ['owner', 'admin'].includes(me.role ?? ''))} />}
+        {me.organization && <SourceAdoptionPanel scopeKey={scopeKey} organizationId={me.organization.id} businessName={me.organization.name} timezone={me.organization.timezone || 'America/New_York'} canManage={canManage} />}
+        {me.organization && <SourceNurturePanel scopeKey={scopeKey} organizationId={me.organization.id} actorUserId={me.id} businessName={me.organization.name} timezone={me.organization.timezone || 'America/New_York'} canManage={canManage} />}
         <CampaignBuilder />
         <CampaignList />
       </div>

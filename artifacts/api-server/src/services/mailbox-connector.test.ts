@@ -13,6 +13,7 @@ import {
 import {
   mailboxConnectorsTable as connectors,
   mailboxReceiptsTable as receipts,
+  mailboxSyncCyclesTable as cycles,
 } from "../../../../lib/db/src/schema/mailbox-connectors";
 import { decryptSecret, encryptSecret } from "../lib/token-encryption";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
@@ -27,6 +28,11 @@ import {
   getLeadMonitoringApproval,
   assertLeadMonitoringApproval,
   setLeadMonitoringApproval,
+  getNurtureMonitoringApproval,
+  assertNurtureMonitoringApproval,
+  setNurtureMonitoringApproval,
+  getNurtureMailboxReadiness,
+  assertNurtureMailboxReady,
 } from "./mailbox-connector";
 import { MAILBOX_READ_SCOPES } from "./mailbox-contract";
 import { MICROSOFT_SCOPES, disconnectMicrosoft } from "./microsoft-oauth";
@@ -92,6 +98,132 @@ const message = (folder: "inbox" | "sentitems", id = `${folder}_message`) => ({
     folder === "inbox"
       ? [{ name: "In-Reply-To", value: "<sentitems_message@example.invalid>" }]
       : [{ name: "x-growthos-parent-id", value: "a".repeat(64) }],
+});
+
+describe("independent nurture grant and completed observation cycles", () => {
+  beforeEach(() => vi.stubEnv("EMAIL_INTELLIGENCE_ENCRYPTION_KEY", "ba".repeat(32)));
+  const command = async (enabled: boolean) => ({ expectedConnectorVersion: (await connector()).version,
+    expectedNurtureMonitoringVersion: (await connector()).nurtureMonitoringVersion, enabled, nurtureContextAcknowledged: true });
+  const ready = async (options: { notBefore?: Date; at?: Date } = {}) => {
+    const identity = (await getMicrosoftMailboxIdentity(org, user))!;
+    return getNurtureMailboxReadiness(identity, { approval: (await getNurtureMonitoringApproval(identity))!, ...options });
+  };
+  const enable = async () => { await activate(); await setNurtureMonitoringApproval(actor(), await command(true)); };
+  const cycleRows = () => db.select().from(cycles).where(eq(cycles.organizationId, org)).orderBy(cycles.sequence);
+  const page = (folder: string, token: string) => `https://graph.microsoft.com/v1.0/me/mailFolders/${folder}/messages/delta?$skiptoken=${token}`;
+  it("does not inherit a BIE context grant or mutate service identity on nurture opt-in", async () => {
+    await activate();
+    const original = (await getMicrosoftMailboxIdentity(org, user))!, before = await connector();
+    await setLeadMonitoringApproval(actor(), { expectedConnectorVersion: before.version, expectedLeadMonitoringVersion: 0, enabled: true, leadContextAcknowledged: true });
+    expect(await getNurtureMonitoringApproval(original)).toBeNull();
+    await expect(setNurtureMonitoringApproval(actor(), { ...await command(true), nurtureContextAcknowledged: false })).rejects.toThrow();
+    await setNurtureMonitoringApproval(actor(), await command(true));
+    expect(await getMicrosoftMailboxIdentity(org, user)).toEqual(original);
+    expect((await connector()).encryptedCursors).toBe(before.encryptedCursors);
+    expect((await connector()).leadMonitoringVersion).toBe(1);
+    expect((await ready()).reason).toBe("mailbox_sync_incomplete");
+    await expect(assertNurtureMonitoringApproval({ ...original, organizationId: randomUUID() }, (await getNurtureMonitoringApproval(original))!)).rejects.toMatchObject({ code: "mailbox_grant_changed" });
+  });
+  it("records only same-cycle complete Sent and Inbox boundaries with five-minute freshness", async () => {
+    await enable();
+    await db.update(connectors).set({ lastSuccessAt: new Date() }).where(eq(connectors.organizationId, org));
+    expect((await ready()).ready).toBe(false);
+    await processMailboxConnectors(org, { transport: poll() });
+    const [cycle] = await cycleRows();
+    expect(cycle).toMatchObject({ state: "complete", freshBoundary: true, sequence: 1, nurtureMonitoringVersion: 1 });
+    expect((await ready()).completedCycleId).toBe(cycle.id);
+    expect((await ready()).ready).toBe(true);
+    expect((await ready({ notBefore: cycle.startedAt })).reason).toBe("mailbox_sync_predates_predecessor");
+    expect((await ready({ at: new Date(cycle.completedAt!.getTime() + 300_001) })).reason).toBe("mailbox_sync_stale");
+    const identity = (await getMicrosoftMailboxIdentity(org, user))!;
+    await expect(db.transaction(tx => assertNurtureMailboxReady(identity, { approval: { version: cycle.nurtureMonitoringVersion, approvedAt: cycle.nurtureMonitoringApprovedAt.toISOString() } }, tx))).resolves.toMatchObject({ ready: true });
+  });
+  it("does not combine old Inbox complete=true with a new partial Sent round", async () => {
+    await enable(); await processMailboxConnectors(org, { transport: poll() });
+    const transport = vi.fn<typeof fetch>().mockResolvedValueOnce(respond(tokens)).mockResolvedValueOnce(respond(profile))
+      .mockResolvedValueOnce(respond({ value: [], "@odata.nextLink": page("sent_id", "first") }))
+      .mockResolvedValueOnce(respond({ value: [], "@odata.nextLink": page("sent_id", "second") }));
+    await processMailboxConnectors(org, { transport });
+    expect(transport).toHaveBeenCalledTimes(4);
+    expect((await connector()).lastSuccessAt).not.toBeNull();
+    expect((await cycleRows())[1]).toMatchObject({ state: "scanning", sentCompletedAt: null, inboxCompletedAt: null, completedAt: null });
+    expect((await ready()).reason).toBe("mailbox_sync_incomplete");
+    await processMailboxConnectors(org, { transport: poll() });
+    expect((await cycleRows())[1].state).toBe("complete");
+    expect((await ready()).ready).toBe(true);
+  });
+  it("resumes unfinished Inbox across ticks without restarting completed Sent Items", async () => {
+    await enable();
+    const transport = vi.fn<typeof fetch>().mockResolvedValueOnce(respond(tokens)).mockResolvedValueOnce(respond(profile))
+      .mockResolvedValueOnce(respond({ value: [], "@odata.deltaLink": next("sent_id") }))
+      .mockResolvedValueOnce(respond({ value: [], "@odata.nextLink": page("inbox_id", "first") }))
+      .mockResolvedValueOnce(respond({ value: [], "@odata.nextLink": page("inbox_id", "second") }));
+    await processMailboxConnectors(org, { transport });
+    const [pending] = await cycleRows();
+    expect(pending.sentCompletedAt).not.toBeNull(); expect(pending.inboxCompletedAt).toBeNull();
+    const finish = vi.fn<typeof fetch>().mockResolvedValueOnce(respond(tokens)).mockResolvedValueOnce(respond(profile))
+      .mockResolvedValueOnce(respond({ value: [], "@odata.deltaLink": next("inbox_id") }));
+    await processMailboxConnectors(org, { transport: finish });
+    expect(finish).toHaveBeenCalledTimes(3);
+    expect(String(finish.mock.calls[2][0])).toContain("inbox_id");
+    expect(await cycleRows()).toHaveLength(1);
+    expect((await ready()).ready).toBe(true);
+  });
+  it("retains rejected/pending receipts as an incomplete observation, not silence", async () => {
+    await enable();
+    const malformed = { ...message("inbox", "malformed"), receivedDateTime: "invalid" };
+    await processMailboxConnectors(org, { transport: poll([], [malformed]) });
+    expect((await cycleRows())[0]).toMatchObject({ state: "failed", errorCode: "mailbox_sync_receipts_unresolved", completedAt: null });
+    expect((await ready()).ready).toBe(false);
+    await processMailboxConnectors(org, { transport: poll() });
+    expect((await ready()).reason).toBe("mailbox_sync_receipts_unresolved");
+  });
+  it("fences old work when nurture permission changes during provider work", async () => {
+    await enable();
+    const identity = (await getMicrosoftMailboxIdentity(org, user))!, approval = (await getNurtureMonitoringApproval(identity))!;
+    const transport = vi.fn<typeof fetch>().mockImplementationOnce(async () => {
+      await setNurtureMonitoringApproval(actor(), await command(false)); return respond(tokens);
+    }).mockResolvedValueOnce(respond(profile)).mockResolvedValueOnce(respond({ value: [], "@odata.deltaLink": next("sent_id") }));
+    await processMailboxConnectors(org, { transport });
+    expect((await cycleRows())[0]).toMatchObject({ state: "failed", completedAt: null });
+    expect((await connector()).state).toBe("active");
+    await expect(assertNurtureMonitoringApproval(identity, approval)).rejects.toMatchObject({ code: "mailbox_nurture_approval_changed" });
+    vi.stubEnv("MICROSOFT_MAILBOX_READ_ENABLED", "false");
+    expect((await getMailboxStatus(org, user)).nurtureMonitoringEnabled).toBe(false);
+  });
+  it("requires another fresh round after recovery from a failed partial cursor", async () => {
+    await enable();
+    const transport = vi.fn<typeof fetch>().mockResolvedValueOnce(respond(tokens)).mockResolvedValueOnce(respond(profile))
+      .mockResolvedValueOnce(respond({ value: [], "@odata.nextLink": page("sent_id", "partial") })).mockResolvedValueOnce(respond({}, 503));
+    await processMailboxConnectors(org, { transport });
+    expect((await ready()).ready).toBe(false);
+    expect((await connector()).lastSuccessAt).not.toBeNull();
+    await processMailboxConnectors(org, { transport: poll() });
+    expect((await cycleRows())[1]).toMatchObject({ state: "failed", freshBoundary: false, errorCode: "mailbox_sync_continuity_warmup" });
+    expect((await ready()).ready).toBe(false);
+    await processMailboxConnectors(org, { transport: poll() });
+    expect((await cycleRows())[2]).toMatchObject({ state: "complete", freshBoundary: true });
+    expect((await ready()).ready).toBe(true);
+  });
+  it("holds a current in-flight lease and cannot adopt old evidence after reconnect", async () => {
+    await enable(); await processMailboxConnectors(org, { transport: poll() });
+    const oldIdentity = (await getMicrosoftMailboxIdentity(org, user))!, oldApproval = (await getNurtureMonitoringApproval(oldIdentity))!;
+    await db.update(connectors).set({ leaseToken: randomUUID(), leaseExpiresAt: new Date(Date.now() + 60_000) }).where(eq(connectors.organizationId, org));
+    expect((await ready()).reason).toBe("mailbox_sync_in_progress");
+    await activate();
+    expect((await getMailboxStatus(org, user)).nurtureMonitoringEnabled).toBe(false);
+    await expect(assertNurtureMailboxReady(oldIdentity, { approval: oldApproval })).rejects.toMatchObject({ code: "mailbox_grant_changed" });
+    await setNurtureMonitoringApproval(actor(), await command(true));
+    expect((await ready()).reason).toBe("mailbox_sync_incomplete");
+  });
+  it("holds new nurture when short-lived reply evidence cannot be encrypted", async () => {
+    await enable(); await processMailboxConnectors(org, { transport: poll() });
+    vi.stubEnv("EMAIL_INTELLIGENCE_ENCRYPTION_KEY", "");
+    expect((await ready()).reason).toBe("mailbox_nurture_storage_unavailable");
+    expect((await connector()).state).toBe("active");
+    vi.stubEnv("EMAIL_INTELLIGENCE_ENCRYPTION_KEY", "bad");
+    expect((await ready()).ready).toBe(false);
+  });
 });
 async function start() {
   return new URL(

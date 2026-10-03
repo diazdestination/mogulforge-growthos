@@ -191,15 +191,49 @@ it("keeps global read opt-in disabled separately from sending access", async () 
     code: "mailbox_feature_disabled",
   });
 });
+
+it("requires a separate strict accepted-session nurture acknowledgment and allows held-state revoke", async () => {
+  vi.stubEnv("EMAIL_INTELLIGENCE_ENCRYPTION_KEY", "ba".repeat(32));
+  vi.stubEnv("MICROSOFT_MAILBOX_READ_ENABLED", "true"); vi.stubEnv("MICROSOFT_OAUTH_CLIENT_ID", "synthetic-client"); vi.stubEnv("MICROSOFT_OAUTH_CLIENT_SECRET", "synthetic-secret"); vi.stubEnv("APP_ORIGIN", "https://growth.example");
+  const actor = { organizationId: org, userId: owner }, prior = await getMailboxStatus(org, owner);
+  const state = new URL(await beginMailboxOAuth(actor, { ...input, expectedVersion: prior.version })).searchParams.get("state")!;
+  const response = (value: unknown) => new Response(JSON.stringify(value));
+  const provider = vi.fn<typeof fetch>().mockResolvedValueOnce(response({ token_type: "Bearer", access_token: "synthetic-access", refresh_token: "synthetic-refresh", scope: "Mail.Read User.Read" }))
+    .mockResolvedValueOnce(response({ id: "synthetic_account", mail: "staff@example.invalid" })).mockResolvedValueOnce(response({ id: "inbox_nurture" })).mockResolvedValueOnce(response({ id: "sent_nurture" }));
+  await completeMailboxOAuth(actor, state, "synthetic-code", provider);
+  const active = await getMailboxStatus(org, owner);
+  const approval = { expectedConnectorVersion: active.version, expectedNurtureMonitoringVersion: active.nurtureMonitoringVersion, enabled: true, nurtureContextAcknowledged: true };
+  const headers = { ...auth(), origin: "https://growth.example" };
+  const submit = (body: unknown, override: Record<string, string> = headers, query = "") => httpFetch(`${base}/nurture-monitoring${query}`, { method: "POST", headers: override, body: JSON.stringify(body) });
+  const noProvider = vi.fn<typeof fetch>(); vi.stubGlobal("fetch", noProvider);
+  expect((await submit(approval, { ...headers, origin: "https://foreign.example" })).status).toBe(403);
+  expect((await submit(approval, { "content-type": "application/json", "x-api-key": key })).status).toBe(403);
+  expect((await submit(approval, { ...headers, authorization: `Bearer ${sessions[1]}` })).status).toBe(403);
+  expect((await submit({ ...approval, nurtureContextAcknowledged: false })).status).toBe(400);
+  expect((await submit({ ...approval, leadContextAcknowledged: true })).status).toBe(400);
+  expect((await submit({ ...approval, organizationId: randomUUID() })).status).toBe(400);
+  expect((await submit(approval, headers, "?grant=all")).status).toBe(400);
+  const accepted = await submit(approval);
+  expect(accepted.status).toBe(200);
+  expect(await accepted.json()).toMatchObject({ version: active.version, nurtureMonitoringEnabled: true, nurtureMonitoringVersion: active.nurtureMonitoringVersion + 1,
+    leadMonitoringEnabled: false, nurtureSync: { ready: false, reason: "mailbox_sync_incomplete", completedCycleId: null } });
+  expect((await submit(approval)).status).toBe(409);
+  vi.stubEnv("MICROSOFT_MAILBOX_READ_ENABLED", "false");
+  const revoked = await submit({ ...approval, expectedNurtureMonitoringVersion: active.nurtureMonitoringVersion + 1, enabled: false });
+  expect(revoked.status).toBe(200);
+  expect(await revoked.json()).toMatchObject({ nurtureMonitoringEnabled: false, nurtureMonitoringApprovedAt: null, leadMonitoringEnabled: false });
+  expect(noProvider).not.toHaveBeenCalled();
+});
 it("begins only the explicit read flow for the exact authenticated current sender", async () => {
   vi.stubEnv("MICROSOFT_MAILBOX_READ_ENABLED", "true");
   vi.stubEnv("MICROSOFT_OAUTH_CLIENT_ID", "synthetic-client");
   vi.stubEnv("MICROSOFT_OAUTH_CLIENT_SECRET", "synthetic-secret");
   vi.stubEnv("APP_ORIGIN", "https://growth.example");
+  const before = await getMailboxStatus(org, owner);
   const response = await httpFetch(`${base}/connect`, {
     method: "POST",
     headers: { ...auth(), origin: "https://growth.example" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, expectedVersion: before.version }),
   });
   expect(response.status).toBe(200);
   const body = (await response.json()) as { authorizationUrl: string };

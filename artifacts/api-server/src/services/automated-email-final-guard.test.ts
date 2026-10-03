@@ -1,11 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { appointmentsTable, automationsTable, contactsTable, customerLifecycleTable, db, DEFAULT_SENDING_HOURS, emailIntelligenceSourcesTable, emailResponseReviewsTable,
+import { appointmentsTable, automationRunsTable, automationsTable, consentRecordsTable, contactsTable, customerLifecycleTable, db, DEFAULT_SENDING_HOURS, emailIntelligenceSourcesTable, emailResponseReviewsTable,
   emailSenderPreferencesTable, leadsTable, microsoftConnectionsTable, organizationsTable, playbookEnrollmentsTable, playbooksTable, revenueExecutionsTable, scheduledActionsTable, usersTable } from "@workspace/db";
 import { encryptSecret } from "../lib/token-encryption";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
-import { processDueScheduledActions } from "./automation";
+import { processDueScheduledActions, runEvent } from "./automation";
+import { runDurableAction } from "./durable-execution";
+import { contactTouchReservationsTable as touchReservations } from "../../../../lib/db/src/schema/contact-touch-reservations";
+import { providers } from "./providers";
 import { executePlaybookStep } from "./playbooks";
 import { updateOrgSettings } from "./settings";
 // Only drafting is synthetic; use the actual CustomerEmail/UserEmail/Microsoft chain.
@@ -27,7 +30,7 @@ beforeEach(() => {
     throw new Error("Unexpected synthetic transport operation");
   }); vi.stubGlobal("fetch", transport);
 });
-afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 afterAll(async () => { await deleteTestOrgs(...orgs); });
 async function fixture() {
   const [org] = await db.insert(organizationsTable).values({ name: "Synthetic final automation gate", slug: randomUUID() }).returning(); orgs.push(org.id);
@@ -117,5 +120,45 @@ describe("post-OAuth final guards preserve legacy automatic-send claims", () => 
     const f = await fixture(); await scheduled(f); ambiguous = true; await processDueScheduledActions(f.org); expect(posts).toBe(1);
     const [receipt] = await db.select().from(revenueExecutionsTable).where(eq(revenueExecutionsTable.organizationId, f.org)); expect(receipt.state).toBe("indeterminate");
     await processDueScheduledActions(f.org); expect(posts).toBe(1);
+  });
+  it.each([false, true])("persists the original immediate run and ordinal before a real Microsoft effect (unknown=%s)", async unknownEffect => {
+    const f = await fixture(), action = { type: "send_email" as const, params: { subject: "Original immediate subject", body: "Original immediate body" } };
+    const [rule] = await db.insert(automationsTable).values({ organizationId: f.org, name: "Synthetic immediate original", event: "assessment.abandoned", conditions: {}, actions: [action] }).returning();
+    const context = { leadId: f.lead.id, event: "assessment.abandoned" }; ambiguous = unknownEffect;
+    afterRefresh = async () => {
+      const [run] = await db.select().from(automationRunsTable).where(eq(automationRunsTable.automationId, rule.id));
+      expect(run).toMatchObject({ actionResults: [], status: "skipped" });
+      const [receipt] = await db.select().from(revenueExecutionsTable).where(eq(revenueExecutionsTable.organizationId, f.org));
+      expect(receipt).toMatchObject({ actionKey: `automation-run:${run.id}:0`, state: "processing" });
+      expect(await db.select().from(touchReservations).where(eq(touchReservations.organizationId, f.org))).toEqual([expect.objectContaining({ logicalKey: receipt.actionKey })]);
+    };
+    await runEvent(f.org, "assessment.abandoned", { leadId: f.lead.id }); expect(posts).toBe(1);
+    const [run] = await db.select().from(automationRunsTable).where(eq(automationRunsTable.automationId, rule.id));
+    const [receipt] = await db.select().from(revenueExecutionsTable).where(eq(revenueExecutionsTable.organizationId, f.org));
+    expect(receipt.state).toBe(unknownEffect ? "indeterminate" : "succeeded");
+    expect((await db.select().from(touchReservations).where(eq(touchReservations.organizationId, f.org)))[0].dispatchStartedAt).not.toBeNull();
+    let replayed = 0;
+    await runDurableAction({ organizationId: f.org, actionKey: `automation-run:${run.id}:0`, kind: action.type, payload: { action, context },
+      execute: async () => { replayed++; return { state: "succeeded", detail: "This replacement must never execute" }; } });
+    await processDueScheduledActions(f.org); expect(replayed).toBe(0); expect(posts).toBe(1);
+    expect(await db.select().from(scheduledActionsTable).where(eq(scheduledActionsTable.organizationId, f.org))).toHaveLength(0);
+    // This proves the retained run/ordinal, not event-level deduplication: a new
+    // domain event is an existing separate admission and is not tested as retry.
+  });
+  it("preserves the established SMS idempotency key while attaching the original immediate allowance", async () => {
+    const f = await fixture(), phone = "+12025550188";
+    await db.update(contactsTable).set({ phone }).where(eq(contactsTable.id, f.contact.id));
+    await db.insert(consentRecordsTable).values({ organizationId: f.org, contactId: f.contact.id, channel: "sms", granted: true, disclosureVersion: "synthetic adapter-key fixture" });
+    const action = { type: "send_sms" as const, params: { body: "Synthetic original SMS body" } };
+    const [rule] = await db.insert(automationsTable).values({ organizationId: f.org, name: "Synthetic SMS identity", event: "assessment.abandoned", actions: [action] }).returning();
+    // This assertion tests the existing adapter contract, not live SMS delivery.
+    const sms = vi.spyOn(providers.sms, "send").mockResolvedValue({ id: "synthetic-message", provider: "synthetic-sms" });
+    await runEvent(f.org, "assessment.abandoned", { leadId: f.lead.id });
+    const [run] = await db.select().from(automationRunsTable).where(eq(automationRunsTable.automationId, rule.id));
+    expect(sms).toHaveBeenCalledWith(phone, action.params.body, expect.objectContaining({
+      idempotencyKey: `automation:${rule.id}:${f.lead.id}:${JSON.stringify(action.params)}`,
+      contactTouch: { logicalKey: `automation-run:${run.id}:0`, payloadHash: expect.stringMatching(/^[a-f0-9]{64}$/) },
+    }));
+    expect(sms).toHaveBeenCalledTimes(1);
   });
 });

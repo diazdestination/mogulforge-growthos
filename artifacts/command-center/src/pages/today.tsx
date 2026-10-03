@@ -359,9 +359,10 @@ export default function Today() {
                   <WorkRow
                     key={item.id}
                     href={
-                      /^\/invoices\?projectId=[0-9a-f-]+$/i.test(
-                        item.actionPath,
-                      )
+                      /^\/invoices\?projectId=[0-9a-f-]+$/i.test(item.actionPath) ||
+                      (item.leadId !== null &&
+                        /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(item.leadId) &&
+                        item.actionPath === `/leads/${item.leadId}?tab=messages`)
                         ? item.actionPath
                         : `/tasks?taskId=${encodeURIComponent(item.id)}`
                     }

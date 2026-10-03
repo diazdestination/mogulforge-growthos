@@ -25,6 +25,7 @@ import { assertServiceCareAuthorizationCurrent } from "./service-care-authorizat
 import { lockServiceStanding, ServiceStandingError, standingCompanyProjection } from "./service-standing-policy";
 import { assertServiceSmsReplyStorageReady, serviceSmsReplyReference, serviceSmsReplySuffix } from "./service-sms-policy";
 import { hasServiceSmsReplyHold, reserveServiceSmsParent } from "./service-sms";
+import { markContactTouchDispatchStarted } from "./contact-touch-claim";
 
 const APPROVED = "service.care_reminder_approved";
 const RESPONSE = "service.care_response_recorded";
@@ -227,6 +228,7 @@ export async function executeServiceCareReminder(org: string, params: Record<str
     const live = await reviewCurrent(org, liveClaim);
     const liveReceipt = await receipt(org, scheduledActionId);
     if (live.blocked || live.resumeAt || liveClaim.scheduled.status !== "pending" || liveReceipt?.state !== "processing" || liveReceipt.expiresAt.getTime() <= Date.now() || liveReceipt.fingerprint !== careFingerprint({ action: liveClaim.scheduled.action, context: liveClaim.scheduled.context })) throw new EmailDispatchBlockedError();
+    await markContactTouchDispatchStarted(org, `scheduled:${scheduledActionId}`);
   };
   let evidence: Record<string, unknown>;
   try {
@@ -251,7 +253,7 @@ export async function executeServiceCareReminder(org: string, params: Record<str
   await db.transaction(async tx => {
     await lockContractorSchedule(tx, org);
     await tx.insert(auditEventsTable).values({ organizationId: org, actorUserId: claim.audit.actorUserId, action: "service.care_reminder_accepted", entityType: "service_obligation", entityId: saved.obligationId, metadata: { approvalId: claim.audit.id, scheduledActionId, channel: saved.channel, ...evidence } });
-    await tx.insert(activitiesTable).values({ organizationId: org, contactId: saved.contactId, type: "automation_message_sent", title: "Service reminder accepted by provider (delivery unconfirmed)", metadata: { serviceObligationId: saved.obligationId, approvalId: claim.audit.id, channel: saved.channel, ...evidence } });
+    await tx.insert(activitiesTable).values({ organizationId: org, contactId: saved.contactId, type: "automation_message_sent", title: "Service reminder accepted by provider (delivery unconfirmed)", metadata: { serviceObligationId: saved.obligationId, approvalId: claim.audit.id, channel: saved.channel, touchLogicalKey: `scheduled:${scheduledActionId}`, ...evidence } });
     const { obligation } = await readService(org, saved.obligationId, tx);
     if (obligation.status === "active" && !await isBooked(org, obligation, tx) && !await latest(org, obligation.id, RESPONSE, tx)) {
       const [task] = await tx.select().from(crmTasksTable).where(and(eq(crmTasksTable.organizationId, org), eq(crmTasksTable.id, obligation.taskId)));

@@ -1,5 +1,22 @@
 # Next acceptance work
 
+Current bounded L6 source candidate:
+`reports/source-nurture-integration-2026-10-03.md`. Finish its exact PostgreSQL
+candidate CI and explicitly dispatched merged-main CI before source release
+selection. Base L5 PR20/main110f145/exact-main CI37148428665 is already complete.
+The130-table candidate adds reviewed0014after0013 and36read-only synthetic restored
+app probes. Neither local recovery nor a finite two-message Microsoft sequence
+closes full L6 or either contractor's replacement acceptance.
+
+After this bounded engineering gate, follow `LAUNCH-COMPLETION.md`: confirm any
+required remaining campaign/mailbox/reception scope, then necessary L7 unified
+customer history/workday behavior and L8 approved migration layouts. Keep Azure
+first sign-in, hosted staging/schema/backup/admin-rotation, actual email/Twilio/
+phones/Smart Sites, subscriptions/onboarding and both complete contractor-workday
+cards separate. No real sends, automatic booking, payment processing or cutover.
+Source-nurture operator steps are recorded in its operator guide; no retry keys
+or reimport may release permanent unknown/admitted source ownership.
+
 Current standing-service wave: `reports/standing-service-integration-2026-10-03.md`,
 from PR19/mainf91e1c3 and passed exact-main CI37134529680. Complete its exact
 PostgreSQL candidate/main CI before release selection. The125-table candidate

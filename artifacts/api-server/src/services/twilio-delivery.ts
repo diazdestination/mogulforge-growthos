@@ -190,6 +190,11 @@ export async function sendTwilioSms(
       const { assertServiceSmsParentDispatch } = await import("./service-sms");
       await assertServiceSmsParentDispatch({ parentId: context.serviceSmsParentId, organizationId: context.organizationId, operationId: operation.id, body, binding: current, consentProofId: proof.id });
     }
+    if (context.contactTouch) {
+      const { assertSmsContactTouch, markContactTouchDispatchStarted } = await import("./contact-touch-claim");
+      await assertSmsContactTouch({ organizationId: context.organizationId, contactId: context.contactId, to, ...context.contactTouch });
+      await markContactTouchDispatchStarted(context.organizationId, context.contactTouch.logicalKey);
+    }
     dispatched = true;
     const response = await fetch(
       `https://api.twilio.com/2010-04-01/Accounts/${current.accountSid}/Messages.json`,

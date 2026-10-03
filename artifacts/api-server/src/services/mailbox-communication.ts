@@ -2,14 +2,15 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { auditEventsTable, bieActionProposalsTable, contactsTable, crmTasksTable, db, emailResponseReviewsTable as leadReplies, leadsTable, revenueExecutionsTable, serviceObligationsTable, usersTable } from "@workspace/db";
-import { mailboxCommunicationParentsTable as parents, mailboxServiceRepliesTable as replies } from "../../../../lib/db/src/schema/mailbox-communication";
+import { mailboxCommunicationParentsTable as parents, mailboxServiceRepliesTable as replies, type SourceNurtureMailboxContext } from "../../../../lib/db/src/schema/mailbox-communication";
+import { sourceNurturePlansTable, sourceNurtureItemsTable, sourceNurtureStepsTable } from "../../../../lib/db/src/schema/source-nurture";
 import { decryptEmailContent, encryptEmailContent } from "../lib/email-content-encryption";
 import { hasPermission } from "../lib/permissions";
-import { assertOperationalStaff, lockContractorSchedule, type ScheduleTransaction } from "./contractor-scheduling";
+import { assertOperationalStaff, type ScheduleTransaction } from "./contractor-scheduling";
 import { getCustomerLifecycleStatus } from "./customer-lifecycle";
 import { EmailDispatchBlockedError } from "./email-dispatch-guard";
 import { MAILBOX_HEADER, MAILBOX_MAX_BODY, mailboxDigest, type MailboxIdentity } from "./mailbox-contract";
-import { confirmObservedMailboxLeadReply, hasCustomerReplyHold, lockReplyLead } from "./response-correlation";
+import { confirmObservedMailboxLeadReply, hasCustomerReplyHold, lockReplyLead, lockReplyContact } from "./response-correlation";
 import { assertServiceCareAuthorizationCurrent } from "./service-care-authorization";
 import { careFingerprint } from "./service-care-policy";
 import { hasServiceSmsReplyHold } from "./service-sms";
@@ -32,6 +33,9 @@ const identitySchema = z.object({ organizationId: z.uuid(), senderUserId: z.stri
 const leadContextFields = { version: z.literal(1), kind: z.literal("bie_lead_email"), leadId: z.uuid(), contactId: z.uuid(), leadCreatedAt: z.iso.datetime(), leadUpdatedAt: z.iso.datetime(),
   leadMonitoringApproval: z.object({ version: z.number().int().positive(), approvedAt: z.iso.datetime() }).strict() };
 const leadContextSchema = z.object({ ...leadContextFields, proposalId: z.uuid() }).strict();
+const nurtureContextSchema = z.object({ kind: z.literal("source_nurture_email"), version: z.literal(1), planId: z.uuid(), itemId: z.uuid(), stepId: z.uuid(), stepIndex: z.union([z.literal(1), z.literal(2)]),
+  leadId: z.uuid(), contactId: z.uuid(), scheduledActionId: z.uuid(), planReviewId: z.uuid(), planFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  nurtureMonitoringApproval: z.object({ version: z.number().int().positive(), approvedAt: z.iso.datetime() }).strict() }).strict();
 export const leadReplySendSnapshotSchema = z.object({ ...leadContextFields, recipient: email, mailboxIdentity: identitySchema }).strict();
 export type LeadReplySendSnapshot = Omit<z.infer<typeof leadReplySendSnapshotSchema>, "mailboxIdentity"> & { mailboxIdentity: MailboxIdentity };
 export const leadReplyReviewInput = z.object({ requestId: z.uuid(), expectedVersion: z.number().int().positive(), decision: z.literal("handled"), note: z.string().trim().min(10).max(1000), reviewed: z.literal(true) }).strict();
@@ -53,8 +57,8 @@ async function currentIdentity(identity: MailboxIdentity, reader: Reader = db) {
   await assertMailboxIdentityCurrent(identity, reader);
 }
 async function lock(tx: ScheduleTransaction, org: string) {
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`customer-lifecycle:${org}`}, 0))`);
-  await lockContractorSchedule(tx, org);
+  const { acquireNurtureLocks } = await import("./source-outreach-ownership");
+  await acquireNurtureLocks(tx, org);
 }
 async function activeCompany(reader: Reader, org: string) { if (!(await getCustomerLifecycleStatus(org, reader)).automationAllowed) fail("company_held"); }
 async function readerAllowed(reader: Reader, org: string, actor: string) {
@@ -64,7 +68,7 @@ async function readerAllowed(reader: Reader, org: string, actor: string) {
 async function executionCurrent(reader: Reader, parent: Parent) {
   const [receipt] = await reader.select().from(revenueExecutionsTable).where(and(eq(revenueExecutionsTable.organizationId, parent.organizationId), eq(revenueExecutionsTable.actionKey, parent.actionKey)));
   if (!receipt || receipt.state !== "processing" || receipt.expiresAt <= new Date() || receipt.fingerprint !== parent.executionFingerprint) fail("execution_not_owned");
-  if (parent.leadId && receipt.actorUserId !== parent.senderUserId) fail("execution_not_owned");
+  if (parent.leadId && !parent.sourceNurtureStepId && receipt.actorUserId !== parent.senderUserId) fail("execution_not_owned");
 }
 async function exactService(reader: Reader, parent: Parent, dispatch = false, options: { lockTask?: boolean } = {}) {
   if (!parent.serviceObligationId) fail("unsupported_context");
@@ -86,12 +90,19 @@ async function exactService(reader: Reader, parent: Parent, dispatch = false, op
 }
 
 async function leadMonitoringCurrent(parent: Parent, reader: Reader) {
+  if (parent.sourceNurtureStepId) {
+    const snapshot = nurtureContextSchema.parse(parent.contextSnapshot);
+    const { getNurtureMonitoringApproval } = await import("./mailbox-connector");
+    const approval = await getNurtureMonitoringApproval(identityFor(parent), reader);
+    return snapshot.stepId === parent.sourceNurtureStepId && !!approval && mailboxDigest(approval) === mailboxDigest(snapshot.nurtureMonitoringApproval);
+  }
   const snapshot = leadContextSchema.parse(parent.contextSnapshot);
   const { getLeadMonitoringApproval } = await import("./mailbox-connector");
   const approval = await getLeadMonitoringApproval(identityFor(parent), reader);
   return !!approval && mailboxDigest(approval) === mailboxDigest(snapshot.leadMonitoringApproval);
 }
 async function exactLead(reader: Reader, parent: Parent, dispatch = false) {
+  if (parent.sourceNurtureStepId) return exactNurtureLead(reader, parent, dispatch);
   const snapshot = leadContextSchema.parse(parent.contextSnapshot);
   if (!parent.leadId || snapshot.leadId !== parent.leadId || snapshot.contactId !== parent.contactId) fail("unsupported_context");
   const [lead] = await reader.select().from(leadsTable).where(and(eq(leadsTable.organizationId, parent.organizationId), eq(leadsTable.id, parent.leadId)));
@@ -108,11 +119,66 @@ async function exactLead(reader: Reader, parent: Parent, dispatch = false) {
   return { lead, contact, historical };
 }
 
+/** Read exact retained authority for correlation; stopping/expiry does not erase history. */
+async function exactNurtureLead(reader: Reader, parent: Parent, dispatch = false) {
+  const snapshot = nurtureContextSchema.parse(parent.contextSnapshot);
+  if (parent.sourceNurtureStepId !== snapshot.stepId || parent.leadId !== snapshot.leadId || parent.contactId !== snapshot.contactId) fail("unsupported_context");
+  const [saved] = await reader.select({ step: sourceNurtureStepsTable, item: sourceNurtureItemsTable, plan: sourceNurturePlansTable }).from(sourceNurtureStepsTable)
+    .innerJoin(sourceNurtureItemsTable, and(eq(sourceNurtureItemsTable.organizationId, parent.organizationId), eq(sourceNurtureItemsTable.id, sourceNurtureStepsTable.itemId)))
+    .innerJoin(sourceNurturePlansTable, and(eq(sourceNurturePlansTable.organizationId, parent.organizationId), eq(sourceNurturePlansTable.id, sourceNurtureStepsTable.planId)))
+    .where(and(eq(sourceNurtureStepsTable.organizationId, parent.organizationId), eq(sourceNurtureStepsTable.id, snapshot.stepId)));
+  if (!saved || saved.plan.id !== snapshot.planId || saved.item.id !== snapshot.itemId || saved.step.stepIndex !== snapshot.stepIndex ||
+    saved.step.leadId !== parent.leadId || saved.step.contactId !== parent.contactId || saved.step.scheduledActionId !== snapshot.scheduledActionId ||
+    parent.actionKey !== `scheduled:${snapshot.scheduledActionId}` || saved.plan.payloadSha256 !== snapshot.planFingerprint || saved.plan.reviewId !== snapshot.planReviewId ||
+    mailboxDigest(saved.item.snapshot.mailboxIdentity) !== mailboxDigest(identityFor(parent)) || mailboxDigest(saved.item.snapshot.nurtureMonitoringApproval) !== mailboxDigest(snapshot.nurtureMonitoringApproval) ||
+    saved.item.recipient !== parent.recipient || mailboxContentHash({ to: saved.item.recipient, subject: saved.step.subject, body: saved.step.body }) !== parent.contentSha256) fail("nurture_parent_changed");
+  const [lead] = await reader.select().from(leadsTable).where(and(eq(leadsTable.organizationId, parent.organizationId), eq(leadsTable.id, snapshot.leadId)));
+  const [contact] = await reader.select().from(contactsTable).where(and(eq(contactsTable.organizationId, parent.organizationId), eq(contactsTable.id, parent.contactId)));
+  if (!lead || !contact) fail("context_missing");
+  const historical = lead.contactId !== parent.contactId || contact.email?.trim().toLowerCase() !== parent.recipient || lead.createdAt.toISOString() !== saved.item.snapshot.leadCreatedAt || ["won", "lost", "completed"].includes(lead.status);
+  if (dispatch) {
+    if (historical) fail("lead_changed_or_reply_held");
+    const { assertNurtureStepCurrent } = await import("./source-nurture-authority");
+    const current = await assertNurtureStepCurrent(reader, parent.organizationId, snapshot.stepId, { phase: "dispatch" });
+    if (current.executionFingerprint !== parent.executionFingerprint) fail("execution_not_owned");
+  }
+  return { lead, contact, historical };
+}
+
+/** Internal typed authority only; no caller-provided policy/source snapshots. */
+export async function reserveSourceNurtureMailboxParent(input: { identity: MailboxIdentity; stepId: string; executionFingerprint: string; message: Message }) {
+  const { identity, message } = input;
+  return db.transaction(async tx => {
+    await lock(tx, identity.organizationId);
+    const { readNurtureStep, assertNurtureStepCurrent } = await import("./source-nurture-authority");
+    const saved = await readNurtureStep(tx, identity.organizationId, input.stepId);
+    await lockReplyLead(tx, identity.organizationId, saved.step.leadId);
+    await currentIdentity(identity, tx);
+    const authority = await assertNurtureStepCurrent(tx, identity.organizationId, input.stepId, { phase: "dispatch" });
+    if (!authority.step.scheduledActionId || authority.executionFingerprint !== input.executionFingerprint || mailboxDigest(authority.mailboxIdentity) !== mailboxDigest(identity) || mailboxContentHash(authority.message) !== mailboxContentHash(message)) fail("approval_mismatch");
+    const context: SourceNurtureMailboxContext = { kind: "source_nurture_email", version: 1, planId: authority.plan.id, itemId: authority.item.id, stepId: authority.step.id, stepIndex: authority.step.stepIndex,
+      leadId: authority.step.leadId, contactId: authority.step.contactId, scheduledActionId: authority.step.scheduledActionId, planReviewId: authority.plan.reviewId, planFingerprint: authority.plan.payloadSha256,
+      nurtureMonitoringApproval: authority.nurtureMonitoringApproval };
+    const actionKey = `scheduled:${authority.step.scheduledActionId}`;
+    const [prior] = await tx.select().from(parents).where(and(eq(parents.organizationId, identity.organizationId), eq(parents.actionKey, actionKey)));
+    if (prior) {
+      if (prior.sourceNurtureStepId !== input.stepId || !sameIdentity(prior, identity) || prior.contentSha256 !== mailboxContentHash(message) || prior.executionFingerprint !== input.executionFingerprint || mailboxDigest(prior.contextSnapshot) !== mailboxDigest(context)) fail("parent_conflict");
+      if (prior.dispatchStartedAt) fail("dispatch_already_claimed");
+      await executionCurrent(tx, prior); return prior.id;
+    }
+    const [parent] = await tx.insert(parents).values({ organizationId: identity.organizationId, leadId: authority.step.leadId, contactId: authority.step.contactId, sourceNurtureStepId: input.stepId, contextSnapshot: context,
+      provider: "microsoft", senderUserId: identity.senderUserId, connectionId: identity.connectionId, connectionRevision: identity.connectionRevision, mailboxAccountId: identity.mailboxAccountId, mailboxEmail: identity.mailboxEmail,
+      connectorId: identity.connectorId, connectorVersion: identity.connectorVersion, policyVersion: identity.policyVersion, connectorStartedAt: identity.startedAt, recipient: message.to.trim().toLowerCase(),
+      contentSha256: mailboxContentHash(message), subjectSha256: hash(message.subject), bodySha256: hash(message.body), correlationHeader: randomBytes(32).toString("hex"), actionKey, executionFingerprint: input.executionFingerprint }).returning();
+    await executionCurrent(tx, parent); return parent.id;
+  });
+}
+
 /** Called only by the BIE executor; the saved approved payload supplies authority. */
 export async function reserveLeadMailboxParent(input: { identity: MailboxIdentity; leadId: string; contactId: string; proposalId: string; executionFingerprint: string; message: Message }) {
   const { identity, message } = input;
   return db.transaction(async tx => {
-    await lock(tx, identity.organizationId); await currentIdentity(identity, tx); await lockReplyLead(tx, identity.organizationId, input.leadId);
+    await lock(tx, identity.organizationId); await lockReplyLead(tx, identity.organizationId, input.leadId); await currentIdentity(identity, tx);
     const [proposal] = await tx.select().from(bieActionProposalsTable).where(and(eq(bieActionProposalsTable.organizationId, identity.organizationId), eq(bieActionProposalsTable.id, input.proposalId)));
     const parsed = leadReplySendSnapshotSchema.safeParse(proposal?.payload.deliverySnapshot);
     if (!proposal || !parsed.success || proposal.status !== "approved" || proposal.actionType !== "send_email" || proposal.leadId !== input.leadId || proposal.reviewedByUserId !== identity.senderUserId) fail("approval_mismatch");
@@ -173,11 +239,14 @@ export async function reserveServiceMailboxParent(input: { identity: MailboxIden
 export async function assertMailboxOutboundParentDispatch(parentId: string, identity: MailboxIdentity, message: Message): Promise<{ name: "x-growthos-parent-id"; value: string }> {
   try {
     return await db.transaction(async tx => {
-      await lock(tx, identity.organizationId); await currentIdentity(identity, tx);
+      await lock(tx, identity.organizationId);
+      const [context] = await tx.select({ leadId: parents.leadId }).from(parents).where(parentWhere(identity.organizationId, parentId));
+      if (context?.leadId) await lockReplyLead(tx, identity.organizationId, context.leadId);
+      await currentIdentity(identity, tx);
       const [parent] = await tx.select().from(parents).where(parentWhere(identity.organizationId, parentId)).for("update");
       if (!parent || !sameIdentity(parent, identity) || parent.dispatchStartedAt || parent.contentSha256 !== mailboxContentHash(message)) fail("parent_dispatch_mismatch");
       await executionCurrent(tx, parent);
-      if (parent.leadId) { await lockReplyLead(tx, identity.organizationId, parent.leadId); await exactLead(tx, parent, true); }
+      if (parent.leadId) await exactLead(tx, parent, true);
       else await exactService(tx, parent, true, { lockTask: true });
       await tx.update(parents).set({ dispatchStartedAt: new Date() }).where(eq(parents.id, parent.id));
       return { name: MAILBOX_HEADER, value: parent.correlationHeader };
@@ -185,7 +254,7 @@ export async function assertMailboxOutboundParentDispatch(parentId: string, iden
   } catch { throw new EmailDispatchBlockedError(); }
 }
 export async function recordMailboxParentAcceptance(parentId: string, org: string) {
-  await db.update(parents).set({ acceptedAt: new Date() }).where(and(parentWhere(org, parentId), isNotNull(parents.dispatchStartedAt)));
+  await db.update(parents).set({ acceptedAt: new Date() }).where(and(parentWhere(org, parentId), isNotNull(parents.dispatchStartedAt), isNull(parents.acceptedAt)));
 }
 
 /** Only the fixed authenticated original-mailbox adapter calls this; header text alone is not authority. */
@@ -194,7 +263,10 @@ export async function bindMailboxSentParent(identity: MailboxIdentity, raw: z.in
   if (!parsed.success) return { matched: false, reason: "invalid_sent_observation" };
   const input = parsed.data;
   return db.transaction(async tx => {
-    await lock(tx, identity.organizationId); await currentIdentity(identity, tx);
+    await lock(tx, identity.organizationId);
+    const [before] = await tx.select({ leadId: parents.leadId }).from(parents).where(and(eq(parents.organizationId, identity.organizationId), eq(parents.correlationHeader, input.correlationHeader)));
+    if (before?.leadId) await lockReplyLead(tx, identity.organizationId, before.leadId);
+    await currentIdentity(identity, tx);
     const [parent] = await tx.select().from(parents).where(and(eq(parents.organizationId, identity.organizationId), eq(parents.correlationHeader, input.correlationHeader))).for("update");
     if (!parent || !sameIdentity(parent, identity)) return { matched: false, reason: "parent_not_reserved" };
     if (parent.leadId && !await leadMonitoringCurrent(parent, tx)) return { matched: false, reason: "lead_monitoring_changed" };
@@ -234,19 +306,22 @@ export async function isMailboxReplyCandidate(identity: MailboxIdentity, raw: z.
 export async function ingestMailboxReply(identity: MailboxIdentity, raw: z.input<typeof replySchema>): Promise<{ state: string; replyId?: string; reason: string }> {
   const input = replySchema.parse(raw), payloadSha256 = mailboxDigest({ ...input, sentAt: input.sentAt?.toISOString() ?? null, receivedAt: input.receivedAt.toISOString() });
   return db.transaction(async tx => {
-    await lock(tx, identity.organizationId); await currentIdentity(identity, tx);
+    await lock(tx, identity.organizationId);
     const [previous] = await tx.select().from(replies).where(and(eq(replies.organizationId, identity.organizationId), eq(replies.connectorId, identity.connectorId), eq(replies.providerMessageId, input.providerMessageId)));
     if (previous) {
+      await currentIdentity(identity, tx);
       if (previous.payloadSha256 !== payloadSha256) fail("reply_payload_conflict");
       return { state: "duplicate", replyId: previous.id, reason: "previous_receipt_retained" };
     }
     const [priorLead] = await tx.select().from(leadReplies).where(and(eq(leadReplies.organizationId, identity.organizationId), eq(leadReplies.mailboxConnectorId, identity.connectorId), eq(leadReplies.externalMessageId, input.providerMessageId)));
     if (priorLead) {
+      await currentIdentity(identity, tx);
       if (priorLead.payloadSha256 !== payloadSha256) fail("reply_payload_conflict");
       return { state: "duplicate", replyId: priorLead.id, reason: "previous_receipt_retained" };
     }
     const candidates = await tx.select().from(parents).where(and(eq(parents.organizationId, identity.organizationId), eq(parents.connectorId, identity.connectorId), inArray(parents.internetMessageId, input.inReplyTo))).limit(2);
     if (!candidates.length) {
+      await currentIdentity(identity, tx);
       // Retry only a narrowly eligible dispatch awaiting observation. This is
       // NOT a fuzzy match: an eventual exact original RFC parent is still mandatory.
       const pending = await tx.select().from(parents).where(and(eq(parents.organizationId, identity.organizationId), eq(parents.connectorId, identity.connectorId),
@@ -259,17 +334,20 @@ export async function ingestMailboxReply(identity: MailboxIdentity, raw: z.input
     }
     if (candidates.length !== 1) return { state: "ignored", reason: "ambiguous_parent" };
     const parent = candidates[0];
+    if (parent.leadId) await lockReplyContact(tx, identity.organizationId, parent.contactId, [parent.leadId]);
+    await currentIdentity(identity, tx);
     if (!sameIdentity(parent, identity) || !parent.observedAt || !parent.providerSentAt || !input.sentAt || input.from !== parent.recipient || !input.to.includes(parent.mailboxEmail) || input.sentAt < parent.providerSentAt || input.receivedAt < parent.providerSentAt || input.receivedAt < new Date(identity.startedAt)) return { state: "ignored", reason: "reply_evidence_mismatch" };
     if (parent.leadId) {
       if (!await leadMonitoringCurrent(parent, tx)) return { state: "ignored", reason: "lead_monitoring_changed" };
-      await lockReplyLead(tx, identity.organizationId, parent.leadId);
       const { lead, historical } = await exactLead(tx, parent);
       const id = randomUUID();
       const [row] = await tx.insert(leadReplies).values({ id, organizationId: identity.organizationId, leadId: parent.leadId, contactId: parent.contactId,
         mailboxParentId: parent.id, mailboxConnectorId: identity.connectorId, externalMessageId: input.providerMessageId, internetMessageId: input.internetMessageId,
         payloadSha256, state: "confirmed", reason: "original_mailbox_observation", replyAt: input.sentAt, receivedAt: input.receivedAt,
         encryptedText: encryptEmailContent(JSON.stringify({ subject: input.subject, text: input.text }), `${identity.organizationId}:${id}:lead-reply`), rawExpiresAt: new Date(Date.now() + 7 * 86_400_000) }).returning();
-      const confirmed = await confirmObservedMailboxLeadReply(tx, row, { leadId: lead.id, contactId: parent.contactId, replyAt: input.sentAt, historical });
+      const nurture = parent.sourceNurtureStepId ? nurtureContextSchema.parse(parent.contextSnapshot) : null;
+      const confirmed = await confirmObservedMailboxLeadReply(tx, row, { leadId: lead.id, contactId: parent.contactId, replyAt: input.sentAt, historical,
+        ...(nurture ? { nurture: { planId: nurture.planId, itemId: nurture.itemId, stepId: nurture.stepId } } : {}) });
       return { state: "needs_review", replyId: row.id, reason: confirmed.reason };
     }
     const { service, historical } = await exactService(tx, parent);
@@ -378,12 +456,14 @@ export async function listLeadMailboxReplies(org: string, actor: string, leadId:
     const continuityKey = mailboxDigest({ identity: identityFor(parent), context: parent.contextSnapshot });
     if (!continuity.has(continuityKey)) continuity.set(continuityKey, leadMonitoringCurrent(parent, db).catch(() => false));
     const monitoringCurrent = await continuity.get(continuityKey)!;
+    const nurture = parent.sourceNurtureStepId ? nurtureContextSchema.parse(parent.contextSnapshot) : null;
     return { id: reply.id, leadId, version: reply.version, state: reply.state, reason: reply.reason, replyAt: reply.replyAt?.toISOString() ?? null,
       receivedAt: reply.receivedAt.toISOString(), historical: reply.reason === "historical_reply", holdActive: reply.holdActive,
       taskId: task?.id ?? null, taskTitle: task?.title ?? null, taskStatus: task?.status ?? null, assignedUserId: assigned ? owner.id : null,
       assignedUserName: assigned ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || null : null,
       content, rawExpiresAt: reply.rawExpiresAt?.toISOString() ?? null, releasedAt: reply.releasedAt?.toISOString() ?? null,
-      releaseNote: reply.releaseNote, effectSummary: reply.effectSummary, monitoringCurrent, evidence: "original_mailbox_observation" as const };
+      releaseNote: reply.releaseNote, effectSummary: reply.effectSummary, monitoringCurrent, evidence: "original_mailbox_observation" as const,
+      context: nurture ? { kind: "source_nurture_email" as const, planId: nurture.planId, itemId: nurture.itemId, stepId: nurture.stepId, stepIndex: nurture.stepIndex } : { kind: "bie_lead_email" as const } };
   }));
   return { items, hasMore: rows.length > 25, offset: query.offset, limit: 25 };
 }
@@ -391,8 +471,8 @@ export async function listLeadMailboxReplies(org: string, actor: string, leadId:
 export async function reviewLeadMailboxReply(org: string, actor: string, leadId: string, replyId: string, raw: unknown) {
   const input = leadReplyReviewInput.parse(raw), fingerprint = mailboxDigest({ ...input, actor, leadId, replyId });
   return db.transaction(async tx => {
-    await lock(tx, org); await readerAllowed(tx, org, actor); await assertOperationalStaff(tx, org, [actor]); await activeCompany(tx, org);
-    await lockReplyLead(tx, org, leadId);
+    await lock(tx, org); await lockReplyLead(tx, org, leadId);
+    await readerAllowed(tx, org, actor); await assertOperationalStaff(tx, org, [actor]); await activeCompany(tx, org);
     const [reply] = await tx.select().from(leadReplies).where(and(eq(leadReplies.organizationId, org), eq(leadReplies.leadId, leadId), eq(leadReplies.id, replyId), isNotNull(leadReplies.mailboxParentId))).for("update");
     if (!reply) fail("not_found", 404);
     const [parent] = await tx.select().from(parents).where(parentWhere(org, reply.mailboxParentId!));

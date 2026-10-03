@@ -421,6 +421,7 @@ async function ingestForSource(
   const rawExpiresAt = new Date(Date.now() + source.retentionDays * 24 * 60 * 60 * 1000);
   const payloadSha256 = createHash("sha256").update(JSON.stringify({ rawText, forwardedBy: payload.forwardedBy, replyTo: payload.replyTo ?? null })).digest("hex");
   return db.transaction(async tx => {
+  await (await import("./source-outreach-ownership")).acquireNurtureLocks(tx, source.organizationId);
   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`email-intake:${source.organizationId}:${source.id}:${payload.externalMessageId}`}, 0))`);
   const [prior] = await tx.select().from(emailResponseReviewsTable).where(and(
     eq(emailResponseReviewsTable.organizationId, source.organizationId), eq(emailResponseReviewsTable.sourceId, source.id),

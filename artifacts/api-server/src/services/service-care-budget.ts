@@ -1,5 +1,6 @@
 import { activitiesTable, auditEventsTable, db, revenueExecutionsTable, scheduledActionsTable } from "@workspace/db";
 import { and, eq, gt, inArray, ne, notExists, sql } from "drizzle-orm";
+import { contactTouchReservationsTable } from "../../../../lib/db/src/schema/contact-touch-reservations";
 
 /** Accepted activity and its receipt are one touch; unknown claims remain reserved. */
 export async function servicePendingTouchTimes(reader: Pick<typeof db, "select">, org: string, contactId: string, since: Date, excludeActionKey?: string) {
@@ -11,6 +12,7 @@ export async function servicePendingTouchTimes(reader: Pick<typeof db, "select">
       sql`${auditEventsTable.metadata}->'snapshot'->>'contactId' = ${contactId}`,
       inArray(revenueExecutionsTable.state, ["processing", "indeterminate", "succeeded", "confirmed_succeeded"]),
       gt(revenueExecutionsTable.createdAt, since), excludeActionKey ? ne(revenueExecutionsTable.actionKey, excludeActionKey) : undefined,
+      notExists(reader.select({ id: contactTouchReservationsTable.id }).from(contactTouchReservationsTable).where(and(eq(contactTouchReservationsTable.organizationId, org), eq(contactTouchReservationsTable.logicalKey, revenueExecutionsTable.actionKey)))),
       notExists(reader.select({ id: activitiesTable.id }).from(activitiesTable).where(and(eq(activitiesTable.organizationId, org), eq(activitiesTable.contactId, contactId),
         eq(activitiesTable.type, "automation_message_sent"), gt(activitiesTable.occurredAt, since), sql`${activitiesTable.metadata}->>'approvalId' = ${auditEventsTable.id}::text`)))));
   return rows.map(row => row.occurredAt);

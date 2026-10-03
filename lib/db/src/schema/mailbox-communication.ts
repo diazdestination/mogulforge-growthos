@@ -6,10 +6,13 @@ import { leadsTable } from "./leads";
 import { serviceObligationsTable } from "./service-obligations";
 import { usersTable } from "./auth";
 import { mailboxConnectorsTable } from "./mailbox-connectors";
+import { sourceNurtureStepsTable } from "./source-nurture";
 
 export type ServiceMailboxContext = { dueAt: string; occurrenceIndex: number; createdAt: string; updatedAt: string; approvalId: string; scheduledActionId: string;
   authorization?: { origin: "individual" | "standing"; fingerprint: string } };
 export type LeadMailboxContext = { kind: "bie_lead_email"; version: 1; leadId: string; contactId: string; leadCreatedAt: string; leadUpdatedAt: string; proposalId: string; leadMonitoringApproval: { version: number; approvedAt: string } };
+export type SourceNurtureMailboxContext = { kind: "source_nurture_email"; version: 1; planId: string; itemId: string; stepId: string; stepIndex: 1 | 2;
+  leadId: string; contactId: string; scheduledActionId: string; planReviewId: string; planFingerprint: string; nurtureMonitoringApproval: { version: number; approvedAt: string } };
 
 /** Frozen before dispatch. Observing a sent message is evidence, never resend authority. */
 export const mailboxCommunicationParentsTable = pgTable("mailbox_communication_parents", {
@@ -18,7 +21,8 @@ export const mailboxCommunicationParentsTable = pgTable("mailbox_communication_p
   contactId: uuid("contact_id").notNull(),
   leadId: uuid("lead_id"),
   serviceObligationId: uuid("service_obligation_id"),
-  contextSnapshot: jsonb("context_snapshot").$type<ServiceMailboxContext | LeadMailboxContext>().notNull(),
+  sourceNurtureStepId: uuid("source_nurture_step_id"),
+  contextSnapshot: jsonb("context_snapshot").$type<ServiceMailboxContext | LeadMailboxContext | SourceNurtureMailboxContext>().notNull(),
   provider: text("provider").notNull(),
   senderUserId: varchar("sender_user_id").notNull(),
   connectionId: uuid("connection_id").notNull(),
@@ -50,13 +54,16 @@ export const mailboxCommunicationParentsTable = pgTable("mailbox_communication_p
   uniqueIndex("mailbox_parent_header_uq").on(t.correlationHeader),
   uniqueIndex("mailbox_parent_action_uq").on(t.organizationId, t.actionKey),
   uniqueIndex("mailbox_parent_service_uq").on(t.organizationId, t.serviceObligationId).where(sql`${t.serviceObligationId} is not null`),
+  uniqueIndex("mailbox_parent_nurture_step_uq").on(t.organizationId, t.sourceNurtureStepId).where(sql`${t.sourceNurtureStepId} is not null`),
   uniqueIndex("mailbox_parent_provider_id_uq").on(t.organizationId, t.connectorId, t.providerMessageId).where(sql`${t.providerMessageId} is not null`),
   uniqueIndex("mailbox_parent_rfc_id_uq").on(t.organizationId, t.connectorId, t.internetMessageId).where(sql`${t.internetMessageId} is not null`),
   check("mailbox_parent_one_context", sql`(${t.leadId} is not null)::int + (${t.serviceObligationId} is not null)::int = 1`),
+  check("mailbox_parent_nurture_context_ck", sql`(${t.sourceNurtureStepId} is null and coalesce(${t.contextSnapshot}->>'kind','') <> 'source_nurture_email') or (${t.sourceNurtureStepId} is not null and ${t.leadId} is not null and ${t.serviceObligationId} is null and coalesce(${t.contextSnapshot}->>'kind' = 'source_nurture_email' and ${t.contextSnapshot}->>'version' = '1' and ${t.contextSnapshot}->>'stepId' = ${t.sourceNurtureStepId}::text and ${t.contextSnapshot}->>'leadId' = ${t.leadId}::text and ${t.contextSnapshot}->>'contactId' = ${t.contactId}::text and ${t.contextSnapshot}->>'stepIndex' in ('1','2') and ${t.contextSnapshot}->>'planFingerprint' ~ '^[a-f0-9]{64}$' and ${t.actionKey} = 'scheduled:' || (${t.contextSnapshot}->>'scheduledActionId'),false))`),
   check("mailbox_parent_format_ck", sql`${t.provider} = 'microsoft' and ${t.connectorVersion} > 0 and ${t.policyVersion} = 1 and ${t.correlationHeader} ~ '^[a-f0-9]{64}$' and ${t.contentSha256} ~ '^[a-f0-9]{64}$'`),
   foreignKey({ columns: [t.organizationId, t.connectorId], foreignColumns: [mailboxConnectorsTable.organizationId, mailboxConnectorsTable.id], name: "mailbox_parent_connector_fk" }),
   foreignKey({ columns: [t.organizationId, t.contactId], foreignColumns: [contactsTable.organizationId, contactsTable.id], name: "mailbox_parent_contact_fk" }),
   foreignKey({ columns: [t.organizationId, t.leadId], foreignColumns: [leadsTable.organizationId, leadsTable.id], name: "mailbox_parent_lead_fk" }),
+  foreignKey({ columns: [t.organizationId, t.sourceNurtureStepId, t.leadId, t.contactId], foreignColumns: [sourceNurtureStepsTable.organizationId, sourceNurtureStepsTable.id, sourceNurtureStepsTable.leadId, sourceNurtureStepsTable.contactId], name: "mailbox_parent_nurture_step_fk" }),
   foreignKey({ columns: [t.organizationId, t.serviceObligationId], foreignColumns: [serviceObligationsTable.organizationId, serviceObligationsTable.id], name: "mailbox_parent_service_fk" }),
   foreignKey({ columns: [t.organizationId, t.senderUserId], foreignColumns: [usersTable.organizationId, usersTable.id], name: "mailbox_parent_sender_fk" }),
 ]);
