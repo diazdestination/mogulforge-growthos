@@ -70,6 +70,13 @@ names them exactly; no permission, test or assertion was weakened. The other
 2,283 API tests passed, including the new independent-PostgreSQL races; 15 skips
 are unchanged. Full CI must be rerun on the corrective commit before integration.
 
+Corrective candidate84cd9288d46150a322b45e80985a190a15a33332 passed full
+CI37089194639: API2,284/15 unchanged skips, UI558, scripts229, libraries16 =
+3,087 passed, plus26 website-adapter tests. All workspace types, API/UI builds
+and Docker staging parity passed. PR17 merged at51da543db898f9907a4198fbc0ada880c378900d;
+the merged tree exactly matches that tested candidate. Exact-main CI37090103299
+was separately dispatched; its completion must be verified. No deployment.
+
 ## Schema and synthetic recovery
 
 `node scripts/lead-replies-schema-preview.mjs` generates reviewed-only `0010`
@@ -115,3 +122,10 @@ Azure first sign-in, separately pending held-staging upgrade/admin rotation,
 Twilio/device checks, actual source reconciliation and both complete contractor
 replacement cards remain gates. Contractor payment collection stays deferred.
 No live message, hosted schema/credential change, deployment or purchase occurred.
+
+Final first-wave release update: exact merged main
+`51da543db898f9907a4198fbc0ada880c378900d` passed CI37090103299, including
+2,284 API tests, 558 UI tests, 229 script tests and 16 library tests, with the
+same 15 pre-existing skips. Website-adapter verification (26 tests), TypeScript,
+both builds and Docker staging parity also passed. This supersedes earlier
+main-pending wording, not any live-provider or hosted release gate.

@@ -44,6 +44,8 @@ export const revenueExecutionsTable = pgTable(
     completedAt: timestamp("completed_at", { withTimezone: true }),
   },
   (t) => [
+    unique("revenue_execution_exact_uq").on(t.organizationId, t.id, t.actionKey, t.fingerprint),
+    unique("revenue_execution_exact_actor_uq").on(t.organizationId, t.id, t.actionKey, t.fingerprint, t.actorUserId),
     uniqueIndex("revenue_execution_org_key").on(t.organizationId, t.actionKey),
     index("revenue_execution_org_state").on(t.organizationId, t.state),
   ],

@@ -1,13 +1,11 @@
 import {
-  activitiesTable,
   auditEventsTable,
   contactsTable,
   db,
   leadsTable,
-  revenueExecutionsTable,
   usersTable,
 } from "@workspace/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { hasPermission } from "../lib/permissions";
 import { InvoiceError } from "./invoice-contract";
 import { getInvoice } from "./invoices";
@@ -19,27 +17,37 @@ import { assertCustomerLifecycleActive } from "./customer-lifecycle";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
 import { checkSendEligibility } from "./send-gate";
 import { emailAcceptanceEvidence } from "./user-email";
-import { runDurableAction } from "./durable-execution";
 import { EmailDispatchBlockedError } from "./email-dispatch-guard";
 import {
+  assertInvoiceDeliveryAttemptDispatch,
+  getInvoiceDeliveryChain,
+  invoiceAttemptReviewMetadataSchema,
+  runInvoiceDeliveryAttempt,
+  type InvoiceAttemptReviewMetadata,
+  type InvoiceDeliveryChain,
+} from "./invoice-delivery-attempts";
+import {
   deliveryFingerprint,
-  invoiceDeliveryKey,
   invoiceDeliveryPreviewSchema,
   invoiceDeliverySendSchema,
   renderInvoiceEmail,
   type InvoiceDeliveryEvidence,
+  type InvoiceDeliveryIntent,
 } from "./invoice-delivery-contract";
 
 const PREVIEW_LIFETIME_MS = 10 * 60_000;
 const reviewAction = "invoice_delivery.previewed";
 const deliveryDetail =
   "Gmail/Microsoft acceptance does not confirm inbox delivery. Delivery/bounce monitoring is not connected by this send-only integration.";
-const conflict = (message: string): never => {
+function conflict(message: string): never {
   throw new InvoiceError(409, "invoice_delivery_review_changed", message);
-};
+}
 async function manager(org: string, actor: string) {
   const [user] = await db
-    .select({ role: usersTable.role })
+    .select({
+      role: usersTable.role,
+      emailVerifiedAt: usersTable.emailVerifiedAt,
+    })
     .from(usersTable)
     .where(
       and(
@@ -48,15 +56,25 @@ async function manager(org: string, actor: string) {
         eq(usersTable.isActive, true),
       ),
     );
-  if (!user || !hasPermission(user.role, "invoices.manage"))
+  if (
+    !user ||
+    !user.emailVerifiedAt ||
+    actor.startsWith("invite:") ||
+    !hasPermission(user.role, "invoices.manage")
+  )
     throw new InvoiceError(
       403,
       "invoice_access_denied",
-      "An active staff member with invoice management permission must review and send this invoice.",
+      "A verified, accepted active staff member with invoice management permission must review and send this invoice.",
     );
 }
 
-async function current(org: string, actor: string, invoiceId: string) {
+async function current(
+  org: string,
+  actor: string,
+  invoiceId: string,
+  intent: InvoiceDeliveryIntent,
+) {
   await manager(org, actor);
   // Reuse canonical document integrity, financial reconciliation, tenant and
   // related-record validation; never render the mutable draft of an issued bill.
@@ -111,6 +129,7 @@ async function current(org: string, actor: string, invoiceId: string) {
     invoiceNumber: invoice.invoiceNumber,
     issuedAt: invoice.issuedAt,
     document: invoice.document,
+    additionalCopy: intent === "additional_copy",
   });
   // Current native issue is the transactional basis; imported history is not
   // erased or used to authorize marketing. A changed source/contact/assignment
@@ -126,6 +145,8 @@ async function current(org: string, actor: string, invoiceId: string) {
     sourceSha256: deliveryFingerprint({
       creationMethod: source.lead.creationMethod,
       importedHistory: source.lead.importedHistory,
+      source: source.lead.source,
+      assignedUserId: source.lead.assignedUserId,
       updatedAt: source.lead.updatedAt.toISOString(),
       contactUpdatedAt: source.contact.updatedAt.toISOString(),
     }),
@@ -168,46 +189,16 @@ async function eligibility(
     );
 }
 
-async function execution(org: string, invoiceId: string) {
-  const [row] = await db
-    .select()
-    .from(revenueExecutionsTable)
-    .where(
-      and(
-        eq(revenueExecutionsTable.organizationId, org),
-        eq(revenueExecutionsTable.actionKey, invoiceDeliveryKey(invoiceId)),
-      ),
-    );
-  return row;
-}
-
 export async function getInvoiceDelivery(
   org: string,
   actor: string,
   invoiceId: string,
 ): Promise<InvoiceDeliveryEvidence> {
   const invoice = await getInvoice(org, actor, invoiceId);
-  const row = await execution(org, invoiceId);
-  const [accepted] = await db
-    .select({
-      metadata: auditEventsTable.metadata,
-      createdAt: auditEventsTable.createdAt,
-    })
-    .from(auditEventsTable)
-    .where(
-      and(
-        eq(auditEventsTable.organizationId, org),
-        eq(auditEventsTable.entityType, "invoice"),
-        eq(auditEventsTable.entityId, invoiceId),
-        eq(auditEventsTable.action, "invoice_delivery.provider_accepted"),
-      ),
-    )
-    .orderBy(desc(auditEventsTable.createdAt))
-    .limit(1);
-  const metadata = accepted?.metadata;
+  const chain = await getInvoiceDeliveryChain(org, invoiceId);
+  const row = chain.attempts.at(-1);
   const uncertain =
-    row?.state === "indeterminate" ||
-    (row?.state === "processing" && row.expiresAt.getTime() <= Date.now());
+    chain.integrity !== "valid" || row?.state === "indeterminate";
   const state: InvoiceDeliveryEvidence["state"] = uncertain
     ? "uncertain"
     : row?.state === "processing"
@@ -217,7 +208,7 @@ export async function getInvoiceDelivery(
         : row?.state === "confirmed_succeeded" ||
             row?.state === "confirmed_not_performed"
           ? "reconciled"
-          : row?.state === "succeeded" && accepted
+          : row?.state === "succeeded" && row.proof === "provider_accepted"
             ? "accepted"
             : row
               ? "uncertain"
@@ -229,34 +220,70 @@ export async function getInvoiceDelivery(
       "A send is owned and may be in progress. Check status; do not prepare a second send.",
     accepted:
       "The selected email provider accepted this invoice. Acceptance is not confirmed delivery or a payment.",
-    held: "The reserved send was held before dispatch. It was not sent. Operator review is required; this flow does not automatically requeue reserved attempts.",
+    held:
+      row?.proof === "not_dispatched"
+        ? "The server recorded that this exact attempt was refused before provider dispatch. A new, separately reviewed retry may be available; the original receipt stays retained."
+        : "This historical attempt is held, but no typed server proof establishes that it was not dispatched. Review the evidence; it cannot authorize a retry.",
     uncertain:
       "The effect is uncertain. Check the original selected mailbox and reconcile the execution; a new preview or request cannot resend this invoice.",
     reconciled:
       "An operator recorded a reconciliation. This is not new provider/delivery evidence and does not authorize an automatic resend.",
   }[state];
   return {
-    invoiceId,
+    ...chain,
     state,
-    executionId: row?.id ?? null,
+    executionId: chain.latestExecutionId,
     detail,
-    provider:
-      metadata?.provider === "gmail" || metadata?.provider === "microsoft"
-        ? metadata.provider
-        : null,
-    providerMessageId:
-      typeof metadata?.providerMessageId === "string"
-        ? metadata.providerMessageId
-        : null,
-    providerRequestId:
-      typeof metadata?.providerRequestId === "string"
-        ? metadata.providerRequestId
-        : null,
-    acceptedAt: accepted?.createdAt.toISOString() ?? null,
+    provider: row?.provider ?? null,
+    providerMessageId: row?.providerMessageId ?? null,
+    providerRequestId: row?.providerRequestId ?? null,
+    acceptedAt: row?.acceptedAt ?? null,
     deliveryConfirmed: false,
     deliveryDetail,
-    canPrepare: !row && invoice.status === "issued",
+    // Backward-compatible initial-only flag. New clients must use the kernel's
+    // nextIntents, never infer retry permission from a display state.
+    canPrepare:
+      invoice.status === "issued" && chain.nextIntents.includes("initial"),
   };
+}
+
+function decision(
+  metadata: Pick<
+    InvoiceAttemptReviewMetadata,
+    "intent" | "expectedLatestExecutionId" | "reason"
+  >,
+) {
+  return {
+    intent: metadata.intent,
+    expectedLatestExecutionId: metadata.expectedLatestExecutionId,
+    reason: metadata.reason,
+  };
+}
+function context(
+  snapshot: Awaited<ReturnType<typeof current>>["snapshot"],
+): InvoiceAttemptReviewMetadata["context"] {
+  return {
+    leadId: snapshot.leadId,
+    contactId: snapshot.contactId,
+    invoiceNumber: snapshot.invoiceNumber,
+    recipient: snapshot.recipient,
+    sender: snapshot.sender,
+  };
+}
+function requireIntent(
+  chain: InvoiceDeliveryChain,
+  input: ReturnType<typeof decision>,
+) {
+  if (
+    chain.integrity !== "valid" ||
+    chain.latestExecutionId !== input.expectedLatestExecutionId ||
+    !chain.nextIntents.includes(input.intent)
+  )
+    throw new InvoiceError(
+      409,
+      "invoice_delivery_reserved",
+      "This review mode is not authorized by the latest retained evidence. Refresh invoice delivery status and choose an available review; uncertainty and reconciliation cannot authorize a new send.",
+    );
 }
 
 export async function previewInvoiceDelivery(
@@ -266,20 +293,27 @@ export async function previewInvoiceDelivery(
   raw: unknown,
 ) {
   const input = invoiceDeliveryPreviewSchema.parse(raw);
-  const value = await current(org, actor, invoiceId);
+  const value = await current(org, actor, invoiceId, input.intent);
   if (value.snapshot.invoiceVersion !== input.expectedVersion)
     conflict(
       "The invoice changed. Refresh it and review the latest saved document.",
     );
-  if (await execution(org, invoiceId))
-    throw new InvoiceError(
-      409,
-      "invoice_delivery_reserved",
-      "This invoice already has a reserved send. Check its evidence rather than creating another request.",
-    );
+  const chain = await getInvoiceDeliveryChain(org, invoiceId);
+  requireIntent(chain, input);
   await eligibility(org, value);
-  const payloadSha256 = deliveryFingerprint(value.snapshot);
+  const choice = decision(input);
+  const payloadSha256 = deliveryFingerprint({ ...value.snapshot, ...choice });
   const expiresAt = new Date(Date.now() + PREVIEW_LIFETIME_MS).toISOString();
+  const metadata = invoiceAttemptReviewMetadataSchema.parse({
+    reviewVersion: 2,
+    payloadSha256,
+    expiresAt,
+    invoiceVersion: value.snapshot.invoiceVersion,
+    documentSha256: value.snapshot.documentSha256,
+    ...choice,
+    duplicateCopyAcknowledged: false,
+    context: context(value.snapshot),
+  });
   const [review] = await db
     .insert(auditEventsTable)
     .values({
@@ -288,13 +322,9 @@ export async function previewInvoiceDelivery(
       action: reviewAction,
       entityType: "invoice",
       entityId: invoiceId,
-      // Only hashes and record identities; immutable invoice contents remain canonical.
-      metadata: {
-        payloadSha256,
-        expiresAt,
-        invoiceVersion: value.snapshot.invoiceVersion,
-        documentSha256: value.snapshot.documentSha256,
-      },
+      // Retain exact selected identities and decisions, not message bodies or
+      // provider credentials. The issued document remains canonical.
+      metadata,
     })
     .returning({ id: auditEventsTable.id });
   return {
@@ -302,6 +332,9 @@ export async function previewInvoiceDelivery(
     payloadSha256,
     expiresAt,
     ...value.snapshot,
+    ...choice,
+    prospectiveAttemptNumber: chain.attemptCount + 1,
+    maxAttempts: chain.maxAttempts,
     deliveryDetail,
   };
 }
@@ -316,36 +349,69 @@ export async function sendInvoiceDelivery(
   await manager(org, actor);
   // Read permission and canonical invoice/relationship integrity apply to replay too.
   await getInvoice(org, actor, invoiceId);
-  const [review] = await db
-    .select()
-    .from(auditEventsTable)
-    .where(
-      and(
-        eq(auditEventsTable.id, input.previewId),
-        eq(auditEventsTable.organizationId, org),
-        eq(auditEventsTable.actorUserId, actor),
-        eq(auditEventsTable.action, reviewAction),
-        eq(auditEventsTable.entityType, "invoice"),
-        eq(auditEventsTable.entityId, invoiceId),
-      ),
-    );
-  if (!review || review.metadata.payloadSha256 !== input.payloadSha256)
+  const readReview = async () =>
+    (
+      await db
+        .select()
+        .from(auditEventsTable)
+        .where(
+          and(
+            eq(auditEventsTable.id, input.previewId),
+            eq(auditEventsTable.organizationId, org),
+            eq(auditEventsTable.actorUserId, actor),
+            eq(auditEventsTable.action, reviewAction),
+            eq(auditEventsTable.entityType, "invoice"),
+            eq(auditEventsTable.entityId, invoiceId),
+          ),
+        )
+    )[0];
+  const review = await readReview();
+  const parsed = invoiceAttemptReviewMetadataSchema.safeParse(review?.metadata);
+  if (
+    !review ||
+    !parsed.success ||
+    parsed.data.payloadSha256 !== input.payloadSha256
+  )
     conflict(
       "This exact invoice preview is unavailable to this staff member. Prepare and review it again.",
     );
-  if (await execution(org, invoiceId))
+  // Old previews are not adopted into new authority. Old-format accepted
+  // history remains read-only; only an eligible v2 chain can authorize a copy.
+  const metadata = parsed.data;
+  if (
+    (input.duplicateCopyAcknowledged === true) !==
+    (metadata.intent === "additional_copy")
+  )
+    throw new InvoiceError(
+      409,
+      "invoice_delivery_copy_acknowledgement_required",
+      "An additional copy requires a new acknowledgement after reviewing its exact document, customer and sender. Other review modes cannot use that acknowledgement.",
+    );
+  const chain = await getInvoiceDeliveryChain(org, invoiceId);
+  // Repeated clicks or another preview racing the same predecessor only return
+  // retained status. They cannot mint a different logical attempt.
+  if (
+    chain.integrity !== "valid" ||
+    chain.latestExecutionId !== metadata.expectedLatestExecutionId
+  )
     return getInvoiceDelivery(org, actor, invoiceId);
   const check = async () => {
+    const saved = await readReview();
     if (
-      typeof review.metadata.expiresAt !== "string" ||
-      !Number.isFinite(Date.parse(review.metadata.expiresAt)) ||
-      Date.parse(review.metadata.expiresAt) <= Date.now()
+      !saved ||
+      deliveryFingerprint(saved.metadata) !== deliveryFingerprint(metadata) ||
+      Date.parse(metadata.expiresAt) <= Date.now()
     )
       conflict(
         "This preview expired. Prepare and review the invoice again before sending.",
       );
-    const value = await current(org, actor, invoiceId);
-    if (deliveryFingerprint(value.snapshot) !== input.payloadSha256)
+    const value = await current(org, actor, invoiceId, metadata.intent);
+    if (
+      deliveryFingerprint({ ...value.snapshot, ...decision(metadata) }) !==
+        input.payloadSha256 ||
+      deliveryFingerprint(context(value.snapshot)) !==
+        deliveryFingerprint(metadata.context)
+    )
       conflict(
         "The invoice, customer, source or selected sender changed. Review a fresh preview; the old approval cannot send.",
       );
@@ -353,40 +419,32 @@ export async function sendInvoiceDelivery(
     return value;
   };
   const reviewed = await check();
+  requireIntent(chain, metadata);
   try {
-    await runDurableAction({
-      organizationId: org,
-      actionKey: invoiceDeliveryKey(invoiceId),
-      kind: "invoice_email",
-      payload: {
+    await runInvoiceDeliveryAttempt(
+      {
+        ...metadata,
+        organizationId: org,
         invoiceId,
         previewId: input.previewId,
-        payloadSha256: input.payloadSha256,
+        actorUserId: actor,
+        duplicateCopyAcknowledged: input.duplicateCopyAcknowledged === true,
       },
-      actorUserId: actor,
-      leadId: reviewed.snapshot.leadId,
-      execute: async () => {
+      async (claim) => {
         try {
           await check();
+          await assertInvoiceDeliveryAttemptDispatch(claim);
         } catch (error) {
-          if (error instanceof InvoiceError)
+          if (
+            error instanceof InvoiceError ||
+            error instanceof EmailDispatchBlockedError
+          )
             return {
-              state: "blocked",
-              detail: `Invoice email held before dispatch: ${error.code}.`,
+              kind: "not_dispatched",
+              code: "review_changed_before_dispatch",
             };
           throw error;
         }
-        await db.insert(auditEventsTable).values({
-          organizationId: org,
-          actorUserId: actor,
-          action: "invoice_delivery.approved",
-          entityType: "invoice",
-          entityId: invoiceId,
-          metadata: {
-            previewId: review.id,
-            payloadSha256: input.payloadSha256,
-          },
-        });
         // This callback also runs after provider token refresh, at actual dispatch.
         // A late stale approval or revoked permission is never permission to send.
         let dispatchCheckRejected = false;
@@ -402,6 +460,7 @@ export async function sendInvoiceDelivery(
             beforeDispatch: async () => {
               try {
                 await check();
+                await assertInvoiceDeliveryAttemptDispatch(claim);
               } catch (error) {
                 dispatchCheckRejected = true;
                 throw error;
@@ -413,11 +472,7 @@ export async function sendInvoiceDelivery(
             dispatchCheckRejected ||
             error instanceof EmailDispatchBlockedError
           )
-            return {
-              state: "blocked",
-              detail:
-                "Invoice review no longer authorized at dispatch. No email was sent.",
-            };
+            return { kind: "not_dispatched", code: "dispatch_guard_rejected" };
           // No guessing based on provider error text: a timeout, lost receipt or
           // failed receipt write remains indeterminate, never safe for replay.
           throw error;
@@ -435,35 +490,23 @@ export async function sendInvoiceDelivery(
           documentSha256: reviewed.snapshot.documentSha256,
           senderUserId: result.senderUserId,
         };
-        await db.transaction(async (tx) => {
-          await tx.insert(auditEventsTable).values({
-            organizationId: org,
-            actorUserId: actor,
-            action: "invoice_delivery.provider_accepted",
-            entityType: "invoice",
-            entityId: invoiceId,
-            metadata: evidence,
-          });
-          await tx.insert(activitiesTable).values({
-            organizationId: org,
-            actorUserId: actor,
-            leadId: reviewed.snapshot.leadId,
-            contactId: reviewed.snapshot.contactId,
-            type: "email_sent",
-            title: `Invoice ${reviewed.snapshot.invoiceNumber} accepted by email provider`,
-            metadata: evidence,
-          });
-        });
+        // The kernel atomically finalizes acceptance, receipt and activity. A
+        // lost final write is not retried and never becomes no-effect proof.
         return {
-          state: "succeeded",
-          detail:
-            "Invoice accepted by selected email provider; delivery is unconfirmed.",
+          kind: "accepted",
+          evidence,
+          leadId: reviewed.snapshot.leadId,
+          contactId: reviewed.snapshot.contactId,
         };
       },
-    });
+    );
   } catch (error) {
-    // A racing review with another hash/key cannot bypass the one logical slot.
-    if (!(await execution(org, invoiceId))) throw error;
+    const latest = await getInvoiceDeliveryChain(org, invoiceId);
+    if (
+      latest.integrity === "valid" &&
+      latest.latestExecutionId === metadata.expectedLatestExecutionId
+    )
+      throw error;
   }
   return getInvoiceDelivery(org, actor, invoiceId);
 }

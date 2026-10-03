@@ -2,6 +2,12 @@
 
 ## October 2 two-wave continuation
 
+First wave is merged at 51da543 with the exact tree of green 84cd928,
+CI37089194639; exact-main CI37090103299 also passed. The active second
+slice is `reports/invoice-recovery-contract-2026-10-02.md`: append-only invoice
+attempts, delivery visibility and explicitly reviewed safe recovery/copies.
+Do not broaden it into payment processing, automatic sends or provider setup.
+
 The owner explicitly requested the next two launch-critical waves after PR16
 and exact-main CI37085822984 passed at c2d999b. First complete tracked Microsoft
 lead replies and final dispatch guards; then complete invoice delivery exception

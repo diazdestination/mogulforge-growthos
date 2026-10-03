@@ -24,6 +24,7 @@ import {
   previewInvoiceDelivery,
   sendInvoiceDelivery,
 } from "../../services/invoice-delivery";
+import { listInvoiceDeliveryWorklist } from "../../services/invoice-delivery-worklist";
 
 const router: IRouter = Router();
 router.use("/invoices", (req, res, next) => {
@@ -70,7 +71,10 @@ const safe =
   (work: (req: Request, res: Response) => Promise<unknown>) =>
   async (req: Request, res: Response, _next: NextFunction) => {
     try {
-      if (req.path !== "/invoices" && Object.keys(req.query).length)
+      if (
+        !["/invoices", "/invoices/delivery-worklist"].includes(req.path) &&
+        Object.keys(req.query).length
+      )
         throw new InvoiceError(
           400,
           "invoice_invalid_request",
@@ -101,6 +105,44 @@ const safe =
   };
 const id = (req: Request) => z.uuid().parse(req.params.id);
 router.get(
+  "/invoices/delivery-worklist",
+  requireMember("invoices.read"),
+  safe(async (req, res) =>
+    res.json(
+      await listInvoiceDeliveryWorklist(
+        req.member!.organizationId,
+        req.member!.user.id,
+        req.query,
+      ),
+    ),
+  ),
+);
+// Delivery approval is an external-effect boundary. Keep ordinary invoice CRUD
+// compatibility separate while requiring the exact human session and trusted page.
+function invoiceDeliveryMutation(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const origin = req.get("origin");
+  if (
+    req.get("x-api-key") !== undefined ||
+    !req.user ||
+    req.user.id !== req.member?.user.id ||
+    (!origin && !/^Bearer [^\s]+$/.test(req.get("authorization") ?? ""))
+  ) {
+    res
+      .status(403)
+      .json({
+        code: "invoice_access_denied",
+        error:
+          "Use your accepted staff session on the trusted GrowthOS page to approve invoice email.",
+      });
+    return;
+  }
+  next();
+}
+router.get(
   "/invoices/:id/delivery",
   requireMember("invoices.read"),
   safe(async (req, res) =>
@@ -116,6 +158,7 @@ router.get(
 router.post(
   "/invoices/:id/delivery/preview",
   requireMember("invoices.manage"),
+  invoiceDeliveryMutation,
   safe(async (req, res) =>
     res.json(
       await previewInvoiceDelivery(
@@ -130,6 +173,7 @@ router.post(
 router.post(
   "/invoices/:id/delivery/send",
   requireMember("invoices.manage"),
+  invoiceDeliveryMutation,
   safe(async (req, res) =>
     res.json(
       await sendInvoiceDelivery(

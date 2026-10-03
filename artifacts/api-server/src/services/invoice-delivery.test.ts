@@ -38,6 +38,7 @@ import {
   deliveryFingerprint,
   invoiceDeliveryKey,
   renderInvoiceEmail,
+  type InvoiceDeliveryIntent,
 } from "./invoice-delivery-contract";
 import {
   resolveCustomerEmailSender,
@@ -149,6 +150,25 @@ const approve = (p: { previewId: string; payloadSha256: string }) => ({
 });
 const send = (f: Fixture, p: { previewId: string; payloadSha256: string }) =>
   sendInvoiceDelivery(f.org, f.actor, f.invoice.id, approve(p));
+const recover = (
+  f: Fixture,
+  intent: Exclude<InvoiceDeliveryIntent, "initial">,
+  head: string,
+) =>
+  previewInvoiceDelivery(f.org, f.actor, f.invoice.id, {
+    expectedVersion: f.invoice.version,
+    intent,
+    expectedLatestExecutionId: head,
+    reason: "Synthetic staff reviewed the exact customer request.",
+  });
+const sendCopy = (
+  f: Fixture,
+  p: { previewId: string; payloadSha256: string },
+) =>
+  sendInvoiceDelivery(f.org, f.actor, f.invoice.id, {
+    ...approve(p),
+    duplicateCopyAcknowledged: true,
+  });
 beforeEach(() => {
   vi.stubEnv("GROWTHOS_OUTBOUND_HOLD", "false");
   vi.mocked(resolveCustomerEmailSender).mockImplementation(
@@ -238,8 +258,13 @@ describe("native invoice exact review and customer-safe content", () => {
       .from(auditEventsTable)
       .where(eq(auditEventsTable.id, p.previewId));
     expect(row!.metadata).toMatchObject({ payloadSha256: p.payloadSha256 });
+    expect(row!.metadata).toMatchObject({
+      reviewVersion: 2,
+      duplicateCopyAcknowledged: false,
+      context: { recipient: p.recipient, sender: p.sender },
+    });
     expect(JSON.stringify(row!.metadata)).not.toMatch(
-      /customer@example|Agreed repair/,
+      /Agreed repair|Invoice items:|refreshToken/,
     );
     expect(
       await db
@@ -413,6 +438,43 @@ describe("native invoice exact review and customer-safe content", () => {
 });
 
 describe("invoice delivery holds, roles and unknown-effect ownership", () => {
+  it.each(["unverified", "invited"])(
+    "rejects an %s manager before preparing or reserving a send",
+    async (kind) => {
+      const f = await fixture();
+      let actor = f.actor;
+      if (kind === "unverified")
+        await db
+          .update(usersTable)
+          .set({ emailVerifiedAt: null })
+          .where(eq(usersTable.id, actor));
+      else {
+        const [invite] = await db
+          .insert(usersTable)
+          .values({
+            id: `invite:${randomUUID()}`,
+            organizationId: f.org,
+            role: "owner",
+            isActive: true,
+            emailVerifiedAt: new Date(),
+          })
+          .returning();
+        actor = invite!.id;
+      }
+      await expect(
+        previewInvoiceDelivery(f.org, actor, f.invoice.id, {
+          expectedVersion: 2,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(effects).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(revenueExecutionsTable)
+          .where(eq(revenueExecutionsTable.organizationId, f.org)),
+      ).toHaveLength(0);
+    },
+  );
   it("recognizes the server-only no-effect dispatch error without releasing the send reservation", async () => {
     const f = await fixture();
     const p = await preview(f);
@@ -601,6 +663,194 @@ describe("invoice delivery holds, roles and unknown-effect ownership", () => {
     expect(await send(f, p)).toMatchObject({
       state: "uncertain",
       canPrepare: false,
+    });
+    expect(effects).toHaveLength(0);
+  });
+});
+
+describe("separately reviewed invoice recovery, without resetting history", () => {
+  it("requires a fresh explicit review after typed pre-dispatch refusal and retains the original blocked receipt", async () => {
+    const f = await fixture();
+    const initial = await preview(f);
+    lateChange = async () => {
+      throw new EmailDispatchBlockedError();
+    };
+    const blocked = await send(f, initial);
+    expect(blocked).toMatchObject({
+      state: "held",
+      attemptCount: 1,
+      nextIntents: ["retry_not_dispatched"],
+      integrity: "valid",
+    });
+    expect(blocked.attempts[0]).toMatchObject({
+      ordinal: 1,
+      proof: "not_dispatched",
+      state: "blocked",
+    });
+    lateChange = null;
+    await expect(
+      recover(f, "additional_copy", blocked.executionId!),
+    ).rejects.toMatchObject({ code: "invoice_delivery_reserved" });
+    const retry = await recover(
+      f,
+      "retry_not_dispatched",
+      blocked.executionId!,
+    );
+    expect(retry).toMatchObject({
+      prospectiveAttemptNumber: 2,
+      maxAttempts: 5,
+      expectedLatestExecutionId: blocked.executionId,
+    });
+    expect(retry.subject).not.toContain("COPY");
+    expect((await send(f, initial)).attemptCount).toBe(1);
+    const accepted = await send(f, retry);
+    expect(accepted).toMatchObject({
+      state: "accepted",
+      attemptCount: 2,
+      nextIntents: ["additional_copy"],
+    });
+    expect(accepted.attempts[0]).toEqual(blocked.attempts[0]);
+    expect(accepted.attempts[1]).toMatchObject({
+      ordinal: 2,
+      intent: "retry_not_dispatched",
+      proof: "provider_accepted",
+    });
+    expect(effects).toEqual([f.org]);
+    expect((await send(f, retry)).executionId).toBe(accepted.executionId);
+    expect(effects).toHaveLength(1);
+  });
+  it("allows an additional COPY only after a fresh preview and a separate post-preview acknowledgement", async () => {
+    const f = await fixture();
+    const first = await send(f, await preview(f));
+    expect(first.nextIntents).toEqual(["additional_copy"]);
+    await expect(
+      recover(f, "retry_not_dispatched", first.executionId!),
+    ).rejects.toMatchObject({ code: "invoice_delivery_reserved" });
+    const copy = await recover(f, "additional_copy", first.executionId!);
+    expect(copy).toMatchObject({
+      intent: "additional_copy",
+      prospectiveAttemptNumber: 2,
+      maxAttempts: 5,
+    });
+    expect(copy.subject).toContain("COPY of invoice");
+    expect(copy.body).toContain("not a new bill or charge");
+    await expect(send(f, copy)).rejects.toMatchObject({
+      code: "invoice_delivery_copy_acknowledgement_required",
+    });
+    expect(effects).toHaveLength(1);
+    const result = await sendCopy(f, copy);
+    expect(result).toMatchObject({
+      state: "accepted",
+      attemptCount: 2,
+      deliveryConfirmed: false,
+    });
+    expect(result.attempts[0]).toEqual(first.attempts[0]);
+    expect(result.attempts[1]).toMatchObject({
+      intent: "additional_copy",
+      ordinal: 2,
+    });
+    expect(effects).toEqual([f.org, f.org]);
+    expect((await sendCopy(f, copy)).executionId).toBe(result.executionId);
+    expect(effects).toHaveLength(2);
+    expect(
+      await db
+        .select()
+        .from(valueEntriesTable)
+        .where(eq(valueEntriesTable.organizationId, f.org)),
+    ).toHaveLength(0);
+  });
+  it("does not turn an old untyped held receipt or reconciliation note into retry authority", async () => {
+    const f = await fixture();
+    const [legacy] = await db
+      .insert(revenueExecutionsTable)
+      .values({
+        organizationId: f.org,
+        actionKey: invoiceDeliveryKey(f.invoice.id),
+        kind: "invoice_email",
+        actorUserId: f.actor,
+        fingerprint: "a".repeat(64),
+        state: "blocked",
+        detail: "No email was sent (legacy text is not typed proof)",
+        expiresAt: new Date(),
+      })
+      .returning();
+    expect(
+      await getInvoiceDelivery(f.org, f.actor, f.invoice.id),
+    ).toMatchObject({
+      state: "held",
+      nextIntents: [],
+      attentionReason: "legacy_review_identity_unavailable",
+    });
+    await expect(
+      recover(f, "retry_not_dispatched", legacy!.id),
+    ).rejects.toMatchObject({ code: "invoice_delivery_reserved" });
+    await db
+      .update(revenueExecutionsTable)
+      .set({ state: "confirmed_not_performed" })
+      .where(eq(revenueExecutionsTable.id, legacy!.id));
+    expect(
+      await getInvoiceDelivery(f.org, f.actor, f.invoice.id),
+    ).toMatchObject({ state: "reconciled", nextIntents: [] });
+    await expect(
+      recover(f, "retry_not_dispatched", legacy!.id),
+    ).rejects.toMatchObject({ code: "invoice_delivery_reserved" });
+    expect(effects).toHaveLength(0);
+  });
+  it("blocks every additional attempt once the latest copy becomes uncertain", async () => {
+    const f = await fixture();
+    const first = await send(f, await preview(f));
+    const copyA = await recover(f, "additional_copy", first.executionId!);
+    const copyB = await recover(f, "additional_copy", first.executionId!);
+    lostReceipt = true;
+    const uncertain = await sendCopy(f, copyA);
+    expect(uncertain).toMatchObject({
+      state: "uncertain",
+      attemptCount: 2,
+      nextIntents: [],
+    });
+    expect((await sendCopy(f, copyB)).executionId).toBe(uncertain.executionId);
+    for (const intent of ["retry_not_dispatched", "additional_copy"] as const)
+      await expect(
+        recover(f, intent, uncertain.executionId!),
+      ).rejects.toMatchObject({ code: "invoice_delivery_reserved" });
+    expect(effects).toHaveLength(2);
+  });
+  it("caps all server attempts at five, including explicitly acknowledged copies", async () => {
+    const f = await fixture();
+    let latest = await send(f, await preview(f));
+    for (let ordinal = 2; ordinal <= 5; ordinal++) {
+      const copy = await recover(f, "additional_copy", latest.executionId!);
+      expect(copy.prospectiveAttemptNumber).toBe(ordinal);
+      latest = await sendCopy(f, copy);
+    }
+    expect(latest).toMatchObject({
+      state: "accepted",
+      attemptCount: 5,
+      maxAttempts: 5,
+      nextIntents: [],
+      attentionReason: "attempt_limit_reached",
+    });
+    await expect(
+      recover(f, "additional_copy", latest.executionId!),
+    ).rejects.toMatchObject({ code: "invoice_delivery_reserved" });
+    expect(effects).toHaveLength(5);
+  });
+  it("requires a fresh v2 review rather than adopting an old unconsumed preview", async () => {
+    const f = await fixture();
+    const p = await preview(f);
+    await db
+      .update(auditEventsTable)
+      .set({
+        metadata: {
+          payloadSha256: p.payloadSha256,
+          expiresAt: p.expiresAt,
+          invoiceVersion: p.invoiceVersion,
+          documentSha256: p.documentSha256,
+        },
+      })
+      .where(eq(auditEventsTable.id, p.previewId));
+    await expect(send(f, p)).rejects.toMatchObject({
+      code: "invoice_delivery_review_changed",
     });
     expect(effects).toHaveLength(0);
   });

@@ -3659,6 +3659,104 @@ export const InvoiceDeliveryEvidenceProvider = {
   microsoft: 'microsoft',
 } as const;
 
+export type InvoiceDeliveryEvidenceMaxAttempts = typeof InvoiceDeliveryEvidenceMaxAttempts[keyof typeof InvoiceDeliveryEvidenceMaxAttempts];
+
+
+export const InvoiceDeliveryEvidenceMaxAttempts = {
+  NUMBER_5: 5,
+} as const;
+
+export type InvoiceDeliveryEvidenceNextIntentsItem = typeof InvoiceDeliveryEvidenceNextIntentsItem[keyof typeof InvoiceDeliveryEvidenceNextIntentsItem];
+
+
+export const InvoiceDeliveryEvidenceNextIntentsItem = {
+  initial: 'initial',
+  retry_not_dispatched: 'retry_not_dispatched',
+  additional_copy: 'additional_copy',
+} as const;
+
+export type InvoiceDeliveryEvidenceIntegrity = typeof InvoiceDeliveryEvidenceIntegrity[keyof typeof InvoiceDeliveryEvidenceIntegrity];
+
+
+export const InvoiceDeliveryEvidenceIntegrity = {
+  valid: 'valid',
+  unavailable: 'unavailable',
+} as const;
+
+export type InvoiceDeliveryAttemptEvidenceIntent = typeof InvoiceDeliveryAttemptEvidenceIntent[keyof typeof InvoiceDeliveryAttemptEvidenceIntent];
+
+
+export const InvoiceDeliveryAttemptEvidenceIntent = {
+  initial: 'initial',
+  retry_not_dispatched: 'retry_not_dispatched',
+  additional_copy: 'additional_copy',
+} as const;
+
+export type InvoiceDeliveryAttemptEvidenceState = typeof InvoiceDeliveryAttemptEvidenceState[keyof typeof InvoiceDeliveryAttemptEvidenceState];
+
+
+export const InvoiceDeliveryAttemptEvidenceState = {
+  processing: 'processing',
+  succeeded: 'succeeded',
+  blocked: 'blocked',
+  indeterminate: 'indeterminate',
+  confirmed_succeeded: 'confirmed_succeeded',
+  confirmed_not_performed: 'confirmed_not_performed',
+} as const;
+
+export type InvoiceDeliveryAttemptEvidenceProof = typeof InvoiceDeliveryAttemptEvidenceProof[keyof typeof InvoiceDeliveryAttemptEvidenceProof];
+
+
+export const InvoiceDeliveryAttemptEvidenceProof = {
+  not_dispatched: 'not_dispatched',
+  provider_accepted: 'provider_accepted',
+  none: 'none',
+} as const;
+
+/**
+ * @nullable
+ */
+export type InvoiceDeliveryAttemptEvidenceProvider = typeof InvoiceDeliveryAttemptEvidenceProvider[keyof typeof InvoiceDeliveryAttemptEvidenceProvider] | null;
+
+
+export const InvoiceDeliveryAttemptEvidenceProvider = {
+  gmail: 'gmail',
+  microsoft: 'microsoft',
+} as const;
+
+export interface InvoiceDeliveryAttemptEvidence {
+  /** @nullable */
+  attemptId: string | null;
+  legacy: boolean;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  ordinal: number;
+  executionId: string;
+  actionKey: string;
+  intent: InvoiceDeliveryAttemptEvidenceIntent;
+  state: InvoiceDeliveryAttemptEvidenceState;
+  detail: string;
+  proof: InvoiceDeliveryAttemptEvidenceProof;
+  /** @nullable */
+  proofId: string | null;
+  createdAt: string;
+  /** @nullable */
+  completedAt: string | null;
+  /** @nullable */
+  provider: InvoiceDeliveryAttemptEvidenceProvider;
+  /** @nullable */
+  providerMessageId: string | null;
+  /** @nullable */
+  providerRequestId: string | null;
+  /** @nullable */
+  acceptedAt: string | null;
+}
+
+/**
+ * Append-only invoice attempt history. canPrepare is initial-only for compatibility; nextIntents is the server-derived authority for a fresh review, never an automatic send. Unknown or inconsistent evidence fails closed.
+ */
 export interface InvoiceDeliveryEvidence {
   invoiceId: string;
   state: InvoiceDeliveryEvidenceState;
@@ -3676,18 +3774,136 @@ export interface InvoiceDeliveryEvidence {
   deliveryConfirmed: false;
   deliveryDetail: string;
   canPrepare: boolean;
+  /** @minimum 0 */
+  attemptCount: number;
+  maxAttempts: InvoiceDeliveryEvidenceMaxAttempts;
+  /** @nullable */
+  latestExecutionId: string | null;
+  /** @maxItems 1 */
+  nextIntents: InvoiceDeliveryEvidenceNextIntentsItem[];
+  /** @nullable */
+  attentionReason: string | null;
+  integrity: InvoiceDeliveryEvidenceIntegrity;
+  /** @maxItems 5 */
+  attempts: InvoiceDeliveryAttemptEvidence[];
 }
 
-export interface InvoiceDeliveryPreviewRequest {
+export type InvoiceDeliveryWorklistItemStatus = typeof InvoiceDeliveryWorklistItemStatus[keyof typeof InvoiceDeliveryWorklistItemStatus];
+
+
+export const InvoiceDeliveryWorklistItemStatus = {
+  draft: 'draft',
+  issued: 'issued',
+  void: 'void',
+} as const;
+
+export type InvoiceDeliveryWorklistItemDeliveryMaxAttempts = typeof InvoiceDeliveryWorklistItemDeliveryMaxAttempts[keyof typeof InvoiceDeliveryWorklistItemDeliveryMaxAttempts];
+
+
+export const InvoiceDeliveryWorklistItemDeliveryMaxAttempts = {
+  NUMBER_5: 5,
+} as const;
+
+export type InvoiceDeliveryWorklistItemDeliveryNextIntentsItem = typeof InvoiceDeliveryWorklistItemDeliveryNextIntentsItem[keyof typeof InvoiceDeliveryWorklistItemDeliveryNextIntentsItem];
+
+
+export const InvoiceDeliveryWorklistItemDeliveryNextIntentsItem = {
+  initial: 'initial',
+  retry_not_dispatched: 'retry_not_dispatched',
+  additional_copy: 'additional_copy',
+} as const;
+
+export type InvoiceDeliveryWorklistItemDeliveryIntegrity = typeof InvoiceDeliveryWorklistItemDeliveryIntegrity[keyof typeof InvoiceDeliveryWorklistItemDeliveryIntegrity];
+
+
+export const InvoiceDeliveryWorklistItemDeliveryIntegrity = {
+  valid: 'valid',
+  unavailable: 'unavailable',
+} as const;
+
+export type InvoiceDeliveryWorklistItemDelivery = {
+  /** @minimum 0 */
+  attemptCount: number;
+  maxAttempts: InvoiceDeliveryWorklistItemDeliveryMaxAttempts;
+  /** @nullable */
+  latestExecutionId: string | null;
+  /** @maxItems 1 */
+  nextIntents: InvoiceDeliveryWorklistItemDeliveryNextIntentsItem[];
+  /** @nullable */
+  attentionReason: string | null;
+  integrity: InvoiceDeliveryWorklistItemDeliveryIntegrity;
+  latestAttempt: InvoiceDeliveryAttemptEvidence | null;
+};
+
+export interface InvoiceDeliveryWorklistItem {
+  invoiceId: string;
+  /** @nullable */
+  invoiceNumber: string | null;
+  title: string;
+  customerName: string;
+  status: InvoiceDeliveryWorklistItemStatus;
+  /** @minimum 1 */
+  version: number;
+  leadId: string;
+  /** @nullable */
+  projectId: string | null;
+  delivery: InvoiceDeliveryWorklistItemDelivery;
+}
+
+export type InvoiceDeliveryWorklistPageSize = typeof InvoiceDeliveryWorklistPageSize[keyof typeof InvoiceDeliveryWorklistPageSize];
+
+
+export const InvoiceDeliveryWorklistPageSize = {
+  NUMBER_25: 25,
+} as const;
+
+/**
+ * One canonical invoice page enriched with verified delivery history. Totals count matching invoices, not a global queue of delivery exceptions. SELECT-only; no OAuth, sender lookup, approval, claim or delivery work.
+ */
+export interface InvoiceDeliveryWorklist {
+  /** @maxItems 25 */
+  items: InvoiceDeliveryWorklistItem[];
+  /** @minimum 0 */
+  total: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  page: number;
+  pageSize: InvoiceDeliveryWorklistPageSize;
+  boundary: string;
+}
+
+/**
+ * Initial defaults when intent is omitted. Successors require exact current predecessor and a fresh reason; whitespace is trimmed server-side.
+ */
+export type InvoiceDeliveryPreviewRequest = {
   /** @minimum 1 */
   expectedVersion: number;
-}
+  intent?: 'initial';
+  /** @nullable */
+  expectedLatestExecutionId?: null;
+  /** @nullable */
+  reason?: null;
+} | {
+  /** @minimum 1 */
+  expectedVersion: number;
+  intent: 'retry_not_dispatched' | 'additional_copy';
+  expectedLatestExecutionId: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  reason: string;
+};
 
 export interface InvoiceDeliverySendRequest {
   previewId: string;
   /** @pattern ^[a-f0-9]{64}$ */
   payloadSha256: string;
   confirmed: true;
+  /** Required after reviewing an additional-copy preview; never selects an intent or grants retry authority. */
+  duplicateCopyAcknowledged?: true;
 }
 
 export type InvoiceDeliveryPreviewSenderSource = typeof InvoiceDeliveryPreviewSenderSource[keyof typeof InvoiceDeliveryPreviewSenderSource];
@@ -3713,18 +3929,55 @@ export type InvoiceDeliveryPreviewSender = {
   senderEmail: string;
 };
 
+export type InvoiceDeliveryPreviewIntent = typeof InvoiceDeliveryPreviewIntent[keyof typeof InvoiceDeliveryPreviewIntent];
+
+
+export const InvoiceDeliveryPreviewIntent = {
+  initial: 'initial',
+  retry_not_dispatched: 'retry_not_dispatched',
+  additional_copy: 'additional_copy',
+} as const;
+
+export type InvoiceDeliveryPreviewMaxAttempts = typeof InvoiceDeliveryPreviewMaxAttempts[keyof typeof InvoiceDeliveryPreviewMaxAttempts];
+
+
+export const InvoiceDeliveryPreviewMaxAttempts = {
+  NUMBER_5: 5,
+} as const;
+
 export interface InvoiceDeliveryPreview {
   previewId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
   payloadSha256: string;
   expiresAt: string;
   invoiceId: string;
+  /** @minimum 1 */
+  invoiceVersion: number;
+  invoiceNumber: string;
+  issuedAt: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  documentSha256: string;
+  leadId: string;
+  contactId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  sourceSha256: string;
   recipient: string;
+  sender: InvoiceDeliveryPreviewSender;
   subject: string;
   body: string;
-  sender: InvoiceDeliveryPreviewSender;
+  intent: InvoiceDeliveryPreviewIntent;
+  /** @nullable */
+  expectedLatestExecutionId: string | null;
+  /** @nullable */
+  reason: string | null;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  prospectiveAttemptNumber: number;
+  maxAttempts: InvoiceDeliveryPreviewMaxAttempts;
   deliveryDetail: string;
-  [key: string]: unknown;
- }
+}
 
 export type ServiceCareReviewPreview = { [key: string]: unknown } | null;
 
@@ -5886,6 +6139,26 @@ export const ListServiceObligationsStatus = {
   active: 'active',
   completed: 'completed',
   cancelled: 'cancelled',
+} as const;
+
+export type ListInvoiceDeliveryWorklistParams = {
+/**
+ * @minimum 0
+ * @maximum 10000
+ */
+page?: number;
+status?: ListInvoiceDeliveryWorklistStatus;
+leadId?: string;
+projectId?: string;
+};
+
+export type ListInvoiceDeliveryWorklistStatus = typeof ListInvoiceDeliveryWorklistStatus[keyof typeof ListInvoiceDeliveryWorklistStatus];
+
+
+export const ListInvoiceDeliveryWorklistStatus = {
+  draft: 'draft',
+  issued: 'issued',
+  void: 'void',
 } as const;
 
 export type GetServiceCareParams = {

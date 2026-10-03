@@ -115,7 +115,7 @@ describe("read-only lifecycle inventory tenant boundary", () => {
     expect(failures, JSON.stringify(failures)).toEqual([]);
     expect(inventory.status).toBe("bounded_preview");
     expect(readOnly).toBe("on");
-    expect(inventory.coverage).toMatchObject({ classifiedTables: 117, countedTables: 112, excludedTables: 5, deployedSchema: "matched", reasons: [] });
+    expect(inventory.coverage).toMatchObject({ classifiedTables: 118, countedTables: 113, excludedTables: 5, deployedSchema: "matched", reasons: [] });
     for (const name of ["missed_call_care_policies", "missed_call_care_cases"])
       expect(table(inventory, name)).toMatchObject({ ownership: "direct_org", rowCount: 0, countStatus: "exact_in_snapshot" });
   });

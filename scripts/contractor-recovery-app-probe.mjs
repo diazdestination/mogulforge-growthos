@@ -6,6 +6,7 @@ import { nativeFixtureIds } from './native-contractor-recovery-fixture.mjs';
 import { careFixtureIds } from './customer-care-recovery-fixture.mjs';
 import { operationsFixtureIds } from './operations-wave-recovery-fixture.mjs';
 import { leadReplyFixtureIds } from './lead-replies-recovery-fixture.mjs';
+import { invoiceRecoveryIds } from './invoice-recovery-fixture.mjs';
 
 const target = new URL(process.env.DATABASE_URL ?? '');
 if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.hostname !== '127.0.0.1' || target.pathname !== '/postgres' || process.env.CONTRACTOR_SYNTHETIC_RECOVERY !== 'true' || process.env.NODE_ENV !== 'test') throw new Error('contractor_probe_target_invalid');
@@ -43,6 +44,7 @@ try {
     `/api/v1/source-adoption/outreach/${operations.batch}`, '/api/v1/financial-migrations', `/api/v1/financial-migrations/${operations.review}`, `/api/v1/invoices/${operations.invoice}`);
   good.push(`/api/v1/service-obligations/${native.nextService}/mailbox-replies`, '/api/v1/staff-invitations/email-deliveries');
   good.push(`/api/v1/leads/${id.lead}/mailbox-replies`);
+  good.push('/api/v1/invoices/delivery-worklist');
   for (const route of good) {
     check = `read_${good.indexOf(route)}`;
     const response = await fetch(`${origin}${route}`, { headers });
@@ -52,6 +54,23 @@ try {
   const invoice = await (await fetch(`${origin}/api/v1/invoices/${native.invoice}`, { headers })).json();
   assert.equal(invoice.recordedPaidCents,0); assert.equal(invoice.balanceDueCents,10000);
   assert.equal(invoice.allocations.length,1); assert.ok(invoice.allocations[0].reversedAt);
+  check = 'invoice_recovery_chain';
+  const delivery = await (await fetch(`${origin}/api/v1/invoices/${native.invoice}/delivery`, { headers })).json();
+  assert.equal(delivery.integrity, 'valid'); assert.equal(delivery.attemptCount, 2); assert.equal(delivery.state, 'uncertain');
+  assert.equal(delivery.canPrepare, false); assert.deepEqual(delivery.nextIntents, []);
+  assert.equal(delivery.latestExecutionId, invoiceRecoveryIds('restore-drill-contractor-a').secondExecution);
+  assert.deepEqual(delivery.attempts.map(row => row.proof), ['not_dispatched', 'none']);
+  assert.deepEqual(delivery.attempts.map(row => row.state), ['blocked', 'indeterminate']);
+  check = 'invoice_delivery_worklist';
+  const worklist = await (await fetch(`${origin}/api/v1/invoices/delivery-worklist`, { headers })).json();
+  assert.equal(worklist.pageSize, 25); assert.equal(worklist.total, 2);
+  assert.equal(worklist.items.some(row => row.invoiceId === otherNative.invoice), false);
+  const listed = worklist.items.find(row => row.invoiceId === native.invoice);
+  assert.equal(listed.delivery.integrity, 'valid'); assert.equal(listed.delivery.attemptCount, 2);
+  assert.equal(listed.delivery.latestAttempt.state, 'indeterminate'); assert.deepEqual(listed.delivery.nextIntents, []);
+  assert.match(worklist.boundary, /not all delivery exceptions/);
+  const foreignPage = await fetch(`${origin}/api/v1/invoices/delivery-worklist?leadId=${other.lead}`, { headers });
+  assert.equal(foreignPage.status, 200); assert.deepEqual((await foreignPage.json()).items, []);
   const opening = await (await fetch(`${origin}/api/v1/invoices/${operations.invoice}`, { headers })).json();
   assert.equal(opening.recordedPaidCents,0); assert.equal(opening.balanceDueCents,6000); assert.equal(opening.balanceBasis,'opening_receivable');
   const outreach = await (await fetch(`${origin}/api/v1/source-adoption/outreach/${operations.batch}`, { headers })).json();

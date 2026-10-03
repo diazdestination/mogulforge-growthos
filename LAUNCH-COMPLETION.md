@@ -19,7 +19,7 @@ HOUSECALL-PRO-REPLACEMENT-GATE.md.
 | --- | --- | --- |
 | L1 | An email reply reaches the correct lead or service work item and responsible office staff | Microsoft tracked-service loop is integrated; the lead-replies candidate adds individually prepared/reviewed native BIE email, separate lead permission and canonical hold/task/handling. General compose/campaign/Gmail typed intake is not delivered; actual required mailbox contexts, authorization, continuity and reply acceptance remain open. |
 | L2 | Staff can reliably join/sign in and recover access | Durable verification/reset/invitation send ledger, exact signed callback reconciliation and staff delivery evidence implemented in the candidate. Configure stable platform context and prove actual inbox receipt/access separately; uncertain attempts cannot be automatically retried. |
-| L3 | Customers receive usable invoices; staff see accurate external balances | Reviewed plain-text send and native/historical balances built. Finish delivery exceptions and an explicitly safe reviewed resend path; reconcile actual documents and receipts. No payment processing. |
+| L3 | Customers receive usable invoices; staff see accurate external balances | Reviewed plain-text send and native/historical balances built. Active second wave adds append-only attempt history and explicitly reviewed proven-no-dispatch retry or additional copy; exact release/provider/document acceptance remains required. The bounded invoice-page view is not a global delivery-state exception filter. No payment processing. |
 | L4 | Missed calls are recovered promptly without uncontrolled messages | Staff-reviewed recovery built. Complete bounded automation required by the agreed receptionist/qualification/booking use case; autonomous conversation is not currently delivered. Prove real routing, consent, stop, handoff and failures. |
 | L5 | HVAC service obligations produce timely reminders, responses and visits | Recurrence, individual review, booking and exception watch built. Finish a reviewed standing-policy path for required routine reminders without approving arbitrary future messages; prove actual agreements, responses and completion/next date. |
 | L6 | Lead recovery and campaigns produce accountable opportunities | Reviewed one-touch imported-source recovery built. Finish the agreed bounded ongoing nurture behavior, keeping source reconciliation and separate permission. Prove reply/opt-out stops and outcomes. |
@@ -32,8 +32,10 @@ HOUSECALL-PRO-REPLACEMENT-GATE.md.
 ## Active implementation: two-wave L1 then L3 continuation
 
 The owner requested two consecutive waves. Tracked Microsoft lead replies are
-the first candidate; see `reports/lead-replies-integration-2026-10-02.md`.
-After its release checks, implement invoice delivery exceptions and safe,
+merged at51da543 from green84cd928/CI37089194639; see
+`reports/lead-replies-integration-2026-10-02.md`. Exact-main CI37090103299 also
+passed. Active second-wave contract:
+`reports/invoice-recovery-contract-2026-10-02.md`, delivery exceptions and safe,
 explicitly reviewed recovery. Unknown effects must never be rearmed by new keys
 or staff attestation. This extends source readiness, not hosted/client acceptance.
 

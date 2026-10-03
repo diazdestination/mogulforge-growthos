@@ -1,6 +1,24 @@
 # GrowthOS project state
 
-## October 2 tracked lead replies (newest candidate)
+## October 2 invoice delivery recovery (active second wave)
+
+First-wave PR17 is merged at 51da543db898f9907a4198fbc0ada880c378900d.
+Its tree exactly matches candidate 84cd928. Candidate CI37089194639 and
+exact-main CI37090103299 both passed: 3,087 tests, 15 unchanged skips,
+26 additional adapter tests, all types/builds and Docker parity. Active branch:
+agent/growthos-invoice-recovery-20261002 under
+`reports/invoice-recovery-contract-2026-10-02.md`.
+
+Second wave adds an append-only capped invoice-delivery attempt chain, explicit
+known-no-dispatch retry versus separately acknowledged additional copy, and
+office-visible delivery history on the existing Invoices surface. Unknown
+effects and operator attestations never authorize replay. The reviewed-only
+schema delta 0011 adds one table (118 total). Synthetic upgrade/restore passed
+with 26 real read-only routes and nine invoice constraint-negative checks.
+Old-format hash-only previews remain read-only. See the second-wave integration
+report for candidate release evidence. No hosted/provider/customer activation.
+
+## October 2 tracked lead replies (integrated first wave)
 
 The owner requested two consecutive waves. First:
 `reports/lead-replies-integration-2026-10-02.md`, based on green mainc2d999b /

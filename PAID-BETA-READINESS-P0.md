@@ -7,6 +7,15 @@
 
 ## Mission
 
+**October 2 second-wave active scope:** PR17 integrated lead replies at51da543
+matches green84cd928 / CI37089194639 (3,087 passed,15 unchanged skips,26 adapter,
+types/builds/Docker). Exact-main CI37090103299 passed. Continue only the
+bounded invoice-delivery recovery contract; require additive0011/118-table
+restore, full source-release checks and separate hosted/provider/client gates.
+Safe retry requires machine no-dispatch proof and a matching blocked receipt;
+additional copy needs actual acceptance and fresh explicit review. Unknown
+effects are never rearmed. This still excludes contractor payment processing.
+
 **October 2 two-wave continuation:** owner authorized tracked lead replies then
 invoice delivery exceptions/reviewed recovery. First-wave contract and evidence:
 `reports/lead-replies-contract-2026-10-02.md` and its integration report. Native

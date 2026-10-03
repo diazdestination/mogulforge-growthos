@@ -5,9 +5,16 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+import type { InvoiceDeliveryAttemptEvidence } from './invoiceDeliveryAttemptEvidence';
+import type { InvoiceDeliveryEvidenceIntegrity } from './invoiceDeliveryEvidenceIntegrity';
+import type { InvoiceDeliveryEvidenceMaxAttempts } from './invoiceDeliveryEvidenceMaxAttempts';
+import type { InvoiceDeliveryEvidenceNextIntentsItem } from './invoiceDeliveryEvidenceNextIntentsItem';
 import type { InvoiceDeliveryEvidenceProvider } from './invoiceDeliveryEvidenceProvider';
 import type { InvoiceDeliveryEvidenceState } from './invoiceDeliveryEvidenceState';
 
+/**
+ * Append-only invoice attempt history. canPrepare is initial-only for compatibility; nextIntents is the server-derived authority for a fresh review, never an automatic send. Unknown or inconsistent evidence fails closed.
+ */
 export interface InvoiceDeliveryEvidence {
   invoiceId: string;
   state: InvoiceDeliveryEvidenceState;
@@ -25,4 +32,16 @@ export interface InvoiceDeliveryEvidence {
   deliveryConfirmed: false;
   deliveryDetail: string;
   canPrepare: boolean;
+  /** @minimum 0 */
+  attemptCount: number;
+  maxAttempts: InvoiceDeliveryEvidenceMaxAttempts;
+  /** @nullable */
+  latestExecutionId: string | null;
+  /** @maxItems 1 */
+  nextIntents: InvoiceDeliveryEvidenceNextIntentsItem[];
+  /** @nullable */
+  attentionReason: string | null;
+  integrity: InvoiceDeliveryEvidenceIntegrity;
+  /** @maxItems 5 */
+  attempts: InvoiceDeliveryAttemptEvidence[];
 }

@@ -11,4 +11,6 @@ export interface InvoiceDeliverySendRequest {
   /** @pattern ^[a-f0-9]{64}$ */
   payloadSha256: string;
   confirmed: true;
+  /** Required after reviewing an additional-copy preview; never selects an intent or grants retry authority. */
+  duplicateCopyAcknowledged?: true;
 }

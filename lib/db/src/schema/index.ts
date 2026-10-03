@@ -12,6 +12,7 @@ export * from "./leads";
 export * from "./engagement-links";
 export * from "./estimates";
 export * from "./invoices";
+export * from "./invoice-delivery-attempts";
 export * from "./projects";
 export * from "./crm-tasks";
 export * from "./appointments";

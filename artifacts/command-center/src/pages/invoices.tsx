@@ -7,6 +7,7 @@ import LeadSelect from "@/components/lead-select";
 import { InvoiceEditor } from "@/components/invoice-editor";
 import { InvoiceActions } from "@/components/invoice-actions";
 import { InvoiceDelivery } from "@/components/invoice-delivery";
+import { InvoiceDeliveryWorklist } from "@/components/invoice-delivery-worklist";
 import { canManageInvoices, canReadInvoices } from "@/lib/permissions";
 import { contractorRequest } from "@/lib/contractor-api";
 import {
@@ -142,6 +143,9 @@ function InvoiceIndex({ actor }: { actor: Actor }) {
   const leadId = search.get("leadId") || "";
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(0);
+  const [deliveryView, setDeliveryView] = useState(
+    () => search.get("view") === "delivery",
+  );
   const [creating, setCreating] = useState(() => {
     try {
       return !!sessionStorage.getItem(
@@ -169,6 +173,7 @@ function InvoiceIndex({ actor }: { actor: Actor }) {
       return contractorRequest<InvoiceList>(`/invoices?${params}`, { signal });
     },
     retry: false,
+    enabled: !deliveryView,
   });
   return (
     <div className="flex-1 p-4 text-foreground md:p-6">
@@ -214,140 +219,171 @@ function InvoiceIndex({ actor }: { actor: Actor }) {
             onClose={() => setCreating(false)}
           />
         )}
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <label
-              htmlFor="invoice-status"
-              className="mb-1 block text-sm font-medium"
-            >
-              Document status
-            </label>
-            <select
-              id="invoice-status"
-              className={invoiceControl}
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value);
-                setPage(0);
-              }}
-            >
-              <option value="">All invoices</option>
-              <option value="draft">Drafts</option>
-              <option value="issued">Issued</option>
-              <option value="void">Void</option>
-            </select>
-          </div>
+        <nav
+          aria-label="Invoice workspace views"
+          className="flex flex-wrap gap-2"
+        >
           <button
             className={invoiceButton}
-            disabled={list.isFetching}
-            onClick={() => void list.refetch()}
+            aria-pressed={!deliveryView}
+            onClick={() => setDeliveryView(false)}
           >
-            <RefreshCw className="h-4 w-4" aria-hidden />
-            Refresh list
+            Documents and balances
           </button>
-        </div>
-        {list.isPending ? (
-          <p role="status">Loading invoices…</p>
-        ) : list.isError ? (
-          <div
-            role="alert"
-            className="rounded-xl border border-border bg-card p-5"
+          <button
+            className={invoiceButton}
+            aria-pressed={deliveryView}
+            onClick={() => setDeliveryView(true)}
           >
-            <h2 className="font-semibold">Invoices could not load</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Refresh the list to try again. No empty list or zero balance is
-              being assumed.
-            </p>
-          </div>
-        ) : list.data ? (
+            Invoice email delivery
+          </button>
+        </nav>
+        {deliveryView ? (
+          <InvoiceDeliveryWorklist
+            key={`${projectId}:${leadId}`}
+            organizationId={actor.organizationId}
+            canManage={actor.manage}
+            projectId={projectId}
+            leadId={leadId}
+          />
+        ) : (
           <>
-            <p className="text-sm text-muted-foreground">
-              {list.data.total === 0
-                ? "No invoices match this view."
-                : `${list.data.total} invoice${list.data.total === 1 ? "" : "s"} · Page ${list.data.page + 1}`}
-            </p>
-            {list.data.total === 0 ? (
-              <div className="rounded-xl border border-border bg-card p-6">
-                <h2 className="font-semibold">Start with a draft</h2>
-                <p className="mt-2 max-w-prose text-sm text-muted-foreground">
-                  Link approved work to its customer opportunity, review the
-                  details, then issue the saved version. No customer message or
-                  charge is sent here.
-                </p>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <label
+                  htmlFor="invoice-status"
+                  className="mb-1 block text-sm font-medium"
+                >
+                  Document status
+                </label>
+                <select
+                  id="invoice-status"
+                  className={invoiceControl}
+                  value={status}
+                  onChange={(event) => {
+                    setStatus(event.target.value);
+                    setPage(0);
+                  }}
+                >
+                  <option value="">All invoices</option>
+                  <option value="draft">Drafts</option>
+                  <option value="issued">Issued</option>
+                  <option value="void">Void</option>
+                </select>
               </div>
-            ) : (
-              <ul
-                aria-label="Customer invoices"
-                className="divide-y divide-border rounded-xl border border-border bg-card"
-              >
-                {list.data.items.map((invoice) => (
-                  <li key={invoice.id}>
-                    <Link
-                      href={`/invoices/${invoice.id}`}
-                      className="grid gap-3 p-4 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-                    >
-                      <div className="min-w-0">
-                        <span className="font-semibold">
-                          {invoice.invoiceNumber ??
-                            (invoice.status === "void"
-                              ? "Voided draft"
-                              : "Unnumbered draft")}
-                        </span>
-                        <p className="mt-1 break-words text-sm">
-                          {invoice.title}
-                        </p>
-                        <p className="mt-1 text-xs capitalize text-muted-foreground">
-                          {invoice.status}
-                          {invoice.status === "issued" ||
-                          invoice.reconciliationRequired
-                            ? ` · ${paymentLabel(invoice)}`
-                            : ""}
-                        </p>
-                      </div>
-                      <div className="min-w-0 text-sm">
-                        <p className="break-words font-medium">
-                          {invoice.customerName}
-                        </p>
-                        <p className="mt-1 text-muted-foreground">
-                          Due {dateLabel(invoice.dueDate)}
-                        </p>
-                      </div>
-                      <div className="text-sm sm:text-right">
-                        <p className="tabular-nums">
-                          Total {money(invoice.totalCents)}
-                        </p>
-                        <p className="mt-1 font-medium">
-                          Balance <Balance invoice={invoice} />
-                        </p>
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex flex-wrap items-center justify-between gap-3">
               <button
                 className={invoiceButton}
-                disabled={page === 0 || list.isFetching}
-                onClick={() => setPage((current) => current - 1)}
+                disabled={list.isFetching}
+                onClick={() => void list.refetch()}
               >
-                <ArrowLeft className="h-4 w-4" aria-hidden />
-                Previous page
-              </button>
-              <button
-                className={invoiceButton}
-                disabled={
-                  (page + 1) * list.data.pageSize >= list.data.total ||
-                  list.isFetching
-                }
-                onClick={() => setPage((current) => current + 1)}
-              >
-                Next page
-                <ArrowRight className="h-4 w-4" aria-hidden />
+                <RefreshCw className="h-4 w-4" aria-hidden />
+                Refresh list
               </button>
             </div>
+            {list.isPending ? (
+              <p role="status">Loading invoices…</p>
+            ) : list.isError ? (
+              <div
+                role="alert"
+                className="rounded-xl border border-border bg-card p-5"
+              >
+                <h2 className="font-semibold">Invoices could not load</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Refresh the list to try again. No empty list or zero balance
+                  is being assumed.
+                </p>
+              </div>
+            ) : list.data ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {list.data.total === 0
+                    ? "No invoices match this view."
+                    : `${list.data.total} invoice${list.data.total === 1 ? "" : "s"} · Page ${list.data.page + 1}`}
+                </p>
+                {list.data.total === 0 ? (
+                  <div className="rounded-xl border border-border bg-card p-6">
+                    <h2 className="font-semibold">Start with a draft</h2>
+                    <p className="mt-2 max-w-prose text-sm text-muted-foreground">
+                      Link approved work to its customer opportunity, review the
+                      details, then issue the saved version. No customer message
+                      or charge is sent here.
+                    </p>
+                  </div>
+                ) : (
+                  <ul
+                    aria-label="Customer invoices"
+                    className="divide-y divide-border rounded-xl border border-border bg-card"
+                  >
+                    {list.data.items.map((invoice) => (
+                      <li key={invoice.id}>
+                        <Link
+                          href={`/invoices/${invoice.id}`}
+                          className="grid gap-3 p-4 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                        >
+                          <div className="min-w-0">
+                            <span className="font-semibold">
+                              {invoice.invoiceNumber ??
+                                (invoice.status === "void"
+                                  ? "Voided draft"
+                                  : "Unnumbered draft")}
+                            </span>
+                            <p className="mt-1 break-words text-sm">
+                              {invoice.title}
+                            </p>
+                            <p className="mt-1 text-xs capitalize text-muted-foreground">
+                              {invoice.status}
+                              {invoice.status === "issued" ||
+                              invoice.reconciliationRequired
+                                ? ` · ${paymentLabel(invoice)}`
+                                : ""}
+                            </p>
+                          </div>
+                          <div className="min-w-0 text-sm">
+                            <p className="break-words font-medium">
+                              {invoice.customerName}
+                            </p>
+                            <p className="mt-1 text-muted-foreground">
+                              Due {dateLabel(invoice.dueDate)}
+                            </p>
+                          </div>
+                          <div className="text-sm sm:text-right">
+                            <p className="tabular-nums">
+                              Total {money(invoice.totalCents)}
+                            </p>
+                            <p className="mt-1 font-medium">
+                              Balance <Balance invoice={invoice} />
+                            </p>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    className={invoiceButton}
+                    disabled={page === 0 || list.isFetching}
+                    onClick={() => setPage((current) => current - 1)}
+                  >
+                    <ArrowLeft className="h-4 w-4" aria-hidden />
+                    Previous page
+                  </button>
+                  <button
+                    className={invoiceButton}
+                    disabled={
+                      (page + 1) * list.data.pageSize >= list.data.total ||
+                      list.isFetching
+                    }
+                    onClick={() => setPage((current) => current + 1)}
+                  >
+                    Next page
+                    <ArrowRight className="h-4 w-4" aria-hidden />
+                  </button>
+                </div>
+              </>
+            ) : null}
           </>
-        ) : null}
+        )}
       </div>
     </div>
   );
