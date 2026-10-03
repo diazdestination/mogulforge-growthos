@@ -1,17 +1,58 @@
 import { createHash } from "node:crypto";
 import { z } from "zod/v4";
 import type { InvoiceDocument } from "@workspace/db";
+import type { InvoiceDeliveryChain } from "./invoice-delivery-attempts";
 
+export const invoiceDeliveryIntentSchema = z.enum([
+  "initial",
+  "retry_not_dispatched",
+  "additional_copy",
+]);
+export type InvoiceDeliveryIntent = z.infer<typeof invoiceDeliveryIntentSchema>;
+export const MAX_INVOICE_DELIVERY_ATTEMPTS = 5;
 export const invoiceDeliveryPreviewSchema = z
   .object({
     expectedVersion: z.number().int().positive(),
+    intent: invoiceDeliveryIntentSchema.default("initial"),
+    expectedLatestExecutionId: z
+      .uuid()
+      .nullable()
+      .optional()
+      .transform((v) => v ?? null),
+    reason: z
+      .string()
+      .trim()
+      .min(10)
+      .max(1000)
+      .nullable()
+      .optional()
+      .transform((v) => v ?? null),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.intent === "initial") {
+      if (value.expectedLatestExecutionId !== null || value.reason !== null)
+        ctx.addIssue({
+          code: "custom",
+          message:
+            "Initial delivery cannot refer to a prior send or copy reason.",
+        });
+    } else if (!value.expectedLatestExecutionId || !value.reason) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Recovery requires the exact latest execution and a new review reason.",
+      });
+    }
+  });
 export const invoiceDeliverySendSchema = z
   .object({
     previewId: z.uuid(),
     payloadSha256: z.string().regex(/^[a-f0-9]{64}$/),
     confirmed: z.literal(true),
+    // This is a new acknowledgement made after viewing an additional-copy
+    // preview. It is never supplied by the preview or used to choose its intent.
+    duplicateCopyAcknowledged: z.literal(true).optional(),
   })
   .strict();
 
@@ -36,13 +77,20 @@ export function renderInvoiceEmail(input: {
   invoiceNumber: string;
   issuedAt: string;
   document: InvoiceDocument;
+  additionalCopy?: boolean;
 }) {
   const doc = input.document;
   const dollars = (cents: number) => `USD ${(cents / 100).toFixed(2)}`;
   return {
-    subject: `Invoice ${input.invoiceNumber} from ${doc.issuerName}`,
+    subject: `${input.additionalCopy ? "COPY of invoice" : "Invoice"} ${input.invoiceNumber} from ${doc.issuerName}`,
     body: [
-      `Invoice ${input.invoiceNumber}`,
+      ...(input.additionalCopy
+        ? [
+            `COPY of invoice ${input.invoiceNumber}`,
+            "This is an additional copy of the same issued invoice, not a new bill or charge.",
+            "",
+          ]
+        : [`Invoice ${input.invoiceNumber}`]),
       doc.title,
       `Issued: ${input.issuedAt.slice(0, 10)}`,
       `Due date: ${doc.dueDate ?? "Not specified"}`,
@@ -70,7 +118,7 @@ export function renderInvoiceEmail(input: {
   };
 }
 
-export interface InvoiceDeliveryEvidence {
+export interface InvoiceDeliveryEvidence extends InvoiceDeliveryChain {
   invoiceId: string;
   state:
     | "not_sent"

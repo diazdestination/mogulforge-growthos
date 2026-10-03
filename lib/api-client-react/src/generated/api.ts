@@ -119,6 +119,7 @@ import type {
   InvoiceDeliveryPreview,
   InvoiceDeliveryPreviewRequest,
   InvoiceDeliverySendRequest,
+  InvoiceDeliveryWorklist,
   InvoiceDetail,
   InvoiceList,
   InvoiceMutation,
@@ -146,6 +147,7 @@ import type {
   ListCustomerRepliesParams,
   ListEstimatesParams,
   ListInvitationEmailDeliveriesParams,
+  ListInvoiceDeliveryWorklistParams,
   ListInvoicesParams,
   ListLeadMailboxRepliesParams,
   ListLeadsParams,
@@ -15746,6 +15748,91 @@ export const useSetServiceObligationRecurrence = <TError = ErrorType<void>,
       return useMutation(getSetServiceObligationRecurrenceMutationOptions(options));
     }
 
+export const getListInvoiceDeliveryWorklistUrl = (params?: ListInvoiceDeliveryWorklistParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/invoices/delivery-worklist?${stringifiedParams}` : `/api/v1/invoices/delivery-worklist`
+}
+
+/**
+ * One canonical invoice page enriched with verified delivery history. Totals count matching invoices, not a global queue of delivery exceptions. SELECT-only; no OAuth, sender lookup, approval, claim or delivery work. Document-status, lead and project filters only; no global delivery-state filter.
+ * @summary Read a bounded invoice page with delivery exceptions
+ */
+export const listInvoiceDeliveryWorklist = async (params?: ListInvoiceDeliveryWorklistParams, options?: Parameters<typeof customFetch>[1]): Promise<InvoiceDeliveryWorklist> => {
+
+  return customFetch<InvoiceDeliveryWorklist>(getListInvoiceDeliveryWorklistUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListInvoiceDeliveryWorklistQueryKey = (params?: ListInvoiceDeliveryWorklistParams,) => {
+    return [
+    `/api/v1/invoices/delivery-worklist`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListInvoiceDeliveryWorklistQueryOptions = <TData = Awaited<ReturnType<typeof listInvoiceDeliveryWorklist>>, TError = ErrorType<void>>(params?: ListInvoiceDeliveryWorklistParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInvoiceDeliveryWorklist>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListInvoiceDeliveryWorklistQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInvoiceDeliveryWorklist>>> = ({ signal }) => listInvoiceDeliveryWorklist(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInvoiceDeliveryWorklist>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListInvoiceDeliveryWorklistQueryResult = NonNullable<Awaited<ReturnType<typeof listInvoiceDeliveryWorklist>>>
+export type ListInvoiceDeliveryWorklistQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read a bounded invoice page with delivery exceptions
+ */
+
+export function useListInvoiceDeliveryWorklist<TData = Awaited<ReturnType<typeof listInvoiceDeliveryWorklist>>, TError = ErrorType<void>>(
+ params?: ListInvoiceDeliveryWorklistParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInvoiceDeliveryWorklist>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListInvoiceDeliveryWorklistQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetInvoiceDeliveryUrl = (id: string,) => {
 
 
@@ -15906,8 +15993,8 @@ export const getSendInvoiceDeliveryUrl = (id: string,) => {
 }
 
 /**
- * Session-only invoices.manage. Rechecks identity, permission, content, recipient and holds at network dispatch. One logical send per invoice; timeout or unknown result cannot be bypassed by a new preview. No payment processor, public link or attachment.
- * @summary Send the exact approved invoice once
+ * Session-only invoices.manage with accepted verified staff. Rechecks exact attempt ownership, predecessor, actor, invoice/document, recipient, selected sender and holds at dispatch. Initial fixed key is preserved; append-only successors are capped at five total. Only typed no-dispatch proof permits retry, and an accepted prior send requires a fresh explicit copy review/acknowledgement. Unknown results and reconciliation never authorize replay. No payment processor, public link or attachment.
+ * @summary Send one exact reviewed invoice attempt
  */
 export const sendInvoiceDelivery = async (id: string,
     invoiceDeliverySendRequest: InvoiceDeliverySendRequest, options?: Parameters<typeof customFetch>[1]): Promise<InvoiceDeliveryEvidence> => {
@@ -15957,7 +16044,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SendInvoiceDeliveryMutationError = ErrorType<void>
 
     /**
- * @summary Send the exact approved invoice once
+ * @summary Send one exact reviewed invoice attempt
  */
 export const useSendInvoiceDelivery = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendInvoiceDelivery>>, TError,{id: string;data: BodyType<InvoiceDeliverySendRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}

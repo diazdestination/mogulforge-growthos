@@ -4,6 +4,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -32,6 +33,8 @@ export const auditEventsTable = pgTable(
       .defaultNow(),
   },
   (table) => [
+    unique("audit_event_org_id_uq").on(table.organizationId, table.id),
+    unique("audit_event_exact_review_uq").on(table.organizationId, table.id, table.actorUserId, table.entityId),
     index("audit_events_org_created_idx").on(
       table.organizationId,
       table.createdAt,

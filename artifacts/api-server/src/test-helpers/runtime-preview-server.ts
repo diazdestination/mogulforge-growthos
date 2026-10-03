@@ -14,6 +14,11 @@ if (
   new URL(process.env.DATABASE_URL!).hostname !== "127.0.0.1"
 )
   throw new Error("Synthetic loopback preview required");
+// PGlite exposes one backend through its socket adapter. Multiple concurrent
+// pg clients can mix result metadata during a full-page browser load. Serialize
+// this disposable visual runner only; real PostgreSQL/production pooling and
+// CI's independent-session concurrency checks remain unchanged.
+pool.options.max = 1;
 const server = app.listen(4192, "127.0.0.1", () => startAutomationScheduler());
 for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.once(signal, () => {

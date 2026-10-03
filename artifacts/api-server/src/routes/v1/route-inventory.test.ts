@@ -85,6 +85,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /contractor/today": "crm.read",
   "GET /tasks/:id": "crm.read",
   "GET /invoices": "invoices.read",
+  "GET /invoices/delivery-worklist": "invoices.read",
   "GET /invoices/:id": "invoices.read",
   "GET /invoices/:id/delivery": "invoices.read",
   "POST /invoices/:id/delivery/preview": "invoices.manage",

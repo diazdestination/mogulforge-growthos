@@ -6,7 +6,25 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface InvoiceDeliveryPreviewRequest {
+/**
+ * Initial defaults when intent is omitted. Successors require exact current predecessor and a fresh reason; whitespace is trimmed server-side.
+ */
+export type InvoiceDeliveryPreviewRequest = {
   /** @minimum 1 */
   expectedVersion: number;
-}
+  intent?: 'initial';
+  /** @nullable */
+  expectedLatestExecutionId?: null;
+  /** @nullable */
+  reason?: null;
+} | {
+  /** @minimum 1 */
+  expectedVersion: number;
+  intent: 'retry_not_dispatched' | 'additional_copy';
+  expectedLatestExecutionId: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  reason: string;
+};

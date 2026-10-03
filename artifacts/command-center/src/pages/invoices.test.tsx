@@ -18,6 +18,7 @@ import {
 } from "@/test/invoice-fixtures";
 import { invoiceRequestStorageKey } from "@/hooks/use-invoice-command";
 import type { InvoiceDetail, InvoiceDraft } from "@/lib/invoice-ui";
+import { sampleDelivery } from "@/test/invoice-delivery-fixtures";
 
 function json(value: unknown, status = 200) {
   return new Response(JSON.stringify(value), {
@@ -57,6 +58,13 @@ function server(
       return json(current);
     if (method === "GET" && path === "/api/v1/invoices")
       return json({ items: [current], total: 1, page: 0, pageSize: 25 });
+    if (method === "GET" && path === `/api/v1/invoices/${invoiceId}/delivery`)
+      return json(
+        sampleDelivery({
+          nextIntents: current.status === "issued" ? ["initial"] : [],
+          canPrepare: current.status === "issued",
+        }),
+      );
     if (method === "GET" && path === "/api/v1/leads")
       return json([
         {
@@ -107,13 +115,46 @@ afterEach(() => {
 });
 
 describe("Customer invoices", () => {
+  it("opens the delivery view inside the canonical invoice workspace without an email mutation", async () => {
+    const api = server("office", sampleInvoice(), (request) =>
+      request.path === "/api/v1/invoices/delivery-worklist"
+        ? json({
+            items: [],
+            total: 0,
+            page: 0,
+            pageSize: 25,
+            boundary: "Canonical invoice pages only.",
+          })
+        : undefined,
+    );
+    renderInvoices("/invoices");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Invoice email delivery" }),
+    );
+    await screen.findByRole("region", {
+      name: "Invoice email delivery worklist",
+    });
+    await screen.findByText(/0 matching invoices/);
+    expect(
+      api.requests.some(
+        (request) => request.path === "/api/v1/invoices/delivery-worklist",
+      ),
+    ).toBe(true);
+    expect(writes(api.requests)).toHaveLength(0);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Documents and balances" }),
+    );
+    await screen.findByRole("link", { name: /Synthetic service work/ });
+  });
   it.each(["owner", "admin"])(
     "gives %s a reviewed history import entry point",
     async (role) => {
       server(role);
       renderInvoices("/invoices");
       expect(
-        (await screen.findByRole("link", { name: "Import invoice history" })).getAttribute("href"),
+        (
+          await screen.findByRole("link", { name: "Import invoice history" })
+        ).getAttribute("href"),
       ).toBe("/financial-migrations");
     },
   );

@@ -1,5 +1,16 @@
 # Next acceptance work
 
+Active second wave: invoice delivery exceptions and explicit safe recovery under
+`reports/invoice-recovery-contract-2026-10-02.md`. PR17 is merged at 51da543 with
+the identical green 84cd928 tree (CI37089194639). Exact-main CI37090103299 passed.
+The bounded invoice kernel/dispatch/UI, additive 0011 and 118-table compatible
+restore are implemented. Close the exact invoice PR/main release gate before
+advancing to another checklist item; see its integration report.
+Do not infer provider readiness from attempt eligibility. No automatic resends,
+payment processing, global delivery-state exception count, or live activation.
+
+The earlier first-wave candidate wording below is retained as historical context.
+
 Newest authorized continuation is two waves: tracked Microsoft lead replies,
 then invoice delivery exceptions/reviewed recovery. First-wave integration:
 `reports/lead-replies-integration-2026-10-02.md`, based on c2d999b with green

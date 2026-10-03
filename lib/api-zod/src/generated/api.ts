@@ -8424,12 +8424,99 @@ export const SetServiceObligationRecurrenceResponse = zod.object({
 
 
 /**
+ * One canonical invoice page enriched with verified delivery history. Totals count matching invoices, not a global queue of delivery exceptions. SELECT-only; no OAuth, sender lookup, approval, claim or delivery work. Document-status, lead and project filters only; no global delivery-state filter.
+ * @summary Read a bounded invoice page with delivery exceptions
+ */
+export const listInvoiceDeliveryWorklistQueryPageDefault = 0;
+export const listInvoiceDeliveryWorklistQueryPageMin = 0;
+export const listInvoiceDeliveryWorklistQueryPageMax = 10000;
+
+
+
+export const ListInvoiceDeliveryWorklistQueryParams = zod.object({
+  "page": zod.coerce.number().int().min(listInvoiceDeliveryWorklistQueryPageMin).max(listInvoiceDeliveryWorklistQueryPageMax).default(listInvoiceDeliveryWorklistQueryPageDefault),
+  "status": zod.enum(['draft', 'issued', 'void']).optional(),
+  "leadId": zod.uuid().optional(),
+  "projectId": zod.uuid().optional()
+})
+
+
+export const listInvoiceDeliveryWorklistResponseItemsItemDeliveryAttemptCountMin = 0;
+
+export const listInvoiceDeliveryWorklistResponseItemsItemDeliveryNextIntentsMax = 1;
+
+export const listInvoiceDeliveryWorklistResponseItemsItemDeliveryLatestAttemptOneOrdinalMax = 5;
+
+export const listInvoiceDeliveryWorklistResponseItemsMax = 25;
+
+export const listInvoiceDeliveryWorklistResponseTotalMin = 0;
+
+export const listInvoiceDeliveryWorklistResponsePageMin = 0;
+export const listInvoiceDeliveryWorklistResponsePageMax = 10000;
+
+
+
+export const ListInvoiceDeliveryWorklistResponse = zod.object({
+  "items": zod.array(zod.object({
+  "invoiceId": zod.uuid(),
+  "invoiceNumber": zod.string().nullable(),
+  "title": zod.string(),
+  "customerName": zod.string(),
+  "status": zod.enum(['draft', 'issued', 'void']),
+  "version": zod.int().min(1),
+  "leadId": zod.uuid(),
+  "projectId": zod.uuid().nullable(),
+  "delivery": zod.object({
+  "attemptCount": zod.int().min(listInvoiceDeliveryWorklistResponseItemsItemDeliveryAttemptCountMin),
+  "maxAttempts": zod.literal(5),
+  "latestExecutionId": zod.uuid().nullable(),
+  "nextIntents": zod.array(zod.enum(['initial', 'retry_not_dispatched', 'additional_copy'])).max(listInvoiceDeliveryWorklistResponseItemsItemDeliveryNextIntentsMax),
+  "attentionReason": zod.string().nullable(),
+  "integrity": zod.enum(['valid', 'unavailable']),
+  "latestAttempt": zod.union([zod.object({
+  "attemptId": zod.uuid().nullable(),
+  "legacy": zod.boolean(),
+  "ordinal": zod.int().min(1).max(listInvoiceDeliveryWorklistResponseItemsItemDeliveryLatestAttemptOneOrdinalMax),
+  "executionId": zod.uuid(),
+  "actionKey": zod.string(),
+  "intent": zod.enum(['initial', 'retry_not_dispatched', 'additional_copy']),
+  "state": zod.enum(['processing', 'succeeded', 'blocked', 'indeterminate', 'confirmed_succeeded', 'confirmed_not_performed']),
+  "detail": zod.string(),
+  "proof": zod.enum(['not_dispatched', 'provider_accepted', 'none']),
+  "proofId": zod.uuid().nullable(),
+  "createdAt": zod.coerce.date(),
+  "completedAt": zod.coerce.date().nullable(),
+  "provider": zod.union([zod.literal('gmail'),zod.literal('microsoft'),zod.literal(null)]).nullable(),
+  "providerMessageId": zod.string().nullable(),
+  "providerRequestId": zod.string().nullable(),
+  "acceptedAt": zod.coerce.date().nullable()
+}),zod.null()])
+})
+})).max(listInvoiceDeliveryWorklistResponseItemsMax),
+  "total": zod.int().min(listInvoiceDeliveryWorklistResponseTotalMin),
+  "page": zod.int().min(listInvoiceDeliveryWorklistResponsePageMin).max(listInvoiceDeliveryWorklistResponsePageMax),
+  "pageSize": zod.literal(25),
+  "boundary": zod.string()
+}).describe('One canonical invoice page enriched with verified delivery history. Totals count matching invoices, not a global queue of delivery exceptions. SELECT-only; no OAuth, sender lookup, approval, claim or delivery work.')
+
+
+/**
  * Requires invoices.read. Provider acceptance does not establish delivery, customer receipt or payment.
  * @summary Read invoice email evidence
  */
 export const GetInvoiceDeliveryParams = zod.object({
   "id": zod.uuid()
 })
+
+export const getInvoiceDeliveryResponseAttemptCountMin = 0;
+
+export const getInvoiceDeliveryResponseNextIntentsMax = 1;
+
+export const getInvoiceDeliveryResponseAttemptsItemOrdinalMax = 5;
+
+export const getInvoiceDeliveryResponseAttemptsMax = 5;
+
+
 
 export const GetInvoiceDeliveryResponse = zod.object({
   "invoiceId": zod.uuid(),
@@ -8442,8 +8529,32 @@ export const GetInvoiceDeliveryResponse = zod.object({
   "acceptedAt": zod.coerce.date().nullable(),
   "deliveryConfirmed": zod.literal(false),
   "deliveryDetail": zod.string(),
-  "canPrepare": zod.boolean()
-})
+  "canPrepare": zod.boolean(),
+  "attemptCount": zod.int().min(getInvoiceDeliveryResponseAttemptCountMin),
+  "maxAttempts": zod.literal(5),
+  "latestExecutionId": zod.uuid().nullable(),
+  "nextIntents": zod.array(zod.enum(['initial', 'retry_not_dispatched', 'additional_copy'])).max(getInvoiceDeliveryResponseNextIntentsMax),
+  "attentionReason": zod.string().nullable(),
+  "integrity": zod.enum(['valid', 'unavailable']),
+  "attempts": zod.array(zod.object({
+  "attemptId": zod.uuid().nullable(),
+  "legacy": zod.boolean(),
+  "ordinal": zod.int().min(1).max(getInvoiceDeliveryResponseAttemptsItemOrdinalMax),
+  "executionId": zod.uuid(),
+  "actionKey": zod.string(),
+  "intent": zod.enum(['initial', 'retry_not_dispatched', 'additional_copy']),
+  "state": zod.enum(['processing', 'succeeded', 'blocked', 'indeterminate', 'confirmed_succeeded', 'confirmed_not_performed']),
+  "detail": zod.string(),
+  "proof": zod.enum(['not_dispatched', 'provider_accepted', 'none']),
+  "proofId": zod.uuid().nullable(),
+  "createdAt": zod.coerce.date(),
+  "completedAt": zod.coerce.date().nullable(),
+  "provider": zod.union([zod.literal('gmail'),zod.literal('microsoft'),zod.literal(null)]).nullable(),
+  "providerMessageId": zod.string().nullable(),
+  "providerRequestId": zod.string().nullable(),
+  "acceptedAt": zod.coerce.date().nullable()
+})).max(getInvoiceDeliveryResponseAttemptsMax)
+}).describe('Append-only invoice attempt history. canPrepare is initial-only for compatibility; nextIntents is the server-derived authority for a fresh review, never an automatic send. Unknown or inconsistent evidence fails closed.')
 
 
 /**
@@ -8456,32 +8567,64 @@ export const PreviewInvoiceDeliveryParams = zod.object({
 
 
 
+export const previewInvoiceDeliveryBodyTwoReasonMin = 10;
+export const previewInvoiceDeliveryBodyTwoReasonMax = 1000;
 
-export const PreviewInvoiceDeliveryBody = zod.object({
-  "expectedVersion": zod.int().min(1)
-})
+
+
+export const PreviewInvoiceDeliveryBody = zod.union([zod.object({
+  "expectedVersion": zod.int().min(1),
+  "intent": zod.enum(['initial']).optional(),
+  "expectedLatestExecutionId": zod.null().optional(),
+  "reason": zod.null().optional()
+}),zod.object({
+  "expectedVersion": zod.int().min(1),
+  "intent": zod.enum(['retry_not_dispatched', 'additional_copy']),
+  "expectedLatestExecutionId": zod.uuid(),
+  "reason": zod.string().min(previewInvoiceDeliveryBodyTwoReasonMin).max(previewInvoiceDeliveryBodyTwoReasonMax)
+})]).describe('Initial defaults when intent is omitted. Successors require exact current predecessor and a fresh reason; whitespace is trimmed server-side.')
+
+export const previewInvoiceDeliveryResponsePayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+
+export const previewInvoiceDeliveryResponseDocumentSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewInvoiceDeliveryResponseSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewInvoiceDeliveryResponseProspectiveAttemptNumberMax = 5;
+
+
 
 export const PreviewInvoiceDeliveryResponse = zod.object({
   "previewId": zod.uuid(),
-  "payloadSha256": zod.string(),
+  "payloadSha256": zod.string().regex(previewInvoiceDeliveryResponsePayloadSha256RegExp),
   "expiresAt": zod.coerce.date(),
   "invoiceId": zod.uuid(),
+  "invoiceVersion": zod.int().min(1),
+  "invoiceNumber": zod.string(),
+  "issuedAt": zod.coerce.date(),
+  "documentSha256": zod.string().regex(previewInvoiceDeliveryResponseDocumentSha256RegExp),
+  "leadId": zod.uuid(),
+  "contactId": zod.uuid(),
+  "sourceSha256": zod.string().regex(previewInvoiceDeliveryResponseSourceSha256RegExp),
   "recipient": zod.email(),
-  "subject": zod.string(),
-  "body": zod.string(),
   "sender": zod.object({
   "userId": zod.string(),
   "source": zod.enum(['lead_assignee', 'company_default']),
   "provider": zod.enum(['gmail', 'microsoft']),
   "senderEmail": zod.email()
 }),
+  "subject": zod.string(),
+  "body": zod.string(),
+  "intent": zod.enum(['initial', 'retry_not_dispatched', 'additional_copy']),
+  "expectedLatestExecutionId": zod.uuid().nullable(),
+  "reason": zod.string().nullable(),
+  "prospectiveAttemptNumber": zod.int().min(1).max(previewInvoiceDeliveryResponseProspectiveAttemptNumberMax),
+  "maxAttempts": zod.literal(5),
   "deliveryDetail": zod.string()
 })
 
 
 /**
- * Session-only invoices.manage. Rechecks identity, permission, content, recipient and holds at network dispatch. One logical send per invoice; timeout or unknown result cannot be bypassed by a new preview. No payment processor, public link or attachment.
- * @summary Send the exact approved invoice once
+ * Session-only invoices.manage with accepted verified staff. Rechecks exact attempt ownership, predecessor, actor, invoice/document, recipient, selected sender and holds at dispatch. Initial fixed key is preserved; append-only successors are capped at five total. Only typed no-dispatch proof permits retry, and an accepted prior send requires a fresh explicit copy review/acknowledgement. Unknown results and reconciliation never authorize replay. No payment processor, public link or attachment.
+ * @summary Send one exact reviewed invoice attempt
  */
 export const SendInvoiceDeliveryParams = zod.object({
   "id": zod.uuid()
@@ -8493,8 +8636,19 @@ export const sendInvoiceDeliveryBodyPayloadSha256RegExp = new RegExp('^[a-f0-9]{
 export const SendInvoiceDeliveryBody = zod.object({
   "previewId": zod.uuid(),
   "payloadSha256": zod.string().regex(sendInvoiceDeliveryBodyPayloadSha256RegExp),
-  "confirmed": zod.literal(true)
+  "confirmed": zod.literal(true),
+  "duplicateCopyAcknowledged": zod.literal(true).optional().describe('Required after reviewing an additional-copy preview; never selects an intent or grants retry authority.')
 })
+
+export const sendInvoiceDeliveryResponseAttemptCountMin = 0;
+
+export const sendInvoiceDeliveryResponseNextIntentsMax = 1;
+
+export const sendInvoiceDeliveryResponseAttemptsItemOrdinalMax = 5;
+
+export const sendInvoiceDeliveryResponseAttemptsMax = 5;
+
+
 
 export const SendInvoiceDeliveryResponse = zod.object({
   "invoiceId": zod.uuid(),
@@ -8507,8 +8661,32 @@ export const SendInvoiceDeliveryResponse = zod.object({
   "acceptedAt": zod.coerce.date().nullable(),
   "deliveryConfirmed": zod.literal(false),
   "deliveryDetail": zod.string(),
-  "canPrepare": zod.boolean()
-})
+  "canPrepare": zod.boolean(),
+  "attemptCount": zod.int().min(sendInvoiceDeliveryResponseAttemptCountMin),
+  "maxAttempts": zod.literal(5),
+  "latestExecutionId": zod.uuid().nullable(),
+  "nextIntents": zod.array(zod.enum(['initial', 'retry_not_dispatched', 'additional_copy'])).max(sendInvoiceDeliveryResponseNextIntentsMax),
+  "attentionReason": zod.string().nullable(),
+  "integrity": zod.enum(['valid', 'unavailable']),
+  "attempts": zod.array(zod.object({
+  "attemptId": zod.uuid().nullable(),
+  "legacy": zod.boolean(),
+  "ordinal": zod.int().min(1).max(sendInvoiceDeliveryResponseAttemptsItemOrdinalMax),
+  "executionId": zod.uuid(),
+  "actionKey": zod.string(),
+  "intent": zod.enum(['initial', 'retry_not_dispatched', 'additional_copy']),
+  "state": zod.enum(['processing', 'succeeded', 'blocked', 'indeterminate', 'confirmed_succeeded', 'confirmed_not_performed']),
+  "detail": zod.string(),
+  "proof": zod.enum(['not_dispatched', 'provider_accepted', 'none']),
+  "proofId": zod.uuid().nullable(),
+  "createdAt": zod.coerce.date(),
+  "completedAt": zod.coerce.date().nullable(),
+  "provider": zod.union([zod.literal('gmail'),zod.literal('microsoft'),zod.literal(null)]).nullable(),
+  "providerMessageId": zod.string().nullable(),
+  "providerRequestId": zod.string().nullable(),
+  "acceptedAt": zod.coerce.date().nullable()
+})).max(sendInvoiceDeliveryResponseAttemptsMax)
+}).describe('Append-only invoice attempt history. canPrepare is initial-only for compatibility; nextIntents is the server-derived authority for a fresh review, never an automatic send. Unknown or inconsistent evidence fails closed.')
 
 
 /**

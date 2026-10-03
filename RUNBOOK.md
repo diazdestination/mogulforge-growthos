@@ -3,6 +3,20 @@
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 
+Active second wave: `reports/invoice-recovery-contract-2026-10-02.md`, based on
+integrated lead-reply51da543 / green candidate CI37089194639. Keep invoice
+attempts append-only, unknowns held and additional copies explicitly reviewed.
+Offline schema review uses `node scripts/invoice-recovery-schema-preview.mjs`
+for0011after0010; it never opens a database or applies hosted schema. Complete
+the compatible restore and exact release checks before selecting this candidate.
+Use `reports/invoice-recovery-integration-2026-10-02.md` for the completed source
+checks and browser/recovery evidence. Operator entry: Invoices → Invoice email
+delivery → Open invoice. Old-format reviews and unknown effects remain read-only;
+only exact server-derived modes may prepare a fresh review. The local invoice
+preview flag is `--invoice-recovery`; it never connects a real provider.
+
+The previous candidate and implementation entries below are historical.
+
 Newest candidate: `reports/lead-replies-integration-2026-10-02.md`. Exact reviewed
 BIE Microsoft lead sends now have a separately opted-in original-mailbox reply
 loop, canonical lead hold/task and explicit staff handling. The lead Messages

@@ -5,17 +5,40 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+import type { InvoiceDeliveryPreviewIntent } from './invoiceDeliveryPreviewIntent';
+import type { InvoiceDeliveryPreviewMaxAttempts } from './invoiceDeliveryPreviewMaxAttempts';
 import type { InvoiceDeliveryPreviewSender } from './invoiceDeliveryPreviewSender';
 
 export interface InvoiceDeliveryPreview {
   previewId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
   payloadSha256: string;
   expiresAt: Date;
   invoiceId: string;
+  /** @minimum 1 */
+  invoiceVersion: number;
+  invoiceNumber: string;
+  issuedAt: Date;
+  /** @pattern ^[a-f0-9]{64}$ */
+  documentSha256: string;
+  leadId: string;
+  contactId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  sourceSha256: string;
   recipient: string;
+  sender: InvoiceDeliveryPreviewSender;
   subject: string;
   body: string;
-  sender: InvoiceDeliveryPreviewSender;
+  intent: InvoiceDeliveryPreviewIntent;
+  /** @nullable */
+  expectedLatestExecutionId: string | null;
+  /** @nullable */
+  reason: string | null;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  prospectiveAttemptNumber: number;
+  maxAttempts: InvoiceDeliveryPreviewMaxAttempts;
   deliveryDetail: string;
-  [key: string]: unknown;
- }
+}
