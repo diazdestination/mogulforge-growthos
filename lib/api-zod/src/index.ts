@@ -8,3 +8,5 @@ export type { ListServiceMailboxRepliesParams } from "./generated/types/listServ
 export { ListServiceMailboxRepliesParams as ListServiceMailboxRepliesPathParams } from "./generated/api";
 export type { ListLeadMailboxRepliesParams } from "./generated/types/listLeadMailboxRepliesParams";
 export { ListLeadMailboxRepliesParams as ListLeadMailboxRepliesPathParams } from "./generated/api";
+export type { ListServiceSmsRepliesParams } from "./generated/types/listServiceSmsRepliesParams";
+export { ListServiceSmsRepliesParams as ListServiceSmsRepliesPathParams } from "./generated/api";

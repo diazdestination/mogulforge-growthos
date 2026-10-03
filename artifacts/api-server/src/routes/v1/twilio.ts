@@ -28,6 +28,7 @@ import { recordTouchDelivery } from "../../services/delivery-events";
 import { recordAudit } from "../../services/audit";
 import { consumeCallieSms } from "../../services/callie-intake";
 import { acceptCallieStatusCallback } from "../../services/callie-runtime";
+import { assertServiceSmsReplay, ingestServiceSmsReply, lockServiceSms, ServiceSmsError } from "../../services/service-sms";
 
 const router: IRouter = Router();
 const xml = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>';
@@ -163,13 +164,16 @@ router.post(
         ? "STOP"
         : req.body.OptOutType === "START" || ["START", "UNSTOP"].includes(word)
           ? "START"
-          : word.startsWith("JOIN ")
-            ? "JOIN"
-            : req.body.OptOutType === "HELP" || word === "HELP"
-              ? "HELP"
+          : req.body.OptOutType === "HELP" || word === "HELP"
+            ? "HELP"
+            : word.startsWith("JOIN ")
+              ? "JOIN"
               : /^CALLIE(?:\s|$)/i.test(text) ? "CALLIE" : "message";
     let foreignMessageSid = false;
-    await db.transaction(async (tx) => {
+    try { await db.transaction(async (tx) => {
+      // Lifecycle -> scheduling -> phone/row locks matches service dispatch.
+      // Disabled outbound work does not disable receipt/STOP safety intake.
+      await lockServiceSms(tx, config!.organizationId);
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${`twilio-inbound:${config!.organizationId}:${phone}`}))`,
       );
@@ -179,6 +183,7 @@ router.post(
         .where(eq(twilioInboundEventsTable.messageSid, req.body.MessageSid));
       if (seen) {
         foreignMessageSid = seen.organizationId !== config!.organizationId;
+        if (!foreignMessageSid) await assertServiceSmsReplay(tx, config!.organizationId, req.body);
         return;
       }
       const contacts = await tx
@@ -207,6 +212,7 @@ router.post(
           .from(twilioInboundEventsTable)
           .where(eq(twilioInboundEventsTable.messageSid, req.body.MessageSid));
         foreignMessageSid = claimed?.organizationId !== config!.organizationId;
+        if (!foreignMessageSid) await assertServiceSmsReplay(tx, config!.organizationId, req.body);
         return;
       }
       if (eventType === "STOP") {
@@ -267,6 +273,8 @@ router.post(
             ),
           );
         // No purpose is re-granted; return to the form for fresh consent.
+      } else if (eventType === "message") {
+        await ingestServiceSmsReply(tx, config!, req.body);
       } else if (eventType === "CALLIE") {
         // The exact typed proof and its signed inbound event commit together.
         // No contact, reusable consent or outgoing TwiML message is created here.
@@ -334,7 +342,10 @@ router.post(
           .delete(twilioEnrollmentsTable)
           .where(eq(twilioEnrollmentsTable.id, pending.id));
       }
-    });
+    }); } catch (error) {
+      if (error instanceof ServiceSmsError && error.status === 403) { res.status(403).end(); return; }
+      throw error;
+    }
     if (foreignMessageSid) {
       res.status(403).end();
       return;

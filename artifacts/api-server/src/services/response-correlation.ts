@@ -212,8 +212,8 @@ export async function hasCustomerReplyHold(organizationId: string, leadId: strin
   return Boolean(row);
 }
 
-export async function hasContactReplyHold(organizationId: string, contactId: string) {
-  const [row] = await db.select({ id: replies.id }).from(replies).where(and(eq(replies.organizationId, organizationId), eq(replies.contactId, contactId), eq(replies.holdActive, true))).limit(1);
+export async function hasContactReplyHold(organizationId: string, contactId: string, reader: Pick<typeof db, "select"> = db) {
+  const [row] = await reader.select({ id: replies.id }).from(replies).where(and(eq(replies.organizationId, organizationId), eq(replies.contactId, contactId), eq(replies.holdActive, true))).limit(1);
   return Boolean(row);
 }
 

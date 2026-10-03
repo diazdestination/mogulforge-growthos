@@ -7,7 +7,8 @@ import { serviceObligationsTable } from "./service-obligations";
 import { usersTable } from "./auth";
 import { mailboxConnectorsTable } from "./mailbox-connectors";
 
-export type ServiceMailboxContext = { dueAt: string; occurrenceIndex: number; createdAt: string; updatedAt: string; approvalId: string; scheduledActionId: string };
+export type ServiceMailboxContext = { dueAt: string; occurrenceIndex: number; createdAt: string; updatedAt: string; approvalId: string; scheduledActionId: string;
+  authorization?: { origin: "individual" | "standing"; fingerprint: string } };
 export type LeadMailboxContext = { kind: "bie_lead_email"; version: 1; leadId: string; contactId: string; leadCreatedAt: string; leadUpdatedAt: string; proposalId: string; leadMonitoringApproval: { version: number; approvedAt: string } };
 
 /** Frozen before dispatch. Observing a sent message is evidence, never resend authority. */

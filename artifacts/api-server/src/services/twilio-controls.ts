@@ -12,6 +12,8 @@ export type SmsSendContext = {
   contactId: string;
   purpose: SmsPurpose;
   idempotencyKey: string;
+  /** Typed service parent only; it cannot grant generic SMS consent. */
+  serviceSmsParentId?: string;
 };
 export const phoneE164 = (phone: string) => {
   const digits = phone.replace(/\D/g, "");

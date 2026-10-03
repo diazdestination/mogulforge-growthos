@@ -28,12 +28,24 @@ export async function runDurableAction(input: {
   actorUserId?: string | null;
   leadId?: string | null;
   appointmentId?: string | null;
+  /** Exact original service approval; serializes pending allowance with ownership. */
+  serviceCare?: { approvalId: string; scheduledActionId: string };
   execute: () => Promise<{ state: "succeeded" | "blocked"; detail: string }>;
 }) {
   const fingerprint = createHash("sha256")
     .update(canonical(input.payload))
     .digest("hex");
   const claimed = await db.transaction(async (tx) => {
+    if (input.serviceCare) {
+      const { lockServiceStanding } = await import("./service-standing-policy");
+      await lockServiceStanding(tx, input.organizationId);
+      const [existing] = await tx.select({ id: executions.id }).from(executions).where(and(eq(executions.organizationId, input.organizationId), eq(executions.actionKey, input.actionKey)));
+      if (!existing) {
+        if (input.kind !== "service_care_reminder" || input.actionKey !== `scheduled:${input.serviceCare.scheduledActionId}`) throw new Error("Invalid service claim context.");
+        const { checkServiceClaimBudget } = await import("./service-care-claim");
+        await checkServiceClaimBudget(tx, input.organizationId, input.serviceCare.approvalId, input.serviceCare.scheduledActionId);
+      }
+    }
     if (input.appointmentId) await lockContractorSchedule(tx, input.organizationId);
     if (input.leadId) await lockReplyLead(tx, input.organizationId, input.leadId);
     const [row] = await tx

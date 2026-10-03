@@ -9,6 +9,1143 @@ import * as zod from 'zod';
 
 
 /**
+ * Accepted active staff session only; crm.read. Default-off exact service-series review. One fixed reminder per future eligible occurrence; no backlog, marketing permission, warranty decision or automatic booking. A held/unknown original effect cannot be retried with another policy or channel.
+ * @summary Review standing reminder authority and current occurrence
+ */
+export const GetServiceStandingPolicyParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const getServiceStandingPolicyResponseServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getServiceStandingPolicyResponseEnrollmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getServiceStandingPolicyResponseVersionMin = 0;
+export const getServiceStandingPolicyResponseVersionMax = 9007199254740991;
+
+export const getServiceStandingPolicyResponseRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getServiceStandingPolicyResponseAnchorObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getServiceStandingPolicyResponseSeriesRootObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getServiceStandingPolicyResponsePolicyAgreementStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getServiceStandingPolicyResponsePolicyAgreementEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getServiceStandingPolicyResponsePolicyAgreementEvidenceMin = 10;
+export const getServiceStandingPolicyResponsePolicyAgreementEvidenceMax = 1000;
+
+export const getServiceStandingPolicyResponsePolicySourceReviewEvidenceMin = 10;
+export const getServiceStandingPolicyResponsePolicySourceReviewEvidenceMax = 1000;
+
+export const getServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEvidenceMin = 10;
+export const getServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEvidenceMax = 1000;
+
+export const getServiceStandingPolicyResponseApprovedSnapshotSettingsSourceReviewEvidenceMin = 10;
+export const getServiceStandingPolicyResponseApprovedSnapshotSettingsSourceReviewEvidenceMax = 1000;
+
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeSeriesRootObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeAnchorObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeAnchorOccurrenceIndexMin = 0;
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeAnchorOccurrenceIndexMax = 9007199254740991;
+
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeReviewedObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeReviewedOccurrenceIndexMin = 0;
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeReviewedOccurrenceIndexMax = 9007199254740991;
+
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getServiceStandingPolicyResponseApprovedSnapshotScopePropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeNoticeDaysMin = -9007199254740991;
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeNoticeDaysMax = 9007199254740991;
+
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceIntervalMonthsMax = 60;
+
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceAnchorDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceAgreementNoteMax = 500;
+
+
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeCoverageStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getServiceStandingPolicyResponseApprovedSnapshotScopeCoverageEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getServiceStandingPolicyResponseApprovedSnapshotSeriesFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getServiceStandingPolicyResponseApprovedSnapshotSourceReviewFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getServiceStandingPolicyResponseApprovedSnapshotSenderOneSenderEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const getServiceStandingPolicyResponseApprovedSnapshotSenderOneConnectionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getServiceStandingPolicyResponseApprovedSnapshotSendingHoursStartHourMin = -9007199254740991;
+export const getServiceStandingPolicyResponseApprovedSnapshotSendingHoursStartHourMax = 9007199254740991;
+
+export const getServiceStandingPolicyResponseApprovedSnapshotSendingHoursEndHourMin = -9007199254740991;
+export const getServiceStandingPolicyResponseApprovedSnapshotSendingHoursEndHourMax = 9007199254740991;
+
+export const getServiceStandingPolicyResponseApprovedSnapshotSendingHoursMaxTouchesPerDayMin = 0;
+export const getServiceStandingPolicyResponseApprovedSnapshotSendingHoursMaxTouchesPerDayMax = 9007199254740991;
+
+export const getServiceStandingPolicyResponseSourceSummaryDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getServiceStandingPolicyResponseSourceSummaryNoticeDaysMin = -9007199254740991;
+export const getServiceStandingPolicyResponseSourceSummaryNoticeDaysMax = 9007199254740991;
+
+export const getServiceStandingPolicyResponseSourceSummaryRecurrenceIntervalMonthsMax = 60;
+
+export const getServiceStandingPolicyResponseSourceSummaryRecurrenceAnchorDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getServiceStandingPolicyResponseSourceSummaryRecurrenceEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getServiceStandingPolicyResponseSourceSummaryRecurrenceAgreementNoteMax = 500;
+
+
+export const getServiceStandingPolicyResponseSourceSummaryCoverageStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getServiceStandingPolicyResponseSourceSummaryCoverageEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getServiceStandingPolicyResponseOccurrenceAuthorizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getServiceStandingPolicyResponseOccurrenceScheduledActionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const GetServiceStandingPolicyResponse = zod.object({
+  "serviceObligationId": zod.uuid().regex(getServiceStandingPolicyResponseServiceObligationIdRegExp),
+  "expectedUpdatedAt": zod.coerce.date(),
+  "enrollmentId": zod.uuid().regex(getServiceStandingPolicyResponseEnrollmentIdRegExp).nullable(),
+  "version": zod.int().min(getServiceStandingPolicyResponseVersionMin).max(getServiceStandingPolicyResponseVersionMax),
+  "revisionId": zod.uuid().regex(getServiceStandingPolicyResponseRevisionIdRegExp).nullable(),
+  "anchorObligationId": zod.uuid().regex(getServiceStandingPolicyResponseAnchorObligationIdRegExp),
+  "seriesRootObligationId": zod.uuid().regex(getServiceStandingPolicyResponseSeriesRootObligationIdRegExp),
+  "policy": zod.object({
+  "enabled": zod.boolean(),
+  "channel": zod.enum(['email', 'sms']),
+  "agreementStartsOn": zod.string().regex(getServiceStandingPolicyResponsePolicyAgreementStartsOnRegExp),
+  "agreementEndsOn": zod.string().regex(getServiceStandingPolicyResponsePolicyAgreementEndsOnRegExp),
+  "agreementEvidence": zod.string().min(getServiceStandingPolicyResponsePolicyAgreementEvidenceMin).max(getServiceStandingPolicyResponsePolicyAgreementEvidenceMax),
+  "sourceReview": zod.object({
+  "kind": zod.enum(['native', 'reconciled_import']),
+  "verifiedAt": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date().nullable(),
+  "evidence": zod.string().min(getServiceStandingPolicyResponsePolicySourceReviewEvidenceMin).max(getServiceStandingPolicyResponsePolicySourceReviewEvidenceMax)
+})
+}).nullable(),
+  "approvedSnapshot": zod.object({
+  "schemaVersion": zod.enum(['service-standing-policy.v1']),
+  "settings": zod.object({
+  "enabled": zod.boolean(),
+  "channel": zod.enum(['email', 'sms']),
+  "agreementStartsOn": zod.string().regex(getServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementStartsOnRegExp),
+  "agreementEndsOn": zod.string().regex(getServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEndsOnRegExp),
+  "agreementEvidence": zod.string().min(getServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEvidenceMin).max(getServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEvidenceMax),
+  "sourceReview": zod.object({
+  "kind": zod.enum(['native', 'reconciled_import']),
+  "verifiedAt": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date().nullable(),
+  "evidence": zod.string().min(getServiceStandingPolicyResponseApprovedSnapshotSettingsSourceReviewEvidenceMin).max(getServiceStandingPolicyResponseApprovedSnapshotSettingsSourceReviewEvidenceMax)
+})
+}),
+  "scope": zod.object({
+  "seriesRootObligationId": zod.uuid().regex(getServiceStandingPolicyResponseApprovedSnapshotScopeSeriesRootObligationIdRegExp),
+  "anchorObligationId": zod.uuid().regex(getServiceStandingPolicyResponseApprovedSnapshotScopeAnchorObligationIdRegExp),
+  "anchorUpdatedAt": zod.coerce.date(),
+  "anchorOccurrenceIndex": zod.int().min(getServiceStandingPolicyResponseApprovedSnapshotScopeAnchorOccurrenceIndexMin).max(getServiceStandingPolicyResponseApprovedSnapshotScopeAnchorOccurrenceIndexMax),
+  "reviewedObligationId": zod.uuid().regex(getServiceStandingPolicyResponseApprovedSnapshotScopeReviewedObligationIdRegExp),
+  "reviewedUpdatedAt": zod.coerce.date(),
+  "reviewedOccurrenceIndex": zod.int().min(getServiceStandingPolicyResponseApprovedSnapshotScopeReviewedOccurrenceIndexMin).max(getServiceStandingPolicyResponseApprovedSnapshotScopeReviewedOccurrenceIndexMax),
+  "contactId": zod.uuid().regex(getServiceStandingPolicyResponseApprovedSnapshotScopeContactIdRegExp),
+  "propertyId": zod.uuid().regex(getServiceStandingPolicyResponseApprovedSnapshotScopePropertyIdRegExp).nullable(),
+  "kind": zod.string(),
+  "equipmentLabel": zod.string(),
+  "noticeDays": zod.int().min(getServiceStandingPolicyResponseApprovedSnapshotScopeNoticeDaysMin).max(getServiceStandingPolicyResponseApprovedSnapshotScopeNoticeDaysMax),
+  "source": zod.string(),
+  "externalRef": zod.string().nullable(),
+  "recurrence": zod.object({
+  "mode": zod.enum(['calendar_months']),
+  "intervalMonths": zod.int().min(1).max(getServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceIntervalMonthsMax),
+  "anchorDate": zod.string().regex(getServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceAnchorDateRegExp),
+  "endDate": zod.string().regex(getServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceEndDateRegExp).nullable(),
+  "agreementNote": zod.string().min(1).max(getServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceAgreementNoteMax),
+  "approvedByUserId": zod.string().min(1),
+  "approvedAt": zod.coerce.date()
+}),
+  "coverageStartsOn": zod.string().regex(getServiceStandingPolicyResponseApprovedSnapshotScopeCoverageStartsOnRegExp).nullable(),
+  "coverageEndsOn": zod.string().regex(getServiceStandingPolicyResponseApprovedSnapshotScopeCoverageEndsOnRegExp).nullable(),
+  "coverageEvidence": zod.string().nullable(),
+  "ownerUserId": zod.string(),
+  "recipient": zod.string(),
+  "businessName": zod.string()
+}),
+  "seriesFingerprint": zod.string().regex(getServiceStandingPolicyResponseApprovedSnapshotSeriesFingerprintRegExp),
+  "sourceReviewFingerprint": zod.string().regex(getServiceStandingPolicyResponseApprovedSnapshotSourceReviewFingerprintRegExp),
+  "templateVersion": zod.enum(['service-care.v2']),
+  "template": zod.object({
+  "subject": zod.string(),
+  "body": zod.string()
+}),
+  "sender": zod.union([zod.object({
+  "kind": zod.enum(['email']),
+  "userId": zod.string(),
+  "source": zod.enum(['company_default']),
+  "provider": zod.enum(['gmail', 'microsoft']),
+  "senderEmail": zod.email().regex(getServiceStandingPolicyResponseApprovedSnapshotSenderOneSenderEmailRegExp),
+  "connectionId": zod.uuid().regex(getServiceStandingPolicyResponseApprovedSnapshotSenderOneConnectionIdRegExp),
+  "connectionRevision": zod.coerce.date(),
+  "accountId": zod.string().nullable()
+}),zod.object({
+  "kind": zod.enum(['sms']),
+  "id": zod.string(),
+  "accountSid": zod.string(),
+  "sender": zod.string(),
+  "messagingServiceSid": zod.string(),
+  "disclosureVersion": zod.string(),
+  "origin": zod.string(),
+  "businessName": zod.string()
+})]),
+  "sendingHours": zod.object({
+  "quietHoursEnabled": zod.boolean(),
+  "timezone": zod.string(),
+  "startHour": zod.int().min(getServiceStandingPolicyResponseApprovedSnapshotSendingHoursStartHourMin).max(getServiceStandingPolicyResponseApprovedSnapshotSendingHoursStartHourMax),
+  "endHour": zod.int().min(getServiceStandingPolicyResponseApprovedSnapshotSendingHoursEndHourMin).max(getServiceStandingPolicyResponseApprovedSnapshotSendingHoursEndHourMax),
+  "days": zod.array(zod.string()),
+  "maxTouchesPerDay": zod.int().min(getServiceStandingPolicyResponseApprovedSnapshotSendingHoursMaxTouchesPerDayMin).max(getServiceStandingPolicyResponseApprovedSnapshotSendingHoursMaxTouchesPerDayMax)
+})
+}).nullable(),
+  "sourceSummary": zod.object({
+  "source": zod.string(),
+  "externalRef": zod.string().nullable(),
+  "kind": zod.string(),
+  "equipmentLabel": zod.string(),
+  "dueDate": zod.string().regex(getServiceStandingPolicyResponseSourceSummaryDueDateRegExp),
+  "noticeDays": zod.int().min(getServiceStandingPolicyResponseSourceSummaryNoticeDaysMin).max(getServiceStandingPolicyResponseSourceSummaryNoticeDaysMax),
+  "recurrence": zod.object({
+  "mode": zod.enum(['calendar_months']),
+  "intervalMonths": zod.int().min(1).max(getServiceStandingPolicyResponseSourceSummaryRecurrenceIntervalMonthsMax),
+  "anchorDate": zod.string().regex(getServiceStandingPolicyResponseSourceSummaryRecurrenceAnchorDateRegExp),
+  "endDate": zod.string().regex(getServiceStandingPolicyResponseSourceSummaryRecurrenceEndDateRegExp).nullable(),
+  "agreementNote": zod.string().min(1).max(getServiceStandingPolicyResponseSourceSummaryRecurrenceAgreementNoteMax),
+  "approvedByUserId": zod.string().min(1),
+  "approvedAt": zod.coerce.date()
+}).nullable(),
+  "ownerUserId": zod.string().nullable(),
+  "coverageStartsOn": zod.string().regex(getServiceStandingPolicyResponseSourceSummaryCoverageStartsOnRegExp).nullable(),
+  "coverageEndsOn": zod.string().regex(getServiceStandingPolicyResponseSourceSummaryCoverageEndsOnRegExp).nullable()
+}),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable()
+}),
+  "occurrence": zod.object({
+  "eligible": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "noticeAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date().nullable(),
+  "authorizationId": zod.uuid().regex(getServiceStandingPolicyResponseOccurrenceAuthorizationIdRegExp).nullable(),
+  "scheduledActionId": zod.uuid().regex(getServiceStandingPolicyResponseOccurrenceScheduledActionIdRegExp).nullable(),
+  "origin": zod.enum(['individual', 'standing']).nullable(),
+  "receiptState": zod.string().nullable()
+})
+})
+
+
+/**
+ * Accepted active staff session only; settings.manage. Default-off exact service-series review. One fixed reminder per future eligible occurrence; no backlog, marketing permission, warranty decision or automatic booking. A held/unknown original effect cannot be retried with another policy or channel.
+ * @summary Prepare an exact ten-minute service-series review
+ */
+export const PreviewServiceStandingPolicyParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const previewServiceStandingPolicyBodyExpectedVersionMin = 0;
+export const previewServiceStandingPolicyBodyExpectedVersionMax = 9007199254740991;
+
+export const previewServiceStandingPolicyBodyPolicyAgreementStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const previewServiceStandingPolicyBodyPolicyAgreementEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const previewServiceStandingPolicyBodyPolicyAgreementEvidenceMin = 10;
+export const previewServiceStandingPolicyBodyPolicyAgreementEvidenceMax = 1000;
+
+export const previewServiceStandingPolicyBodyPolicySourceReviewEvidenceMin = 10;
+export const previewServiceStandingPolicyBodyPolicySourceReviewEvidenceMax = 1000;
+
+
+
+export const PreviewServiceStandingPolicyBody = zod.object({
+  "expectedVersion": zod.int().min(previewServiceStandingPolicyBodyExpectedVersionMin).max(previewServiceStandingPolicyBodyExpectedVersionMax),
+  "expectedUpdatedAt": zod.coerce.date(),
+  "policy": zod.object({
+  "enabled": zod.boolean(),
+  "channel": zod.enum(['email', 'sms']),
+  "agreementStartsOn": zod.string().regex(previewServiceStandingPolicyBodyPolicyAgreementStartsOnRegExp),
+  "agreementEndsOn": zod.string().regex(previewServiceStandingPolicyBodyPolicyAgreementEndsOnRegExp),
+  "agreementEvidence": zod.string().min(previewServiceStandingPolicyBodyPolicyAgreementEvidenceMin).max(previewServiceStandingPolicyBodyPolicyAgreementEvidenceMax),
+  "sourceReview": zod.object({
+  "kind": zod.enum(['native', 'reconciled_import']),
+  "verifiedAt": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date().nullable(),
+  "evidence": zod.string().min(previewServiceStandingPolicyBodyPolicySourceReviewEvidenceMin).max(previewServiceStandingPolicyBodyPolicySourceReviewEvidenceMax)
+})
+})
+})
+
+export const previewServiceStandingPolicyResponseExpectedVersionMin = 0;
+export const previewServiceStandingPolicyResponseExpectedVersionMax = 9007199254740991;
+
+export const previewServiceStandingPolicyResponseExpectedSnapshotOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotReviewIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotEnrollmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotExpectedVersionMin = 0;
+export const previewServiceStandingPolicyResponseExpectedSnapshotExpectedVersionMax = 9007199254740991;
+
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySettingsAgreementStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySettingsAgreementEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySettingsAgreementEvidenceMin = 10;
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySettingsAgreementEvidenceMax = 1000;
+
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySettingsSourceReviewEvidenceMin = 10;
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySettingsSourceReviewEvidenceMax = 1000;
+
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeSeriesRootObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeAnchorObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeAnchorOccurrenceIndexMin = 0;
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeAnchorOccurrenceIndexMax = 9007199254740991;
+
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeReviewedObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeReviewedOccurrenceIndexMin = 0;
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeReviewedOccurrenceIndexMax = 9007199254740991;
+
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopePropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeNoticeDaysMin = -9007199254740991;
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeNoticeDaysMax = 9007199254740991;
+
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeRecurrenceIntervalMonthsMax = 60;
+
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeRecurrenceAnchorDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeRecurrenceEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeRecurrenceAgreementNoteMax = 500;
+
+
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeCoverageStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeCoverageEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySeriesFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySourceReviewFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySenderOneSenderEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySenderOneConnectionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySendingHoursStartHourMin = -9007199254740991;
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySendingHoursStartHourMax = 9007199254740991;
+
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySendingHoursEndHourMin = -9007199254740991;
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySendingHoursEndHourMax = 9007199254740991;
+
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySendingHoursMaxTouchesPerDayMin = 0;
+export const previewServiceStandingPolicyResponseExpectedSnapshotPolicySendingHoursMaxTouchesPerDayMax = 9007199254740991;
+
+export const previewServiceStandingPolicyResponsePreviewHashRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const PreviewServiceStandingPolicyResponse = zod.object({
+  "expectedVersion": zod.int().min(previewServiceStandingPolicyResponseExpectedVersionMin).max(previewServiceStandingPolicyResponseExpectedVersionMax),
+  "expectedSnapshot": zod.object({
+  "schemaVersion": zod.enum(['service-standing-preview.v1']),
+  "organizationId": zod.uuid().regex(previewServiceStandingPolicyResponseExpectedSnapshotOrganizationIdRegExp),
+  "actorUserId": zod.string(),
+  "reviewId": zod.uuid().regex(previewServiceStandingPolicyResponseExpectedSnapshotReviewIdRegExp),
+  "enrollmentId": zod.uuid().regex(previewServiceStandingPolicyResponseExpectedSnapshotEnrollmentIdRegExp),
+  "expectedVersion": zod.int().min(previewServiceStandingPolicyResponseExpectedSnapshotExpectedVersionMin).max(previewServiceStandingPolicyResponseExpectedSnapshotExpectedVersionMax),
+  "issuedAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "policy": zod.object({
+  "schemaVersion": zod.enum(['service-standing-policy.v1']),
+  "settings": zod.object({
+  "enabled": zod.boolean(),
+  "channel": zod.enum(['email', 'sms']),
+  "agreementStartsOn": zod.string().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicySettingsAgreementStartsOnRegExp),
+  "agreementEndsOn": zod.string().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicySettingsAgreementEndsOnRegExp),
+  "agreementEvidence": zod.string().min(previewServiceStandingPolicyResponseExpectedSnapshotPolicySettingsAgreementEvidenceMin).max(previewServiceStandingPolicyResponseExpectedSnapshotPolicySettingsAgreementEvidenceMax),
+  "sourceReview": zod.object({
+  "kind": zod.enum(['native', 'reconciled_import']),
+  "verifiedAt": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date().nullable(),
+  "evidence": zod.string().min(previewServiceStandingPolicyResponseExpectedSnapshotPolicySettingsSourceReviewEvidenceMin).max(previewServiceStandingPolicyResponseExpectedSnapshotPolicySettingsSourceReviewEvidenceMax)
+})
+}),
+  "scope": zod.object({
+  "seriesRootObligationId": zod.uuid().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeSeriesRootObligationIdRegExp),
+  "anchorObligationId": zod.uuid().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeAnchorObligationIdRegExp),
+  "anchorUpdatedAt": zod.coerce.date(),
+  "anchorOccurrenceIndex": zod.int().min(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeAnchorOccurrenceIndexMin).max(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeAnchorOccurrenceIndexMax),
+  "reviewedObligationId": zod.uuid().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeReviewedObligationIdRegExp),
+  "reviewedUpdatedAt": zod.coerce.date(),
+  "reviewedOccurrenceIndex": zod.int().min(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeReviewedOccurrenceIndexMin).max(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeReviewedOccurrenceIndexMax),
+  "contactId": zod.uuid().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeContactIdRegExp),
+  "propertyId": zod.uuid().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopePropertyIdRegExp).nullable(),
+  "kind": zod.string(),
+  "equipmentLabel": zod.string(),
+  "noticeDays": zod.int().min(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeNoticeDaysMin).max(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeNoticeDaysMax),
+  "source": zod.string(),
+  "externalRef": zod.string().nullable(),
+  "recurrence": zod.object({
+  "mode": zod.enum(['calendar_months']),
+  "intervalMonths": zod.int().min(1).max(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeRecurrenceIntervalMonthsMax),
+  "anchorDate": zod.string().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeRecurrenceAnchorDateRegExp),
+  "endDate": zod.string().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeRecurrenceEndDateRegExp).nullable(),
+  "agreementNote": zod.string().min(1).max(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeRecurrenceAgreementNoteMax),
+  "approvedByUserId": zod.string().min(1),
+  "approvedAt": zod.coerce.date()
+}),
+  "coverageStartsOn": zod.string().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeCoverageStartsOnRegExp).nullable(),
+  "coverageEndsOn": zod.string().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicyScopeCoverageEndsOnRegExp).nullable(),
+  "coverageEvidence": zod.string().nullable(),
+  "ownerUserId": zod.string(),
+  "recipient": zod.string(),
+  "businessName": zod.string()
+}),
+  "seriesFingerprint": zod.string().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicySeriesFingerprintRegExp),
+  "sourceReviewFingerprint": zod.string().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicySourceReviewFingerprintRegExp),
+  "templateVersion": zod.enum(['service-care.v2']),
+  "template": zod.object({
+  "subject": zod.string(),
+  "body": zod.string()
+}),
+  "sender": zod.union([zod.object({
+  "kind": zod.enum(['email']),
+  "userId": zod.string(),
+  "source": zod.enum(['company_default']),
+  "provider": zod.enum(['gmail', 'microsoft']),
+  "senderEmail": zod.email().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicySenderOneSenderEmailRegExp),
+  "connectionId": zod.uuid().regex(previewServiceStandingPolicyResponseExpectedSnapshotPolicySenderOneConnectionIdRegExp),
+  "connectionRevision": zod.coerce.date(),
+  "accountId": zod.string().nullable()
+}),zod.object({
+  "kind": zod.enum(['sms']),
+  "id": zod.string(),
+  "accountSid": zod.string(),
+  "sender": zod.string(),
+  "messagingServiceSid": zod.string(),
+  "disclosureVersion": zod.string(),
+  "origin": zod.string(),
+  "businessName": zod.string()
+})]),
+  "sendingHours": zod.object({
+  "quietHoursEnabled": zod.boolean(),
+  "timezone": zod.string(),
+  "startHour": zod.int().min(previewServiceStandingPolicyResponseExpectedSnapshotPolicySendingHoursStartHourMin).max(previewServiceStandingPolicyResponseExpectedSnapshotPolicySendingHoursStartHourMax),
+  "endHour": zod.int().min(previewServiceStandingPolicyResponseExpectedSnapshotPolicySendingHoursEndHourMin).max(previewServiceStandingPolicyResponseExpectedSnapshotPolicySendingHoursEndHourMax),
+  "days": zod.array(zod.string()),
+  "maxTouchesPerDay": zod.int().min(previewServiceStandingPolicyResponseExpectedSnapshotPolicySendingHoursMaxTouchesPerDayMin).max(previewServiceStandingPolicyResponseExpectedSnapshotPolicySendingHoursMaxTouchesPerDayMax)
+})
+})
+}),
+  "previewHash": zod.string().regex(previewServiceStandingPolicyResponsePreviewHashRegExp),
+  "expiresAt": zod.coerce.date()
+})
+
+
+/**
+ * Accepted active staff session only; settings.manage. Default-off exact service-series review. One fixed reminder per future eligible occurrence; no backlog, marketing permission, warranty decision or automatic booking. A held/unknown original effect cannot be retried with another policy or channel.
+ * @summary Approve unchanged forward-only service reminders
+ */
+export const ApproveServiceStandingPolicyParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const approveServiceStandingPolicyBodyExpectedVersionMin = 0;
+export const approveServiceStandingPolicyBodyExpectedVersionMax = 9007199254740991;
+
+export const approveServiceStandingPolicyBodyExpectedSnapshotOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotReviewIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotEnrollmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotExpectedVersionMin = 0;
+export const approveServiceStandingPolicyBodyExpectedSnapshotExpectedVersionMax = 9007199254740991;
+
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySettingsAgreementStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySettingsAgreementEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySettingsAgreementEvidenceMin = 10;
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySettingsAgreementEvidenceMax = 1000;
+
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySettingsSourceReviewEvidenceMin = 10;
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySettingsSourceReviewEvidenceMax = 1000;
+
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeSeriesRootObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeAnchorObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeAnchorOccurrenceIndexMin = 0;
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeAnchorOccurrenceIndexMax = 9007199254740991;
+
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeReviewedObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeReviewedOccurrenceIndexMin = 0;
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeReviewedOccurrenceIndexMax = 9007199254740991;
+
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopePropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeNoticeDaysMin = -9007199254740991;
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeNoticeDaysMax = 9007199254740991;
+
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeRecurrenceIntervalMonthsMax = 60;
+
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeRecurrenceAnchorDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeRecurrenceEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeRecurrenceAgreementNoteMax = 500;
+
+
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeCoverageStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeCoverageEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySeriesFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySourceReviewFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySenderOneSenderEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySenderOneConnectionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySendingHoursStartHourMin = -9007199254740991;
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySendingHoursStartHourMax = 9007199254740991;
+
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySendingHoursEndHourMin = -9007199254740991;
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySendingHoursEndHourMax = 9007199254740991;
+
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySendingHoursMaxTouchesPerDayMin = 0;
+export const approveServiceStandingPolicyBodyExpectedSnapshotPolicySendingHoursMaxTouchesPerDayMax = 9007199254740991;
+
+export const approveServiceStandingPolicyBodyPreviewHashRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const ApproveServiceStandingPolicyBody = zod.object({
+  "expectedVersion": zod.int().min(approveServiceStandingPolicyBodyExpectedVersionMin).max(approveServiceStandingPolicyBodyExpectedVersionMax),
+  "expectedSnapshot": zod.object({
+  "schemaVersion": zod.enum(['service-standing-preview.v1']),
+  "organizationId": zod.uuid().regex(approveServiceStandingPolicyBodyExpectedSnapshotOrganizationIdRegExp),
+  "actorUserId": zod.string(),
+  "reviewId": zod.uuid().regex(approveServiceStandingPolicyBodyExpectedSnapshotReviewIdRegExp),
+  "enrollmentId": zod.uuid().regex(approveServiceStandingPolicyBodyExpectedSnapshotEnrollmentIdRegExp),
+  "expectedVersion": zod.int().min(approveServiceStandingPolicyBodyExpectedSnapshotExpectedVersionMin).max(approveServiceStandingPolicyBodyExpectedSnapshotExpectedVersionMax),
+  "issuedAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "policy": zod.object({
+  "schemaVersion": zod.enum(['service-standing-policy.v1']),
+  "settings": zod.object({
+  "enabled": zod.boolean(),
+  "channel": zod.enum(['email', 'sms']),
+  "agreementStartsOn": zod.string().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicySettingsAgreementStartsOnRegExp),
+  "agreementEndsOn": zod.string().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicySettingsAgreementEndsOnRegExp),
+  "agreementEvidence": zod.string().min(approveServiceStandingPolicyBodyExpectedSnapshotPolicySettingsAgreementEvidenceMin).max(approveServiceStandingPolicyBodyExpectedSnapshotPolicySettingsAgreementEvidenceMax),
+  "sourceReview": zod.object({
+  "kind": zod.enum(['native', 'reconciled_import']),
+  "verifiedAt": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date().nullable(),
+  "evidence": zod.string().min(approveServiceStandingPolicyBodyExpectedSnapshotPolicySettingsSourceReviewEvidenceMin).max(approveServiceStandingPolicyBodyExpectedSnapshotPolicySettingsSourceReviewEvidenceMax)
+})
+}),
+  "scope": zod.object({
+  "seriesRootObligationId": zod.uuid().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeSeriesRootObligationIdRegExp),
+  "anchorObligationId": zod.uuid().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeAnchorObligationIdRegExp),
+  "anchorUpdatedAt": zod.coerce.date(),
+  "anchorOccurrenceIndex": zod.int().min(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeAnchorOccurrenceIndexMin).max(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeAnchorOccurrenceIndexMax),
+  "reviewedObligationId": zod.uuid().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeReviewedObligationIdRegExp),
+  "reviewedUpdatedAt": zod.coerce.date(),
+  "reviewedOccurrenceIndex": zod.int().min(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeReviewedOccurrenceIndexMin).max(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeReviewedOccurrenceIndexMax),
+  "contactId": zod.uuid().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeContactIdRegExp),
+  "propertyId": zod.uuid().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopePropertyIdRegExp).nullable(),
+  "kind": zod.string(),
+  "equipmentLabel": zod.string(),
+  "noticeDays": zod.int().min(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeNoticeDaysMin).max(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeNoticeDaysMax),
+  "source": zod.string(),
+  "externalRef": zod.string().nullable(),
+  "recurrence": zod.object({
+  "mode": zod.enum(['calendar_months']),
+  "intervalMonths": zod.int().min(1).max(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeRecurrenceIntervalMonthsMax),
+  "anchorDate": zod.string().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeRecurrenceAnchorDateRegExp),
+  "endDate": zod.string().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeRecurrenceEndDateRegExp).nullable(),
+  "agreementNote": zod.string().min(1).max(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeRecurrenceAgreementNoteMax),
+  "approvedByUserId": zod.string().min(1),
+  "approvedAt": zod.coerce.date()
+}),
+  "coverageStartsOn": zod.string().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeCoverageStartsOnRegExp).nullable(),
+  "coverageEndsOn": zod.string().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicyScopeCoverageEndsOnRegExp).nullable(),
+  "coverageEvidence": zod.string().nullable(),
+  "ownerUserId": zod.string(),
+  "recipient": zod.string(),
+  "businessName": zod.string()
+}),
+  "seriesFingerprint": zod.string().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicySeriesFingerprintRegExp),
+  "sourceReviewFingerprint": zod.string().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicySourceReviewFingerprintRegExp),
+  "templateVersion": zod.enum(['service-care.v2']),
+  "template": zod.object({
+  "subject": zod.string(),
+  "body": zod.string()
+}),
+  "sender": zod.union([zod.object({
+  "kind": zod.enum(['email']),
+  "userId": zod.string(),
+  "source": zod.enum(['company_default']),
+  "provider": zod.enum(['gmail', 'microsoft']),
+  "senderEmail": zod.email().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicySenderOneSenderEmailRegExp),
+  "connectionId": zod.uuid().regex(approveServiceStandingPolicyBodyExpectedSnapshotPolicySenderOneConnectionIdRegExp),
+  "connectionRevision": zod.coerce.date(),
+  "accountId": zod.string().nullable()
+}),zod.object({
+  "kind": zod.enum(['sms']),
+  "id": zod.string(),
+  "accountSid": zod.string(),
+  "sender": zod.string(),
+  "messagingServiceSid": zod.string(),
+  "disclosureVersion": zod.string(),
+  "origin": zod.string(),
+  "businessName": zod.string()
+})]),
+  "sendingHours": zod.object({
+  "quietHoursEnabled": zod.boolean(),
+  "timezone": zod.string(),
+  "startHour": zod.int().min(approveServiceStandingPolicyBodyExpectedSnapshotPolicySendingHoursStartHourMin).max(approveServiceStandingPolicyBodyExpectedSnapshotPolicySendingHoursStartHourMax),
+  "endHour": zod.int().min(approveServiceStandingPolicyBodyExpectedSnapshotPolicySendingHoursEndHourMin).max(approveServiceStandingPolicyBodyExpectedSnapshotPolicySendingHoursEndHourMax),
+  "days": zod.array(zod.string()),
+  "maxTouchesPerDay": zod.int().min(approveServiceStandingPolicyBodyExpectedSnapshotPolicySendingHoursMaxTouchesPerDayMin).max(approveServiceStandingPolicyBodyExpectedSnapshotPolicySendingHoursMaxTouchesPerDayMax)
+})
+})
+}),
+  "previewHash": zod.string().regex(approveServiceStandingPolicyBodyPreviewHashRegExp),
+  "confirmed": zod.literal(true)
+})
+
+export const approveServiceStandingPolicyResponseServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyResponseEnrollmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyResponseVersionMin = 0;
+export const approveServiceStandingPolicyResponseVersionMax = 9007199254740991;
+
+export const approveServiceStandingPolicyResponseRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyResponseAnchorObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyResponseSeriesRootObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyResponsePolicyAgreementStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyResponsePolicyAgreementEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyResponsePolicyAgreementEvidenceMin = 10;
+export const approveServiceStandingPolicyResponsePolicyAgreementEvidenceMax = 1000;
+
+export const approveServiceStandingPolicyResponsePolicySourceReviewEvidenceMin = 10;
+export const approveServiceStandingPolicyResponsePolicySourceReviewEvidenceMax = 1000;
+
+export const approveServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEvidenceMin = 10;
+export const approveServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEvidenceMax = 1000;
+
+export const approveServiceStandingPolicyResponseApprovedSnapshotSettingsSourceReviewEvidenceMin = 10;
+export const approveServiceStandingPolicyResponseApprovedSnapshotSettingsSourceReviewEvidenceMax = 1000;
+
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeSeriesRootObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeAnchorObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeAnchorOccurrenceIndexMin = 0;
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeAnchorOccurrenceIndexMax = 9007199254740991;
+
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeReviewedObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeReviewedOccurrenceIndexMin = 0;
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeReviewedOccurrenceIndexMax = 9007199254740991;
+
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopePropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeNoticeDaysMin = -9007199254740991;
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeNoticeDaysMax = 9007199254740991;
+
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceIntervalMonthsMax = 60;
+
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceAnchorDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceAgreementNoteMax = 500;
+
+
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeCoverageStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotScopeCoverageEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotSeriesFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotSourceReviewFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotSenderOneSenderEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotSenderOneConnectionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyResponseApprovedSnapshotSendingHoursStartHourMin = -9007199254740991;
+export const approveServiceStandingPolicyResponseApprovedSnapshotSendingHoursStartHourMax = 9007199254740991;
+
+export const approveServiceStandingPolicyResponseApprovedSnapshotSendingHoursEndHourMin = -9007199254740991;
+export const approveServiceStandingPolicyResponseApprovedSnapshotSendingHoursEndHourMax = 9007199254740991;
+
+export const approveServiceStandingPolicyResponseApprovedSnapshotSendingHoursMaxTouchesPerDayMin = 0;
+export const approveServiceStandingPolicyResponseApprovedSnapshotSendingHoursMaxTouchesPerDayMax = 9007199254740991;
+
+export const approveServiceStandingPolicyResponseSourceSummaryDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyResponseSourceSummaryNoticeDaysMin = -9007199254740991;
+export const approveServiceStandingPolicyResponseSourceSummaryNoticeDaysMax = 9007199254740991;
+
+export const approveServiceStandingPolicyResponseSourceSummaryRecurrenceIntervalMonthsMax = 60;
+
+export const approveServiceStandingPolicyResponseSourceSummaryRecurrenceAnchorDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyResponseSourceSummaryRecurrenceEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyResponseSourceSummaryRecurrenceAgreementNoteMax = 500;
+
+
+export const approveServiceStandingPolicyResponseSourceSummaryCoverageStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyResponseSourceSummaryCoverageEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const approveServiceStandingPolicyResponseOccurrenceAuthorizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveServiceStandingPolicyResponseOccurrenceScheduledActionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const ApproveServiceStandingPolicyResponse = zod.object({
+  "serviceObligationId": zod.uuid().regex(approveServiceStandingPolicyResponseServiceObligationIdRegExp),
+  "expectedUpdatedAt": zod.coerce.date(),
+  "enrollmentId": zod.uuid().regex(approveServiceStandingPolicyResponseEnrollmentIdRegExp).nullable(),
+  "version": zod.int().min(approveServiceStandingPolicyResponseVersionMin).max(approveServiceStandingPolicyResponseVersionMax),
+  "revisionId": zod.uuid().regex(approveServiceStandingPolicyResponseRevisionIdRegExp).nullable(),
+  "anchorObligationId": zod.uuid().regex(approveServiceStandingPolicyResponseAnchorObligationIdRegExp),
+  "seriesRootObligationId": zod.uuid().regex(approveServiceStandingPolicyResponseSeriesRootObligationIdRegExp),
+  "policy": zod.object({
+  "enabled": zod.boolean(),
+  "channel": zod.enum(['email', 'sms']),
+  "agreementStartsOn": zod.string().regex(approveServiceStandingPolicyResponsePolicyAgreementStartsOnRegExp),
+  "agreementEndsOn": zod.string().regex(approveServiceStandingPolicyResponsePolicyAgreementEndsOnRegExp),
+  "agreementEvidence": zod.string().min(approveServiceStandingPolicyResponsePolicyAgreementEvidenceMin).max(approveServiceStandingPolicyResponsePolicyAgreementEvidenceMax),
+  "sourceReview": zod.object({
+  "kind": zod.enum(['native', 'reconciled_import']),
+  "verifiedAt": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date().nullable(),
+  "evidence": zod.string().min(approveServiceStandingPolicyResponsePolicySourceReviewEvidenceMin).max(approveServiceStandingPolicyResponsePolicySourceReviewEvidenceMax)
+})
+}).nullable(),
+  "approvedSnapshot": zod.object({
+  "schemaVersion": zod.enum(['service-standing-policy.v1']),
+  "settings": zod.object({
+  "enabled": zod.boolean(),
+  "channel": zod.enum(['email', 'sms']),
+  "agreementStartsOn": zod.string().regex(approveServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementStartsOnRegExp),
+  "agreementEndsOn": zod.string().regex(approveServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEndsOnRegExp),
+  "agreementEvidence": zod.string().min(approveServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEvidenceMin).max(approveServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEvidenceMax),
+  "sourceReview": zod.object({
+  "kind": zod.enum(['native', 'reconciled_import']),
+  "verifiedAt": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date().nullable(),
+  "evidence": zod.string().min(approveServiceStandingPolicyResponseApprovedSnapshotSettingsSourceReviewEvidenceMin).max(approveServiceStandingPolicyResponseApprovedSnapshotSettingsSourceReviewEvidenceMax)
+})
+}),
+  "scope": zod.object({
+  "seriesRootObligationId": zod.uuid().regex(approveServiceStandingPolicyResponseApprovedSnapshotScopeSeriesRootObligationIdRegExp),
+  "anchorObligationId": zod.uuid().regex(approveServiceStandingPolicyResponseApprovedSnapshotScopeAnchorObligationIdRegExp),
+  "anchorUpdatedAt": zod.coerce.date(),
+  "anchorOccurrenceIndex": zod.int().min(approveServiceStandingPolicyResponseApprovedSnapshotScopeAnchorOccurrenceIndexMin).max(approveServiceStandingPolicyResponseApprovedSnapshotScopeAnchorOccurrenceIndexMax),
+  "reviewedObligationId": zod.uuid().regex(approveServiceStandingPolicyResponseApprovedSnapshotScopeReviewedObligationIdRegExp),
+  "reviewedUpdatedAt": zod.coerce.date(),
+  "reviewedOccurrenceIndex": zod.int().min(approveServiceStandingPolicyResponseApprovedSnapshotScopeReviewedOccurrenceIndexMin).max(approveServiceStandingPolicyResponseApprovedSnapshotScopeReviewedOccurrenceIndexMax),
+  "contactId": zod.uuid().regex(approveServiceStandingPolicyResponseApprovedSnapshotScopeContactIdRegExp),
+  "propertyId": zod.uuid().regex(approveServiceStandingPolicyResponseApprovedSnapshotScopePropertyIdRegExp).nullable(),
+  "kind": zod.string(),
+  "equipmentLabel": zod.string(),
+  "noticeDays": zod.int().min(approveServiceStandingPolicyResponseApprovedSnapshotScopeNoticeDaysMin).max(approveServiceStandingPolicyResponseApprovedSnapshotScopeNoticeDaysMax),
+  "source": zod.string(),
+  "externalRef": zod.string().nullable(),
+  "recurrence": zod.object({
+  "mode": zod.enum(['calendar_months']),
+  "intervalMonths": zod.int().min(1).max(approveServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceIntervalMonthsMax),
+  "anchorDate": zod.string().regex(approveServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceAnchorDateRegExp),
+  "endDate": zod.string().regex(approveServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceEndDateRegExp).nullable(),
+  "agreementNote": zod.string().min(1).max(approveServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceAgreementNoteMax),
+  "approvedByUserId": zod.string().min(1),
+  "approvedAt": zod.coerce.date()
+}),
+  "coverageStartsOn": zod.string().regex(approveServiceStandingPolicyResponseApprovedSnapshotScopeCoverageStartsOnRegExp).nullable(),
+  "coverageEndsOn": zod.string().regex(approveServiceStandingPolicyResponseApprovedSnapshotScopeCoverageEndsOnRegExp).nullable(),
+  "coverageEvidence": zod.string().nullable(),
+  "ownerUserId": zod.string(),
+  "recipient": zod.string(),
+  "businessName": zod.string()
+}),
+  "seriesFingerprint": zod.string().regex(approveServiceStandingPolicyResponseApprovedSnapshotSeriesFingerprintRegExp),
+  "sourceReviewFingerprint": zod.string().regex(approveServiceStandingPolicyResponseApprovedSnapshotSourceReviewFingerprintRegExp),
+  "templateVersion": zod.enum(['service-care.v2']),
+  "template": zod.object({
+  "subject": zod.string(),
+  "body": zod.string()
+}),
+  "sender": zod.union([zod.object({
+  "kind": zod.enum(['email']),
+  "userId": zod.string(),
+  "source": zod.enum(['company_default']),
+  "provider": zod.enum(['gmail', 'microsoft']),
+  "senderEmail": zod.email().regex(approveServiceStandingPolicyResponseApprovedSnapshotSenderOneSenderEmailRegExp),
+  "connectionId": zod.uuid().regex(approveServiceStandingPolicyResponseApprovedSnapshotSenderOneConnectionIdRegExp),
+  "connectionRevision": zod.coerce.date(),
+  "accountId": zod.string().nullable()
+}),zod.object({
+  "kind": zod.enum(['sms']),
+  "id": zod.string(),
+  "accountSid": zod.string(),
+  "sender": zod.string(),
+  "messagingServiceSid": zod.string(),
+  "disclosureVersion": zod.string(),
+  "origin": zod.string(),
+  "businessName": zod.string()
+})]),
+  "sendingHours": zod.object({
+  "quietHoursEnabled": zod.boolean(),
+  "timezone": zod.string(),
+  "startHour": zod.int().min(approveServiceStandingPolicyResponseApprovedSnapshotSendingHoursStartHourMin).max(approveServiceStandingPolicyResponseApprovedSnapshotSendingHoursStartHourMax),
+  "endHour": zod.int().min(approveServiceStandingPolicyResponseApprovedSnapshotSendingHoursEndHourMin).max(approveServiceStandingPolicyResponseApprovedSnapshotSendingHoursEndHourMax),
+  "days": zod.array(zod.string()),
+  "maxTouchesPerDay": zod.int().min(approveServiceStandingPolicyResponseApprovedSnapshotSendingHoursMaxTouchesPerDayMin).max(approveServiceStandingPolicyResponseApprovedSnapshotSendingHoursMaxTouchesPerDayMax)
+})
+}).nullable(),
+  "sourceSummary": zod.object({
+  "source": zod.string(),
+  "externalRef": zod.string().nullable(),
+  "kind": zod.string(),
+  "equipmentLabel": zod.string(),
+  "dueDate": zod.string().regex(approveServiceStandingPolicyResponseSourceSummaryDueDateRegExp),
+  "noticeDays": zod.int().min(approveServiceStandingPolicyResponseSourceSummaryNoticeDaysMin).max(approveServiceStandingPolicyResponseSourceSummaryNoticeDaysMax),
+  "recurrence": zod.object({
+  "mode": zod.enum(['calendar_months']),
+  "intervalMonths": zod.int().min(1).max(approveServiceStandingPolicyResponseSourceSummaryRecurrenceIntervalMonthsMax),
+  "anchorDate": zod.string().regex(approveServiceStandingPolicyResponseSourceSummaryRecurrenceAnchorDateRegExp),
+  "endDate": zod.string().regex(approveServiceStandingPolicyResponseSourceSummaryRecurrenceEndDateRegExp).nullable(),
+  "agreementNote": zod.string().min(1).max(approveServiceStandingPolicyResponseSourceSummaryRecurrenceAgreementNoteMax),
+  "approvedByUserId": zod.string().min(1),
+  "approvedAt": zod.coerce.date()
+}).nullable(),
+  "ownerUserId": zod.string().nullable(),
+  "coverageStartsOn": zod.string().regex(approveServiceStandingPolicyResponseSourceSummaryCoverageStartsOnRegExp).nullable(),
+  "coverageEndsOn": zod.string().regex(approveServiceStandingPolicyResponseSourceSummaryCoverageEndsOnRegExp).nullable()
+}),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable()
+}),
+  "occurrence": zod.object({
+  "eligible": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "noticeAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date().nullable(),
+  "authorizationId": zod.uuid().regex(approveServiceStandingPolicyResponseOccurrenceAuthorizationIdRegExp).nullable(),
+  "scheduledActionId": zod.uuid().regex(approveServiceStandingPolicyResponseOccurrenceScheduledActionIdRegExp).nullable(),
+  "origin": zod.enum(['individual', 'standing']).nullable(),
+  "receiptState": zod.string().nullable()
+})
+})
+
+
+/**
+ * Accepted active staff session only; settings.manage. Default-off exact service-series review. One fixed reminder per future eligible occurrence; no backlog, marketing permission, warranty decision or automatic booking. A held/unknown original effect cannot be retried with another policy or channel.
+ * @summary Disable future reminders without freeing original receipts
+ */
+export const DisableServiceStandingPolicyParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const disableServiceStandingPolicyBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const disableServiceStandingPolicyBodyExpectedVersionMin = 0;
+export const disableServiceStandingPolicyBodyExpectedVersionMax = 9007199254740991;
+
+export const disableServiceStandingPolicyBodyReasonMin = 10;
+export const disableServiceStandingPolicyBodyReasonMax = 1000;
+
+
+
+export const DisableServiceStandingPolicyBody = zod.object({
+  "requestId": zod.uuid().regex(disableServiceStandingPolicyBodyRequestIdRegExp),
+  "expectedVersion": zod.int().min(disableServiceStandingPolicyBodyExpectedVersionMin).max(disableServiceStandingPolicyBodyExpectedVersionMax),
+  "reason": zod.string().min(disableServiceStandingPolicyBodyReasonMin).max(disableServiceStandingPolicyBodyReasonMax),
+  "confirmed": zod.literal(true)
+})
+
+export const disableServiceStandingPolicyResponseServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const disableServiceStandingPolicyResponseEnrollmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const disableServiceStandingPolicyResponseVersionMin = 0;
+export const disableServiceStandingPolicyResponseVersionMax = 9007199254740991;
+
+export const disableServiceStandingPolicyResponseRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const disableServiceStandingPolicyResponseAnchorObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const disableServiceStandingPolicyResponseSeriesRootObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const disableServiceStandingPolicyResponsePolicyAgreementStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disableServiceStandingPolicyResponsePolicyAgreementEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disableServiceStandingPolicyResponsePolicyAgreementEvidenceMin = 10;
+export const disableServiceStandingPolicyResponsePolicyAgreementEvidenceMax = 1000;
+
+export const disableServiceStandingPolicyResponsePolicySourceReviewEvidenceMin = 10;
+export const disableServiceStandingPolicyResponsePolicySourceReviewEvidenceMax = 1000;
+
+export const disableServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEvidenceMin = 10;
+export const disableServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEvidenceMax = 1000;
+
+export const disableServiceStandingPolicyResponseApprovedSnapshotSettingsSourceReviewEvidenceMin = 10;
+export const disableServiceStandingPolicyResponseApprovedSnapshotSettingsSourceReviewEvidenceMax = 1000;
+
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeSeriesRootObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeAnchorObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeAnchorOccurrenceIndexMin = 0;
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeAnchorOccurrenceIndexMax = 9007199254740991;
+
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeReviewedObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeReviewedOccurrenceIndexMin = 0;
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeReviewedOccurrenceIndexMax = 9007199254740991;
+
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopePropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeNoticeDaysMin = -9007199254740991;
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeNoticeDaysMax = 9007199254740991;
+
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceIntervalMonthsMax = 60;
+
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceAnchorDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceAgreementNoteMax = 500;
+
+
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeCoverageStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotScopeCoverageEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotSeriesFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotSourceReviewFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotSenderOneSenderEmailRegExp = new RegExp('^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_\'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotSenderOneConnectionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const disableServiceStandingPolicyResponseApprovedSnapshotSendingHoursStartHourMin = -9007199254740991;
+export const disableServiceStandingPolicyResponseApprovedSnapshotSendingHoursStartHourMax = 9007199254740991;
+
+export const disableServiceStandingPolicyResponseApprovedSnapshotSendingHoursEndHourMin = -9007199254740991;
+export const disableServiceStandingPolicyResponseApprovedSnapshotSendingHoursEndHourMax = 9007199254740991;
+
+export const disableServiceStandingPolicyResponseApprovedSnapshotSendingHoursMaxTouchesPerDayMin = 0;
+export const disableServiceStandingPolicyResponseApprovedSnapshotSendingHoursMaxTouchesPerDayMax = 9007199254740991;
+
+export const disableServiceStandingPolicyResponseSourceSummaryDueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disableServiceStandingPolicyResponseSourceSummaryNoticeDaysMin = -9007199254740991;
+export const disableServiceStandingPolicyResponseSourceSummaryNoticeDaysMax = 9007199254740991;
+
+export const disableServiceStandingPolicyResponseSourceSummaryRecurrenceIntervalMonthsMax = 60;
+
+export const disableServiceStandingPolicyResponseSourceSummaryRecurrenceAnchorDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disableServiceStandingPolicyResponseSourceSummaryRecurrenceEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disableServiceStandingPolicyResponseSourceSummaryRecurrenceAgreementNoteMax = 500;
+
+
+export const disableServiceStandingPolicyResponseSourceSummaryCoverageStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disableServiceStandingPolicyResponseSourceSummaryCoverageEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const disableServiceStandingPolicyResponseOccurrenceAuthorizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const disableServiceStandingPolicyResponseOccurrenceScheduledActionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const DisableServiceStandingPolicyResponse = zod.object({
+  "serviceObligationId": zod.uuid().regex(disableServiceStandingPolicyResponseServiceObligationIdRegExp),
+  "expectedUpdatedAt": zod.coerce.date(),
+  "enrollmentId": zod.uuid().regex(disableServiceStandingPolicyResponseEnrollmentIdRegExp).nullable(),
+  "version": zod.int().min(disableServiceStandingPolicyResponseVersionMin).max(disableServiceStandingPolicyResponseVersionMax),
+  "revisionId": zod.uuid().regex(disableServiceStandingPolicyResponseRevisionIdRegExp).nullable(),
+  "anchorObligationId": zod.uuid().regex(disableServiceStandingPolicyResponseAnchorObligationIdRegExp),
+  "seriesRootObligationId": zod.uuid().regex(disableServiceStandingPolicyResponseSeriesRootObligationIdRegExp),
+  "policy": zod.object({
+  "enabled": zod.boolean(),
+  "channel": zod.enum(['email', 'sms']),
+  "agreementStartsOn": zod.string().regex(disableServiceStandingPolicyResponsePolicyAgreementStartsOnRegExp),
+  "agreementEndsOn": zod.string().regex(disableServiceStandingPolicyResponsePolicyAgreementEndsOnRegExp),
+  "agreementEvidence": zod.string().min(disableServiceStandingPolicyResponsePolicyAgreementEvidenceMin).max(disableServiceStandingPolicyResponsePolicyAgreementEvidenceMax),
+  "sourceReview": zod.object({
+  "kind": zod.enum(['native', 'reconciled_import']),
+  "verifiedAt": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date().nullable(),
+  "evidence": zod.string().min(disableServiceStandingPolicyResponsePolicySourceReviewEvidenceMin).max(disableServiceStandingPolicyResponsePolicySourceReviewEvidenceMax)
+})
+}).nullable(),
+  "approvedSnapshot": zod.object({
+  "schemaVersion": zod.enum(['service-standing-policy.v1']),
+  "settings": zod.object({
+  "enabled": zod.boolean(),
+  "channel": zod.enum(['email', 'sms']),
+  "agreementStartsOn": zod.string().regex(disableServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementStartsOnRegExp),
+  "agreementEndsOn": zod.string().regex(disableServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEndsOnRegExp),
+  "agreementEvidence": zod.string().min(disableServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEvidenceMin).max(disableServiceStandingPolicyResponseApprovedSnapshotSettingsAgreementEvidenceMax),
+  "sourceReview": zod.object({
+  "kind": zod.enum(['native', 'reconciled_import']),
+  "verifiedAt": zod.coerce.date(),
+  "cutoverAt": zod.coerce.date().nullable(),
+  "evidence": zod.string().min(disableServiceStandingPolicyResponseApprovedSnapshotSettingsSourceReviewEvidenceMin).max(disableServiceStandingPolicyResponseApprovedSnapshotSettingsSourceReviewEvidenceMax)
+})
+}),
+  "scope": zod.object({
+  "seriesRootObligationId": zod.uuid().regex(disableServiceStandingPolicyResponseApprovedSnapshotScopeSeriesRootObligationIdRegExp),
+  "anchorObligationId": zod.uuid().regex(disableServiceStandingPolicyResponseApprovedSnapshotScopeAnchorObligationIdRegExp),
+  "anchorUpdatedAt": zod.coerce.date(),
+  "anchorOccurrenceIndex": zod.int().min(disableServiceStandingPolicyResponseApprovedSnapshotScopeAnchorOccurrenceIndexMin).max(disableServiceStandingPolicyResponseApprovedSnapshotScopeAnchorOccurrenceIndexMax),
+  "reviewedObligationId": zod.uuid().regex(disableServiceStandingPolicyResponseApprovedSnapshotScopeReviewedObligationIdRegExp),
+  "reviewedUpdatedAt": zod.coerce.date(),
+  "reviewedOccurrenceIndex": zod.int().min(disableServiceStandingPolicyResponseApprovedSnapshotScopeReviewedOccurrenceIndexMin).max(disableServiceStandingPolicyResponseApprovedSnapshotScopeReviewedOccurrenceIndexMax),
+  "contactId": zod.uuid().regex(disableServiceStandingPolicyResponseApprovedSnapshotScopeContactIdRegExp),
+  "propertyId": zod.uuid().regex(disableServiceStandingPolicyResponseApprovedSnapshotScopePropertyIdRegExp).nullable(),
+  "kind": zod.string(),
+  "equipmentLabel": zod.string(),
+  "noticeDays": zod.int().min(disableServiceStandingPolicyResponseApprovedSnapshotScopeNoticeDaysMin).max(disableServiceStandingPolicyResponseApprovedSnapshotScopeNoticeDaysMax),
+  "source": zod.string(),
+  "externalRef": zod.string().nullable(),
+  "recurrence": zod.object({
+  "mode": zod.enum(['calendar_months']),
+  "intervalMonths": zod.int().min(1).max(disableServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceIntervalMonthsMax),
+  "anchorDate": zod.string().regex(disableServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceAnchorDateRegExp),
+  "endDate": zod.string().regex(disableServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceEndDateRegExp).nullable(),
+  "agreementNote": zod.string().min(1).max(disableServiceStandingPolicyResponseApprovedSnapshotScopeRecurrenceAgreementNoteMax),
+  "approvedByUserId": zod.string().min(1),
+  "approvedAt": zod.coerce.date()
+}),
+  "coverageStartsOn": zod.string().regex(disableServiceStandingPolicyResponseApprovedSnapshotScopeCoverageStartsOnRegExp).nullable(),
+  "coverageEndsOn": zod.string().regex(disableServiceStandingPolicyResponseApprovedSnapshotScopeCoverageEndsOnRegExp).nullable(),
+  "coverageEvidence": zod.string().nullable(),
+  "ownerUserId": zod.string(),
+  "recipient": zod.string(),
+  "businessName": zod.string()
+}),
+  "seriesFingerprint": zod.string().regex(disableServiceStandingPolicyResponseApprovedSnapshotSeriesFingerprintRegExp),
+  "sourceReviewFingerprint": zod.string().regex(disableServiceStandingPolicyResponseApprovedSnapshotSourceReviewFingerprintRegExp),
+  "templateVersion": zod.enum(['service-care.v2']),
+  "template": zod.object({
+  "subject": zod.string(),
+  "body": zod.string()
+}),
+  "sender": zod.union([zod.object({
+  "kind": zod.enum(['email']),
+  "userId": zod.string(),
+  "source": zod.enum(['company_default']),
+  "provider": zod.enum(['gmail', 'microsoft']),
+  "senderEmail": zod.email().regex(disableServiceStandingPolicyResponseApprovedSnapshotSenderOneSenderEmailRegExp),
+  "connectionId": zod.uuid().regex(disableServiceStandingPolicyResponseApprovedSnapshotSenderOneConnectionIdRegExp),
+  "connectionRevision": zod.coerce.date(),
+  "accountId": zod.string().nullable()
+}),zod.object({
+  "kind": zod.enum(['sms']),
+  "id": zod.string(),
+  "accountSid": zod.string(),
+  "sender": zod.string(),
+  "messagingServiceSid": zod.string(),
+  "disclosureVersion": zod.string(),
+  "origin": zod.string(),
+  "businessName": zod.string()
+})]),
+  "sendingHours": zod.object({
+  "quietHoursEnabled": zod.boolean(),
+  "timezone": zod.string(),
+  "startHour": zod.int().min(disableServiceStandingPolicyResponseApprovedSnapshotSendingHoursStartHourMin).max(disableServiceStandingPolicyResponseApprovedSnapshotSendingHoursStartHourMax),
+  "endHour": zod.int().min(disableServiceStandingPolicyResponseApprovedSnapshotSendingHoursEndHourMin).max(disableServiceStandingPolicyResponseApprovedSnapshotSendingHoursEndHourMax),
+  "days": zod.array(zod.string()),
+  "maxTouchesPerDay": zod.int().min(disableServiceStandingPolicyResponseApprovedSnapshotSendingHoursMaxTouchesPerDayMin).max(disableServiceStandingPolicyResponseApprovedSnapshotSendingHoursMaxTouchesPerDayMax)
+})
+}).nullable(),
+  "sourceSummary": zod.object({
+  "source": zod.string(),
+  "externalRef": zod.string().nullable(),
+  "kind": zod.string(),
+  "equipmentLabel": zod.string(),
+  "dueDate": zod.string().regex(disableServiceStandingPolicyResponseSourceSummaryDueDateRegExp),
+  "noticeDays": zod.int().min(disableServiceStandingPolicyResponseSourceSummaryNoticeDaysMin).max(disableServiceStandingPolicyResponseSourceSummaryNoticeDaysMax),
+  "recurrence": zod.object({
+  "mode": zod.enum(['calendar_months']),
+  "intervalMonths": zod.int().min(1).max(disableServiceStandingPolicyResponseSourceSummaryRecurrenceIntervalMonthsMax),
+  "anchorDate": zod.string().regex(disableServiceStandingPolicyResponseSourceSummaryRecurrenceAnchorDateRegExp),
+  "endDate": zod.string().regex(disableServiceStandingPolicyResponseSourceSummaryRecurrenceEndDateRegExp).nullable(),
+  "agreementNote": zod.string().min(1).max(disableServiceStandingPolicyResponseSourceSummaryRecurrenceAgreementNoteMax),
+  "approvedByUserId": zod.string().min(1),
+  "approvedAt": zod.coerce.date()
+}).nullable(),
+  "ownerUserId": zod.string().nullable(),
+  "coverageStartsOn": zod.string().regex(disableServiceStandingPolicyResponseSourceSummaryCoverageStartsOnRegExp).nullable(),
+  "coverageEndsOn": zod.string().regex(disableServiceStandingPolicyResponseSourceSummaryCoverageEndsOnRegExp).nullable()
+}),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.string().nullable()
+}),
+  "occurrence": zod.object({
+  "eligible": zod.boolean(),
+  "reason": zod.string().nullable(),
+  "noticeAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date().nullable(),
+  "authorizationId": zod.uuid().regex(disableServiceStandingPolicyResponseOccurrenceAuthorizationIdRegExp).nullable(),
+  "scheduledActionId": zod.uuid().regex(disableServiceStandingPolicyResponseOccurrenceScheduledActionIdRegExp).nullable(),
+  "origin": zod.enum(['individual', 'standing']).nullable(),
+  "receiptState": zod.string().nullable()
+})
+})
+
+
+/**
+ * Accepted staff session; crm.read. Signed SMS origin does not verify customer identity. Exact reference and immutable sender/recipient evidence are distinguished from ambiguous phone-scope evidence. Content expires; retained receipt and hold remain. This is not a complete inbox.
+ * @summary Read retained exact-reference or ambiguous service text evidence
+ */
+export const ListServiceSmsRepliesParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const listServiceSmsRepliesQueryOffsetDefault = 0;
+export const listServiceSmsRepliesQueryOffsetMin = 0;
+export const listServiceSmsRepliesQueryOffsetMax = 100000;
+
+
+
+export const ListServiceSmsRepliesQueryParams = zod.object({
+  "offset": zod.coerce.number().int().min(listServiceSmsRepliesQueryOffsetMin).max(listServiceSmsRepliesQueryOffsetMax).default(listServiceSmsRepliesQueryOffsetDefault)
+})
+
+export const listServiceSmsRepliesResponseItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listServiceSmsRepliesResponseItemsItemServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listServiceSmsRepliesResponseItemsItemVersionExclusiveMin = 0;
+export const listServiceSmsRepliesResponseItemsItemVersionMax = 9007199254740991;
+
+export const listServiceSmsRepliesResponseItemsItemCandidateServiceObligationIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listServiceSmsRepliesResponseItemsItemCandidateCountMin = 0;
+export const listServiceSmsRepliesResponseItemsItemCandidateCountMax = 9007199254740991;
+
+export const listServiceSmsRepliesResponseItemsMax = 25;
+
+export const listServiceSmsRepliesResponseOffsetMin = 0;
+export const listServiceSmsRepliesResponseOffsetMax = 100000;
+
+
+
+export const ListServiceSmsRepliesResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(listServiceSmsRepliesResponseItemsItemIdRegExp),
+  "serviceObligationId": zod.uuid().regex(listServiceSmsRepliesResponseItemsItemServiceObligationIdRegExp).nullable(),
+  "version": zod.int().gt(listServiceSmsRepliesResponseItemsItemVersionExclusiveMin).max(listServiceSmsRepliesResponseItemsItemVersionMax),
+  "state": zod.enum(['needs_review', 'reviewed', 'dismissed']),
+  "correlation": zod.enum(['exact_reference', 'ambiguous']),
+  "reason": zod.string(),
+  "historical": zod.boolean(),
+  "holdActive": zod.boolean(),
+  "receivedAt": zod.coerce.date(),
+  "recordedAt": zod.coerce.date(),
+  "rawExpiresAt": zod.coerce.date(),
+  "content": zod.object({
+  "text": zod.string()
+}).nullable(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewNote": zod.string().nullable(),
+  "evidence": zod.enum(['signed_sms_reference', 'signed_sms_phone_scope']),
+  "candidateServiceObligationIds": zod.array(zod.uuid().regex(listServiceSmsRepliesResponseItemsItemCandidateServiceObligationIdsItemRegExp)),
+  "candidateCount": zod.int().min(listServiceSmsRepliesResponseItemsItemCandidateCountMin).max(listServiceSmsRepliesResponseItemsItemCandidateCountMax),
+  "candidatesTruncated": zod.boolean()
+})).max(listServiceSmsRepliesResponseItemsMax),
+  "hasMore": zod.boolean(),
+  "offset": zod.int().min(listServiceSmsRepliesResponseOffsetMin).max(listServiceSmsRepliesResponseOffsetMax),
+  "limit": zod.literal(25),
+  "held": zod.boolean()
+})
+
+
+/**
+ * Accepted active staff session; crm.write. Exact version and replay-safe request required. Office follow-up retains the service hold; explicit handling complete or unrelated-evidence dismissal releases only this evidence hold. Separately authorized future work can resume, never an original owned send. No disposition creates customer confirmation, consent or a booking.
+ * @summary Record an office disposition without consent, booking or resend authority
+ */
+export const ReviewServiceSmsReplyParams = zod.object({
+  "id": zod.uuid(),
+  "replyId": zod.uuid()
+})
+
+export const reviewServiceSmsReplyBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reviewServiceSmsReplyBodyExpectedVersionExclusiveMin = 0;
+export const reviewServiceSmsReplyBodyExpectedVersionMax = 9007199254740991;
+
+export const reviewServiceSmsReplyBodyNoteMin = 10;
+export const reviewServiceSmsReplyBodyNoteMax = 1000;
+
+
+
+export const ReviewServiceSmsReplyBody = zod.object({
+  "requestId": zod.uuid().regex(reviewServiceSmsReplyBodyRequestIdRegExp),
+  "expectedVersion": zod.int().gt(reviewServiceSmsReplyBodyExpectedVersionExclusiveMin).max(reviewServiceSmsReplyBodyExpectedVersionMax),
+  "decision": zod.enum(['office_follow_up', 'not_service_reply', 'handled']),
+  "note": zod.string().min(reviewServiceSmsReplyBodyNoteMin).max(reviewServiceSmsReplyBodyNoteMax),
+  "reviewed": zod.literal(true)
+})
+
+export const reviewServiceSmsReplyResponseReplyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reviewServiceSmsReplyResponseVersionExclusiveMin = 0;
+export const reviewServiceSmsReplyResponseVersionMax = 9007199254740991;
+
+
+
+export const ReviewServiceSmsReplyResponse = zod.object({
+  "replyId": zod.uuid().regex(reviewServiceSmsReplyResponseReplyIdRegExp),
+  "version": zod.int().gt(reviewServiceSmsReplyResponseVersionExclusiveMin).max(reviewServiceSmsReplyResponseVersionMax),
+  "replayed": zod.boolean()
+})
+
+
+/**
  * Accepted active staff session only; no API keys. Missing policy is disabled. Approved policy remains held unless all provider and company gates pass.
  * @summary Read standing CALLIE approval and holds
  */

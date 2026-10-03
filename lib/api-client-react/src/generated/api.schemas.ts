@@ -5,6 +5,978 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+export type ServiceStandingViewPolicyChannel = typeof ServiceStandingViewPolicyChannel[keyof typeof ServiceStandingViewPolicyChannel];
+
+
+export const ServiceStandingViewPolicyChannel = {
+  email: 'email',
+  sms: 'sms',
+} as const;
+
+export type ServiceStandingViewPolicySourceReviewKind = typeof ServiceStandingViewPolicySourceReviewKind[keyof typeof ServiceStandingViewPolicySourceReviewKind];
+
+
+export const ServiceStandingViewPolicySourceReviewKind = {
+  native: 'native',
+  reconciled_import: 'reconciled_import',
+} as const;
+
+export type ServiceStandingViewPolicySourceReview = {
+  kind: ServiceStandingViewPolicySourceReviewKind;
+  verifiedAt: string;
+  cutoverAt: string | null;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  evidence: string;
+};
+
+export type ServiceStandingViewPolicy = {
+  enabled: boolean;
+  channel: ServiceStandingViewPolicyChannel;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  agreementStartsOn: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  agreementEndsOn: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  agreementEvidence: string;
+  sourceReview: ServiceStandingViewPolicySourceReview;
+} | null;
+
+export type ServiceStandingViewApprovedSnapshotSchemaVersion = typeof ServiceStandingViewApprovedSnapshotSchemaVersion[keyof typeof ServiceStandingViewApprovedSnapshotSchemaVersion];
+
+
+export const ServiceStandingViewApprovedSnapshotSchemaVersion = {
+  'service-standing-policyv1': 'service-standing-policy.v1',
+} as const;
+
+export type ServiceStandingViewApprovedSnapshotSettingsChannel = typeof ServiceStandingViewApprovedSnapshotSettingsChannel[keyof typeof ServiceStandingViewApprovedSnapshotSettingsChannel];
+
+
+export const ServiceStandingViewApprovedSnapshotSettingsChannel = {
+  email: 'email',
+  sms: 'sms',
+} as const;
+
+export type ServiceStandingViewApprovedSnapshotSettingsSourceReviewKind = typeof ServiceStandingViewApprovedSnapshotSettingsSourceReviewKind[keyof typeof ServiceStandingViewApprovedSnapshotSettingsSourceReviewKind];
+
+
+export const ServiceStandingViewApprovedSnapshotSettingsSourceReviewKind = {
+  native: 'native',
+  reconciled_import: 'reconciled_import',
+} as const;
+
+export type ServiceStandingViewApprovedSnapshotSettingsSourceReview = {
+  kind: ServiceStandingViewApprovedSnapshotSettingsSourceReviewKind;
+  verifiedAt: string;
+  cutoverAt: string | null;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  evidence: string;
+};
+
+export type ServiceStandingViewApprovedSnapshotSettings = {
+  enabled: boolean;
+  channel: ServiceStandingViewApprovedSnapshotSettingsChannel;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  agreementStartsOn: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  agreementEndsOn: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  agreementEvidence: string;
+  sourceReview: ServiceStandingViewApprovedSnapshotSettingsSourceReview;
+};
+
+export type ServiceStandingViewApprovedSnapshotScopeRecurrenceMode = typeof ServiceStandingViewApprovedSnapshotScopeRecurrenceMode[keyof typeof ServiceStandingViewApprovedSnapshotScopeRecurrenceMode];
+
+
+export const ServiceStandingViewApprovedSnapshotScopeRecurrenceMode = {
+  calendar_months: 'calendar_months',
+} as const;
+
+export type ServiceStandingViewApprovedSnapshotScopeRecurrence = {
+  mode: ServiceStandingViewApprovedSnapshotScopeRecurrenceMode;
+  /**
+     * @minimum 1
+     * @maximum 60
+     */
+  intervalMonths: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  anchorDate: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  endDate: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  agreementNote: string;
+  /** @minLength 1 */
+  approvedByUserId: string;
+  approvedAt: string;
+};
+
+export type ServiceStandingViewApprovedSnapshotScope = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  seriesRootObligationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  anchorObligationId: string;
+  anchorUpdatedAt: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  anchorOccurrenceIndex: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  reviewedObligationId: string;
+  reviewedUpdatedAt: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  reviewedOccurrenceIndex: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  kind: string;
+  equipmentLabel: string;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  noticeDays: number;
+  source: string;
+  externalRef: string | null;
+  recurrence: ServiceStandingViewApprovedSnapshotScopeRecurrence;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  coverageStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  coverageEndsOn: string | null;
+  coverageEvidence: string | null;
+  ownerUserId: string;
+  recipient: string;
+  businessName: string;
+};
+
+export type ServiceStandingViewApprovedSnapshotTemplateVersion = typeof ServiceStandingViewApprovedSnapshotTemplateVersion[keyof typeof ServiceStandingViewApprovedSnapshotTemplateVersion];
+
+
+export const ServiceStandingViewApprovedSnapshotTemplateVersion = {
+  'service-carev2': 'service-care.v2',
+} as const;
+
+export type ServiceStandingViewApprovedSnapshotTemplate = {
+  subject: string;
+  body: string;
+};
+
+export type ServiceStandingViewApprovedSnapshotSender = {
+  kind: 'email';
+  userId: string;
+  source: 'company_default';
+  provider: 'gmail' | 'microsoft';
+  /** @pattern ^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$ */
+  senderEmail: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  connectionId: string;
+  connectionRevision: string;
+  accountId: string | null;
+} | {
+  kind: 'sms';
+  id: string;
+  accountSid: string;
+  sender: string;
+  messagingServiceSid: string;
+  disclosureVersion: string;
+  origin: string;
+  businessName: string;
+};
+
+export type ServiceStandingViewApprovedSnapshotSendingHours = {
+  quietHoursEnabled: boolean;
+  timezone: string;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  startHour: number;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  endHour: number;
+  days: string[];
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  maxTouchesPerDay: number;
+};
+
+export type ServiceStandingViewApprovedSnapshot = {
+  schemaVersion: ServiceStandingViewApprovedSnapshotSchemaVersion;
+  settings: ServiceStandingViewApprovedSnapshotSettings;
+  scope: ServiceStandingViewApprovedSnapshotScope;
+  /** @pattern ^[a-f0-9]{64}$ */
+  seriesFingerprint: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  sourceReviewFingerprint: string;
+  templateVersion: ServiceStandingViewApprovedSnapshotTemplateVersion;
+  template: ServiceStandingViewApprovedSnapshotTemplate;
+  sender: ServiceStandingViewApprovedSnapshotSender;
+  sendingHours: ServiceStandingViewApprovedSnapshotSendingHours;
+} | null;
+
+export type ServiceStandingViewSourceSummaryRecurrenceMode = typeof ServiceStandingViewSourceSummaryRecurrenceMode[keyof typeof ServiceStandingViewSourceSummaryRecurrenceMode];
+
+
+export const ServiceStandingViewSourceSummaryRecurrenceMode = {
+  calendar_months: 'calendar_months',
+} as const;
+
+export type ServiceStandingViewSourceSummaryRecurrence = {
+  mode: ServiceStandingViewSourceSummaryRecurrenceMode;
+  /**
+     * @minimum 1
+     * @maximum 60
+     */
+  intervalMonths: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  anchorDate: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  endDate: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  agreementNote: string;
+  /** @minLength 1 */
+  approvedByUserId: string;
+  approvedAt: string;
+} | null;
+
+export type ServiceStandingViewSourceSummary = {
+  source: string;
+  externalRef: string | null;
+  kind: string;
+  equipmentLabel: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  dueDate: string;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  noticeDays: number;
+  recurrence: ServiceStandingViewSourceSummaryRecurrence;
+  ownerUserId: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  coverageStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  coverageEndsOn: string | null;
+};
+
+export type ServiceStandingViewReadiness = {
+  ready: boolean;
+  reason: string | null;
+};
+
+export type ServiceStandingViewOccurrenceOrigin = typeof ServiceStandingViewOccurrenceOrigin[keyof typeof ServiceStandingViewOccurrenceOrigin] | null;
+
+
+export const ServiceStandingViewOccurrenceOrigin = {
+  individual: 'individual',
+  standing: 'standing',
+} as const;
+
+export type ServiceStandingViewOccurrence = {
+  eligible: boolean;
+  reason: string | null;
+  noticeAt: string;
+  expiresAt: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  authorizationId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  scheduledActionId: string | null;
+  origin: ServiceStandingViewOccurrenceOrigin;
+  receiptState: string | null;
+};
+
+export interface ServiceStandingView {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  serviceObligationId: string;
+  expectedUpdatedAt: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  enrollmentId: string | null;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  version: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  revisionId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  anchorObligationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  seriesRootObligationId: string;
+  policy: ServiceStandingViewPolicy;
+  approvedSnapshot: ServiceStandingViewApprovedSnapshot;
+  sourceSummary: ServiceStandingViewSourceSummary;
+  readiness: ServiceStandingViewReadiness;
+  occurrence: ServiceStandingViewOccurrence;
+}
+
+export type ServiceStandingPreviewExpectedSnapshotSchemaVersion = typeof ServiceStandingPreviewExpectedSnapshotSchemaVersion[keyof typeof ServiceStandingPreviewExpectedSnapshotSchemaVersion];
+
+
+export const ServiceStandingPreviewExpectedSnapshotSchemaVersion = {
+  'service-standing-previewv1': 'service-standing-preview.v1',
+} as const;
+
+export type ServiceStandingPreviewExpectedSnapshotPolicySchemaVersion = typeof ServiceStandingPreviewExpectedSnapshotPolicySchemaVersion[keyof typeof ServiceStandingPreviewExpectedSnapshotPolicySchemaVersion];
+
+
+export const ServiceStandingPreviewExpectedSnapshotPolicySchemaVersion = {
+  'service-standing-policyv1': 'service-standing-policy.v1',
+} as const;
+
+export type ServiceStandingPreviewExpectedSnapshotPolicySettingsChannel = typeof ServiceStandingPreviewExpectedSnapshotPolicySettingsChannel[keyof typeof ServiceStandingPreviewExpectedSnapshotPolicySettingsChannel];
+
+
+export const ServiceStandingPreviewExpectedSnapshotPolicySettingsChannel = {
+  email: 'email',
+  sms: 'sms',
+} as const;
+
+export type ServiceStandingPreviewExpectedSnapshotPolicySettingsSourceReviewKind = typeof ServiceStandingPreviewExpectedSnapshotPolicySettingsSourceReviewKind[keyof typeof ServiceStandingPreviewExpectedSnapshotPolicySettingsSourceReviewKind];
+
+
+export const ServiceStandingPreviewExpectedSnapshotPolicySettingsSourceReviewKind = {
+  native: 'native',
+  reconciled_import: 'reconciled_import',
+} as const;
+
+export type ServiceStandingPreviewExpectedSnapshotPolicySettingsSourceReview = {
+  kind: ServiceStandingPreviewExpectedSnapshotPolicySettingsSourceReviewKind;
+  verifiedAt: string;
+  cutoverAt: string | null;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  evidence: string;
+};
+
+export type ServiceStandingPreviewExpectedSnapshotPolicySettings = {
+  enabled: boolean;
+  channel: ServiceStandingPreviewExpectedSnapshotPolicySettingsChannel;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  agreementStartsOn: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  agreementEndsOn: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  agreementEvidence: string;
+  sourceReview: ServiceStandingPreviewExpectedSnapshotPolicySettingsSourceReview;
+};
+
+export type ServiceStandingPreviewExpectedSnapshotPolicyScopeRecurrenceMode = typeof ServiceStandingPreviewExpectedSnapshotPolicyScopeRecurrenceMode[keyof typeof ServiceStandingPreviewExpectedSnapshotPolicyScopeRecurrenceMode];
+
+
+export const ServiceStandingPreviewExpectedSnapshotPolicyScopeRecurrenceMode = {
+  calendar_months: 'calendar_months',
+} as const;
+
+export type ServiceStandingPreviewExpectedSnapshotPolicyScopeRecurrence = {
+  mode: ServiceStandingPreviewExpectedSnapshotPolicyScopeRecurrenceMode;
+  /**
+     * @minimum 1
+     * @maximum 60
+     */
+  intervalMonths: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  anchorDate: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  endDate: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  agreementNote: string;
+  /** @minLength 1 */
+  approvedByUserId: string;
+  approvedAt: string;
+};
+
+export type ServiceStandingPreviewExpectedSnapshotPolicyScope = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  seriesRootObligationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  anchorObligationId: string;
+  anchorUpdatedAt: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  anchorOccurrenceIndex: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  reviewedObligationId: string;
+  reviewedUpdatedAt: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  reviewedOccurrenceIndex: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  kind: string;
+  equipmentLabel: string;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  noticeDays: number;
+  source: string;
+  externalRef: string | null;
+  recurrence: ServiceStandingPreviewExpectedSnapshotPolicyScopeRecurrence;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  coverageStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  coverageEndsOn: string | null;
+  coverageEvidence: string | null;
+  ownerUserId: string;
+  recipient: string;
+  businessName: string;
+};
+
+export type ServiceStandingPreviewExpectedSnapshotPolicyTemplateVersion = typeof ServiceStandingPreviewExpectedSnapshotPolicyTemplateVersion[keyof typeof ServiceStandingPreviewExpectedSnapshotPolicyTemplateVersion];
+
+
+export const ServiceStandingPreviewExpectedSnapshotPolicyTemplateVersion = {
+  'service-carev2': 'service-care.v2',
+} as const;
+
+export type ServiceStandingPreviewExpectedSnapshotPolicyTemplate = {
+  subject: string;
+  body: string;
+};
+
+export type ServiceStandingPreviewExpectedSnapshotPolicySender = {
+  kind: 'email';
+  userId: string;
+  source: 'company_default';
+  provider: 'gmail' | 'microsoft';
+  /** @pattern ^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$ */
+  senderEmail: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  connectionId: string;
+  connectionRevision: string;
+  accountId: string | null;
+} | {
+  kind: 'sms';
+  id: string;
+  accountSid: string;
+  sender: string;
+  messagingServiceSid: string;
+  disclosureVersion: string;
+  origin: string;
+  businessName: string;
+};
+
+export type ServiceStandingPreviewExpectedSnapshotPolicySendingHours = {
+  quietHoursEnabled: boolean;
+  timezone: string;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  startHour: number;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  endHour: number;
+  days: string[];
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  maxTouchesPerDay: number;
+};
+
+export type ServiceStandingPreviewExpectedSnapshotPolicy = {
+  schemaVersion: ServiceStandingPreviewExpectedSnapshotPolicySchemaVersion;
+  settings: ServiceStandingPreviewExpectedSnapshotPolicySettings;
+  scope: ServiceStandingPreviewExpectedSnapshotPolicyScope;
+  /** @pattern ^[a-f0-9]{64}$ */
+  seriesFingerprint: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  sourceReviewFingerprint: string;
+  templateVersion: ServiceStandingPreviewExpectedSnapshotPolicyTemplateVersion;
+  template: ServiceStandingPreviewExpectedSnapshotPolicyTemplate;
+  sender: ServiceStandingPreviewExpectedSnapshotPolicySender;
+  sendingHours: ServiceStandingPreviewExpectedSnapshotPolicySendingHours;
+};
+
+export type ServiceStandingPreviewExpectedSnapshot = {
+  schemaVersion: ServiceStandingPreviewExpectedSnapshotSchemaVersion;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  actorUserId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  reviewId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  enrollmentId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  issuedAt: string;
+  expiresAt: string;
+  policy: ServiceStandingPreviewExpectedSnapshotPolicy;
+};
+
+export interface ServiceStandingPreview {
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  expectedSnapshot: ServiceStandingPreviewExpectedSnapshot;
+  /** @pattern ^[a-f0-9]{64}$ */
+  previewHash: string;
+  expiresAt: string;
+}
+
+export type ServiceStandingPreviewRequestPolicyChannel = typeof ServiceStandingPreviewRequestPolicyChannel[keyof typeof ServiceStandingPreviewRequestPolicyChannel];
+
+
+export const ServiceStandingPreviewRequestPolicyChannel = {
+  email: 'email',
+  sms: 'sms',
+} as const;
+
+export type ServiceStandingPreviewRequestPolicySourceReviewKind = typeof ServiceStandingPreviewRequestPolicySourceReviewKind[keyof typeof ServiceStandingPreviewRequestPolicySourceReviewKind];
+
+
+export const ServiceStandingPreviewRequestPolicySourceReviewKind = {
+  native: 'native',
+  reconciled_import: 'reconciled_import',
+} as const;
+
+export type ServiceStandingPreviewRequestPolicySourceReview = {
+  kind: ServiceStandingPreviewRequestPolicySourceReviewKind;
+  verifiedAt: string;
+  cutoverAt: string | null;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  evidence: string;
+};
+
+export type ServiceStandingPreviewRequestPolicy = {
+  enabled: boolean;
+  channel: ServiceStandingPreviewRequestPolicyChannel;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  agreementStartsOn: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  agreementEndsOn: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  agreementEvidence: string;
+  sourceReview: ServiceStandingPreviewRequestPolicySourceReview;
+};
+
+export interface ServiceStandingPreviewRequest {
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  expectedUpdatedAt: string;
+  policy: ServiceStandingPreviewRequestPolicy;
+}
+
+export type ServiceStandingApprovalRequestExpectedSnapshotSchemaVersion = typeof ServiceStandingApprovalRequestExpectedSnapshotSchemaVersion[keyof typeof ServiceStandingApprovalRequestExpectedSnapshotSchemaVersion];
+
+
+export const ServiceStandingApprovalRequestExpectedSnapshotSchemaVersion = {
+  'service-standing-previewv1': 'service-standing-preview.v1',
+} as const;
+
+export type ServiceStandingApprovalRequestExpectedSnapshotPolicySchemaVersion = typeof ServiceStandingApprovalRequestExpectedSnapshotPolicySchemaVersion[keyof typeof ServiceStandingApprovalRequestExpectedSnapshotPolicySchemaVersion];
+
+
+export const ServiceStandingApprovalRequestExpectedSnapshotPolicySchemaVersion = {
+  'service-standing-policyv1': 'service-standing-policy.v1',
+} as const;
+
+export type ServiceStandingApprovalRequestExpectedSnapshotPolicySettingsChannel = typeof ServiceStandingApprovalRequestExpectedSnapshotPolicySettingsChannel[keyof typeof ServiceStandingApprovalRequestExpectedSnapshotPolicySettingsChannel];
+
+
+export const ServiceStandingApprovalRequestExpectedSnapshotPolicySettingsChannel = {
+  email: 'email',
+  sms: 'sms',
+} as const;
+
+export type ServiceStandingApprovalRequestExpectedSnapshotPolicySettingsSourceReviewKind = typeof ServiceStandingApprovalRequestExpectedSnapshotPolicySettingsSourceReviewKind[keyof typeof ServiceStandingApprovalRequestExpectedSnapshotPolicySettingsSourceReviewKind];
+
+
+export const ServiceStandingApprovalRequestExpectedSnapshotPolicySettingsSourceReviewKind = {
+  native: 'native',
+  reconciled_import: 'reconciled_import',
+} as const;
+
+export type ServiceStandingApprovalRequestExpectedSnapshotPolicySettingsSourceReview = {
+  kind: ServiceStandingApprovalRequestExpectedSnapshotPolicySettingsSourceReviewKind;
+  verifiedAt: string;
+  cutoverAt: string | null;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  evidence: string;
+};
+
+export type ServiceStandingApprovalRequestExpectedSnapshotPolicySettings = {
+  enabled: boolean;
+  channel: ServiceStandingApprovalRequestExpectedSnapshotPolicySettingsChannel;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  agreementStartsOn: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  agreementEndsOn: string;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  agreementEvidence: string;
+  sourceReview: ServiceStandingApprovalRequestExpectedSnapshotPolicySettingsSourceReview;
+};
+
+export type ServiceStandingApprovalRequestExpectedSnapshotPolicyScopeRecurrenceMode = typeof ServiceStandingApprovalRequestExpectedSnapshotPolicyScopeRecurrenceMode[keyof typeof ServiceStandingApprovalRequestExpectedSnapshotPolicyScopeRecurrenceMode];
+
+
+export const ServiceStandingApprovalRequestExpectedSnapshotPolicyScopeRecurrenceMode = {
+  calendar_months: 'calendar_months',
+} as const;
+
+export type ServiceStandingApprovalRequestExpectedSnapshotPolicyScopeRecurrence = {
+  mode: ServiceStandingApprovalRequestExpectedSnapshotPolicyScopeRecurrenceMode;
+  /**
+     * @minimum 1
+     * @maximum 60
+     */
+  intervalMonths: number;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  anchorDate: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  endDate: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  agreementNote: string;
+  /** @minLength 1 */
+  approvedByUserId: string;
+  approvedAt: string;
+};
+
+export type ServiceStandingApprovalRequestExpectedSnapshotPolicyScope = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  seriesRootObligationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  anchorObligationId: string;
+  anchorUpdatedAt: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  anchorOccurrenceIndex: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  reviewedObligationId: string;
+  reviewedUpdatedAt: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  reviewedOccurrenceIndex: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  kind: string;
+  equipmentLabel: string;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  noticeDays: number;
+  source: string;
+  externalRef: string | null;
+  recurrence: ServiceStandingApprovalRequestExpectedSnapshotPolicyScopeRecurrence;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  coverageStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  coverageEndsOn: string | null;
+  coverageEvidence: string | null;
+  ownerUserId: string;
+  recipient: string;
+  businessName: string;
+};
+
+export type ServiceStandingApprovalRequestExpectedSnapshotPolicyTemplateVersion = typeof ServiceStandingApprovalRequestExpectedSnapshotPolicyTemplateVersion[keyof typeof ServiceStandingApprovalRequestExpectedSnapshotPolicyTemplateVersion];
+
+
+export const ServiceStandingApprovalRequestExpectedSnapshotPolicyTemplateVersion = {
+  'service-carev2': 'service-care.v2',
+} as const;
+
+export type ServiceStandingApprovalRequestExpectedSnapshotPolicyTemplate = {
+  subject: string;
+  body: string;
+};
+
+export type ServiceStandingApprovalRequestExpectedSnapshotPolicySender = {
+  kind: 'email';
+  userId: string;
+  source: 'company_default';
+  provider: 'gmail' | 'microsoft';
+  /** @pattern ^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$ */
+  senderEmail: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  connectionId: string;
+  connectionRevision: string;
+  accountId: string | null;
+} | {
+  kind: 'sms';
+  id: string;
+  accountSid: string;
+  sender: string;
+  messagingServiceSid: string;
+  disclosureVersion: string;
+  origin: string;
+  businessName: string;
+};
+
+export type ServiceStandingApprovalRequestExpectedSnapshotPolicySendingHours = {
+  quietHoursEnabled: boolean;
+  timezone: string;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  startHour: number;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  endHour: number;
+  days: string[];
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  maxTouchesPerDay: number;
+};
+
+export type ServiceStandingApprovalRequestExpectedSnapshotPolicy = {
+  schemaVersion: ServiceStandingApprovalRequestExpectedSnapshotPolicySchemaVersion;
+  settings: ServiceStandingApprovalRequestExpectedSnapshotPolicySettings;
+  scope: ServiceStandingApprovalRequestExpectedSnapshotPolicyScope;
+  /** @pattern ^[a-f0-9]{64}$ */
+  seriesFingerprint: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  sourceReviewFingerprint: string;
+  templateVersion: ServiceStandingApprovalRequestExpectedSnapshotPolicyTemplateVersion;
+  template: ServiceStandingApprovalRequestExpectedSnapshotPolicyTemplate;
+  sender: ServiceStandingApprovalRequestExpectedSnapshotPolicySender;
+  sendingHours: ServiceStandingApprovalRequestExpectedSnapshotPolicySendingHours;
+};
+
+export type ServiceStandingApprovalRequestExpectedSnapshot = {
+  schemaVersion: ServiceStandingApprovalRequestExpectedSnapshotSchemaVersion;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  actorUserId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  reviewId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  enrollmentId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  issuedAt: string;
+  expiresAt: string;
+  policy: ServiceStandingApprovalRequestExpectedSnapshotPolicy;
+};
+
+export interface ServiceStandingApprovalRequest {
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  expectedSnapshot: ServiceStandingApprovalRequestExpectedSnapshot;
+  /** @pattern ^[a-f0-9]{64}$ */
+  previewHash: string;
+  confirmed: true;
+}
+
+export interface ServiceStandingDisableRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  reason: string;
+  confirmed: true;
+}
+
+export type ServiceSmsReplyPageItemsItemState = typeof ServiceSmsReplyPageItemsItemState[keyof typeof ServiceSmsReplyPageItemsItemState];
+
+
+export const ServiceSmsReplyPageItemsItemState = {
+  needs_review: 'needs_review',
+  reviewed: 'reviewed',
+  dismissed: 'dismissed',
+} as const;
+
+export type ServiceSmsReplyPageItemsItemCorrelation = typeof ServiceSmsReplyPageItemsItemCorrelation[keyof typeof ServiceSmsReplyPageItemsItemCorrelation];
+
+
+export const ServiceSmsReplyPageItemsItemCorrelation = {
+  exact_reference: 'exact_reference',
+  ambiguous: 'ambiguous',
+} as const;
+
+export type ServiceSmsReplyPageItemsItemContent = {
+  text: string;
+} | null;
+
+export type ServiceSmsReplyPageItemsItemEvidence = typeof ServiceSmsReplyPageItemsItemEvidence[keyof typeof ServiceSmsReplyPageItemsItemEvidence];
+
+
+export const ServiceSmsReplyPageItemsItemEvidence = {
+  signed_sms_reference: 'signed_sms_reference',
+  signed_sms_phone_scope: 'signed_sms_phone_scope',
+} as const;
+
+export type ServiceSmsReplyPageItemsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  serviceObligationId: string | null;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  version: number;
+  state: ServiceSmsReplyPageItemsItemState;
+  correlation: ServiceSmsReplyPageItemsItemCorrelation;
+  reason: string;
+  historical: boolean;
+  holdActive: boolean;
+  receivedAt: string;
+  recordedAt: string;
+  rawExpiresAt: string;
+  content: ServiceSmsReplyPageItemsItemContent;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  evidence: ServiceSmsReplyPageItemsItemEvidence;
+  /** @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  candidateServiceObligationIds: string[];
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  candidateCount: number;
+  candidatesTruncated: boolean;
+};
+
+export type ServiceSmsReplyPageLimit = typeof ServiceSmsReplyPageLimit[keyof typeof ServiceSmsReplyPageLimit];
+
+
+export const ServiceSmsReplyPageLimit = {
+  NUMBER_25: 25,
+} as const;
+
+export interface ServiceSmsReplyPage {
+  /** @maxItems 25 */
+  items: ServiceSmsReplyPageItemsItem[];
+  hasMore: boolean;
+  /**
+     * @minimum 0
+     * @maximum 100000
+     */
+  offset: number;
+  limit: ServiceSmsReplyPageLimit;
+  held: boolean;
+}
+
+export type ReviewServiceSmsReplyDecision = typeof ReviewServiceSmsReplyDecision[keyof typeof ReviewServiceSmsReplyDecision];
+
+
+export const ReviewServiceSmsReplyDecision = {
+  office_follow_up: 'office_follow_up',
+  not_service_reply: 'not_service_reply',
+  handled: 'handled',
+} as const;
+
+export interface ReviewServiceSmsReply {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  expectedVersion: number;
+  decision: ReviewServiceSmsReplyDecision;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  note: string;
+  reviewed: true;
+}
+
+export interface ServiceSmsReplyReviewResult {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  replyId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  version: number;
+  replayed: boolean;
+}
+
 export type CalliePolicySnapshotTemplateVersion = typeof CalliePolicySnapshotTemplateVersion[keyof typeof CalliePolicySnapshotTemplateVersion];
 
 
@@ -6369,6 +7341,14 @@ export type AuthorizationSessionHeaderParameter = string;
  * Opaque homeowner portal session token.
  */
 export type PortalTokenHeaderParameter = string;
+
+export type ListServiceSmsRepliesParams = {
+/**
+ * @minimum 0
+ * @maximum 100000
+ */
+offset?: number;
+};
 
 export type ListCallieIntakesParams = {
 scope?: ListCallieIntakesScope;

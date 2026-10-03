@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import ServiceCarePanel from '@/components/service-care-panel';
 import { mockApi } from '@/test/mock-api';
 import { renderWithQuery } from '@/test/render';
@@ -73,6 +73,34 @@ describe('service customer-care approval', () => {
     expect(await screen.findByText('Unknown send result — operator reconciliation required')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Approve one reminder' })).toBeNull();
     expect(screen.queryByText(/^Delivered$/)).toBeNull();
+  });
+  it('labels a standing-admitted original receipt without claiming individual approval or offering a second reminder', async () => {
+    setup(() => Response.json({ ...initial(), reminder: { ...reminder('pending'), origin: 'standing', policyRevisionId: 'revision' } })); renderPanel();
+    expect(await screen.findByText(/Standing-policy admission — not a new individual staff approval/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Approve one reminder' })).toBeNull();
+  });
+  it('invalidates customer evidence checkboxes on edits instead of silently reusing earlier attestation', async () => {
+    setup(() => Response.json(initial())); renderPanel(); await screen.findByText(/To: customer@example.invalid/);
+    fireEvent.change(screen.getByLabelText('Current service agreement / customer expectation evidence'), { target: { value: 'Synthetic agreement first reviewed.' } });
+    fireEvent.click(screen.getByLabelText(/I reviewed this exact message/));
+    fireEvent.change(screen.getByLabelText('Current service agreement / customer expectation evidence'), { target: { value: 'Different synthetic agreement evidence.' } });
+    expect(screen.getByLabelText(/I reviewed this exact message/)).toHaveProperty('checked', false);
+    fireEvent.click(screen.getByLabelText(/I reviewed the actual customer response/));
+    fireEvent.change(screen.getByLabelText('Customer outcome'), { target: { value: 'declined' } });
+    expect(screen.getByLabelText(/I reviewed the actual customer response/)).toHaveProperty('checked', false);
+  });
+  it('does not refresh or invoke parent callbacks for a late mutation after the panel has closed', async () => {
+    let finish!: (response: Response) => void; const deferred = new Promise<Response>(resolve => { finish = resolve; });
+    const fetch = setup((_method, path) => path.endsWith('/care') ? Response.json(initial()) : undefined);
+    const fallback = fetch.getMockImplementation()!; fetch.mockImplementation((url, init) => init?.method === 'POST' ? deferred : fallback(url, init));
+    const changed = vi.fn(async () => {});
+    const view = renderWithQuery(<ServiceCarePanel obligationId="service-one" editable onChanged={changed} onClose={vi.fn()} />);
+    await screen.findByText(/To: customer@example.invalid/);
+    fireEvent.change(screen.getByLabelText('Current service agreement / customer expectation evidence'), { target: { value: 'Synthetic agreement current and reviewed.' } });
+    fireEvent.click(screen.getByLabelText(/I reviewed this exact message/)); fireEvent.click(screen.getByRole('button', { name: 'Approve one reminder' }));
+    view.unmount(); await act(async () => { finish(Response.json({ approvalId: 'approval' })); });
+    expect(changed).not.toHaveBeenCalled();
+    expect(fetch.mock.calls.filter(([url]) => String(url).includes('/care?'))).toHaveLength(1);
   });
   it('keeps source/consent holds visible and allows read-only inspection without write controls', async () => {
     setup(() => Response.json({ ...initial(), preview: null, blockReason: 'Reminder held: imported_source_requires_current_review.' })); renderPanel(false);

@@ -1,5 +1,17 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## October 3 standing-service continuation
+
+The owner requested the next big wave after CALLIE PR19/main f91e1c3 and
+exact-main CI37134529680 passed. The active L5 slice is
+`reports/standing-service-contract-2026-10-03.md`: exact owner-reviewed,
+forward-only service-series reminder authority, shared non-replayable dispatch,
+and signed SMS service-reply holds in the existing Service Desk. Use coordinated
+runtime, intake and experience agents; the coordinator owns shared integration
+and release evidence. No backlog sweep, warranty inference, marketing authority,
+automatic booking, provider activation, hosted/schema change or client cutover
+is authorized by this engineering continuation. Earlier live gates remain open.
+
 ## October 3 CALLIE intake continuation
 
 The owner requested the next launch-critical wave after PR18/main fa7c827 and

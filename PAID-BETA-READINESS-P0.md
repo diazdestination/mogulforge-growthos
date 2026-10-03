@@ -7,6 +7,16 @@
 
 ## Mission
 
+**October 3 current standing-service scope:** PR19/mainf91e1c3 passed exact-main
+CI37134529680. The next authorized L5 candidate follows
+`reports/standing-service-contract-2026-10-03.md`: exact, finite, forward-only
+owner-reviewed service-series reminders and signed SMS reply review. Require
+reviewed0013/125-table compatible recovery and fresh exact candidate/main CI.
+No backlog, warranty inference, consent grant, automatic booking, provider or
+hosted activation is implied. Read the integration report for local evidence;
+both contractor replacement cards and the fixed launch checklist remain open.
+This dated scope supersedes earlier active-wave wording, not release gates.
+
 **October3 current CALLIE scope:** PR18/mainfa7c827 passed exact-main CI37092275861.
 The next authorized candidate is bounded L4 intake under
 `reports/callie-intake-contract-2026-10-03.md`: new-call-only standing policy,

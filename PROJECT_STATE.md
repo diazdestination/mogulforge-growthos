@@ -1,5 +1,24 @@
 # GrowthOS project state
 
+## October 3 standing service reminders (current candidate)
+
+Base PR19/mainf91e1c3 and exact-main CI37134529680 passed. The owner-authorized
+L5 wave implements reviewed future service-series authority inside the existing
+Service Desk: fixed message, finite agreement/source review, immutable revision,
+shared permanent occurrence ownership and final dispatch checks. Exact signed
+service SMS references and ambiguous phone-scope evidence create office holds,
+not customer identity, consent, booking or inferred warranty protection. Microsoft
+parents retain the original typed individual/standing authority.
+
+Source schema125tables; reviewed-only0013after0012. Synthetic compatible restore
+preserves disabled decisions, uncertain sends and purged reply holds, with31real
+SELECT-only app checks and14new FK/shape negatives. See
+`reports/standing-service-integration-2026-10-03.md` for exact local/release proof.
+Exact candidate/main CI is required before selection. Hosted rollout/recovery,
+provider/device testing and both company replacement cards remain separate and
+unaccepted. Azure first sign-in stays owner-deferred; payment collection is not
+part of this wave. Earlier active/candidate labels below are historical.
+
 ## October 3 CALLIE intake (current candidate)
 
 PR18 is merged at fa7c827; exact-main CI37092275861 passed. The next owner-authorized

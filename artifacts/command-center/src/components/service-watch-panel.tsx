@@ -29,33 +29,35 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
   return value as T;
 }
 
-export function ServiceWatchPanel({ obligationId, editable, onOpenCare, onClose, onChanged }: { obligationId: string; editable: boolean; onOpenCare: () => void; onClose: () => void; onChanged: () => Promise<void> }) {
+export function ServiceWatchPanel({ obligationId, editable, onOpenCare, onClose, onChanged, scopeKey = '' }: { obligationId: string; editable: boolean; onOpenCare: () => void; onClose: () => void; onChanged: () => Promise<void>; scopeKey?: string }) {
   const [data, setData] = useState<WatchDetail | null>(null), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [reviewNeeded, setReviewNeeded] = useState(false);
   const [owner, setOwner] = useState(''), [note, setNote] = useState(''), [deadline, setDeadline] = useState(''), [reviewed, setReviewed] = useState(false);
-  const { data: users, isError: usersError } = useListUsers({ query: { queryKey: getListUsersQueryKey(), enabled: editable } });
-  const sequence = useRef(0), key = useRef(obligationId); key.current = obligationId;
+  const { data: users, isError: usersError } = useListUsers({ query: { queryKey: [...getListUsersQueryKey(), 'service-watch', scopeKey], enabled: editable } });
+  const mounted = useRef(true), sequence = useRef(0), key = useRef(''); key.current = `${scopeKey}:${obligationId}:${editable}`;
   async function refresh() {
-    const run = ++sequence.current, id = obligationId; setLoading(true);
+    const run = ++sequence.current, currentView = key.current; setLoading(true);
     try {
-      const result = await request<WatchDetail>(`service-obligations/${id}/watch`);
-      if (run !== sequence.current || id !== key.current) return;
+      const result = await request<WatchDetail>(`service-obligations/${obligationId}/watch`);
+      if (!mounted.current || run !== sequence.current || currentView !== key.current) return;
       setData(result); setOwner(result.assignedUserId ?? ''); setNote(result.nextAction ?? ''); setDeadline(localDateTime(result.nextActionAt));
       setReviewed(false); setReviewNeeded(false); setError('');
     } catch (cause) {
-      if (run === sequence.current && id === key.current) { setError(cause instanceof Error ? cause.message : 'Service watch is unavailable.'); setReviewNeeded(true); }
-    } finally { if (run === sequence.current && id === key.current) setLoading(false); }
+      if (mounted.current && run === sequence.current && currentView === key.current) { setError(cause instanceof Error ? cause.message : 'Service watch is unavailable.'); setReviewNeeded(true); }
+    } finally { if (mounted.current && run === sequence.current && currentView === key.current) setLoading(false); }
   }
-  useEffect(() => { setData(null); void refresh(); return () => { ++sequence.current; }; }, [obligationId]);
+  useEffect(() => { mounted.current = true; setData(null); setBusy(false); setReviewed(false); setNotice(''); void refresh(); return () => { mounted.current = false; ++sequence.current; }; }, [obligationId, scopeKey, editable]);
   async function save(action: 'assign' | 'acknowledge') {
     if (!data || busy || loading || reviewNeeded || data.held || !editable) return;
+    const run = sequence.current, currentView = key.current;
     setBusy(true); setNotice('');
     try {
       await request(`service-obligations/${obligationId}/watch`, { action, requestId: crypto.randomUUID(), expectedVersion: data.expectedVersion, expectedFingerprint: data.expectedFingerprint,
         assignedUserId: owner, note, ...(action === 'acknowledge' ? { nextActionAt: new Date(deadline).toISOString(), reviewed: true } : {}) });
-      await refresh(); await onChanged(); setNotice('Office plan saved. No customer message, reply, booking or service completion was created.');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Save was not confirmed.'); setReviewNeeded(true); setReviewed(false); }
-    finally { setBusy(false); }
+      if (!mounted.current || run !== sequence.current || currentView !== key.current) return;
+      await refresh(); if (mounted.current && currentView === key.current) { await onChanged(); if (mounted.current && currentView === key.current) setNotice('Office plan saved. No customer message, reply, booking or service completion was created.'); }
+    } catch (cause) { if (mounted.current && currentView === key.current) { setError(cause instanceof Error ? cause.message : 'Save was not confirmed.'); setReviewNeeded(true); setReviewed(false); } }
+    finally { if (mounted.current && currentView === key.current) setBusy(false); }
   }
   const disabled = loading || busy || reviewNeeded || !editable || !!data?.held;
   return <section aria-label="Service watch detail" className="min-w-0 space-y-3 rounded-xl border bg-card p-3 sm:p-4">

@@ -15,31 +15,33 @@ function validPage(value: Page, id: string) {
   return value && Array.isArray(value.items) && value.items.every(row => row && typeof row.id === 'string' && row.serviceObligationId === id && Number.isInteger(row.version) &&
     ['needs_review', 'reviewed', 'dismissed'].includes(row.state) && (row.content === null || (typeof row.content?.subject === 'string' && typeof row.content?.text === 'string'))) && typeof value.hasMore === 'boolean' && typeof value.held === 'boolean';
 }
-export default function ServiceMailboxRepliesPanel({ obligationId, editable, onChanged }: { obligationId: string; editable: boolean; onChanged: () => Promise<void> }) {
+export default function ServiceMailboxRepliesPanel({ obligationId, editable, onChanged, scopeKey = '' }: { obligationId: string; editable: boolean; onChanged: () => Promise<void>; scopeKey?: string }) {
   const [offset, setOffset] = useState(0), [page, setPage] = useState<Page | null>(null), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [needsReview, setNeedsReview] = useState(false);
   const [selected, setSelected] = useState(''), [decision, setDecision] = useState('office_follow_up'), [note, setNote] = useState(''), [checked, setChecked] = useState(false);
-  const sequence = useRef(0), view = useRef(''); view.current = `${obligationId}:${offset}`;
+  const mounted = useRef(true), sequence = useRef(0), view = useRef(''); view.current = `${scopeKey}:${obligationId}:${offset}:${editable}`;
   async function refresh() {
     const run = ++sequence.current, key = view.current; setLoading(true);
     try {
       const value = await request<Page>(`${obligationId}/mailbox-replies?offset=${offset}`);
       if (!validPage(value, obligationId)) throw new Error('Service reply evidence is unavailable. No empty-inbox conclusion can be made.');
-      if (run !== sequence.current || view.current !== key) return;
+      if (!mounted.current || run !== sequence.current || view.current !== key) return;
       setPage(value); setNeedsReview(false); setError(''); setSelected(''); setNote(''); setChecked(false);
-    } catch (cause) { if (run === sequence.current && view.current === key) { setPage(null); setNeedsReview(true); setError(cause instanceof Error ? cause.message : 'Reply evidence is unavailable.'); } }
-    finally { if (run === sequence.current && view.current === key) setLoading(false); }
+    } catch (cause) { if (mounted.current && run === sequence.current && view.current === key) { setPage(null); setNeedsReview(true); setError(cause instanceof Error ? cause.message : 'Reply evidence is unavailable.'); } }
+    finally { if (mounted.current && run === sequence.current && view.current === key) setLoading(false); }
   }
-  useEffect(() => { setPage(null); setNotice(''); void refresh(); return () => { ++sequence.current; }; }, [obligationId, offset]);
+  useEffect(() => { mounted.current = true; setPage(null); setNotice(''); setBusy(false); setChecked(false); void refresh(); return () => { mounted.current = false; ++sequence.current; }; }, [obligationId, offset, scopeKey, editable]);
   async function review(row: Reply) {
     if (!editable || busy || loading || needsReview || page?.held || !checked) return;
+    const run = sequence.current, key = view.current;
     setBusy(true); setError(''); setNotice('');
     try {
       await request(`${obligationId}/mailbox-replies/${row.id}/review`, { requestId: crypto.randomUUID(), expectedVersion: row.version, decision, note, reviewed: true });
+      if (!mounted.current || run !== sequence.current || view.current !== key) return;
       setNotice('Office review saved. No message was sent, send receipt reset, customer conversation invented or appointment booked. Record the actual conversation separately before booking.');
-      await refresh(); await onChanged();
-    } catch (cause) { setNeedsReview(true); setChecked(false); setError(`${cause instanceof Error ? cause.message : 'The result was not confirmed.'} Refresh and review the saved evidence before another action. No automatic retry was made.`); }
-    finally { setBusy(false); }
+      await refresh(); if (mounted.current && view.current === key) await onChanged();
+    } catch (cause) { if (mounted.current && view.current === key) { setNeedsReview(true); setChecked(false); setError(`${cause instanceof Error ? cause.message : 'The result was not confirmed.'} Refresh and review the saved evidence before another action. No automatic retry was made.`); } }
+    finally { if (mounted.current && view.current === key) setBusy(false); }
   }
   const disabled = busy || loading || needsReview || !editable || page?.held;
   return <section className="min-w-0 space-y-3 rounded-lg border p-3" aria-label="Service mailbox replies">

@@ -17,6 +17,7 @@ import { seedLaunchCommunicationsPreview } from "./launch-communications-preview
 import { seedLeadRepliesPreview } from "./lead-replies-preview-fixture.mjs";
 import { seedInvoiceRecoveryPreview } from "./invoice-recovery-preview-fixture.mjs";
 import { seedCalliePreview } from "./callie-preview-fixture.mjs";
+import { seedStandingServicePreview } from "./standing-service-preview-fixture.mjs";
 
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const database = path.resolve(api, "../../lib/db");
@@ -49,6 +50,10 @@ Object.assign(env, {
   SCHEDULER_AUTOSTART: "false",
   RUNTIME_SYNTHETIC_PREVIEW: "loopback-only",
 });
+// Disposable encryption for fictional reply-storage readiness only. This is not
+// a provider key, is never persisted and does not clear any outbound hold.
+if (process.argv.includes("--standing-service"))
+  env.EMAIL_INTELLIGENCE_ENCRYPTION_KEY = randomBytes(32).toString("hex");
 let child;
 const cacheRoot = path.join(api, "node_modules/.cache");
 await mkdir(cacheRoot, { recursive: true });
@@ -95,6 +100,7 @@ try {
     if (process.argv.includes("--lead-replies")) await seedLeadRepliesPreview(client, org.id, user.id);
     if (process.argv.includes("--invoice-recovery")) await seedInvoiceRecoveryPreview(client, org.id, user.id);
     if (process.argv.includes("--callie")) await seedCalliePreview(client, org.id, user.id);
+    if (process.argv.includes("--standing-service")) await seedStandingServicePreview(client, org.id, user.id);
     await client.query(
       "INSERT INTO scheduled_actions(organization_id,action,context,run_at,status,attempts,last_error) VALUES ($1,$2,'{}',now()-interval '1 hour','failed',3,'Synthetic preparation failure for visual QA')",
       [

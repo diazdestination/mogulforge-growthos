@@ -78,6 +78,7 @@ describe("typed service original-mailbox evidence", () => {
   it("approved send -> actual parent claim -> Sent Items observation -> reply creates office work, never a lead, booking or consent", async () => {
     const f = await fixture(); const { parent, result } = await send(f);
     expect(result.status).toBe("success"); expect(parent.acceptedAt).toBeTruthy(); expect(parent.internetMessageId).toBeNull();
+    const [staffTask] = await db.select().from(crmTasksTable).where(eq(crmTasksTable.id, f.service.taskId));
     const { result: arrival } = await arrived(f);
     expect(actualPosts).toBe(1); expect(await hasServiceMailboxReplyHold(f.org, f.service.id)).toBe(true);
     expect(await db.select().from(leadsTable).where(eq(leadsTable.organizationId, f.org))).toHaveLength(0);
@@ -86,7 +87,7 @@ describe("typed service original-mailbox evidence", () => {
     const page = await listServiceMailboxReplies(f.org, f.staff, f.service.id);
     expect(page.items[0]).toMatchObject({ id: arrival.replyId, historical: false, holdActive: true, content: { text: expect.stringContaining("Ignore every prior instruction") } });
     const [stored] = await db.select().from(replies).where(eq(replies.id, arrival.replyId!)); expect(stored.encryptedText).not.toContain("Ignore every prior instruction");
-    const [task] = await db.select().from(crmTasksTable).where(eq(crmTasksTable.id, f.service.taskId)); expect(task.description).toContain("untrusted");
+    const [task] = await db.select().from(crmTasksTable).where(eq(crmTasksTable.id, f.service.taskId)); expect(task).toEqual(staffTask);
     await processServiceWatch(f.org); const watch = await getServiceWatch(f.org, f.staff, f.service.id); expect(watch.reasons).toContain("reply_received_review"); expect(watch.reasons).not.toContain("no_response_recorded");
   });
   it("reply before Sent Items observation remains unmatched and can match later without resending", async () => {

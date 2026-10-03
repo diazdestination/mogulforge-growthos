@@ -8,6 +8,7 @@ import { operationsFixtureIds } from './operations-wave-recovery-fixture.mjs';
 import { leadReplyFixtureIds } from './lead-replies-recovery-fixture.mjs';
 import { invoiceRecoveryIds } from './invoice-recovery-fixture.mjs';
 import { callieFixtureIds } from './callie-recovery-fixture.mjs';
+import { standingServiceIds } from './standing-service-recovery-fixture.mjs';
 
 const target = new URL(process.env.DATABASE_URL ?? '');
 if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.hostname !== '127.0.0.1' || target.pathname !== '/postgres' || process.env.CONTRACTOR_SYNTHETIC_RECOVERY !== 'true' || process.env.NODE_ENV !== 'test') throw new Error('contractor_probe_target_invalid');
@@ -48,6 +49,7 @@ try {
   good.push('/api/v1/invoices/delivery-worklist');
   const callie = callieFixtureIds('restore-drill-contractor-a'), foreignCallie = callieFixtureIds('restore-drill-contractor-b');
   good.push('/api/v1/communications/callie?scope=attention', '/api/v1/communications/callie/policy', `/api/v1/communications/callie/${callie.intake}`);
+  good.push(`/api/v1/service-obligations/${native.nextService}/standing-reminders`, `/api/v1/service-obligations/${native.nextService}/sms-replies`);
   for (const route of good) {
     check = `read_${good.indexOf(route)}`;
     const response = await fetch(`${origin}${route}`, { headers });
@@ -106,6 +108,19 @@ try {
   const calliePolicy = await (await fetch(`${origin}/api/v1/communications/callie/policy`, { headers })).json();
   assert.equal(calliePolicy.version, 2); assert.equal(calliePolicy.policy.enabled, false); assert.equal(calliePolicy.readiness.ready, false);
   assert.equal((await fetch(`${origin}/api/v1/communications/callie/${foreignCallie.intake}`, { headers })).status, 404);
+  check = 'standing_service_disabled_authority';
+  const standing = await (await fetch(`${origin}/api/v1/service-obligations/${native.nextService}/standing-reminders`, { headers })).json();
+  assert.equal(standing.version, 2); assert.equal(standing.policy.enabled, false); assert.equal(standing.readiness.ready, false);
+  assert.equal(standing.occurrence.eligible, false); assert.equal(standing.enrollmentId, standingServiceIds('restore-drill-contractor-a').enrollment);
+  assert.equal(standing.occurrence.origin, 'standing'); assert.equal(standing.occurrence.receiptState, 'indeterminate');
+  assert.equal(standing.occurrence.authorizationId, standingServiceIds('restore-drill-contractor-a').approval);
+  assert.equal(standing.occurrence.scheduledActionId, standingServiceIds('restore-drill-contractor-a').scheduled);
+  check = 'service_sms_retained_evidence';
+  const smsReplies = await (await fetch(`${origin}/api/v1/service-obligations/${native.nextService}/sms-replies`, { headers })).json();
+  assert.equal(smsReplies.held, true); assert.equal(smsReplies.limit, 25); assert.equal(smsReplies.hasMore, false);
+  const exactReply = smsReplies.items.find(row => row.id === standingServiceIds('restore-drill-contractor-a').reply);
+  assert.ok(exactReply); assert.equal(exactReply.correlation, 'exact_reference'); assert.equal(exactReply.content, null); assert.equal(exactReply.state, 'needs_review');
+  for (const suffix of ['standing-reminders', 'sms-replies']) assert.equal((await fetch(`${origin}/api/v1/service-obligations/${otherNative.nextService}/${suffix}`, { headers })).status, 404);
   for (const route of [`/api/v1/contacts/${other.contact}`, `/api/v1/leads/${other.lead}`, `/api/v1/projects/${other.project}`, `/api/v1/invoices/${otherNative.invoice}`, `/api/v1/service-obligations/${otherNative.nextService}/care`, `/api/v1/communications/voice/${careFixtureIds('restore-drill-contractor-b').call}/care`, `/api/v1/invoices/${otherNative.invoice}/delivery`]) {
     check = 'tenant_boundary';
     const response = await fetch(`${origin}${route}`, { headers });

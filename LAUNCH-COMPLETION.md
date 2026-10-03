@@ -21,7 +21,7 @@ HOUSECALL-PRO-REPLACEMENT-GATE.md.
 | L2 | Staff can reliably join/sign in and recover access | Durable verification/reset/invitation send ledger, exact signed callback reconciliation and staff delivery evidence implemented in the candidate. Configure stable platform context and prove actual inbox receipt/access separately; uncertain attempts cannot be automatically retried. |
 | L3 | Customers receive usable invoices; staff see accurate external balances | PR18/mainfa7c827 and its exact CI passed: append-only attempt history and explicitly reviewed proven-no-dispatch retry or additional copy are built. Hosted/provider/document acceptance remains required. The bounded invoice-page view is not a global delivery-state exception filter. No payment processing. |
 | L4 | Missed calls are recovered promptly without uncontrolled messages | Current CALLIE candidate adds owner-reviewed forward-only policy, bounded keypad qualification, caller-originated one-call acknowledgment, accountable handoff and explicit office-confirmed booking. This does not deliver freeform conversational reception or autonomous confirmed booking, nor close L4. Finish required remaining scope and prove actual routing, consent, stop, handoff and failure behavior. |
-| L5 | HVAC service obligations produce timely reminders, responses and visits | Recurrence, individual review, booking and exception watch built. Finish a reviewed standing-policy path for required routine reminders without approving arbitrary future messages; prove actual agreements, responses and completion/next date. |
+| L5 | HVAC service obligations produce timely reminders, responses and visits | Current standing-service candidate adds exact forward-only series approval, shared one-reminder ownership, signed service SMS evidence/office holds and typed Microsoft reply authority. No backlog, warranty inference or automatic booking. Close exact release CI, then prove each actual agreement, sender, response, visit and completion/next date. |
 | L6 | Lead recovery and campaigns produce accountable opportunities | Reviewed one-touch imported-source recovery built. Finish the agreed bounded ongoing nurture behavior, keeping source reconciliation and separate permission. Prove reply/opt-out stops and outcomes. |
 | L7 | The office and technician can find and finish each customer's work simply | Implement necessary unified history over canonical records; confirm actual equipment/checklist needs, repeat-customer jobs, multi-property work and required scheduling details. No duplicate customer or invented acquisition lead. |
 | L8 | Both businesses can migrate and cut over without losing required work/history | Obtain approved source samples; map required customers/properties/equipment, open jobs/appointments/media and balances. Existing finance loader is normalized JSON, not universal Housecall Pro import. Reconcile counts, exceptions, one writer, rollback and export. |
@@ -29,7 +29,23 @@ HOUSECALL-PRO-REPLACEMENT-GATE.md.
 | L10 | The selected release is recoverable, isolated and supportable | Exact-head/main CI, reviewed hosted schema, compatible restore, always-on scheduler, actionable failure alerts, two-company isolation, privacy/export/retention and AI cost/runtime acceptance. |
 | L11 | Selling/onboarding is repeatable and honestly valuable | GrowthOS subscription test flow (separate from contractor collection), explicit included scope/allowances, setup/support effort, complete company workday acceptance and one conservatively evidenced inquiry-to-outcome chain. |
 
-## Active implementation: bounded L4 CALLIE intake
+## Active implementation: bounded L5 standing service reminders
+
+PR19/mainf91e1c3 and exact-main CI37134529680 passed. The next owner-authorized
+slice is `reports/standing-service-contract-2026-10-03.md`. See its integration
+report and operator guide. Existing Service Desk and MAINTAIN now expose separate
+series authority, occurrence receipts and reply review. This extends L5 source
+readiness, not live acceptance. Candidate schema is125tables with reviewed0013
+after0012; the synthetic restore checks31SELECT-only app reads and14new constraint
+negatives. Keep exact candidate/main CI separate from hosted/provider/phone proof.
+
+Next fixed-checklist engineering is bounded ongoing lead nurture (L6), then the
+remaining required customer-history/workday gaps (L7) and source-specific migration
+once actual approved exports are available (L8). Required L1/L4 capability and
+contractor acceptance gaps remain explicit; keypad intake is not a conversational
+receptionist. Do not silently mark the full checklist complete.
+
+## Previous implementation: bounded L4 CALLIE intake
 
 Owner requested the next wave after PR18/mainfa7c827 and green exact-main
 CI37092275861. See `reports/callie-intake-integration-2026-10-03.md` and its operator

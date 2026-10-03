@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useListAppointments, useListUsers } from '@workspace/api-client-react';
+import { useEffect, useRef, useState } from 'react';
+import { getListAppointmentsQueryKey, getListUsersQueryKey, useListAppointments, useListUsers } from '@workspace/api-client-react';
 import { canAssignWork, scheduleTimezone } from '@/lib/contractor-schedule';
 
 export type ServiceRow = {
@@ -16,7 +16,7 @@ async function save(path: string, body: unknown, method = 'PATCH') {
   return result;
 }
 
-export default function ServiceObligationEditor({ row, onSaved, onClose }: { row: ServiceRow; onSaved: (notice: string) => Promise<void>; onClose: () => void }) {
+export default function ServiceObligationEditor({ row, onSaved, onClose, scopeKey = '' }: { row: ServiceRow; onSaved: (notice: string) => Promise<void>; onClose: () => void; scopeKey?: string }) {
   const { obligation: item, task } = row;
   const [dueDate, setDueDate] = useState(item.dueAt.slice(0, 10));
   const [assignedUserId, setAssignedUserId] = useState(task.assignedUserId ?? '');
@@ -29,16 +29,23 @@ export default function ServiceObligationEditor({ row, onSaved, onClose }: { row
   const [agreement, setAgreement] = useState(item.recurrence?.agreementNote ?? '');
   const [completionNote, setCompletionNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [reviewNeeded, setReviewNeeded] = useState(false);
   const [error, setError] = useState('');
-  const { data: users } = useListUsers();
+  const { data: users, isError: usersError } = useListUsers({ query: { queryKey: [...getListUsersQueryKey(), 'service-editor', scopeKey] } });
   const params = { leadId: undefined, contactId: item.contactId ?? row.contact.id };
-  const { data: appointments, isError: appointmentError } = useListAppointments(params);
+  const { data: appointments, isError: appointmentError } = useListAppointments(params, { query: { queryKey: [...getListAppointmentsQueryKey(params), 'service-editor', scopeKey] } });
+  const mounted = useRef(true), view = useRef(''); view.current = `${scopeKey}:${item.id}:${item.updatedAt}`;
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   async function work(fn: () => Promise<void>) {
+    if (busy || reviewNeeded) return;
+    const key = view.current;
     setBusy(true); setError('');
-    try { await fn(); } catch (e) { setError(e instanceof Error ? e.message : 'Service could not be saved.'); } finally { setBusy(false); }
+    try { await fn(); } catch (e) { if (mounted.current && key === view.current) { setReviewNeeded(true); setError(`${e instanceof Error ? e.message : 'Service could not be saved.'} Close this editor and refresh the saved service before another change. No automatic retry was made.`); } } finally { if (mounted.current && key === view.current) setBusy(false); }
   }
   async function update(status?: 'completed' | 'cancelled') {
+    const key = view.current;
     const result = await save(item.id, status ? { status, completionNote, expectedUpdatedAt: item.updatedAt } : { dueDate, assignedUserId: assignedUserId || null, appointmentId: appointmentId || null, coverageStartsOn: startsOn || null, coverageEndsOn: endsOn || null, coverageEvidence: evidence || null, expectedUpdatedAt: item.updatedAt });
+    if (!mounted.current || key !== view.current) return;
     await onSaved(status === 'completed' ? (result.nextObligationId ? 'Service completed. One next agreed service task is ready for office scheduling.' : 'Service completed. No next visit was created.') : status === 'cancelled' ? 'Service cancelled. No next visit will be generated from this occurrence.' : 'Service details saved. No customer message was sent.');
   }
   return <div className="mt-3 w-full min-w-0 space-y-6 border-t pt-4">
@@ -57,14 +64,16 @@ export default function ServiceObligationEditor({ row, onSaved, onClose }: { row
         <div className="grid gap-3 sm:grid-cols-2"><label className="min-w-0 text-sm">Coverage starts<input className={field} type="date" value={startsOn} onChange={event => setStartsOn(event.target.value)} /></label><label className="min-w-0 text-sm">Coverage ends<input className={field} type="date" value={endsOn} onChange={event => setEndsOn(event.target.value)} /></label></div>
         <label className="block text-sm">Agreement or document reference<textarea className={field} maxLength={1000} required={!!startsOn || !!endsOn} value={evidence} onChange={event => setEvidence(event.target.value)} /></label>
       </details>
-      <button className={button} disabled={busy || appointmentError}>Save service details</button>
+      {usersError && <p role="alert" className="text-sm">Team members are unavailable. Refresh before changing the accountable owner.</p>}
+      <button className={button} disabled={busy || reviewNeeded || appointmentError || usersError}>Save service details</button>
     </form>
-    <form className="space-y-3 border-t pt-4" onSubmit={event => { event.preventDefault(); void work(async () => { await save(`${item.id}/recurrence`, { expectedUpdatedAt: item.updatedAt, intervalMonths: Number(interval), endDate: endDate || null, agreementNote: agreement }, 'POST'); await onSaved('Recurring staff task approved. The next task is created after this service is marked complete.'); }); }}>
+    <form className="space-y-3 border-t pt-4" onSubmit={event => { event.preventDefault(); const key = view.current; void work(async () => { await save(`${item.id}/recurrence`, { expectedUpdatedAt: item.updatedAt, intervalMonths: Number(interval), endDate: endDate || null, agreementNote: agreement }, 'POST'); if (mounted.current && key === view.current) await onSaved('Recurring staff task approved. The next task is created after this service is marked complete. Automatic reminders require separate standing approval.'); }); }}>
       <h4 className="font-semibold">Next agreed service</h4><p className="text-sm text-muted-foreground">{item.recurrence ? `Approved every ${item.recurrence.intervalMonths} months from ${item.recurrence.anchorDate}.` : 'This is currently a one-time visit.'} Keep the agreed calendar dates even if a visit is completed late. This never books or bills a customer automatically.</p>
+      <p className="text-sm text-muted-foreground">This approves a recurring staff task, not customer messages. An owner or administrator can separately review forward-only automatic reminders under Customer care & booking. Changing this agreement or its owner requires new standing review.</p>
       <div className="grid gap-3 sm:grid-cols-2"><label className="min-w-0 text-sm">Repeat every (months)<input className={field} type="number" min={1} max={60} required value={interval} onChange={event => setInterval(event.target.value)} /></label><label className="min-w-0 text-sm">Last agreed due date (optional)<input className={field} type="date" value={endDate} onChange={event => setEndDate(event.target.value)} /></label></div>
       <label className="block text-sm">Customer agreement evidence<textarea className={field} required maxLength={500} value={agreement} onChange={event => setAgreement(event.target.value)} placeholder="Agreement reference and the approved service interval" /></label>
-      <div className="flex flex-wrap gap-3"><button className={button} disabled={busy}>Approve recurring task</button>{item.recurrence && <button className={button} disabled={busy || !agreement.trim()} type="button" onClick={() => void work(async () => { await save(`${item.id}/recurrence`, { expectedUpdatedAt: item.updatedAt, intervalMonths: null, agreementNote: agreement }, 'POST'); await onSaved('Future recurrence stopped. This service remains due.'); })}>Stop future recurrence</button>}</div>
+      <div className="flex flex-wrap gap-3"><button className={button} disabled={busy || reviewNeeded}>Approve recurring task</button>{item.recurrence && <button className={button} disabled={busy || reviewNeeded || !agreement.trim()} type="button" onClick={() => { const key = view.current; void work(async () => { await save(`${item.id}/recurrence`, { expectedUpdatedAt: item.updatedAt, intervalMonths: null, agreementNote: agreement }, 'POST'); if (mounted.current && key === view.current) await onSaved('Future recurrence stopped. This service remains due.'); }); }}>Stop future recurrence</button>}</div>
     </form>
-    <div className="space-y-3 border-t pt-4"><h4 className="font-semibold">After the visit</h4><label className="block text-sm">Completion or cancellation note<textarea className={field} maxLength={1000} value={completionNote} onChange={event => setCompletionNote(event.target.value)} /></label><div className="flex flex-wrap gap-3"><button className={`${button} bg-primary text-primary-foreground dark:text-slate-950`} disabled={busy} onClick={() => void work(() => update('completed'))}>Mark serviced</button><button className={button} disabled={busy} onClick={() => void work(() => update('cancelled'))}>Cancel this service</button></div></div>
+    <div className="space-y-3 border-t pt-4"><h4 className="font-semibold">After the visit</h4><label className="block text-sm">Completion or cancellation note<textarea className={field} maxLength={1000} value={completionNote} onChange={event => setCompletionNote(event.target.value)} /></label><div className="flex flex-wrap gap-3"><button className={`${button} bg-primary text-primary-foreground dark:text-slate-950`} disabled={busy || reviewNeeded} onClick={() => void work(() => update('completed'))}>Mark serviced</button><button className={button} disabled={busy || reviewNeeded} onClick={() => void work(() => update('cancelled'))}>Cancel this service</button></div></div>
   </div>;
 }
