@@ -29,6 +29,8 @@ vi.mock("./reactivation", () => ({
 vi.mock("./missed-call-care", () => ({
   processMissedCallCare: vi.fn(async () => {}),
 }));
+// Never claim another suite's exact one-call SMS grant.
+vi.mock("./callie-runtime", () => ({ processCallieIntakes: vi.fn(async () => {}) }));
 vi.mock("./service-watch", () => ({ processServiceWatch: vi.fn(async () => {}) }));
 // A global scheduler test must not poll or purge another suite's reply fixtures.
 vi.mock("./mailbox-connector", () => ({ processMailboxConnectors: vi.fn(async () => {}) }));
@@ -51,6 +53,7 @@ import { markAbandonedConversations } from "./concierge";
 import { processScheduledWork } from "./automation";
 import { processStaffLeadPush } from "./staff-push";
 import { processMissedCallCare } from "./missed-call-care";
+import { processCallieIntakes } from "./callie-runtime";
 import { processServiceWatch } from "./service-watch";
 import { processMailboxConnectors } from "./mailbox-connector";
 import { purgeExpiredServiceReplyContent, purgeExpiredLeadReplyContent } from "./mailbox-communication";
@@ -140,6 +143,7 @@ describe("scheduler stage isolation", () => {
     );
     expect(processPendingDeliveries).not.toHaveBeenCalled();
     expect(processMissedCallCare).not.toHaveBeenCalled();
+    expect(processCallieIntakes).not.toHaveBeenCalled();
     expect(processServiceWatch).not.toHaveBeenCalled();
     expect(processStaffLeadPush).not.toHaveBeenCalled();
   });
@@ -155,6 +159,7 @@ describe("scheduler stage isolation", () => {
 
     expect(processPendingDeliveries).toHaveBeenCalledTimes(1);
     expect(processMissedCallCare).toHaveBeenCalledExactlyOnceWith(undefined);
+    expect(processCallieIntakes).toHaveBeenCalledExactlyOnceWith(undefined);
     expect(processStaffLeadPush).toHaveBeenCalledTimes(1);
     expect(cleanupExpiredPreviousSecrets).toHaveBeenCalledTimes(1);
     expect(markAbandonedConversations).toHaveBeenCalledTimes(1);
@@ -225,5 +230,17 @@ describe("scheduler stage isolation", () => {
     expect(processStaffLeadPush).toHaveBeenCalledExactlyOnceWith(undefined);
     expect(observe).toHaveBeenCalledWith("upload-cleanup", "succeeded");
     expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("PRIVATE_SERVICE_EVIDENCE");
+  });
+  it("isolates CALLIE failure without exposing caller or challenge evidence", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(processCallieIntakes).mockRejectedValueOnce(new Error("PRIVATE_CALLIE_CHALLENGE"));
+    const observe = vi.fn(async () => {});
+    await processScheduledWork(undefined, observe);
+    expect(processCallieIntakes).toHaveBeenCalledExactlyOnceWith(undefined);
+    expect(observe).toHaveBeenCalledWith("callie-intake", "failed");
+    expect(observe).toHaveBeenCalledWith("service-watch", "succeeded");
+    expect(observe).toHaveBeenCalledWith("upload-cleanup", "succeeded");
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("PRIVATE_CALLIE_CHALLENGE");
+    expect(JSON.stringify(observe.mock.calls)).not.toContain("PRIVATE_CALLIE_CHALLENGE");
   });
 });

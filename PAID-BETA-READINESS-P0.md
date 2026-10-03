@@ -7,6 +7,17 @@
 
 ## Mission
 
+**October3 current CALLIE scope:** PR18/mainfa7c827 passed exact-main CI37092275861.
+The next authorized candidate is bounded L4 intake under
+`reports/callie-intake-contract-2026-10-03.md`: new-call-only standing policy,
+keypad choices, caller-originated one-call acknowledgment and explicit staff
+booking. Require reviewed0012/121-table compatible restore and exact candidate/
+main CI. Its integration report distinguishes source, synthetic and live proof.
+No general consent, autonomous booking, freeform receptionist, emergency dispatch,
+payment collection or hosted/provider/customer activation is authorized here.
+L4 and both complete contractor replacement cards remain unaccepted. This dated
+scope supersedes older active-wave wording below, not any release/activation gate.
+
 **October 2 second-wave active scope:** PR17 integrated lead replies at51da543
 matches green84cd928 / CI37089194639 (3,087 passed,15 unchanged skips,26 adapter,
 types/builds/Docker). Exact-main CI37090103299 passed. Continue only the

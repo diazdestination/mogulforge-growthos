@@ -19,8 +19,8 @@ HOUSECALL-PRO-REPLACEMENT-GATE.md.
 | --- | --- | --- |
 | L1 | An email reply reaches the correct lead or service work item and responsible office staff | Microsoft tracked-service loop is integrated; the lead-replies candidate adds individually prepared/reviewed native BIE email, separate lead permission and canonical hold/task/handling. General compose/campaign/Gmail typed intake is not delivered; actual required mailbox contexts, authorization, continuity and reply acceptance remain open. |
 | L2 | Staff can reliably join/sign in and recover access | Durable verification/reset/invitation send ledger, exact signed callback reconciliation and staff delivery evidence implemented in the candidate. Configure stable platform context and prove actual inbox receipt/access separately; uncertain attempts cannot be automatically retried. |
-| L3 | Customers receive usable invoices; staff see accurate external balances | Reviewed plain-text send and native/historical balances built. Active second wave adds append-only attempt history and explicitly reviewed proven-no-dispatch retry or additional copy; exact release/provider/document acceptance remains required. The bounded invoice-page view is not a global delivery-state exception filter. No payment processing. |
-| L4 | Missed calls are recovered promptly without uncontrolled messages | Staff-reviewed recovery built. Complete bounded automation required by the agreed receptionist/qualification/booking use case; autonomous conversation is not currently delivered. Prove real routing, consent, stop, handoff and failures. |
+| L3 | Customers receive usable invoices; staff see accurate external balances | PR18/mainfa7c827 and its exact CI passed: append-only attempt history and explicitly reviewed proven-no-dispatch retry or additional copy are built. Hosted/provider/document acceptance remains required. The bounded invoice-page view is not a global delivery-state exception filter. No payment processing. |
+| L4 | Missed calls are recovered promptly without uncontrolled messages | Current CALLIE candidate adds owner-reviewed forward-only policy, bounded keypad qualification, caller-originated one-call acknowledgment, accountable handoff and explicit office-confirmed booking. This does not deliver freeform conversational reception or autonomous confirmed booking, nor close L4. Finish required remaining scope and prove actual routing, consent, stop, handoff and failure behavior. |
 | L5 | HVAC service obligations produce timely reminders, responses and visits | Recurrence, individual review, booking and exception watch built. Finish a reviewed standing-policy path for required routine reminders without approving arbitrary future messages; prove actual agreements, responses and completion/next date. |
 | L6 | Lead recovery and campaigns produce accountable opportunities | Reviewed one-touch imported-source recovery built. Finish the agreed bounded ongoing nurture behavior, keeping source reconciliation and separate permission. Prove reply/opt-out stops and outcomes. |
 | L7 | The office and technician can find and finish each customer's work simply | Implement necessary unified history over canonical records; confirm actual equipment/checklist needs, repeat-customer jobs, multi-property work and required scheduling details. No duplicate customer or invented acquisition lead. |
@@ -29,7 +29,17 @@ HOUSECALL-PRO-REPLACEMENT-GATE.md.
 | L10 | The selected release is recoverable, isolated and supportable | Exact-head/main CI, reviewed hosted schema, compatible restore, always-on scheduler, actionable failure alerts, two-company isolation, privacy/export/retention and AI cost/runtime acceptance. |
 | L11 | Selling/onboarding is repeatable and honestly valuable | GrowthOS subscription test flow (separate from contractor collection), explicit included scope/allowances, setup/support effort, complete company workday acceptance and one conservatively evidenced inquiry-to-outcome chain. |
 
-## Active implementation: two-wave L1 then L3 continuation
+## Active implementation: bounded L4 CALLIE intake
+
+Owner requested the next wave after PR18/mainfa7c827 and green exact-main
+CI37092275861. See `reports/callie-intake-integration-2026-10-03.md` and its operator
+guide. Three lanes implement finite intake, guarded one-call acknowledgment and
+explicit office review/booking; original calls/tasks and response ownership remain
+canonical. Source expects121tables with reviewed0012after0011. Require exact
+candidate/main CI and separate hosted/provider/company acceptance. No L4 closure
+or silent substitution of keypad intake for a required conversational assistant.
+
+## Previous implementation: two-wave L1 then L3 continuation
 
 The owner requested two consecutive waves. Tracked Microsoft lead replies are
 merged at51da543 from green84cd928/CI37089194639; see

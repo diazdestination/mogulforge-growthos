@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useListContacts, type Contact } from '@workspace/api-client-react';
+import { getListContactsQueryKey, useListContacts, type Contact } from '@workspace/api-client-react';
 import { Search } from 'lucide-react';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 
@@ -22,6 +22,7 @@ export default function ContactSelect({
   required,
   noneLabel = '-- None --',
   testId = 'contact-select',
+  queryScope,
 }: {
   value: string;
   onChange: (contactId: string) => void;
@@ -29,6 +30,8 @@ export default function ContactSelect({
   /** Label for the empty option. Ignored when `required`. */
   noneLabel?: string;
   testId?: string;
+  /** Isolate sensitive option caches when the member/company authority changes. */
+  queryScope?: string;
 }) {
   const [search, setSearch] = useState('');
   // Remember the selected contact's label so it stays visible even when the
@@ -36,10 +39,11 @@ export default function ContactSelect({
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
 
-  const { data, isLoading } = useListContacts({
+  const params = {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     limit: MAX_CONTACT_OPTIONS + 1,
-  });
+  };
+  const { data, isLoading } = useListContacts(params, queryScope ? { query: { queryKey: [...getListContactsQueryKey(params), queryScope] } } : undefined);
 
   const { visibleContacts, hasMore } = useMemo(() => {
     const rows = data ?? [];

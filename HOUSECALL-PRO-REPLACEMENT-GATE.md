@@ -1,5 +1,15 @@
 # Housecall Pro replacement gate
 
+Current October3 source addendum: PR18/mainfa7c827 passed its exact-main gate.
+The new `reports/callie-intake-integration-2026-10-03.md` candidate adds separately
+approved automatic keypad intake, caller-originated one-call acknowledgment and
+explicit office-confirmed native visits. Caller ID is not identity/consent and
+keypad intent is not booking. This is not a conversational receptionist or
+autonomous confirmed appointment. Source schema121tables/reviewed0012 and synthetic
+recovery do not attest hosted/provider acceptance. Both company cards remain NOT
+ACCEPTED. Use LAUNCH-COMPLETION for current remaining engineering; older matrices
+below are historical where superseded by later integration reports.
+
 Current October 2 operations-wave addendum:
 `reports/operations-wave-integration-2026-10-02.md` supersedes older missing-work
 claims below for service watch/typed staff notifications, reviewed source

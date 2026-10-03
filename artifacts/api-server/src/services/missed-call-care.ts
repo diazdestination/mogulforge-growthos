@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { and, asc, desc, eq, gt, inArray, isNull, lte, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lte, notExists, sql } from "drizzle-orm";
 import {
   activitiesTable, auditEventsTable, contactsTable, crmTasksTable, db, leadsTable,
   missedCallHandoffsTable as handoffs, missedCallCareCasesTable as cases, missedCallCarePoliciesTable as policies,
@@ -15,10 +15,13 @@ import { hasContactReplyHold, hasCustomerReplyHold } from "./response-correlatio
 import { outboundDeliveryHeld } from "./outbound-hold";
 import { phoneE164, twilioForOrganization } from "./twilio-controls";
 import { sendTwilioSms } from "./twilio-delivery";
+import { callieIntakesTable } from "../../../../lib/db/src/schema/callie";
+import { latestTwilioSmsToPhone } from "./twilio-sms-budget";
 import { CARE_BODY, CARE_TEMPLATE_VERSION, DEFAULT_CARE_POLICY, careOperationKey, careOwnerAt, isMissedInbound, missedCallCarePolicySchema, nextCareWindow, type CarePolicyInput } from "./missed-call-care-policy";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type CareCase = typeof cases.$inferSelect;
+const withoutCallie = (callId: typeof calls.id | typeof cases.callId | typeof handoffs.callId) => notExists(db.select({ id: callieIntakesTable.id }).from(callieIntakesTable).where(eq(callieIntakesTable.callId, callId)));
 export class MissedCallCareError extends Error {
   constructor(readonly code: string, readonly statusCode = 409) { super(code); }
 }
@@ -64,6 +67,8 @@ export async function ensureMissedCallCareCase(org: string, callId: string) {
     await lockCare(tx, org);
     const [call] = await tx.select().from(calls).where(and(eq(calls.organizationId, org), eq(calls.id, callId)));
     if (!call || !isMissedInbound(call)) return null;
+    const [callie] = await tx.select({ id: callieIntakesTable.id }).from(callieIntakesTable).where(and(eq(callieIntakesTable.organizationId, org), eq(callieIntakesTable.callId, callId)));
+    if (callie) return null;
     const [handoff] = await tx.select().from(handoffs).where(and(eq(handoffs.organizationId, org), eq(handoffs.callId, callId)));
     if (!handoff) return null;
     const [existing] = await tx.select().from(cases).where(and(eq(cases.organizationId, org), eq(cases.callId, callId)));
@@ -88,6 +93,8 @@ export async function ensureMissedCallCareCase(org: string, callId: string) {
 async function careContext(org: string, callId: string) {
   const [call] = await db.select().from(calls).where(and(eq(calls.organizationId, org), eq(calls.id, callId)));
   if (!call) deny("not_found", 404);
+  const [callie] = await db.select({ id: callieIntakesTable.id }).from(callieIntakesTable).where(and(eq(callieIntakesTable.organizationId, org), eq(callieIntakesTable.callId, callId)));
+  if (callie) deny("callie_intake_authoritative");
   const [handoff] = await db.select().from(handoffs).where(and(eq(handoffs.organizationId, org), eq(handoffs.callId, callId)));
   const [row] = await db.select().from(cases).where(and(eq(cases.organizationId, org), eq(cases.callId, callId)));
   const [policy] = await db.select().from(policies).where(eq(policies.organizationId, org));
@@ -130,13 +137,11 @@ async function currentEligibility(context: Awaited<ReturnType<typeof careContext
   if (!proof?.granted || proof.disclosureVersion !== snapshot.disclosureVersion) deny("customer_care_consent_required");
   if (handoff.leadId ? await hasCustomerReplyHold(org, handoff.leadId) : await hasContactReplyHold(org, contact.id)) deny("customer_reply_requires_review");
   const [reply] = await db.select({ id: inbound.messageSid }).from(inbound).where(and(eq(inbound.organizationId, org), eq(inbound.phone, call.phone),
-    inArray(inbound.eventType, ["message", "STOP", "HELP"]), gt(inbound.receivedAt, call.createdAt))).limit(1);
+    inArray(inbound.eventType, ["message", "STOP", "HELP", "CALLIE"]), gt(inbound.receivedAt, call.createdAt))).limit(1);
   if (reply) deny("caller_reply_requires_review");
   const quietUntil = nextCareWindow(context.config, now);
-  const [recent] = await db.select({ at: dispatches.createdAt }).from(dispatches).where(and(eq(dispatches.organizationId, org), eq(dispatches.phone, call.phone),
-    ne(dispatches.idempotencyKey, careOperationKey(call.id)), gt(dispatches.createdAt, new Date(now.getTime() - 86400_000))))
-    .orderBy(desc(dispatches.createdAt)).limit(1);
-  const capUntil = recent ? new Date(recent.at.getTime() + 86400_000 + 60_000) : null;
+  const recent = await latestTwilioSmsToPhone(db, org, call.phone, new Date(now.getTime() - 86400_000), careOperationKey(call.id));
+  const capUntil = recent ? new Date(recent.getTime() + 86400_000 + 60_000) : null;
   const resume = [quietUntil, capUntil].filter((date): date is Date => date !== null).sort((a, b) => b.getTime() - a.getTime())[0];
   return resume ? { resumeAt: nextCareWindow(context.config, resume) ?? resume, reason: capUntil ? "frequency_cap" : "quiet_hours" } : null;
 }
@@ -255,7 +260,7 @@ async function reconcileCase(row: CareCase, now = new Date()) {
   const [call] = await db.select().from(calls).where(and(eq(calls.organizationId, row.organizationId), eq(calls.id, row.callId)));
   if (!call) return;
   const [reply] = await db.select().from(inbound).where(and(eq(inbound.organizationId, row.organizationId), eq(inbound.phone, call.phone),
-    inArray(inbound.eventType, ["message", "STOP", "HELP"]), gt(inbound.receivedAt, call.createdAt))).orderBy(desc(inbound.receivedAt)).limit(1);
+    inArray(inbound.eventType, ["message", "STOP", "HELP", "CALLIE"]), gt(inbound.receivedAt, call.createdAt))).orderBy(desc(inbound.receivedAt)).limit(1);
   if (reply && !["reply_needs_review", "indeterminate", "dispatching"].includes(row.state)) {
     await transition(row, "reply_needs_review", reply.eventType === "STOP" ? "caller_opted_out" : "caller_message_received"); return;
   }
@@ -278,15 +283,15 @@ async function reconcileCase(row: CareCase, now = new Date()) {
 export async function processMissedCallCare(organizationId?: string) {
   const missing = await db.select({ organizationId: handoffs.organizationId, callId: handoffs.callId }).from(handoffs)
     .leftJoin(cases, and(eq(cases.organizationId, handoffs.organizationId), eq(cases.callId, handoffs.callId)))
-    .where(and(isNull(cases.id), organizationId ? eq(handoffs.organizationId, organizationId) : undefined, customerWorkAllowedSql(handoffs.organizationId)))
+    .where(and(isNull(cases.id), withoutCallie(handoffs.callId), organizationId ? eq(handoffs.organizationId, organizationId) : undefined, customerWorkAllowedSql(handoffs.organizationId)))
     .orderBy(asc(handoffs.createdAt)).limit(20);
   for (const row of missing) await ensureMissedCallCareCase(row.organizationId, row.callId);
   const pending = await db.select().from(cases).where(and(organizationId ? eq(cases.organizationId, organizationId) : undefined,
-    inArray(cases.state, ["approved", "deferred"]), lte(cases.dueAt, new Date()), customerWorkAllowedSql(cases.organizationId)))
+    inArray(cases.state, ["approved", "deferred"]), lte(cases.dueAt, new Date()), withoutCallie(cases.callId), customerWorkAllowedSql(cases.organizationId)))
     .orderBy(asc(cases.dueAt)).limit(20);
   for (const row of pending) await dispatchCase(row);
   const watching = await db.select().from(cases).where(and(organizationId ? eq(cases.organizationId, organizationId) : undefined,
-    inArray(cases.state, ["needs_review", "dispatching", "awaiting_reply", "blocked", "escalated"]), customerWorkAllowedSql(cases.organizationId)))
+    inArray(cases.state, ["needs_review", "dispatching", "awaiting_reply", "blocked", "escalated"]), withoutCallie(cases.callId), customerWorkAllowedSql(cases.organizationId)))
     .orderBy(asc(cases.updatedAt)).limit(50);
   for (const row of watching) {
     await reconcileCase(row);
@@ -300,7 +305,7 @@ export async function listMissedCallCare(org: string) {
   const rows = await db.select({ care: cases, call: calls, handoff: handoffs }).from(cases)
     .innerJoin(calls, and(eq(calls.organizationId, org), eq(calls.id, cases.callId)))
     .innerJoin(handoffs, and(eq(handoffs.organizationId, org), eq(handoffs.callId, cases.callId)))
-    .where(eq(cases.organizationId, org)).orderBy(desc(cases.createdAt)).limit(50);
+    .where(and(eq(cases.organizationId, org), withoutCallie(cases.callId))).orderBy(desc(cases.createdAt)).limit(50);
   const items = [];
   for (const row of rows) {
     const [delivery] = await db.select({ status: dispatches.status, providerSid: dispatches.providerSid }).from(dispatches)

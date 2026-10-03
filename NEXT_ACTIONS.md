@@ -1,5 +1,19 @@
 # Next acceptance work
 
+Current October3 slice: `reports/callie-intake-integration-2026-10-03.md`, after
+green PR18/mainfa7c827 / exact-main CI37092275861. Complete the new CALLIE candidate's
+exact PostgreSQL CI and merged-main gate. The bounded standing-policy/keypad/
+one-call-acknowledgment/office-booking implementation expects121tables and reviewed
+0012after0011. Local recovery is not hosted/provider/contractor acceptance.
+
+Then advance the fixed launch checklist: routine standing service reminders (L5)
+and bounded ongoing nurture (L6), plus actual required L1/L4/L7/L8 gaps. Keypad
+qualification is not the required conversational receptionist or autonomous
+booking claim. Keep Azure first-login and separately approved hosted schema,
+backup/admin rotation, real mail/Twilio/phone tests and both contractor workdays
+as explicit gates. Do not add payment collection or cancel Housecall Pro.
+The prior active-wave notes below are historical.
+
 Active second wave: invoice delivery exceptions and explicit safe recovery under
 `reports/invoice-recovery-contract-2026-10-02.md`. PR17 is merged at 51da543 with
 the identical green 84cd928 tree (CI37089194639). Exact-main CI37090103299 passed.

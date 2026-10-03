@@ -1,4 +1,6 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { getGetMeQueryKey } from "@workspace/api-client-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
@@ -18,6 +20,8 @@ function server(role = "owner", state = "needs_review", override?: (req: Request
     const req = { path, method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : {} }; requests.push(req);
     const custom = override?.(req); if (custom) return custom;
     if (path === "/api/v1/users") return json([{ ...sampleMe(role), operationallyEligible: true }]);
+    if (path === "/api/v1/communications/callie/policy") return json({ version: 0, policy: { ...policy, enabled: false }, snapshot: { ...policy, enabled: false }, approvedAt: null, readiness: { ready: false, reason: "policy_disabled_or_revised" } });
+    if (path === "/api/v1/communications/callie") return json({ scope: "attention", offset: 0, pageSize: 25, hasMore: false, items: [], companyHeld: false, boundary: "This page contains admitted requests only." });
     if (path === "/api/v1/communications/missed-call-care") return json({ policy, version: 1, body: "Thanks for calling. This does not confirm an appointment.", templateVersion: "missed-call-care.v1", items: [item(state)], companyPaused: false, environmentHeld: false });
     if (path === "/api/v1/communications/voice/call-1/care") return json({ caseId: "case-1", version: 1, snapshot, eligibility: { ready: true, reason: null } });
     if (req.method !== "GET" && path.includes("/care/")) return json({ state: "approved" }, 202);
@@ -25,11 +29,31 @@ function server(role = "owner", state = "needs_review", override?: (req: Request
   });
   return requests;
 }
-function renderCalls() { return renderWithQuery(<Router hook={memoryLocation({ path: "/calls" }).hook}><Calls /></Router>); }
+async function renderCalls() { const value = renderWithQuery(<Router hook={memoryLocation({ path: "/calls" }).hook}><Calls /></Router>); fireEvent.click(await screen.findByText("Business calls and individually reviewed recovery")); return value; }
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 describe("CALLIE missed-call recovery controls", () => {
+  it("preserves legacy voice drafts and care approvals through unchanged successful profile checks", async () => {
+    const requests = server(), client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><Router hook={memoryLocation({ path: "/calls" }).hook}><Calls /></Router></QueryClientProvider>);
+    fireEvent.click(await screen.findByText("Business calls and individually reviewed recovery")); await screen.findByText("Staff review needed");
+    fireEvent.change(screen.getByLabelText("Contact record ID"), { target: { value: "saved-voice-contact" } });
+    fireEvent.click(screen.getByLabelText("This contact asked us to call this number. I authorize this call."));
+    fireEvent.click(screen.getByText("Owners, hours and message policy"));
+    fireEvent.change(screen.getByLabelText("Follow-up deadline (minutes)"), { target: { value: "45" } });
+    fireEvent.click(screen.getByLabelText("I approve these owners, hours and the customer-care template."));
+    fireEvent.click(screen.getByRole("button", { name: "Preview one customer-care reply" }));
+    const preview = await screen.findByRole("generic", { name: "Approve missed-call reply" }); fireEvent.click(within(preview).getByRole("checkbox"));
+    for (let index = 0; index < 2; index++) await act(async () => { await client.invalidateQueries({ queryKey: getGetMeQueryKey() }); });
+    expect((screen.getByLabelText("Contact record ID") as HTMLInputElement).value).toBe("saved-voice-contact");
+    expect((screen.getByLabelText("This contact asked us to call this number. I authorize this call.") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Follow-up deadline (minutes)") as HTMLInputElement).value).toBe("45");
+    expect((screen.getByLabelText("I approve these owners, hours and the customer-care template.") as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole("generic", { name: "Approve missed-call reply" })).toBe(preview); expect((within(preview).getByRole("checkbox") as HTMLInputElement).checked).toBe(true);
+    expect(requests.filter(req => req.path === "/api/v1/me")).toHaveLength(3); expect(requests.every(req => req.method === "GET")).toBe(true);
+    cleanup(); client.clear();
+  });
   it("loads a clear owner/deadline/canonical lead view without any automatic customer action", async () => {
-    const requests = server(); renderCalls();
+    const requests = server(); await renderCalls();
     expect(await screen.findByText("Staff review needed")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Open opportunity" }).getAttribute("href")).toBe("/leads/lead-1");
     expect(screen.getByRole("link", { name: "Open callback task" }).getAttribute("href")).toBe("/tasks?taskId=task-1");
@@ -37,7 +61,7 @@ describe("CALLIE missed-call recovery controls", () => {
     expect(requests.every((r) => r.method === "GET")).toBe(true);
   });
   it("requires a fresh exact preview and unchecked explicit approval before queuing once", async () => {
-    const requests = server(); renderCalls();
+    const requests = server(); await renderCalls();
     fireEvent.click(await screen.findByRole("button", { name: "Preview one customer-care reply" }));
     const preview = await screen.findByRole("generic", { name: "Approve missed-call reply" });
     const approve = within(preview).getByRole("button", { name: "Approve and queue one reply" });
@@ -50,7 +74,7 @@ describe("CALLIE missed-call recovery controls", () => {
     expect(screen.queryByRole("button", { name: "Approve and queue one reply" })).toBeNull();
   });
   it("discards stale previews after a conflict and makes no automatic retry", async () => {
-    const requests = server("owner", "needs_review", (req) => req.path.endsWith("/care/approve") ? json({ code: "stale_approval" }, 409) : undefined); renderCalls();
+    const requests = server("owner", "needs_review", (req) => req.path.endsWith("/care/approve") ? json({ code: "stale_approval" }, 409) : undefined); await renderCalls();
     fireEvent.click(await screen.findByRole("button", { name: "Preview one customer-care reply" }));
     const preview = await screen.findByRole("generic", { name: "Approve missed-call reply" });
     fireEvent.click(within(preview).getByRole("checkbox")); fireEvent.click(within(preview).getByRole("button"));
@@ -59,7 +83,7 @@ describe("CALLIE missed-call recovery controls", () => {
     expect(requests.filter((r) => r.method === "POST")).toHaveLength(1);
   });
   it("does not show send/close/policy controls to read-only staff", async () => {
-    const requests = server("viewer"); renderCalls(); await screen.findByText("Staff review needed");
+    const requests = server("viewer"); await renderCalls(); await screen.findByText("Staff review needed");
     expect(screen.queryByRole("button", { name: "Preview one customer-care reply" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Mark handled by staff" })).toBeNull();
     expect(screen.queryByText("Owners, hours and message policy")).toBeNull();
@@ -67,13 +91,13 @@ describe("CALLIE missed-call recovery controls", () => {
     expect(requests.every((r) => r.method === "GET")).toBe(true);
   });
   it("cannot approve another send for an uncertain outcome and provides a real reconciliation route", async () => {
-    server("owner", "indeterminate"); renderCalls();
+    server("owner", "indeterminate"); await renderCalls();
     expect(await screen.findByText("Outcome unknown · do not resend")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Preview one customer-care reply" })).toBeNull();
     expect(screen.getByRole("link", { name: "Revenue Desk" }).getAttribute("href")).toBe("/bie");
   });
   it("resets the policy approval checkbox after any settings edit", async () => {
-    server(); renderCalls(); await screen.findByText("Staff review needed");
+    server(); await renderCalls(); await screen.findByText("Staff review needed");
     fireEvent.click(screen.getByText("Owners, hours and message policy"));
     const checkbox = screen.getByLabelText("I approve these owners, hours and the customer-care template.");
     fireEvent.click(checkbox); expect(screen.getByRole("button", { name: "Save recovery policy" }).matches(":disabled")).toBe(false);

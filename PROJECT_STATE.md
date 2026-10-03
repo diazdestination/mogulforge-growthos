@@ -1,5 +1,23 @@
 # GrowthOS project state
 
+## October 3 CALLIE intake (current candidate)
+
+PR18 is merged at fa7c827; exact-main CI37092275861 passed. The next owner-authorized
+wave is bounded CALLIE intake under `reports/callie-intake-contract-2026-10-03.md`.
+It adds separately approved forward-only policy revisions, keypad qualification,
+caller-originated one-call acknowledgment and explicit office-confirmed native
+booking. Unknown sends retain the original response identity across old/new
+paths; no generic consent, fabricated lead or autonomous booking is implied.
+See its integration report and operator guide for exact behavior and evidence.
+
+Candidate schema is121tables with reviewed-only0012after0011. Synthetic recovery
+passed29real read-only routes and12new constraint negatives; no hosted schema or
+managed acceptance changed. Finish exact candidate/main CI before release selection.
+L4 is extended, not closed. Remaining fixed checklist engineering, Azure return,
+held-staging/backup/admin rotation, providers/phones and both contractor replacement
+cards are still open. Payment collection remains deferred. Older active/pending
+notes below are historical and must not supersede this entry.
+
 ## October 2 invoice delivery recovery (active second wave)
 
 First-wave PR17 is merged at 51da543db898f9907a4198fbc0ada880c378900d.

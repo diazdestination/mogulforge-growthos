@@ -3,6 +3,19 @@
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 
+Current October3 CALLIE candidate: `reports/callie-intake-integration-2026-10-03.md`
+and its operator guide. Calls is the entry point; the setup panel requires exact
+owner approval, while each visit needs actual staff-reviewed identity and an
+agreed appointment. Original handoff/task and permanent response identity are
+reused. Never replay unknown sends or bypass a held provider with legacy care.
+Generate reviewed-only0012offline with `node scripts/callie-schema-preview.mjs`;
+the candidate has121tables. The compatible synthetic recovery has29SELECT-only
+real routes and12new CALLIE constraint checks. Preview flag `--callie` creates
+fictional records without provider credentials; scheduler off, outbound held.
+Require exact candidate/main CI and separate current-release hosted/provider
+acceptance. This is not conversational AI voice, a warranty decision or live
+activation. Previous active-wave wording below is retained as historical.
+
 Active second wave: `reports/invoice-recovery-contract-2026-10-02.md`, based on
 integrated lead-reply51da543 / green candidate CI37089194639. Keep invoice
 attempts append-only, unknowns held and additional copies explicitly reviewed.

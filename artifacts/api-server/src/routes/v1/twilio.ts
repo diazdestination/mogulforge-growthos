@@ -26,6 +26,8 @@ import { sendTwilioSms } from "../../services/twilio-delivery";
 import { normalizePhone, addSuppression } from "../../services/send-gate";
 import { recordTouchDelivery } from "../../services/delivery-events";
 import { recordAudit } from "../../services/audit";
+import { consumeCallieSms } from "../../services/callie-intake";
+import { acceptCallieStatusCallback } from "../../services/callie-runtime";
 
 const router: IRouter = Router();
 const xml = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>';
@@ -165,7 +167,7 @@ router.post(
             ? "JOIN"
             : req.body.OptOutType === "HELP" || word === "HELP"
               ? "HELP"
-              : "message";
+              : /^CALLIE(?:\s|$)/i.test(text) ? "CALLIE" : "message";
     let foreignMessageSid = false;
     await db.transaction(async (tx) => {
       await tx.execute(
@@ -265,6 +267,10 @@ router.post(
             ),
           );
         // No purpose is re-granted; return to the form for fresh consent.
+      } else if (eventType === "CALLIE") {
+        // The exact typed proof and its signed inbound event commit together.
+        // No contact, reusable consent or outgoing TwiML message is created here.
+        await consumeCallieSms(tx, { binding: config!, phone, messageSid: req.body.MessageSid, text, fields: req.body });
       } else if (eventType === "JOIN" && config!.smsEnabled && contacts.length === 1) {
         const [pending] = await tx
           .select()
@@ -340,6 +346,11 @@ router.post(
   "/public/sms/status",
   rateLimit({ windowMs: 60_000, max: 240, key: "twilio-status" }),
   async (req, res) => {
+    if (req.query.callieOperation !== undefined) {
+      if (req.query.operation !== undefined) { res.status(403).end(); return; }
+      res.status(await acceptCallieStatusCallback(req) ? 204 : 403).end();
+      return;
+    }
     const id = z.uuid().safeParse(req.query.operation);
     if (!id.success) {
       res.status(403).end();

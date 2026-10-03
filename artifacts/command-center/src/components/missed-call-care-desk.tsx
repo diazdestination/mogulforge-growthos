@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { useGetMe, useListUsers, type MemberProfile } from "@workspace/api-client-react";
+import { getGetMeQueryKey, getListUsersQueryKey, useGetMe, useListUsers, type MemberProfile } from "@workspace/api-client-react";
 import { canManageSettings, canWrite } from "@/lib/permissions";
+import { memberAuthorityScope } from "@/lib/member-authority-scope";
 
 type Policy = { enabled: boolean; timezone: string; days: number[]; opensAt: string; closesAt: string; businessHoursOwnerId: string | null; afterHoursOwnerId: string | null; responseMinutes: number };
 type Item = {
@@ -24,13 +25,14 @@ async function request<T>(path: string, body?: unknown, method = "POST"): Promis
 }
 
 export function MissedCallCareDesk({ refreshToken = 0 }: { refreshToken?: number }) {
-  const { data: me } = useGetMe();
-  if (!me?.isActive || !me.organization) return null;
+  const { data: me, isError } = useGetMe({ query: { queryKey: getGetMeQueryKey(), refetchOnMount: false } });
+  if (isError || !me?.isActive || !me.organization) return null;
   // Membership changes must discard every old-company preview and checkbox.
-  return <CarePanel key={`${me.id}:${me.organization.id}:${me.role}`} me={me} refreshToken={refreshToken} />;
+  const scopeKey = memberAuthorityScope(me);
+  return <CarePanel key={scopeKey} scopeKey={scopeKey} me={me} refreshToken={refreshToken} />;
 }
-function CarePanel({ me, refreshToken }: { me: MemberProfile; refreshToken: number }) {
-  const { data: users = [] } = useListUsers();
+function CarePanel({ scopeKey, me, refreshToken }: { scopeKey: string; me: MemberProfile; refreshToken: number }) {
+  const { data: users = [] } = useListUsers({ query: { queryKey: [...getListUsersQueryKey(), "missed-call-care", scopeKey] } });
   const [desk, setDesk] = useState<Desk | null>(null), [draft, setDraft] = useState<Policy | null>(null);
   const [policyApproved, setPolicyApproved] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [preview, setPreview] = useState<{ callId: string; data: Preview } | null>(null), [messageApproved, setMessageApproved] = useState(false);
@@ -55,10 +57,11 @@ function CarePanel({ me, refreshToken }: { me: MemberProfile; refreshToken: numb
     finally { if (mounted.current) { await refresh(); setBusy(false); } }
   }
   async function loadPreview(callId: string) {
+    const current = ++generation.current;
     setBusy(true); setError(""); setPreview(null); setMessageApproved(false);
-    try { const result = await request<Preview>(`/communications/voice/${callId}/care`); if (mounted.current) setPreview({ callId, data: result }); }
-    catch (failure) { if (mounted.current) setError(failure instanceof Error ? failure.message : "Preview unavailable."); }
-    finally { if (mounted.current) setBusy(false); }
+    try { const result = await request<Preview>(`/communications/voice/${callId}/care`); if (mounted.current && generation.current === current) setPreview({ callId, data: result }); }
+    catch (failure) { if (mounted.current && generation.current === current) setError(failure instanceof Error ? failure.message : "Preview unavailable."); }
+    finally { if (mounted.current && generation.current === current) setBusy(false); }
   }
   const ownerName = (id: string | null) => { const user = users.find((entry) => entry.id === id); return user ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "Staff member" : "Owner needs assignment"; };
   const eligibleOwners = users.filter((user) => user.isActive && user.operationallyEligible === true && canWrite(user.role));

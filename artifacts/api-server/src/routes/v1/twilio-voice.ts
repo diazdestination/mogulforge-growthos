@@ -2,10 +2,11 @@ import { Router, type IRouter, type Request } from "express";
 import { z } from "zod";
 import { twiml } from "twilio";
 import { and, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
-import { db, contactsTable, missedCallHandoffsTable, twilioCallsTable } from "@workspace/db";
+import { db, contactsTable, missedCallHandoffsTable, twilioCallsTable, callieIntakesTable } from "@workspace/db";
 import { requireMember } from "../../middlewares/requireMember";
 import { rateLimit } from "../../lib/rateLimit";
 import { ensureMissedCallHandoff, reviewMissedCall } from "../../services/missed-call-handoff";
+import { admitCallieIntake, beginCallieMissedIntake, handleCallieGather } from "../../services/callie-intake";
 import { assertOutboundDeliveryAllowed, outboundDeliveryHeld } from "../../services/outbound-hold";
 import { customerWorkHeld } from "../../services/customer-lifecycle-runtime";
 import {
@@ -50,10 +51,13 @@ router.get(
             ),
           )
       : [];
+    const callie = calls.length ? await db.select({ id: callieIntakesTable.id, callId: callieIntakesTable.callId }).from(callieIntakesTable)
+      .where(and(eq(callieIntakesTable.organizationId, req.member!.organizationId), inArray(callieIntakesTable.callId, calls.map((call) => call.id)))) : [];
+    const callieByCall = new Map(callie.map((row) => [row.callId, row.id]));
     res.json({
       enabled:
         Boolean(config?.voiceEnabled),
-      calls,
+      calls: calls.map((call) => ({ ...call, callieIntakeId: callieByCall.get(call.id) ?? null })),
       ...(handoffs.length ? { handoffs } : {}),
     });
   },
@@ -405,7 +409,12 @@ router.post(
         })
         .onConflictDoNothing()
         .returning();
-      if (created) return created;
+      if (created) {
+        // Admission is part of the original signed-call transaction only.
+        // Existing/replayed calls cannot inherit a policy enabled later.
+        await admitCallieIntake(tx, created, config!);
+        return created;
+      }
       const [raced] = await tx.select().from(twilioCallsTable)
         .where(eq(twilioCallsTable.providerSid, req.body.CallSid));
       return raced?.organizationId === config!.organizationId &&
@@ -584,8 +593,24 @@ router.post("/public/voice/complete", async (req, res) => {
           isNull(twilioCallsTable.dialStatus),
         ),
       );
+  if (status.success) {
+    const [recorded] = await db.select({ dialStatus: twilioCallsTable.dialStatus }).from(twilioCallsTable)
+      .where(and(eq(twilioCallsTable.organizationId, op.organizationId), eq(twilioCallsTable.id, op.id)));
+    // The first signed dial outcome owns this leg. A conflicting replay must
+    // not present an old intake prompt or reinterpret an answered call.
+    if (recorded?.dialStatus !== status.data) {
+      res.type("text/xml").send(hangup()); return;
+    }
+  }
   if (op.direction === "inbound" && status.success && status.data !== "completed") {
     await ensureMissedCallHandoff(op.organizationId, op.id);
+  }
+  if (op.direction === "inbound" && status.success) {
+    const intakeResponse = await beginCallieMissedIntake(op.organizationId, op.id);
+    if (intakeResponse !== null) {
+      res.type("text/xml").send(intakeResponse);
+      return;
+    }
   }
   const xml = new twiml.VoiceResponse();
   if (
@@ -595,6 +620,17 @@ router.post("/public/voice/complete", async (req, res) => {
     xml.say("We could not connect your call. Please try again later.");
   xml.hangup();
   res.type("text/xml").send(xml.toString());
+});
+router.post("/public/voice/care-gather", rateLimit({ windowMs: 60_000, max: 240, key: "callie-voice-gather" }), async (req, res) => {
+  const bound = await boundOperation(req);
+  const stage = z.enum(["service", "request", "window", "consent"]).safeParse(req.query.stage);
+  const version = typeof req.query.version === "string" && /^[1-9]\d{0,2}$/.test(req.query.version) ? Number(req.query.version) : null;
+  if (!bound || bound.op.direction !== "inbound" || !stage.success || version === null) {
+    res.status(403).end(); return;
+  }
+  // Signature validation rejected non-string/array fields. Empty input is an explicit bounded result.
+  const digit = typeof req.body.Digits === "string" ? req.body.Digits : "";
+  res.type("text/xml").send(await handleCallieGather(bound.op.organizationId, bound.op.id, stage.data, version, digit));
 });
 router.post("/public/voice/status", async (req, res) => {
   const bound = await boundOperation(req);

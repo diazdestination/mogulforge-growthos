@@ -8,6 +8,7 @@ type Call = {
   status: string;
   dialStatus: string | null;
   contactId: string | null;
+  callieIntakeId?: string | null;
 };
 type Handoff = { callId: string; taskId: string; contactId: string | null; leadId: string | null; reviewedAt: string | null };
 export function VoiceDesk({ onReviewed, canEdit = true }: { onReviewed?: () => void; canEdit?: boolean } = {}) {
@@ -25,22 +26,27 @@ export function VoiceDesk({ onReviewed, canEdit = true }: { onReviewed?: () => v
     [message, setMessage] = useState("");
   const operation = useRef(crypto.randomUUID());
   const reviewRequest = useRef(crypto.randomUUID());
+  const mounted = useRef(true), generation = useRef(0);
   async function refresh() {
+    const run = ++generation.current;
     try {
       const response = await fetch("/api/v1/communications/voice", {
         credentials: "include",
       });
       if (!response.ok) throw new Error();
       const state = await response.json();
+      if (!mounted.current || run !== generation.current) return;
       setCalls(state.calls);
       setHandoffs(state.handoffs ?? []);
       setEnabled(state.enabled);
     } catch {
-      setMessage("Calling status could not be loaded.");
+      if (mounted.current && run === generation.current) setMessage("Calling status could not be loaded.");
     }
   }
   useEffect(() => {
+    mounted.current = true;
     void refresh();
+    return () => { mounted.current = false; generation.current++; };
   }, []);
   async function call() {
     setBusy(true);
@@ -60,19 +66,18 @@ export function VoiceDesk({ onReviewed, canEdit = true }: { onReviewed?: () => v
         throw new Error(
           data.error ?? "Call not confirmed. Review the call log.",
         );
+      if (!mounted.current) return;
       setMessage(
         `Call operation: ${data.status}. Answer the approved staff phone and press 1 to connect. This does not confirm the customer answered.`,
       );
       operation.current = crypto.randomUUID();
       setRequested(false);
     } catch (error) {
-      setMessage(
+      if (mounted.current) setMessage(
         error instanceof Error ? error.message : "Call not confirmed.",
       );
     } finally {
-      setBusy(false);
-      await refresh();
-      onReviewed?.();
+      if (mounted.current) { setBusy(false); await refresh(); if (mounted.current) onReviewed?.(); }
     }
   }
   async function reviewMissedCall() {
@@ -90,19 +95,20 @@ export function VoiceDesk({ onReviewed, canEdit = true }: { onReviewed?: () => v
             }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error === 'choose_existing_contact'
+      if (!response.ok) throw new Error(result.error === 'callie_review_required' ? 'Open this call in the CALLIE office desk to review its current request.' : result.error === 'choose_existing_contact'
         ? 'This phone matches an existing customer. Select that contact before creating an opportunity.'
         : result.error || 'Review could not be saved.');
+      if (!mounted.current) return;
       setMessage(reviewMode === 'create_opportunity'
         ? 'Opportunity and callback task are linked. No text or campaign was sent.'
         : 'Customer linked to the callback task. No text was sent.');
       setSelectedCall(null);
       reviewRequest.current = crypto.randomUUID();
       await refresh();
-      onReviewed?.();
+      if (mounted.current) onReviewed?.();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Review could not be saved.');
-    } finally { setBusy(false); }
+      if (mounted.current) setMessage(error instanceof Error ? error.message : 'Review could not be saved.');
+    } finally { if (mounted.current) setBusy(false); }
   }
   return (
     <section
@@ -175,7 +181,8 @@ export function VoiceDesk({ onReviewed, canEdit = true }: { onReviewed?: () => v
                 {handoffs.find(handoff => handoff.callId === item.id)?.reviewedAt ? ' · reviewed' : ' · needs review'}
               </span>
             )}
-            {canEdit && handoffs.some(handoff => handoff.callId === item.id && !handoff.reviewedAt) && (
+            {item.callieIntakeId && <Link className="ml-2 underline" href={`/calls?callieId=${item.callieIntakeId}`}>Open CALLIE office request</Link>}
+            {!item.callieIntakeId && canEdit && handoffs.some(handoff => handoff.callId === item.id && !handoff.reviewedAt) && (
               <button type="button" className="underline ml-2" onClick={() => {
                 setSelectedCall(item); setReviewContactId(item.contactId ?? '');
                 setReviewMode('create_opportunity'); setReviewFirstName(''); setReviewServiceType('');

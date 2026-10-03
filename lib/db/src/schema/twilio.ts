@@ -49,6 +49,7 @@ export const twilioClientBindingsTable = pgTable(
   },
   (table) => [
     uniqueIndex("twilio_client_binding_org_uq").on(table.organizationId),
+    unique("twilio_client_binding_org_id_uq").on(table.organizationId, table.id),
     uniqueIndex("twilio_client_binding_account_uq").on(table.accountSid),
     uniqueIndex("twilio_client_binding_phone_uq").on(table.phoneNumber),
     uniqueIndex("twilio_client_binding_program_uq").on(table.publicEnrollmentToken),
@@ -145,7 +146,7 @@ export const twilioInboundEventsTable = pgTable("twilio_inbound_events", {
   receivedAt: timestamp("received_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}, (table) => [unique("twilio_inbound_event_org_sid_uq").on(table.organizationId, table.messageSid)]);
 
 export const twilioCallsTable = pgTable(
   "twilio_calls",
