@@ -9,6 +9,861 @@ import * as zod from 'zod';
 
 
 /**
+ * Accepted active staff session only; no API keys. Missing policy is disabled. Approved policy remains held unless all provider and company gates pass.
+ * @summary Read standing CALLIE approval and holds
+ */
+export const getCalliePolicyResponseVersionMin = 0;
+
+export const getCalliePolicyResponsePolicyTimezoneMax = 80;
+
+export const getCalliePolicyResponsePolicyDaysItemMax = 7;
+
+export const getCalliePolicyResponsePolicyDaysMax = 7;
+
+export const getCalliePolicyResponsePolicyOpensAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+export const getCalliePolicyResponsePolicyClosesAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+export const getCalliePolicyResponsePolicyBusinessHoursOwnerIdMax = 128;
+
+
+export const getCalliePolicyResponsePolicyBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCalliePolicyResponsePolicyAfterHoursOwnerIdMax = 128;
+
+
+export const getCalliePolicyResponsePolicyAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCalliePolicyResponsePolicyResponseMinutesMin = 5;
+export const getCalliePolicyResponsePolicyResponseMinutesMax = 1440;
+
+export const getCalliePolicyResponseSnapshotDaysItemMax = 7;
+
+export const getCalliePolicyResponseSnapshotDaysMax = 7;
+
+export const getCalliePolicyResponseSnapshotResponseMinutesMin = 5;
+export const getCalliePolicyResponseSnapshotResponseMinutesMax = 1440;
+
+
+
+export const GetCalliePolicyResponse = zod.object({
+  "version": zod.int().min(getCalliePolicyResponseVersionMin),
+  "revisionId": zod.union([zod.uuid(),zod.null()]),
+  "policy": zod.object({
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(getCalliePolicyResponsePolicyTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(getCalliePolicyResponsePolicyDaysItemMax)).min(1).max(getCalliePolicyResponsePolicyDaysMax),
+  "opensAt": zod.string().regex(getCalliePolicyResponsePolicyOpensAtRegExp),
+  "closesAt": zod.string().regex(getCalliePolicyResponsePolicyClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(getCalliePolicyResponsePolicyBusinessHoursOwnerIdMax).regex(getCalliePolicyResponsePolicyBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(getCalliePolicyResponsePolicyAfterHoursOwnerIdMax).regex(getCalliePolicyResponsePolicyAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(getCalliePolicyResponsePolicyResponseMinutesMin).max(getCalliePolicyResponsePolicyResponseMinutesMax)
+}),
+  "snapshot": zod.object({
+  "enabled": zod.boolean(),
+  "timezone": zod.string(),
+  "days": zod.array(zod.int().min(1).max(getCalliePolicyResponseSnapshotDaysItemMax)).max(getCalliePolicyResponseSnapshotDaysMax),
+  "opensAt": zod.string(),
+  "closesAt": zod.string(),
+  "businessHoursOwnerId": zod.union([zod.string(),zod.null()]),
+  "afterHoursOwnerId": zod.union([zod.string(),zod.null()]),
+  "responseMinutes": zod.int().min(getCalliePolicyResponseSnapshotResponseMinutesMin).max(getCalliePolicyResponseSnapshotResponseMinutesMax),
+  "templateVersion": zod.enum(['callie-intake.v1']),
+  "prompts": zod.object({
+  "service": zod.string(),
+  "request": zod.string(),
+  "window": zod.string(),
+  "disclosure": zod.string(),
+  "consent": zod.string(),
+  "instructions": zod.string()
+}),
+  "acknowledgmentBody": zod.string(),
+  "binding": zod.union([zod.object({
+  "id": zod.uuid(),
+  "accountSid": zod.string(),
+  "sender": zod.string(),
+  "messagingServiceSid": zod.string(),
+  "disclosureVersion": zod.string(),
+  "origin": zod.url(),
+  "businessName": zod.string()
+}),zod.null()])
+}),
+  "approvedAt": zod.union([zod.coerce.date(),zod.null()]),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.union([zod.string(),zod.null()])
+}),
+  "automaticUnknownCallerEnrollment": zod.literal(false),
+  "callerInitiatedOneCallAcknowledgmentOnly": zod.literal(true)
+})
+
+
+/**
+ * Accepted active staff session only; no API keys. settings.manage; ten-minute actor/org/version-bound review. This does not enable intake or send a text.
+ * @summary Review exact standing CALLIE policy
+ */
+export const previewCalliePolicyBodyExpectedVersionMin = 0;
+
+export const previewCalliePolicyBodyPolicyTimezoneMax = 80;
+
+export const previewCalliePolicyBodyPolicyDaysItemMax = 7;
+
+export const previewCalliePolicyBodyPolicyDaysMax = 7;
+
+export const previewCalliePolicyBodyPolicyOpensAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+export const previewCalliePolicyBodyPolicyClosesAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+export const previewCalliePolicyBodyPolicyBusinessHoursOwnerIdMax = 128;
+
+
+export const previewCalliePolicyBodyPolicyBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const previewCalliePolicyBodyPolicyAfterHoursOwnerIdMax = 128;
+
+
+export const previewCalliePolicyBodyPolicyAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const previewCalliePolicyBodyPolicyResponseMinutesMin = 5;
+export const previewCalliePolicyBodyPolicyResponseMinutesMax = 1440;
+
+
+
+export const PreviewCalliePolicyBody = zod.object({
+  "expectedVersion": zod.int().min(previewCalliePolicyBodyExpectedVersionMin),
+  "policy": zod.object({
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(previewCalliePolicyBodyPolicyTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(previewCalliePolicyBodyPolicyDaysItemMax)).min(1).max(previewCalliePolicyBodyPolicyDaysMax),
+  "opensAt": zod.string().regex(previewCalliePolicyBodyPolicyOpensAtRegExp),
+  "closesAt": zod.string().regex(previewCalliePolicyBodyPolicyClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(previewCalliePolicyBodyPolicyBusinessHoursOwnerIdMax).regex(previewCalliePolicyBodyPolicyBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(previewCalliePolicyBodyPolicyAfterHoursOwnerIdMax).regex(previewCalliePolicyBodyPolicyAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(previewCalliePolicyBodyPolicyResponseMinutesMin).max(previewCalliePolicyBodyPolicyResponseMinutesMax)
+})
+})
+
+export const previewCalliePolicyResponseExpectedVersionMin = 0;
+
+export const previewCalliePolicyResponseExpectedSnapshotExpectedVersionMin = 0;
+
+export const previewCalliePolicyResponseExpectedSnapshotPolicyDaysItemMax = 7;
+
+export const previewCalliePolicyResponseExpectedSnapshotPolicyDaysMax = 7;
+
+export const previewCalliePolicyResponseExpectedSnapshotPolicyResponseMinutesMin = 5;
+export const previewCalliePolicyResponseExpectedSnapshotPolicyResponseMinutesMax = 1440;
+
+export const previewCalliePolicyResponsePreviewHashRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const PreviewCalliePolicyResponse = zod.object({
+  "expectedVersion": zod.int().min(previewCalliePolicyResponseExpectedVersionMin),
+  "expectedSnapshot": zod.object({
+  "schemaVersion": zod.enum(['callie-policy-preview.v1']),
+  "organizationId": zod.uuid(),
+  "actorUserId": zod.string(),
+  "reviewId": zod.uuid(),
+  "expectedVersion": zod.int().min(previewCalliePolicyResponseExpectedSnapshotExpectedVersionMin),
+  "issuedAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "policy": zod.object({
+  "enabled": zod.boolean(),
+  "timezone": zod.string(),
+  "days": zod.array(zod.int().min(1).max(previewCalliePolicyResponseExpectedSnapshotPolicyDaysItemMax)).max(previewCalliePolicyResponseExpectedSnapshotPolicyDaysMax),
+  "opensAt": zod.string(),
+  "closesAt": zod.string(),
+  "businessHoursOwnerId": zod.union([zod.string(),zod.null()]),
+  "afterHoursOwnerId": zod.union([zod.string(),zod.null()]),
+  "responseMinutes": zod.int().min(previewCalliePolicyResponseExpectedSnapshotPolicyResponseMinutesMin).max(previewCalliePolicyResponseExpectedSnapshotPolicyResponseMinutesMax),
+  "templateVersion": zod.enum(['callie-intake.v1']),
+  "prompts": zod.object({
+  "service": zod.string(),
+  "request": zod.string(),
+  "window": zod.string(),
+  "disclosure": zod.string(),
+  "consent": zod.string(),
+  "instructions": zod.string()
+}),
+  "acknowledgmentBody": zod.string(),
+  "binding": zod.union([zod.object({
+  "id": zod.uuid(),
+  "accountSid": zod.string(),
+  "sender": zod.string(),
+  "messagingServiceSid": zod.string(),
+  "disclosureVersion": zod.string(),
+  "origin": zod.url(),
+  "businessName": zod.string()
+}),zod.null()])
+})
+}),
+  "previewHash": zod.string().regex(previewCalliePolicyResponsePreviewHashRegExp),
+  "expiresAt": zod.coerce.date()
+})
+
+
+/**
+ * Accepted active staff session only; no API keys. settings.manage; immutable revision, explicit confirmation and exact server preview required. Only future newly admitted signed calls are eligible. Disabling never rearms a send.
+ * @summary Approve unchanged standing CALLIE policy
+ */
+export const approveCalliePolicyBodyExpectedVersionMin = 0;
+
+export const approveCalliePolicyBodyExpectedSnapshotExpectedVersionMin = 0;
+
+export const approveCalliePolicyBodyExpectedSnapshotPolicyDaysItemMax = 7;
+
+export const approveCalliePolicyBodyExpectedSnapshotPolicyDaysMax = 7;
+
+export const approveCalliePolicyBodyExpectedSnapshotPolicyResponseMinutesMin = 5;
+export const approveCalliePolicyBodyExpectedSnapshotPolicyResponseMinutesMax = 1440;
+
+export const approveCalliePolicyBodyPreviewHashRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const ApproveCalliePolicyBody = zod.object({
+  "expectedVersion": zod.int().min(approveCalliePolicyBodyExpectedVersionMin),
+  "expectedSnapshot": zod.object({
+  "schemaVersion": zod.enum(['callie-policy-preview.v1']),
+  "organizationId": zod.uuid(),
+  "actorUserId": zod.string(),
+  "reviewId": zod.uuid(),
+  "expectedVersion": zod.int().min(approveCalliePolicyBodyExpectedSnapshotExpectedVersionMin),
+  "issuedAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "policy": zod.object({
+  "enabled": zod.boolean(),
+  "timezone": zod.string(),
+  "days": zod.array(zod.int().min(1).max(approveCalliePolicyBodyExpectedSnapshotPolicyDaysItemMax)).max(approveCalliePolicyBodyExpectedSnapshotPolicyDaysMax),
+  "opensAt": zod.string(),
+  "closesAt": zod.string(),
+  "businessHoursOwnerId": zod.union([zod.string(),zod.null()]),
+  "afterHoursOwnerId": zod.union([zod.string(),zod.null()]),
+  "responseMinutes": zod.int().min(approveCalliePolicyBodyExpectedSnapshotPolicyResponseMinutesMin).max(approveCalliePolicyBodyExpectedSnapshotPolicyResponseMinutesMax),
+  "templateVersion": zod.enum(['callie-intake.v1']),
+  "prompts": zod.object({
+  "service": zod.string(),
+  "request": zod.string(),
+  "window": zod.string(),
+  "disclosure": zod.string(),
+  "consent": zod.string(),
+  "instructions": zod.string()
+}),
+  "acknowledgmentBody": zod.string(),
+  "binding": zod.union([zod.object({
+  "id": zod.uuid(),
+  "accountSid": zod.string(),
+  "sender": zod.string(),
+  "messagingServiceSid": zod.string(),
+  "disclosureVersion": zod.string(),
+  "origin": zod.url(),
+  "businessName": zod.string()
+}),zod.null()])
+})
+}),
+  "previewHash": zod.string().regex(approveCalliePolicyBodyPreviewHashRegExp),
+  "confirmed": zod.literal(true)
+})
+
+export const approveCalliePolicyResponseVersionMin = 0;
+
+export const approveCalliePolicyResponsePolicyTimezoneMax = 80;
+
+export const approveCalliePolicyResponsePolicyDaysItemMax = 7;
+
+export const approveCalliePolicyResponsePolicyDaysMax = 7;
+
+export const approveCalliePolicyResponsePolicyOpensAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCalliePolicyResponsePolicyClosesAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCalliePolicyResponsePolicyBusinessHoursOwnerIdMax = 128;
+
+
+export const approveCalliePolicyResponsePolicyBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCalliePolicyResponsePolicyAfterHoursOwnerIdMax = 128;
+
+
+export const approveCalliePolicyResponsePolicyAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCalliePolicyResponsePolicyResponseMinutesMin = 5;
+export const approveCalliePolicyResponsePolicyResponseMinutesMax = 1440;
+
+export const approveCalliePolicyResponseSnapshotDaysItemMax = 7;
+
+export const approveCalliePolicyResponseSnapshotDaysMax = 7;
+
+export const approveCalliePolicyResponseSnapshotResponseMinutesMin = 5;
+export const approveCalliePolicyResponseSnapshotResponseMinutesMax = 1440;
+
+
+
+export const ApproveCalliePolicyResponse = zod.object({
+  "version": zod.int().min(approveCalliePolicyResponseVersionMin),
+  "revisionId": zod.union([zod.uuid(),zod.null()]),
+  "policy": zod.object({
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(approveCalliePolicyResponsePolicyTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(approveCalliePolicyResponsePolicyDaysItemMax)).min(1).max(approveCalliePolicyResponsePolicyDaysMax),
+  "opensAt": zod.string().regex(approveCalliePolicyResponsePolicyOpensAtRegExp),
+  "closesAt": zod.string().regex(approveCalliePolicyResponsePolicyClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(approveCalliePolicyResponsePolicyBusinessHoursOwnerIdMax).regex(approveCalliePolicyResponsePolicyBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(approveCalliePolicyResponsePolicyAfterHoursOwnerIdMax).regex(approveCalliePolicyResponsePolicyAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(approveCalliePolicyResponsePolicyResponseMinutesMin).max(approveCalliePolicyResponsePolicyResponseMinutesMax)
+}),
+  "snapshot": zod.object({
+  "enabled": zod.boolean(),
+  "timezone": zod.string(),
+  "days": zod.array(zod.int().min(1).max(approveCalliePolicyResponseSnapshotDaysItemMax)).max(approveCalliePolicyResponseSnapshotDaysMax),
+  "opensAt": zod.string(),
+  "closesAt": zod.string(),
+  "businessHoursOwnerId": zod.union([zod.string(),zod.null()]),
+  "afterHoursOwnerId": zod.union([zod.string(),zod.null()]),
+  "responseMinutes": zod.int().min(approveCalliePolicyResponseSnapshotResponseMinutesMin).max(approveCalliePolicyResponseSnapshotResponseMinutesMax),
+  "templateVersion": zod.enum(['callie-intake.v1']),
+  "prompts": zod.object({
+  "service": zod.string(),
+  "request": zod.string(),
+  "window": zod.string(),
+  "disclosure": zod.string(),
+  "consent": zod.string(),
+  "instructions": zod.string()
+}),
+  "acknowledgmentBody": zod.string(),
+  "binding": zod.union([zod.object({
+  "id": zod.uuid(),
+  "accountSid": zod.string(),
+  "sender": zod.string(),
+  "messagingServiceSid": zod.string(),
+  "disclosureVersion": zod.string(),
+  "origin": zod.url(),
+  "businessName": zod.string()
+}),zod.null()])
+}),
+  "approvedAt": zod.union([zod.coerce.date(),zod.null()]),
+  "readiness": zod.object({
+  "ready": zod.boolean(),
+  "reason": zod.union([zod.string(),zod.null()])
+}),
+  "automaticUnknownCallerEnrollment": zod.literal(false),
+  "callerInitiatedOneCallAcknowledgmentOnly": zod.literal(true)
+})
+
+
+/**
+ * Accepted active staff session only; no API keys. crm.read; oldest attention deadlines first, 25 rows plus hasMore. Not a whole-company count; no secret challenge material.
+ * @summary Read paged CALLIE office work
+ */
+export const listCallieIntakesQueryScopeDefault = `attention`;
+export const listCallieIntakesQueryOffsetDefault = 0;
+export const listCallieIntakesQueryOffsetMin = 0;
+export const listCallieIntakesQueryOffsetMax = 100000;
+
+
+
+export const ListCallieIntakesQueryParams = zod.object({
+  "scope": zod.enum(['attention', 'waiting', 'history']).default(listCallieIntakesQueryScopeDefault),
+  "offset": zod.coerce.number().int().min(listCallieIntakesQueryOffsetMin).max(listCallieIntakesQueryOffsetMax).default(listCallieIntakesQueryOffsetDefault)
+})
+
+export const listCallieIntakesResponseOffsetMin = 0;
+export const listCallieIntakesResponseOffsetMax = 100000;
+
+
+export const listCallieIntakesResponseItemsMax = 25;
+
+
+
+export const ListCallieIntakesResponse = zod.object({
+  "scope": zod.enum(['attention', 'waiting', 'history']),
+  "offset": zod.int().min(listCallieIntakesResponseOffsetMin).max(listCallieIntakesResponseOffsetMax),
+  "pageSize": zod.literal(25),
+  "hasMore": zod.boolean(),
+  "items": zod.array(zod.object({
+  "id": zod.uuid(),
+  "callId": zod.uuid(),
+  "version": zod.int().min(1),
+  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked']),
+  "stage": zod.enum(['admitted', 'service', 'request', 'window', 'consent', 'complete']),
+  "reason": zod.string(),
+  "phone": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "dueAt": zod.coerce.date(),
+  "overdue": zod.boolean(),
+  "owner": zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "eligible": zod.boolean()
+}),
+  "task": zod.object({
+  "id": zod.uuid(),
+  "status": zod.string()
+}),
+  "leadId": zod.union([zod.uuid(),zod.null()]),
+  "callerReviewed": zod.boolean(),
+  "serviceIntent": zod.union([zod.enum(['repair', 'replacement', 'maintenance', 'other']),zod.null()]),
+  "requestIntent": zod.union([zod.enum(['callback', 'visit']),zod.null()]),
+  "callbackWindow": zod.union([zod.enum(['morning', 'afternoon', 'any']),zod.null()]),
+  "smsProof": zod.enum(['single_call_confirmed', 'confirmation_expired', 'awaiting_caller_confirmation', 'not_confirmed']),
+  "confirmedAt": zod.union([zod.coerce.date(),zod.null()]),
+  "appointmentId": zod.union([zod.uuid(),zod.null()])
+})).max(listCallieIntakesResponseItemsMax),
+  "companyHeld": zod.boolean(),
+  "boundary": zod.string()
+})
+
+
+/**
+ * Accepted active staff session only; no API keys. crm.read. The ID is an intake ID, not a call ID. Caller choices, one-call SMS proof and staff-reviewed identity are separate.
+ * @summary Review one CALLIE intake and exact office evidence
+ */
+export const GetCallieIntakeParams = zod.object({
+  "id": zod.uuid()
+})
+
+
+export const getCallieIntakeResponseExpectedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getCallieIntakeResponseBookingOptionsPropertiesMax = 100;
+
+export const getCallieIntakeResponseBookingOptionsStaffMax = 200;
+
+
+
+export const GetCallieIntakeResponse = zod.object({
+  "id": zod.uuid(),
+  "callId": zod.uuid(),
+  "version": zod.int().min(1),
+  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked']),
+  "stage": zod.enum(['admitted', 'service', 'request', 'window', 'consent', 'complete']),
+  "reason": zod.string(),
+  "phone": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "dueAt": zod.coerce.date(),
+  "overdue": zod.boolean(),
+  "owner": zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "eligible": zod.boolean()
+}),
+  "task": zod.object({
+  "id": zod.uuid(),
+  "status": zod.string()
+}),
+  "leadId": zod.union([zod.uuid(),zod.null()]),
+  "callerReviewed": zod.boolean(),
+  "serviceIntent": zod.union([zod.enum(['repair', 'replacement', 'maintenance', 'other']),zod.null()]),
+  "requestIntent": zod.union([zod.enum(['callback', 'visit']),zod.null()]),
+  "callbackWindow": zod.union([zod.enum(['morning', 'afternoon', 'any']),zod.null()]),
+  "smsProof": zod.enum(['single_call_confirmed', 'confirmation_expired', 'awaiting_caller_confirmation', 'not_confirmed']),
+  "confirmedAt": zod.union([zod.coerce.date(),zod.null()]),
+  "appointmentId": zod.union([zod.uuid(),zod.null()]),
+  "expectedFingerprint": zod.string().regex(getCallieIntakeResponseExpectedFingerprintRegExp),
+  "companyHeld": zod.boolean(),
+  "timezone": zod.string(),
+  "identityReviewed": zod.boolean(),
+  "contact": zod.union([zod.object({
+  "id": zod.uuid(),
+  "name": zod.string(),
+  "phone": zod.union([zod.string(),zod.null()])
+}),zod.null()]),
+  "reviewedAt": zod.union([zod.coerce.date(),zod.null()]),
+  "bookingOptions": zod.object({
+  "complete": zod.boolean(),
+  "properties": zod.array(zod.object({
+  "id": zod.uuid(),
+  "label": zod.string()
+})).max(getCallieIntakeResponseBookingOptionsPropertiesMax),
+  "staff": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string()
+})).max(getCallieIntakeResponseBookingOptionsStaffMax)
+}),
+  "appointment": zod.union([zod.object({
+  "id": zod.uuid(),
+  "status": zod.string(),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.union([zod.coerce.date(),zod.null()]),
+  "assignedUserId": zod.union([zod.string(),zod.null()])
+}),zod.null()]),
+  "delivery": zod.union([zod.object({
+  "status": zod.string(),
+  "providerSid": zod.union([zod.string(),zod.null()]),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]),
+  "execution": zod.union([zod.object({
+  "id": zod.uuid(),
+  "state": zod.string()
+}),zod.null()]),
+  "actions": zod.object({
+  "canReviewCaller": zod.boolean(),
+  "canAssign": zod.boolean(),
+  "canClose": zod.boolean(),
+  "canBook": zod.boolean(),
+  "blockReason": zod.union([zod.string(),zod.null()])
+}),
+  "evidence": zod.enum(['caller_choices_are_requests_not_identity_or_confirmed_appointments'])
+})
+
+
+/**
+ * Accepted active staff session only; no API keys. crm.write. Current version and fingerprint required. Assignment is office-only and stops automatic acknowledgment; unknown sends need reconciliation. Cancelling automation leaves callback task open.
+ * @summary Assign, resolve or cancel an exact CALLIE office request
+ */
+export const UpdateCallieOfficeParams = zod.object({
+  "id": zod.uuid()
+})
+
+
+export const updateCallieOfficeBodyOneExpectedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateCallieOfficeBodyOneAssignedUserIdMax = 200;
+
+export const updateCallieOfficeBodyOneNoteMin = 10;
+export const updateCallieOfficeBodyOneNoteMax = 1000;
+
+
+export const updateCallieOfficeBodyTwoExpectedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateCallieOfficeBodyTwoNoteMin = 10;
+export const updateCallieOfficeBodyTwoNoteMax = 1000;
+
+
+
+export const UpdateCallieOfficeBody = zod.union([zod.object({
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(1),
+  "expectedFingerprint": zod.string().regex(updateCallieOfficeBodyOneExpectedFingerprintRegExp),
+  "action": zod.enum(['assign']),
+  "assignedUserId": zod.string().min(1).max(updateCallieOfficeBodyOneAssignedUserIdMax),
+  "note": zod.string().min(updateCallieOfficeBodyOneNoteMin).max(updateCallieOfficeBodyOneNoteMax)
+}),zod.object({
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(1),
+  "expectedFingerprint": zod.string().regex(updateCallieOfficeBodyTwoExpectedFingerprintRegExp),
+  "action": zod.enum(['resolved', 'cancelled']),
+  "note": zod.string().min(updateCallieOfficeBodyTwoNoteMin).max(updateCallieOfficeBodyTwoNoteMax),
+  "staffConfirmed": zod.literal(true)
+})])
+
+
+export const updateCallieOfficeResponseDetailExpectedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateCallieOfficeResponseDetailBookingOptionsPropertiesMax = 100;
+
+export const updateCallieOfficeResponseDetailBookingOptionsStaffMax = 200;
+
+
+
+export const UpdateCallieOfficeResponse = zod.object({
+  "detail": zod.object({
+  "id": zod.uuid(),
+  "callId": zod.uuid(),
+  "version": zod.int().min(1),
+  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked']),
+  "stage": zod.enum(['admitted', 'service', 'request', 'window', 'consent', 'complete']),
+  "reason": zod.string(),
+  "phone": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "dueAt": zod.coerce.date(),
+  "overdue": zod.boolean(),
+  "owner": zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "eligible": zod.boolean()
+}),
+  "task": zod.object({
+  "id": zod.uuid(),
+  "status": zod.string()
+}),
+  "leadId": zod.union([zod.uuid(),zod.null()]),
+  "callerReviewed": zod.boolean(),
+  "serviceIntent": zod.union([zod.enum(['repair', 'replacement', 'maintenance', 'other']),zod.null()]),
+  "requestIntent": zod.union([zod.enum(['callback', 'visit']),zod.null()]),
+  "callbackWindow": zod.union([zod.enum(['morning', 'afternoon', 'any']),zod.null()]),
+  "smsProof": zod.enum(['single_call_confirmed', 'confirmation_expired', 'awaiting_caller_confirmation', 'not_confirmed']),
+  "confirmedAt": zod.union([zod.coerce.date(),zod.null()]),
+  "appointmentId": zod.union([zod.uuid(),zod.null()]),
+  "expectedFingerprint": zod.string().regex(updateCallieOfficeResponseDetailExpectedFingerprintRegExp),
+  "companyHeld": zod.boolean(),
+  "timezone": zod.string(),
+  "identityReviewed": zod.boolean(),
+  "contact": zod.union([zod.object({
+  "id": zod.uuid(),
+  "name": zod.string(),
+  "phone": zod.union([zod.string(),zod.null()])
+}),zod.null()]),
+  "reviewedAt": zod.union([zod.coerce.date(),zod.null()]),
+  "bookingOptions": zod.object({
+  "complete": zod.boolean(),
+  "properties": zod.array(zod.object({
+  "id": zod.uuid(),
+  "label": zod.string()
+})).max(updateCallieOfficeResponseDetailBookingOptionsPropertiesMax),
+  "staff": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string()
+})).max(updateCallieOfficeResponseDetailBookingOptionsStaffMax)
+}),
+  "appointment": zod.union([zod.object({
+  "id": zod.uuid(),
+  "status": zod.string(),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.union([zod.coerce.date(),zod.null()]),
+  "assignedUserId": zod.union([zod.string(),zod.null()])
+}),zod.null()]),
+  "delivery": zod.union([zod.object({
+  "status": zod.string(),
+  "providerSid": zod.union([zod.string(),zod.null()]),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]),
+  "execution": zod.union([zod.object({
+  "id": zod.uuid(),
+  "state": zod.string()
+}),zod.null()]),
+  "actions": zod.object({
+  "canReviewCaller": zod.boolean(),
+  "canAssign": zod.boolean(),
+  "canClose": zod.boolean(),
+  "canBook": zod.boolean(),
+  "blockReason": zod.union([zod.string(),zod.null()])
+}),
+  "evidence": zod.enum(['caller_choices_are_requests_not_identity_or_confirmed_appointments'])
+}),
+  "replayed": zod.boolean()
+})
+
+
+/**
+ * Accepted active staff session only; no API keys. crm.write. Fresh staff confirmation, exact fingerprint/version and canonical same-phone identity checks. No inferred consent or automatic marketing enrollment.
+ * @summary Explicitly identify the caller and link canonical records
+ */
+export const ReviewCallieCallerParams = zod.object({
+  "id": zod.uuid()
+})
+
+
+export const reviewCallieCallerBodyOneExpectedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+
+export const reviewCallieCallerBodyTwoExpectedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const reviewCallieCallerBodyTwoFirstNameMax = 100;
+
+export const reviewCallieCallerBodyTwoLastNameMax = 100;
+
+export const reviewCallieCallerBodyTwoServiceTypeMax = 100;
+
+
+
+export const ReviewCallieCallerBody = zod.union([zod.object({
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(1),
+  "expectedFingerprint": zod.string().regex(reviewCallieCallerBodyOneExpectedFingerprintRegExp),
+  "action": zod.enum(['link_contact']),
+  "contactId": zod.uuid(),
+  "staffConfirmed": zod.literal(true)
+}),zod.object({
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(1),
+  "expectedFingerprint": zod.string().regex(reviewCallieCallerBodyTwoExpectedFingerprintRegExp),
+  "action": zod.enum(['create_opportunity']),
+  "contactId": zod.uuid().optional(),
+  "firstName": zod.string().min(1).max(reviewCallieCallerBodyTwoFirstNameMax).optional(),
+  "lastName": zod.string().max(reviewCallieCallerBodyTwoLastNameMax).optional(),
+  "serviceType": zod.string().max(reviewCallieCallerBodyTwoServiceTypeMax).optional(),
+  "staffConfirmed": zod.literal(true)
+})])
+
+
+export const reviewCallieCallerResponseDetailExpectedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const reviewCallieCallerResponseDetailBookingOptionsPropertiesMax = 100;
+
+export const reviewCallieCallerResponseDetailBookingOptionsStaffMax = 200;
+
+
+
+export const ReviewCallieCallerResponse = zod.object({
+  "detail": zod.object({
+  "id": zod.uuid(),
+  "callId": zod.uuid(),
+  "version": zod.int().min(1),
+  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked']),
+  "stage": zod.enum(['admitted', 'service', 'request', 'window', 'consent', 'complete']),
+  "reason": zod.string(),
+  "phone": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "dueAt": zod.coerce.date(),
+  "overdue": zod.boolean(),
+  "owner": zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "eligible": zod.boolean()
+}),
+  "task": zod.object({
+  "id": zod.uuid(),
+  "status": zod.string()
+}),
+  "leadId": zod.union([zod.uuid(),zod.null()]),
+  "callerReviewed": zod.boolean(),
+  "serviceIntent": zod.union([zod.enum(['repair', 'replacement', 'maintenance', 'other']),zod.null()]),
+  "requestIntent": zod.union([zod.enum(['callback', 'visit']),zod.null()]),
+  "callbackWindow": zod.union([zod.enum(['morning', 'afternoon', 'any']),zod.null()]),
+  "smsProof": zod.enum(['single_call_confirmed', 'confirmation_expired', 'awaiting_caller_confirmation', 'not_confirmed']),
+  "confirmedAt": zod.union([zod.coerce.date(),zod.null()]),
+  "appointmentId": zod.union([zod.uuid(),zod.null()]),
+  "expectedFingerprint": zod.string().regex(reviewCallieCallerResponseDetailExpectedFingerprintRegExp),
+  "companyHeld": zod.boolean(),
+  "timezone": zod.string(),
+  "identityReviewed": zod.boolean(),
+  "contact": zod.union([zod.object({
+  "id": zod.uuid(),
+  "name": zod.string(),
+  "phone": zod.union([zod.string(),zod.null()])
+}),zod.null()]),
+  "reviewedAt": zod.union([zod.coerce.date(),zod.null()]),
+  "bookingOptions": zod.object({
+  "complete": zod.boolean(),
+  "properties": zod.array(zod.object({
+  "id": zod.uuid(),
+  "label": zod.string()
+})).max(reviewCallieCallerResponseDetailBookingOptionsPropertiesMax),
+  "staff": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string()
+})).max(reviewCallieCallerResponseDetailBookingOptionsStaffMax)
+}),
+  "appointment": zod.union([zod.object({
+  "id": zod.uuid(),
+  "status": zod.string(),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.union([zod.coerce.date(),zod.null()]),
+  "assignedUserId": zod.union([zod.string(),zod.null()])
+}),zod.null()]),
+  "delivery": zod.union([zod.object({
+  "status": zod.string(),
+  "providerSid": zod.union([zod.string(),zod.null()]),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]),
+  "execution": zod.union([zod.object({
+  "id": zod.uuid(),
+  "state": zod.string()
+}),zod.null()]),
+  "actions": zod.object({
+  "canReviewCaller": zod.boolean(),
+  "canAssign": zod.boolean(),
+  "canClose": zod.boolean(),
+  "canBook": zod.boolean(),
+  "blockReason": zod.union([zod.string(),zod.null()])
+}),
+  "evidence": zod.enum(['caller_choices_are_requests_not_identity_or_confirmed_appointments'])
+}),
+  "replayed": zod.boolean()
+})
+
+
+/**
+ * Accepted active staff session only; no API keys. crm.write. Explicit customer agreement, reviewed same-customer identity, accepted technician and native capacity/conflict locks. Atomic request identity prevents duplicate appointment; caller choices alone cannot book.
+ * @summary Book an office-confirmed exact visit window
+ */
+export const BookCallieVisitParams = zod.object({
+  "id": zod.uuid()
+})
+
+
+export const bookCallieVisitBodyExpectedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const bookCallieVisitBodyAssignedUserIdMax = 200;
+
+export const bookCallieVisitBodyConfirmationNoteMin = 10;
+export const bookCallieVisitBodyConfirmationNoteMax = 1000;
+
+
+
+export const BookCallieVisitBody = zod.object({
+  "requestId": zod.uuid(),
+  "expectedVersion": zod.int().min(1),
+  "expectedFingerprint": zod.string().regex(bookCallieVisitBodyExpectedFingerprintRegExp),
+  "contactId": zod.uuid(),
+  "leadId": zod.union([zod.uuid(),zod.null()]),
+  "propertyId": zod.union([zod.uuid(),zod.null()]),
+  "assignedUserId": zod.string().min(1).max(bookCallieVisitBodyAssignedUserIdMax),
+  "type": zod.enum(['inspection', 'other']),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date(),
+  "confirmationNote": zod.string().min(bookCallieVisitBodyConfirmationNoteMin).max(bookCallieVisitBodyConfirmationNoteMax),
+  "customerConfirmed": zod.literal(true)
+})
+
+
+export const bookCallieVisitResponseDetailExpectedFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const bookCallieVisitResponseDetailBookingOptionsPropertiesMax = 100;
+
+export const bookCallieVisitResponseDetailBookingOptionsStaffMax = 200;
+
+
+
+export const BookCallieVisitResponse = zod.object({
+  "detail": zod.object({
+  "id": zod.uuid(),
+  "callId": zod.uuid(),
+  "version": zod.int().min(1),
+  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked']),
+  "stage": zod.enum(['admitted', 'service', 'request', 'window', 'consent', 'complete']),
+  "reason": zod.string(),
+  "phone": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "dueAt": zod.coerce.date(),
+  "overdue": zod.boolean(),
+  "owner": zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "eligible": zod.boolean()
+}),
+  "task": zod.object({
+  "id": zod.uuid(),
+  "status": zod.string()
+}),
+  "leadId": zod.union([zod.uuid(),zod.null()]),
+  "callerReviewed": zod.boolean(),
+  "serviceIntent": zod.union([zod.enum(['repair', 'replacement', 'maintenance', 'other']),zod.null()]),
+  "requestIntent": zod.union([zod.enum(['callback', 'visit']),zod.null()]),
+  "callbackWindow": zod.union([zod.enum(['morning', 'afternoon', 'any']),zod.null()]),
+  "smsProof": zod.enum(['single_call_confirmed', 'confirmation_expired', 'awaiting_caller_confirmation', 'not_confirmed']),
+  "confirmedAt": zod.union([zod.coerce.date(),zod.null()]),
+  "appointmentId": zod.union([zod.uuid(),zod.null()]),
+  "expectedFingerprint": zod.string().regex(bookCallieVisitResponseDetailExpectedFingerprintRegExp),
+  "companyHeld": zod.boolean(),
+  "timezone": zod.string(),
+  "identityReviewed": zod.boolean(),
+  "contact": zod.union([zod.object({
+  "id": zod.uuid(),
+  "name": zod.string(),
+  "phone": zod.union([zod.string(),zod.null()])
+}),zod.null()]),
+  "reviewedAt": zod.union([zod.coerce.date(),zod.null()]),
+  "bookingOptions": zod.object({
+  "complete": zod.boolean(),
+  "properties": zod.array(zod.object({
+  "id": zod.uuid(),
+  "label": zod.string()
+})).max(bookCallieVisitResponseDetailBookingOptionsPropertiesMax),
+  "staff": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string()
+})).max(bookCallieVisitResponseDetailBookingOptionsStaffMax)
+}),
+  "appointment": zod.union([zod.object({
+  "id": zod.uuid(),
+  "status": zod.string(),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.union([zod.coerce.date(),zod.null()]),
+  "assignedUserId": zod.union([zod.string(),zod.null()])
+}),zod.null()]),
+  "delivery": zod.union([zod.object({
+  "status": zod.string(),
+  "providerSid": zod.union([zod.string(),zod.null()]),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]),
+  "execution": zod.union([zod.object({
+  "id": zod.uuid(),
+  "state": zod.string()
+}),zod.null()]),
+  "actions": zod.object({
+  "canReviewCaller": zod.boolean(),
+  "canAssign": zod.boolean(),
+  "canClose": zod.boolean(),
+  "canBook": zod.boolean(),
+  "blockReason": zod.union([zod.string(),zod.null()])
+}),
+  "evidence": zod.enum(['caller_choices_are_requests_not_identity_or_confirmed_appointments'])
+}),
+  "replayed": zod.boolean()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

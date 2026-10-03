@@ -1152,6 +1152,10 @@ export async function processScheduledWork(organizationId?: string, observe?: St
     const { processMissedCallCare } = await import("./missed-call-care");
     await processMissedCallCare(organizationId);
   });
+  await stage("callie-intake", async () => {
+    const { processCallieIntakes } = await import("./callie-runtime");
+    await processCallieIntakes(organizationId);
+  });
   await stage("service-watch", async () => {
     const { processServiceWatch } = await import("./service-watch");
     await processServiceWatch(organizationId);

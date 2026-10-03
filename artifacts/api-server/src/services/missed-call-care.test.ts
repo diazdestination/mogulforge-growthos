@@ -72,6 +72,13 @@ afterEach(async () => {
 });
 
 describe("reviewed missed-call recovery", () => {
+  it("holds an older individually reviewed response when a newer typed CALLIE request arrives", async () => {
+    await reviewed(); await approve();
+    await db.insert(twilioInboundEventsTable).values({ organizationId: org, messageSid: `SM${randomUUID().replaceAll("-", "")}`, phone, eventType: "CALLIE", body: null, receivedAt: new Date() });
+    await processMissedCallCare(org);
+    expect(provider).not.toHaveBeenCalled(); expect(await records()).toHaveLength(0);
+    expect(await row()).toMatchObject({ state: "reply_needs_review", reason: "caller_message_received" });
+  });
   it("keeps default-disabled and unknown callers in review without creating leads, consent, or SMS", async () => {
     await ensureMissedCallHandoff(org, call); await ensureMissedCallHandoff(org, call);
     await processMissedCallCare(org);

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import {
   db,
   contactsTable,
@@ -13,6 +13,7 @@ import {
   twilioForOrganization,
   type SmsSendContext,
 } from "./twilio-controls";
+import { callieOwnsSmsOperation, countTwilioSmsOperations, lockTwilioSmsBudget } from "./twilio-sms-budget";
 
 export async function sendTwilioSms(
   to: string,
@@ -89,9 +90,9 @@ export async function sendTwilioSms(
   );
   const operation = await db.transaction(async (tx) => {
     // Serialize the daily allowance and ownership claim across processes.
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtext(${`twilio:${context.organizationId}`}))`,
-    );
+    await lockTwilioSmsBudget(tx, context.organizationId);
+    if (await callieOwnsSmsOperation(tx, context.organizationId, context.idempotencyKey))
+      throw new Error("This call response is already owned; do not create another SMS attempt");
     const [existing] = await tx
       .select()
       .from(twilioDispatchesTable)
@@ -108,16 +109,7 @@ export async function sendTwilioSms(
     }
     const day = new Date();
     day.setUTCHours(0, 0, 0, 0);
-    const [usage] = await tx
-      .select({ count: sql<number>`count(*)::int` })
-      .from(twilioDispatchesTable)
-      .where(
-        and(
-          eq(twilioDispatchesTable.organizationId, context.organizationId),
-          gte(twilioDispatchesTable.createdAt, day),
-        ),
-      );
-    if (usage.count >= config.dailySmsLimit)
+    if (await countTwilioSmsOperations(tx, context.organizationId, day) >= config.dailySmsLimit)
       throw new Error("SMS daily operation limit reached");
     const [created] = await tx
       .insert(twilioDispatchesTable)

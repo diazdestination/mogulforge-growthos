@@ -34,6 +34,7 @@ export const auditEventsTable = pgTable(
   },
   (table) => [
     unique("audit_event_org_id_uq").on(table.organizationId, table.id),
+    unique("audit_event_org_actor_uq").on(table.organizationId, table.id, table.actorUserId),
     unique("audit_event_exact_review_uq").on(table.organizationId, table.id, table.actorUserId, table.entityId),
     index("audit_events_org_created_idx").on(
       table.organizationId,

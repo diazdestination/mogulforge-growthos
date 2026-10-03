@@ -12,6 +12,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { phoneE164 } from "./twilio-controls";
 import { enqueueStaffLeadPush } from "./staff-push";
 import { ensureMissedCallCareCase } from "./missed-call-care";
+import { callieIntakesTable } from "../../../../lib/db/src/schema/callie";
 
 const MISSED_STATUSES = new Set(["busy", "no-answer", "failed", "canceled"]);
 
@@ -82,9 +83,24 @@ type ReviewError =
   | "already_reviewed"
   | "invalid_contact"
   | "choose_existing_contact"
-  | "first_name_required";
+  | "first_name_required"
+  | "callie_review_required";
 
 export async function reviewMissedCall(
+  organizationId: string,
+  callId: string,
+  actorUserId: string,
+  input: MissedCallReviewInput,
+): Promise<{ handoff: typeof missedCallHandoffsTable.$inferSelect; leadCreated: boolean } | { error: ReviewError }> {
+  const [callie] = await db.select({ id: callieIntakesTable.id }).from(callieIntakesTable)
+    .where(and(eq(callieIntakesTable.organizationId, organizationId), eq(callieIntakesTable.callId, callId)));
+  if (callie) return { error: "callie_review_required" };
+  return db.transaction(tx => reviewMissedCallInTransaction(tx, organizationId, callId, actorUserId, input));
+}
+
+/** Shared canonical review used by CALLIE's versioned office transaction. */
+export async function reviewMissedCallInTransaction(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   organizationId: string,
   callId: string,
   actorUserId: string,
@@ -98,7 +114,6 @@ export async function reviewMissedCall(
     serviceType: input.action === "create_opportunity" ? input.serviceType?.trim() ?? null : null,
   };
   const payloadHash = createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
-  return db.transaction(async (tx) => {
     const [call] = await tx
       .select()
       .from(twilioCallsTable)
@@ -125,7 +140,8 @@ export async function reviewMissedCall(
       const [contact] = await tx
         .select()
         .from(contactsTable)
-        .where(and(eq(contactsTable.id, contactId), eq(contactsTable.organizationId, organizationId)));
+        .where(and(eq(contactsTable.id, contactId), eq(contactsTable.organizationId, organizationId)))
+        .for("share");
       if (!contact || phoneE164(contact.phone ?? "") !== call.phone) {
         return { error: "invalid_contact" as const };
       }
@@ -180,9 +196,11 @@ export async function reviewMissedCall(
       .update(twilioCallsTable)
       .set({ contactId, updatedAt: new Date() })
       .where(eq(twilioCallsTable.id, call.id));
+    const [callie] = await tx.select({ ownerUserId: callieIntakesTable.ownerUserId }).from(callieIntakesTable)
+      .where(and(eq(callieIntakesTable.organizationId, organizationId), eq(callieIntakesTable.callId, call.id)));
     await tx
       .update(crmTasksTable)
-      .set({ contactId, leadId, assignedUserId: actorUserId })
+      .set({ contactId, leadId, ...(callie ? {} : { assignedUserId: actorUserId }) })
       .where(eq(crmTasksTable.id, handoff.taskId));
     const [reviewed] = await tx
       .update(missedCallHandoffsTable)
@@ -207,5 +225,4 @@ export async function reviewMissedCall(
     // No lead.created event here: that could auto-enroll outreach and send to
     // a caller who has not granted a purpose-specific SMS or marketing opt-in.
     return { handoff: reviewed, leadCreated: Boolean(leadId) };
-  });
 }

@@ -3,6 +3,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -42,6 +43,7 @@ export const appointmentsTable = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
+    unique("appointments_org_id_uq").on(table.organizationId, table.id),
     index("appointments_org_start_idx").on(
       table.organizationId,
       table.scheduledStart,

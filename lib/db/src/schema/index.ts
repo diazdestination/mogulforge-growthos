@@ -56,5 +56,6 @@ export * from "./email-intelligence";
 export * from "./revenue-workspace";
 export * from "./scheduler";
 export * from "./missed-call-care";
+export * from "./callie";
 export * from "./financial-migration";
 export * from "./source-adoption";

@@ -1,5 +1,19 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## October 3 CALLIE intake continuation
+
+The owner requested the next launch-critical wave after PR18/main fa7c827 and
+exact-main CI37092275861 passed. The current bounded L4 extension is
+`reports/callie-intake-contract-2026-10-03.md`: forward-only, separately approved
+missed-call keypad intake, caller-originated one-call SMS acknowledgment, and
+explicit office-confirmed native visit booking. It is not free-form AI voice,
+autonomous confirmed booking, general SMS consent, marketing or live activation.
+Preserve existing manual call history, permanent uncertain-send reservations,
+tenant isolation and the fixed launch checklist. Use coordinated intake, runtime
+and experience agents; the coordinator owns integration/release verification.
+No hosted schema, provider, credential, customer-contact or cutover approval is
+implied. Azure first sign-in remains an owner-return gate.
+
 ## October 2 two-wave continuation
 
 First wave is merged at 51da543 with the exact tree of green 84cd928,

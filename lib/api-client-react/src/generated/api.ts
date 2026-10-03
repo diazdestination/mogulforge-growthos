@@ -49,6 +49,16 @@ import type {
   BookServiceCareVisit,
   BulkLeadActionRequest,
   BulkLeadActionResult,
+  CallieBookingRequest,
+  CallieCallerReviewRequest,
+  CallieIntakeDetail,
+  CallieIntakePage,
+  CallieOfficeActionRequest,
+  CallieOfficeCommandResult,
+  CalliePolicy,
+  CalliePolicyApproveRequest,
+  CalliePolicyPreview,
+  CalliePolicyPreviewRequest,
   CaptureDelivery,
   CaptureEndpoint,
   CaptureEndpointInput,
@@ -142,6 +152,7 @@ import type {
   ListAppointmentsParams,
   ListAuditEventsParams,
   ListAutomationRunsParams,
+  ListCallieIntakesParams,
   ListCaptureDeliveriesParams,
   ListContactsParams,
   ListCustomerRepliesParams,
@@ -313,6 +324,610 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetCalliePolicyUrl = () => {
+
+
+
+
+  return `/api/v1/communications/callie/policy`
+}
+
+/**
+ * Accepted active staff session only; no API keys. Missing policy is disabled. Approved policy remains held unless all provider and company gates pass.
+ * @summary Read standing CALLIE approval and holds
+ */
+export const getCalliePolicy = async ( options?: Parameters<typeof customFetch>[1]): Promise<CalliePolicy> => {
+
+  return customFetch<CalliePolicy>(getGetCalliePolicyUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCalliePolicyQueryKey = () => {
+    return [
+    `/api/v1/communications/callie/policy`
+    ] as const;
+    }
+
+
+export const getGetCalliePolicyQueryOptions = <TData = Awaited<ReturnType<typeof getCalliePolicy>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCalliePolicy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCalliePolicyQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCalliePolicy>>> = ({ signal }) => getCalliePolicy({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCalliePolicy>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCalliePolicyQueryResult = NonNullable<Awaited<ReturnType<typeof getCalliePolicy>>>
+export type GetCalliePolicyQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read standing CALLIE approval and holds
+ */
+
+export function useGetCalliePolicy<TData = Awaited<ReturnType<typeof getCalliePolicy>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCalliePolicy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCalliePolicyQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPreviewCalliePolicyUrl = () => {
+
+
+
+
+  return `/api/v1/communications/callie/policy/preview`
+}
+
+/**
+ * Accepted active staff session only; no API keys. settings.manage; ten-minute actor/org/version-bound review. This does not enable intake or send a text.
+ * @summary Review exact standing CALLIE policy
+ */
+export const previewCalliePolicy = async (calliePolicyPreviewRequest: CalliePolicyPreviewRequest, options?: Parameters<typeof customFetch>[1]): Promise<CalliePolicyPreview> => {
+
+  return customFetch<CalliePolicyPreview>(getPreviewCalliePolicyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(calliePolicyPreviewRequest)
+  }
+);}
+
+
+
+
+
+export const getPreviewCalliePolicyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewCalliePolicy>>, TError,{data: BodyType<CalliePolicyPreviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewCalliePolicy>>, TError,{data: BodyType<CalliePolicyPreviewRequest>}, TContext> => {
+
+const mutationKey = ['previewCalliePolicy'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewCalliePolicy>>, {data: BodyType<CalliePolicyPreviewRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewCalliePolicy(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewCalliePolicyMutationResult = NonNullable<Awaited<ReturnType<typeof previewCalliePolicy>>>
+    export type PreviewCalliePolicyMutationBody = BodyType<CalliePolicyPreviewRequest>
+    export type PreviewCalliePolicyMutationError = ErrorType<void>
+
+    /**
+ * @summary Review exact standing CALLIE policy
+ */
+export const usePreviewCalliePolicy = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewCalliePolicy>>, TError,{data: BodyType<CalliePolicyPreviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewCalliePolicy>>,
+        TError,
+        {data: BodyType<CalliePolicyPreviewRequest>},
+        TContext
+      > => {
+      return useMutation(getPreviewCalliePolicyMutationOptions(options));
+    }
+
+export const getApproveCalliePolicyUrl = () => {
+
+
+
+
+  return `/api/v1/communications/callie/policy/approve`
+}
+
+/**
+ * Accepted active staff session only; no API keys. settings.manage; immutable revision, explicit confirmation and exact server preview required. Only future newly admitted signed calls are eligible. Disabling never rearms a send.
+ * @summary Approve unchanged standing CALLIE policy
+ */
+export const approveCalliePolicy = async (calliePolicyApproveRequest: CalliePolicyApproveRequest, options?: Parameters<typeof customFetch>[1]): Promise<CalliePolicy> => {
+
+  return customFetch<CalliePolicy>(getApproveCalliePolicyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(calliePolicyApproveRequest)
+  }
+);}
+
+
+
+
+
+export const getApproveCalliePolicyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveCalliePolicy>>, TError,{data: BodyType<CalliePolicyApproveRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveCalliePolicy>>, TError,{data: BodyType<CalliePolicyApproveRequest>}, TContext> => {
+
+const mutationKey = ['approveCalliePolicy'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveCalliePolicy>>, {data: BodyType<CalliePolicyApproveRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  approveCalliePolicy(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveCalliePolicyMutationResult = NonNullable<Awaited<ReturnType<typeof approveCalliePolicy>>>
+    export type ApproveCalliePolicyMutationBody = BodyType<CalliePolicyApproveRequest>
+    export type ApproveCalliePolicyMutationError = ErrorType<void>
+
+    /**
+ * @summary Approve unchanged standing CALLIE policy
+ */
+export const useApproveCalliePolicy = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveCalliePolicy>>, TError,{data: BodyType<CalliePolicyApproveRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveCalliePolicy>>,
+        TError,
+        {data: BodyType<CalliePolicyApproveRequest>},
+        TContext
+      > => {
+      return useMutation(getApproveCalliePolicyMutationOptions(options));
+    }
+
+export const getListCallieIntakesUrl = (params?: ListCallieIntakesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/communications/callie?${stringifiedParams}` : `/api/v1/communications/callie`
+}
+
+/**
+ * Accepted active staff session only; no API keys. crm.read; oldest attention deadlines first, 25 rows plus hasMore. Not a whole-company count; no secret challenge material.
+ * @summary Read paged CALLIE office work
+ */
+export const listCallieIntakes = async (params?: ListCallieIntakesParams, options?: Parameters<typeof customFetch>[1]): Promise<CallieIntakePage> => {
+
+  return customFetch<CallieIntakePage>(getListCallieIntakesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCallieIntakesQueryKey = (params?: ListCallieIntakesParams,) => {
+    return [
+    `/api/v1/communications/callie`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCallieIntakesQueryOptions = <TData = Awaited<ReturnType<typeof listCallieIntakes>>, TError = ErrorType<void>>(params?: ListCallieIntakesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCallieIntakes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCallieIntakesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCallieIntakes>>> = ({ signal }) => listCallieIntakes(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCallieIntakes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCallieIntakesQueryResult = NonNullable<Awaited<ReturnType<typeof listCallieIntakes>>>
+export type ListCallieIntakesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read paged CALLIE office work
+ */
+
+export function useListCallieIntakes<TData = Awaited<ReturnType<typeof listCallieIntakes>>, TError = ErrorType<void>>(
+ params?: ListCallieIntakesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCallieIntakes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCallieIntakesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetCallieIntakeUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/communications/callie/${id}`
+}
+
+/**
+ * Accepted active staff session only; no API keys. crm.read. The ID is an intake ID, not a call ID. Caller choices, one-call SMS proof and staff-reviewed identity are separate.
+ * @summary Review one CALLIE intake and exact office evidence
+ */
+export const getCallieIntake = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<CallieIntakeDetail> => {
+
+  return customFetch<CallieIntakeDetail>(getGetCallieIntakeUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCallieIntakeQueryKey = (id: string,) => {
+    return [
+    `/api/v1/communications/callie/${id}`
+    ] as const;
+    }
+
+
+export const getGetCallieIntakeQueryOptions = <TData = Awaited<ReturnType<typeof getCallieIntake>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCallieIntake>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCallieIntakeQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCallieIntake>>> = ({ signal }) => getCallieIntake(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCallieIntake>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCallieIntakeQueryResult = NonNullable<Awaited<ReturnType<typeof getCallieIntake>>>
+export type GetCallieIntakeQueryError = ErrorType<void>
+
+
+/**
+ * @summary Review one CALLIE intake and exact office evidence
+ */
+
+export function useGetCallieIntake<TData = Awaited<ReturnType<typeof getCallieIntake>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCallieIntake>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCallieIntakeQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateCallieOfficeUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/communications/callie/${id}/office-action`
+}
+
+/**
+ * Accepted active staff session only; no API keys. crm.write. Current version and fingerprint required. Assignment is office-only and stops automatic acknowledgment; unknown sends need reconciliation. Cancelling automation leaves callback task open.
+ * @summary Assign, resolve or cancel an exact CALLIE office request
+ */
+export const updateCallieOffice = async (id: string,
+    callieOfficeActionRequest: CallieOfficeActionRequest, options?: Parameters<typeof customFetch>[1]): Promise<CallieOfficeCommandResult> => {
+
+  return customFetch<CallieOfficeCommandResult>(getUpdateCallieOfficeUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(callieOfficeActionRequest)
+  }
+);}
+
+
+
+
+
+export const getUpdateCallieOfficeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCallieOffice>>, TError,{id: string;data: BodyType<CallieOfficeActionRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCallieOffice>>, TError,{id: string;data: BodyType<CallieOfficeActionRequest>}, TContext> => {
+
+const mutationKey = ['updateCallieOffice'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCallieOffice>>, {id: string;data: BodyType<CallieOfficeActionRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateCallieOffice(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCallieOfficeMutationResult = NonNullable<Awaited<ReturnType<typeof updateCallieOffice>>>
+    export type UpdateCallieOfficeMutationBody = BodyType<CallieOfficeActionRequest>
+    export type UpdateCallieOfficeMutationError = ErrorType<void>
+
+    /**
+ * @summary Assign, resolve or cancel an exact CALLIE office request
+ */
+export const useUpdateCallieOffice = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCallieOffice>>, TError,{id: string;data: BodyType<CallieOfficeActionRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCallieOffice>>,
+        TError,
+        {id: string;data: BodyType<CallieOfficeActionRequest>},
+        TContext
+      > => {
+      return useMutation(getUpdateCallieOfficeMutationOptions(options));
+    }
+
+export const getReviewCallieCallerUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/communications/callie/${id}/review-caller`
+}
+
+/**
+ * Accepted active staff session only; no API keys. crm.write. Fresh staff confirmation, exact fingerprint/version and canonical same-phone identity checks. No inferred consent or automatic marketing enrollment.
+ * @summary Explicitly identify the caller and link canonical records
+ */
+export const reviewCallieCaller = async (id: string,
+    callieCallerReviewRequest: CallieCallerReviewRequest, options?: Parameters<typeof customFetch>[1]): Promise<CallieOfficeCommandResult> => {
+
+  return customFetch<CallieOfficeCommandResult>(getReviewCallieCallerUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(callieCallerReviewRequest)
+  }
+);}
+
+
+
+
+
+export const getReviewCallieCallerMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewCallieCaller>>, TError,{id: string;data: BodyType<CallieCallerReviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewCallieCaller>>, TError,{id: string;data: BodyType<CallieCallerReviewRequest>}, TContext> => {
+
+const mutationKey = ['reviewCallieCaller'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewCallieCaller>>, {id: string;data: BodyType<CallieCallerReviewRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reviewCallieCaller(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewCallieCallerMutationResult = NonNullable<Awaited<ReturnType<typeof reviewCallieCaller>>>
+    export type ReviewCallieCallerMutationBody = BodyType<CallieCallerReviewRequest>
+    export type ReviewCallieCallerMutationError = ErrorType<void>
+
+    /**
+ * @summary Explicitly identify the caller and link canonical records
+ */
+export const useReviewCallieCaller = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewCallieCaller>>, TError,{id: string;data: BodyType<CallieCallerReviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewCallieCaller>>,
+        TError,
+        {id: string;data: BodyType<CallieCallerReviewRequest>},
+        TContext
+      > => {
+      return useMutation(getReviewCallieCallerMutationOptions(options));
+    }
+
+export const getBookCallieVisitUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/communications/callie/${id}/book`
+}
+
+/**
+ * Accepted active staff session only; no API keys. crm.write. Explicit customer agreement, reviewed same-customer identity, accepted technician and native capacity/conflict locks. Atomic request identity prevents duplicate appointment; caller choices alone cannot book.
+ * @summary Book an office-confirmed exact visit window
+ */
+export const bookCallieVisit = async (id: string,
+    callieBookingRequest: CallieBookingRequest, options?: Parameters<typeof customFetch>[1]): Promise<CallieOfficeCommandResult> => {
+
+  return customFetch<CallieOfficeCommandResult>(getBookCallieVisitUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(callieBookingRequest)
+  }
+);}
+
+
+
+
+
+export const getBookCallieVisitMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookCallieVisit>>, TError,{id: string;data: BodyType<CallieBookingRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bookCallieVisit>>, TError,{id: string;data: BodyType<CallieBookingRequest>}, TContext> => {
+
+const mutationKey = ['bookCallieVisit'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bookCallieVisit>>, {id: string;data: BodyType<CallieBookingRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  bookCallieVisit(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BookCallieVisitMutationResult = NonNullable<Awaited<ReturnType<typeof bookCallieVisit>>>
+    export type BookCallieVisitMutationBody = BodyType<CallieBookingRequest>
+    export type BookCallieVisitMutationError = ErrorType<void>
+
+    /**
+ * @summary Book an office-confirmed exact visit window
+ */
+export const useBookCallieVisit = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookCallieVisit>>, TError,{id: string;data: BodyType<CallieBookingRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bookCallieVisit>>,
+        TError,
+        {id: string;data: BodyType<CallieBookingRequest>},
+        TContext
+      > => {
+      return useMutation(getBookCallieVisitMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

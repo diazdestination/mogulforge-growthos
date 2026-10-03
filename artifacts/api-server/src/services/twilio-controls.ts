@@ -77,8 +77,8 @@ function hydrate(binding: Binding) {
   };
 }
 export type TwilioClientBinding = ReturnType<typeof hydrate>;
-export async function twilioForOrganization(organizationId: string): Promise<TwilioClientBinding | null> {
-  const [binding] = await db.select().from(twilioClientBindingsTable)
+export async function twilioForOrganization(organizationId: string, reader: Pick<typeof db, "select"> = db): Promise<TwilioClientBinding | null> {
+  const [binding] = await reader.select().from(twilioClientBindingsTable)
     .where(eq(twilioClientBindingsTable.organizationId, organizationId)).limit(1);
   return binding ? hydrate(binding) : null;
 }

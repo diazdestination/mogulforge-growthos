@@ -15,6 +15,7 @@ export const SCHEDULER_STAGES = [
   "mailbox-replies",
   "scheduled-actions",
   "missed-call-care",
+  "callie-intake",
   "service-watch",
   "staff-lead-notifications",
   "reactivation-drain",

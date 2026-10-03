@@ -16,6 +16,7 @@ import { seedOperationsPreview } from "./operations-preview-fixture.mjs";
 import { seedLaunchCommunicationsPreview } from "./launch-communications-preview-fixture.mjs";
 import { seedLeadRepliesPreview } from "./lead-replies-preview-fixture.mjs";
 import { seedInvoiceRecoveryPreview } from "./invoice-recovery-preview-fixture.mjs";
+import { seedCalliePreview } from "./callie-preview-fixture.mjs";
 
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const database = path.resolve(api, "../../lib/db");
@@ -93,6 +94,7 @@ try {
     if (process.argv.includes("--communications") || process.argv.includes("--lead-replies")) await seedLaunchCommunicationsPreview(client, org.id, user.id);
     if (process.argv.includes("--lead-replies")) await seedLeadRepliesPreview(client, org.id, user.id);
     if (process.argv.includes("--invoice-recovery")) await seedInvoiceRecoveryPreview(client, org.id, user.id);
+    if (process.argv.includes("--callie")) await seedCalliePreview(client, org.id, user.id);
     await client.query(
       "INSERT INTO scheduled_actions(organization_id,action,context,run_at,status,attempts,last_error) VALUES ($1,$2,'{}',now()-interval '1 hour','failed',3,'Synthetic preparation failure for visual QA')",
       [

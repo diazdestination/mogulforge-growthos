@@ -7,6 +7,7 @@ import { careFixtureIds } from './customer-care-recovery-fixture.mjs';
 import { operationsFixtureIds } from './operations-wave-recovery-fixture.mjs';
 import { leadReplyFixtureIds } from './lead-replies-recovery-fixture.mjs';
 import { invoiceRecoveryIds } from './invoice-recovery-fixture.mjs';
+import { callieFixtureIds } from './callie-recovery-fixture.mjs';
 
 const target = new URL(process.env.DATABASE_URL ?? '');
 if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.hostname !== '127.0.0.1' || target.pathname !== '/postgres' || process.env.CONTRACTOR_SYNTHETIC_RECOVERY !== 'true' || process.env.NODE_ENV !== 'test') throw new Error('contractor_probe_target_invalid');
@@ -45,6 +46,8 @@ try {
   good.push(`/api/v1/service-obligations/${native.nextService}/mailbox-replies`, '/api/v1/staff-invitations/email-deliveries');
   good.push(`/api/v1/leads/${id.lead}/mailbox-replies`);
   good.push('/api/v1/invoices/delivery-worklist');
+  const callie = callieFixtureIds('restore-drill-contractor-a'), foreignCallie = callieFixtureIds('restore-drill-contractor-b');
+  good.push('/api/v1/communications/callie?scope=attention', '/api/v1/communications/callie/policy', `/api/v1/communications/callie/${callie.intake}`);
   for (const route of good) {
     check = `read_${good.indexOf(route)}`;
     const response = await fetch(`${origin}${route}`, { headers });
@@ -89,6 +92,20 @@ try {
   assert.equal(leadReplies.items[0].content, null);
   assert.equal(leadReplies.items[0].taskId, leadReplyFixtureIds('restore-drill-contractor-a').task);
   assert.equal(leadReplies.items[0].evidence, 'original_mailbox_observation');
+  check = 'callie_restored_request';
+  const callieDetail = await (await fetch(`${origin}/api/v1/communications/callie/${callie.intake}`, { headers })).json();
+  assert.equal(callieDetail.state, 'indeterminate'); assert.equal(callieDetail.identityReviewed, false);
+  assert.equal(callieDetail.appointment, null); assert.equal(callieDetail.task.id, callie.task);
+  assert.equal(callieDetail.execution.state, 'indeterminate'); assert.equal(callieDetail.delivery.status, 'uncertain');
+  assert.equal(callieDetail.companyHeld, true); assert.equal(callieDetail.actions.canBook, false);
+  assert.equal(callieDetail.requestIntent, 'visit');
+  for (const key of ['challengeHash', 'challengeEncrypted', 'stepReceipts', 'triggerPayloadHash']) assert.equal(key in callieDetail, false);
+  const calliePage = await (await fetch(`${origin}/api/v1/communications/callie?scope=attention`, { headers })).json();
+  assert.equal(calliePage.pageSize, 25); assert.equal(calliePage.hasMore, false);
+  assert.deepEqual(calliePage.items.map(row => row.id), [callie.intake]);
+  const calliePolicy = await (await fetch(`${origin}/api/v1/communications/callie/policy`, { headers })).json();
+  assert.equal(calliePolicy.version, 2); assert.equal(calliePolicy.policy.enabled, false); assert.equal(calliePolicy.readiness.ready, false);
+  assert.equal((await fetch(`${origin}/api/v1/communications/callie/${foreignCallie.intake}`, { headers })).status, 404);
   for (const route of [`/api/v1/contacts/${other.contact}`, `/api/v1/leads/${other.lead}`, `/api/v1/projects/${other.project}`, `/api/v1/invoices/${otherNative.invoice}`, `/api/v1/service-obligations/${otherNative.nextService}/care`, `/api/v1/communications/voice/${careFixtureIds('restore-drill-contractor-b').call}/care`, `/api/v1/invoices/${otherNative.invoice}/delivery`]) {
     check = 'tenant_boundary';
     const response = await fetch(`${origin}${route}`, { headers });
@@ -102,6 +119,8 @@ try {
   assert.equal((await fetch(`${origin}/api/v1/leads/${other.lead}/mailbox-replies`, { headers })).status, 404);
   const mutation = await fetch(`${origin}/api/v1/contacts/${id.contact}`, { method: 'PATCH', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify({ firstName: 'Forbidden' }) });
   assert.equal(mutation.status, 405); await mutation.arrayBuffer();
+  const callieMutation = await fetch(`${origin}/api/v1/communications/callie/${callie.intake}/office-action`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: '{}' });
+  assert.equal(callieMutation.status, 405); await callieMutation.arrayBuffer();
   process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, tenantBoundariesVerified: true, readChecks: good.length, writeBlocked: true })}\n`);
 } catch (error) {
   // No response body, URL with credentials, SQL parameters or record content.
