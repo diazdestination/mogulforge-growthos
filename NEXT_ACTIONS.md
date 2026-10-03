@@ -1,6 +1,15 @@
 # Next acceptance work
 
-Current wave: `reports/operations-wave-integration-2026-10-02.md`, based on
+Current authorized work is the fixed `LAUNCH-COMPLETION.md` checklist. Complete
+the communications release gate using
+`reports/launch-communications-integration-2026-10-02.md` (117tables), then finish
+remaining L1 lead-reply coverage, L2 actual access-mail acceptance, and
+the remaining required automation and actual contractor workday/migration gaps.
+Use exact new-candidate evidence. Operations main c01bea0 has passed exact-main
+CI; the older candidate-pending notes below are historical. Hosted/provider,
+Azure owner-return and both company acceptance gates are unchanged.
+
+Historical operations wave: `reports/operations-wave-integration-2026-10-02.md`, based on
 customer-care PR14/main602131d with green exact-main CI37074053979. Finish this
 operations candidate's exact-head PostgreSQL CI, builds/Docker and exact-main
 verification before release selection. Service-watch/typed staff alerts,

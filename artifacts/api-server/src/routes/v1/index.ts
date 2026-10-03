@@ -54,6 +54,9 @@ import missedCallCareRouter from "./missed-call-care";
 import serviceWatchRouter from "./service-watch";
 import financialMigrationRouter from "./financial-migration";
 import sourceAdoptionRouter from "./source-adoption";
+import platformEmailDeliveryRouter from "./platform-email-delivery";
+import serviceMailboxRepliesRouter from "./service-mailbox-replies";
+import mailboxIntegrationsRouter from "./mailbox-integrations";
 
 const router: IRouter = Router();
 
@@ -98,6 +101,9 @@ router.use(automationsRouter);
 router.use(playbooksRouter);
 router.use(reactivationRouter);
 router.use(sourceAdoptionRouter);
+router.use(platformEmailDeliveryRouter);
+router.use(serviceMailboxRepliesRouter);
+router.use(mailboxIntegrationsRouter);
 router.use(captureRouter);
 router.use(smartSitesRouter);
 router.use(clientOnboardingRouter);

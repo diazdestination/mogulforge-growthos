@@ -6,13 +6,14 @@ import {
   organizationsTable,
   staffInvitationsTable,
   usersTable,
+  platformEmailDispatchesTable,
   type StaffInvitation,
   type User,
 } from "@workspace/db";
 import { hasPermission } from "../lib/permissions";
 import { sendInviteEmail } from "./invite-email";
 import { INVITE_TOKEN_TTL_MS, verifyInviteToken } from "./invite-token";
-import { isTransactionalEmailConfigured } from "./providers";
+import { isPlatformIdentityDeliveryConfigured } from "./platform-email-delivery";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type InvitationActor = { userId: string; scope: "platform" | "member" };
@@ -136,6 +137,8 @@ async function deliver(
   );
   const attempt = sendInviteEmail({
     invitedUserId: row.pendingUserId,
+    invitationId: row.id,
+    actorUserId: actor.userId,
     organizationId: row.organizationId,
     to: row.email,
     inviterName,
@@ -229,7 +232,7 @@ export async function createStaffInvitation(
 ) {
   if (
     process.env.NODE_ENV === "production" &&
-    !isTransactionalEmailConfigured()
+    !isPlatformIdentityDeliveryConfigured()
   )
     fail("transactional_email_unavailable", 503);
   const email = input.email.trim().toLowerCase();
@@ -369,9 +372,15 @@ export async function updateStaffInvitation(
     )
       fail("invitation_member_changed");
     if (command.action === "reissue") {
+      // A new token revision is not an escape hatch for an unknown prior send.
+      const [uncertain] = await tx.select({ id: platformEmailDispatchesTable.id }).from(platformEmailDispatchesTable).where(and(
+        eq(platformEmailDispatchesTable.invitationId, row.id),
+        sql`${platformEmailDispatchesTable.outcome} in ('claimed','unknown')`,
+      )).limit(1);
+      if (uncertain) fail("invitation_delivery_reconciliation_required");
       if (
         process.env.NODE_ENV === "production" &&
-        !isTransactionalEmailConfigured()
+        !isPlatformIdentityDeliveryConfigured()
       )
         fail("transactional_email_unavailable", 503);
       if (row.deliveryAttemptedAt.getTime() > Date.now() - 60_000)

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import { db, identityTokensTable } from "@workspace/db";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 
 export type IdentityTokenPurpose = "email_verification" | "password_reset";
 
@@ -24,8 +24,19 @@ export async function issueIdentityToken(params: {
   purpose: IdentityTokenPurpose;
   now?: Date;
 }): Promise<string> {
+  return (await issueIdentityTokenRecord(params)).token;
+}
+
+/** Stable record identity is the mail event key; the raw token never enters a ledger. */
+export async function issueIdentityTokenRecord(params: {
+  userId: string;
+  purpose: IdentityTokenPurpose;
+  now?: Date;
+}): Promise<{ token: string; tokenRecordId: string }> {
   const now = params.now ?? new Date();
-  await db
+  return db.transaction(async tx => {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`identity-token:${params.userId}:${params.purpose}`}, 0))`);
+  await tx
     .update(identityTokensTable)
     .set({ consumedAt: now })
     .where(
@@ -37,13 +48,14 @@ export async function issueIdentityToken(params: {
     );
 
   const token = randomBytes(32).toString("base64url");
-  await db.insert(identityTokensTable).values({
+  const [row] = await tx.insert(identityTokensTable).values({
     userId: params.userId,
     purpose: params.purpose,
     tokenDigest: digestToken(token),
     expiresAt: new Date(now.getTime() + IDENTITY_TOKEN_TTL_MS[params.purpose]),
+  }).returning({ id: identityTokensTable.id });
+  return { token, tokenRecordId: row.id };
   });
-  return token;
 }
 
 /**

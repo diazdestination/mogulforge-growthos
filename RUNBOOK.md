@@ -3,7 +3,14 @@
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 
-Current operations wave: `reports/operations-wave-integration-2026-10-02.md`
+Newest implementation: `reports/launch-communications-integration-2026-10-02.md`
+and its three lane reports. The117-table source adds tracked Microsoft service
+replies and platform identity delivery evidence. It is not general inbox support.
+Use `LAUNCH-COMPLETION.md` for remaining work and the new report for exact screen
+entry points, reviewed0009schema, safe local QA and pending release/live gates.
+No hosted upgrade or provider activation is implied by this entry point.
+
+Historical operations wave: `reports/operations-wave-integration-2026-10-02.md`
 and `reports/operations-wave-operator-guide-2026-10-02.md`. Service watch adds
 internal next actions and separately opted-in current-owner notifications;
 source adoption adds no consent, and reviewed outreach is one bounded email

@@ -47,6 +47,7 @@ const SESSION_ONLY_ROUTES = new Set([
   "GET /platform/clients/profiles",
   "GET /platform/clients/health",
   "GET /platform/runtime",
+  "GET /platform/email-deliveries",
   "POST /platform/clients",
   "GET /platform/clients/:orgId/readiness",
   "GET /platform/clients/:orgId/invitations",
@@ -71,6 +72,13 @@ const SESSION_ONLY_ROUTES = new Set([
  * - settings.manage — org configuration surfaces (owner/admin)
  */
 const EXPECTED_PERMISSIONS: Record<string, Permission> = {
+  "GET /staff-invitations/email-deliveries": "users.manage",
+  "GET /service-obligations/:id/mailbox-replies": "crm.read",
+  "POST /service-obligations/:id/mailbox-replies/:replyId/review": "crm.write",
+  "GET /mailbox/microsoft": "crm.write",
+  "POST /mailbox/microsoft/connect": "crm.write",
+  "GET /mailbox/microsoft/callback": "crm.write",
+  "POST /mailbox/microsoft/disable": "crm.write",
   "GET /contractor/today": "crm.read",
   "GET /tasks/:id": "crm.read",
   "GET /invoices": "invoices.read",

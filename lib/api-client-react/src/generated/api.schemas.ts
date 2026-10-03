@@ -5,6 +5,255 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+export type ServiceMailboxReplyState = typeof ServiceMailboxReplyState[keyof typeof ServiceMailboxReplyState];
+
+
+export const ServiceMailboxReplyState = {
+  needs_review: 'needs_review',
+  reviewed: 'reviewed',
+  dismissed: 'dismissed',
+} as const;
+
+export type ServiceMailboxReplyContent = {
+  subject: string;
+  text: string;
+} | null;
+
+export type ServiceMailboxReplyEvidence = typeof ServiceMailboxReplyEvidence[keyof typeof ServiceMailboxReplyEvidence];
+
+
+export const ServiceMailboxReplyEvidence = {
+  original_mailbox_observation: 'original_mailbox_observation',
+} as const;
+
+export interface ServiceMailboxReply {
+  id: string;
+  serviceObligationId: string;
+  /** @minimum 1 */
+  version: number;
+  state: ServiceMailboxReplyState;
+  historical: boolean;
+  holdActive: boolean;
+  replyAt: string;
+  receivedAt: string;
+  rawExpiresAt: string;
+  content: ServiceMailboxReplyContent;
+  /** @nullable */
+  reviewedAt: string | null;
+  /** @nullable */
+  reviewNote: string | null;
+  evidence: ServiceMailboxReplyEvidence;
+}
+
+export type ServiceMailboxReplyPageLimit = typeof ServiceMailboxReplyPageLimit[keyof typeof ServiceMailboxReplyPageLimit];
+
+
+export const ServiceMailboxReplyPageLimit = {
+  NUMBER_25: 25,
+} as const;
+
+export interface ServiceMailboxReplyPage {
+  /** @maxItems 25 */
+  items: ServiceMailboxReply[];
+  hasMore: boolean;
+  /** @minimum 0 */
+  offset: number;
+  limit: ServiceMailboxReplyPageLimit;
+  held: boolean;
+}
+
+export type ReviewServiceMailboxReplyDecision = typeof ReviewServiceMailboxReplyDecision[keyof typeof ReviewServiceMailboxReplyDecision];
+
+
+export const ReviewServiceMailboxReplyDecision = {
+  office_follow_up: 'office_follow_up',
+  not_customer_reply: 'not_customer_reply',
+} as const;
+
+export interface ReviewServiceMailboxReply {
+  requestId: string;
+  /** @minimum 1 */
+  expectedVersion: number;
+  decision: ReviewServiceMailboxReplyDecision;
+  /**
+     * @minLength 10
+     * @maxLength 1000
+     */
+  note: string;
+  reviewed: true;
+}
+
+export interface ServiceMailboxReplyReviewResult {
+  replyId: string;
+  /** @minimum 1 */
+  version: number;
+  replayed: boolean;
+}
+
+export type PlatformEmailDeliveryPurpose = typeof PlatformEmailDeliveryPurpose[keyof typeof PlatformEmailDeliveryPurpose];
+
+
+export const PlatformEmailDeliveryPurpose = {
+  email_verification: 'email_verification',
+  password_reset: 'password_reset',
+  staff_invitation: 'staff_invitation',
+} as const;
+
+export type PlatformEmailDeliveryOutcome = typeof PlatformEmailDeliveryOutcome[keyof typeof PlatformEmailDeliveryOutcome];
+
+
+export const PlatformEmailDeliveryOutcome = {
+  claimed: 'claimed',
+  accepted: 'accepted',
+  rejected: 'rejected',
+  unknown: 'unknown',
+  not_attempted: 'not_attempted',
+} as const;
+
+export type PlatformEmailDeliveryProvider = typeof PlatformEmailDeliveryProvider[keyof typeof PlatformEmailDeliveryProvider];
+
+
+export const PlatformEmailDeliveryProvider = {
+  resend: 'resend',
+} as const;
+
+export type PlatformEmailDeliveryDeliveryState = typeof PlatformEmailDeliveryDeliveryState[keyof typeof PlatformEmailDeliveryDeliveryState];
+
+
+export const PlatformEmailDeliveryDeliveryState = {
+  unconfirmed: 'unconfirmed',
+  delivered: 'delivered',
+  delayed: 'delayed',
+  failed: 'failed',
+  bounced: 'bounced',
+  complained: 'complained',
+  needs_review: 'needs_review',
+} as const;
+
+export interface PlatformEmailDelivery {
+  id: string;
+  /** @nullable */
+  organizationId: string | null;
+  /** @nullable */
+  invitationId: string | null;
+  /** @nullable */
+  recipientLabel: string | null;
+  purpose: PlatformEmailDeliveryPurpose;
+  outcome: PlatformEmailDeliveryOutcome;
+  /** @nullable */
+  outcomeCode: string | null;
+  provider: PlatformEmailDeliveryProvider;
+  /** @nullable */
+  providerMessageId: string | null;
+  deliveryState: PlatformEmailDeliveryDeliveryState;
+  deliveryConfirmed: boolean;
+  retryAllowed: false;
+  claimedAt: string;
+  /** @nullable */
+  finishedAt: string | null;
+  /** @nullable */
+  lastEventAt: string | null;
+}
+
+export type PlatformEmailDeliveryPagePageSize = typeof PlatformEmailDeliveryPagePageSize[keyof typeof PlatformEmailDeliveryPagePageSize];
+
+
+export const PlatformEmailDeliveryPagePageSize = {
+  NUMBER_25: 25,
+} as const;
+
+export type PlatformEmailDeliveryPageUnmatchedCallbackLimit = typeof PlatformEmailDeliveryPageUnmatchedCallbackLimit[keyof typeof PlatformEmailDeliveryPageUnmatchedCallbackLimit];
+
+
+export const PlatformEmailDeliveryPageUnmatchedCallbackLimit = {
+  NUMBER_1000: 1000,
+} as const;
+
+export interface PlatformEmailDeliveryPage {
+  /** @maxItems 25 */
+  deliveries: PlatformEmailDelivery[];
+  /** @minimum 1 */
+  page: number;
+  pageSize: PlatformEmailDeliveryPagePageSize;
+  hasMore: boolean;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  unmatchedCallbackCount: number | null;
+  unmatchedCallbackLimit: PlatformEmailDeliveryPageUnmatchedCallbackLimit;
+}
+
+export type MicrosoftMailboxStatusState = typeof MicrosoftMailboxStatusState[keyof typeof MicrosoftMailboxStatusState];
+
+
+export const MicrosoftMailboxStatusState = {
+  pending: 'pending',
+  active: 'active',
+  disabled: 'disabled',
+  gap: 'gap',
+  revoked: 'revoked',
+} as const;
+
+export interface MicrosoftMailboxStatus {
+  enabled: boolean;
+  configured: boolean;
+  /** @minimum 0 */
+  version: number;
+  state: MicrosoftMailboxStatusState;
+  usable: boolean;
+  /** @nullable */
+  mailboxEmail: string | null;
+  /** @nullable */
+  startedAt: string | null;
+  /** @nullable */
+  lastSuccessAt: string | null;
+  /** @nullable */
+  lastErrorAt: string | null;
+  /** @nullable */
+  reason: string | null;
+  /** @minimum 0 */
+  pendingParentCount: number;
+  /** @minimum 0 */
+  reviewCount: number;
+  scopes: string[];
+  folders: string[];
+  historicalCrawl: false;
+  attachmentsRead: false;
+  remoteConsentRevoked: false;
+}
+
+export type MicrosoftMailboxConnectReturnPath = typeof MicrosoftMailboxConnectReturnPath[keyof typeof MicrosoftMailboxConnectReturnPath];
+
+
+export const MicrosoftMailboxConnectReturnPath = {
+  '/account': '/account',
+  '/settings': '/settings',
+} as const;
+
+export interface MicrosoftMailboxConnect {
+  /** @minimum 0 */
+  expectedVersion: number;
+  readAcknowledged: true;
+  retentionAcknowledged: true;
+  returnPath?: MicrosoftMailboxConnectReturnPath;
+}
+
+export interface MicrosoftMailboxConnectResult {
+  authorizationUrl: string;
+}
+
+export interface MicrosoftMailboxDisable {
+  /** @minimum 1 */
+  expectedVersion: number;
+  confirmed: true;
+}
+
+export interface MicrosoftMailboxDisableResult {
+  disabled: true;
+  remoteConsentRevoked: false;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -3660,6 +3909,7 @@ export const ServiceWatchItemReasonsItem = {
   next_action_overdue: 'next_action_overdue',
   owner_required: 'owner_required',
   source_review_required: 'source_review_required',
+  reply_received_review: 'reply_received_review',
 } as const;
 
 export interface ServiceWatchItem {
@@ -3672,7 +3922,7 @@ export interface ServiceWatchItem {
      */
   version: number;
   state: ServiceWatchItemState;
-  /** @maxItems 11 */
+  /** @maxItems 12 */
   reasons: ServiceWatchItemReasonsItem[];
   observedFingerprint: string;
   /**
@@ -3762,6 +4012,7 @@ export const ServiceWatchDetailReasonsItem = {
   next_action_overdue: 'next_action_overdue',
   owner_required: 'owner_required',
   source_review_required: 'source_review_required',
+  reply_received_review: 'reply_received_review',
 } as const;
 
 export type ServiceWatchDetailHistoryItemMetadata = {[key: string]: unknown};
@@ -3788,7 +4039,7 @@ export interface ServiceWatchDetail {
   /** @pattern ^[a-f0-9]{64}$ */
   expectedFingerprint: string;
   state: ServiceWatchDetailState;
-  /** @maxItems 11 */
+  /** @maxItems 12 */
   reasons: ServiceWatchDetailReasonsItem[];
   /** @nullable */
   recordedState: string | null;
@@ -5469,4 +5720,37 @@ export const GetServiceCareChannel = {
   email: 'email',
   sms: 'sms',
 } as const;
+
+export type ListServiceMailboxRepliesParams = {
+/**
+ * @minimum 0
+ * @maximum 100000
+ */
+offset?: number;
+};
+
+export type ListPlatformIdentityDeliveriesParams = {
+/**
+ * @minimum 1
+ * @maximum 100000
+ */
+page?: number;
+organizationId?: string;
+invitationId?: string;
+};
+
+export type ListInvitationEmailDeliveriesParams = {
+/**
+ * @minimum 1
+ * @maximum 100000
+ */
+page?: number;
+invitationId?: string;
+};
+
+export type CompleteMicrosoftMailboxOAuthParams = {
+state?: string;
+code?: string;
+error?: string;
+};
 

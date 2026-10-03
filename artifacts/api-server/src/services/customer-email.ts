@@ -145,6 +145,7 @@ export async function sendCustomerEmail(
     body: string;
     expectedSender?: CustomerEmailSender;
     beforeDispatch?: () => Promise<void>;
+    outboundParentId?: string;
   },
 ) {
   assertOutboundDeliveryAllowed({ channel: "email", recipient: input.to });
@@ -159,6 +160,7 @@ export async function sendCustomerEmail(
     to: input.to,
     subject: input.subject,
     body: input.body,
+    outboundParentId: input.outboundParentId,
     expectedSender: { provider: sender.provider, senderEmail: sender.senderEmail },
     beforeDispatch: async () => {
       await input.beforeDispatch?.();

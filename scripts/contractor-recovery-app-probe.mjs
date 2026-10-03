@@ -40,6 +40,7 @@ try {
   const operations = operationsFixtureIds('restore-drill-contractor-a'), foreignOperations = operationsFixtureIds('restore-drill-contractor-b');
   good.push('/api/v1/service-watch', `/api/v1/service-obligations/${native.nextService}/watch`, '/api/v1/source-adoption',
     `/api/v1/source-adoption/outreach/${operations.batch}`, '/api/v1/financial-migrations', `/api/v1/financial-migrations/${operations.review}`, `/api/v1/invoices/${operations.invoice}`);
+  good.push(`/api/v1/service-obligations/${native.nextService}/mailbox-replies`, '/api/v1/staff-invitations/email-deliveries');
   for (const route of good) {
     check = `read_${good.indexOf(route)}`;
     const response = await fetch(`${origin}${route}`, { headers });
@@ -53,6 +54,12 @@ try {
   assert.equal(opening.recordedPaidCents,0); assert.equal(opening.balanceDueCents,6000); assert.equal(opening.balanceBasis,'opening_receivable');
   const outreach = await (await fetch(`${origin}/api/v1/source-adoption/outreach/${operations.batch}`, { headers })).json();
   assert.equal(outreach.state,'revoked'); assert.equal(outreach.items[0].delivery.state,'uncertain');
+  check = 'service_reply_evidence';
+  const serviceReplies = await (await fetch(`${origin}/api/v1/service-obligations/${native.nextService}/mailbox-replies`, { headers })).json();
+  assert.equal(serviceReplies.items.length, 1);
+  assert.equal(serviceReplies.items[0].holdActive, true);
+  assert.equal(serviceReplies.items[0].content, null);
+  assert.equal(serviceReplies.items[0].state, 'needs_review');
   for (const route of [`/api/v1/contacts/${other.contact}`, `/api/v1/leads/${other.lead}`, `/api/v1/projects/${other.project}`, `/api/v1/invoices/${otherNative.invoice}`, `/api/v1/service-obligations/${otherNative.nextService}/care`, `/api/v1/communications/voice/${careFixtureIds('restore-drill-contractor-b').call}/care`, `/api/v1/invoices/${otherNative.invoice}/delivery`]) {
     check = 'tenant_boundary';
     const response = await fetch(`${origin}${route}`, { headers });
@@ -62,6 +69,7 @@ try {
   for (const route of [`/api/v1/service-obligations/${otherNative.nextService}/watch`, `/api/v1/source-adoption/outreach/${foreignOperations.batch}`, `/api/v1/financial-migrations/${foreignOperations.review}`, `/api/v1/invoices/${foreignOperations.invoice}`]) {
     const response = await fetch(`${origin}${route}`,{headers}); assert.equal(response.status,404,route); await response.arrayBuffer();
   }
+  assert.equal((await fetch(`${origin}/api/v1/service-obligations/${otherNative.nextService}/mailbox-replies`, { headers })).status, 404);
   const mutation = await fetch(`${origin}/api/v1/contacts/${id.contact}`, { method: 'PATCH', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify({ firstName: 'Forbidden' }) });
   assert.equal(mutation.status, 405); await mutation.arrayBuffer();
   process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, tenantBoundariesVerified: true, readChecks: good.length, writeBlocked: true })}\n`);

@@ -16,8 +16,10 @@ import { logger } from "../lib/logger";
 
 import { crmAppUrl, sendInviteEmail } from "./invite-email";
 import { verifyInviteToken } from "./invite-token";
-import * as providers from "./providers";
-import { ResendSendError } from "./resend-delivery";
+import * as ledger from "./platform-email-delivery";
+import { randomUUID } from "node:crypto";
+const invitationId = randomUUID(), tokenRevision = randomUUID();
+const accepted = () => ({ dispatchId: randomUUID(), outcome: "accepted" as const, outcomeCode: "provider_accepted", providerMessageId: randomUUID(), duplicate: false });
 
 let org: { id: string };
 
@@ -71,10 +73,11 @@ describe("crmAppUrl", () => {
 describe("sendInviteEmail", () => {
   it("sends a branded email with inviter, role, and sign-in link", async () => {
     const send = vi
-      .spyOn(providers.transactionalEmailProvider, "send")
-      .mockResolvedValue({ id: "x", provider: "mock-email" });
+      .spyOn(ledger, "sendPlatformIdentityEmail")
+      .mockResolvedValue(accepted());
     const result = await sendInviteEmail({
       invitedUserId: "invite:newbie",
+      invitationId, tokenRevision, actorUserId: "synthetic-inviter",
       organizationId: org.id,
       to: "newbie@example.com",
       inviteeFirstName: "Nia",
@@ -83,7 +86,7 @@ describe("sendInviteEmail", () => {
     });
     expect(result).toEqual({ sent: true, error: null });
     expect(send).toHaveBeenCalledOnce();
-    const [to, subject, body] = send.mock.calls[0];
+    const { to, subject, body } = send.mock.calls[0][0];
     expect(to).toBe("newbie@example.com");
     // Branding comes from org settings: fresh orgs default to the org name.
     expect(subject).toContain("Invite Email Test Org");
@@ -103,6 +106,7 @@ describe("sendInviteEmail", () => {
         inviteId: "invite:newbie",
         organizationId: org.id,
         email: "newbie@example.com",
+        tokenRevision,
       }),
     ).toBe(true);
   });
@@ -116,10 +120,11 @@ describe("sendInviteEmail", () => {
     failure.name = privateDetails;
     const log = vi.spyOn(logger, "error").mockImplementation(() => {});
     const send = vi
-      .spyOn(providers.transactionalEmailProvider, "send")
+      .spyOn(ledger, "sendPlatformIdentityEmail")
       .mockRejectedValue(failure);
     const result = await sendInviteEmail({
       invitedUserId: "invite:failure",
+      invitationId, tokenRevision, actorUserId: "synthetic-inviter",
       organizationId: org.id,
       to: "newbie@example.com",
       inviterName: "Ava Admin",
@@ -132,8 +137,6 @@ describe("sendInviteEmail", () => {
     expect(log).toHaveBeenCalledExactlyOnceWith(
       {
         errorCode: "invite_email_unconfirmed",
-        outcome: "unknown",
-        httpStatus: undefined,
       },
       "invite: email delivery was not confirmed",
     );
@@ -151,27 +154,22 @@ describe("sendInviteEmail", () => {
   it.each(["rejected", "unknown"] as const)(
     "preserves a safe Resend %s outcome for the admin and operator",
     async (outcome) => {
-      const failure = new ResendSendError(
-        outcome,
-        outcome === "rejected" ? 403 : 503,
-      );
       const log = vi.spyOn(logger, "error").mockImplementation(() => {});
       const send = vi
-        .spyOn(providers.transactionalEmailProvider, "send")
-        .mockRejectedValue(failure);
+        .spyOn(ledger, "sendPlatformIdentityEmail")
+        .mockResolvedValue({ ...accepted(), outcome, providerMessageId: null });
       const result = await sendInviteEmail({
         invitedUserId: "invite:provider-failure",
+        invitationId, tokenRevision, actorUserId: "synthetic-inviter",
         organizationId: org.id,
         to: "newbie@example.com",
         inviterName: "Ava Admin",
         role: "admin",
       });
-      expect(result).toEqual({ sent: false, error: failure.message });
+      expect(result.sent).toBe(false);
+      expect(result.error).toMatch(/will not be retried/);
       expect(send).toHaveBeenCalledOnce();
-      expect(log).toHaveBeenCalledExactlyOnceWith(
-        { errorCode: failure.code, outcome, httpStatus: failure.httpStatus },
-        "invite: email delivery was not confirmed",
-      );
+      expect(log).not.toHaveBeenCalled();
       expect(JSON.stringify(log.mock.calls)).not.toContain(
         "newbie@example.com",
       );
@@ -179,7 +177,7 @@ describe("sendInviteEmail", () => {
   );
 
   it("rejects unsafe recipient addresses without calling the provider", async () => {
-    const send = vi.spyOn(providers.transactionalEmailProvider, "send");
+    const send = vi.spyOn(ledger, "sendPlatformIdentityEmail");
     const result = await sendInviteEmail({
       invitedUserId: "invite:unsafe",
       organizationId: org.id,
@@ -188,6 +186,13 @@ describe("sendInviteEmail", () => {
       role: "viewer",
     });
     expect(result.sent).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("refuses untracked legacy invitations before any provider/ledger dispatch", async () => {
+    const send = vi.spyOn(ledger, "sendPlatformIdentityEmail");
+    expect(await sendInviteEmail({ invitedUserId: "invite:legacy", organizationId: org.id, to: "legacy@example.com", inviterName: "Ava", role: "viewer" }))
+      .toMatchObject({ sent: false, error: expect.stringMatching(/durable staff review/) });
     expect(send).not.toHaveBeenCalled();
   });
 });

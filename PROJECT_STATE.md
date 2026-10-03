@@ -1,6 +1,23 @@
 # GrowthOS project state
 
-## October 2 operations wave (current)
+## October 2 launch communications (newest implementation)
+
+Base operations mainc01bea0 passed exact-main CI37081202257. The owner approved
+the fixed `LAUNCH-COMPLETION.md` finish line. The communications implementation
+adds the first typed Microsoft-service reply loop and durable platform identity
+mail ledger, with separately authorized read access, original-mailbox proof,
+office-review holds and truthful delivery evidence. Read
+`reports/launch-communications-integration-2026-10-02.md` for local checks,
+actual UI entry points, recovery and remaining engineering. General lead/Gmail
+reply coverage is still open; do not call L1 or the entire product finished.
+
+Current source schema is117tables, reviewed0009after0008. Old103-table hosted
+recovery does not accept this schema. Require exact PR/main CI before release
+selection and separately approved hosted/provider/phone/company evidence before
+activation. Azure first sign-in, pending held-staging upgrade/admin rotation and
+both Housecall Pro replacement cards remain open. Payment processing is deferred.
+
+## October 2 operations wave (historical implementation)
 
 Customer-care PR14 merged as main `602131d1b0311ea5933633fedc2c25b5af218238`;
 exact-main CI37074053979 passed. The next owner-authorized candidate is

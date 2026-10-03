@@ -1068,6 +1068,12 @@ export async function processDueScheduledActions(organizationId?: string): Promi
  */
 export async function processScheduledWork(organizationId?: string, observe?: StageObserver): Promise<void> {
   const stage = (name: SchedulerStage, fn: () => Promise<void>) => runStage(name, fn, observe);
+  // Observe explicitly connected replies before claiming new follow-up work.
+  // The adapter is globally default-off and checks each current mailbox policy.
+  await stage("mailbox-replies", async () => {
+    const { processMailboxConnectors } = await import("./mailbox-connector");
+    await processMailboxConnectors(organizationId);
+  });
   await stage("scheduled-actions", () => processDueScheduledActions(organizationId));
   await stage("missed-call-care", async () => {
     const { processMissedCallCare } = await import("./missed-call-care");
@@ -1116,6 +1122,10 @@ export async function processScheduledWork(organizationId?: string, observe?: St
   await stage("email-intelligence-retention", async () => {
     const { purgeExpiredEmailContent } = await import("./email-intelligence");
     await purgeExpiredEmailContent();
+  });
+  await stage("service-reply-retention", async () => {
+    const { purgeExpiredServiceReplyContent } = await import("./mailbox-communication");
+    await purgeExpiredServiceReplyContent();
   });
   // Email org admins once when an active API key nears its expiry date.
   await stage("api-key-expiry-reminders", async () => {

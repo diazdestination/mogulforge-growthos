@@ -6,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
   varchar,
@@ -59,6 +60,7 @@ export const staffInvitationsTable = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
+    unique("staff_invitations_org_id_unique").on(table.organizationId, table.id),
     uniqueIndex("staff_invitations_request_idx").on(
       table.organizationId,
       table.requestId,

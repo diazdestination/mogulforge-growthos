@@ -18,7 +18,7 @@ export interface ServiceWatchItem {
      */
   version: number;
   state: ServiceWatchItemState;
-  /** @maxItems 11 */
+  /** @maxItems 12 */
   reasons: ServiceWatchItemReasonsItem[];
   observedFingerprint: string;
   /**

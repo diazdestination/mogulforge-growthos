@@ -30,6 +30,12 @@ vi.mock("./missed-call-care", () => ({
   processMissedCallCare: vi.fn(async () => {}),
 }));
 vi.mock("./service-watch", () => ({ processServiceWatch: vi.fn(async () => {}) }));
+// A global scheduler test must not poll or purge another suite's reply fixtures.
+vi.mock("./mailbox-connector", () => ({ processMailboxConnectors: vi.fn(async () => {}) }));
+vi.mock("./mailbox-communication", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./mailbox-communication")>(),
+  purgeExpiredServiceReplyContent: vi.fn(async () => {}),
+}));
 
 // The notification stage intentionally retires expired subscriptions and
 // abandoned claims even while outbound delivery is held. An unscoped real
@@ -45,6 +51,8 @@ import { processScheduledWork } from "./automation";
 import { processStaffLeadPush } from "./staff-push";
 import { processMissedCallCare } from "./missed-call-care";
 import { processServiceWatch } from "./service-watch";
+import { processMailboxConnectors } from "./mailbox-connector";
+import { purgeExpiredServiceReplyContent } from "./mailbox-communication";
 import {
   cleanupExpiredPreviousSecrets,
   processPendingDeliveries,
@@ -80,6 +88,23 @@ afterEach(() => {
 });
 
 describe("scheduler stage isolation", () => {
+  it("observes mailbox replies before due sends and isolates read failure without exposing message details", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(processMailboxConnectors).mockRejectedValueOnce(new Error("PRIVATE_MAILBOX_CONTENT"));
+    const observe = vi.fn(async () => {});
+    await processScheduledWork(undefined, observe);
+    expect(observe.mock.calls[0]).toEqual(["mailbox-replies", "running"]);
+    expect(observe).toHaveBeenCalledWith("mailbox-replies", "failed");
+    expect(observe).toHaveBeenCalledWith("scheduled-actions", "succeeded");
+    expect(purgeExpiredServiceReplyContent).toHaveBeenCalledOnce();
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("PRIVATE_MAILBOX_CONTENT");
+  });
+
+  it("scopes mailbox work to one company and skips global raw-content retention", async () => {
+    await processScheduledWork("00000000-0000-4000-8000-000000000001");
+    expect(processMailboxConnectors).toHaveBeenCalledExactlyOnceWith("00000000-0000-4000-8000-000000000001");
+    expect(purgeExpiredServiceReplyContent).not.toHaveBeenCalled();
+  });
   it("reports failed stages without exposing raw exceptions to logs or heartbeat", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(processPendingDeliveries).mockRejectedValueOnce(

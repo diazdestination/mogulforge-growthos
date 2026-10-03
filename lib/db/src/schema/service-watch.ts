@@ -4,7 +4,7 @@ import { usersTable } from "./auth";
 import { serviceObligationsTable } from "./service-obligations";
 
 export type ServiceWatchState = "clear" | "open" | "acknowledged" | "resolved" | "held";
-export type ServiceWatchReason = "reminder_needs_review" | "no_response_recorded" | "reminder_blocked" | "send_unknown" | "visit_cancelled" | "visit_no_show" | "service_overdue" | "response_needs_action" | "next_action_overdue" | "owner_required" | "source_review_required";
+export type ServiceWatchReason = "reminder_needs_review" | "no_response_recorded" | "reminder_blocked" | "send_unknown" | "visit_cancelled" | "visit_no_show" | "service_overdue" | "response_needs_action" | "reply_received_review" | "next_action_overdue" | "owner_required" | "source_review_required";
 
 /** A retained office-work projection, never a second service record or send authority. */
 export const serviceWatchCasesTable = pgTable("service_watch_cases", {

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PlatformEmailDeliveryPanel } from "./platform-email-delivery-panel";
 
 type Invitation = {
   id: string;
@@ -44,6 +45,8 @@ const messages: Record<string, string> = {
     "Invitation email is not configured. Complete transactional email setup before sending.",
   invitation_request_changed:
     "This request changed. Restore the original details or edit the email to start a new request.",
+  invitation_delivery_reconciliation_required:
+    "A previous invitation send is still unknown. Review delivery evidence with platform support; a new link cannot bypass that uncertainty.",
   invalid_request: "Check the email, role and approval before sending.",
 };
 async function request<T>(
@@ -424,6 +427,7 @@ function StaffPanel({
           </p>
         )}
       </div>
+      <PlatformEmailDeliveryPanel actorId={actorId} scope="platform" organizationId={organizationId} />
       {review && (
         <div
           className="space-y-3 border-t pt-4"

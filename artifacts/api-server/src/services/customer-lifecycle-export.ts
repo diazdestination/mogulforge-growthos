@@ -30,6 +30,7 @@ export const CUSTOMER_EXPORT_DATASETS: readonly Dataset[] = [
 ] as const;
 export const CUSTOMER_EXPORT_EXCLUSIONS = [
   "Credentials, passwords, sessions, identity tokens, API keys and provider/billing configuration are excluded.",
+  "Mailbox read credentials/cursors, provider identities, raw reply content, immutable parent/receipt/review evidence and platform identity-email delivery records are excluded. They remain in inventory/backups and require a separately reviewed communications/security export; this core export is not a complete mailbox or identity archive.",
   "Opaque activity/import/attribution metadata, provider error details, staff identities and device/IP data are excluded.",
   "Invoice numbering configuration and command retry fingerprints are excluded. Invoice receipt allocations reference value_entries; do not count them as additional cash transactions. An allocation reversal is not a cash refund.",
   "Opening receivables are non-cash balances at a documented cutoff, never payments or collected revenue. Historical invoice source fields and fixed migration identities are included; raw migration reviews/normalized payloads and staff approval identities are excluded.",
@@ -51,7 +52,7 @@ const invoiceDocument = z.object({
 });
 const recurrence = z.object({ mode: z.literal("calendar_months"), intervalMonths: z.number().int().min(1).max(60), anchorDate: z.iso.date(), endDate: z.iso.date().nullable(), agreementNote: z.string(), approvedAt: z.string() });
 const historicalSource = z.object({ sourceSystem: z.string(), sourceAccount: z.string(), externalId: z.string(), cutoffAt: z.string(), recordSha256: z.string().regex(/^[a-f0-9]{64}$/) });
-const watchReasons = z.array(z.enum(["reminder_needs_review", "no_response_recorded", "reminder_blocked", "send_unknown", "visit_cancelled", "visit_no_show", "service_overdue", "response_needs_action", "next_action_overdue", "owner_required", "source_review_required"])).max(11);
+const watchReasons = z.array(z.enum(["reminder_needs_review", "no_response_recorded", "reminder_blocked", "send_unknown", "visit_cancelled", "visit_no_show", "service_overdue", "response_needs_action", "next_action_overdue", "owner_required", "source_review_required", "reply_received_review"])).max(12);
 const unavailable = () => new CustomerLifecycleError(503, "customer_export_unavailable", "The export could not be prepared. No data was changed. Try again or ask your GrowthOS operator for help.");
 type ExportClient = Pick<pg.Client, "connect" | "query" | "end" | "on">;
 

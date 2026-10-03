@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getListUsersQueryKey, useListUsers } from '@workspace/api-client-react';
 import { canAssignWork, localDateTime, scheduleTimezone } from '@/lib/contractor-schedule';
+import ServiceMailboxRepliesPanel from './service-mailbox-replies-panel';
 
 type Preview = { channel: 'email' | 'sms'; recipient: string; subject: string; body: string; fingerprint: string; runAt: string; sender: { senderEmail: string; provider: string } | null };
 type Care = {
@@ -22,6 +23,7 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
 
 export default function ServiceCarePanel({ obligationId, editable, onChanged, onClose }: { obligationId: string; editable: boolean; onChanged: () => Promise<void>; onClose: () => void }) {
   const [channel, setChannel] = useState<'email' | 'sms'>('email');
+  const [showReplies, setShowReplies] = useState(false);
   const [care, setCare] = useState<Care | null>(null);
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [reviewNeeded, setReviewNeeded] = useState(false);
   const [notice, setNotice] = useState(''), [error, setError] = useState('');
@@ -66,7 +68,9 @@ export default function ServiceCarePanel({ obligationId, editable, onChanged, on
   const freshResponse = care?.response?.outcome === 'ready_to_book' && care.booking?.responseId !== care.response.id;
   return <section className="mt-3 w-full min-w-0 space-y-4 border-t pt-4" aria-label="Service customer care">
     <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-lg font-semibold">Customer care → office booking</h3><div className="flex flex-wrap gap-2"><button type="button" disabled={busy || loading} className={button} onClick={() => void refresh()}>Refresh and review</button><button type="button" disabled={busy} className={button} onClick={onClose}>Close customer care</button></div></div>
-    <p className="text-sm text-muted-foreground">One reviewed reminder for this service. Replies are recorded by your office; this is not an automatic inbox or self-booking flow. Completion remains a separate service action.</p>
+    <p className="text-sm text-muted-foreground">One reviewed reminder for this service. Supported original-mailbox replies need office review; other conversations remain staff-recorded. This is not self-booking. Completion remains a separate service action.</p>
+    <button type="button" className={button} onClick={() => setShowReplies(value => !value)}>{showReplies ? 'Hide mailbox reply evidence' : 'Review mailbox reply evidence'}</button>
+    {showReplies && <ServiceMailboxRepliesPanel key={obligationId} obligationId={obligationId} editable={editable} onChanged={async () => { await refresh(); await onChanged(); }} />}
     {notice && <p role="status" className="rounded-lg border p-3">{notice}</p>}
     {error && <p role="alert" className="rounded-lg border border-destructive p-3">{error}</p>}
     {loading && <p>Loading customer-care record…</p>}
