@@ -63,6 +63,13 @@ These are provider-free local results. Exact candidate and merged-main PostgreSQ
 CI and any additional release evidence are recorded below when
 completed; the base release's CI does not attest this working tree.
 
+Initial PR17 CI37088633166 at872e200 found one coordinator omission: the four
+new authenticated routes were absent from the explicit permission-inventory test.
+The routes themselves declared the required permissions. The test contract now
+names them exactly; no permission, test or assertion was weakened. The other
+2,283 API tests passed, including the new independent-PostgreSQL races; 15 skips
+are unchanged. Full CI must be rerun on the corrective commit before integration.
+
 ## Schema and synthetic recovery
 
 `node scripts/lead-replies-schema-preview.mjs` generates reviewed-only `0010`
