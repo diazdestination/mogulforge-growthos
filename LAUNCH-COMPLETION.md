@@ -23,13 +23,23 @@ HOUSECALL-PRO-REPLACEMENT-GATE.md.
 | L4 | Missed calls are recovered promptly without uncontrolled messages | Current CALLIE candidate adds owner-reviewed forward-only policy, bounded keypad qualification, caller-originated one-call acknowledgment, accountable handoff and explicit office-confirmed booking. This does not deliver freeform conversational reception or autonomous confirmed booking, nor close L4. Finish required remaining scope and prove actual routing, consent, stop, handoff and failure behavior. |
 | L5 | HVAC service obligations produce timely reminders, responses and visits | Current standing-service candidate adds exact forward-only series approval, shared one-reminder ownership, signed service SMS evidence/office holds and typed Microsoft reply authority. No backlog, warranty inference or automatic booking. Close exact release CI, then prove each actual agreement, sender, response, visit and completion/next date. |
 | L6 | Lead recovery and campaigns produce accountable opportunities | Current finite two-message Microsoft candidate adds exact review/start/stop, permanent ownership, shared contact allowances and fresh completed-sync/reply gates. Finish exact release verification; confirm remaining required campaign scope and prove actual reply/opt-out stops and accountable outcomes. This bounded slice does not close full L6. |
-| L7 | The office and technician can find and finish each customer's work simply | Implement necessary unified history over canonical records; confirm actual equipment/checklist needs, repeat-customer jobs, multi-property work and required scheduling details. No duplicate customer or invented acquisition lead. |
+| L7 | The office and technician can find and finish each customer's work simply | October5 candidate implements canonical nine-section customer history, exact appointment links and explicit new-service property selection. Finish exact release CI; confirm actual equipment/checklist needs, repeat-customer jobs, multi-property work and required scheduling details. No duplicate customer or invented acquisition lead. |
 | L8 | Both businesses can migrate and cut over without losing required work/history | Obtain approved source samples; map required customers/properties/equipment, open jobs/appointments/media and balances. Existing finance loader is normalized JSON, not universal Housecall Pro import. Reconcile counts, exceptions, one writer, rollback and export. |
 | L9 | Smart Sites and phones deliver the right work to the right staff | Accept each website/company connection, owner/day/after-hours routing, actual installed phones, background/locked/offline behavior and correct lead/service deep links; manual SMS compose is not delivery evidence. |
 | L10 | The selected release is recoverable, isolated and supportable | Exact-head/main CI, reviewed hosted schema, compatible restore, always-on scheduler, actionable failure alerts, two-company isolation, privacy/export/retention and AI cost/runtime acceptance. |
 | L11 | Selling/onboarding is repeatable and honestly valuable | GrowthOS subscription test flow (separate from contractor collection), explicit included scope/allowances, setup/support effort, complete company workday acceptance and one conservatively evidenced inquiry-to-outcome chain. |
 
-## Active implementation: bounded L6 source nurture
+## Active implementation: bounded L7 customer workspace
+
+Base PR21/main d4b8c0a and exact-main CI37154526789 passed. The resumed October5
+slice follows `reports/customer-workspace-contract-2026-10-03.md`; see its October5
+integration report and operator guide. Customer history and companion navigation
+are built over canonical records; new service property selection is explicit and
+parent-stable through creation. No new schema (130tables); compatible synthetic
+restore has47read-only app probes. Require exact candidate/main PostgreSQL CI and
+separate hosted/provider/company proof. This does not close all L7 or cutover.
+
+## Previous implementation: bounded L6 source nurture
 
 Base L5 PR20/main110f145 and exact-main CI37148428665 passed. Current contract:
 `reports/source-nurture-contract-2026-10-03.md`. Use its integration report and

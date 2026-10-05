@@ -3,6 +3,15 @@
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 
+Current L7 customer work record: Customers & Jobs → Customers → Customer record.
+See `reports/customer-workspace-operator-guide-2026-10-05.md` and its integration
+report. Nine selected-section-only pages, exact appointment summary and explicit
+new-service property picker reuse existing canonical workflows. No new schema.
+Use `preview-runtime-isolated.mjs --customer-workspace` for provider-free local
+QA; compatible recovery now includes47SELECT-only app probes. Independent PG16
+property-writer tests and exact candidate/main CI remain required source proof;
+local preview is not hosted/phone/provider/customer acceptance.
+
 Current L6 candidate: `reports/source-nurture-integration-2026-10-03.md` and
 `reports/source-nurture-operator-guide-2026-10-03.md`. Entry: More tools → Win-back
 → Reviewed two-message follow-up. Source adoption, exact-address permission,

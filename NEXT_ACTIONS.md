@@ -1,5 +1,16 @@
 # Next acceptance work
 
+October5 active slice: bounded L7 customer workspace, after completed PR21/main
+d4b8c0a. Finish its exact candidate PostgreSQL CI, merge only the reviewed green
+head, and explicitly dispatch/verify exact merged-main CI. See
+`reports/customer-workspace-integration-2026-10-05.md`. Keep the130-table schema;
+do not apply any hosted changes. Compatible synthetic restore has47read-only app
+probes. Then continue the fixed launch list: actual required equipment/checklist,
+repeat-job and scheduling gaps, approved source-specific migration, remaining
+mailbox/reception/campaign scope and both company workday cards. Azure first
+sign-in and real provider/phone/hosted acceptance remain separate owner gates.
+Older candidate-pending entries below are historical.
+
 Current bounded L6 source candidate:
 `reports/source-nurture-integration-2026-10-03.md`. Finish its exact PostgreSQL
 candidate CI and explicitly dispatched merged-main CI before source release

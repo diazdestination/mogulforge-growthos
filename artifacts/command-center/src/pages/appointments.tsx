@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useListAppointments, useCreateAppointment, useUpdateAppointment, getListAppointmentsQueryKey, AppointmentStatus, AppointmentType, useListUsers, useGetInspectionAvailability } from '@workspace/api-client-react';
+import { useListAppointments, useCreateAppointment, useUpdateAppointment, getListAppointmentsQueryKey, AppointmentStatus, AppointmentType, useListUsers, getListUsersQueryKey, useGetInspectionAvailability, getGetInspectionAvailabilityQueryKey, type MemberProfile } from '@workspace/api-client-react';
+import { useSearch } from 'wouter';
 import LeadSelect from '@/components/lead-select';
 import ContactSelect from '@/components/contact-select';
+import AppointmentLinkedCard from '@/components/appointment-linked-card';
 import { Loader2, Plus, Calendar, Clock, Edit, AlertTriangle, X } from 'lucide-react';
 import { getInspectionAvailabilityWarning } from '@workspace/inspection-availability';
 import { canWrite } from '@/lib/permissions';
@@ -9,18 +11,33 @@ import { useGetMe } from '@workspace/api-client-react';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import { canAssignWork, localDateTime, scheduleTimezone } from '@/lib/contractor-schedule';
+import { memberAuthorityScope } from '@/lib/member-authority-scope';
 
 export default function Appointments() {
+  const profile = useGetMe();
+  if (profile.isError) return <div role="alert" className="p-4">Company access could not be verified. Appointment controls are unavailable until access is checked again. <button className="min-h-11 underline" onClick={() => void profile.refetch()}>Check appointment access</button></div>;
+  if (profile.isLoading) return <p role="status" className="p-4">Confirming company access before opening appointments…</p>;
+  if (!profile.data?.isActive || !profile.data.organization) return <p role="alert" className="p-4">Active company access is required to open appointments.</p>;
+  const scopeKey = memberAuthorityScope(profile.data);
+  return <AppointmentsContent key={scopeKey} me={profile.data} scopeKey={scopeKey} />;
+}
+
+function AppointmentsContent({ me, scopeKey }: { me: MemberProfile; scopeKey: string }) {
   const [date, setDate] = useState(() => localDateTime(new Date().toISOString()).slice(0, 10));
   const [days, setDays] = useState(7);
   const [assignedUserId, setAssignedUserId] = useState('');
-  const { data: users } = useListUsers();
+  const { data: users } = useListUsers({ query: { queryKey: [...getListUsersQueryKey(), scopeKey] } });
   const from = new Date(`${date || localDateTime(new Date().toISOString()).slice(0, 10)}T00:00`);
   const to = new Date(from); to.setDate(to.getDate() + days);
   const params = { leadId: undefined, from: from.toISOString(), to: to.toISOString(), assignedUserId: assignedUserId || undefined };
-  const { data: appointments, isLoading, isError, refetch } = useListAppointments(params);
-  const { data: me } = useGetMe();
+  const { data: appointments, isLoading, isError, refetch } = useListAppointments(params, { query: { queryKey: [...getListAppointmentsQueryKey(params), scopeKey] } });
   const queryClient = useQueryClient();
+  const search = useSearch();
+  const viewKey = JSON.stringify([search, date, days, assignedUserId]);
+  const currentView = useRef(viewKey); currentView.current = viewKey;
+  const [linkedRevision, setLinkedRevision] = useState(0);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   
   const canEdit = canWrite(me?.role);
 
@@ -29,6 +46,7 @@ export default function Appointments() {
   const [statusReview, setStatusReview] = useState<{ id: string; status: AppointmentStatus } | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [reviewError, setReviewError] = useState('');
+  useEffect(() => { setIsFormOpen(false); setEditingAppt(null); setStatusReview(null); setReviewError(''); setReviewing(false); }, [viewKey]);
 
   const openEdit = (appt: any) => {
     setEditingAppt(appt);
@@ -46,8 +64,8 @@ export default function Appointments() {
     if(!canEdit || statusReview || updateAppt.isPending) return;
     const original = appointments?.find(appointment => appointment.id === id);
     updateAppt.mutate({ id, data: { status, ...(original?.updatedAt ? { expectedUpdatedAt: original.updatedAt } : {}) } }, {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() }),
-      onError: () => { setReviewError(''); setStatusReview({ id, status }); },
+      onSuccess: () => { if (alive.current) setLinkedRevision(value => value + 1); return queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() }); },
+      onError: () => { if (alive.current && currentView.current === viewKey) { setReviewError(''); setStatusReview({ id, status }); } },
     });
   }
 
@@ -56,6 +74,7 @@ export default function Appointments() {
     setReviewing(true); setReviewError('');
     try {
       const result = await refetch();
+      if (!alive.current || currentView.current !== viewKey) return;
       if (result.isError) throw new Error('The current appointment could not be loaded. No change has been retried.');
       const current = result.data?.find(appointment => appointment.id === statusReview.id);
       if (!current) throw new Error('This appointment is not in the selected range. Adjust the date or team filter, then refresh and review again. No change has been retried.');
@@ -63,8 +82,8 @@ export default function Appointments() {
       // acknowledgement may already have committed that command.
       setEditingAppt(current); setIsFormOpen(true); setStatusReview(null);
     } catch (error) {
-      setReviewError(error instanceof Error ? error.message : 'Refresh failed. No change has been retried.');
-    } finally { setReviewing(false); }
+      if (alive.current && currentView.current === viewKey) setReviewError(error instanceof Error ? error.message : 'Refresh failed. No change has been retried.');
+    } finally { if (alive.current && currentView.current === viewKey) setReviewing(false); }
   }
 
   // Sort by date ascending (upcoming first)
@@ -87,6 +106,7 @@ export default function Appointments() {
       </header>
 
       <div className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
+        <AppointmentLinkedCard search={search} organizationId={me.organization!.id} scopeKey={scopeKey} refreshKey={linkedRevision} onShowDay={start => { setDate(localDateTime(start).slice(0, 10)); setDays(1); setAssignedUserId(''); }} />
         {statusReview && <div role="alert" className="mx-auto mb-5 max-w-5xl space-y-2 rounded-lg border border-destructive p-4">
           <p className="font-semibold">Appointment update needs review</p>
           <p className="text-sm">The requested change to {statusReview.status.replaceAll('_', ' ')} was not confirmed. It may already have saved, or another team member may have changed the record. Review the current appointment before deciding what to do next. No change is retried automatically.</p>
@@ -199,14 +219,15 @@ export default function Appointments() {
       {isFormOpen && canEdit && (
         <ApptFormModal 
           appt={editingAppt} 
-          onClose={() => setIsFormOpen(false)} 
+          scopeKey={scopeKey}
+          onClose={() => { setIsFormOpen(false); setLinkedRevision(value => value + 1); }}
         />
       )}
     </div>
   );
 }
 
-function ApptFormModal({ appt, onClose }: { appt?: any, onClose: () => void }) {
+function ApptFormModal({ appt, onClose, scopeKey }: { appt?: any, onClose: () => void; scopeKey: string }) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -224,7 +245,7 @@ function ApptFormModal({ appt, onClose }: { appt?: any, onClose: () => void }) {
   const [contactId, setContactId] = useState(appt?.contactId || '');
   const [assigneeId, setAssigneeId] = useState(appt?.assignedUserId || '');
   
-  const { data: users } = useListUsers();
+  const { data: users } = useListUsers({ query: { queryKey: [...getListUsersQueryKey(), scopeKey] } });
   const createAppt = useCreateAppointment();
   const updateAppt = useUpdateAppointment();
   const queryClient = useQueryClient();
@@ -234,7 +255,7 @@ function ApptFormModal({ appt, onClose }: { appt?: any, onClose: () => void }) {
 
   // Same availability source admins configure for concierge chat bookings —
   // warn (without blocking) when a manual inspection falls outside it.
-  const { data: availability } = useGetInspectionAvailability();
+  const { data: availability } = useGetInspectionAvailability({ query: { queryKey: [...getGetInspectionAvailabilityQueryKey(), scopeKey] } });
   const availabilityWarning =
     type === 'inspection' && start && availability
       ? getInspectionAvailabilityWarning(new Date(start), availability)
@@ -363,11 +384,11 @@ function ApptFormModal({ appt, onClose }: { appt?: any, onClose: () => void }) {
             </select>
           </div>
 
-          <div className="space-y-1.5"><label className="block text-sm font-medium">Customer<ContactSelect value={contactId} onChange={setContactId} testId="appointment-contact" /></label><p className="text-sm text-slate-600 dark:text-slate-300">Choose a customer for a service visit. A related opportunity is optional.</p></div>
+          <div className="space-y-1.5"><label className="block text-sm font-medium">Customer<ContactSelect queryScope={scopeKey} value={contactId} onChange={setContactId} testId="appointment-contact" /></label><p className="text-sm text-slate-600 dark:text-slate-300">Choose a customer for a service visit. A related opportunity is optional.</p></div>
           <label className="block space-y-1.5">
             <span className="text-[10px] md:text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">Related Lead</span>
             <div className="shadow-sm rounded-xl overflow-hidden">
-               <LeadSelect value={leadId} onChange={setLeadId} />
+               <LeadSelect queryScope={scopeKey} value={leadId} onChange={setLeadId} />
             </div>
           </label>
           

@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { useGetMe } from "@workspace/api-client-react";
+import { useGetMe, type MemberProfile } from "@workspace/api-client-react";
 import { ArrowRight, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { contractorRequest } from "@/lib/contractor-api";
 import { canManageSettings } from "@/lib/permissions";
+import { memberAuthorityScope } from "@/lib/member-authority-scope";
 
 type Queue<T> = { items: T[]; total: number; truncated: boolean };
 type AssignedWork = {
@@ -129,12 +130,14 @@ function WorkRow({
   href,
   title,
   customer,
+  customerHref,
   detail,
   status,
 }: {
   href: string;
   title: string;
   customer: string | null;
+  customerHref?: string;
   detail: string;
   status: string;
 }) {
@@ -157,12 +160,20 @@ function WorkRow({
           {detail}
         </p>
       </Link>
+      {customerHref && <Link href={customerHref} aria-label={`Open customer record for ${customer || "this work"}`} className="inline-flex min-h-11 items-center rounded text-sm underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Customer record</Link>}
     </li>
   );
 }
 
 export default function Today() {
-  const { data: me, isLoading: profileLoading } = useGetMe();
+  const profile = useGetMe();
+  if (profile.isError) return <div role="alert" className="p-4">Company access could not be verified. <button className="min-h-11 underline" onClick={() => void profile.refetch()}>Check work-day access</button></div>;
+  if (profile.isLoading) return <p role="status" className="p-4">Confirming company access before opening the work day…</p>;
+  if (!profile.data?.isActive || !profile.data.organization) return <p role="alert" className="p-4">Active company access is required to open the work day.</p>;
+  const scopeKey = memberAuthorityScope(profile.data);
+  return <TodayContent key={scopeKey} me={profile.data} scopeKey={scopeKey} />;
+}
+function TodayContent({ me, scopeKey }: { me: MemberProfile; scopeKey: string }) {
   const [date, setDate] = useState("");
   const [selectedScope, setScope] = useState<"mine" | "company" | null>(null);
   const scope =
@@ -172,7 +183,7 @@ export default function Today() {
       : "mine");
   const companyId = me?.organization?.id;
   const day = useQuery({
-    queryKey: ["contractor-day", companyId, scope, date],
+    queryKey: ["contractor-day", scopeKey, scope, date],
     enabled: !!companyId,
     queryFn: async ({ signal }) => {
       const params = new URLSearchParams({ scope });
@@ -284,7 +295,7 @@ export default function Today() {
             Refresh
           </button>
         </div>
-        {profileLoading || (companyId && day.isPending) ? (
+        {companyId && day.isPending ? (
           <div role="status" className="space-y-3">
             <span className="text-sm text-muted-foreground">
               Loading the work day…
@@ -341,9 +352,10 @@ export default function Today() {
                 {data.appointments.items.map((item) => (
                   <WorkRow
                     key={item.id}
-                    href="/appointments"
+                    href={`/appointments?appointmentId=${encodeURIComponent(item.id)}&organizationId=${encodeURIComponent(data.organizationId)}`}
                     title={human(item.type)}
                     customer={item.customerLabel}
+                    customerHref={item.contactId ? `/contacts/${encodeURIComponent(item.contactId)}?organizationId=${encodeURIComponent(data.organizationId)}` : undefined}
                     status={item.status}
                     detail={`${time(item.scheduledStart, data.timeZone, new Date(item.scheduledStart) < new Date(data.startAt))}${item.scheduledEnd ? ` – ${time(item.scheduledEnd, data.timeZone, new Date(item.scheduledEnd) >= new Date(data.endAt))}` : ""} · ${item.assigneeName || "Unassigned"}`}
                   />
@@ -368,6 +380,7 @@ export default function Today() {
                     }
                     title={item.title}
                     customer={item.customerLabel}
+                    customerHref={item.contactId ? `/contacts/${encodeURIComponent(item.contactId)}?organizationId=${encodeURIComponent(data.organizationId)}` : undefined}
                     status={item.status}
                     detail={`${time(item.dueAt, data.timeZone, true)} · ${item.assigneeName || "Unassigned"}`}
                   />
@@ -399,9 +412,10 @@ export default function Today() {
                 {data.services.items.map((item) => (
                   <WorkRow
                     key={item.id}
-                    href="/service"
+                    href={`/service?serviceObligationId=${encodeURIComponent(item.id)}&organizationId=${encodeURIComponent(data.organizationId)}`}
                     title={item.title}
                     customer={item.customerLabel}
+                    customerHref={item.contactId ? `/contacts/${encodeURIComponent(item.contactId)}?organizationId=${encodeURIComponent(data.organizationId)}` : undefined}
                     status={item.status}
                     detail={`${human(item.kind)} · Due ${serviceDate(item.dueAt)} · ${item.assigneeName || "Unassigned"}`}
                   />

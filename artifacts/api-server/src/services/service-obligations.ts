@@ -150,8 +150,10 @@ export async function createServiceObligation(
   return db.transaction(async (tx) => {
     await lockContractorSchedule(tx, organizationId);
     await assertOperationalStaff(tx, organizationId, input.assignedUserId ? [input.assignedUserId] : []);
+    // Keep the explicitly selected customer/property stable through task and service creation.
+    // A later property edit is allowed, but cannot race these parent checks.
     const [contact] = await tx.select({ id: contactsTable.id }).from(contactsTable)
-      .where(and(eq(contactsTable.id, input.contactId), eq(contactsTable.organizationId, organizationId)));
+      .where(and(eq(contactsTable.id, input.contactId), eq(contactsTable.organizationId, organizationId))).for("share");
     if (!contact) return { error: "contact_not_found" as const };
     if (input.propertyId) {
       const [property] = await tx.select({ id: propertiesTable.id }).from(propertiesTable)
@@ -159,7 +161,7 @@ export async function createServiceObligation(
           eq(propertiesTable.id, input.propertyId),
           eq(propertiesTable.organizationId, organizationId),
           eq(propertiesTable.contactId, input.contactId),
-        ));
+        )).for("share");
       if (!property) return { error: "property_not_found" as const };
     }
     const source = clean(input.source, 80) ?? "manual";

@@ -1,9 +1,11 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { getGetMeQueryKey } from "@workspace/api-client-react";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Today, { type ContractorDay } from "./today";
-import { mockApi } from "@/test/mock-api";
+import { mockApi, sampleMe } from "@/test/mock-api";
 import { renderWithQuery } from "@/test/render";
 
 const queue = { items: [], total: 0, truncated: false };
@@ -55,6 +57,49 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe("Today work day", () => {
+  it("opens exact service and appointment records while keeping customer navigation as a separate link", async () => {
+    const organizationId = "00000000-0000-4000-8000-000000000001", contactId = "00000000-0000-4000-8000-000000000002";
+    const appointmentId = "00000000-0000-4000-8000-000000000003", serviceId = "00000000-0000-4000-8000-000000000004";
+    const assigned = { contactId, customerLabel: "Synthetic Customer", assignedUserId: null, assigneeName: null, status: "scheduled" };
+    mockApi("office", { me: { organization: { id: organizationId, name: "Synthetic HVAC", slug: "synthetic", timezone: "UTC" } }, handler: (_method, path) => path.endsWith("/contractor/today") ? json(day({ organizationId,
+      appointments: { total: 2, truncated: false, items: [{ ...assigned, id: appointmentId, type: "inspection", leadId: null, scheduledStart: "2026-10-01T14:00:00Z", scheduledEnd: null }, { ...assigned, id: "unlinked", contactId: null, type: "other", leadId: null, scheduledStart: "2026-10-01T15:00:00Z", scheduledEnd: null }] },
+      services: { total: 1, truncated: false, items: [{ ...assigned, id: serviceId, title: "Heat pump maintenance", dueAt: "2026-10-01T12:00:00Z", kind: "maintenance", taskId: "task" }] },
+    })) : undefined });
+    const { hook } = memoryLocation({ path: "/" }); renderWithQuery(<Router hook={hook}><Today /></Router>);
+    const visit = await screen.findByRole("link", { name: /^inspection/ });
+    const service = screen.getByRole("link", { name: /^Heat pump maintenance/ });
+    expect(visit.getAttribute("href")).toBe(`/appointments?appointmentId=${appointmentId}&organizationId=${organizationId}`);
+    expect(service.getAttribute("href")).toBe(`/service?serviceObligationId=${serviceId}&organizationId=${organizationId}`);
+    for (const primary of [visit, service]) {
+      const secondary = within(primary.closest("li")!).getByRole("link", { name: "Open customer record for Synthetic Customer" });
+      expect(secondary.getAttribute("href")).toBe(`/contacts/${contactId}?organizationId=${organizationId}`);
+      expect(primary.contains(secondary)).toBe(false); expect(primary.querySelector("a")).toBeNull();
+    }
+    expect(within(screen.getByRole("link", { name: /^other/ }).closest("li")!).queryByRole("link", { name: /Open customer record/ })).toBeNull();
+  });
+  it("removes cached work on profile failure and ignores an old-company response after switching membership", async () => {
+    let company = "o1", fail = false, hold = false, resolve!: (value: Response) => void;
+    const pending = new Promise<Response>(done => { resolve = done; });
+    const fetch = mockApi("office"), fallback = fetch.getMockImplementation()!;
+    fetch.mockImplementation(async (input, init) => {
+      const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (raw.endsWith("/me")) return fail ? json({ error: "Unavailable" }, 403) : json({ ...sampleMe("office"), organization: { id: company, name: company, slug: company, timezone: "UTC" } });
+      if (raw.includes("/contractor/today")) return hold && company === "o1" ? pending : json(day({ organizationId: company, tasks: { total: 1, truncated: false, items: [{ id: "task", title: `${company} work only`, status: "open", dueAt: null, leadId: null, contactId: null, customerLabel: null, assignedUserId: null, assigneeName: null, actionPath: "/tasks?taskId=task" }] } }));
+      return fallback(input, init);
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); const { hook } = memoryLocation({ path: "/" });
+    render(<QueryClientProvider client={client}><Router hook={hook}><Today /></Router></QueryClientProvider>);
+    await screen.findByText("o1 work only"); fail = true;
+    await act(async () => { await client.refetchQueries({ queryKey: getGetMeQueryKey() }); });
+    await screen.findByRole("alert"); expect(screen.queryByText("o1 work only")).toBeNull();
+    fail = false; hold = true; fireEvent.click(screen.getByRole("button", { name: "Check work-day access" }));
+    await waitFor(() => expect(fetch.mock.calls.filter(([url]) => String(url).includes("/contractor/today")).length).toBeGreaterThan(1));
+    company = "o2";
+    await act(async () => { await client.refetchQueries({ queryKey: getGetMeQueryKey() }); });
+    await screen.findByText("o2 work only");
+    await act(async () => { resolve(json(day())); });
+    expect(screen.queryByText("o1 work only")).toBeNull(); expect(screen.getByText("o2 work only")).toBeTruthy();
+  });
   it("opens a server-linked reply task at its exact lead Messages tab, never an arbitrary supplied destination", async () => {
     const leadId = "00000000-0000-4000-8000-000000000456";
     const base = { status: "open", dueAt: null, leadId, contactId: "c1", customerLabel: "Synthetic", assignedUserId: "u1", assigneeName: "Office" };

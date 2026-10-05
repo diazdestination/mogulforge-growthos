@@ -9,6 +9,401 @@ import * as zod from 'zod';
 
 
 /**
+ * Read-only canonical customer records for current accepted staff. Company comes only from the session. No writes, financial totals, raw activity/mailbox contents or inferred parent links. Sending holds do not block historical reading. Section pages contain at most 25 valid rows in created-descending order, using company/customer/section-bound keyset cursors; not a frozen export.
+ * @summary Read a canonical customer header and available sections
+ */
+export const GetCustomerWorkspaceParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const getCustomerWorkspaceResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceResponseContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceResponseAvailableSectionsMax = 9;
+
+
+
+export const GetCustomerWorkspaceResponse = zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceResponseOrganizationIdRegExp),
+  "contact": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceResponseContactIdRegExp),
+  "firstName": zod.string(),
+  "lastName": zod.string().nullable(),
+  "email": zod.string().nullable(),
+  "phone": zod.string().nullable(),
+  "preferredContactMethod": zod.string().nullable(),
+  "doNotContact": zod.boolean(),
+  "doNotContactEmail": zod.boolean(),
+  "doNotContactSms": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "permissions": zod.object({
+  "canWrite": zod.boolean(),
+  "canReadInvoices": zod.boolean()
+}),
+  "availableSections": zod.array(zod.enum(['properties', 'appointments', 'services', 'leads', 'projects', 'estimates', 'invoices', 'tasks', 'activity'])).max(getCustomerWorkspaceResponseAvailableSectionsMax)
+})
+
+
+/**
+ * Read-only canonical customer records for current accepted staff. Company comes only from the session. No writes, financial totals, raw activity/mailbox contents or inferred parent links. Sending holds do not block historical reading. Section pages contain at most 25 valid rows in created-descending order, using company/customer/section-bound keyset cursors; not a frozen export.
+ * @summary Read one bounded canonical customer record section
+ */
+export const GetCustomerWorkspaceSectionParams = zod.object({
+  "id": zod.uuid(),
+  "section": zod.enum(['properties', 'appointments', 'services', 'leads', 'projects', 'estimates', 'invoices', 'tasks', 'activity'])
+})
+
+export const getCustomerWorkspaceSectionQueryCursorMax = 2048;
+
+
+export const getCustomerWorkspaceSectionQueryCursorRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+
+
+export const GetCustomerWorkspaceSectionQueryParams = zod.object({
+  "cursor": zod.coerce.string().min(1).max(getCustomerWorkspaceSectionQueryCursorMax).regex(getCustomerWorkspaceSectionQueryCursorRegExp).optional()
+})
+
+export const getCustomerWorkspaceSectionResponseOneOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseOneContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseOneNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseOneItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseOneItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseTwoOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseTwoContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseTwoNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseTwoItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseTwoItemsItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseTwoItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseTwoItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseTwoItemsItemOwnerIdMax = 200;
+
+export const getCustomerWorkspaceSectionResponseTwoItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseThreeOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseThreeItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeItemsItemOccurrenceIndexMin = 0;
+export const getCustomerWorkspaceSectionResponseThreeItemsItemOccurrenceIndexMax = 9007199254740991;
+
+export const getCustomerWorkspaceSectionResponseThreeItemsItemPredecessorObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeItemsItemTaskIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeItemsItemAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeItemsItemOwnerIdMax = 200;
+
+export const getCustomerWorkspaceSectionResponseThreeItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseFourOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFourContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFourNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseFourItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFourItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFourItemsItemOwnerIdMax = 200;
+
+export const getCustomerWorkspaceSectionResponseFourItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseFiveOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFiveContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFiveNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseFiveItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFiveItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFiveItemsItemEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFiveItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFiveItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseSixOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSixContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSixNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseSixItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSixItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSixItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSixItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseSevenOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseSevenItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenItemsItemProjectIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenItemsItemEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseEightOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseEightContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseEightNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseEightItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseEightItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseEightItemsItemOwnerIdMax = 200;
+
+export const getCustomerWorkspaceSectionResponseEightItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseNineOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseNineContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseNineNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseNineItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseNineItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseNineItemsMax = 25;
+
+
+
+export const GetCustomerWorkspaceSectionResponse = zod.union([zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseOneOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseOneContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseOneNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['properties']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseOneItemsItemIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable(),
+  "kind": zod.enum(['property']),
+  "createdAt": zod.coerce.date()
+})).max(getCustomerWorkspaceSectionResponseOneItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseTwoNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['appointments']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['appointment']),
+  "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']),
+  "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date(),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoItemsItemContactIdRegExp).nullable(),
+  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoItemsItemLeadIdRegExp).nullable(),
+  "property": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoItemsItemPropertyIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable()
+}).nullable(),
+  "owner": zod.object({
+  "id": zod.string().min(1).max(getCustomerWorkspaceSectionResponseTwoItemsItemOwnerIdMax),
+  "name": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseTwoItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseThreeNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['services']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['service']),
+  "serviceKind": zod.enum(['warranty_check', 'maintenance', 'service_plan']),
+  "equipmentLabel": zod.string(),
+  "status": zod.enum(['active', 'completed', 'cancelled']),
+  "dueAt": zod.coerce.date(),
+  "completedAt": zod.coerce.date().nullable(),
+  "coverageStartsOn": zod.coerce.date().nullable(),
+  "coverageEndsOn": zod.coerce.date().nullable(),
+  "occurrenceIndex": zod.int().min(getCustomerWorkspaceSectionResponseThreeItemsItemOccurrenceIndexMin).max(getCustomerWorkspaceSectionResponseThreeItemsItemOccurrenceIndexMax),
+  "predecessorObligationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemPredecessorObligationIdRegExp).nullable(),
+  "taskId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemTaskIdRegExp),
+  "appointmentId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemAppointmentIdRegExp).nullable(),
+  "property": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemPropertyIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable()
+}).nullable(),
+  "owner": zod.object({
+  "id": zod.string().min(1).max(getCustomerWorkspaceSectionResponseThreeItemsItemOwnerIdMax),
+  "name": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseThreeItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFourOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFourContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseFourNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['leads']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseFourItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['lead']),
+  "status": zod.enum(['new', 'ai_qualified', 'contact_attempted', 'inspection_scheduled', 'inspection_completed', 'estimate_preparing', 'estimate_sent', 'claim_pending', 'follow_up', 'won', 'production_scheduled', 'in_progress', 'final_walkthrough', 'completed', 'review_requested', 'nurture', 'lost']),
+  "urgency": zod.enum(['low', 'normal', 'high', 'emergency']),
+  "serviceType": zod.string().nullable(),
+  "property": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseFourItemsItemPropertyIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable()
+}).nullable(),
+  "owner": zod.object({
+  "id": zod.string().min(1).max(getCustomerWorkspaceSectionResponseFourItemsItemOwnerIdMax),
+  "name": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseFourItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseFiveNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['projects']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['project']),
+  "name": zod.string(),
+  "status": zod.enum(['scheduled', 'in_progress', 'on_hold', 'completed', 'cancelled']),
+  "scheduledStart": zod.coerce.date().nullable(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveItemsItemLeadIdRegExp),
+  "estimateId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveItemsItemEstimateIdRegExp).nullable(),
+  "property": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveItemsItemPropertyIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseFiveItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseSixNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['estimates']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['estimate']),
+  "title": zod.string(),
+  "status": zod.enum(['draft', 'sent', 'accepted', 'declined']),
+  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixItemsItemLeadIdRegExp),
+  "property": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixItemsItemPropertyIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseSixItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseSevenNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['invoices']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['invoice']),
+  "invoiceNumber": zod.string().nullable(),
+  "title": zod.string(),
+  "status": zod.enum(['draft', 'issued', 'void']),
+  "issuedAt": zod.coerce.date().nullable(),
+  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemLeadIdRegExp),
+  "projectId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemProjectIdRegExp).nullable(),
+  "estimateId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemEstimateIdRegExp).nullable(),
+  "property": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemPropertyIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseSevenItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseEightOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseEightContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseEightNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['tasks']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseEightItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['task']),
+  "title": zod.string(),
+  "status": zod.enum(['open', 'in_progress', 'done', 'cancelled']),
+  "priority": zod.enum(['low', 'normal', 'high', 'emergency']),
+  "dueAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseEightItemsItemLeadIdRegExp).nullable(),
+  "owner": zod.object({
+  "id": zod.string().min(1).max(getCustomerWorkspaceSectionResponseEightItemsItemOwnerIdMax),
+  "name": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseEightItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseNineOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseNineContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseNineNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['activity']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseNineItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['activity']),
+  "category": zod.enum(['note', 'lead', 'appointment', 'service', 'task', 'communication', 'invoice']),
+  "label": zod.enum(['Note recorded', 'Opportunity updated', 'Visit updated', 'Service updated', 'Task updated', 'Communication event recorded', 'Customer response recorded', 'Invoice updated']),
+  "occurredAt": zod.coerce.date(),
+  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseNineItemsItemLeadIdRegExp).nullable()
+})).max(getCustomerWorkspaceSectionResponseNineItemsMax)
+})])
+
+
+/**
  * Accepted staff session only; no API-key authority. Finite imported-source nurture requires separate source adoption, address-specific marketing permission, Microsoft sender/read grant, exact approval and explicit start. Maximum ten addresses, two fixed emails, at least 72 hours after actual predecessor acceptance and a fresh complete reply scan, expiring within fourteen days. Permanent ownership and unknown effects never permit replacement keys or automatic replay. Provider acceptance is not delivery, consent, customer confirmation or collected revenue.
  * @summary Find oldest bounded nurture attention, waiting work or history
  */
@@ -5355,6 +5750,56 @@ export const CreateAppointmentResponse = zod.object({
   "notes": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date().optional()
+})
+
+
+/**
+ * Read-only canonical customer records for current accepted staff. Company comes only from the session. No writes, financial totals, raw activity/mailbox contents or inferred parent links. Sending holds do not block historical reading. Section pages contain at most 25 valid rows in created-descending order, using company/customer/section-bound keyset cursors; not a frozen export.
+ * @summary Read one exact appointment outside schedule list filters
+ */
+export const GetCustomerWorkspaceAppointmentParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const getCustomerWorkspaceAppointmentResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceAppointmentResponseAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceAppointmentResponseAppointmentContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceAppointmentResponseAppointmentLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceAppointmentResponseAppointmentPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceAppointmentResponseAppointmentOwnerIdMax = 200;
+
+
+
+export const GetCustomerWorkspaceAppointmentResponse = zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceAppointmentResponseOrganizationIdRegExp),
+  "appointment": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceAppointmentResponseAppointmentIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['appointment']),
+  "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']),
+  "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date(),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceAppointmentResponseAppointmentContactIdRegExp).nullable(),
+  "leadId": zod.uuid().regex(getCustomerWorkspaceAppointmentResponseAppointmentLeadIdRegExp).nullable(),
+  "property": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceAppointmentResponseAppointmentPropertyIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable()
+}).nullable(),
+  "owner": zod.object({
+  "id": zod.string().min(1).max(getCustomerWorkspaceAppointmentResponseAppointmentOwnerIdMax),
+  "name": zod.string().nullable()
+}).nullable()
+}),
+  "permissions": zod.object({
+  "canWrite": zod.boolean()
+})
 })
 
 

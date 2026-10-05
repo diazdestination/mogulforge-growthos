@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useListLeads, type Lead } from '@workspace/api-client-react';
+import { getListLeadsQueryKey, useListLeads, type Lead } from '@workspace/api-client-react';
 import { Search } from 'lucide-react';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 
@@ -24,6 +24,7 @@ export default function LeadSelect({
   testId = 'lead-select',
   id,
   label = 'Lead',
+  queryScope,
 }: {
   value: string;
   onChange: (leadId: string) => void;
@@ -36,6 +37,8 @@ export default function LeadSelect({
   id?: string;
   /** Accessible name for the selection and its search input. */
   label?: string;
+  /** Isolate option caches when the current member/company authority changes. */
+  queryScope?: string;
 }) {
   const [search, setSearch] = useState('');
   // Remember the selected lead's label so it stays visible even when the
@@ -43,10 +46,11 @@ export default function LeadSelect({
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
 
-  const { data, isLoading } = useListLeads({
+  const params = {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     limit: MAX_LEAD_OPTIONS + 1,
-  });
+  };
+  const { data, isLoading } = useListLeads(params, queryScope ? { query: { queryKey: [...getListLeadsQueryKey(params), queryScope] } } : undefined);
 
   const { visibleLeads, hasMore } = useMemo(() => {
     const rows = data ?? [];

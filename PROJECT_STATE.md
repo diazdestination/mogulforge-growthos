@@ -1,5 +1,17 @@
 # GrowthOS project state
 
+## October 5 canonical customer workspace (current candidate)
+
+The usage interruption was resumed on October5. Base PR21/main d4b8c0a and
+exact-main CI37154526789 are complete. Bounded L7 customer work/history, exact
+appointment navigation and new-service property selection are implemented;
+see `reports/customer-workspace-integration-2026-10-05.md` and operator guide.
+No new schema (130 tables). Compatible synthetic recovery now proves47SELECT-only
+app reads. Three coordinated lanes have passed focused checks; root owns final
+candidate/main PostgreSQL CI and the release receipt. Do not treat earlier
+candidate labels below as the current status, or this slice as all L7/launch done.
+Hosted/provider/device/source-migration and both contractor workday gates remain.
+
 ## October 3 bounded source nurture (current candidate)
 
 Base L5 PR20/main110f145 and exact-main CI37148428665 passed. The owner-requested
