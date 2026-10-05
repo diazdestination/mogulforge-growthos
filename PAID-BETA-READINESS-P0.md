@@ -7,6 +7,14 @@
 
 ## Mission
 
+**October 5 bounded manual-appointment scope:** PR22/main6cbf0ae and exact-main
+CI37383108807 passed the full PostgreSQL16 gate. The owner-authorized follow-on
+is `reports/manual-appointment-property-contract-2026-10-05.md`: explicit new-
+visit property selection with retained parent locks, no historical relinking
+or new schema. This bounded continuation does not change hosted/provider,
+financial, customer-contact or contractor acceptance gates. Require its own
+fresh candidate/main checks before source release selection.
+
 **October 3 customer-workspace scope:** PR21/main d4b8c0a passed exact-main
 CI37154526789. The owner authorized the next fixed-checklist L7 slice under
 `reports/customer-workspace-contract-2026-10-03.md`: canonical customer history,

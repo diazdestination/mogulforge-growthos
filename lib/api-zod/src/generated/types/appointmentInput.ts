@@ -11,7 +11,8 @@ import type { AppointmentType } from './appointmentType';
 export interface AppointmentInput {
   leadId?: string;
   contactId?: string;
-  propertyId?: string;
+  /** @nullable */
+  propertyId?: string | null;
   assignedUserId?: string;
   type?: AppointmentType;
   status?: AppointmentStatus;

@@ -5726,7 +5726,7 @@ export const ListAppointmentsResponse = zod.array(ListAppointmentsResponseItem)
 export const CreateAppointmentBody = zod.object({
   "leadId": zod.uuid().optional(),
   "contactId": zod.uuid().optional(),
-  "propertyId": zod.uuid().optional(),
+  "propertyId": zod.uuid().nullish(),
   "assignedUserId": zod.string().optional(),
   "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']).optional(),
   "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']).optional(),

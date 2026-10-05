@@ -3,6 +3,7 @@ import { useListAppointments, useCreateAppointment, useUpdateAppointment, getLis
 import { useSearch } from 'wouter';
 import LeadSelect from '@/components/lead-select';
 import ContactSelect from '@/components/contact-select';
+import CustomerPropertySelect from '@/components/customer-property-select';
 import AppointmentLinkedCard from '@/components/appointment-linked-card';
 import { Loader2, Plus, Calendar, Clock, Edit, AlertTriangle, X } from 'lucide-react';
 import { getInspectionAvailabilityWarning } from '@workspace/inspection-availability';
@@ -220,6 +221,7 @@ function AppointmentsContent({ me, scopeKey }: { me: MemberProfile; scopeKey: st
         <ApptFormModal 
           appt={editingAppt} 
           scopeKey={scopeKey}
+          organizationId={me.organization!.id}
           onClose={() => { setIsFormOpen(false); setLinkedRevision(value => value + 1); }}
         />
       )}
@@ -227,12 +229,14 @@ function AppointmentsContent({ me, scopeKey }: { me: MemberProfile; scopeKey: st
   );
 }
 
-function ApptFormModal({ appt, onClose, scopeKey }: { appt?: any, onClose: () => void; scopeKey: string }) {
+function ApptFormModal({ appt, onClose, scopeKey, organizationId }: { appt?: any, onClose: () => void; scopeKey: string; organizationId: string }) {
   const panel = useRef<HTMLDivElement>(null);
+  const alive = useRef(true);
   useEffect(() => {
+    alive.current = true;
     const previous = document.activeElement as HTMLElement | null;
     panel.current?.querySelector<HTMLElement>('select, input, button')?.focus();
-    return () => previous?.focus();
+    return () => { alive.current = false; previous?.focus(); };
   }, []);
   const [type, setType] = useState<AppointmentType>(appt?.type || 'inspection');
   const [status, setStatus] = useState<AppointmentStatus>(appt?.status || 'scheduled');
@@ -243,6 +247,7 @@ function ApptFormModal({ appt, onClose, scopeKey }: { appt?: any, onClose: () =>
   const [notes, setNotes] = useState(appt?.notes || '');
   const [leadId, setLeadId] = useState(appt?.leadId || '');
   const [contactId, setContactId] = useState(appt?.contactId || '');
+  const [propertyId, setPropertyId] = useState('');
   const [assigneeId, setAssigneeId] = useState(appt?.assignedUserId || '');
   
   const { data: users } = useListUsers({ query: { queryKey: [...getListUsersQueryKey(), scopeKey] } });
@@ -263,7 +268,7 @@ function ApptFormModal({ appt, onClose, scopeKey }: { appt?: any, onClose: () =>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!start) return;
+    if (!start || isSubmitting) return;
     setSubmitError(null);
     if (end && new Date(end) <= new Date(start)) { setSubmitError('Set an end time after the start time.'); return; }
 
@@ -292,10 +297,12 @@ function ApptFormModal({ appt, onClose, scopeKey }: { appt?: any, onClose: () =>
     if (appt) {
       updateAppt.mutate({ id: appt.id, data }, {
         onSuccess: () => {
+          if (!alive.current) return;
           queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() });
           onClose();
         },
         onError: (error: any) => {
+          if (!alive.current) return;
           if (error?.status === 409) {
             setSubmitError(error?.data?.error || 'That inspection window is already fully booked. Pick another time.');
           } else {
@@ -304,12 +311,14 @@ function ApptFormModal({ appt, onClose, scopeKey }: { appt?: any, onClose: () =>
         }
       });
     } else {
-      createAppt.mutate({ data: { ...data, notes: notes || undefined, leadId: leadId || undefined, contactId: contactId || undefined, assignedUserId: assigneeId || undefined } }, {
+      createAppt.mutate({ data: { ...data, notes: notes || undefined, leadId: leadId || undefined, contactId: contactId || undefined, propertyId: propertyId || null, assignedUserId: assigneeId || undefined } }, {
         onSuccess: () => {
+          if (!alive.current) return;
           queryClient.invalidateQueries({ queryKey: getListAppointmentsQueryKey() });
           onClose();
         },
         onError: (error: any) => {
+          if (!alive.current) return;
           if (error?.status === 409) {
             setSubmitError(error?.data?.error || 'That inspection window is already fully booked. Pick another time.');
           } else {
@@ -384,13 +393,14 @@ function ApptFormModal({ appt, onClose, scopeKey }: { appt?: any, onClose: () =>
             </select>
           </div>
 
-          <div className="space-y-1.5"><label className="block text-sm font-medium">Customer<ContactSelect queryScope={scopeKey} value={contactId} onChange={setContactId} testId="appointment-contact" /></label><p className="text-sm text-slate-600 dark:text-slate-300">Choose a customer for a service visit. A related opportunity is optional.</p></div>
+          <div className="space-y-1.5"><label className="block text-sm font-medium">Customer<ContactSelect queryScope={scopeKey} value={contactId} onChange={id => { setContactId(id); setPropertyId(''); }} testId="appointment-contact" /></label><p className="text-sm text-slate-600 dark:text-slate-300">Choose a customer for a service visit. A related opportunity is optional.</p></div>
           <label className="block space-y-1.5">
             <span className="text-[10px] md:text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">Related Lead</span>
             <div className="shadow-sm rounded-xl overflow-hidden">
-               <LeadSelect queryScope={scopeKey} value={leadId} onChange={setLeadId} />
+               <LeadSelect queryScope={scopeKey} value={leadId} onChange={id => { setLeadId(id); setPropertyId(''); }} />
             </div>
           </label>
+          {!appt && <CustomerPropertySelect organizationId={organizationId} contactId={contactId} scopeKey={JSON.stringify([scopeKey, leadId])} value={propertyId} onChange={setPropertyId} purpose="appointment" disabled={isSubmitting} />}
           
           <div className="space-y-1.5">
             <label className="text-[10px] md:text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">Notes</label>

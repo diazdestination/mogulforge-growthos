@@ -1,5 +1,17 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## October 5 manual-appointment property continuation
+
+PR22/main6cbf0ae passed exact-main CI37383108807; its customer-workspace source
+release is complete. The owner-authorized bounded follow-on is frozen in
+`reports/manual-appointment-property-contract-2026-10-05.md`: explicit property
+choice for NEW manual appointments, coherent locked parents through native
+creation, unchanged historical visits/notes and focused UI/real-PG race tests.
+Use coordinated runtime, experience and companion agents; root owns integration
+and release. No new schema, equipment/checklist invention, guessed migration,
+hosted/provider activation or contractor cutover. Require fresh candidate/main
+gates for this slice; earlier active-wave headings below are historical.
+
 ## October 3 customer-workspace continuation
 
 The owner requested the next wave after PR21/main d4b8c0a and exact-main

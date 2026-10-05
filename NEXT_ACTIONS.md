@@ -1,15 +1,18 @@
 # Next acceptance work
 
-October5 active slice: bounded L7 customer workspace, after completed PR21/main
-d4b8c0a. Finish its exact candidate PostgreSQL CI, merge only the reviewed green
-head, and explicitly dispatch/verify exact merged-main CI. See
-`reports/customer-workspace-integration-2026-10-05.md`. Keep the130-table schema;
-do not apply any hosted changes. Compatible synthetic restore has47read-only app
-probes. Then continue the fixed launch list: actual required equipment/checklist,
-repeat-job and scheduling gaps, approved source-specific migration, remaining
-mailbox/reception/campaign scope and both company workday cards. Azure first
-sign-in and real provider/phone/hosted acceptance remain separate owner gates.
-Older candidate-pending entries below are historical.
+October5 active slice: explicit property selection for NEW manual appointments,
+after completed PR22/main6cbf0ae and exact-main CI37383108807. Follow the frozen
+`reports/manual-appointment-property-contract-2026-10-05.md`. Integrate coherent
+parent locks with the native appointment/reminder writer, preserve historical
+visits/notes, and verify focused UI plus real PostgreSQL race tests. Root owns
+fresh candidate/main release checks. Keep the130-table schema; do not apply
+hosted changes. Prior compatible synthetic recovery has47read-only app probes;
+recheck compatibility without treating it as newer hosted acceptance. Actual
+equipment/checklist, repeat-job and source-migration decisions need approved
+contractor examples/exports, not invented defaults. Remaining required mailbox,
+reception/campaign scope, Azure first sign-in, real providers/phones/Smart Sites,
+held-staging/recovery and both company workday cards remain separate. Older
+candidate-pending entries below are historical. No real sends, payments or cutover.
 
 Current bounded L6 source candidate:
 `reports/source-nurture-integration-2026-10-03.md`. Finish its exact PostgreSQL

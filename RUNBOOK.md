@@ -3,6 +3,14 @@
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 
+Active bounded manual-visit extension follows
+`reports/manual-appointment-property-contract-2026-10-05.md`. PR22 source release
+is complete at main6cbf0ae with exact-main CI37383108807. New manual property
+selection must stay optional/default unlinked and must not change historical
+visits or bypass native scheduling/reminder guards. Its own candidate/main
+checks and operator guide are required before selecting the next source release.
+No schema/provider/hosted activation or contractor cutover follows from this work.
+
 Current L7 customer work record: Customers & Jobs → Customers → Customer record.
 See `reports/customer-workspace-operator-guide-2026-10-05.md` and its integration
 report. Nine selected-section-only pages, exact appointment summary and explicit
