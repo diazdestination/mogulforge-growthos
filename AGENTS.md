@@ -1,5 +1,16 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## October 3 customer-workspace continuation
+
+The owner requested the next wave after PR21/main d4b8c0a and exact-main
+CI37154526789 passed. Current scope is the bounded L7 canonical customer work
+record in `reports/customer-workspace-contract-2026-10-03.md`: tenant/role-safe
+paged reads, exact work navigation and explicit property selection for new
+service work. Use coordinated runtime, experience and companion agents; root
+owns integration/release. No duplicate customer or invented acquisition lead,
+historical relinking, new equipment facts, hosted/provider activation or cutover.
+The fixed launch list and both contractor replacement cards remain open.
+
 ## October 3 bounded source-nurture continuation
 
 The owner requested the next wave after L5 PR20/main110f145 and exact-main

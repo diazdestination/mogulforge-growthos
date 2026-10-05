@@ -7,6 +7,14 @@
 
 ## Mission
 
+**October 3 customer-workspace scope:** PR21/main d4b8c0a passed exact-main
+CI37154526789. The owner authorized the next fixed-checklist L7 slice under
+`reports/customer-workspace-contract-2026-10-03.md`: canonical customer history,
+safe exact navigation and explicit property selection for new service work.
+No new schema is expected (130 tables); require fresh candidate/main CI,
+synthetic recovery and separate hosted/provider/company acceptance. This does
+not close all L7 or either replacement card, or alter any release/activation gate.
+
 **October 3 current standing-service scope:** PR19/mainf91e1c3 passed exact-main
 CI37134529680. The next authorized L5 candidate follows
 `reports/standing-service-contract-2026-10-03.md`: exact, finite, forward-only

@@ -201,6 +201,8 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /contacts": "crm.read",
   "POST /contacts": "crm.write",
   "GET /contacts/:id": "crm.read",
+  "GET /contacts/:id/workspace": "crm.read",
+  "GET /contacts/:id/workspace/:section": "crm.read",
   "PATCH /contacts/:id": "crm.write",
   "DELETE /contacts/:id": "crm.delete",
   "GET /properties": "crm.read",
@@ -259,6 +261,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "PATCH /tasks/:id": "crm.write",
   "DELETE /tasks/:id": "crm.delete",
   "GET /appointments": "crm.read",
+  "GET /appointments/:id": "crm.read",
   "POST /appointments": "crm.write",
   "PATCH /appointments/:id": "crm.write",
   // dashboard & audit

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearch } from 'wouter';
+import { Link, useSearch } from 'wouter';
 import { useGetMe, type MemberProfile } from '@workspace/api-client-react';
 import ContactSelect from '@/components/contact-select';
+import CustomerPropertySelect from '@/components/customer-property-select';
 import { canManageSettings, canWrite } from '@/lib/permissions';
 import { memberAuthorityScope } from '@/lib/member-authority-scope';
 import ServiceObligationEditor, { type ServiceRow } from '@/components/service-obligation-editor';
@@ -56,6 +57,7 @@ function ServiceDeskContent({ me, scopeKey }: { me: MemberProfile; scopeKey: str
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [contactId, setContactId] = useState('');
+  const [propertyId, setPropertyId] = useState('');
   const [kind, setKind] = useState<ServiceKind>('maintenance');
   const [equipmentLabel, setEquipmentLabel] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -135,11 +137,12 @@ function ServiceDeskContent({ me, scopeKey }: { me: MemberProfile; scopeKey: str
 
   async function addService(event: React.FormEvent) {
     event.preventDefault();
+    if (!editable || busy || !contactId) return;
     setBusy(true); setNotice('');
     try {
       await jsonRequest('/api/v1/service-obligations', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contactId, kind, equipmentLabel, dueDate, noticeDays }),
+        body: JSON.stringify({ contactId, propertyId: propertyId || null, kind, equipmentLabel, dueDate, noticeDays }),
       });
       if (!mounted.current) return;
       setNotice('Service date saved. A staff follow-up task is ready; no customer message was sent.');
@@ -220,6 +223,8 @@ function ServiceDeskContent({ me, scopeKey }: { me: MemberProfile; scopeKey: str
               <li key={obligation.id} className="rounded-lg border p-3 flex flex-wrap items-center justify-between gap-3 text-sm">
                 <div className="min-w-0 break-words">
                   <p className="font-medium">{contact.firstName} {contact.lastName ?? ''} · {kindNames[obligation.kind]} · {obligation.equipmentLabel}</p>
+                  <Link className="inline-flex min-h-11 items-center underline underline-offset-4" href={`/contacts/${encodeURIComponent(obligation.contactId)}?organizationId=${encodeURIComponent(me.organization!.id)}`}>Customer record</Link>
+                  {obligation.propertyId === null && <p className="text-muted-foreground">No property linked</p>}
                   <p className="text-muted-foreground">Due {obligation.dueAt.slice(0, 10)} · Staff task {task.status} · {obligation.source}</p>
                   {obligation.appointmentId && <p>Appointment linked</p>}
                   <p className="text-muted-foreground">{obligation.recurrence ? `Agreed every ${obligation.recurrence.intervalMonths} months` : 'One-time service'} · {task.assignedUserId ? 'Staff assigned' : 'Staff assignment needed'}</p>
@@ -255,8 +260,10 @@ function ServiceDeskContent({ me, scopeKey }: { me: MemberProfile; scopeKey: str
       </section>
       {editable && <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-2">
         <form onSubmit={addService} className="rounded-xl border bg-card p-4 space-y-3">
+          <fieldset disabled={busy} className="min-w-0 space-y-3">
           <h2 className="font-semibold">Add a service date</h2>
-          <label className="block text-sm">Customer<ContactSelect queryScope={scopeKey} value={contactId} onChange={setContactId} required testId="service-contact" /></label>
+          <label className="block text-sm">Customer<ContactSelect queryScope={scopeKey} value={contactId} onChange={id => { setContactId(id); setPropertyId(''); }} required testId="service-contact" /></label>
+          <CustomerPropertySelect organizationId={me.organization!.id} contactId={contactId} scopeKey={scopeKey} value={propertyId} onChange={setPropertyId} disabled={busy} />
           <label className="block text-sm">Service type<select className="block w-full rounded border p-2" value={kind} onChange={event => setKind(event.target.value as ServiceKind)}>
             {Object.entries(kindNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select></label>
@@ -264,6 +271,7 @@ function ServiceDeskContent({ me, scopeKey }: { me: MemberProfile; scopeKey: str
           <label className="block text-sm">Service due date<input required type="date" className="block w-full rounded border p-2" value={dueDate} onChange={event => setDueDate(event.target.value)} /></label>
           <label className="block text-sm">Staff follow-up lead time (days)<input required type="number" min={0} max={365} className="block w-full rounded border p-2" value={noticeDays} onChange={event => { setNoticeDays(Number(event.target.value)); setPreview(null); }} /></label>
           <button disabled={busy || !contactId} className="min-h-11 rounded bg-primary px-4 py-2 text-primary-foreground dark:text-slate-950 disabled:opacity-50">Save service date</button>
+          </fieldset>
         </form>
         <section className="rounded-xl border bg-card p-4 space-y-3" aria-label="Import customers">
           <h2 className="font-semibold">Import customer service dates</h2>

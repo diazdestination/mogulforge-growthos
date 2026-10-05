@@ -10,6 +10,7 @@ import { invoiceRecoveryIds } from './invoice-recovery-fixture.mjs';
 import { callieFixtureIds } from './callie-recovery-fixture.mjs';
 import { standingServiceIds } from './standing-service-recovery-fixture.mjs';
 import { sourceNurtureIds } from './source-nurture-recovery-fixture.mjs';
+import { customerWorkspaceIds } from './customer-workspace-fixture.mjs';
 
 const target = new URL(process.env.DATABASE_URL ?? '');
 if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.hostname !== '127.0.0.1' || target.pathname !== '/postgres' || process.env.CONTRACTOR_SYNTHETIC_RECOVERY !== 'true' || process.env.NODE_ENV !== 'test') throw new Error('contractor_probe_target_invalid');
@@ -54,6 +55,10 @@ try {
   const nurture = sourceNurtureIds('restore-drill-contractor-a'), foreignNurture = sourceNurtureIds('restore-drill-contractor-b');
   good.push('/api/v1/source-nurture?bucket=attention', '/api/v1/source-nurture?bucket=waiting', '/api/v1/source-nurture?bucket=history',
     `/api/v1/source-nurture/${nurture.plan}`, `/api/v1/leads/${nurture.lead}/mailbox-replies`);
+  const workspace = customerWorkspaceIds('restore-drill-contractor-a'), foreignWorkspace = customerWorkspaceIds('restore-drill-contractor-b');
+  const workspacePath = `/api/v1/contacts/${workspace.contact}/workspace`;
+  good.push(workspacePath, ...['properties','appointments','services','leads','projects','estimates','invoices','tasks','activity'].map(section => `${workspacePath}/${section}`),
+    `/api/v1/appointments/${workspace.appointments[0]}`);
   for (const route of good) {
     check = `read_${good.indexOf(route)}`;
     const response = await fetch(`${origin}${route}`, { headers });
@@ -61,6 +66,30 @@ try {
     assert.equal(databaseFailed, false);
   }
   const invoice = await (await fetch(`${origin}/api/v1/invoices/${native.invoice}`, { headers })).json();
+  check = 'canonical_customer_workspace';
+  const readWorkspace = async path => {
+    const response = await fetch(`${origin}${path}`, { headers });
+    assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'no-store');
+    return response.json();
+  };
+  const customer = await readWorkspace(workspacePath);
+  assert.equal(customer.contact.id, workspace.contact); assert.equal(customer.organizationId, id.organization);
+  assert.equal(customer.contact.doNotContact, true); assert.equal(customer.availableSections.length, 9);
+  const sites = await readWorkspace(`${workspacePath}/properties`);
+  assert.equal(sites.items.length, 25); assert.equal(sites.hasMore, true); assert.ok(sites.nextCursor);
+  const nextSites = await readWorkspace(`${workspacePath}/properties?cursor=${sites.nextCursor}`);
+  assert.equal(nextSites.items.length, 2); assert.equal(nextSites.hasMore, false);
+  assert.equal(new Set([...sites.items, ...nextSites.items].map(row => row.id)).size, 27);
+  const services = await readWorkspace(`${workspacePath}/services`);
+  assert.equal(services.items.length, 2); assert.equal(services.items.filter(row => row.property === null).length, 1);
+  assert.equal((await readWorkspace(`${workspacePath}/leads`)).items.length, 0);
+  const exactVisit = await readWorkspace(`/api/v1/appointments/${workspace.appointments[0]}`);
+  assert.equal(exactVisit.appointment.contactId, workspace.contact); assert.equal(exactVisit.appointment.id, workspace.appointments[0]);
+  assert.equal('notes' in exactVisit.appointment, false);
+  const history = await readWorkspace(`${workspacePath}/activity`);
+  assert.equal(history.items[0].label, 'Note recorded'); assert.equal(JSON.stringify(history).includes('PRIVATE SYNTHETIC'), false);
+  assert.equal((await fetch(`${origin}/api/v1/contacts/${foreignWorkspace.contact}/workspace`, { headers })).status, 404);
+  assert.equal((await fetch(`${origin}/api/v1/appointments/${foreignWorkspace.appointments[0]}`, { headers })).status, 404);
   check = 'nurture_stopped_unknown_original';
   const nurtureDetail = await (await fetch(`${origin}/api/v1/source-nurture/${nurture.plan}`, { headers })).json();
   assert.equal(nurtureDetail.state, 'stopped'); assert.equal(nurtureDetail.version, 4); assert.equal(nurtureDetail.readiness.ready, false);
@@ -157,7 +186,7 @@ try {
   assert.equal(mutation.status, 405); await mutation.arrayBuffer();
   const callieMutation = await fetch(`${origin}/api/v1/communications/callie/${callie.intake}/office-action`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: '{}' });
   assert.equal(callieMutation.status, 405); await callieMutation.arrayBuffer();
-  process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, tenantBoundariesVerified: true, readChecks: good.length, writeBlocked: true })}\n`);
+  process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, tenantBoundariesVerified: true, customerWorkspaceVerified: true, readChecks: good.length, writeBlocked: true })}\n`);
 } catch (error) {
   // No response body, URL with credentials, SQL parameters or record content.
   process.stderr.write(`CONTRACTOR_APP_PROBE_FAILED:${check}:${error.code === 'ERR_ASSERTION' ? 'assertion' : 'unavailable'}${Number.isInteger(error.actual) ? `:status_${error.actual}` : ''}\n`);

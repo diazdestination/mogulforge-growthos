@@ -10,6 +10,7 @@ import { AccessGate } from '@/components/access-gate';
 import { Loader2 } from 'lucide-react';
 import { CLIENT } from '@/lib/client.config';
 import { notificationLeadPath, notificationServicePath } from '@/lib/mobile-lead';
+import { appointmentWorkspaceLoginPath, customerWorkspaceLoginPath } from '@/lib/customer-workspace-links';
 import { NotificationLeadGuard, TenantMobileBoundary } from '@/components/mobile-lead-boundary';
 
 // Pages
@@ -23,6 +24,7 @@ import Insights from '@/pages/insights';
 import Reports from '@/pages/reports';
 import LeadDetail from '@/pages/lead-detail';
 import Contacts from '@/pages/contacts';
+import CustomerWorkspace from '@/pages/customer-workspace';
 import Properties from '@/pages/properties';
 import Estimates from '@/pages/estimates';
 import Projects from '@/pages/projects';
@@ -502,9 +504,11 @@ function Router() {
   }
 
   if (!isAuthenticated) {
-    // Keep an exact validated lead/service URL through a login reload. Do not accept a
-    // general returnTo redirect or save private lead data in browser storage.
-    if (notificationLeadPath(window.location.pathname + window.location.search, window.location.origin) || notificationServicePath(window.location.pathname + window.location.search, window.location.origin)) {
+    // Keep only fixed, validated, company-pinned record routes through a login reload.
+    // This does not accept a general returnTo or store private records in the browser.
+    const recordPath = window.location.pathname + window.location.search + window.location.hash;
+    if (notificationLeadPath(recordPath, window.location.origin) || notificationServicePath(recordPath, window.location.origin) ||
+        customerWorkspaceLoginPath(recordPath, window.location.origin) || appointmentWorkspaceLoginPath(recordPath, window.location.origin)) {
       return <LoginScreen initialMode="login" />;
     }
     return (
@@ -594,6 +598,7 @@ function AuthedApp({ authUserId }: { authUserId: string }) {
           <Route path="/insights" component={Insights} />
           <Route path="/reports" component={Reports} />
           <Route path="/leads/:id"><NotificationLeadGuard organizationId={session.organization.id}><LeadDetail /></NotificationLeadGuard></Route>
+          <Route path="/contacts/:id" component={CustomerWorkspace} />
           <Route path="/contacts" component={Contacts} />
           <Route path="/properties" component={Properties} />
           <Route path="/estimates" component={Estimates} />

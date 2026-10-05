@@ -10,3 +10,5 @@ export type { ListLeadMailboxRepliesParams } from "./generated/types/listLeadMai
 export { ListLeadMailboxRepliesParams as ListLeadMailboxRepliesPathParams } from "./generated/api";
 export type { ListServiceSmsRepliesParams } from "./generated/types/listServiceSmsRepliesParams";
 export { ListServiceSmsRepliesParams as ListServiceSmsRepliesPathParams } from "./generated/api";
+export type { GetCustomerWorkspaceSectionParams } from "./generated/types/getCustomerWorkspaceSectionParams";
+export { GetCustomerWorkspaceSectionParams as GetCustomerWorkspaceSectionPathParams } from "./generated/api";

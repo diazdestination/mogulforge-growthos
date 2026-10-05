@@ -7,6 +7,8 @@ import { ToastAction } from '@/components/ui/toast';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useListContacts, useCreateContact, useUpdateContact, useDeleteContact, getListContactsQueryKey, listContacts, deleteContact as deleteContactRequest, type Contact } from '@workspace/api-client-react';
 import { useToast, toast as globalToast } from '@/hooks/use-toast';
+import { Link } from 'wouter';
+import { customerWorkspacePath } from '@/lib/customer-workspace-links';
 
 export default function Contacts() {
   const [search, setSearch] = useState('');
@@ -70,7 +72,9 @@ export default function Contacts() {
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 300) loadMore();
   };
 
-  const { data: me } = useGetMe();
+  const { data: me, isError: memberError } = useGetMe();
+  const workRecordPath = (contact: Contact) => !memberError && me?.isActive && contact.organizationId === me.organization?.id
+    ? customerWorkspacePath(contact.id, contact.organizationId) : null;
   const queryClient = useQueryClient();
   
   const canEdit = canWrite(me?.role);
@@ -142,7 +146,7 @@ export default function Contacts() {
                              <User className="w-5 h-5" />
                           </div>
                           <div>
-                            <div className="font-bold text-foreground text-base">{contact.firstName} {contact.lastName}</div>
+                            <div className="font-bold text-foreground text-base">{workRecordPath(contact) ? <Link href={workRecordPath(contact)!} className="inline-flex min-h-11 items-center text-primary hover:underline" aria-label={`Open customer work record for ${contact.firstName} ${contact.lastName || ''}`}>{contact.firstName} {contact.lastName}</Link> : <>{contact.firstName} {contact.lastName}</>}</div>
                             <div className="text-[10px] text-muted-foreground font-mono opacity-60">ID: {contact.id.substring(0,8)}</div>
                           </div>
                        </div>
@@ -216,7 +220,7 @@ export default function Contacts() {
                               <User className="w-4 h-4" />
                            </div>
                            <div>
-                              <div className="font-bold text-foreground text-base">{contact.firstName} {contact.lastName}</div>
+                              <div className="font-bold text-foreground text-base">{workRecordPath(contact) ? <Link href={workRecordPath(contact)!} className="inline-flex min-h-11 items-center text-primary hover:underline" aria-label={`Open customer work record for ${contact.firstName} ${contact.lastName || ''}`}>{contact.firstName} {contact.lastName}</Link> : <>{contact.firstName} {contact.lastName}</>}</div>
                               <div className="text-[10px] text-muted-foreground font-mono mt-0.5 opacity-60">ID: {contact.id.substring(0,8)}</div>
                            </div>
                         </div>

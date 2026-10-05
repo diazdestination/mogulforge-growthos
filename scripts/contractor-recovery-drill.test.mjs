@@ -15,7 +15,8 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.tableCounts.staff_invitations).toBe(2);
   expect(result.tableCounts.invoices).toBe(4);
   expect(result.tableCounts.invoice_receipt_allocations).toBe(4);
-  expect(result.readChecks).toBe(36);
+  expect(result.readChecks).toBe(47);
+  expect(result.customerWorkspaceVerified).toBe(true);
   expect(result.invoiceRecoveryConstraintChecks).toBe(9);
   expect(result.invoiceUnknownChainPreserved).toBe(true);
   expect(result.typedNoDispatchProofPreserved).toBe(true);

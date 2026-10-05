@@ -19,6 +19,7 @@ import { invoiceRecoveryIds, seedInvoiceRecoveryFixture, assertInvoiceRecoveryFi
 import { callieFixtureIds, seedCallieRecoveryFixture, assertCallieRecoveryFixture, assertCallieRecoveryKeys } from './callie-recovery-fixture.mjs';
 import { standingServiceIds, seedStandingServiceRecovery, assertStandingServiceRecovery, assertStandingServiceKeys } from './standing-service-recovery-fixture.mjs';
 import { sourceNurtureIds, seedSourceNurtureRecovery, assertSourceNurtureRecovery, assertSourceNurtureKeys } from './source-nurture-recovery-fixture.mjs';
+import { seedCustomerWorkspaceFixture } from './customer-workspace-fixture.mjs';
 
 const requireApi = createRequire(new URL('../artifacts/api-server/package.json', import.meta.url));
 const requireDb = createRequire(new URL('../lib/db/package.json', import.meta.url));
@@ -137,6 +138,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       await seedSourceNurtureRecovery(source, slug);
       await assertSourceNurtureRecovery(source, slug);
       const id = fixtureIds(slug), emailSource = randomUUID();
+      await seedCustomerWorkspaceFixture(source, slug, { organization: id.organization, user: id.user, completed: true });
       await insert(source, 'billing_checkouts', { organization_id: id.organization, intent: 'initial', state: 'reconcile', price_id: 'price_synthetic', plan_id: 'beta', success_url: 'https://example.invalid/success', cancel_url: 'https://example.invalid/cancel', provider_configuration_hash: sha('synthetic-provider'), recovery_reason: 'synthetic_acknowledgement_unknown' });
       await insert(source, 'customer_lifecycle', { organization_id: id.organization, state: 'paused', version: 2, reason: 'Synthetic recovery hold', updated_by_user_id: id.user });
       await insert(source, 'staff_invitations', { organization_id: id.organization, request_id: randomUUID(), payload_hash: sha('synthetic-invitation'), pending_user_id: `invite:${randomUUID()}`, email: `${slug}.pending@example.invalid`, role: 'admin', delivery_state: 'unconfirmed', created_by_user_id: id.user, expires_at: new Date(Date.now() + 86_400_000) });

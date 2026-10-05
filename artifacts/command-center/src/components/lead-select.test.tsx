@@ -5,8 +5,9 @@
  * a selected lead's label stays visible even after the search results no
  * longer include it.
  */
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import LeadSelect from '@/components/lead-select';
 import { renderWithQuery } from '@/test/render';
@@ -49,6 +50,18 @@ function Harness(props: { initial?: string }) {
 describe('LeadSelect', () => {
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('isolates optional member-scoped options from a previous company cache', async () => {
+    let company = 'first';
+    mockApi('office', { handler: (_method, path) => path.endsWith('/leads') ? jsonResponse([{ ...sampleLead, id: `${company}-lead`, contactName: `${company} customer` }]) : undefined });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    const view = render(<QueryClientProvider client={client}><LeadSelect queryScope="member:first:office" value="" onChange={() => {}} /></QueryClientProvider>);
+    await screen.findByRole('option', { name: 'first customer' }); company = 'second';
+    view.rerender(<QueryClientProvider client={client}><LeadSelect queryScope="member:second:office" value="" onChange={() => {}} /></QueryClientProvider>);
+    expect(screen.queryByRole('option', { name: 'first customer' })).toBeNull();
+    await screen.findByRole('option', { name: 'second customer' }); expect(screen.queryByRole('option', { name: 'first customer' })).toBeNull();
   });
 
   it('debounces typing into a single server search request with search + limit params', async () => {

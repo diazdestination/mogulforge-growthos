@@ -49,6 +49,7 @@ import { ManualLeadSms } from '@/components/manual-lead-sms';
 import { NextBestActionCard } from '@/components/next-best-action-card';
 import { LeadMailboxRepliesPanel } from '@/components/lead-mailbox-replies-panel';
 import { memberAuthorityScope } from '@/lib/member-authority-scope';
+import { customerWorkspacePath } from '@/lib/customer-workspace-links';
 import { format } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -223,6 +224,9 @@ export default function LeadDetail() {
               <div className="bg-muted/20 border border-border/50 rounded-xl p-3 md:p-4 text-sm shadow-sm relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-bl-full -z-10" />
                 <div className="font-bold text-foreground text-base mb-2">{contact.firstName} {contact.lastName}</div>
+                {!memberError && me?.isActive && me.organization?.id === lead.organizationId && contact.organizationId === lead.organizationId && contact.id === lead.contactId && customerWorkspacePath(contact.id, lead.organizationId) && (
+                  <Link href={customerWorkspacePath(contact.id, lead.organizationId)!} className="mb-2 inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline">Open customer work record</Link>
+                )}
                 <div className="space-y-1.5">
                    {contact.email && <div className="text-muted-foreground flex items-center gap-2 font-medium"><MailIcon className="w-3.5 h-3.5" /> {contact.email}</div>}
                    {contact.phone && <div className="text-foreground font-mono flex items-center gap-2 font-bold"><PhoneIcon className="w-3.5 h-3.5 text-muted-foreground" /> {contact.phone}</div>}
