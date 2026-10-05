@@ -1,4 +1,4 @@
-import { appointmentsTable, crmTasksTable, db, invoicesTable, leadsTable, projectsTable, propertiesTable, usersTable } from "@workspace/db";
+import { appointmentsTable, contactsTable, crmTasksTable, db, invoicesTable, leadsTable, projectsTable, propertiesTable, usersTable } from "@workspace/db";
 import { and, eq, gt, inArray, lt, ne, or, sql } from "drizzle-orm";
 import { hasPermission } from "../lib/permissions";
 
@@ -9,17 +9,34 @@ export class ScheduleError extends Error {
   }
 }
 
-export async function appointmentCustomer(tx: ScheduleTransaction, org: string, refs: { leadId?: string | null; contactId?: string | null; propertyId?: string | null }) {
+/**
+ * Callers hold the company schedule lock first. Retain selected parent SHARE
+ * locks through native appointment/reminder insertion so ordinary CRM edits
+ * cannot invalidate a previously read relationship before the booking commits.
+ * New manual work checks the lead's complete property lineage; unchanged
+ * historical edits retain the older lead/property semantics, without relinking.
+ */
+export async function appointmentCustomer(tx: ScheduleTransaction, org: string, refs: { leadId?: string | null; contactId?: string | null; propertyId?: string | null }, options: { requireCoherentLeadProperty?: boolean } = {}) {
   let contactId = refs.contactId ?? null;
+  let leadPropertyId: string | null = null;
   if (refs.leadId) {
-    const [lead] = await tx.select({ contactId: leadsTable.contactId }).from(leadsTable).where(and(eq(leadsTable.organizationId, org), eq(leadsTable.id, refs.leadId)));
+    const [lead] = await tx.select({ contactId: leadsTable.contactId, propertyId: leadsTable.propertyId }).from(leadsTable).where(and(eq(leadsTable.organizationId, org), eq(leadsTable.id, refs.leadId))).for("share");
     if (!lead || (contactId && contactId !== lead.contactId)) throw new ScheduleError("customer_reference_mismatch", 400);
     contactId = lead.contactId;
+    if (options.requireCoherentLeadProperty) leadPropertyId = lead.propertyId;
   }
-  if (refs.propertyId) {
-    const [property] = await tx.select({ contactId: propertiesTable.contactId }).from(propertiesTable).where(and(eq(propertiesTable.organizationId, org), eq(propertiesTable.id, refs.propertyId)));
-    if (!property || !contactId || property.contactId !== contactId) throw new ScheduleError("customer_reference_mismatch", 400);
+  if (contactId) {
+    const [contact] = await tx.select({ id: contactsTable.id }).from(contactsTable).where(and(eq(contactsTable.organizationId, org), eq(contactsTable.id, contactId))).for("share");
+    if (!contact) throw new ScheduleError("customer_reference_mismatch", 400);
   }
+  if (leadPropertyId && refs.propertyId && leadPropertyId !== refs.propertyId) throw new ScheduleError("customer_reference_mismatch", 400);
+  const propertyIds = [...new Set([refs.propertyId, leadPropertyId].filter((id): id is string => !!id))].sort();
+  if (propertyIds.length) {
+    const properties = await tx.select({ id: propertiesTable.id, contactId: propertiesTable.contactId }).from(propertiesTable)
+      .where(and(eq(propertiesTable.organizationId, org), inArray(propertiesTable.id, propertyIds))).orderBy(propertiesTable.id).for("share");
+    if (!contactId || properties.length !== propertyIds.length || properties.some(property => property.contactId !== contactId)) throw new ScheduleError("customer_reference_mismatch", 400);
+  }
+  // Derive only the customer from an explicit lead, never its worksite.
   return contactId;
 }
 

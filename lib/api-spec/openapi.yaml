@@ -5995,7 +5995,7 @@ components:
           type: string
           format: uuid
         propertyId:
-          type: string
+          type: [string, "null"]
           format: uuid
         assignedUserId:
           type: string

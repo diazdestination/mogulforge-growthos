@@ -29,7 +29,17 @@ HOUSECALL-PRO-REPLACEMENT-GATE.md.
 | L10 | The selected release is recoverable, isolated and supportable | Exact-head/main CI, reviewed hosted schema, compatible restore, always-on scheduler, actionable failure alerts, two-company isolation, privacy/export/retention and AI cost/runtime acceptance. |
 | L11 | Selling/onboarding is repeatable and honestly valuable | GrowthOS subscription test flow (separate from contractor collection), explicit included scope/allowances, setup/support effort, complete company workday acceptance and one conservatively evidenced inquiry-to-outcome chain. |
 
-## Active implementation: bounded L7 customer workspace
+## Active implementation: NEW manual-appointment property selection
+
+PR22/main6cbf0ae and exact-main CI37383108807 passed. Continue only the frozen
+`reports/manual-appointment-property-contract-2026-10-05.md`: explicit optional
+customer property for NEW manual visits, coherent parent locks through native
+creation, preserved historical visits/notes and focused UI/real-PG barrier tests.
+This uses the existing130-table schema and needs its own candidate/main gate.
+Equipment/checklist, repeat-job and migration choices still need actual approved
+contractor inputs. L7/L8 and both complete replacement cards remain open.
+
+## Previous implementation: bounded L7 customer workspace
 
 Base PR21/main d4b8c0a and exact-main CI37154526789 passed. The resumed October5
 slice follows `reports/customer-workspace-contract-2026-10-03.md`; see its October5

@@ -1157,7 +1157,7 @@ export async function createAppointment(
     const end = input.scheduledEnd ?? new Date(input.scheduledStart.getTime() + 2 * 3_600_000);
     assertScheduleInterval(input.scheduledStart, end);
     if (active) await assertResourceWindow(tx, organizationId, staff, input.scheduledStart, end);
-    const contactId = await appointmentCustomer(tx, organizationId, input);
+    const contactId = await appointmentCustomer(tx, organizationId, input, { requireCoherentLeadProperty: true });
     const values = { ...input, organizationId, contactId, scheduledEnd: end };
     const row = (input.type ?? "inspection") === "inspection" && active
       ? await insertInspectionInTransaction(tx, values)

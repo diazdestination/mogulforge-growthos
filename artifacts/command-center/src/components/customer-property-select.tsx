@@ -8,6 +8,7 @@ type Props = {
   value: string;
   onChange: (propertyId: string) => void;
   disabled?: boolean;
+  purpose?: 'service' | 'appointment';
 };
 
 /** This picker only links new work. A single returned address is never auto-selected. */
@@ -15,7 +16,7 @@ export default function CustomerPropertySelect(props: Props) {
   return <PropertyPicker key={`${props.scopeKey}:${props.organizationId}:${props.contactId}`} {...props} />;
 }
 
-function PropertyPicker({ organizationId, contactId, value, onChange, disabled }: Props) {
+function PropertyPicker({ organizationId, contactId, value, onChange, disabled, purpose = 'service' }: Props) {
   const [rows, setRows] = useState<CustomerWorkspaceProperty[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,13 +61,13 @@ function PropertyPicker({ organizationId, contactId, value, onChange, disabled }
 
   const selected = rows.some(row => row.id === value) ? value : '';
   return <div className="min-w-0 space-y-2 text-sm">
-    <label className="block min-w-0">Property for this new service
+    <label className="block min-w-0">Property for this new {purpose}
       <select aria-describedby={helpId} className="block min-h-11 w-full min-w-0 max-w-full rounded-lg border bg-background p-2" value={selected} disabled={disabled || !contextValid || loading || failed} onChange={event => onChange(rows.some(row => row.id === event.target.value) ? event.target.value : '')}>
         <option value="">No property linked</option>
         {rows.map(row => <option key={row.id} value={row.id}>{[row.addressLine1, row.addressLine2, row.city, row.state, row.postalCode].filter(Boolean).join(', ')}</option>)}
       </select>
     </label>
-    <p id={helpId} className="text-muted-foreground">Optional. Choose a property only for this new service record. Existing service history is not changed.</p>
+    <p id={helpId} className="text-muted-foreground">{purpose === 'appointment' ? 'Optional. Choose a property only for this new appointment. Existing visits and their notes are not changed.' : 'Optional. Choose a property only for this new service record. Existing service history is not changed.'}</p>
     {!contextValid && <p className="text-muted-foreground">Choose a customer to check their linked properties.</p>}
     {loading && <p role="status">Checking customer properties…</p>}
     {failed && <div role="alert"><p>Customer properties could not be verified. No property is selected; this is not an empty-property result.</p><button type="button" disabled={disabled} className="min-h-11 underline" onClick={() => void load()}>Retry customer properties</button></div>}

@@ -1,5 +1,30 @@
 # GrowthOS project state
 
+## October 5 manual appointment property selection (active bounded slice)
+
+PR22 customer workspace is merged at6cbf0ae93f4daf9d0a3f7e8b932d959b65f2870b;
+candidate CI37366497034 attempt3 and exact-main CI37383108807 both passed.
+Each gate passed3668recursive tests/15existing skips plus26adapter tests, actual
+PostgreSQL16 writer barriers, types/builds/Docker parity and cleanup. The accepted
+tracked tree is e2fe11ead39ec84935d7a8308f79165c50af01fd. This closes that source
+release only, not hosted/provider/device/company acceptance.
+
+The approved follow-on contract is
+`reports/manual-appointment-property-contract-2026-10-05.md`: NEW manual visits
+get an explicit optional paged property choice and coherent locked parents
+through native creation. Historical visits/notes remain untouched. Runtime,
+experience and companion lanes are coordinated; root owns integration/release.
+No new schema, equipment/checklist definitions or guessed migration mappings.
+Require fresh candidate/main evidence for this slice. Older candidate labels
+below are historical; the fixed launch list and both company cards remain open.
+
+Implementation and independent review are complete; see
+`reports/manual-appointment-property-integration-2026-10-05.md`. Pre-commit proof:
+120 focused runtime passes/6 explicit PG skips, full UI795/795, types/builds,
+synthetic compatible recovery and built desktop/mobile save/readback passed.
+Actual PostgreSQL barriers and fresh candidate/exact-main CI remain required;
+use the private release receipt for pinned identities and final release status.
+
 ## October 5 canonical customer workspace (current candidate)
 
 The usage interruption was resumed on October5. Base PR21/main d4b8c0a and
