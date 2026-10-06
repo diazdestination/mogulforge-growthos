@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { canManageSettings, canWrite } from "@/lib/permissions";
 import { BieEmailReviewSummary, preparedBieEmail } from "./bie-email-review";
+import { customerWorkspacePath } from '@/lib/customer-workspace-links';
 
 export async function revenueRequest<T>(
   path: string,
@@ -128,6 +129,7 @@ interface Room {
   }[];
 }
 interface Ledger {
+  sourceBreakdown?: { source: 'lead' | 'customer_work'; entryCount: number; netReceiptsCents: number; netDirectCostsCents: number }[];
   period: "all_time" | { startAt: string; endAt: string; timeZone: "UTC" };
   undatedAcceptedEstimateCount: number;
   undatedCompletedProjectCount: number;
@@ -143,7 +145,11 @@ interface Ledger {
   boundary: string;
   entries: {
     id: string;
-    leadId: string;
+    organizationId?: string;
+    leadId: string | null;
+    customerWorkId?: string | null;
+    contactId?: string | null;
+    refundOfValueEntryId?: string | null;
     kind: string;
     amountCents: number;
     sourceReference: string;
@@ -1332,6 +1338,7 @@ export function ValueLedger({
         />
       </div>
       <Note>{data.boundary}</Note>
+      {data.sourceBreakdown && <section aria-label="Recorded value by work source" className="grid gap-3 sm:grid-cols-2">{data.sourceBreakdown.map(row => <div key={row.source} className="rounded-lg border p-3 text-sm"><h4 className="font-semibold">{row.source === 'customer_work' ? 'Existing-customer work' : 'Acquisition opportunities'}</h4><p>{row.entryCount} recorded entries · {money(row.netReceiptsCents)} net receipts · {money(row.netDirectCostsCents)} net direct costs</p></div>)}<p className="text-xs text-muted-foreground sm:col-span-2">Returning work is not new acquisition or recovered revenue. These are staff-recorded source totals, not causal ROI.</p></section>}
       {period &&
         ((data.undatedAcceptedEstimateCount ?? 0) > 0 ||
           (data.undatedCompletedProjectCount ?? 0) > 0) && (
@@ -1476,12 +1483,14 @@ export function ValueLedger({
             className="flex flex-wrap justify-between gap-2 rounded-lg border p-3 text-sm"
           >
             <div className="min-w-0 max-w-full">
-              <Link
+              {e.leadId ? <Link
                 className="block break-words text-primary hover:underline"
                 href={`/leads/${e.leadId}`}
               >
                 {e.sourceReference}
-              </Link>
+              </Link> : e.contactId && e.organizationId && customerWorkspacePath(e.contactId, e.organizationId, 'invoices') ? <Link className="block break-words text-primary hover:underline" href={customerWorkspacePath(e.contactId, e.organizationId, 'invoices')!}>{e.sourceReference}</Link> : <span className="block break-words">{e.sourceReference}</span>}
+              {e.customerWorkId && <p className="break-all text-xs text-muted-foreground">Existing-customer work: {e.customerWorkId}</p>}
+              {e.refundOfValueEntryId && <p className="break-all text-xs text-muted-foreground">External refund correction of receipt {e.refundOfValueEntryId}; no money moved.</p>}
               <p className="text-xs text-muted-foreground">
                 {e.kind.replaceAll("_", " ")} ·{" "}
                 {new Date(e.occurredAt).toLocaleDateString("en-US", {

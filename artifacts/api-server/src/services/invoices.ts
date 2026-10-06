@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   auditEventsTable,
   activitiesTable,
   contactsTable,
+  customerWorkRootsTable,
   crmTasksTable,
   db,
   estimatesTable,
@@ -15,9 +16,12 @@ import {
   projectsTable,
   usersTable,
   valueEntriesTable as entries,
+  type UserRole,
 } from "@workspace/db";
 import { hasPermission } from "../lib/permissions";
 import { lockContractorSchedule } from "./contractor-scheduling";
+import { assertCustomerWorkActive, assertCustomerWorkReader, createCustomerWorkRoot, customerWorkActor, customerWorkHash, lockCustomerWork, readNativeWorkLineage } from "./customer-work-lineage";
+import { CustomerWorkError } from "./returning-customer-contract";
 import {
   createInvoiceSchema,
   invoiceAllocationSchema,
@@ -25,6 +29,7 @@ import {
   InvoiceError,
   invoiceListSchema,
   invoicePaymentSchema,
+  invoiceRefundSchema,
   issueInvoiceSchema,
   reverseInvoiceAllocationSchema,
   updateInvoiceSchema,
@@ -37,6 +42,7 @@ import {
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Reader = Tx | typeof db;
+export type InvoiceReader = Reader;
 type Invoice = typeof invoices.$inferSelect;
 type Allocation = typeof allocations.$inferSelect;
 const fingerprint = (value: unknown) =>
@@ -63,6 +69,7 @@ async function actor(
   org: string,
   userId: string,
   manage: boolean,
+  effectiveRole?: UserRole,
 ) {
   const query = reader
     .select({ id: usersTable.id, role: usersTable.role })
@@ -77,7 +84,8 @@ async function actor(
   const [user] = await (manage ? query.for("share") : query);
   if (
     !user ||
-    !hasPermission(user.role, manage ? "invoices.manage" : "invoices.read")
+    !hasPermission(user.role, manage ? "invoices.manage" : "invoices.read") ||
+    !hasPermission(effectiveRole ?? user!.role, manage ? "invoices.manage" : "invoices.read")
   ) {
     throw new InvoiceError(
       403,
@@ -100,32 +108,26 @@ async function related(
   reader: Reader,
   org: string,
   refs: {
-    leadId: string;
+    leadId: string | null;
+    customerWorkId?: string | null;
     projectId?: string | null;
     estimateId?: string | null;
   },
   creating = false,
+  locked = false,
 ) {
-  const [lead] = await reader
-    .select({ id: leadsTable.id, contactId: leadsTable.contactId })
-    .from(leadsTable)
-    .where(
-      and(eq(leadsTable.id, refs.leadId), eq(leadsTable.organizationId, org)),
-    );
-  if (!lead) return absent();
-  const [contact] = await reader
-    .select({ id: contactsTable.id })
-    .from(contactsTable)
-    .where(
-      and(
-        eq(contactsTable.id, lead.contactId),
-        eq(contactsTable.organizationId, org),
-      ),
-    );
-  if (!contact) return absent();
+  const lineage = await readNativeWorkLineage(reader,org,{leadId:refs.leadId,customerWorkId:refs.customerWorkId ?? null},locked).catch(error=>{
+    // Keep the established invoice boundary opaque for unavailable/mismatched
+    // parents; a native helper's internal code is not a new legacy API result.
+    if (error instanceof CustomerWorkError && ["customer_work_not_found","customer_work_parent_unavailable","customer_work_parent_mismatch","customer_work_scope_invalid"].includes(error.code)) return absent();
+    throw error;
+  });
+  const lead = lineage.lead;
+  let project: typeof projectsTable.$inferSelect | null = null;
+  let estimate: typeof estimatesTable.$inferSelect | null = null;
   let estimateId = refs.estimateId ?? null;
   if (refs.projectId) {
-    const [project] = await reader
+    const pq = reader
       .select()
       .from(projectsTable)
       .where(
@@ -134,19 +136,24 @@ async function related(
           eq(projectsTable.organizationId, org),
         ),
       );
-    if (!project || project.leadId !== lead.id) return absent();
+    const [selected] = await (locked ? pq.for("share") : pq);
+    if (!selected || selected.leadId !== refs.leadId || selected.customerWorkId !== (refs.customerWorkId ?? null)) return absent();
+    project = selected;
     if (
-      creating &&
+      (creating || refs.customerWorkId) &&
       estimateId &&
       project.estimateId &&
       estimateId !== project.estimateId
     )
       return absent();
-    if (creating) estimateId ??= project.estimateId;
+    // Returning lineage includes the project's populated estimate even when an
+    // older/manual native row omitted invoice.estimateId. Read its exact parent
+    // as evidence; never rewrite the invoice's stored linkage or legacy hash.
+    if (creating || refs.customerWorkId) estimateId ??= project.estimateId;
   }
   if (estimateId) {
-    const [estimate] = await reader
-      .select({ id: estimatesTable.id, leadId: estimatesTable.leadId })
+    const eqry = reader
+      .select()
       .from(estimatesTable)
       .where(
         and(
@@ -154,9 +161,11 @@ async function related(
           eq(estimatesTable.organizationId, org),
         ),
       );
-    if (!estimate || estimate.leadId !== lead.id) return absent();
+    const [selected] = await (locked ? eqry.for("share") : eqry);
+    if (!selected || selected.leadId !== refs.leadId || selected.customerWorkId !== (refs.customerWorkId ?? null)) return absent();
+    estimate = selected;
   }
-  return { lead, estimateId };
+  return { lead, estimateId, lineage, project, estimate };
 }
 async function load(
   reader: Reader,
@@ -170,7 +179,7 @@ async function load(
     .where(and(eq(invoices.id, id), eq(invoices.organizationId, org)));
   const [row] = await (locked ? query.for("update") : query);
   if (!row) return absent();
-  await related(reader, org, row);
+  await related(reader, org, row, false, locked);
   checkedDocument(row);
   return row;
 }
@@ -202,14 +211,22 @@ function checkedDocument(row: Invoice) {
 }
 
 /** Read every related cash record needed for arithmetic; caps fail, never truncate totals. */
-async function financial(reader: Reader, org: string, leadId: string) {
+type MoneyScope = {leadId:string|null;customerWorkId:string|null};
+function moneyScope(value: string | MoneyScope): MoneyScope {
+  const scope = typeof value === "string" ? {leadId:value,customerWorkId:null} : value;
+  if ((scope.leadId === null) === (scope.customerWorkId === null)) throw unavailable();
+  return scope;
+}
+function sameScope(a: MoneyScope,b: MoneyScope) {return a.leadId===b.leadId && a.customerWorkId===b.customerWorkId;}
+async function financial(reader: Reader, org: string, input: string | MoneyScope) {
+  const scope=moneyScope(input);
   const values = await reader
     .select()
     .from(entries)
     .where(
       and(
         eq(entries.organizationId, org),
-        eq(entries.leadId, leadId),
+        scope.customerWorkId ? and(eq(entries.customerWorkId,scope.customerWorkId),isNull(entries.leadId)) : and(eq(entries.leadId,scope.leadId!),isNull(entries.customerWorkId)),
         inArray(entries.kind, ["payment", "refund"]),
       ),
     )
@@ -222,6 +239,7 @@ async function financial(reader: Reader, org: string, leadId: string) {
         id: invoices.id,
         organizationId: invoices.organizationId,
         leadId: invoices.leadId,
+        customerWorkId: invoices.customerWorkId,
       },
     })
     .from(allocations)
@@ -229,7 +247,7 @@ async function financial(reader: Reader, org: string, leadId: string) {
     .where(
       or(
         and(
-          eq(invoices.leadId, leadId),
+          scope.customerWorkId ? and(eq(invoices.customerWorkId,scope.customerWorkId),isNull(invoices.leadId)) : and(eq(invoices.leadId,scope.leadId!),isNull(invoices.customerWorkId)),
           or(
             eq(allocations.organizationId, org),
             eq(invoices.organizationId, org),
@@ -262,7 +280,7 @@ async function financial(reader: Reader, org: string, leadId: string) {
     const value = valueMap.get(a.valueEntryId);
     if (
       owner.organizationId !== org ||
-      owner.leadId !== leadId ||
+      !sameScope(owner,scope) ||
       a.organizationId !== org ||
       !value ||
       !Number.isSafeInteger(value.amountCents) ||
@@ -294,6 +312,26 @@ async function financial(reader: Reader, org: string, leadId: string) {
   for (const [id, amount] of used)
     if (amount > valueMap.get(id)!.amountCents || !Number.isSafeInteger(amount))
       throw unavailable();
+  if (scope.customerWorkId) {
+    const refunded = new Map<string, number>();
+    for (const value of values) {
+      if (!sameScope(value,scope)) throw unavailable();
+      if (value.kind === "payment") {
+        if (value.refundOfValueEntryId !== null) throw unavailable();
+        continue;
+      }
+      const original = valueMap.get(value.refundOfValueEntryId ?? "");
+      if (!original || original.kind !== "payment" || original.id === value.id || value.occurredAt < original.occurredAt) throw unavailable();
+      refunded.set(original.id,(refunded.get(original.id) ?? 0)+value.amountCents);
+    }
+    for (const [id,amount] of refunded) if (!Number.isSafeInteger(amount) || amount > valueMap.get(id)!.amountCents) throw unavailable();
+    for (const a of active.filter(a=>a.kind === "refund")) {
+      const originalPaymentId=valueMap.get(a.valueEntryId)!.refundOfValueEntryId!;
+      const paid=active.filter(p=>p.invoiceId===a.invoiceId && p.kind==="payment" && p.valueEntryId===originalPaymentId).reduce((s,p)=>s+p.amountCents,0);
+      const returned=active.filter(r=>r.invoiceId===a.invoiceId && r.kind==="refund" && valueMap.get(r.valueEntryId)!.refundOfValueEntryId===originalPaymentId).reduce((s,r)=>s+r.amountCents,0);
+      if (returned>paid) throw unavailable();
+    }
+  }
   const unallocatedRefundCents = values
     .filter((v) => v.kind === "refund")
     .reduce((sum, v) => sum + v.amountCents - (used.get(v.id) ?? 0), 0);
@@ -350,11 +388,16 @@ function money(row: Invoice, data: Financial) {
     unallocatedRefundCents: data.unallocatedRefundCents,
   };
 }
-function summary(row: Invoice, data: Financial): InvoiceSummary {
+function summary(row: Invoice, data: Financial, lineage: Awaited<ReturnType<typeof readNativeWorkLineage>>): InvoiceSummary {
   const doc = checkedDocument(row);
   return {
     id: row.id,
+    organizationId: row.organizationId,
     leadId: row.leadId,
+    customerWorkId: row.customerWorkId,
+    contactId: lineage.contact.id,
+    propertyId: lineage.property?.id ?? null,
+    sourceKind: lineage.kind,
     projectId: row.projectId,
     estimateId: row.estimateId,
     invoiceNumber: row.invoiceNumber,
@@ -384,7 +427,8 @@ async function detail(
   org: string,
   row: Invoice,
 ): Promise<InvoiceDetail> {
-  const data = await financial(reader, org, row.leadId);
+  const data = await financial(reader, org, row);
+  const {lineage} = await related(reader,org,row);
   const history = await reader
     .select()
     .from(operations)
@@ -398,7 +442,7 @@ async function detail(
     (v) => v.amountCents > (data.used.get(v.id) ?? 0),
   );
   return {
-    ...summary(row, data),
+    ...summary(row, data, lineage),
     document: row.issuedDocument ?? row.draftDocument,
     allocations: data.applied
       .filter((a) => a.invoiceId === row.id && a.kind !== "reversal")
@@ -408,6 +452,7 @@ async function detail(
         return {
           id: a.id,
           valueEntryId: value.id,
+          refundOfValueEntryId: value.refundOfValueEntryId,
           kind: a.kind as "payment" | "refund",
           sourceReference: value.sourceReference,
           amountCents: a.amountCents,
@@ -419,6 +464,7 @@ async function detail(
       }),
     availableValueEntries: available.slice(0, 50).map((v) => ({
       id: v.id,
+      refundOfValueEntryId: v.refundOfValueEntryId,
       kind: v.kind as "payment" | "refund",
       sourceReference: v.sourceReference,
       amountCents: v.amountCents,
@@ -439,17 +485,20 @@ export async function listInvoices(
   org: string,
   userId: string,
   raw: unknown,
+  effectiveRole?: UserRole,
 ): Promise<InvoiceList> {
   const filter = invoiceListSchema.parse(raw);
   return db.transaction(
     async (tx) => {
       await budget(tx);
-      await actor(tx, org, userId, false);
+      await actor(tx, org, userId, false,effectiveRole);
       const where = and(
         eq(invoices.organizationId, org),
         filter.status ? eq(invoices.status, filter.status) : undefined,
         filter.leadId ? eq(invoices.leadId, filter.leadId) : undefined,
         filter.projectId ? eq(invoices.projectId, filter.projectId) : undefined,
+        filter.customerWorkId ? eq(invoices.customerWorkId,filter.customerWorkId) : undefined,
+        filter.contactId ? sql`((exists(select 1 from ${customerWorkRootsTable} r where r.organization_id=${org} and r.id=${invoices.customerWorkId} and r.contact_id=${filter.contactId})) or (exists(select 1 from ${leadsTable} l where l.organization_id=${org} and l.id=${invoices.leadId} and l.contact_id=${filter.contactId})))` : undefined,
       );
       const [count] = await tx
         .select({ total: sql<number>`count(*)::int` })
@@ -465,10 +514,11 @@ export async function listInvoices(
       const cache = new Map<string, Financial>();
       const items: InvoiceSummary[] = [];
       for (const row of rows) {
-        await related(tx, org, row);
-        if (!cache.has(row.leadId))
-          cache.set(row.leadId, await financial(tx, org, row.leadId));
-        items.push(summary(row, cache.get(row.leadId)!));
+        const {lineage}=await related(tx, org, row);
+        if (row.customerWorkId) await customerWorkActor(tx,org,{userId,effectiveRole},"invoices.read");
+        const key=row.customerWorkId ? `work:${row.customerWorkId}` : `lead:${row.leadId}`;
+        if (!cache.has(key)) cache.set(key,await financial(tx,org,row));
+        items.push(summary(row,cache.get(key)!,lineage));
       }
       return { items, total: count!.total, page: filter.page, pageSize: 25 };
     },
@@ -479,15 +529,41 @@ export async function getInvoice(
   org: string,
   userId: string,
   id: string,
+  effectiveRole?: UserRole,
 ): Promise<InvoiceDetail> {
   return db.transaction(
     async (tx) => {
       await budget(tx);
-      await actor(tx, org, userId, false);
-      return detail(tx, org, await load(tx, org, id));
+      return readInvoiceDetail(tx,org,userId,id,{effectiveRole});
     },
     { isolationLevel: "repeatable read", accessMode: "read only" },
   );
+}
+
+/** No nested transaction/pool read: the caller retains its own exact admission locks. */
+export async function readInvoiceDetail(reader:Reader,org:string,userId:string,id:string,options:{effectiveRole?:UserRole;lockRows?:boolean}={}) {
+  const locked=options.lockRows === true;
+  assertCustomerWorkReader(reader,locked);
+  await actor(reader,org,userId,false,options.effectiveRole);
+  const row=await load(reader,org,id,locked);
+  if (row.customerWorkId) await customerWorkActor(reader,org,{userId,effectiveRole:options.effectiveRole},"invoices.read",locked);
+  return detail(reader,org,row);
+}
+
+/** Returning-only delivery authority. V2 callers continue constructing their literal legacy snapshot. */
+export async function readReturningInvoiceLineage(reader:Reader,org:string,invoiceId:string,options:{actorUserId:string;effectiveRole?:UserRole;lockRows?:boolean;requireIssued?:boolean}) {
+  const locked=options.lockRows===true;
+  assertCustomerWorkReader(reader,locked);
+  await customerWorkActor(reader,org,{userId:options.actorUserId,effectiveRole:options.effectiveRole},"invoices.manage",locked);
+  const row=await load(reader,org,invoiceId,locked);
+  const parents=await related(reader,org,row,false,locked);
+  if (parents.lineage.kind!=="customer_work") return absent();
+  if (options.requireIssued!==false && row.status!=="issued") return conflict("invoice_transition_unavailable","Only a current issued invoice can be reviewed for email.");
+  const {root,contact,property}=parents.lineage;
+  // Include semantic values, not only timestamps. Ordinary same-millisecond edits
+  // invalidate a reviewed recipient/address/native parent without rewriting issue history.
+  const parentEvidence={root,contact,property,project:parents.project,estimate:parents.estimate};
+  return {invoice:await detail(reader,org,row),root,contact,property,parentEvidence,sourceSha256:customerWorkHash(parentEvidence)};
 }
 
 async function replay(
@@ -495,6 +571,8 @@ async function replay(
   org: string,
   requestId: string,
   hash: string,
+  userId?: string,
+  effectiveRole?: UserRole,
 ): Promise<InvoiceMutation | null> {
   const [prior] = await tx
     .select()
@@ -511,8 +589,13 @@ async function replay(
       "invoice_request_conflict",
       "This request identity already records a different invoice action. Review the saved result before changing it.",
     );
+  const row=await load(tx,org,prior.invoiceId);
+  if (row.customerWorkId) {
+    if (!userId || prior.actorUserId!==userId) return conflict("invoice_request_conflict","The original request belongs to a different staff action.");
+    await customerWorkActor(tx,org,{userId,effectiveRole},"invoices.manage",true);
+  }
   return {
-    invoice: await detail(tx, org, await load(tx, org, prior.invoiceId)),
+    invoice: await detail(tx, org, row),
     duplicate: true,
   };
 }
@@ -557,6 +640,7 @@ async function event(
   await tx.insert(activitiesTable).values({
     organizationId: org,
     leadId: row.leadId,
+    contactId: row.customerWorkId ? (await related(tx,org,row)).lineage.contact.id : null,
     actorUserId: userId,
     type: "invoice_event",
     title: `Invoice ${action.replaceAll("_", " ")}`,
@@ -565,6 +649,7 @@ async function event(
       version: row.version,
       invoiceNumber: row.invoiceNumber,
       providerEffect: false,
+      ...(row.customerWorkId ? {customerWorkId:row.customerWorkId} : {}),
     },
   });
 }
@@ -606,15 +691,20 @@ async function mutate(
     reason?: string | null;
     resultId?: string | null;
   }>,
+  effectiveRole?: UserRole,
 ): Promise<InvoiceMutation> {
   const hash = fingerprint({ action, id, input });
   return db.transaction(async (tx) => {
     await budget(tx);
-    await lock(tx, org);
-    await actor(tx, org, userId, true);
-    const prior = await replay(tx, org, input.requestId, hash);
+    await lockCustomerWork(tx,org,true);
+    await actor(tx, org, userId, true,effectiveRole);
+    const prior = await replay(tx, org, input.requestId, hash,userId,effectiveRole);
     if (prior) return prior;
     const row = await load(tx, org, id, true);
+    if (row.customerWorkId) {
+      await customerWorkActor(tx,org,{userId,effectiveRole},"invoices.manage",true);
+      await assertCustomerWorkActive(tx,org);
+    }
     if (row.version !== input.expectedVersion)
       return conflict(
         "invoice_version_changed",
@@ -639,6 +729,7 @@ export async function createInvoice(
   org: string,
   userId: string,
   raw: unknown,
+  effectiveRole?: UserRole,
 ): Promise<InvoiceMutation> {
   const parsed = createInvoiceSchema.parse(raw);
   const input = {
@@ -650,19 +741,26 @@ export async function createInvoice(
   const hash = fingerprint({ action: "draft_created", input });
   return db.transaction(async (tx) => {
     await budget(tx);
-    // CRM merge/delete retention checks use this lock even without a project.
-    // Keep it first so references cannot move after their retention check.
-    await lockContractorSchedule(tx, org);
-    await lock(tx, org);
-    await actor(tx, org, userId, true);
-    const prior = await replay(tx, org, input.requestId, hash);
+    // Prefix also serializes native conversion/preparation; there is no
+    // invoice-then-schedule inversion and no second owner after a lost response.
+    await lockCustomerWork(tx,org,true);
+    await actor(tx, org, userId, true,effectiveRole);
+    if ("source" in input) await customerWorkActor(tx,org,{userId,effectiveRole},"invoices.manage",true);
+    const prior = await replay(tx, org, input.requestId, hash,userId,effectiveRole);
     if (prior) return prior;
-    const refs = await related(tx, org, input, true);
+    let leadId:string|null=null;
+    let customerWorkId:string|null=null;
+    if ("source" in input) {
+      await assertCustomerWorkActive(tx,org);
+      customerWorkId=input.source.kind === "customer_work" ? input.source.customerWorkId : (await createCustomerWorkRoot(tx,org,userId,input.source)).id;
+    } else leadId=input.leadId;
+    const refs = await related(tx, org, {...input,leadId,customerWorkId}, true, true);
     const [row] = await tx
       .insert(invoices)
       .values({
         organizationId: org,
-        leadId: input.leadId,
+        leadId,
+        customerWorkId,
         projectId: input.projectId,
         estimateId: refs.estimateId,
         draftDocument: input.document,
@@ -677,7 +775,7 @@ export async function createInvoice(
         .where(
           and(
             eq(crmTasksTable.organizationId, org),
-            eq(crmTasksTable.leadId, input.leadId),
+            customerWorkId ? and(isNull(crmTasksTable.leadId),eq(crmTasksTable.contactId,refs.lineage.contact.id)) : eq(crmTasksTable.leadId,leadId!),
             eq(
               crmTasksTable.sourceEvent,
               `project.invoice_preparation:${input.projectId}`,
@@ -693,6 +791,7 @@ export async function updateInvoice(
   userId: string,
   id: string,
   raw: unknown,
+  effectiveRole?: UserRole,
 ) {
   const parsed = updateInvoiceSchema.parse(raw);
   const input = { ...parsed, document: invoiceDocument(parsed.document) };
@@ -705,13 +804,14 @@ export async function updateInvoice(
     return {
       row: await advance(tx, org, row, { draftDocument: input.document }),
     };
-  });
+  },effectiveRole);
 }
 export async function issueInvoice(
   org: string,
   userId: string,
   id: string,
   raw: unknown,
+  effectiveRole?: UserRole,
 ) {
   const input = issueInvoiceSchema.parse(raw);
   return mutate(org, userId, id, input, "issued", async (tx, row) => {
@@ -763,13 +863,14 @@ export async function issueInvoice(
         issuedAt: new Date(),
       }),
     };
-  });
+  },effectiveRole);
 }
 export async function voidInvoice(
   org: string,
   userId: string,
   id: string,
   raw: unknown,
+  effectiveRole?: UserRole,
 ) {
   const input = voidInvoiceSchema.parse(raw);
   return mutate(org, userId, id, input, "voided", async (tx, row) => {
@@ -779,7 +880,7 @@ export async function voidInvoice(
         "This invoice is already void.",
       );
     if (
-      money(row, await financial(tx, org, row.leadId)).recordedPaidCents !== 0
+      money(row, await financial(tx, org, row)).recordedPaidCents !== 0
     )
       return conflict(
         "invoice_payment_conflict",
@@ -793,7 +894,7 @@ export async function voidInvoice(
       }),
       reason: input.reason,
     };
-  });
+  },effectiveRole);
 }
 async function applyValue(
   tx: Tx,
@@ -808,7 +909,7 @@ async function applyValue(
       "invoice_transition_unavailable",
       "Receipts and refunds can be allocated only to an issued invoice.",
     );
-  const data = await financial(tx, org, row.leadId);
+  const data = await financial(tx, org, row);
   const value = data.valueMap.get(valueEntryId);
   if (
     !value ||
@@ -837,6 +938,11 @@ async function applyValue(
       "invoice_payment_conflict",
       "A recorded refund allocation cannot exceed this invoice's recorded net receipts.",
     );
+  if (row.customerWorkId && value.kind==="refund") {
+    const paid=data.active.filter(a=>a.invoiceId===row.id && a.kind==="payment" && a.valueEntryId===value.refundOfValueEntryId).reduce((s,a)=>s+a.amountCents,0);
+    const returned=data.active.filter(a=>a.invoiceId===row.id && a.kind==="refund" && data.valueMap.get(a.valueEntryId)!.refundOfValueEntryId===value.refundOfValueEntryId).reduce((s,a)=>s+a.amountCents,0);
+    if (amountCents>paid-returned) return conflict("invoice_refund_allocation_conflict","This refund exceeds this invoice's remaining allocation from its exact original payment.");
+  }
   const [allocation] = await tx
     .insert(allocations)
     .values({
@@ -855,6 +961,7 @@ export async function allocateInvoiceValue(
   userId: string,
   id: string,
   raw: unknown,
+  effectiveRole?: UserRole,
 ) {
   const input = invoiceAllocationSchema.parse(raw);
   return mutate(org, userId, id, input, "value_allocated", async (tx, row) => {
@@ -867,13 +974,14 @@ export async function allocateInvoiceValue(
       input.amountCents,
     );
     return { row: await advance(tx, org, row), resultId: allocation.id };
-  });
+  },effectiveRole);
 }
 export async function recordInvoicePayment(
   org: string,
   userId: string,
   id: string,
   raw: unknown,
+  effectiveRole?: UserRole,
 ) {
   const parsed = invoicePaymentSchema.parse(raw);
   const input = {
@@ -916,6 +1024,7 @@ export async function recordInvoicePayment(
       .values({
         organizationId: org,
         leadId: row.leadId,
+        customerWorkId: row.customerWorkId,
         kind: "payment",
         amountCents: input.amountCents,
         occurredAt: new Date(input.occurredAt),
@@ -939,6 +1048,7 @@ export async function recordInvoicePayment(
       entityId: entry!.id,
       metadata: {
         leadId: row.leadId,
+        ...(row.customerWorkId ? {customerWorkId:row.customerWorkId} : {}),
         invoiceId: row.id,
         kind: "payment",
         evidence: "staff_recorded",
@@ -946,7 +1056,27 @@ export async function recordInvoicePayment(
       },
     });
     return { row: await advance(tx, org, row), resultId: allocation.id };
-  });
+  },effectiveRole);
+}
+/** Staff records a refund that happened outside GrowthOS; no processor is called. */
+export async function recordInvoiceRefund(org:string,userId:string,id:string,raw:unknown,effectiveRole?:UserRole) {
+  const parsed=invoiceRefundSchema.parse(raw);
+  const input={...parsed,occurredAt:new Date(parsed.occurredAt).toISOString()};
+  return mutate(org,userId,id,input,"refund_recorded",async(tx,row)=>{
+    if (!row.customerWorkId || row.status!=="issued") return conflict("invoice_transition_unavailable","Record this external refund only against an issued returning-work invoice.");
+    const data=await financial(tx,org,row);
+    const original=data.valueMap.get(input.originalPaymentValueEntryId);
+    if (!original || original.kind!=="payment" || new Date(input.occurredAt)<original.occurredAt) return conflict("invoice_refund_source_unavailable","Choose this work's exact original payment and a refund date no earlier than that receipt.");
+    const refunded=data.values.filter(v=>v.kind==="refund" && v.refundOfValueEntryId===original.id).reduce((s,v)=>s+v.amountCents,0);
+    if (input.amountCents>original.amountCents-refunded) return conflict("invoice_refund_cash_conflict","Cumulative recorded refunds cannot exceed the exact original cash receipt.");
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`value-entry:${org}:${input.sourceReference}`}))`);
+    const [existing]=await tx.select({id:entries.id}).from(entries).where(and(eq(entries.organizationId,org),eq(entries.sourceReference,input.sourceReference)));
+    if (existing) return conflict("invoice_receipt_unavailable","That cash reference is already recorded. Review its original allocation rather than recording it again.");
+    const [entry]=await tx.insert(entries).values({organizationId:org,leadId:null,customerWorkId:row.customerWorkId,kind:"refund",refundOfValueEntryId:original.id,amountCents:input.amountCents,sourceReference:input.sourceReference,occurredAt:new Date(input.occurredAt),recordedByUserId:userId}).returning();
+    const allocation=await applyValue(tx,org,userId,row,entry!.id,input.amountCents);
+    await tx.insert(auditEventsTable).values({organizationId:org,actorUserId:userId,action:"revenue.value_recorded",entityType:"value_entry",entityId:entry!.id,metadata:{customerWorkId:row.customerWorkId,invoiceId:row.id,originalPaymentValueEntryId:original.id,kind:"refund",evidence:"staff_recorded",providerEffect:false,reason:input.reason}});
+    return {row:await advance(tx,org,row),reason:input.reason,resultId:allocation.id};
+  },effectiveRole);
 }
 export async function reverseInvoiceAllocation(
   org: string,
@@ -954,6 +1084,7 @@ export async function reverseInvoiceAllocation(
   id: string,
   allocationId: string,
   raw: unknown,
+  effectiveRole?: UserRole,
 ) {
   const input = { ...reverseInvoiceAllocationSchema.parse(raw), allocationId };
   return mutate(
@@ -968,7 +1099,7 @@ export async function reverseInvoiceAllocation(
           "invoice_transition_unavailable",
           "Only an issued invoice's allocation can be reversed.",
         );
-      const data = await financial(tx, org, row.leadId);
+      const data = await financial(tx, org, row);
       const original = data.active.find(
         (a) => a.id === allocationId && a.invoiceId === row.id,
       );
@@ -977,6 +1108,11 @@ export async function reverseInvoiceAllocation(
           "invoice_receipt_unavailable",
           "The allocation is unavailable or has already been reversed.",
         );
+      if (row.customerWorkId && original.kind==="payment") {
+        const remaining=data.active.filter(a=>a.id!==original.id && a.invoiceId===row.id && a.kind==="payment" && a.valueEntryId===original.valueEntryId).reduce((s,a)=>s+a.amountCents,0);
+        const returned=data.active.filter(a=>a.invoiceId===row.id && a.kind==="refund" && data.valueMap.get(a.valueEntryId)!.refundOfValueEntryId===original.valueEntryId).reduce((s,a)=>s+a.amountCents,0);
+        if (returned>remaining) return conflict("invoice_refund_allocation_conflict","Reconcile the linked refund allocation before reversing its original payment allocation.");
+      }
       const totals = money(row, data);
       const nextPaid =
         totals.recordedPaidCents +
@@ -1013,6 +1149,7 @@ export async function reverseInvoiceAllocation(
         resultId: reversal!.id,
       };
     },
+    effectiveRole,
   );
 }
 

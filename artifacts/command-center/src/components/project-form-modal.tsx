@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   useCreateProject,
   useUpdateProject,
@@ -6,9 +6,12 @@ import {
   updateLead as updateLeadRequest,
   getListProjectsQueryKey,
   getListLeadsQueryKey,
+  getListEstimatesQueryKey,
+  getListUsersQueryKey,
   useListEstimates,
   useListUsers,
   Project,
+  useGetMe,
 } from '@workspace/api-client-react';
 import { Loader2 } from 'lucide-react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
@@ -16,6 +19,10 @@ import { useToast, toast as globalToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import LeadSelect from '@/components/lead-select';
 import { canAssignWork, localDateTime, scheduleTimezone } from '@/lib/contractor-schedule';
+import { CustomerWorkForm, type CustomerWorkActor } from './customer-work-form';
+import { customerWorkCommandKey } from '@/hooks/use-customer-work-command';
+import { memberAuthorityScope, currentMemberAuthorityMatches } from '@/lib/member-authority-scope';
+import { canWrite } from '@/lib/permissions';
 
 function toDateInput(value: string | null | undefined) {
   return localDateTime(value);
@@ -35,14 +42,24 @@ export default function ProjectFormModal({
   project,
   defaults,
   initialLeadId,
+  initialContactId,
+  authority,
   onClose,
 }: {
   project: Project | null;
   defaults?: ProjectFormDefaults;
   /** Seeds the lead selector (still editable), e.g. from a ?leadId= link. */
   initialLeadId?: string;
+  initialContactId?: string;
+  authority?: CustomerWorkActor;
   onClose: () => void;
 }) {
+  const profile = useGetMe();
+  const actor = authority ?? (profile.data?.organization ? { id: profile.data.id, organizationId: profile.data.organization.id, scopeKey: memberAuthorityScope(profile.data) } : null);
+  const [returning, setReturning] = useState(() => { try { return !!initialContactId || (!!actor && !!sessionStorage.getItem(customerWorkCommandKey(actor.id, actor.organizationId, 'projects:new'))); } catch { return !!initialContactId; } });
+  const alive = useRef(true), identity = useRef(actor?.scopeKey);
+  if (identity.current !== actor?.scopeKey) { if (identity.current !== undefined) alive.current = false; identity.current = actor?.scopeKey; }
+  useEffect(() => { return () => { alive.current = false; }; }, []);
   const [name, setName] = useState(project?.name || defaults?.name || '');
   const [leadId, setLeadId] = useState(project?.leadId || defaults?.leadId || initialLeadId || '');
   const [estimateId, setEstimateId] = useState(project?.estimateId || defaults?.estimateId || '');
@@ -53,9 +70,9 @@ export default function ProjectFormModal({
   const [advanceLead, setAdvanceLead] = useState(defaults?.offerLeadAdvance ?? false);
   const [formError, setFormError] = useState('');
 
-  const { data: users } = useListUsers();
+  const { data: users } = useListUsers({ query: { queryKey: [...getListUsersQueryKey(), actor?.scopeKey], enabled: !!actor && !profile.isError } });
   const effectiveLeadId = project?.leadId || leadId;
-  const { data: allEstimates } = useListEstimates();
+  const { data: allEstimates } = useListEstimates(undefined, { query: { queryKey: [...getListEstimatesQueryKey(), actor?.scopeKey], enabled: !!actor && !profile.isError } });
   const estimates = effectiveLeadId
     ? allEstimates?.filter(e => e.leadId === effectiveLeadId)
     : [];
@@ -64,6 +81,7 @@ export default function ProjectFormModal({
   const updateLead = useUpdateLead();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const currentMember = () => !!actor && currentMemberAuthorityMatches(queryClient, actor.scopeKey);
 
   const isSubmitting = createProject.isPending || updateProject.isPending || updateLead.isPending;
 
@@ -73,16 +91,18 @@ export default function ProjectFormModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || (!project && !leadId)) return;
+    if (!name || (!project && !leadId) || !alive.current || !currentMember() || !profile.data?.isActive || !canWrite(profile.data.role)) return;
     setFormError('');
     if ((end && (!start || new Date(end) <= new Date(start))) || (start && crew.length && !end)) { setFormError('Set an end time after the start time for assigned work.'); return; }
 
     const finish = () => {
+      if (!alive.current || !currentMember()) return;
       queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
       onClose();
     };
 
     const handleSaveError = (error: unknown) => {
+      if (!alive.current || !currentMember()) return;
       const serverMessage =
         error && typeof error === 'object' && 'data' in error
           ? (error as { data?: { error?: string } }).data?.error
@@ -122,17 +142,20 @@ export default function ProjectFormModal({
         },
       }, {
         onSuccess: () => {
+          if (!alive.current || !currentMember()) return;
           if (defaults?.offerLeadAdvance && advanceLead) {
             updateLead.mutate(
               { id: leadId, data: { status: 'production_scheduled' } },
               {
                 onSuccess: () => {
+                  if (!currentMember()) return;
                   queryClient.invalidateQueries({ queryKey: getListLeadsQueryKey() });
                   finish();
                 },
                 onError: () => {
+                  if (!currentMember()) return;
                   queryClient.invalidateQueries({ queryKey: getListLeadsQueryKey() });
-                  showLeadAdvanceFailedToast(leadId, queryClient);
+                  showLeadAdvanceFailedToast(leadId, queryClient, currentMember);
                   finish();
                 },
               },
@@ -146,6 +169,9 @@ export default function ProjectFormModal({
     }
   };
 
+  if (profile.isError || !alive.current || (profile.data && (!profile.data.isActive || !canWrite(profile.data.role)))) return <p role="alert">Current job access changed. Close this form and reopen the exact record.</p>;
+  if (profile.isLoading || !profile.data) return <p role="status">Checking current job access…</p>;
+  if (returning && actor && !project && !defaults?.leadId) return <CustomerWorkForm kind="projects" actor={actor} contactId={initialContactId} onOpportunity={() => setReturning(false)} onClose={onClose} />;
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-card border border-border shadow-xl rounded-xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
@@ -154,6 +180,7 @@ export default function ProjectFormModal({
           <button aria-label="Close project form" onClick={onClose} className="min-h-11 min-w-11 text-muted-foreground hover:text-foreground">&times;</button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+          {!project && !defaults?.leadId && <div className="rounded border p-3 text-sm"><p>Work source: Customer opportunity</p><button type="button" className="min-h-11 underline" disabled={isSubmitting || !actor} onClick={() => setReturning(true)}>Use existing customer instead</button></div>}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Name *</label>
             <input aria-label="Project name" required className="w-full bg-background border border-border rounded-md px-3 py-2 text-base focus:ring-2 focus:ring-primary focus:outline-none" value={name} onChange={e => setName(e.target.value)} />
@@ -167,7 +194,7 @@ export default function ProjectFormModal({
                   {defaults.leadLabel || defaults.leadId.substring(0, 8)}
                 </div>
               ) : (
-                <LeadSelect required withStatus value={leadId} onChange={id => { setLeadId(id); setEstimateId(''); }} />
+                <LeadSelect required withStatus queryScope={actor?.scopeKey} value={leadId} onChange={id => { setLeadId(id); setEstimateId(''); }} />
               )}
             </div>
           )}
@@ -240,7 +267,7 @@ export default function ProjectFormModal({
  * Lives at module level (using the global toast store and the plain fetch
  * client) so retrying keeps working after the modal has closed.
  */
-function showLeadAdvanceFailedToast(leadId: string, queryClient: QueryClient) {
+function showLeadAdvanceFailedToast(leadId: string, queryClient: QueryClient, currentMember = () => true) {
   const { dismiss } = globalToast({
     variant: 'destructive',
     title: 'Lead status not updated',
@@ -250,13 +277,14 @@ function showLeadAdvanceFailedToast(leadId: string, queryClient: QueryClient) {
       <ToastAction
         altText="Retry lead status update"
         onClick={async () => {
+          if (!currentMember()) return;
           try {
             await updateLeadRequest(leadId, { status: 'production_scheduled' });
             queryClient.invalidateQueries({ queryKey: getListLeadsQueryKey() });
             dismiss();
           } catch {
             queryClient.invalidateQueries({ queryKey: getListLeadsQueryKey() });
-            showLeadAdvanceFailedToast(leadId, queryClient);
+            if (currentMember()) showLeadAdvanceFailedToast(leadId, queryClient, currentMember);
           }
         }}
       >

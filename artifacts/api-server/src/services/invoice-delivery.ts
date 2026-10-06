@@ -4,18 +4,21 @@ import {
   db,
   leadsTable,
   usersTable,
+  type UserRole,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { hasPermission } from "../lib/permissions";
 import { InvoiceError } from "./invoice-contract";
-import { getInvoice } from "./invoices";
+import { getInvoice, readReturningInvoiceLineage } from "./invoices";
 import {
+  readCompanyEmailSender,
   resolveCustomerEmailSender,
   sendCustomerEmail,
 } from "./customer-email";
 import { assertCustomerLifecycleActive } from "./customer-lifecycle";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
 import { checkSendEligibility } from "./send-gate";
+import { hasContactReplyHold } from "./response-correlation";
 import { emailAcceptanceEvidence } from "./user-email";
 import { EmailDispatchBlockedError } from "./email-dispatch-guard";
 import {
@@ -42,7 +45,7 @@ const deliveryDetail =
 function conflict(message: string): never {
   throw new InvoiceError(409, "invoice_delivery_review_changed", message);
 }
-async function manager(org: string, actor: string) {
+async function manager(org: string, actor: string, effectiveRole?: UserRole) {
   const [user] = await db
     .select({
       role: usersTable.role,
@@ -60,7 +63,8 @@ async function manager(org: string, actor: string) {
     !user ||
     !user.emailVerifiedAt ||
     actor.startsWith("invite:") ||
-    !hasPermission(user.role, "invoices.manage")
+    !hasPermission(user.role, "invoices.manage") ||
+    !hasPermission(effectiveRole ?? user.role, "invoices.manage")
   )
     throw new InvoiceError(
       403,
@@ -74,8 +78,9 @@ async function current(
   actor: string,
   invoiceId: string,
   intent: InvoiceDeliveryIntent,
+  effectiveRole?: UserRole,
 ) {
-  await manager(org, actor);
+  await manager(org, actor, effectiveRole);
   // Reuse canonical document integrity, financial reconciliation, tenant and
   // related-record validation; never render the mutable draft of an issued bill.
   const invoice = await getInvoice(org, actor, invoiceId);
@@ -89,6 +94,53 @@ async function current(
       "invoice_delivery_not_issued",
       "Only a currently issued, non-void invoice can be emailed.",
     );
+  if (invoice.customerWorkId) {
+    const lineage = await readReturningInvoiceLineage(db, org, invoiceId, {
+      actorUserId: actor,
+      effectiveRole,
+      requireIssued: true,
+    });
+    const exact = lineage.invoice;
+    if (!exact.invoiceNumber || !exact.issuedAt || exact.status !== "issued")
+      conflict("The issued invoice changed. Refresh the exact saved document.");
+    let selected: Awaited<ReturnType<typeof readCompanyEmailSender>>;
+    try {
+      selected = await readCompanyEmailSender(db, org);
+    } catch {
+      throw new InvoiceError(
+        409,
+        "invoice_delivery_sender_unavailable",
+        "Select a company customer-email sender in Settings > Automations. That accepted staff member must connect and explicitly select Gmail or Microsoft in My Profile. No implicit or alternate mailbox will be used.",
+      );
+    }
+    return {
+      contact: lineage.contact,
+      snapshot: {
+        reviewVersion: 3 as const,
+        invoiceId,
+        invoiceVersion: exact.version,
+        invoiceNumber: exact.invoiceNumber,
+        issuedAt: exact.issuedAt,
+        documentSha256: deliveryFingerprint(exact.document),
+        leadId: null,
+        customerWorkId: lineage.root.id,
+        contactId: lineage.contact.id,
+        propertyId: lineage.property?.id ?? null,
+        sourceSha256: lineage.sourceSha256,
+        senderIdentitySha256: selected.identitySha256,
+        recipient: lineage.contact.email?.trim().toLowerCase() ?? "",
+        sender: selected.sender,
+        ...renderInvoiceEmail({
+          invoiceNumber: exact.invoiceNumber,
+          issuedAt: exact.issuedAt,
+          document: exact.document,
+          additionalCopy: intent === "additional_copy",
+        }),
+      },
+    };
+  }
+  if (!invoice.leadId)
+    conflict("The invoice source is unavailable. No email was sent.");
   const [source] = await db
     .select({ lead: leadsTable, contact: contactsTable })
     .from(leadsTable)
@@ -187,6 +239,17 @@ async function eligibility(
       "invoice_delivery_held",
       `Invoice email is not permitted (${gate.reason}). No email was sent.`,
     );
+  // Transactional send-gate intentionally does not apply outreach reply holds.
+  // Returning invoices have an explicit, narrower reviewed-contact requirement.
+  if (
+    value.snapshot.leadId === null &&
+    (await hasContactReplyHold(org, value.contact.id))
+  )
+    throw new InvoiceError(
+      409,
+      "invoice_delivery_held",
+      "This customer has an unresolved reply requiring office review. No invoice email was sent.",
+    );
 }
 
 export async function getInvoiceDelivery(
@@ -262,6 +325,18 @@ function decision(
 function context(
   snapshot: Awaited<ReturnType<typeof current>>["snapshot"],
 ): InvoiceAttemptReviewMetadata["context"] {
+  if (snapshot.leadId === null)
+    return {
+      leadId: null,
+      customerWorkId: snapshot.customerWorkId,
+      contactId: snapshot.contactId,
+      propertyId: snapshot.propertyId,
+      sourceSha256: snapshot.sourceSha256,
+      senderIdentitySha256: snapshot.senderIdentitySha256,
+      invoiceNumber: snapshot.invoiceNumber,
+      recipient: snapshot.recipient,
+      sender: snapshot.sender,
+    };
   return {
     leadId: snapshot.leadId,
     contactId: snapshot.contactId,
@@ -291,9 +366,16 @@ export async function previewInvoiceDelivery(
   actor: string,
   invoiceId: string,
   raw: unknown,
+  effectiveRole?: UserRole,
 ) {
   const input = invoiceDeliveryPreviewSchema.parse(raw);
-  const value = await current(org, actor, invoiceId, input.intent);
+  const value = await current(
+    org,
+    actor,
+    invoiceId,
+    input.intent,
+    effectiveRole,
+  );
   if (value.snapshot.invoiceVersion !== input.expectedVersion)
     conflict(
       "The invoice changed. Refresh it and review the latest saved document.",
@@ -305,7 +387,7 @@ export async function previewInvoiceDelivery(
   const payloadSha256 = deliveryFingerprint({ ...value.snapshot, ...choice });
   const expiresAt = new Date(Date.now() + PREVIEW_LIFETIME_MS).toISOString();
   const metadata = invoiceAttemptReviewMetadataSchema.parse({
-    reviewVersion: 2,
+    reviewVersion: value.snapshot.leadId === null ? 3 : 2,
     payloadSha256,
     expiresAt,
     invoiceVersion: value.snapshot.invoiceVersion,
@@ -344,9 +426,10 @@ export async function sendInvoiceDelivery(
   actor: string,
   invoiceId: string,
   raw: unknown,
+  effectiveRole?: UserRole,
 ) {
   const input = invoiceDeliverySendSchema.parse(raw);
-  await manager(org, actor);
+  await manager(org, actor, effectiveRole);
   // Read permission and canonical invoice/relationship integrity apply to replay too.
   await getInvoice(org, actor, invoiceId);
   const readReview = async () =>
@@ -405,7 +488,13 @@ export async function sendInvoiceDelivery(
       conflict(
         "This preview expired. Prepare and review the invoice again before sending.",
       );
-    const value = await current(org, actor, invoiceId, metadata.intent);
+    const value = await current(
+      org,
+      actor,
+      invoiceId,
+      metadata.intent,
+      effectiveRole,
+    );
     if (
       deliveryFingerprint({ ...value.snapshot, ...decision(metadata) }) !==
         input.payloadSha256 ||
@@ -428,6 +517,7 @@ export async function sendInvoiceDelivery(
         invoiceId,
         previewId: input.previewId,
         actorUserId: actor,
+        effectiveRole,
         duplicateCopyAcknowledged: input.duplicateCopyAcknowledged === true,
       },
       async (claim) => {
@@ -478,17 +568,31 @@ export async function sendInvoiceDelivery(
           throw error;
         }
         const evidence = {
-          ...emailAcceptanceEvidence(result, {
-            organizationId: org,
-            leadId: reviewed.snapshot.leadId,
-            recipientEmail: reviewed.snapshot.recipient,
-          }),
+          ...emailAcceptanceEvidence(
+            result,
+            reviewed.snapshot.leadId === null
+              ? undefined
+              : {
+                  organizationId: org,
+                  leadId: reviewed.snapshot.leadId,
+                  recipientEmail: reviewed.snapshot.recipient,
+                },
+          ),
           invoiceId,
           invoiceNumber: reviewed.snapshot.invoiceNumber,
           previewId: review.id,
           payloadSha256: input.payloadSha256,
           documentSha256: reviewed.snapshot.documentSha256,
           senderUserId: result.senderUserId,
+          ...(reviewed.snapshot.leadId === null
+            ? {
+                customerWorkId: reviewed.snapshot.customerWorkId,
+                propertyId: reviewed.snapshot.propertyId,
+                recipient: reviewed.snapshot.recipient,
+                sourceSha256: reviewed.snapshot.sourceSha256,
+                senderIdentitySha256: reviewed.snapshot.senderIdentitySha256,
+              }
+            : {}),
         };
         // The kernel atomically finalizes acceptance, receipt and activity. A
         // lost final write is not retried and never becomes no-effect proof.
@@ -497,6 +601,12 @@ export async function sendInvoiceDelivery(
           evidence,
           leadId: reviewed.snapshot.leadId,
           contactId: reviewed.snapshot.contactId,
+          ...(reviewed.snapshot.leadId === null
+            ? {
+                customerWorkId: reviewed.snapshot.customerWorkId,
+                propertyId: reviewed.snapshot.propertyId,
+              }
+            : {}),
         };
       },
     );

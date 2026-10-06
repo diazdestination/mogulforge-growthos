@@ -37,12 +37,14 @@ export function InvoiceEditor({
   busy,
   onSave,
   children,
+  saveDisabled = false,
 }: {
   initial: InvoiceDraft;
   disabled: boolean;
   busy: boolean;
   onSave: (document: InvoiceDraft) => void;
   children?: ReactNode;
+  saveDisabled?: boolean;
 }) {
   const prefix = useId();
   const [fields, setFields] = useState(initial);
@@ -75,7 +77,7 @@ export function InvoiceEditor({
       : null;
   function save(event: FormEvent) {
     event.preventDefault();
-    if (disabled) return;
+    if (disabled || saveDisabled) return;
     if (preview === null || lines.some((line) => !line.description.trim())) {
       setError(
         "Enter a description and valid positive quantity for each line, and dollar amounts with at most two decimals. The total cannot exceed $10,000,000.",
@@ -344,7 +346,7 @@ export function InvoiceEditor({
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={disabled} className={invoicePrimary}>
+        <button type="submit" disabled={disabled || saveDisabled} className={invoicePrimary}>
           {busy ? "Saving…" : "Save draft"}
         </button>
         <p className="text-xs text-muted-foreground">

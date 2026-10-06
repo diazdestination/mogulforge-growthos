@@ -65,3 +65,4 @@ export * from "./source-adoption";
 export * from "./source-nurture";
 export * from "./contact-touch-reservations";
 export * from "./contractor-workday";
+export * from "./customer-work";

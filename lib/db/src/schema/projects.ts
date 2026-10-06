@@ -1,5 +1,8 @@
-import { isNotNull } from "drizzle-orm";
+import { isNotNull, sql } from "drizzle-orm";
 import {
+  check,
+  foreignKey,
+  integer,
   index,
   jsonb,
   pgTable,
@@ -7,6 +10,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  unique,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -14,6 +18,7 @@ import { projectStatusEnum } from "./enums";
 import { estimatesTable } from "./estimates";
 import { leadsTable } from "./leads";
 import { organizationsTable } from "./organizations";
+import { customerWorkRootsTable } from "./customer-work";
 
 export const projectsTable = pgTable(
   "projects",
@@ -23,8 +28,9 @@ export const projectsTable = pgTable(
       .notNull()
       .references(() => organizationsTable.id),
     leadId: uuid("lead_id")
-      .notNull()
       .references(() => leadsTable.id),
+    customerWorkId: uuid("customer_work_id"),
+    workVersion: integer("work_version"),
     estimateId: uuid("estimate_id").references(() => estimatesTable.id),
     name: text("name").notNull(),
     status: projectStatusEnum("status").notNull().default("scheduled"),
@@ -45,6 +51,11 @@ export const projectsTable = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
+    unique("projects_org_work_id_uq").on(table.organizationId, table.id, table.customerWorkId),
+    uniqueIndex("projects_work_root_uq").on(table.customerWorkId).where(sql`${table.customerWorkId} is not null`),
+    foreignKey({ columns: [table.organizationId, table.customerWorkId], foreignColumns: [customerWorkRootsTable.organizationId, customerWorkRootsTable.id], name: "projects_customer_work_fk" }),
+    foreignKey({ columns: [table.organizationId, table.estimateId, table.customerWorkId], foreignColumns: [estimatesTable.organizationId, estimatesTable.id, estimatesTable.customerWorkId], name: "projects_work_estimate_fk" }),
+    check("projects_work_scope_ck", sql`(${table.leadId} is not null and ${table.customerWorkId} is null and ${table.workVersion} is null) or (${table.leadId} is null and ${table.customerWorkId} is not null and ${table.workVersion} is not null and ${table.workVersion} > 0)`),
     index("projects_org_status_idx").on(table.organizationId, table.status),
     index("projects_org_lead_idx").on(table.organizationId, table.leadId),
     // A given estimate can back at most one project; the API re-checks this

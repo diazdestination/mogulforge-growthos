@@ -5,12 +5,13 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+import type { ProjectSourceKind } from './projectSourceKind';
 import type { ProjectStatus } from './projectStatus';
 
 export interface Project {
   id: string;
   organizationId: string;
-  leadId: string;
+  leadId: string | null;
   /**
      * Convenience display name of the linked lead (contact name, falling back to lead summary; list endpoints only).
      * @nullable
@@ -31,4 +32,15 @@ export interface Project {
   completedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  customerWorkId?: string | null;
+  contactId?: string;
+  propertyId?: string | null;
+  sourceKind?: ProjectSourceKind;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  workVersion?: number | null;
+  customerLabel?: string;
+  propertyLabel?: string | null;
 }

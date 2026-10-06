@@ -23,6 +23,7 @@ import { seedCustomerWorkspacePreview } from "./customer-workspace-preview-fixtu
 import { seedCallieConversationPreview } from "./callie-conversation-preview-fixture.mjs";
 import { seedContractorWorkdayPreview } from "./contractor-workday-preview-fixture.mjs";
 import { credentialCodec } from "../../../scripts/restore-drill-fixture.mjs";
+import { seedSyntheticReturningCustomer } from "../../../scripts/returning-customer-recovery-fixture.mjs";
 
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const database = path.resolve(api, "../../lib/db");
@@ -43,8 +44,8 @@ Object.assign(env, {
   DATABASE_URL: `postgresql://postgres:synthetic@${socket.getServerConn()}/postgres`,
   NODE_ENV: "production",
   HOST: "127.0.0.1",
-  PORT: "4192",
-  APP_ORIGIN: "http://127.0.0.1:4192",
+  PORT: process.argv.includes("--returning-customer") ? "4193" : "4192",
+  APP_ORIGIN: process.argv.includes("--returning-customer") ? "http://127.0.0.1:4193" : "http://127.0.0.1:4192",
   STATIC_DIR: path.resolve(api, "../command-center/dist/public"),
   SESSION_SECRET: "synthetic-runtime-preview-never-deploy",
   OBJECT_STORAGE_PROVIDER: "postgres",
@@ -115,6 +116,12 @@ try {
       console.log(`Synthetic workday: ${workday.customer} | ${workday.visit} | ${workday.history}. Fictional records, no providers/customer contact.`);
       console.log(`Synthetic roofing workday: ${workday.roof.customer} | ${workday.roof.visit} | ${workday.roof.history}. Separate fictional records, no imported customer facts.`);
     }
+    if (process.argv.includes("--returning-customer")) {
+      const work = await seedSyntheticReturningCustomer(client,{namespace:"preview-returning-work",organizationId:org.id,actorUserId:user.id,preview:true});
+      console.log(`FICTIONAL returning-work customer: /contacts/${work.contact}?organizationId=${org.id}`);
+      console.log(`FICTIONAL returning job/invoice: /projects?projectId=${work.project}&organizationId=${org.id} | /invoices/${work.invoice}?organizationId=${org.id}`);
+      console.log(`FICTIONAL later-page property: ${work.laterPropertyId}. Original unknown invoice email remains held; no provider or customer contact.`);
+    }
     if (process.argv.includes("--callie-conversation")) {
       const codec = await credentialCodec(env.OAUTH_TOKEN_ENCRYPTION_KEY);
       const reception = await seedCallieConversationPreview(client, org.id, user.id, codec);
@@ -135,7 +142,7 @@ try {
       [org.id],
     );
     console.log(
-      "Isolated preview: http://127.0.0.1:4192/\nFixture login: runtime-qa@example.invalid / Local-QA-only-2026!\nThese are disposable local credentials, not a real account. All records are fictional; provider credentials are excluded.",
+      `Isolated preview: ${env.APP_ORIGIN}/\nFixture login: runtime-qa@example.invalid / Local-QA-only-2026!\nThese are disposable local credentials, not a real account. All records are fictional; provider credentials are excluded.`,
     );
   } finally {
     await client.end();

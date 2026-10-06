@@ -7,6 +7,15 @@
 
 ## Mission
 
+**October6 returning-customer continuation:** PR25/mainbd9df2f and exact-main
+CI37424251416 passed all gates and independent review. Owner authorized the
+next bounded source wave: coherent native existing-customer estimates/jobs/
+invoices and external receipts without fake acquisition leads. Freeze a written
+contract first; preserve legacy money/documents/send authority and all required
+fresh candidate/main PostgreSQL16, hosted, provider/device/company acceptance
+gates. Payment processing remains deferred. This source exception does not
+authorize deployment, hosted schema/credentials, real data/contact or spending.
+
 **October6 researched workday scope:** PR24/main3f1f1b5 and exact-mainCI37407237259
 are fully accepted. Owner approved common HVAC/roofing research and source work
 before client exports, with later adaptation. Frozen contractor-workday contract

@@ -9,6 +9,1061 @@ import * as zod from 'zod';
 
 
 /**
+ * Current human invoice manager only. Append a staff-recorded external refund correction tied to the original same-work receipt and remaining invoice allocation. It does not issue a processor refund or move cash. Existing invoice operation/request ledger and cumulative receipt cap apply.
+ * @summary recordInvoiceRefund
+ */
+export const RecordInvoiceRefundParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const recordInvoiceRefundBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const recordInvoiceRefundBodyExpectedVersionMax = 2147483646;
+
+export const recordInvoiceRefundBodyOriginalPaymentValueEntryIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const recordInvoiceRefundBodyAmountCentsMax = 1000000000;
+
+export const recordInvoiceRefundBodySourceReferenceMin = 5;
+export const recordInvoiceRefundBodySourceReferenceMax = 160;
+
+export const recordInvoiceRefundBodyReasonMin = 10;
+export const recordInvoiceRefundBodyReasonMax = 500;
+
+
+
+export const RecordInvoiceRefundBody = zod.object({
+  "requestId": zod.uuid().regex(recordInvoiceRefundBodyRequestIdRegExp),
+  "expectedVersion": zod.int().min(1).max(recordInvoiceRefundBodyExpectedVersionMax),
+  "confirmed": zod.literal(true),
+  "originalPaymentValueEntryId": zod.uuid().regex(recordInvoiceRefundBodyOriginalPaymentValueEntryIdRegExp),
+  "amountCents": zod.int().min(1).max(recordInvoiceRefundBodyAmountCentsMax),
+  "sourceReference": zod.string().min(recordInvoiceRefundBodySourceReferenceMin).max(recordInvoiceRefundBodySourceReferenceMax),
+  "occurredAt": zod.coerce.date(),
+  "reason": zod.string().min(recordInvoiceRefundBodyReasonMin).max(recordInvoiceRefundBodyReasonMax)
+})
+
+export const recordInvoiceRefundResponseInvoiceOpeningReceivableCentsMin = 0;
+export const recordInvoiceRefundResponseInvoiceOpeningReceivableCentsMax = 1000000000;
+
+export const recordInvoiceRefundResponseInvoiceHistoricalSourceOneRecordSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const recordInvoiceRefundResponseInvoiceVersionMax = 2147483646;
+
+export const recordInvoiceRefundResponseInvoiceSubtotalCentsMin = 0;
+export const recordInvoiceRefundResponseInvoiceSubtotalCentsMax = 1000000000;
+
+export const recordInvoiceRefundResponseInvoiceTaxCentsMin = 0;
+export const recordInvoiceRefundResponseInvoiceTaxCentsMax = 1000000000;
+
+export const recordInvoiceRefundResponseInvoiceTotalCentsMin = 0;
+export const recordInvoiceRefundResponseInvoiceTotalCentsMax = 1000000000;
+
+export const recordInvoiceRefundResponseInvoiceUnallocatedRefundCentsMin = 0;
+export const recordInvoiceRefundResponseInvoiceUnallocatedRefundCentsMax = 1000000000;
+
+export const recordInvoiceRefundResponseInvoiceDocumentTitleMax = 150;
+
+export const recordInvoiceRefundResponseInvoiceDocumentIssuerNameMax = 200;
+
+export const recordInvoiceRefundResponseInvoiceDocumentIssuerAddressMax = 500;
+
+export const recordInvoiceRefundResponseInvoiceDocumentCustomerNameMax = 200;
+
+export const recordInvoiceRefundResponseInvoiceDocumentCustomerAddressMax = 500;
+
+export const recordInvoiceRefundResponseInvoiceDocumentNotesMax = 2000;
+
+export const recordInvoiceRefundResponseInvoiceDocumentLineItemsItemDescriptionMax = 1000;
+
+export const recordInvoiceRefundResponseInvoiceDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const recordInvoiceRefundResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const recordInvoiceRefundResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const recordInvoiceRefundResponseInvoiceDocumentLineItemsItemTotalCentsMin = 0;
+export const recordInvoiceRefundResponseInvoiceDocumentLineItemsItemTotalCentsMax = 1000000000;
+
+export const recordInvoiceRefundResponseInvoiceDocumentLineItemsMax = 100;
+
+export const recordInvoiceRefundResponseInvoiceDocumentTaxCentsMin = 0;
+export const recordInvoiceRefundResponseInvoiceDocumentTaxCentsMax = 1000000000;
+
+export const recordInvoiceRefundResponseInvoiceDocumentSubtotalCentsMin = 0;
+export const recordInvoiceRefundResponseInvoiceDocumentSubtotalCentsMax = 1000000000;
+
+export const recordInvoiceRefundResponseInvoiceDocumentTotalCentsMin = 0;
+export const recordInvoiceRefundResponseInvoiceDocumentTotalCentsMax = 1000000000;
+
+export const recordInvoiceRefundResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
+
+export const recordInvoiceRefundResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
+export const recordInvoiceRefundResponseInvoiceAvailableValueEntriesItemAmountCentsMax = 1000000000;
+
+export const recordInvoiceRefundResponseInvoiceAvailableValueEntriesItemAvailableCentsMin = 0;
+export const recordInvoiceRefundResponseInvoiceAvailableValueEntriesItemAvailableCentsMax = 1000000000;
+
+export const recordInvoiceRefundResponseInvoiceEventsItemVersionMax = 2147483646;
+
+
+
+export const RecordInvoiceRefundResponse = zod.object({
+  "invoice": zod.object({
+  "balanceBasis": zod.enum(['full_history', 'opening_receivable']).describe('Opening receivables are non-cash cutoff balances, not proof of money received.'),
+  "openingReceivableCents": zod.int().min(recordInvoiceRefundResponseInvoiceOpeningReceivableCentsMin).max(recordInvoiceRefundResponseInvoiceOpeningReceivableCentsMax).nullable(),
+  "openingAsOf": zod.coerce.date().nullable(),
+  "historicalSource": zod.union([zod.object({
+  "sourceSystem": zod.string(),
+  "sourceAccount": zod.string(),
+  "externalId": zod.string(),
+  "cutoffAt": zod.coerce.date(),
+  "recordSha256": zod.string().regex(recordInvoiceRefundResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
+}),zod.null()]),
+  "id": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
+  "projectId": zod.uuid().nullable(),
+  "estimateId": zod.uuid().nullable(),
+  "invoiceNumber": zod.string().nullable(),
+  "status": zod.enum(['draft', 'issued', 'void']),
+  "version": zod.int().min(1).max(recordInvoiceRefundResponseInvoiceVersionMax),
+  "title": zod.string(),
+  "customerName": zod.string(),
+  "currency": zod.enum(['USD']),
+  "subtotalCents": zod.int().min(recordInvoiceRefundResponseInvoiceSubtotalCentsMin).max(recordInvoiceRefundResponseInvoiceSubtotalCentsMax),
+  "taxCents": zod.int().min(recordInvoiceRefundResponseInvoiceTaxCentsMin).max(recordInvoiceRefundResponseInvoiceTaxCentsMax),
+  "totalCents": zod.int().min(recordInvoiceRefundResponseInvoiceTotalCentsMin).max(recordInvoiceRefundResponseInvoiceTotalCentsMax),
+  "dueDate": zod.coerce.date().nullable(),
+  "issuedAt": zod.coerce.date().nullable(),
+  "voidedAt": zod.coerce.date().nullable(),
+  "voidReason": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "recordedPaidCents": zod.int(),
+  "recordedBalanceCents": zod.int(),
+  "balanceDueCents": zod.int().nullable(),
+  "paymentState": zod.enum(['unpaid', 'partial', 'paid', 'reconciliation_required']),
+  "reconciliationRequired": zod.boolean(),
+  "unallocatedRefundCents": zod.int().min(recordInvoiceRefundResponseInvoiceUnallocatedRefundCentsMin).max(recordInvoiceRefundResponseInvoiceUnallocatedRefundCentsMax),
+  "document": zod.object({
+  "title": zod.string().min(1).max(recordInvoiceRefundResponseInvoiceDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(recordInvoiceRefundResponseInvoiceDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(recordInvoiceRefundResponseInvoiceDocumentIssuerAddressMax).nullable(),
+  "customerName": zod.string().min(1).max(recordInvoiceRefundResponseInvoiceDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(recordInvoiceRefundResponseInvoiceDocumentCustomerAddressMax).nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "notes": zod.string().max(recordInvoiceRefundResponseInvoiceDocumentNotesMax).nullable(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(recordInvoiceRefundResponseInvoiceDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(recordInvoiceRefundResponseInvoiceDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
+  "unitPriceCents": zod.int().min(recordInvoiceRefundResponseInvoiceDocumentLineItemsItemUnitPriceCentsMin).max(recordInvoiceRefundResponseInvoiceDocumentLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(recordInvoiceRefundResponseInvoiceDocumentLineItemsItemTotalCentsMin).max(recordInvoiceRefundResponseInvoiceDocumentLineItemsItemTotalCentsMax)
+})).max(recordInvoiceRefundResponseInvoiceDocumentLineItemsMax),
+  "taxCents": zod.int().min(recordInvoiceRefundResponseInvoiceDocumentTaxCentsMin).max(recordInvoiceRefundResponseInvoiceDocumentTaxCentsMax),
+  "subtotalCents": zod.int().min(recordInvoiceRefundResponseInvoiceDocumentSubtotalCentsMin).max(recordInvoiceRefundResponseInvoiceDocumentSubtotalCentsMax),
+  "totalCents": zod.int().min(recordInvoiceRefundResponseInvoiceDocumentTotalCentsMin).max(recordInvoiceRefundResponseInvoiceDocumentTotalCentsMax)
+}),
+  "allocations": zod.array(zod.object({
+  "id": zod.uuid(),
+  "valueEntryId": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(1).max(recordInvoiceRefundResponseInvoiceAllocationsItemAmountCentsMax),
+  "occurredAt": zod.coerce.date(),
+  "allocatedAt": zod.coerce.date(),
+  "reversedAt": zod.coerce.date().nullable(),
+  "reversalReason": zod.string().nullable(),
+  "refundOfValueEntryId": zod.uuid().nullish()
+})),
+  "availableValueEntries": zod.array(zod.object({
+  "id": zod.uuid(),
+  "kind": zod.enum(['payment', 'refund']),
+  "sourceReference": zod.string(),
+  "amountCents": zod.int().min(recordInvoiceRefundResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(recordInvoiceRefundResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
+  "availableCents": zod.int().min(recordInvoiceRefundResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(recordInvoiceRefundResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
+  "occurredAt": zod.coerce.date(),
+  "refundOfValueEntryId": zod.uuid().nullish()
+})),
+  "availableValueEntriesTruncated": zod.boolean(),
+  "events": zod.array(zod.object({
+  "id": zod.uuid(),
+  "action": zod.string(),
+  "version": zod.int().min(1).max(recordInvoiceRefundResponseInvoiceEventsItemVersionMax),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "customerWorkId": zod.uuid().nullable(),
+  "contactId": zod.uuid(),
+  "propertyId": zod.uuid().nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "organizationId": zod.uuid()
+}),
+  "duplicate": zod.boolean()
+})
+
+
+/**
+ * Explicit canonical returning-customer work. No acquisition lead, signature, provider delivery or payment is inferred. Exact original request/result is retained transactionally. The root/property is immutable and native estimate/job history is versioned.
+ * @summary updateCustomerWorkProject
+ */
+export const UpdateCustomerWorkProjectParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const updateCustomerWorkProjectBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkProjectBodyExpectedWorkVersionMax = 2147483646;
+
+export const updateCustomerWorkProjectBodyNameMax = 200;
+
+export const updateCustomerWorkProjectBodyCrewUserIdsItemMax = 200;
+
+export const updateCustomerWorkProjectBodyCrewUserIdsMax = 50;
+
+export const updateCustomerWorkProjectBodyCrewNotesMax = 4000;
+
+
+
+export const UpdateCustomerWorkProjectBody = zod.object({
+  "requestId": zod.uuid().regex(updateCustomerWorkProjectBodyRequestIdRegExp),
+  "confirmed": zod.literal(true),
+  "expectedWorkVersion": zod.int().min(1).max(updateCustomerWorkProjectBodyExpectedWorkVersionMax),
+  "name": zod.string().min(1).max(updateCustomerWorkProjectBodyNameMax),
+  "status": zod.enum(['scheduled', 'in_progress', 'on_hold', 'completed', 'cancelled']),
+  "scheduledStart": zod.coerce.date().nullable(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "crewUserIds": zod.array(zod.string().min(1).max(updateCustomerWorkProjectBodyCrewUserIdsItemMax)).max(updateCustomerWorkProjectBodyCrewUserIdsMax),
+  "crewNotes": zod.string().max(updateCustomerWorkProjectBodyCrewNotesMax).nullable()
+})
+
+export const updateCustomerWorkProjectResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkProjectResponseProjectIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkProjectResponseProjectOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkProjectResponseProjectLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkProjectResponseProjectCustomerWorkIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkProjectResponseProjectContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkProjectResponseProjectPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkProjectResponseProjectCustomerLabelMax = 500;
+
+export const updateCustomerWorkProjectResponseProjectWorkVersionMax = 2147483646;
+
+export const updateCustomerWorkProjectResponseProjectEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkProjectResponseProjectNameMax = 200;
+
+export const updateCustomerWorkProjectResponseProjectCrewUserIdsItemMax = 200;
+
+export const updateCustomerWorkProjectResponseProjectCrewUserIdsMax = 50;
+
+export const updateCustomerWorkProjectResponseProjectCrewNotesMax = 4000;
+
+export const updateCustomerWorkProjectResponseCommandRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkProjectResponseCommandCustomerWorkIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkProjectResponseCommandTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkProjectResponseCommandVersionMax = 2147483646;
+
+
+
+export const UpdateCustomerWorkProjectResponse = zod.object({
+  "organizationId": zod.uuid().regex(updateCustomerWorkProjectResponseOrganizationIdRegExp),
+  "project": zod.object({
+  "id": zod.uuid().regex(updateCustomerWorkProjectResponseProjectIdRegExp),
+  "organizationId": zod.uuid().regex(updateCustomerWorkProjectResponseProjectOrganizationIdRegExp),
+  "leadId": zod.uuid().regex(updateCustomerWorkProjectResponseProjectLeadIdRegExp).nullable(),
+  "customerWorkId": zod.uuid().regex(updateCustomerWorkProjectResponseProjectCustomerWorkIdRegExp).nullable(),
+  "contactId": zod.uuid().regex(updateCustomerWorkProjectResponseProjectContactIdRegExp),
+  "propertyId": zod.uuid().regex(updateCustomerWorkProjectResponseProjectPropertyIdRegExp).nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "customerLabel": zod.string().min(1).max(updateCustomerWorkProjectResponseProjectCustomerLabelMax),
+  "propertyLabel": zod.string().nullable(),
+  "leadLabel": zod.string().nullable(),
+  "workVersion": zod.int().min(1).max(updateCustomerWorkProjectResponseProjectWorkVersionMax).nullable(),
+  "estimateId": zod.uuid().regex(updateCustomerWorkProjectResponseProjectEstimateIdRegExp).nullable(),
+  "name": zod.string().min(1).max(updateCustomerWorkProjectResponseProjectNameMax),
+  "status": zod.enum(['scheduled', 'in_progress', 'on_hold', 'completed', 'cancelled']),
+  "scheduledStart": zod.coerce.date().nullable(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "crewUserIds": zod.array(zod.string().min(1).max(updateCustomerWorkProjectResponseProjectCrewUserIdsItemMax)).max(updateCustomerWorkProjectResponseProjectCrewUserIdsMax),
+  "crewNotes": zod.string().max(updateCustomerWorkProjectResponseProjectCrewNotesMax).nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "command": zod.object({
+  "requestId": zod.uuid().regex(updateCustomerWorkProjectResponseCommandRequestIdRegExp),
+  "action": zod.enum(['estimate_created', 'estimate_updated', 'project_created', 'project_updated']),
+  "customerWorkId": zod.uuid().regex(updateCustomerWorkProjectResponseCommandCustomerWorkIdRegExp),
+  "targetId": zod.uuid().regex(updateCustomerWorkProjectResponseCommandTargetIdRegExp),
+  "version": zod.int().min(1).max(updateCustomerWorkProjectResponseCommandVersionMax),
+  "duplicate": zod.boolean()
+})
+})
+
+
+/**
+ * Explicit canonical returning-customer work. No acquisition lead, signature, provider delivery or payment is inferred. Exact original request/result is retained transactionally. The root/property is immutable and native estimate/job history is versioned.
+ * @summary createCustomerWorkProject
+ */
+export const createCustomerWorkProjectBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectBodySourceOneContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectBodySourceOnePropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectBodySourceTwoEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectBodySourceTwoExpectedWorkVersionMax = 2147483646;
+
+export const createCustomerWorkProjectBodyNameMax = 200;
+
+export const createCustomerWorkProjectBodyCrewUserIdsItemMax = 200;
+
+export const createCustomerWorkProjectBodyCrewUserIdsMax = 50;
+
+export const createCustomerWorkProjectBodyCrewNotesMax = 4000;
+
+
+
+export const CreateCustomerWorkProjectBody = zod.object({
+  "requestId": zod.uuid().regex(createCustomerWorkProjectBodyRequestIdRegExp),
+  "confirmed": zod.literal(true),
+  "source": zod.union([zod.object({
+  "kind": zod.enum(['existing_customer']),
+  "contactId": zod.uuid().regex(createCustomerWorkProjectBodySourceOneContactIdRegExp),
+  "propertyId": zod.uuid().regex(createCustomerWorkProjectBodySourceOnePropertyIdRegExp).nullable()
+}),zod.object({
+  "kind": zod.enum(['estimate']),
+  "estimateId": zod.uuid().regex(createCustomerWorkProjectBodySourceTwoEstimateIdRegExp),
+  "expectedWorkVersion": zod.int().min(1).max(createCustomerWorkProjectBodySourceTwoExpectedWorkVersionMax)
+})]),
+  "name": zod.string().min(1).max(createCustomerWorkProjectBodyNameMax),
+  "status": zod.enum(['scheduled', 'in_progress', 'on_hold', 'completed', 'cancelled']),
+  "scheduledStart": zod.coerce.date().nullable(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "crewUserIds": zod.array(zod.string().min(1).max(createCustomerWorkProjectBodyCrewUserIdsItemMax)).max(createCustomerWorkProjectBodyCrewUserIdsMax),
+  "crewNotes": zod.string().max(createCustomerWorkProjectBodyCrewNotesMax).nullable()
+})
+
+export const createCustomerWorkProjectResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectResponseProjectIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectResponseProjectOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectResponseProjectLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectResponseProjectCustomerWorkIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectResponseProjectContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectResponseProjectPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectResponseProjectCustomerLabelMax = 500;
+
+export const createCustomerWorkProjectResponseProjectWorkVersionMax = 2147483646;
+
+export const createCustomerWorkProjectResponseProjectEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectResponseProjectNameMax = 200;
+
+export const createCustomerWorkProjectResponseProjectCrewUserIdsItemMax = 200;
+
+export const createCustomerWorkProjectResponseProjectCrewUserIdsMax = 50;
+
+export const createCustomerWorkProjectResponseProjectCrewNotesMax = 4000;
+
+export const createCustomerWorkProjectResponseCommandRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectResponseCommandCustomerWorkIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectResponseCommandTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkProjectResponseCommandVersionMax = 2147483646;
+
+
+
+export const CreateCustomerWorkProjectResponse = zod.object({
+  "organizationId": zod.uuid().regex(createCustomerWorkProjectResponseOrganizationIdRegExp),
+  "project": zod.object({
+  "id": zod.uuid().regex(createCustomerWorkProjectResponseProjectIdRegExp),
+  "organizationId": zod.uuid().regex(createCustomerWorkProjectResponseProjectOrganizationIdRegExp),
+  "leadId": zod.uuid().regex(createCustomerWorkProjectResponseProjectLeadIdRegExp).nullable(),
+  "customerWorkId": zod.uuid().regex(createCustomerWorkProjectResponseProjectCustomerWorkIdRegExp).nullable(),
+  "contactId": zod.uuid().regex(createCustomerWorkProjectResponseProjectContactIdRegExp),
+  "propertyId": zod.uuid().regex(createCustomerWorkProjectResponseProjectPropertyIdRegExp).nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "customerLabel": zod.string().min(1).max(createCustomerWorkProjectResponseProjectCustomerLabelMax),
+  "propertyLabel": zod.string().nullable(),
+  "leadLabel": zod.string().nullable(),
+  "workVersion": zod.int().min(1).max(createCustomerWorkProjectResponseProjectWorkVersionMax).nullable(),
+  "estimateId": zod.uuid().regex(createCustomerWorkProjectResponseProjectEstimateIdRegExp).nullable(),
+  "name": zod.string().min(1).max(createCustomerWorkProjectResponseProjectNameMax),
+  "status": zod.enum(['scheduled', 'in_progress', 'on_hold', 'completed', 'cancelled']),
+  "scheduledStart": zod.coerce.date().nullable(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "crewUserIds": zod.array(zod.string().min(1).max(createCustomerWorkProjectResponseProjectCrewUserIdsItemMax)).max(createCustomerWorkProjectResponseProjectCrewUserIdsMax),
+  "crewNotes": zod.string().max(createCustomerWorkProjectResponseProjectCrewNotesMax).nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "command": zod.object({
+  "requestId": zod.uuid().regex(createCustomerWorkProjectResponseCommandRequestIdRegExp),
+  "action": zod.enum(['estimate_created', 'estimate_updated', 'project_created', 'project_updated']),
+  "customerWorkId": zod.uuid().regex(createCustomerWorkProjectResponseCommandCustomerWorkIdRegExp),
+  "targetId": zod.uuid().regex(createCustomerWorkProjectResponseCommandTargetIdRegExp),
+  "version": zod.int().min(1).max(createCustomerWorkProjectResponseCommandVersionMax),
+  "duplicate": zod.boolean()
+})
+})
+
+
+/**
+ * Explicit canonical returning-customer work. No acquisition lead, signature, provider delivery or payment is inferred. Exact original request/result is retained transactionally. The root/property is immutable and native estimate/job history is versioned.
+ * @summary updateCustomerWorkEstimate
+ */
+export const UpdateCustomerWorkEstimateParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const updateCustomerWorkEstimateBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkEstimateBodyExpectedWorkVersionMax = 2147483646;
+
+export const updateCustomerWorkEstimateBodyTitleMax = 150;
+
+export const updateCustomerWorkEstimateBodyLineItemsItemDescriptionMax = 1000;
+
+export const updateCustomerWorkEstimateBodyLineItemsItemQuantityExclusiveMin = 0;
+export const updateCustomerWorkEstimateBodyLineItemsItemQuantityMax = 999999;
+
+export const updateCustomerWorkEstimateBodyLineItemsItemUnitPriceCentsMin = 0;
+export const updateCustomerWorkEstimateBodyLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const updateCustomerWorkEstimateBodyLineItemsMax = 100;
+
+export const updateCustomerWorkEstimateBodyTaxCentsMin = 0;
+export const updateCustomerWorkEstimateBodyTaxCentsMax = 1000000000;
+
+export const updateCustomerWorkEstimateBodyNotesMax = 2000;
+
+
+
+export const UpdateCustomerWorkEstimateBody = zod.object({
+  "requestId": zod.uuid().regex(updateCustomerWorkEstimateBodyRequestIdRegExp),
+  "confirmed": zod.literal(true),
+  "expectedWorkVersion": zod.int().min(1).max(updateCustomerWorkEstimateBodyExpectedWorkVersionMax),
+  "title": zod.string().min(1).max(updateCustomerWorkEstimateBodyTitleMax),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(updateCustomerWorkEstimateBodyLineItemsItemDescriptionMax),
+  "quantity": zod.number().gt(updateCustomerWorkEstimateBodyLineItemsItemQuantityExclusiveMin).max(updateCustomerWorkEstimateBodyLineItemsItemQuantityMax),
+  "unitPriceCents": zod.int().min(updateCustomerWorkEstimateBodyLineItemsItemUnitPriceCentsMin).max(updateCustomerWorkEstimateBodyLineItemsItemUnitPriceCentsMax)
+})).max(updateCustomerWorkEstimateBodyLineItemsMax),
+  "taxCents": zod.int().min(updateCustomerWorkEstimateBodyTaxCentsMin).max(updateCustomerWorkEstimateBodyTaxCentsMax),
+  "notes": zod.string().max(updateCustomerWorkEstimateBodyNotesMax).nullable(),
+  "status": zod.enum(['draft', 'sent', 'accepted', 'declined'])
+})
+
+export const updateCustomerWorkEstimateResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkEstimateResponseEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkEstimateResponseEstimateOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkEstimateResponseEstimateLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkEstimateResponseEstimateCustomerWorkIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkEstimateResponseEstimateContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkEstimateResponseEstimatePropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkEstimateResponseEstimateCustomerLabelMax = 500;
+
+export const updateCustomerWorkEstimateResponseEstimateWorkVersionMax = 2147483646;
+
+export const updateCustomerWorkEstimateResponseEstimateTitleMax = 150;
+
+export const updateCustomerWorkEstimateResponseEstimateLineItemsItemDescriptionMax = 1000;
+
+export const updateCustomerWorkEstimateResponseEstimateLineItemsItemQuantityExclusiveMin = 0;
+export const updateCustomerWorkEstimateResponseEstimateLineItemsItemQuantityMax = 999999;
+
+export const updateCustomerWorkEstimateResponseEstimateLineItemsItemUnitPriceCentsMin = 0;
+export const updateCustomerWorkEstimateResponseEstimateLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const updateCustomerWorkEstimateResponseEstimateLineItemsItemTotalCentsMin = 0;
+export const updateCustomerWorkEstimateResponseEstimateLineItemsItemTotalCentsMax = 1000000000;
+
+export const updateCustomerWorkEstimateResponseEstimateLineItemsMax = 100;
+
+export const updateCustomerWorkEstimateResponseEstimateSubtotalCentsMin = 0;
+export const updateCustomerWorkEstimateResponseEstimateSubtotalCentsMax = 1000000000;
+
+export const updateCustomerWorkEstimateResponseEstimateTaxCentsMin = 0;
+export const updateCustomerWorkEstimateResponseEstimateTaxCentsMax = 1000000000;
+
+export const updateCustomerWorkEstimateResponseEstimateTotalCentsMin = 0;
+export const updateCustomerWorkEstimateResponseEstimateTotalCentsMax = 1000000000;
+
+export const updateCustomerWorkEstimateResponseCommandRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkEstimateResponseCommandCustomerWorkIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkEstimateResponseCommandTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCustomerWorkEstimateResponseCommandVersionMax = 2147483646;
+
+
+
+export const UpdateCustomerWorkEstimateResponse = zod.object({
+  "organizationId": zod.uuid().regex(updateCustomerWorkEstimateResponseOrganizationIdRegExp),
+  "estimate": zod.object({
+  "id": zod.uuid().regex(updateCustomerWorkEstimateResponseEstimateIdRegExp),
+  "organizationId": zod.uuid().regex(updateCustomerWorkEstimateResponseEstimateOrganizationIdRegExp),
+  "leadId": zod.uuid().regex(updateCustomerWorkEstimateResponseEstimateLeadIdRegExp).nullable(),
+  "customerWorkId": zod.uuid().regex(updateCustomerWorkEstimateResponseEstimateCustomerWorkIdRegExp).nullable(),
+  "contactId": zod.uuid().regex(updateCustomerWorkEstimateResponseEstimateContactIdRegExp),
+  "propertyId": zod.uuid().regex(updateCustomerWorkEstimateResponseEstimatePropertyIdRegExp).nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "customerLabel": zod.string().min(1).max(updateCustomerWorkEstimateResponseEstimateCustomerLabelMax),
+  "propertyLabel": zod.string().nullable(),
+  "leadLabel": zod.string().nullable(),
+  "workVersion": zod.int().min(1).max(updateCustomerWorkEstimateResponseEstimateWorkVersionMax).nullable(),
+  "title": zod.string().min(1).max(updateCustomerWorkEstimateResponseEstimateTitleMax),
+  "status": zod.enum(['draft', 'sent', 'accepted', 'declined']),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(updateCustomerWorkEstimateResponseEstimateLineItemsItemDescriptionMax),
+  "quantity": zod.number().gt(updateCustomerWorkEstimateResponseEstimateLineItemsItemQuantityExclusiveMin).max(updateCustomerWorkEstimateResponseEstimateLineItemsItemQuantityMax),
+  "unitPriceCents": zod.int().min(updateCustomerWorkEstimateResponseEstimateLineItemsItemUnitPriceCentsMin).max(updateCustomerWorkEstimateResponseEstimateLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(updateCustomerWorkEstimateResponseEstimateLineItemsItemTotalCentsMin).max(updateCustomerWorkEstimateResponseEstimateLineItemsItemTotalCentsMax)
+})).max(updateCustomerWorkEstimateResponseEstimateLineItemsMax),
+  "subtotalCents": zod.int().min(updateCustomerWorkEstimateResponseEstimateSubtotalCentsMin).max(updateCustomerWorkEstimateResponseEstimateSubtotalCentsMax),
+  "taxCents": zod.int().min(updateCustomerWorkEstimateResponseEstimateTaxCentsMin).max(updateCustomerWorkEstimateResponseEstimateTaxCentsMax),
+  "totalCents": zod.int().min(updateCustomerWorkEstimateResponseEstimateTotalCentsMin).max(updateCustomerWorkEstimateResponseEstimateTotalCentsMax),
+  "notes": zod.string().nullable(),
+  "sentAt": zod.coerce.date().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "command": zod.object({
+  "requestId": zod.uuid().regex(updateCustomerWorkEstimateResponseCommandRequestIdRegExp),
+  "action": zod.enum(['estimate_created', 'estimate_updated', 'project_created', 'project_updated']),
+  "customerWorkId": zod.uuid().regex(updateCustomerWorkEstimateResponseCommandCustomerWorkIdRegExp),
+  "targetId": zod.uuid().regex(updateCustomerWorkEstimateResponseCommandTargetIdRegExp),
+  "version": zod.int().min(1).max(updateCustomerWorkEstimateResponseCommandVersionMax),
+  "duplicate": zod.boolean()
+})
+})
+
+
+/**
+ * Explicit canonical returning-customer work. No acquisition lead, signature, provider delivery or payment is inferred. Exact original request/result is retained transactionally. The root/property is immutable and native estimate/job history is versioned.
+ * @summary createCustomerWorkEstimate
+ */
+export const createCustomerWorkEstimateBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkEstimateBodySourceContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkEstimateBodySourcePropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkEstimateBodyTitleMax = 150;
+
+export const createCustomerWorkEstimateBodyLineItemsItemDescriptionMax = 1000;
+
+export const createCustomerWorkEstimateBodyLineItemsItemQuantityExclusiveMin = 0;
+export const createCustomerWorkEstimateBodyLineItemsItemQuantityMax = 999999;
+
+export const createCustomerWorkEstimateBodyLineItemsItemUnitPriceCentsMin = 0;
+export const createCustomerWorkEstimateBodyLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const createCustomerWorkEstimateBodyLineItemsMax = 100;
+
+export const createCustomerWorkEstimateBodyTaxCentsMin = 0;
+export const createCustomerWorkEstimateBodyTaxCentsMax = 1000000000;
+
+export const createCustomerWorkEstimateBodyNotesMax = 2000;
+
+
+
+export const CreateCustomerWorkEstimateBody = zod.object({
+  "requestId": zod.uuid().regex(createCustomerWorkEstimateBodyRequestIdRegExp),
+  "confirmed": zod.literal(true),
+  "source": zod.object({
+  "kind": zod.enum(['existing_customer']),
+  "contactId": zod.uuid().regex(createCustomerWorkEstimateBodySourceContactIdRegExp),
+  "propertyId": zod.uuid().regex(createCustomerWorkEstimateBodySourcePropertyIdRegExp).nullable()
+}),
+  "title": zod.string().min(1).max(createCustomerWorkEstimateBodyTitleMax),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(createCustomerWorkEstimateBodyLineItemsItemDescriptionMax),
+  "quantity": zod.number().gt(createCustomerWorkEstimateBodyLineItemsItemQuantityExclusiveMin).max(createCustomerWorkEstimateBodyLineItemsItemQuantityMax),
+  "unitPriceCents": zod.int().min(createCustomerWorkEstimateBodyLineItemsItemUnitPriceCentsMin).max(createCustomerWorkEstimateBodyLineItemsItemUnitPriceCentsMax)
+})).max(createCustomerWorkEstimateBodyLineItemsMax),
+  "taxCents": zod.int().min(createCustomerWorkEstimateBodyTaxCentsMin).max(createCustomerWorkEstimateBodyTaxCentsMax),
+  "notes": zod.string().max(createCustomerWorkEstimateBodyNotesMax).nullable()
+})
+
+export const createCustomerWorkEstimateResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkEstimateResponseEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkEstimateResponseEstimateOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkEstimateResponseEstimateLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkEstimateResponseEstimateCustomerWorkIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkEstimateResponseEstimateContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkEstimateResponseEstimatePropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkEstimateResponseEstimateCustomerLabelMax = 500;
+
+export const createCustomerWorkEstimateResponseEstimateWorkVersionMax = 2147483646;
+
+export const createCustomerWorkEstimateResponseEstimateTitleMax = 150;
+
+export const createCustomerWorkEstimateResponseEstimateLineItemsItemDescriptionMax = 1000;
+
+export const createCustomerWorkEstimateResponseEstimateLineItemsItemQuantityExclusiveMin = 0;
+export const createCustomerWorkEstimateResponseEstimateLineItemsItemQuantityMax = 999999;
+
+export const createCustomerWorkEstimateResponseEstimateLineItemsItemUnitPriceCentsMin = 0;
+export const createCustomerWorkEstimateResponseEstimateLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const createCustomerWorkEstimateResponseEstimateLineItemsItemTotalCentsMin = 0;
+export const createCustomerWorkEstimateResponseEstimateLineItemsItemTotalCentsMax = 1000000000;
+
+export const createCustomerWorkEstimateResponseEstimateLineItemsMax = 100;
+
+export const createCustomerWorkEstimateResponseEstimateSubtotalCentsMin = 0;
+export const createCustomerWorkEstimateResponseEstimateSubtotalCentsMax = 1000000000;
+
+export const createCustomerWorkEstimateResponseEstimateTaxCentsMin = 0;
+export const createCustomerWorkEstimateResponseEstimateTaxCentsMax = 1000000000;
+
+export const createCustomerWorkEstimateResponseEstimateTotalCentsMin = 0;
+export const createCustomerWorkEstimateResponseEstimateTotalCentsMax = 1000000000;
+
+export const createCustomerWorkEstimateResponseCommandRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkEstimateResponseCommandCustomerWorkIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkEstimateResponseCommandTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createCustomerWorkEstimateResponseCommandVersionMax = 2147483646;
+
+
+
+export const CreateCustomerWorkEstimateResponse = zod.object({
+  "organizationId": zod.uuid().regex(createCustomerWorkEstimateResponseOrganizationIdRegExp),
+  "estimate": zod.object({
+  "id": zod.uuid().regex(createCustomerWorkEstimateResponseEstimateIdRegExp),
+  "organizationId": zod.uuid().regex(createCustomerWorkEstimateResponseEstimateOrganizationIdRegExp),
+  "leadId": zod.uuid().regex(createCustomerWorkEstimateResponseEstimateLeadIdRegExp).nullable(),
+  "customerWorkId": zod.uuid().regex(createCustomerWorkEstimateResponseEstimateCustomerWorkIdRegExp).nullable(),
+  "contactId": zod.uuid().regex(createCustomerWorkEstimateResponseEstimateContactIdRegExp),
+  "propertyId": zod.uuid().regex(createCustomerWorkEstimateResponseEstimatePropertyIdRegExp).nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "customerLabel": zod.string().min(1).max(createCustomerWorkEstimateResponseEstimateCustomerLabelMax),
+  "propertyLabel": zod.string().nullable(),
+  "leadLabel": zod.string().nullable(),
+  "workVersion": zod.int().min(1).max(createCustomerWorkEstimateResponseEstimateWorkVersionMax).nullable(),
+  "title": zod.string().min(1).max(createCustomerWorkEstimateResponseEstimateTitleMax),
+  "status": zod.enum(['draft', 'sent', 'accepted', 'declined']),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(createCustomerWorkEstimateResponseEstimateLineItemsItemDescriptionMax),
+  "quantity": zod.number().gt(createCustomerWorkEstimateResponseEstimateLineItemsItemQuantityExclusiveMin).max(createCustomerWorkEstimateResponseEstimateLineItemsItemQuantityMax),
+  "unitPriceCents": zod.int().min(createCustomerWorkEstimateResponseEstimateLineItemsItemUnitPriceCentsMin).max(createCustomerWorkEstimateResponseEstimateLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(createCustomerWorkEstimateResponseEstimateLineItemsItemTotalCentsMin).max(createCustomerWorkEstimateResponseEstimateLineItemsItemTotalCentsMax)
+})).max(createCustomerWorkEstimateResponseEstimateLineItemsMax),
+  "subtotalCents": zod.int().min(createCustomerWorkEstimateResponseEstimateSubtotalCentsMin).max(createCustomerWorkEstimateResponseEstimateSubtotalCentsMax),
+  "taxCents": zod.int().min(createCustomerWorkEstimateResponseEstimateTaxCentsMin).max(createCustomerWorkEstimateResponseEstimateTaxCentsMax),
+  "totalCents": zod.int().min(createCustomerWorkEstimateResponseEstimateTotalCentsMin).max(createCustomerWorkEstimateResponseEstimateTotalCentsMax),
+  "notes": zod.string().nullable(),
+  "sentAt": zod.coerce.date().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "command": zod.object({
+  "requestId": zod.uuid().regex(createCustomerWorkEstimateResponseCommandRequestIdRegExp),
+  "action": zod.enum(['estimate_created', 'estimate_updated', 'project_created', 'project_updated']),
+  "customerWorkId": zod.uuid().regex(createCustomerWorkEstimateResponseCommandCustomerWorkIdRegExp),
+  "targetId": zod.uuid().regex(createCustomerWorkEstimateResponseCommandTargetIdRegExp),
+  "version": zod.int().min(1).max(createCustomerWorkEstimateResponseCommandVersionMax),
+  "duplicate": zod.boolean()
+})
+})
+
+
+/**
+ * Read-only canonical customer records for current accepted staff. Company comes only from the session. No writes, financial totals, raw activity/mailbox contents or inferred parent links. Sending holds do not block historical reading. Section pages contain at most 25 valid rows in created-descending order, using company/customer/section-bound keyset cursors; not a frozen export.
+ * @summary Read a canonical customer header and available sections
+ */
+export const GetCustomerWorkspaceParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const getCustomerWorkspaceResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceResponseContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceResponseAvailableSectionsMax = 9;
+
+
+
+export const GetCustomerWorkspaceResponse = zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceResponseOrganizationIdRegExp),
+  "contact": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceResponseContactIdRegExp),
+  "firstName": zod.string(),
+  "lastName": zod.string().nullable(),
+  "email": zod.string().nullable(),
+  "phone": zod.string().nullable(),
+  "preferredContactMethod": zod.string().nullable(),
+  "doNotContact": zod.boolean(),
+  "doNotContactEmail": zod.boolean(),
+  "doNotContactSms": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "permissions": zod.object({
+  "canWrite": zod.boolean(),
+  "canReadInvoices": zod.boolean()
+}),
+  "availableSections": zod.array(zod.enum(['properties', 'appointments', 'services', 'leads', 'projects', 'estimates', 'invoices', 'tasks', 'activity'])).max(getCustomerWorkspaceResponseAvailableSectionsMax)
+})
+
+
+/**
+ * Read-only canonical customer records for current accepted staff. Company comes only from the session. No writes, financial totals, raw activity/mailbox contents or inferred parent links. Sending holds do not block historical reading. Section pages contain at most 25 valid rows in created-descending order, using company/customer/section-bound keyset cursors; not a frozen export.
+ * @summary Read one bounded canonical customer record section
+ */
+export const GetCustomerWorkspaceSectionParams = zod.object({
+  "id": zod.uuid(),
+  "section": zod.enum(['properties', 'appointments', 'services', 'leads', 'projects', 'estimates', 'invoices', 'tasks', 'activity'])
+})
+
+export const getCustomerWorkspaceSectionQueryCursorMax = 2048;
+
+
+export const getCustomerWorkspaceSectionQueryCursorRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+
+
+export const GetCustomerWorkspaceSectionQueryParams = zod.object({
+  "cursor": zod.coerce.string().min(1).max(getCustomerWorkspaceSectionQueryCursorMax).regex(getCustomerWorkspaceSectionQueryCursorRegExp).optional()
+})
+
+export const getCustomerWorkspaceSectionResponseOneOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseOneContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseOneNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseOneItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseOneItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseTwoOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseTwoContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseTwoNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseTwoItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseTwoItemsItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseTwoItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseTwoItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseTwoItemsItemOwnerIdMax = 200;
+
+export const getCustomerWorkspaceSectionResponseTwoItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseThreeOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseThreeItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeItemsItemOccurrenceIndexMin = 0;
+export const getCustomerWorkspaceSectionResponseThreeItemsItemOccurrenceIndexMax = 9007199254740991;
+
+export const getCustomerWorkspaceSectionResponseThreeItemsItemPredecessorObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeItemsItemTaskIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeItemsItemAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseThreeItemsItemOwnerIdMax = 200;
+
+export const getCustomerWorkspaceSectionResponseThreeItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseFourOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFourContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFourNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseFourItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFourItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFourItemsItemOwnerIdMax = 200;
+
+export const getCustomerWorkspaceSectionResponseFourItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseFiveOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFiveContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFiveNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseFiveItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFiveItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFiveItemsItemCustomerWorkIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFiveItemsItemWorkVersionExclusiveMin = 0;
+export const getCustomerWorkspaceSectionResponseFiveItemsItemWorkVersionMax = 9007199254740991;
+
+export const getCustomerWorkspaceSectionResponseFiveItemsItemEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFiveItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseFiveItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseSixOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSixContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSixNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseSixItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSixItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSixItemsItemCustomerWorkIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSixItemsItemWorkVersionExclusiveMin = 0;
+export const getCustomerWorkspaceSectionResponseSixItemsItemWorkVersionMax = 9007199254740991;
+
+export const getCustomerWorkspaceSectionResponseSixItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSixItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseSevenOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseSevenItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenItemsItemCustomerWorkIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenItemsItemProjectIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenItemsItemEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseSevenItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseEightOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseEightContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseEightNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseEightItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseEightItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseEightItemsItemOwnerIdMax = 200;
+
+export const getCustomerWorkspaceSectionResponseEightItemsMax = 25;
+
+export const getCustomerWorkspaceSectionResponseNineOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseNineContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseNineNextCursorMax = 2048;
+
+export const getCustomerWorkspaceSectionResponseNineItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseNineItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCustomerWorkspaceSectionResponseNineItemsMax = 25;
+
+
+
+export const GetCustomerWorkspaceSectionResponse = zod.union([zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseOneOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseOneContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseOneNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['properties']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseOneItemsItemIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable(),
+  "kind": zod.enum(['property']),
+  "createdAt": zod.coerce.date()
+})).max(getCustomerWorkspaceSectionResponseOneItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseTwoNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['appointments']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['appointment']),
+  "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']),
+  "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date(),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoItemsItemContactIdRegExp).nullable(),
+  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoItemsItemLeadIdRegExp).nullable(),
+  "property": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoItemsItemPropertyIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable()
+}).nullable(),
+  "owner": zod.object({
+  "id": zod.string().min(1).max(getCustomerWorkspaceSectionResponseTwoItemsItemOwnerIdMax),
+  "name": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseTwoItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseThreeNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['services']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['service']),
+  "serviceKind": zod.enum(['warranty_check', 'maintenance', 'service_plan']),
+  "equipmentLabel": zod.string(),
+  "status": zod.enum(['active', 'completed', 'cancelled']),
+  "dueAt": zod.coerce.date(),
+  "completedAt": zod.coerce.date().nullable(),
+  "coverageStartsOn": zod.coerce.date().nullable(),
+  "coverageEndsOn": zod.coerce.date().nullable(),
+  "occurrenceIndex": zod.int().min(getCustomerWorkspaceSectionResponseThreeItemsItemOccurrenceIndexMin).max(getCustomerWorkspaceSectionResponseThreeItemsItemOccurrenceIndexMax),
+  "predecessorObligationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemPredecessorObligationIdRegExp).nullable(),
+  "taskId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemTaskIdRegExp),
+  "appointmentId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemAppointmentIdRegExp).nullable(),
+  "property": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemPropertyIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable()
+}).nullable(),
+  "owner": zod.object({
+  "id": zod.string().min(1).max(getCustomerWorkspaceSectionResponseThreeItemsItemOwnerIdMax),
+  "name": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseThreeItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFourOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFourContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseFourNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['leads']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseFourItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['lead']),
+  "status": zod.enum(['new', 'ai_qualified', 'contact_attempted', 'inspection_scheduled', 'inspection_completed', 'estimate_preparing', 'estimate_sent', 'claim_pending', 'follow_up', 'won', 'production_scheduled', 'in_progress', 'final_walkthrough', 'completed', 'review_requested', 'nurture', 'lost']),
+  "urgency": zod.enum(['low', 'normal', 'high', 'emergency']),
+  "serviceType": zod.string().nullable(),
+  "property": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseFourItemsItemPropertyIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable()
+}).nullable(),
+  "owner": zod.object({
+  "id": zod.string().min(1).max(getCustomerWorkspaceSectionResponseFourItemsItemOwnerIdMax),
+  "name": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseFourItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseFiveNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['projects']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['project']),
+  "name": zod.string(),
+  "status": zod.enum(['scheduled', 'in_progress', 'on_hold', 'completed', 'cancelled']),
+  "scheduledStart": zod.coerce.date().nullable(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveItemsItemLeadIdRegExp).nullable(),
+  "customerWorkId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveItemsItemCustomerWorkIdRegExp).nullish(),
+  "workVersion": zod.int().gt(getCustomerWorkspaceSectionResponseFiveItemsItemWorkVersionExclusiveMin).max(getCustomerWorkspaceSectionResponseFiveItemsItemWorkVersionMax).nullish(),
+  "estimateId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveItemsItemEstimateIdRegExp).nullable(),
+  "property": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveItemsItemPropertyIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseFiveItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseSixNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['estimates']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['estimate']),
+  "title": zod.string(),
+  "status": zod.enum(['draft', 'sent', 'accepted', 'declined']),
+  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixItemsItemLeadIdRegExp).nullable(),
+  "customerWorkId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixItemsItemCustomerWorkIdRegExp).nullish(),
+  "workVersion": zod.int().gt(getCustomerWorkspaceSectionResponseSixItemsItemWorkVersionExclusiveMin).max(getCustomerWorkspaceSectionResponseSixItemsItemWorkVersionMax).nullish(),
+  "property": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixItemsItemPropertyIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseSixItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseSevenNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['invoices']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['invoice']),
+  "invoiceNumber": zod.string().nullable(),
+  "title": zod.string(),
+  "status": zod.enum(['draft', 'issued', 'void']),
+  "issuedAt": zod.coerce.date().nullable(),
+  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemLeadIdRegExp).nullable(),
+  "customerWorkId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemCustomerWorkIdRegExp).nullish(),
+  "projectId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemProjectIdRegExp).nullable(),
+  "estimateId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemEstimateIdRegExp).nullable(),
+  "property": zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemPropertyIdRegExp),
+  "addressLine1": zod.string(),
+  "addressLine2": zod.string().nullable(),
+  "city": zod.string(),
+  "state": zod.string(),
+  "postalCode": zod.string(),
+  "propertyType": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseSevenItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseEightOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseEightContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseEightNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['tasks']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseEightItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['task']),
+  "title": zod.string(),
+  "status": zod.enum(['open', 'in_progress', 'done', 'cancelled']),
+  "priority": zod.enum(['low', 'normal', 'high', 'emergency']),
+  "dueAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseEightItemsItemLeadIdRegExp).nullable(),
+  "owner": zod.object({
+  "id": zod.string().min(1).max(getCustomerWorkspaceSectionResponseEightItemsItemOwnerIdMax),
+  "name": zod.string().nullable()
+}).nullable()
+})).max(getCustomerWorkspaceSectionResponseEightItemsMax)
+}),zod.object({
+  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseNineOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseNineContactIdRegExp),
+  "order": zod.enum(['created_desc']),
+  "limit": zod.literal(25),
+  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseNineNextCursorMax).nullable(),
+  "hasMore": zod.boolean(),
+  "section": zod.enum(['activity']),
+  "items": zod.array(zod.object({
+  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseNineItemsItemIdRegExp),
+  "createdAt": zod.coerce.date(),
+  "kind": zod.enum(['activity']),
+  "category": zod.enum(['note', 'lead', 'appointment', 'service', 'task', 'communication', 'invoice']),
+  "label": zod.enum(['Note recorded', 'Opportunity updated', 'Visit updated', 'Service updated', 'Task updated', 'Communication event recorded', 'Customer response recorded', 'Invoice updated']),
+  "occurredAt": zod.coerce.date(),
+  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseNineItemsItemLeadIdRegExp).nullable()
+})).max(getCustomerWorkspaceSectionResponseNineItemsMax)
+})])
+
+
+/**
  * Human accepted verified active company staff only; no API-key authority. Requires crm.read, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
  * @summary Read explicit paged customer/property assets
  */
@@ -4699,401 +5754,6 @@ export const ApproveCallieReceptionPolicyResponse = zod.object({
 }),
   "boundary": zod.enum(['Voice-only missed-call reception. Requests are unverified; no automatic booking or messaging permission.'])
 })
-
-
-/**
- * Read-only canonical customer records for current accepted staff. Company comes only from the session. No writes, financial totals, raw activity/mailbox contents or inferred parent links. Sending holds do not block historical reading. Section pages contain at most 25 valid rows in created-descending order, using company/customer/section-bound keyset cursors; not a frozen export.
- * @summary Read a canonical customer header and available sections
- */
-export const GetCustomerWorkspaceParams = zod.object({
-  "id": zod.uuid()
-})
-
-export const getCustomerWorkspaceResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceResponseContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceResponseAvailableSectionsMax = 9;
-
-
-
-export const GetCustomerWorkspaceResponse = zod.object({
-  "organizationId": zod.uuid().regex(getCustomerWorkspaceResponseOrganizationIdRegExp),
-  "contact": zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceResponseContactIdRegExp),
-  "firstName": zod.string(),
-  "lastName": zod.string().nullable(),
-  "email": zod.string().nullable(),
-  "phone": zod.string().nullable(),
-  "preferredContactMethod": zod.string().nullable(),
-  "doNotContact": zod.boolean(),
-  "doNotContactEmail": zod.boolean(),
-  "doNotContactSms": zod.boolean(),
-  "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
-}),
-  "permissions": zod.object({
-  "canWrite": zod.boolean(),
-  "canReadInvoices": zod.boolean()
-}),
-  "availableSections": zod.array(zod.enum(['properties', 'appointments', 'services', 'leads', 'projects', 'estimates', 'invoices', 'tasks', 'activity'])).max(getCustomerWorkspaceResponseAvailableSectionsMax)
-})
-
-
-/**
- * Read-only canonical customer records for current accepted staff. Company comes only from the session. No writes, financial totals, raw activity/mailbox contents or inferred parent links. Sending holds do not block historical reading. Section pages contain at most 25 valid rows in created-descending order, using company/customer/section-bound keyset cursors; not a frozen export.
- * @summary Read one bounded canonical customer record section
- */
-export const GetCustomerWorkspaceSectionParams = zod.object({
-  "id": zod.uuid(),
-  "section": zod.enum(['properties', 'appointments', 'services', 'leads', 'projects', 'estimates', 'invoices', 'tasks', 'activity'])
-})
-
-export const getCustomerWorkspaceSectionQueryCursorMax = 2048;
-
-
-export const getCustomerWorkspaceSectionQueryCursorRegExp = new RegExp('^[A-Za-z0-9_-]+$');
-
-
-export const GetCustomerWorkspaceSectionQueryParams = zod.object({
-  "cursor": zod.coerce.string().min(1).max(getCustomerWorkspaceSectionQueryCursorMax).regex(getCustomerWorkspaceSectionQueryCursorRegExp).optional()
-})
-
-export const getCustomerWorkspaceSectionResponseOneOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseOneContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseOneNextCursorMax = 2048;
-
-export const getCustomerWorkspaceSectionResponseOneItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseOneItemsMax = 25;
-
-export const getCustomerWorkspaceSectionResponseTwoOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseTwoContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseTwoNextCursorMax = 2048;
-
-export const getCustomerWorkspaceSectionResponseTwoItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseTwoItemsItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseTwoItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseTwoItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseTwoItemsItemOwnerIdMax = 200;
-
-export const getCustomerWorkspaceSectionResponseTwoItemsMax = 25;
-
-export const getCustomerWorkspaceSectionResponseThreeOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseThreeContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseThreeNextCursorMax = 2048;
-
-export const getCustomerWorkspaceSectionResponseThreeItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseThreeItemsItemOccurrenceIndexMin = 0;
-export const getCustomerWorkspaceSectionResponseThreeItemsItemOccurrenceIndexMax = 9007199254740991;
-
-export const getCustomerWorkspaceSectionResponseThreeItemsItemPredecessorObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseThreeItemsItemTaskIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseThreeItemsItemAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseThreeItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseThreeItemsItemOwnerIdMax = 200;
-
-export const getCustomerWorkspaceSectionResponseThreeItemsMax = 25;
-
-export const getCustomerWorkspaceSectionResponseFourOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseFourContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseFourNextCursorMax = 2048;
-
-export const getCustomerWorkspaceSectionResponseFourItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseFourItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseFourItemsItemOwnerIdMax = 200;
-
-export const getCustomerWorkspaceSectionResponseFourItemsMax = 25;
-
-export const getCustomerWorkspaceSectionResponseFiveOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseFiveContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseFiveNextCursorMax = 2048;
-
-export const getCustomerWorkspaceSectionResponseFiveItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseFiveItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseFiveItemsItemEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseFiveItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseFiveItemsMax = 25;
-
-export const getCustomerWorkspaceSectionResponseSixOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseSixContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseSixNextCursorMax = 2048;
-
-export const getCustomerWorkspaceSectionResponseSixItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseSixItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseSixItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseSixItemsMax = 25;
-
-export const getCustomerWorkspaceSectionResponseSevenOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseSevenContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseSevenNextCursorMax = 2048;
-
-export const getCustomerWorkspaceSectionResponseSevenItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseSevenItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseSevenItemsItemProjectIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseSevenItemsItemEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseSevenItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseSevenItemsMax = 25;
-
-export const getCustomerWorkspaceSectionResponseEightOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseEightContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseEightNextCursorMax = 2048;
-
-export const getCustomerWorkspaceSectionResponseEightItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseEightItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseEightItemsItemOwnerIdMax = 200;
-
-export const getCustomerWorkspaceSectionResponseEightItemsMax = 25;
-
-export const getCustomerWorkspaceSectionResponseNineOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseNineContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseNineNextCursorMax = 2048;
-
-export const getCustomerWorkspaceSectionResponseNineItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseNineItemsItemLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
-export const getCustomerWorkspaceSectionResponseNineItemsMax = 25;
-
-
-
-export const GetCustomerWorkspaceSectionResponse = zod.union([zod.object({
-  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseOneOrganizationIdRegExp),
-  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseOneContactIdRegExp),
-  "order": zod.enum(['created_desc']),
-  "limit": zod.literal(25),
-  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseOneNextCursorMax).nullable(),
-  "hasMore": zod.boolean(),
-  "section": zod.enum(['properties']),
-  "items": zod.array(zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseOneItemsItemIdRegExp),
-  "addressLine1": zod.string(),
-  "addressLine2": zod.string().nullable(),
-  "city": zod.string(),
-  "state": zod.string(),
-  "postalCode": zod.string(),
-  "propertyType": zod.string().nullable(),
-  "kind": zod.enum(['property']),
-  "createdAt": zod.coerce.date()
-})).max(getCustomerWorkspaceSectionResponseOneItemsMax)
-}),zod.object({
-  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoOrganizationIdRegExp),
-  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoContactIdRegExp),
-  "order": zod.enum(['created_desc']),
-  "limit": zod.literal(25),
-  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseTwoNextCursorMax).nullable(),
-  "hasMore": zod.boolean(),
-  "section": zod.enum(['appointments']),
-  "items": zod.array(zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoItemsItemIdRegExp),
-  "createdAt": zod.coerce.date(),
-  "kind": zod.enum(['appointment']),
-  "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']),
-  "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']),
-  "scheduledStart": zod.coerce.date(),
-  "scheduledEnd": zod.coerce.date().nullable(),
-  "updatedAt": zod.coerce.date(),
-  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoItemsItemContactIdRegExp).nullable(),
-  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoItemsItemLeadIdRegExp).nullable(),
-  "property": zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseTwoItemsItemPropertyIdRegExp),
-  "addressLine1": zod.string(),
-  "addressLine2": zod.string().nullable(),
-  "city": zod.string(),
-  "state": zod.string(),
-  "postalCode": zod.string(),
-  "propertyType": zod.string().nullable()
-}).nullable(),
-  "owner": zod.object({
-  "id": zod.string().min(1).max(getCustomerWorkspaceSectionResponseTwoItemsItemOwnerIdMax),
-  "name": zod.string().nullable()
-}).nullable()
-})).max(getCustomerWorkspaceSectionResponseTwoItemsMax)
-}),zod.object({
-  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeOrganizationIdRegExp),
-  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeContactIdRegExp),
-  "order": zod.enum(['created_desc']),
-  "limit": zod.literal(25),
-  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseThreeNextCursorMax).nullable(),
-  "hasMore": zod.boolean(),
-  "section": zod.enum(['services']),
-  "items": zod.array(zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemIdRegExp),
-  "createdAt": zod.coerce.date(),
-  "kind": zod.enum(['service']),
-  "serviceKind": zod.enum(['warranty_check', 'maintenance', 'service_plan']),
-  "equipmentLabel": zod.string(),
-  "status": zod.enum(['active', 'completed', 'cancelled']),
-  "dueAt": zod.coerce.date(),
-  "completedAt": zod.coerce.date().nullable(),
-  "coverageStartsOn": zod.coerce.date().nullable(),
-  "coverageEndsOn": zod.coerce.date().nullable(),
-  "occurrenceIndex": zod.int().min(getCustomerWorkspaceSectionResponseThreeItemsItemOccurrenceIndexMin).max(getCustomerWorkspaceSectionResponseThreeItemsItemOccurrenceIndexMax),
-  "predecessorObligationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemPredecessorObligationIdRegExp).nullable(),
-  "taskId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemTaskIdRegExp),
-  "appointmentId": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemAppointmentIdRegExp).nullable(),
-  "property": zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseThreeItemsItemPropertyIdRegExp),
-  "addressLine1": zod.string(),
-  "addressLine2": zod.string().nullable(),
-  "city": zod.string(),
-  "state": zod.string(),
-  "postalCode": zod.string(),
-  "propertyType": zod.string().nullable()
-}).nullable(),
-  "owner": zod.object({
-  "id": zod.string().min(1).max(getCustomerWorkspaceSectionResponseThreeItemsItemOwnerIdMax),
-  "name": zod.string().nullable()
-}).nullable()
-})).max(getCustomerWorkspaceSectionResponseThreeItemsMax)
-}),zod.object({
-  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFourOrganizationIdRegExp),
-  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFourContactIdRegExp),
-  "order": zod.enum(['created_desc']),
-  "limit": zod.literal(25),
-  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseFourNextCursorMax).nullable(),
-  "hasMore": zod.boolean(),
-  "section": zod.enum(['leads']),
-  "items": zod.array(zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseFourItemsItemIdRegExp),
-  "createdAt": zod.coerce.date(),
-  "kind": zod.enum(['lead']),
-  "status": zod.enum(['new', 'ai_qualified', 'contact_attempted', 'inspection_scheduled', 'inspection_completed', 'estimate_preparing', 'estimate_sent', 'claim_pending', 'follow_up', 'won', 'production_scheduled', 'in_progress', 'final_walkthrough', 'completed', 'review_requested', 'nurture', 'lost']),
-  "urgency": zod.enum(['low', 'normal', 'high', 'emergency']),
-  "serviceType": zod.string().nullable(),
-  "property": zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseFourItemsItemPropertyIdRegExp),
-  "addressLine1": zod.string(),
-  "addressLine2": zod.string().nullable(),
-  "city": zod.string(),
-  "state": zod.string(),
-  "postalCode": zod.string(),
-  "propertyType": zod.string().nullable()
-}).nullable(),
-  "owner": zod.object({
-  "id": zod.string().min(1).max(getCustomerWorkspaceSectionResponseFourItemsItemOwnerIdMax),
-  "name": zod.string().nullable()
-}).nullable()
-})).max(getCustomerWorkspaceSectionResponseFourItemsMax)
-}),zod.object({
-  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveOrganizationIdRegExp),
-  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveContactIdRegExp),
-  "order": zod.enum(['created_desc']),
-  "limit": zod.literal(25),
-  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseFiveNextCursorMax).nullable(),
-  "hasMore": zod.boolean(),
-  "section": zod.enum(['projects']),
-  "items": zod.array(zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveItemsItemIdRegExp),
-  "createdAt": zod.coerce.date(),
-  "kind": zod.enum(['project']),
-  "name": zod.string(),
-  "status": zod.enum(['scheduled', 'in_progress', 'on_hold', 'completed', 'cancelled']),
-  "scheduledStart": zod.coerce.date().nullable(),
-  "scheduledEnd": zod.coerce.date().nullable(),
-  "completedAt": zod.coerce.date().nullable(),
-  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveItemsItemLeadIdRegExp),
-  "estimateId": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveItemsItemEstimateIdRegExp).nullable(),
-  "property": zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseFiveItemsItemPropertyIdRegExp),
-  "addressLine1": zod.string(),
-  "addressLine2": zod.string().nullable(),
-  "city": zod.string(),
-  "state": zod.string(),
-  "postalCode": zod.string(),
-  "propertyType": zod.string().nullable()
-}).nullable()
-})).max(getCustomerWorkspaceSectionResponseFiveItemsMax)
-}),zod.object({
-  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixOrganizationIdRegExp),
-  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixContactIdRegExp),
-  "order": zod.enum(['created_desc']),
-  "limit": zod.literal(25),
-  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseSixNextCursorMax).nullable(),
-  "hasMore": zod.boolean(),
-  "section": zod.enum(['estimates']),
-  "items": zod.array(zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixItemsItemIdRegExp),
-  "createdAt": zod.coerce.date(),
-  "kind": zod.enum(['estimate']),
-  "title": zod.string(),
-  "status": zod.enum(['draft', 'sent', 'accepted', 'declined']),
-  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixItemsItemLeadIdRegExp),
-  "property": zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseSixItemsItemPropertyIdRegExp),
-  "addressLine1": zod.string(),
-  "addressLine2": zod.string().nullable(),
-  "city": zod.string(),
-  "state": zod.string(),
-  "postalCode": zod.string(),
-  "propertyType": zod.string().nullable()
-}).nullable()
-})).max(getCustomerWorkspaceSectionResponseSixItemsMax)
-}),zod.object({
-  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenOrganizationIdRegExp),
-  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenContactIdRegExp),
-  "order": zod.enum(['created_desc']),
-  "limit": zod.literal(25),
-  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseSevenNextCursorMax).nullable(),
-  "hasMore": zod.boolean(),
-  "section": zod.enum(['invoices']),
-  "items": zod.array(zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemIdRegExp),
-  "createdAt": zod.coerce.date(),
-  "kind": zod.enum(['invoice']),
-  "invoiceNumber": zod.string().nullable(),
-  "title": zod.string(),
-  "status": zod.enum(['draft', 'issued', 'void']),
-  "issuedAt": zod.coerce.date().nullable(),
-  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemLeadIdRegExp),
-  "projectId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemProjectIdRegExp).nullable(),
-  "estimateId": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemEstimateIdRegExp).nullable(),
-  "property": zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseSevenItemsItemPropertyIdRegExp),
-  "addressLine1": zod.string(),
-  "addressLine2": zod.string().nullable(),
-  "city": zod.string(),
-  "state": zod.string(),
-  "postalCode": zod.string(),
-  "propertyType": zod.string().nullable()
-}).nullable()
-})).max(getCustomerWorkspaceSectionResponseSevenItemsMax)
-}),zod.object({
-  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseEightOrganizationIdRegExp),
-  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseEightContactIdRegExp),
-  "order": zod.enum(['created_desc']),
-  "limit": zod.literal(25),
-  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseEightNextCursorMax).nullable(),
-  "hasMore": zod.boolean(),
-  "section": zod.enum(['tasks']),
-  "items": zod.array(zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseEightItemsItemIdRegExp),
-  "createdAt": zod.coerce.date(),
-  "kind": zod.enum(['task']),
-  "title": zod.string(),
-  "status": zod.enum(['open', 'in_progress', 'done', 'cancelled']),
-  "priority": zod.enum(['low', 'normal', 'high', 'emergency']),
-  "dueAt": zod.coerce.date().nullable(),
-  "completedAt": zod.coerce.date().nullable(),
-  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseEightItemsItemLeadIdRegExp).nullable(),
-  "owner": zod.object({
-  "id": zod.string().min(1).max(getCustomerWorkspaceSectionResponseEightItemsItemOwnerIdMax),
-  "name": zod.string().nullable()
-}).nullable()
-})).max(getCustomerWorkspaceSectionResponseEightItemsMax)
-}),zod.object({
-  "organizationId": zod.uuid().regex(getCustomerWorkspaceSectionResponseNineOrganizationIdRegExp),
-  "contactId": zod.uuid().regex(getCustomerWorkspaceSectionResponseNineContactIdRegExp),
-  "order": zod.enum(['created_desc']),
-  "limit": zod.literal(25),
-  "nextCursor": zod.string().min(1).max(getCustomerWorkspaceSectionResponseNineNextCursorMax).nullable(),
-  "hasMore": zod.boolean(),
-  "section": zod.enum(['activity']),
-  "items": zod.array(zod.object({
-  "id": zod.uuid().regex(getCustomerWorkspaceSectionResponseNineItemsItemIdRegExp),
-  "createdAt": zod.coerce.date(),
-  "kind": zod.enum(['activity']),
-  "category": zod.enum(['note', 'lead', 'appointment', 'service', 'task', 'communication', 'invoice']),
-  "label": zod.enum(['Note recorded', 'Opportunity updated', 'Visit updated', 'Service updated', 'Task updated', 'Communication event recorded', 'Customer response recorded', 'Invoice updated']),
-  "occurredAt": zod.coerce.date(),
-  "leadId": zod.uuid().regex(getCustomerWorkspaceSectionResponseNineItemsItemLeadIdRegExp).nullable()
-})).max(getCustomerWorkspaceSectionResponseNineItemsMax)
-})])
 
 
 /**
@@ -10363,7 +11023,10 @@ export const ListEstimatesQueryParams = zod.object({
   "leadId": zod.uuid().optional(),
   "status": zod.enum(['draft', 'sent', 'accepted', 'declined']).optional(),
   "limit": zod.coerce.number().int().optional().describe('Max rows to return (server caps at 200).'),
-  "offset": zod.coerce.number().int().optional().describe('Number of rows to skip, for paging past earlier results (server treats negatives as 0).')
+  "offset": zod.coerce.number().int().optional().describe('Number of rows to skip, for paging past earlier results (server treats negatives as 0).'),
+  "contactId": zod.uuid().optional(),
+  "customerWorkId": zod.uuid().optional(),
+  "propertyId": zod.uuid().optional()
 })
 
 export const listEstimatesResponseLineItemsItemQuantityMin = 0;
@@ -10372,12 +11035,14 @@ export const listEstimatesResponseLineItemsItemUnitPriceCentsMin = 0;
 
 export const listEstimatesResponseLineItemsItemTotalCentsMin = 0;
 
+export const listEstimatesResponseWorkVersionMax = 2147483646;
+
 
 
 export const ListEstimatesResponseItem = zod.object({
   "id": zod.uuid(),
   "organizationId": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "title": zod.string(),
   "status": zod.enum(['draft', 'sent', 'accepted', 'declined']),
   "lineItems": zod.array(zod.object({
@@ -10394,7 +11059,14 @@ export const ListEstimatesResponseItem = zod.object({
   "sentAt": zod.coerce.date().nullish(),
   "acceptedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "customerWorkId": zod.uuid().nullish(),
+  "contactId": zod.uuid().optional(),
+  "propertyId": zod.uuid().nullish(),
+  "sourceKind": zod.enum(['lead', 'customer_work']).optional(),
+  "workVersion": zod.int().min(1).max(listEstimatesResponseWorkVersionMax).nullish(),
+  "customerLabel": zod.string().optional(),
+  "propertyLabel": zod.string().nullish()
 })
 export const ListEstimatesResponse = zod.array(ListEstimatesResponseItem)
 
@@ -10430,12 +11102,14 @@ export const createEstimateResponseLineItemsItemUnitPriceCentsMin = 0;
 
 export const createEstimateResponseLineItemsItemTotalCentsMin = 0;
 
+export const createEstimateResponseWorkVersionMax = 2147483646;
+
 
 
 export const CreateEstimateResponse = zod.object({
   "id": zod.uuid(),
   "organizationId": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "title": zod.string(),
   "status": zod.enum(['draft', 'sent', 'accepted', 'declined']),
   "lineItems": zod.array(zod.object({
@@ -10452,7 +11126,14 @@ export const CreateEstimateResponse = zod.object({
   "sentAt": zod.coerce.date().nullish(),
   "acceptedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "customerWorkId": zod.uuid().nullish(),
+  "contactId": zod.uuid().optional(),
+  "propertyId": zod.uuid().nullish(),
+  "sourceKind": zod.enum(['lead', 'customer_work']).optional(),
+  "workVersion": zod.int().min(1).max(createEstimateResponseWorkVersionMax).nullish(),
+  "customerLabel": zod.string().optional(),
+  "propertyLabel": zod.string().nullish()
 })
 
 
@@ -10466,12 +11147,14 @@ export const getEstimateResponseLineItemsItemUnitPriceCentsMin = 0;
 
 export const getEstimateResponseLineItemsItemTotalCentsMin = 0;
 
+export const getEstimateResponseWorkVersionMax = 2147483646;
+
 
 
 export const GetEstimateResponse = zod.object({
   "id": zod.uuid(),
   "organizationId": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "title": zod.string(),
   "status": zod.enum(['draft', 'sent', 'accepted', 'declined']),
   "lineItems": zod.array(zod.object({
@@ -10488,7 +11171,14 @@ export const GetEstimateResponse = zod.object({
   "sentAt": zod.coerce.date().nullish(),
   "acceptedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "customerWorkId": zod.uuid().nullish(),
+  "contactId": zod.uuid().optional(),
+  "propertyId": zod.uuid().nullish(),
+  "sourceKind": zod.enum(['lead', 'customer_work']).optional(),
+  "workVersion": zod.int().min(1).max(getEstimateResponseWorkVersionMax).nullish(),
+  "customerLabel": zod.string().optional(),
+  "propertyLabel": zod.string().nullish()
 })
 
 
@@ -10526,12 +11216,14 @@ export const updateEstimateResponseLineItemsItemUnitPriceCentsMin = 0;
 
 export const updateEstimateResponseLineItemsItemTotalCentsMin = 0;
 
+export const updateEstimateResponseWorkVersionMax = 2147483646;
+
 
 
 export const UpdateEstimateResponse = zod.object({
   "id": zod.uuid(),
   "organizationId": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "title": zod.string(),
   "status": zod.enum(['draft', 'sent', 'accepted', 'declined']),
   "lineItems": zod.array(zod.object({
@@ -10548,7 +11240,14 @@ export const UpdateEstimateResponse = zod.object({
   "sentAt": zod.coerce.date().nullish(),
   "acceptedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "customerWorkId": zod.uuid().nullish(),
+  "contactId": zod.uuid().optional(),
+  "propertyId": zod.uuid().nullish(),
+  "sourceKind": zod.enum(['lead', 'customer_work']).optional(),
+  "workVersion": zod.int().min(1).max(updateEstimateResponseWorkVersionMax).nullish(),
+  "customerLabel": zod.string().optional(),
+  "propertyLabel": zod.string().nullish()
 })
 
 
@@ -10561,13 +11260,20 @@ export const DeleteEstimateResponse = zod.void()
 
 export const ListProjectsQueryParams = zod.object({
   "leadId": zod.uuid().optional(),
-  "status": zod.enum(['scheduled', 'in_progress', 'on_hold', 'completed', 'cancelled']).optional()
+  "status": zod.enum(['scheduled', 'in_progress', 'on_hold', 'completed', 'cancelled']).optional(),
+  "contactId": zod.uuid().optional(),
+  "customerWorkId": zod.uuid().optional(),
+  "propertyId": zod.uuid().optional()
 })
+
+export const listProjectsResponseWorkVersionMax = 2147483646;
+
+
 
 export const ListProjectsResponseItem = zod.object({
   "id": zod.uuid(),
   "organizationId": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "leadLabel": zod.string().nullish().describe('Convenience display name of the linked lead (contact name, falling back to lead summary; list endpoints only).'),
   "estimateId": zod.uuid().nullish(),
   "name": zod.string(),
@@ -10578,7 +11284,14 @@ export const ListProjectsResponseItem = zod.object({
   "crewNotes": zod.string().nullish(),
   "completedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "customerWorkId": zod.uuid().nullish(),
+  "contactId": zod.uuid().optional(),
+  "propertyId": zod.uuid().nullish(),
+  "sourceKind": zod.enum(['lead', 'customer_work']).optional(),
+  "workVersion": zod.int().min(1).max(listProjectsResponseWorkVersionMax).nullish(),
+  "customerLabel": zod.string().optional(),
+  "propertyLabel": zod.string().nullish()
 })
 export const ListProjectsResponse = zod.array(ListProjectsResponseItem)
 
@@ -10597,10 +11310,14 @@ export const CreateProjectBody = zod.object({
   "crewNotes": zod.string().optional()
 })
 
+export const createProjectResponseWorkVersionMax = 2147483646;
+
+
+
 export const CreateProjectResponse = zod.object({
   "id": zod.uuid(),
   "organizationId": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "leadLabel": zod.string().nullish().describe('Convenience display name of the linked lead (contact name, falling back to lead summary; list endpoints only).'),
   "estimateId": zod.uuid().nullish(),
   "name": zod.string(),
@@ -10611,7 +11328,14 @@ export const CreateProjectResponse = zod.object({
   "crewNotes": zod.string().nullish(),
   "completedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "customerWorkId": zod.uuid().nullish(),
+  "contactId": zod.uuid().optional(),
+  "propertyId": zod.uuid().nullish(),
+  "sourceKind": zod.enum(['lead', 'customer_work']).optional(),
+  "workVersion": zod.int().min(1).max(createProjectResponseWorkVersionMax).nullish(),
+  "customerLabel": zod.string().optional(),
+  "propertyLabel": zod.string().nullish()
 })
 
 
@@ -10619,10 +11343,14 @@ export const GetProjectParams = zod.object({
   "id": zod.uuid()
 })
 
+export const getProjectResponseWorkVersionMax = 2147483646;
+
+
+
 export const GetProjectResponse = zod.object({
   "id": zod.uuid(),
   "organizationId": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "leadLabel": zod.string().nullish().describe('Convenience display name of the linked lead (contact name, falling back to lead summary; list endpoints only).'),
   "estimateId": zod.uuid().nullish(),
   "name": zod.string(),
@@ -10633,7 +11361,14 @@ export const GetProjectResponse = zod.object({
   "crewNotes": zod.string().nullish(),
   "completedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "customerWorkId": zod.uuid().nullish(),
+  "contactId": zod.uuid().optional(),
+  "propertyId": zod.uuid().nullish(),
+  "sourceKind": zod.enum(['lead', 'customer_work']).optional(),
+  "workVersion": zod.int().min(1).max(getProjectResponseWorkVersionMax).nullish(),
+  "customerLabel": zod.string().optional(),
+  "propertyLabel": zod.string().nullish()
 })
 
 
@@ -10655,10 +11390,14 @@ export const UpdateProjectBody = zod.object({
   "expectedUpdatedAt": zod.coerce.date().optional().describe('Last observed update token; stale edits return 409.')
 })
 
+export const updateProjectResponseWorkVersionMax = 2147483646;
+
+
+
 export const UpdateProjectResponse = zod.object({
   "id": zod.uuid(),
   "organizationId": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "leadLabel": zod.string().nullish().describe('Convenience display name of the linked lead (contact name, falling back to lead summary; list endpoints only).'),
   "estimateId": zod.uuid().nullish(),
   "name": zod.string(),
@@ -10669,7 +11408,14 @@ export const UpdateProjectResponse = zod.object({
   "crewNotes": zod.string().nullish(),
   "completedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
+  "updatedAt": zod.coerce.date(),
+  "customerWorkId": zod.uuid().nullish(),
+  "contactId": zod.uuid().optional(),
+  "propertyId": zod.uuid().nullish(),
+  "sourceKind": zod.enum(['lead', 'customer_work']).optional(),
+  "workVersion": zod.int().min(1).max(updateProjectResponseWorkVersionMax).nullish(),
+  "customerLabel": zod.string().optional(),
+  "propertyLabel": zod.string().nullish()
 })
 
 
@@ -14073,11 +14819,13 @@ export const GetContractorTodayResponse = zod.object({
   "id": zod.uuid(),
   "title": zod.string(),
   "status": zod.string(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "customerLabel": zod.string().nullable(),
   "crewNames": zod.array(zod.string()),
   "scheduledStart": zod.coerce.date().nullable(),
-  "scheduledEnd": zod.coerce.date().nullable()
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "customerWorkId": zod.uuid().nullish(),
+  "contactId": zod.uuid().optional()
 })).max(getContractorTodayResponseProjectsItemsMax),
   "total": zod.int().min(getContractorTodayResponseProjectsTotalMin),
   "truncated": zod.boolean()
@@ -14115,7 +14863,9 @@ export const ListInvoicesQueryParams = zod.object({
   "status": zod.enum(['draft', 'issued', 'void']).optional(),
   "leadId": zod.uuid().optional(),
   "projectId": zod.uuid().optional(),
-  "page": zod.coerce.number().int().min(listInvoicesQueryPageMin).max(listInvoicesQueryPageMax).default(listInvoicesQueryPageDefault)
+  "page": zod.coerce.number().int().min(listInvoicesQueryPageMin).max(listInvoicesQueryPageMax).default(listInvoicesQueryPageDefault),
+  "contactId": zod.uuid().optional(),
+  "customerWorkId": zod.uuid().optional()
 })
 
 export const listInvoicesResponseItemsItemOpeningReceivableCentsMin = 0;
@@ -14157,7 +14907,7 @@ export const ListInvoicesResponse = zod.object({
   "recordSha256": zod.string().regex(listInvoicesResponseItemsItemHistoricalSourceOneRecordSha256RegExp)
 }),zod.null()]),
   "id": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "projectId": zod.uuid().nullable(),
   "estimateId": zod.uuid().nullable(),
   "invoiceNumber": zod.string().nullable(),
@@ -14180,7 +14930,12 @@ export const ListInvoicesResponse = zod.object({
   "balanceDueCents": zod.int().nullable(),
   "paymentState": zod.enum(['unpaid', 'partial', 'paid', 'reconciliation_required']),
   "reconciliationRequired": zod.boolean(),
-  "unallocatedRefundCents": zod.int().min(listInvoicesResponseItemsItemUnallocatedRefundCentsMin).max(listInvoicesResponseItemsItemUnallocatedRefundCentsMax)
+  "unallocatedRefundCents": zod.int().min(listInvoicesResponseItemsItemUnallocatedRefundCentsMin).max(listInvoicesResponseItemsItemUnallocatedRefundCentsMax),
+  "customerWorkId": zod.uuid().nullable(),
+  "contactId": zod.uuid(),
+  "propertyId": zod.uuid().nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "organizationId": zod.uuid()
 })).max(listInvoicesResponseItemsMax),
   "total": zod.int().min(listInvoicesResponseTotalMin),
   "page": zod.int().min(listInvoicesResponsePageMin),
@@ -14192,53 +14947,114 @@ export const ListInvoicesResponse = zod.object({
  * Session-only owner/admin/office command. requestId is a durable UUID scoped to this company; reuse the identical request after an uncertain result. Does not send, charge or issue.
  * @summary Prepare a customer invoice draft
  */
-export const createInvoiceBodyDocumentTitleMax = 150;
+export const createInvoiceBodyOneRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createInvoiceBodyOneLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createInvoiceBodyOneProjectIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createInvoiceBodyOneEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createInvoiceBodyOneDocumentTitleMax = 150;
 
-export const createInvoiceBodyDocumentIssuerNameMax = 200;
+export const createInvoiceBodyOneDocumentIssuerNameMax = 200;
 
-export const createInvoiceBodyDocumentIssuerAddressMax = 500;
+export const createInvoiceBodyOneDocumentIssuerAddressMax = 500;
 
-export const createInvoiceBodyDocumentCustomerNameMax = 200;
+export const createInvoiceBodyOneDocumentCustomerNameMax = 200;
 
-export const createInvoiceBodyDocumentCustomerAddressMax = 500;
+export const createInvoiceBodyOneDocumentCustomerAddressMax = 500;
 
-export const createInvoiceBodyDocumentNotesMax = 2000;
+export const createInvoiceBodyOneDocumentNotesMax = 2000;
 
-export const createInvoiceBodyDocumentLineItemsItemDescriptionMax = 1000;
+export const createInvoiceBodyOneDocumentLineItemsItemDescriptionMax = 1000;
 
-export const createInvoiceBodyDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
-export const createInvoiceBodyDocumentLineItemsItemUnitPriceCentsMin = 0;
-export const createInvoiceBodyDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+export const createInvoiceBodyOneDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const createInvoiceBodyOneDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const createInvoiceBodyOneDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
 
-export const createInvoiceBodyDocumentLineItemsMax = 100;
+export const createInvoiceBodyOneDocumentLineItemsMax = 100;
 
-export const createInvoiceBodyDocumentTaxCentsMin = 0;
-export const createInvoiceBodyDocumentTaxCentsMax = 1000000000;
+export const createInvoiceBodyOneDocumentTaxCentsMin = 0;
+export const createInvoiceBodyOneDocumentTaxCentsMax = 1000000000;
+
+export const createInvoiceBodyTwoRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createInvoiceBodyTwoSourceOneCustomerWorkIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createInvoiceBodyTwoSourceTwoContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createInvoiceBodyTwoSourceTwoPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createInvoiceBodyTwoProjectIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createInvoiceBodyTwoEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createInvoiceBodyTwoDocumentTitleMax = 150;
+
+export const createInvoiceBodyTwoDocumentIssuerNameMax = 200;
+
+export const createInvoiceBodyTwoDocumentIssuerAddressMax = 500;
+
+export const createInvoiceBodyTwoDocumentCustomerNameMax = 200;
+
+export const createInvoiceBodyTwoDocumentCustomerAddressMax = 500;
+
+export const createInvoiceBodyTwoDocumentNotesMax = 2000;
+
+export const createInvoiceBodyTwoDocumentLineItemsItemDescriptionMax = 1000;
+
+export const createInvoiceBodyTwoDocumentLineItemsItemQuantityRegExp = new RegExp('^\\d{1,6}(?:\\.\\d{1,3})?$');
+export const createInvoiceBodyTwoDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const createInvoiceBodyTwoDocumentLineItemsItemUnitPriceCentsMax = 1000000000;
+
+export const createInvoiceBodyTwoDocumentLineItemsMax = 100;
+
+export const createInvoiceBodyTwoDocumentTaxCentsMin = 0;
+export const createInvoiceBodyTwoDocumentTaxCentsMax = 1000000000;
 
 
 
-export const CreateInvoiceBody = zod.object({
-  "requestId": zod.uuid(),
-  "leadId": zod.uuid(),
-  "projectId": zod.uuid().nullish(),
-  "estimateId": zod.uuid().nullish(),
+export const CreateInvoiceBody = zod.union([zod.object({
+  "requestId": zod.uuid().regex(createInvoiceBodyOneRequestIdRegExp),
+  "leadId": zod.uuid().regex(createInvoiceBodyOneLeadIdRegExp),
+  "projectId": zod.uuid().regex(createInvoiceBodyOneProjectIdRegExp).nullish(),
+  "estimateId": zod.uuid().regex(createInvoiceBodyOneEstimateIdRegExp).nullish(),
   "document": zod.object({
-  "title": zod.string().min(1).max(createInvoiceBodyDocumentTitleMax),
+  "title": zod.string().min(1).max(createInvoiceBodyOneDocumentTitleMax),
   "currency": zod.enum(['USD']),
-  "issuerName": zod.string().min(1).max(createInvoiceBodyDocumentIssuerNameMax),
-  "issuerAddress": zod.string().max(createInvoiceBodyDocumentIssuerAddressMax).nullish(),
-  "customerName": zod.string().min(1).max(createInvoiceBodyDocumentCustomerNameMax),
-  "customerAddress": zod.string().max(createInvoiceBodyDocumentCustomerAddressMax).nullish(),
+  "issuerName": zod.string().min(1).max(createInvoiceBodyOneDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(createInvoiceBodyOneDocumentIssuerAddressMax).nullish(),
+  "customerName": zod.string().min(1).max(createInvoiceBodyOneDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(createInvoiceBodyOneDocumentCustomerAddressMax).nullish(),
   "dueDate": zod.coerce.date().nullish(),
-  "notes": zod.string().max(createInvoiceBodyDocumentNotesMax).nullish(),
+  "notes": zod.string().max(createInvoiceBodyOneDocumentNotesMax).nullish(),
   "lineItems": zod.array(zod.object({
-  "description": zod.string().min(1).max(createInvoiceBodyDocumentLineItemsItemDescriptionMax),
-  "quantity": zod.string().regex(createInvoiceBodyDocumentLineItemsItemQuantityRegExp).describe('Positive decimal quantity, up to three fractional digits. Each line rounds half-up to cents.'),
-  "unitPriceCents": zod.int().min(createInvoiceBodyDocumentLineItemsItemUnitPriceCentsMin).max(createInvoiceBodyDocumentLineItemsItemUnitPriceCentsMax)
-})).max(createInvoiceBodyDocumentLineItemsMax),
-  "taxCents": zod.int().min(createInvoiceBodyDocumentTaxCentsMin).max(createInvoiceBodyDocumentTaxCentsMax)
+  "description": zod.string().min(1).max(createInvoiceBodyOneDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(createInvoiceBodyOneDocumentLineItemsItemQuantityRegExp),
+  "unitPriceCents": zod.int().min(createInvoiceBodyOneDocumentLineItemsItemUnitPriceCentsMin).max(createInvoiceBodyOneDocumentLineItemsItemUnitPriceCentsMax)
+})).max(createInvoiceBodyOneDocumentLineItemsMax),
+  "taxCents": zod.int().min(createInvoiceBodyOneDocumentTaxCentsMin).max(createInvoiceBodyOneDocumentTaxCentsMax)
 })
+}),zod.object({
+  "requestId": zod.uuid().regex(createInvoiceBodyTwoRequestIdRegExp),
+  "source": zod.union([zod.object({
+  "kind": zod.enum(['customer_work']),
+  "customerWorkId": zod.uuid().regex(createInvoiceBodyTwoSourceOneCustomerWorkIdRegExp)
+}),zod.object({
+  "kind": zod.enum(['existing_customer']),
+  "contactId": zod.uuid().regex(createInvoiceBodyTwoSourceTwoContactIdRegExp),
+  "propertyId": zod.uuid().regex(createInvoiceBodyTwoSourceTwoPropertyIdRegExp).nullable()
+})]),
+  "projectId": zod.uuid().regex(createInvoiceBodyTwoProjectIdRegExp).nullish(),
+  "estimateId": zod.uuid().regex(createInvoiceBodyTwoEstimateIdRegExp).nullish(),
+  "document": zod.object({
+  "title": zod.string().min(1).max(createInvoiceBodyTwoDocumentTitleMax),
+  "currency": zod.enum(['USD']),
+  "issuerName": zod.string().min(1).max(createInvoiceBodyTwoDocumentIssuerNameMax),
+  "issuerAddress": zod.string().max(createInvoiceBodyTwoDocumentIssuerAddressMax).nullish(),
+  "customerName": zod.string().min(1).max(createInvoiceBodyTwoDocumentCustomerNameMax),
+  "customerAddress": zod.string().max(createInvoiceBodyTwoDocumentCustomerAddressMax).nullish(),
+  "dueDate": zod.coerce.date().nullish(),
+  "notes": zod.string().max(createInvoiceBodyTwoDocumentNotesMax).nullish(),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string().min(1).max(createInvoiceBodyTwoDocumentLineItemsItemDescriptionMax),
+  "quantity": zod.string().regex(createInvoiceBodyTwoDocumentLineItemsItemQuantityRegExp),
+  "unitPriceCents": zod.int().min(createInvoiceBodyTwoDocumentLineItemsItemUnitPriceCentsMin).max(createInvoiceBodyTwoDocumentLineItemsItemUnitPriceCentsMax)
+})).max(createInvoiceBodyTwoDocumentLineItemsMax),
+  "taxCents": zod.int().min(createInvoiceBodyTwoDocumentTaxCentsMin).max(createInvoiceBodyTwoDocumentTaxCentsMax)
 })
+})])
 
 export const createInvoiceResponseInvoiceOpeningReceivableCentsMin = 0;
 export const createInvoiceResponseInvoiceOpeningReceivableCentsMax = 1000000000;
@@ -14315,7 +15131,7 @@ export const CreateInvoiceResponse = zod.object({
   "recordSha256": zod.string().regex(createInvoiceResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
 }),zod.null()]),
   "id": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "projectId": zod.uuid().nullable(),
   "estimateId": zod.uuid().nullable(),
   "invoiceNumber": zod.string().nullable(),
@@ -14367,7 +15183,8 @@ export const CreateInvoiceResponse = zod.object({
   "occurredAt": zod.coerce.date(),
   "allocatedAt": zod.coerce.date(),
   "reversedAt": zod.coerce.date().nullable(),
-  "reversalReason": zod.string().nullable()
+  "reversalReason": zod.string().nullable(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntries": zod.array(zod.object({
   "id": zod.uuid(),
@@ -14375,7 +15192,8 @@ export const CreateInvoiceResponse = zod.object({
   "sourceReference": zod.string(),
   "amountCents": zod.int().min(createInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(createInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
   "availableCents": zod.int().min(createInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(createInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
-  "occurredAt": zod.coerce.date()
+  "occurredAt": zod.coerce.date(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntriesTruncated": zod.boolean(),
   "events": zod.array(zod.object({
@@ -14384,7 +15202,12 @@ export const CreateInvoiceResponse = zod.object({
   "version": zod.int().min(1).max(createInvoiceResponseInvoiceEventsItemVersionMax),
   "reason": zod.string().nullable(),
   "createdAt": zod.coerce.date()
-}))
+})),
+  "customerWorkId": zod.uuid().nullable(),
+  "contactId": zod.uuid(),
+  "propertyId": zod.uuid().nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "organizationId": zod.uuid()
 }),
   "duplicate": zod.boolean()
 })
@@ -14471,7 +15294,7 @@ export const GetInvoiceResponse = zod.object({
   "recordSha256": zod.string().regex(getInvoiceResponseHistoricalSourceOneRecordSha256RegExp)
 }),zod.null()]),
   "id": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "projectId": zod.uuid().nullable(),
   "estimateId": zod.uuid().nullable(),
   "invoiceNumber": zod.string().nullable(),
@@ -14523,7 +15346,8 @@ export const GetInvoiceResponse = zod.object({
   "occurredAt": zod.coerce.date(),
   "allocatedAt": zod.coerce.date(),
   "reversedAt": zod.coerce.date().nullable(),
-  "reversalReason": zod.string().nullable()
+  "reversalReason": zod.string().nullable(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntries": zod.array(zod.object({
   "id": zod.uuid(),
@@ -14531,7 +15355,8 @@ export const GetInvoiceResponse = zod.object({
   "sourceReference": zod.string(),
   "amountCents": zod.int().min(getInvoiceResponseAvailableValueEntriesItemAmountCentsMin).max(getInvoiceResponseAvailableValueEntriesItemAmountCentsMax),
   "availableCents": zod.int().min(getInvoiceResponseAvailableValueEntriesItemAvailableCentsMin).max(getInvoiceResponseAvailableValueEntriesItemAvailableCentsMax),
-  "occurredAt": zod.coerce.date()
+  "occurredAt": zod.coerce.date(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntriesTruncated": zod.boolean(),
   "events": zod.array(zod.object({
@@ -14540,7 +15365,12 @@ export const GetInvoiceResponse = zod.object({
   "version": zod.int().min(1).max(getInvoiceResponseEventsItemVersionMax),
   "reason": zod.string().nullable(),
   "createdAt": zod.coerce.date()
-}))
+})),
+  "customerWorkId": zod.uuid().nullable(),
+  "contactId": zod.uuid(),
+  "propertyId": zod.uuid().nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "organizationId": zod.uuid()
 })
 
 
@@ -14674,7 +15504,7 @@ export const UpdateInvoiceResponse = zod.object({
   "recordSha256": zod.string().regex(updateInvoiceResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
 }),zod.null()]),
   "id": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "projectId": zod.uuid().nullable(),
   "estimateId": zod.uuid().nullable(),
   "invoiceNumber": zod.string().nullable(),
@@ -14726,7 +15556,8 @@ export const UpdateInvoiceResponse = zod.object({
   "occurredAt": zod.coerce.date(),
   "allocatedAt": zod.coerce.date(),
   "reversedAt": zod.coerce.date().nullable(),
-  "reversalReason": zod.string().nullable()
+  "reversalReason": zod.string().nullable(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntries": zod.array(zod.object({
   "id": zod.uuid(),
@@ -14734,7 +15565,8 @@ export const UpdateInvoiceResponse = zod.object({
   "sourceReference": zod.string(),
   "amountCents": zod.int().min(updateInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(updateInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
   "availableCents": zod.int().min(updateInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(updateInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
-  "occurredAt": zod.coerce.date()
+  "occurredAt": zod.coerce.date(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntriesTruncated": zod.boolean(),
   "events": zod.array(zod.object({
@@ -14743,7 +15575,12 @@ export const UpdateInvoiceResponse = zod.object({
   "version": zod.int().min(1).max(updateInvoiceResponseInvoiceEventsItemVersionMax),
   "reason": zod.string().nullable(),
   "createdAt": zod.coerce.date()
-}))
+})),
+  "customerWorkId": zod.uuid().nullable(),
+  "contactId": zod.uuid(),
+  "propertyId": zod.uuid().nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "organizationId": zod.uuid()
 }),
   "duplicate": zod.boolean()
 })
@@ -14842,7 +15679,7 @@ export const IssueInvoiceResponse = zod.object({
   "recordSha256": zod.string().regex(issueInvoiceResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
 }),zod.null()]),
   "id": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "projectId": zod.uuid().nullable(),
   "estimateId": zod.uuid().nullable(),
   "invoiceNumber": zod.string().nullable(),
@@ -14894,7 +15731,8 @@ export const IssueInvoiceResponse = zod.object({
   "occurredAt": zod.coerce.date(),
   "allocatedAt": zod.coerce.date(),
   "reversedAt": zod.coerce.date().nullable(),
-  "reversalReason": zod.string().nullable()
+  "reversalReason": zod.string().nullable(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntries": zod.array(zod.object({
   "id": zod.uuid(),
@@ -14902,7 +15740,8 @@ export const IssueInvoiceResponse = zod.object({
   "sourceReference": zod.string(),
   "amountCents": zod.int().min(issueInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(issueInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
   "availableCents": zod.int().min(issueInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(issueInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
-  "occurredAt": zod.coerce.date()
+  "occurredAt": zod.coerce.date(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntriesTruncated": zod.boolean(),
   "events": zod.array(zod.object({
@@ -14911,7 +15750,12 @@ export const IssueInvoiceResponse = zod.object({
   "version": zod.int().min(1).max(issueInvoiceResponseInvoiceEventsItemVersionMax),
   "reason": zod.string().nullable(),
   "createdAt": zod.coerce.date()
-}))
+})),
+  "customerWorkId": zod.uuid().nullable(),
+  "contactId": zod.uuid(),
+  "propertyId": zod.uuid().nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "organizationId": zod.uuid()
 }),
   "duplicate": zod.boolean()
 })
@@ -15014,7 +15858,7 @@ export const VoidInvoiceResponse = zod.object({
   "recordSha256": zod.string().regex(voidInvoiceResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
 }),zod.null()]),
   "id": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "projectId": zod.uuid().nullable(),
   "estimateId": zod.uuid().nullable(),
   "invoiceNumber": zod.string().nullable(),
@@ -15066,7 +15910,8 @@ export const VoidInvoiceResponse = zod.object({
   "occurredAt": zod.coerce.date(),
   "allocatedAt": zod.coerce.date(),
   "reversedAt": zod.coerce.date().nullable(),
-  "reversalReason": zod.string().nullable()
+  "reversalReason": zod.string().nullable(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntries": zod.array(zod.object({
   "id": zod.uuid(),
@@ -15074,7 +15919,8 @@ export const VoidInvoiceResponse = zod.object({
   "sourceReference": zod.string(),
   "amountCents": zod.int().min(voidInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(voidInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
   "availableCents": zod.int().min(voidInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(voidInvoiceResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
-  "occurredAt": zod.coerce.date()
+  "occurredAt": zod.coerce.date(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntriesTruncated": zod.boolean(),
   "events": zod.array(zod.object({
@@ -15083,7 +15929,12 @@ export const VoidInvoiceResponse = zod.object({
   "version": zod.int().min(1).max(voidInvoiceResponseInvoiceEventsItemVersionMax),
   "reason": zod.string().nullable(),
   "createdAt": zod.coerce.date()
-}))
+})),
+  "customerWorkId": zod.uuid().nullable(),
+  "contactId": zod.uuid(),
+  "propertyId": zod.uuid().nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "organizationId": zod.uuid()
 }),
   "duplicate": zod.boolean()
 })
@@ -15190,7 +16041,7 @@ export const RecordInvoicePaymentResponse = zod.object({
   "recordSha256": zod.string().regex(recordInvoicePaymentResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
 }),zod.null()]),
   "id": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "projectId": zod.uuid().nullable(),
   "estimateId": zod.uuid().nullable(),
   "invoiceNumber": zod.string().nullable(),
@@ -15242,7 +16093,8 @@ export const RecordInvoicePaymentResponse = zod.object({
   "occurredAt": zod.coerce.date(),
   "allocatedAt": zod.coerce.date(),
   "reversedAt": zod.coerce.date().nullable(),
-  "reversalReason": zod.string().nullable()
+  "reversalReason": zod.string().nullable(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntries": zod.array(zod.object({
   "id": zod.uuid(),
@@ -15250,7 +16102,8 @@ export const RecordInvoicePaymentResponse = zod.object({
   "sourceReference": zod.string(),
   "amountCents": zod.int().min(recordInvoicePaymentResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(recordInvoicePaymentResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
   "availableCents": zod.int().min(recordInvoicePaymentResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(recordInvoicePaymentResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
-  "occurredAt": zod.coerce.date()
+  "occurredAt": zod.coerce.date(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntriesTruncated": zod.boolean(),
   "events": zod.array(zod.object({
@@ -15259,7 +16112,12 @@ export const RecordInvoicePaymentResponse = zod.object({
   "version": zod.int().min(1).max(recordInvoicePaymentResponseInvoiceEventsItemVersionMax),
   "reason": zod.string().nullable(),
   "createdAt": zod.coerce.date()
-}))
+})),
+  "customerWorkId": zod.uuid().nullable(),
+  "contactId": zod.uuid(),
+  "propertyId": zod.uuid().nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "organizationId": zod.uuid()
 }),
   "duplicate": zod.boolean()
 })
@@ -15362,7 +16220,7 @@ export const AllocateInvoiceValueResponse = zod.object({
   "recordSha256": zod.string().regex(allocateInvoiceValueResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
 }),zod.null()]),
   "id": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "projectId": zod.uuid().nullable(),
   "estimateId": zod.uuid().nullable(),
   "invoiceNumber": zod.string().nullable(),
@@ -15414,7 +16272,8 @@ export const AllocateInvoiceValueResponse = zod.object({
   "occurredAt": zod.coerce.date(),
   "allocatedAt": zod.coerce.date(),
   "reversedAt": zod.coerce.date().nullable(),
-  "reversalReason": zod.string().nullable()
+  "reversalReason": zod.string().nullable(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntries": zod.array(zod.object({
   "id": zod.uuid(),
@@ -15422,7 +16281,8 @@ export const AllocateInvoiceValueResponse = zod.object({
   "sourceReference": zod.string(),
   "amountCents": zod.int().min(allocateInvoiceValueResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(allocateInvoiceValueResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
   "availableCents": zod.int().min(allocateInvoiceValueResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(allocateInvoiceValueResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
-  "occurredAt": zod.coerce.date()
+  "occurredAt": zod.coerce.date(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntriesTruncated": zod.boolean(),
   "events": zod.array(zod.object({
@@ -15431,7 +16291,12 @@ export const AllocateInvoiceValueResponse = zod.object({
   "version": zod.int().min(1).max(allocateInvoiceValueResponseInvoiceEventsItemVersionMax),
   "reason": zod.string().nullable(),
   "createdAt": zod.coerce.date()
-}))
+})),
+  "customerWorkId": zod.uuid().nullable(),
+  "contactId": zod.uuid(),
+  "propertyId": zod.uuid().nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "organizationId": zod.uuid()
 }),
   "duplicate": zod.boolean()
 })
@@ -15534,7 +16399,7 @@ export const ReverseInvoiceAllocationResponse = zod.object({
   "recordSha256": zod.string().regex(reverseInvoiceAllocationResponseInvoiceHistoricalSourceOneRecordSha256RegExp)
 }),zod.null()]),
   "id": zod.uuid(),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "projectId": zod.uuid().nullable(),
   "estimateId": zod.uuid().nullable(),
   "invoiceNumber": zod.string().nullable(),
@@ -15586,7 +16451,8 @@ export const ReverseInvoiceAllocationResponse = zod.object({
   "occurredAt": zod.coerce.date(),
   "allocatedAt": zod.coerce.date(),
   "reversedAt": zod.coerce.date().nullable(),
-  "reversalReason": zod.string().nullable()
+  "reversalReason": zod.string().nullable(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntries": zod.array(zod.object({
   "id": zod.uuid(),
@@ -15594,7 +16460,8 @@ export const ReverseInvoiceAllocationResponse = zod.object({
   "sourceReference": zod.string(),
   "amountCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceAvailableValueEntriesItemAmountCentsMin).max(reverseInvoiceAllocationResponseInvoiceAvailableValueEntriesItemAmountCentsMax),
   "availableCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceAvailableValueEntriesItemAvailableCentsMin).max(reverseInvoiceAllocationResponseInvoiceAvailableValueEntriesItemAvailableCentsMax),
-  "occurredAt": zod.coerce.date()
+  "occurredAt": zod.coerce.date(),
+  "refundOfValueEntryId": zod.uuid().nullish()
 })),
   "availableValueEntriesTruncated": zod.boolean(),
   "events": zod.array(zod.object({
@@ -15603,7 +16470,12 @@ export const ReverseInvoiceAllocationResponse = zod.object({
   "version": zod.int().min(1).max(reverseInvoiceAllocationResponseInvoiceEventsItemVersionMax),
   "reason": zod.string().nullable(),
   "createdAt": zod.coerce.date()
-}))
+})),
+  "customerWorkId": zod.uuid().nullable(),
+  "contactId": zod.uuid(),
+  "propertyId": zod.uuid().nullable(),
+  "sourceKind": zod.enum(['lead', 'customer_work']),
+  "organizationId": zod.uuid()
 }),
   "duplicate": zod.boolean()
 })
@@ -17693,7 +18565,7 @@ export const ListInvoiceDeliveryWorklistResponse = zod.object({
   "customerName": zod.string(),
   "status": zod.enum(['draft', 'issued', 'void']),
   "version": zod.int().min(1),
-  "leadId": zod.uuid(),
+  "leadId": zod.uuid().nullable(),
   "projectId": zod.uuid().nullable(),
   "delivery": zod.object({
   "attemptCount": zod.int().min(listInvoiceDeliveryWorklistResponseItemsItemDeliveryAttemptCountMin),
@@ -17720,7 +18592,12 @@ export const ListInvoiceDeliveryWorklistResponse = zod.object({
   "providerRequestId": zod.string().nullable(),
   "acceptedAt": zod.coerce.date().nullable()
 }),zod.null()])
-})
+}),
+  "customerWorkId": zod.uuid().nullish(),
+  "contactId": zod.uuid().optional(),
+  "propertyId": zod.uuid().nullish(),
+  "sourceKind": zod.enum(['lead', 'customer_work']).optional(),
+  "organizationId": zod.uuid().optional()
 })).max(listInvoiceDeliveryWorklistResponseItemsMax),
   "total": zod.int().min(listInvoiceDeliveryWorklistResponseTotalMin),
   "page": zod.int().min(listInvoiceDeliveryWorklistResponsePageMin).max(listInvoiceDeliveryWorklistResponsePageMax),
@@ -17813,26 +18690,33 @@ export const PreviewInvoiceDeliveryBody = zod.union([zod.object({
   "reason": zod.string().min(previewInvoiceDeliveryBodyTwoReasonMin).max(previewInvoiceDeliveryBodyTwoReasonMax)
 })]).describe('Initial defaults when intent is omitted. Successors require exact current predecessor and a fresh reason; whitespace is trimmed server-side.')
 
-export const previewInvoiceDeliveryResponsePayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewInvoiceDeliveryResponseOnePayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
 
-export const previewInvoiceDeliveryResponseDocumentSha256RegExp = new RegExp('^[a-f0-9]{64}$');
-export const previewInvoiceDeliveryResponseSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
-export const previewInvoiceDeliveryResponseProspectiveAttemptNumberMax = 5;
+export const previewInvoiceDeliveryResponseOneDocumentSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewInvoiceDeliveryResponseOneSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewInvoiceDeliveryResponseOneProspectiveAttemptNumberMax = 5;
+
+export const previewInvoiceDeliveryResponseTwoPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+
+export const previewInvoiceDeliveryResponseTwoDocumentSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewInvoiceDeliveryResponseTwoSourceSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewInvoiceDeliveryResponseTwoProspectiveAttemptNumberMax = 5;
+
+export const previewInvoiceDeliveryResponseTwoSenderIdentitySha256RegExp = new RegExp('^[a-f0-9]{64}$');
 
 
-
-export const PreviewInvoiceDeliveryResponse = zod.object({
+export const PreviewInvoiceDeliveryResponse = zod.union([zod.object({
   "previewId": zod.uuid(),
-  "payloadSha256": zod.string().regex(previewInvoiceDeliveryResponsePayloadSha256RegExp),
+  "payloadSha256": zod.string().regex(previewInvoiceDeliveryResponseOnePayloadSha256RegExp),
   "expiresAt": zod.coerce.date(),
   "invoiceId": zod.uuid(),
   "invoiceVersion": zod.int().min(1),
   "invoiceNumber": zod.string(),
   "issuedAt": zod.coerce.date(),
-  "documentSha256": zod.string().regex(previewInvoiceDeliveryResponseDocumentSha256RegExp),
+  "documentSha256": zod.string().regex(previewInvoiceDeliveryResponseOneDocumentSha256RegExp),
   "leadId": zod.uuid(),
   "contactId": zod.uuid(),
-  "sourceSha256": zod.string().regex(previewInvoiceDeliveryResponseSourceSha256RegExp),
+  "sourceSha256": zod.string().regex(previewInvoiceDeliveryResponseOneSourceSha256RegExp),
   "recipient": zod.email(),
   "sender": zod.object({
   "userId": zod.string(),
@@ -17845,10 +18729,41 @@ export const PreviewInvoiceDeliveryResponse = zod.object({
   "intent": zod.enum(['initial', 'retry_not_dispatched', 'additional_copy']),
   "expectedLatestExecutionId": zod.uuid().nullable(),
   "reason": zod.string().nullable(),
-  "prospectiveAttemptNumber": zod.int().min(1).max(previewInvoiceDeliveryResponseProspectiveAttemptNumberMax),
+  "prospectiveAttemptNumber": zod.int().min(1).max(previewInvoiceDeliveryResponseOneProspectiveAttemptNumberMax),
   "maxAttempts": zod.literal(5),
   "deliveryDetail": zod.string()
-})
+}),zod.object({
+  "previewId": zod.uuid(),
+  "payloadSha256": zod.string().regex(previewInvoiceDeliveryResponseTwoPayloadSha256RegExp),
+  "expiresAt": zod.coerce.date(),
+  "invoiceId": zod.uuid(),
+  "invoiceVersion": zod.int().min(1),
+  "invoiceNumber": zod.string(),
+  "issuedAt": zod.coerce.date(),
+  "documentSha256": zod.string().regex(previewInvoiceDeliveryResponseTwoDocumentSha256RegExp),
+  "leadId": zod.literal(null).nullable(),
+  "contactId": zod.uuid(),
+  "sourceSha256": zod.string().regex(previewInvoiceDeliveryResponseTwoSourceSha256RegExp),
+  "recipient": zod.email(),
+  "sender": zod.object({
+  "userId": zod.string(),
+  "source": zod.enum(['company_default']),
+  "provider": zod.enum(['gmail', 'microsoft']),
+  "senderEmail": zod.email()
+}),
+  "subject": zod.string(),
+  "body": zod.string(),
+  "intent": zod.enum(['initial', 'retry_not_dispatched', 'additional_copy']),
+  "expectedLatestExecutionId": zod.uuid().nullable(),
+  "reason": zod.string().nullable(),
+  "prospectiveAttemptNumber": zod.int().min(1).max(previewInvoiceDeliveryResponseTwoProspectiveAttemptNumberMax),
+  "maxAttempts": zod.literal(5),
+  "deliveryDetail": zod.string(),
+  "reviewVersion": zod.literal(3),
+  "customerWorkId": zod.uuid(),
+  "propertyId": zod.uuid().nullable(),
+  "senderIdentitySha256": zod.string().regex(previewInvoiceDeliveryResponseTwoSenderIdentitySha256RegExp)
+})])
 
 
 /**

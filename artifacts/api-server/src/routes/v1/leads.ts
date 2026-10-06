@@ -25,6 +25,7 @@ import { recordAudit } from "../../services/audit";
 import { emitAutomationEvent } from "../../services/automation";
 import { listLeadConversations } from "../../services/concierge";
 import * as crm from "../../services/crm";
+import { CustomerWorkError } from "../../services/returning-customer-contract";
 import { correctWonRevenue } from "../../services/post-sale";
 import {
   getNextBestAction,
@@ -390,6 +391,8 @@ router.post(
     if (!result.ok) {
       if (result.error === crm.INVOICE_HISTORY_RETAINED) {
         res.status(409).json({ error: "These customer records have retained invoice history. Keep them separate and ask your operator to review the duplicate.", code: result.error });
+      } else if (result.error === crm.VALUE_HISTORY_RETAINED) {
+        res.status(409).json({ error: "These customer records have retained recorded value. Keep them separate; merging cannot relocate cash or cost history.", code: result.error });
       } else if (result.error === crm.OUTREACH_HISTORY_RETAINED) {
         res.status(409).json({ error: "These records have retained source, communication or visit-work history. Keep them separate and ask your operator to review the duplicate; merging does not authorize outreach or rewrite recorded work.", code: result.error });
       } else if (result.error === "same_lead") {
@@ -750,4 +753,8 @@ router.delete(
   },
 );
 
+router.use((error: unknown, _req: Request, res: Response, next: import("express").NextFunction) => {
+  if (error instanceof CustomerWorkError) { res.status(error.status).json({error:error.message,code:error.code}); return; }
+  next(error);
+});
 export default router;

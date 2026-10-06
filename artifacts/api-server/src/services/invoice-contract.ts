@@ -4,6 +4,7 @@ import type {
   InvoiceDocument,
   InvoiceState,
 } from "@workspace/db";
+import { customerWorkSourceSchema, existingCustomerSourceSchema } from "./returning-customer-contract";
 
 export const MAX_INVOICE_CENTS = 1_000_000_000;
 export class InvoiceError extends Error {
@@ -96,7 +97,7 @@ const requestId = z.uuid();
 const expectedVersion = z.number().int().min(1).max(2_147_483_646);
 const confirmation = { requestId, expectedVersion, confirmed: z.literal(true) };
 const reason = z.string().trim().min(10).max(500);
-export const createInvoiceSchema = z
+export const legacyCreateInvoiceSchema = z
   .object({
     requestId,
     leadId: z.uuid(),
@@ -105,6 +106,12 @@ export const createInvoiceSchema = z
     document: invoiceDocumentInputSchema,
   })
   .strict();
+export const createReturningInvoiceSchema = z.object({
+  requestId, source: z.discriminatedUnion("kind", [customerWorkSourceSchema, existingCustomerSourceSchema]),
+  projectId: z.uuid().nullable().optional(), estimateId: z.uuid().nullable().optional(), document: invoiceDocumentInputSchema,
+}).strict().refine(v => v.source.kind !== "existing_customer" || (!v.projectId && !v.estimateId), "A standalone invoice cannot borrow another work record.");
+/** Preserve the literal old parse/normalization branch and its saved request hash. */
+export const createInvoiceSchema = z.union([legacyCreateInvoiceSchema, createReturningInvoiceSchema]);
 export const updateInvoiceSchema = z
   .object({ requestId, expectedVersion, document: invoiceDocumentInputSchema })
   .strict();
@@ -129,6 +136,9 @@ export const invoiceAllocationSchema = z
     amountCents: cents.min(1),
   })
   .strict();
+export const invoiceRefundSchema = z.object({ ...confirmation, originalPaymentValueEntryId: z.uuid(), amountCents: cents.min(1),
+  sourceReference: z.string().trim().min(5).max(160), occurredAt: z.iso.datetime({ offset: true }), reason,
+}).strict().refine(v => Date.parse(v.occurredAt) <= Date.now(), "A recorded refund cannot be in the future.");
 export const reverseInvoiceAllocationSchema = z
   .object({ ...confirmation, reason })
   .strict();
@@ -137,6 +147,8 @@ export const invoiceListSchema = z
     status: z.enum(["draft", "issued", "void"]).optional(),
     leadId: z.uuid().optional(),
     projectId: z.uuid().optional(),
+    customerWorkId: z.uuid().optional(),
+    contactId: z.uuid().optional(),
     page: z
       .string()
       .regex(/^\d{1,5}$/)
@@ -149,7 +161,12 @@ export const invoiceListSchema = z
 
 export interface InvoiceSummary {
   id: string;
-  leadId: string;
+  organizationId: string;
+  leadId: string | null;
+  customerWorkId: string | null;
+  contactId: string;
+  propertyId: string | null;
+  sourceKind: "lead" | "customer_work";
   projectId: string | null;
   estimateId: string | null;
   invoiceNumber: string | null;
@@ -188,6 +205,7 @@ export interface InvoiceAllocation {
   allocatedAt: string;
   reversedAt: string | null;
   reversalReason: string | null;
+  refundOfValueEntryId: string | null;
 }
 export interface InvoiceAvailableValueEntry {
   id: string;
@@ -196,6 +214,7 @@ export interface InvoiceAvailableValueEntry {
   amountCents: number;
   availableCents: number;
   occurredAt: string;
+  refundOfValueEntryId: string | null;
 }
 export interface InvoiceDetail extends InvoiceSummary {
   document: InvoiceDocument;

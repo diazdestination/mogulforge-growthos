@@ -62,7 +62,7 @@ export const invoiceEmailEvidenceSchema = invoiceChainSummarySchema.extend({
   attempts: z.array(invoiceAttemptSchema).max(5),
 });
 export type InvoiceEmailEvidence = z.infer<typeof invoiceEmailEvidenceSchema>;
-export const invoiceEmailPreviewSchema = z.object({
+const invoiceEmailPreviewBaseSchema = z.object({
   previewId: z.uuid(),
   payloadSha256: z.string().regex(/^[a-f0-9]{64}$/),
   expiresAt: z.iso.datetime(),
@@ -83,6 +83,10 @@ export const invoiceEmailPreviewSchema = z.object({
   prospectiveAttemptNumber: z.number().int().min(1).max(5),
   maxAttempts: z.literal(5),
 });
+export const invoiceEmailPreviewSchema = z.union([
+  invoiceEmailPreviewBaseSchema.extend({ reviewVersion: z.literal(2).optional() }),
+  invoiceEmailPreviewBaseSchema.extend({ reviewVersion: z.literal(3), leadId: z.null(), customerWorkId: z.uuid(), contactId: z.uuid(), propertyId: z.uuid().nullable(), sourceSha256: z.string().regex(/^[a-f0-9]{64}$/), senderIdentitySha256: z.string().regex(/^[a-f0-9]{64}$/), sender: z.object({ userId: z.string(), source: z.literal('company_default'), provider: z.enum(['gmail', 'microsoft']), senderEmail: z.email() }) }),
+]);
 export type InvoiceEmailPreview = z.infer<typeof invoiceEmailPreviewSchema>;
 export const invoiceDeliveryWorklistSchema = z.object({
   items: z
@@ -94,7 +98,12 @@ export const invoiceDeliveryWorklistSchema = z.object({
         customerName: z.string(),
         status: z.enum(["draft", "issued", "void"]),
         version: z.number().int().positive(),
-        leadId: z.string(),
+        leadId: z.string().nullable(),
+        customerWorkId: z.uuid().nullable().optional(),
+        contactId: z.uuid().optional(),
+        propertyId: z.uuid().nullable().optional(),
+        organizationId: z.uuid().optional(),
+        sourceKind: z.enum(['lead', 'customer_work']).optional(),
         projectId: z.string().nullable(),
         delivery: invoiceChainSummarySchema.extend({
           latestAttempt: invoiceAttemptSchema.nullable(),

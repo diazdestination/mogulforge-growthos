@@ -211,7 +211,7 @@ describe("contractor workday snapshot", () => {
     expect(
       result.tasks.items.find((row) => row.title === "Prepare invoice")
         ?.actionPath,
-    ).toBe(`/invoices?projectId=${project.id}`);
+    ).toBe(`/invoices?projectId=${project.id}&organizationId=${t.org}`);
     expect(
       (await getContractorToday(t.org, t.rep)).tasks.items.every(
         (row) => row.actionPath === `/tasks?taskId=${row.id}`,

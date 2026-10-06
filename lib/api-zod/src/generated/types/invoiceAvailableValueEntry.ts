@@ -22,4 +22,5 @@ export interface InvoiceAvailableValueEntry {
      */
   availableCents: number;
   occurredAt: Date;
+  refundOfValueEntryId?: string | null;
 }

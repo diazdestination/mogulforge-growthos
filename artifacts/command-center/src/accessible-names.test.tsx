@@ -226,9 +226,11 @@ describe('every icon-only control keeps an accessible name', () => {
     mockApi('owner', handler ? { handler } : {});
     renderAt(path, <Page />);
     await settle();
-    // Appointment reads wait for the active-company profile first; the text-only
+    // Work reads wait for the active-company profile first; the text-only
     // authority loader is not an empty completed page or a spinner to settle.
     if (path === '/appointments') await screen.findByRole('button', { name: 'Schedule appointment' });
+    if (path === '/estimates') await screen.findByRole('button', { name: 'New Estimate' });
+    if (path === '/projects') await screen.findByRole('button', { name: 'New Project' });
     if (path === '/reports') {
       await screen.findByRole('region', { name: 'Win evidence' });
       await screen.findByRole('region', { name: 'Value ledger' });

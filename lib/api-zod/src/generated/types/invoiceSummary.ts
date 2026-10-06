@@ -9,6 +9,7 @@ import type { HistoricalInvoiceSource } from './historicalInvoiceSource';
 import type { InvoiceSummaryBalanceBasis } from './invoiceSummaryBalanceBasis';
 import type { InvoiceSummaryCurrency } from './invoiceSummaryCurrency';
 import type { InvoiceSummaryPaymentState } from './invoiceSummaryPaymentState';
+import type { InvoiceSummarySourceKind } from './invoiceSummarySourceKind';
 import type { InvoiceSummaryStatus } from './invoiceSummaryStatus';
 
 export interface InvoiceSummary {
@@ -24,7 +25,7 @@ export interface InvoiceSummary {
   openingAsOf: Date | null;
   historicalSource: HistoricalInvoiceSource | null;
   id: string;
-  leadId: string;
+  leadId: string | null;
   /** @nullable */
   projectId: string | null;
   /** @nullable */
@@ -76,4 +77,9 @@ export interface InvoiceSummary {
      * @maximum 1000000000
      */
   unallocatedRefundCents: number;
+  customerWorkId: string | null;
+  contactId: string;
+  propertyId: string | null;
+  sourceKind: InvoiceSummarySourceKind;
+  organizationId: string;
 }

@@ -10,4 +10,7 @@ import type { ProjectStatus } from './projectStatus';
 export type ListProjectsParams = {
 leadId?: string;
 status?: ProjectStatus;
+contactId?: string;
+customerWorkId?: string;
+propertyId?: string;
 };

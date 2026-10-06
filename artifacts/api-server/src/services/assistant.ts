@@ -20,6 +20,7 @@ import {
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 
 import { logger } from "../lib/logger";
+import { validWorkReadScope } from "./customer-work-read-scope";
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
@@ -251,6 +252,7 @@ async function revenueSummary(organizationId: string, days: number) {
       and(
         eq(estimatesTable.organizationId, organizationId),
         gte(estimatesTable.createdAt, since),
+        validWorkReadScope(organizationId, estimatesTable.leadId, estimatesTable.customerWorkId),
       ),
     )
     .groupBy(estimatesTable.status);
@@ -261,6 +263,7 @@ async function revenueSummary(organizationId: string, days: number) {
       and(
         eq(projectsTable.organizationId, organizationId),
         gte(projectsTable.createdAt, since),
+        validWorkReadScope(organizationId, projectsTable.leadId, projectsTable.customerWorkId),
       ),
     )
     .groupBy(projectsTable.status);
@@ -270,12 +273,16 @@ async function revenueSummary(organizationId: string, days: number) {
       totalCents: sql<number>`coalesce(sum(${estimatesTable.totalCents}), 0)::bigint`,
     })
     .from(projectsTable)
-    .innerJoin(estimatesTable, eq(projectsTable.estimateId, estimatesTable.id))
+    .innerJoin(estimatesTable, and(eq(projectsTable.estimateId, estimatesTable.id),
+      eq(estimatesTable.organizationId, organizationId),
+      sql`${estimatesTable.leadId} IS NOT DISTINCT FROM ${projectsTable.leadId}`,
+      sql`${estimatesTable.customerWorkId} IS NOT DISTINCT FROM ${projectsTable.customerWorkId}`))
     .where(
       and(
         eq(projectsTable.organizationId, organizationId),
         gte(projectsTable.createdAt, since),
         sql`${projectsTable.status} <> 'cancelled'`,
+        validWorkReadScope(organizationId, projectsTable.leadId, projectsTable.customerWorkId),
       ),
     );
   return {
@@ -287,6 +294,7 @@ async function revenueSummary(organizationId: string, days: number) {
     })),
     projectsByStatus: projects,
     bookedProjectValueDollars: Number(bookedValue?.totalCents ?? 0) / 100,
+    boundary: "Validated opportunity and returning-customer native work. Saved estimate/job values are not cash, newly acquired/recovered revenue, customer signatures or causal ROI. External receipts live in the value ledger.",
   };
 }
 

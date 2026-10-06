@@ -23,6 +23,7 @@ export default function ContactSelect({
   noneLabel = '-- None --',
   testId = 'contact-select',
   queryScope,
+  label,
 }: {
   value: string;
   onChange: (contactId: string) => void;
@@ -32,6 +33,7 @@ export default function ContactSelect({
   testId?: string;
   /** Isolate sensitive option caches when the member/company authority changes. */
   queryScope?: string;
+  label?: string;
 }) {
   const [search, setSearch] = useState('');
   // Remember the selected contact's label so it stays visible even when the
@@ -64,6 +66,7 @@ export default function ContactSelect({
         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input
           type="search"
+          aria-label={label ? `${label} search` : undefined}
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search contacts by name, email, or phone..."
@@ -72,6 +75,7 @@ export default function ContactSelect({
         />
       </div>
       <select
+        aria-label={label}
         required={required}
         value={value}
         onChange={e => handleChange(e.target.value)}

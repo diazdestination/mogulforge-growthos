@@ -72,6 +72,11 @@ const SESSION_ONLY_ROUTES = new Set([
  * - settings.manage — org configuration surfaces (owner/admin)
  */
 const EXPECTED_PERMISSIONS: Record<string, Permission> = {
+  "POST /customer-work/estimates": "crm.write",
+  "PATCH /customer-work/estimates/:id": "crm.write",
+  "POST /customer-work/projects": "crm.write",
+  "PATCH /customer-work/projects/:id": "crm.write",
+  "POST /invoices/:id/refunds": "invoices.manage",
   "GET /contacts/:id/assets": "crm.read",
   "POST /contacts/:id/assets": "crm.write",
   "PATCH /assets/:id": "crm.write",

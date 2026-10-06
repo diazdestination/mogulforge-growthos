@@ -8,7 +8,8 @@ type Props = {
   value: string;
   onChange: (propertyId: string) => void;
   disabled?: boolean;
-  purpose?: 'service' | 'appointment' | 'asset';
+  onReadyChange?: (ready: boolean) => void;
+  purpose?: 'service' | 'appointment' | 'asset' | 'estimate' | 'job' | 'invoice';
 };
 
 /** This picker only links new work. A single returned address is never auto-selected. */
@@ -16,7 +17,7 @@ export default function CustomerPropertySelect(props: Props) {
   return <PropertyPicker key={`${props.scopeKey}:${props.organizationId}:${props.contactId}`} {...props} />;
 }
 
-function PropertyPicker({ organizationId, contactId, value, onChange, disabled, purpose = 'service' }: Props) {
+function PropertyPicker({ organizationId, contactId, value, onChange, onReadyChange, disabled, purpose = 'service' }: Props) {
   const [rows, setRows] = useState<CustomerWorkspaceProperty[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -25,6 +26,7 @@ function PropertyPicker({ organizationId, contactId, value, onChange, disabled, 
   const alive = useRef(true), sequence = useRef(0), controller = useRef<AbortController | null>(null);
   const cursors = useRef(new Set<string>()), change = useRef(onChange);
   change.current = onChange;
+  const readiness = useRef(onReadyChange); readiness.current = onReadyChange;
   const helpId = useId();
   const contextValid = customerWorkspacePropertySchema.shape.id.safeParse(contactId).success && customerWorkspacePropertySchema.shape.id.safeParse(organizationId).success;
 
@@ -34,6 +36,7 @@ function PropertyPicker({ organizationId, contactId, value, onChange, disabled, 
     const request = new AbortController(); controller.current = request;
     const current = ++sequence.current;
     setLoading(true); setFailed(false);
+    readiness.current?.(false);
     if (!cursor) { setRows([]); setNextCursor(null); setLoaded(false); cursors.current.clear(); change.current(''); }
     const isCurrent = () => alive.current && current === sequence.current && !request.signal.aborted;
     try {
@@ -45,7 +48,7 @@ function PropertyPicker({ organizationId, contactId, value, onChange, disabled, 
       const combined = cursor ? [...rows, ...page.items] : page.items;
       if (new Set(combined.map(row => row.id)).size !== combined.length) throw new Error('Property pages overlap');
       if (cursor) cursors.current.add(cursor);
-      setRows(combined); setNextCursor(page.nextCursor); setLoaded(true);
+      setRows(combined); setNextCursor(page.nextCursor); setLoaded(true); readiness.current?.(true);
     } catch {
       if (!isCurrent()) return;
       setRows([]); setNextCursor(null); setLoaded(false); setFailed(true); change.current('');
@@ -55,6 +58,7 @@ function PropertyPicker({ organizationId, contactId, value, onChange, disabled, 
   useEffect(() => {
     alive.current = true;
     change.current('');
+    readiness.current?.(false);
     if (contextValid) void load();
     return () => { alive.current = false; ++sequence.current; controller.current?.abort(); };
   }, []);
@@ -67,7 +71,7 @@ function PropertyPicker({ organizationId, contactId, value, onChange, disabled, 
         {rows.map(row => <option key={row.id} value={row.id}>{[row.addressLine1, row.addressLine2, row.city, row.state, row.postalCode].filter(Boolean).join(', ')}</option>)}
       </select>
     </label>
-    <p id={helpId} className="text-muted-foreground">{purpose === 'asset' ? 'Choose an explicit property for this new asset. Its customer and property identity cannot be moved later. Existing service labels and visits are not changed.' : purpose === 'appointment' ? 'Optional. Choose a property only for this new appointment. Existing visits and their notes are not changed.' : 'Optional. Choose a property only for this new service record. Existing service history is not changed.'}</p>
+    <p id={helpId} className="text-muted-foreground">{purpose === 'asset' ? 'Choose an explicit property for this new asset. Its customer and property identity cannot be moved later. Existing service labels and visits are not changed.' : purpose === 'appointment' ? 'Optional. Choose a property only for this new appointment. Existing visits and their notes are not changed.' : purpose === 'service' ? 'Optional. Choose a property only for this new service record. Existing service history is not changed.' : `Choose a property or deliberately leave this new ${purpose} without one. Existing work and historical addresses are not changed.`}</p>
     {!contextValid && <p className="text-muted-foreground">Choose a customer to check their linked properties.</p>}
     {loading && <p role="status">Checking customer properties…</p>}
     {failed && <div role="alert"><p>Customer properties could not be verified. No property is selected; this is not an empty-property result.</p><button type="button" disabled={disabled} className="min-h-11 underline" onClick={() => void load()}>Retry customer properties</button></div>}

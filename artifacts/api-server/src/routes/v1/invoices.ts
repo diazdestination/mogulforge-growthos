@@ -8,6 +8,7 @@ import {
 import { z } from "zod/v4";
 import { requireMember } from "../../middlewares/requireMember";
 import { InvoiceError } from "../../services/invoice-contract";
+import { CustomerWorkError } from "../../services/returning-customer-contract";
 import {
   allocateInvoiceValue,
   createInvoice,
@@ -15,6 +16,7 @@ import {
   issueInvoice,
   listInvoices,
   recordInvoicePayment,
+  recordInvoiceRefund,
   reverseInvoiceAllocation,
   updateInvoice,
   voidInvoice,
@@ -90,7 +92,7 @@ const safe =
         });
         return;
       }
-      if (error instanceof InvoiceError) {
+      if (error instanceof InvoiceError || error instanceof CustomerWorkError) {
         res
           .status(error.status)
           .json({ error: error.message, code: error.code });
@@ -166,6 +168,7 @@ router.post(
         req.member!.user.id,
         id(req),
         req.body,
+        req.member!.role,
       ),
     ),
   ),
@@ -181,6 +184,7 @@ router.post(
         req.member!.user.id,
         id(req),
         req.body,
+        req.member!.role,
       ),
     ),
   ),
@@ -194,6 +198,7 @@ router.get(
         req.member!.organizationId,
         req.member!.user.id,
         req.query,
+        req.member!.role,
       ),
     ),
   ),
@@ -207,6 +212,7 @@ router.get(
         req.member!.organizationId,
         req.member!.user.id,
         id(req),
+        req.member!.role,
       ),
     ),
   ),
@@ -225,6 +231,7 @@ router.post(
       req.member!.organizationId,
       req.member!.user.id,
       req.body,
+      req.member!.role,
     );
     res.status(result.duplicate ? 200 : 201).json(result);
   }),
@@ -239,6 +246,7 @@ router.patch(
         req.member!.user.id,
         id(req),
         req.body,
+        req.member!.role,
       ),
     ),
   ),
@@ -253,6 +261,7 @@ router.post(
         req.member!.user.id,
         id(req),
         req.body,
+        req.member!.role,
       ),
     ),
   ),
@@ -267,6 +276,7 @@ router.post(
         req.member!.user.id,
         id(req),
         req.body,
+        req.member!.role,
       ),
     ),
   ),
@@ -281,9 +291,16 @@ router.post(
         req.member!.user.id,
         id(req),
         req.body,
+        req.member!.role,
       ),
     ),
   ),
+);
+router.post(
+  "/invoices/:id/refunds",
+  requireMember("invoices.manage"),
+  invoiceDeliveryMutation,
+  safe(async(req,res)=>res.json(await recordInvoiceRefund(req.member!.organizationId,req.member!.user.id,id(req),req.body,req.member!.role))),
 );
 router.post(
   "/invoices/:id/allocations",
@@ -295,6 +312,7 @@ router.post(
         req.member!.user.id,
         id(req),
         req.body,
+        req.member!.role,
       ),
     ),
   ),
@@ -310,6 +328,7 @@ router.post(
         id(req),
         z.uuid().parse(req.params.allocationId),
         req.body,
+        req.member!.role,
       ),
     ),
   ),

@@ -49,7 +49,7 @@ realPg("retains actual property, task and performing member locks through atomic
     const property = observe(updateProperty(f.org, f.property.id, { addressLine1: "Changed by actual office writer" }), pending);
     const task = observe(updateTask(f.org, f.service!.taskId, { description: "Later actual task writer note", status: "in_progress" }), pending);
     const member = observe(originalFetch(`${base}/api/v1/users/${f.tech.id}`, { method: "PATCH", headers: { origin, cookie: `sid=${sid}`, "content-type": "application/json" }, body: JSON.stringify({ isActive: false }) }), pending);
-    const writers = await Promise.all([blockedBy(finisher, '%update "properties"%'), blockedBy(finisher, '%update "crm_tasks"%'), blockedBy(finisher, '%update "users"%')]);
+    const writers = await Promise.all([blockedBy(finisher, '%from "properties"%for update%'), blockedBy(finisher, '%update "crm_tasks"%'), blockedBy(finisher, '%update "users"%')]);
     expect(new Set([...writers, finisher, b.pid]).size).toBe(5);
     await b.release(); const result = await finishing; expect(result.work.completion?.performerUserId).toBe(f.tech.id);
     await property; await task; expect((await member).status).toBe(200);

@@ -220,7 +220,9 @@ describe("native contractor customer export", () => {
     const t = tenants[0],
       result = await createCustomerLifecycleExporter()(t.org, t.owner),
       encoded = JSON.stringify(result);
-    expect(result.manifest.tables).toHaveLength(26);
+    expect(result.manifest.tables).toHaveLength(27);
+    expect(result.manifest.tables.map(row=>row.table)).toContain("customer_work_roots");
+    expect(result.manifest.tables.map(row=>row.table)).not.toContain("customer_work_commands");
     expect(result.data.invoices[0]).toMatchObject({
       id: t.invoice,
       invoice_number: "INV-000001",

@@ -7,6 +7,7 @@ import {
   useUpdateEstimate,
   useDeleteEstimate,
   getListEstimatesQueryKey,
+  getListProjectsQueryKey,
   useGetMe,
   useListProjects,
   EstimateStatus,
@@ -15,6 +16,7 @@ import {
   updateEstimate as updateEstimateRequest,
   deleteEstimate as deleteEstimateRequest,
   listEstimates,
+  type MemberProfile,
 } from '@workspace/api-client-react';
 import { Loader2, Plus, Trash2, Edit, FileText, Send, CheckCircle, XCircle, HardHat, X } from 'lucide-react';
 import LeadSelect from '@/components/lead-select';
@@ -23,6 +25,12 @@ import { useToast, toast as globalToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { canWrite, canDelete } from '@/lib/permissions';
 import { format } from 'date-fns';
+import { memberAuthorityScope } from '@/lib/member-authority-scope';
+import { customerWorkLocation, customerWorkPath } from '@/lib/customer-work-links';
+import { customerWorkspacePath } from '@/lib/customer-workspace-links';
+import { useExactCustomerWork } from '@/hooks/use-exact-customer-work';
+import { CustomerWorkForm, returningEstimate, type CustomerWorkActor } from '@/components/customer-work-form';
+import { customerWorkCommandKey } from '@/hooks/use-customer-work-command';
 
 const STATUS_STYLES: Record<EstimateStatus, string> = {
   draft: 'bg-muted text-muted-foreground border-border',
@@ -37,28 +45,42 @@ function formatMoney(cents: number) {
 
 export default function Estimates() {
   const search = useSearch();
+  const profile = useGetMe();
+  if (profile.isError) return <p role="alert" className="p-5">Company access could not be verified. No estimate record is shown.</p>;
+  if (profile.isLoading) return <p role="status" className="p-5">Checking estimate access…</p>;
+  if (!profile.data?.isActive || !profile.data.organization) return <p role="alert" className="p-5">Active company access is required.</p>;
+  const scopeKey = memberAuthorityScope(profile.data);
+  return <EstimatesContent key={`${scopeKey}:${search}`} me={profile.data} scopeKey={scopeKey} />;
+}
+function EstimatesContent({ me, scopeKey }: { me: MemberProfile; scopeKey: string }) {
+  const search = useSearch();
+  const target = customerWorkLocation('estimates', search, me.organization!.id);
+  const exact = useExactCustomerWork('estimates', target.kind === 'record' ? target.id : undefined, me.organization!.id, scopeKey);
+  const actor = { id: me.id, organizationId: me.organization!.id, scopeKey };
   const prefillLeadId = new URLSearchParams(search).get('leadId') || undefined;
-  const highlightId = new URLSearchParams(search).get('highlight') || undefined;
+  const highlightId = target.kind === 'record' ? target.id : new URLSearchParams(search).get('highlight') || undefined;
   const wantsEdit = new URLSearchParams(search).get('edit') === '1';
   const highlightRef = useRef<HTMLDivElement | null>(null);
   const hasScrolledToHighlight = useRef(false);
   const hasAutoOpenedEdit = useRef(false);
   const [statusFilter, setStatusFilter] = useState<EstimateStatus | ''>('');
   const estimateParams = { status: statusFilter || undefined };
-  const { data: estimates, isLoading, dataUpdatedAt } = useListEstimates(estimateParams);
-  const { data: me } = useGetMe();
-  const { data: projects } = useListProjects();
+  const { data: estimates, isLoading, isError, dataUpdatedAt } = useListEstimates(estimateParams, { query: { queryKey: [...getListEstimatesQueryKey(estimateParams), scopeKey], enabled: !['invalid', 'different-company'].includes(target.kind) } });
+  const { data: projects } = useListProjects(undefined, { query: { queryKey: [...getListProjectsQueryKey(), scopeKey], enabled: !['invalid', 'different-company'].includes(target.kind) } });
   const queryClient = useQueryClient();
 
   const canEdit = canWrite(me?.role);
   const canDel = canDelete(me?.role);
 
-  const [isFormOpen, setIsFormOpen] = useState(!!prefillLeadId);
+  const [isFormOpen, setIsFormOpen] = useState(!!prefillLeadId || target.kind === 'new');
+  const [returningMode, setReturningMode] = useState(() => { try { return target.kind === 'new' || !!sessionStorage.getItem(customerWorkCommandKey(me.id, me.organization!.id, 'estimates:new')); } catch { return target.kind === 'new'; } });
   const [editingEstimate, setEditingEstimate] = useState<Estimate | null>(null);
   const [startProjectEstimate, setStartProjectEstimate] = useState<Estimate | null>(null);
 
   const updateEstimate = useUpdateEstimate();
   const deleteEstimate = useDeleteEstimate();
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; loadTokenRef.current++; }; }, []);
 
   // Extra pages loaded as the rep scrolls past the first server page (200 rows).
   const PAGE_SIZE = 200;
@@ -100,7 +122,8 @@ export default function Estimates() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadingMore, reachedEnd, firstPage, extraEstimates.length, paramsKey]);
 
-  const allEstimates = useMemo(() => [...firstPage, ...extraEstimates], [firstPage, extraEstimates]);
+  const allLoadedEstimates = useMemo(() => { const list = [...firstPage, ...extraEstimates]; return exact.data && 'title' in exact.data ? [exact.data as Estimate, ...list.filter(item => item.id !== exact.data!.id)] : list; }, [firstPage, extraEstimates, exact.data]);
+  const allEstimates = allLoadedEstimates.filter(item => (!item.organizationId || item.organizationId === me.organization!.id) && (!(item.customerWorkId || item.leadId === null) || !!returningEstimate(item)));
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (!hasMore) return;
     const el = e.currentTarget;
@@ -128,17 +151,18 @@ export default function Estimates() {
   // Lead labels are resolved server-side on the estimate itself, so they stay
   // correct in orgs with more leads than the capped lead-list download.
   const leadLabel = (estimate: Estimate) =>
-    estimate.leadLabel || estimate.leadId.substring(0, 8);
+    returningEstimate(estimate)?.customerLabel || estimate.leadLabel || estimate.leadId?.substring(0, 8) || 'Returning customer work';
 
   const projectForEstimate = (estimateId: string) =>
     projects?.find(p => p.estimateId === estimateId);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListEstimatesQueryKey() });
+  const invalidate = () => { if (target.kind === 'record') void exact.refetch(); return queryClient.invalidateQueries({ queryKey: getListEstimatesQueryKey() }); };
 
   const setStatus = (estimate: Estimate, status: EstimateStatus) => {
+    if (returningEstimate(estimate)) { setEditingEstimate(estimate); setIsFormOpen(true); return; }
     updateEstimate.mutate({ id: estimate.id, data: { status } }, {
       onSuccess: invalidate,
-      onError: () => showEstimateStatusFailedToast(estimate.id, status, queryClient),
+      onError: () => { if (alive.current) showEstimateStatusFailedToast(estimate.id, status, queryClient, () => alive.current); },
     });
   };
 
@@ -146,10 +170,11 @@ export default function Estimates() {
     if (!confirm('Delete this estimate?')) return;
     deleteEstimate.mutate({ id }, {
       onSuccess: invalidate,
-      onError: () => showEstimateDeleteFailedToast(id, queryClient),
+      onError: () => { if (alive.current) showEstimateDeleteFailedToast(id, queryClient, () => alive.current); },
     });
   };
 
+  if (target.kind === 'invalid' || target.kind === 'different-company') return <p role="alert" className="p-5">This estimate link is invalid or belongs to another company. No company was switched.</p>;
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
       <header className="px-4 py-3 md:px-6 md:py-4 border-b border-border flex flex-col md:flex-row items-start md:items-center justify-between bg-card shrink-0 gap-4 sticky top-0 z-10">
@@ -171,6 +196,7 @@ export default function Estimates() {
           </select>
           {canEdit && (
             <button
+              aria-label="New Estimate"
               onClick={() => { setEditingEstimate(null); setIsFormOpen(true); }}
               className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2.5 md:px-3 md:py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-transform active:scale-95 shrink-0 shadow-sm shadow-primary/20"
             >
@@ -181,6 +207,9 @@ export default function Estimates() {
       </header>
 
       <div className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6" onScroll={handleScroll}>
+        {target.kind === 'record' && <section aria-label="Selected estimate" className="mx-auto mb-4 max-w-5xl rounded-lg border p-3">{exact.isPending ? <p role="status">Opening exact estimate…</p> : exact.isError ? <p role="alert">The exact estimate is unavailable. The list below is separate and has not replaced it.</p> : <p>Selected estimate: {'title' in exact.data! ? exact.data.title : ''}</p>}</section>}
+        {isError && <p role="alert">The estimate list could not load. No empty result is assumed.</p>}
+        {allEstimates.length !== allLoadedEstimates.length && <p role="alert">Some estimate source contexts could not be verified. No actions are available for those records.</p>}
         {isLoading ? (
           <div className="flex items-center justify-center py-12 h-full">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -212,6 +241,7 @@ export default function Estimates() {
                         <span className="opacity-40">•</span>
                         <span>{estimate.lineItems.length} line item{estimate.lineItems.length === 1 ? '' : 's'}</span>
                       </div>
+                      {returningEstimate(estimate) && <p className="mt-2 text-sm">Existing customer work · {returningEstimate(estimate)!.propertyLabel || 'No property linked'} · Staff-recorded status, not signature or delivery. <Link className="inline-flex min-h-11 items-center underline" href={customerWorkspacePath(returningEstimate(estimate)!.contactId, me.organization!.id, 'estimates')!}>Customer history</Link></p>}
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[10px] md:text-[11px] font-mono text-muted-foreground uppercase tracking-wider mt-3 bg-muted/20 p-2 rounded-lg border border-border/50 inline-flex">
                         <span>Created {format(new Date(estimate.createdAt), 'MMM d, yy')}</span>
                         {estimate.sentAt && <><span className="opacity-30">|</span><span>Sent {format(new Date(estimate.sentAt), 'MMM d, yy')}</span></>}
@@ -233,12 +263,12 @@ export default function Estimates() {
                 </div>
                 {(canEdit || canDel) && (
                   <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-border">
-                    {canEdit && estimate.status === 'draft' && (
+                    {canEdit && !returningEstimate(estimate) && estimate.status === 'draft' && (
                       <button onClick={() => setStatus(estimate, 'sent')} className="text-xs font-bold flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-400 transition-colors flex-1 md:flex-none active:scale-95">
                         <Send className="w-3.5 h-3.5" /> Mark Sent
                       </button>
                     )}
-                    {canEdit && estimate.status === 'sent' && (
+                    {canEdit && !returningEstimate(estimate) && estimate.status === 'sent' && (
                       <>
                         <button onClick={() => setStatus(estimate, 'accepted')} className="text-xs font-bold flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-green-500/10 text-green-700 hover:bg-green-500/20 dark:text-green-400 transition-colors flex-1 md:flex-none active:scale-95">
                           <CheckCircle className="w-3.5 h-3.5" /> Accept
@@ -251,7 +281,7 @@ export default function Estimates() {
                     {canEdit && estimate.status === 'accepted' && (
                       projectForEstimate(estimate.id) ? (
                         <Link
-                          href={`/projects?highlight=${projectForEstimate(estimate.id)!.id}`}
+                          href={customerWorkPath('projects', projectForEstimate(estimate.id)!.id, me.organization!.id) || `/projects?highlight=${projectForEstimate(estimate.id)!.id}`}
                           className="text-xs font-bold flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-secondary/15 text-secondary hover:bg-secondary/25 transition-colors flex-1 md:flex-none active:scale-95"
                         >
                           <HardHat className="w-3.5 h-3.5" /> View Project
@@ -265,11 +295,11 @@ export default function Estimates() {
                     <div className="hidden md:block flex-1" />
                     <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0 justify-end">
                       {canEdit && (
-                        <button onClick={() => { setEditingEstimate(estimate); setIsFormOpen(true); }} className="flex-1 md:flex-none w-auto md:w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors rounded-xl bg-muted/50 border border-border hover:bg-muted active:scale-95">
+                        <button aria-label={`Edit ${estimate.title}`} onClick={() => { setEditingEstimate(estimate); setIsFormOpen(true); }} className="flex-1 md:flex-none w-auto md:w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors rounded-xl bg-muted/50 border border-border hover:bg-muted active:scale-95">
                           <Edit className="w-4 h-4" /> <span className="md:hidden ml-2 text-xs font-bold uppercase tracking-widest">Edit</span>
                         </button>
                       )}
-                      {canDel && (
+                      {canDel && !returningEstimate(estimate) && (
                         <button onClick={() => handleDelete(estimate.id)} className="flex-1 md:flex-none w-auto md:w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors rounded-xl bg-muted/50 border border-border hover:bg-destructive/10 active:scale-95">
                           <Trash2 className="w-4 h-4" /> <span className="md:hidden ml-2 text-xs font-bold uppercase tracking-widest">Delete</span>
                         </button>
@@ -286,28 +316,31 @@ export default function Estimates() {
             )}
             {!allEstimates.length && (
               <div className="py-12 text-center text-muted-foreground border-2 border-dashed border-border rounded-2xl bg-muted/10">
-                No estimates yet. Create one from a won lead to price the job.
+                No estimates yet. Create one for an opportunity or an existing customer.
               </div>
             )}
           </div>
         )}
       </div>
 
-      {isFormOpen && (
-        <EstimateFormModal estimate={editingEstimate} initialLeadId={editingEstimate ? undefined : prefillLeadId} onClose={() => setIsFormOpen(false)} />
+      {isFormOpen && canEdit && (
+        returningEstimate(editingEstimate) || (!editingEstimate && returningMode)
+          ? <CustomerWorkForm key={`${scopeKey}:${search}:${editingEstimate?.id ?? 'new'}`} kind="estimates" actor={actor} record={returningEstimate(editingEstimate) ?? undefined} contactId={target.kind === 'new' ? target.contactId : ''} onOpportunity={() => setReturningMode(false)} onClose={() => setIsFormOpen(false)} onSaved={() => { void invalidate(); }} />
+          : <EstimateFormModal actor={actor} onReturning={() => setReturningMode(true)} estimate={editingEstimate} initialLeadId={editingEstimate ? undefined : prefillLeadId} onClose={() => setIsFormOpen(false)} />
       )}
 
       {startProjectEstimate && (
-        <ProjectFormModal
+        returningEstimate(startProjectEstimate) ? <CustomerWorkForm kind="projects" actor={actor} fromEstimate={returningEstimate(startProjectEstimate)!} onClose={() => setStartProjectEstimate(null)} /> : <ProjectFormModal
           project={null}
           defaults={{
-            leadId: startProjectEstimate.leadId,
+            leadId: startProjectEstimate.leadId ?? undefined,
             leadLabel: leadLabel(startProjectEstimate),
             estimateId: startProjectEstimate.id,
             name: startProjectEstimate.title,
             offerLeadAdvance: true,
           }}
           onClose={() => setStartProjectEstimate(null)}
+          authority={actor}
         />
       )}
     </div>
@@ -318,7 +351,7 @@ export default function Estimates() {
  * level (global toast store + plain fetch client) so retrying keeps working
  * across re-renders — same pattern as pipeline.tsx / project-form-modal.tsx.
  */
-function showEstimateStatusFailedToast(estimateId: string, status: EstimateStatus, queryClient: QueryClient) {
+function showEstimateStatusFailedToast(estimateId: string, status: EstimateStatus, queryClient: QueryClient, current = () => true) {
   const { dismiss } = globalToast({
     variant: 'destructive',
     title: 'Estimate not updated',
@@ -327,12 +360,13 @@ function showEstimateStatusFailedToast(estimateId: string, status: EstimateStatu
       <ToastAction
         altText="Retry estimate status update"
         onClick={async () => {
+          if (!current()) return;
           try {
             await updateEstimateRequest(estimateId, { status });
             queryClient.invalidateQueries({ queryKey: getListEstimatesQueryKey() });
             dismiss();
           } catch {
-            showEstimateStatusFailedToast(estimateId, status, queryClient);
+            if (current()) showEstimateStatusFailedToast(estimateId, status, queryClient, current);
           }
         }}
       >
@@ -347,7 +381,8 @@ interface LineItemDraft {
   unitPrice: string;
 }
 
-function EstimateFormModal({ estimate, initialLeadId, onClose }: { estimate: Estimate | null; initialLeadId?: string; onClose: () => void }) {
+function EstimateFormModal({ estimate, initialLeadId, onClose, onReturning, actor }: { estimate: Estimate | null; initialLeadId?: string; onClose: () => void; onReturning: () => void; actor: CustomerWorkActor }) {
+  const alive = useRef(true); useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const [title, setTitle] = useState(estimate?.title || '');
   const [leadId, setLeadId] = useState(estimate?.leadId || initialLeadId || '');
   const [notes, setNotes] = useState(estimate?.notes || '');
@@ -411,7 +446,7 @@ function EstimateFormModal({ estimate, initialLeadId, onClose }: { estimate: Est
       updateEstimate.mutate({ id: estimate.id, data: shared }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListEstimatesQueryKey() });
-          onClose();
+          if (alive.current) onClose();
         },
         onError: handleSaveError,
       });
@@ -419,7 +454,7 @@ function EstimateFormModal({ estimate, initialLeadId, onClose }: { estimate: Est
       createEstimate.mutate({ data: { ...shared, leadId } }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListEstimatesQueryKey() });
-          onClose();
+          if (alive.current) onClose();
         },
         onError: handleSaveError,
       });
@@ -436,6 +471,7 @@ function EstimateFormModal({ estimate, initialLeadId, onClose }: { estimate: Est
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-5 overflow-y-auto pb-safe md:pb-6">
+          {!estimate && <div className="flex flex-wrap items-center gap-3 rounded border p-3"><p className="text-sm">Work source: Customer opportunity</p><button type="button" className="min-h-11 underline" disabled={isSubmitting} onClick={onReturning}>Use existing customer instead</button></div>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-widest">Title *</label>
@@ -445,11 +481,11 @@ function EstimateFormModal({ estimate, initialLeadId, onClose }: { estimate: Est
               <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-widest">Lead *</label>
               {estimate ? (
                 <div className="w-full bg-muted/40 border border-border rounded-xl px-4 py-3 md:py-2.5 text-base md:text-sm text-muted-foreground font-medium flex items-center h-[50px] md:h-[42px]">
-                  {estimate.leadLabel || estimate.leadId.substring(0, 8)}
+                  {estimate.leadLabel || estimate.leadId?.substring(0, 8) || 'Returning customer work'}
                 </div>
               ) : (
                 <div className="shadow-sm rounded-xl overflow-hidden">
-                   <LeadSelect required withStatus value={leadId} onChange={setLeadId} />
+                   <LeadSelect required withStatus queryScope={actor.scopeKey} value={leadId} onChange={setLeadId} />
                 </div>
               )}
             </div>
@@ -525,7 +561,7 @@ function EstimateFormModal({ estimate, initialLeadId, onClose }: { estimate: Est
   );
 }
 
-function showEstimateDeleteFailedToast(estimateId: string, queryClient: QueryClient) {
+function showEstimateDeleteFailedToast(estimateId: string, queryClient: QueryClient, current = () => true) {
   const { dismiss } = globalToast({
     variant: 'destructive',
     title: 'Estimate not deleted',
@@ -534,12 +570,13 @@ function showEstimateDeleteFailedToast(estimateId: string, queryClient: QueryCli
       <ToastAction
         altText="Retry estimate delete"
         onClick={async () => {
+          if (!current()) return;
           try {
             await deleteEstimateRequest(estimateId);
             queryClient.invalidateQueries({ queryKey: getListEstimatesQueryKey() });
             dismiss();
           } catch {
-            showEstimateDeleteFailedToast(estimateId, queryClient);
+            if (current()) showEstimateDeleteFailedToast(estimateId, queryClient, current);
           }
         }}
       >

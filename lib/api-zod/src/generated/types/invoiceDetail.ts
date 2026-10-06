@@ -11,6 +11,7 @@ import type { InvoiceAvailableValueEntry } from './invoiceAvailableValueEntry';
 import type { InvoiceDetailBalanceBasis } from './invoiceDetailBalanceBasis';
 import type { InvoiceDetailCurrency } from './invoiceDetailCurrency';
 import type { InvoiceDetailPaymentState } from './invoiceDetailPaymentState';
+import type { InvoiceDetailSourceKind } from './invoiceDetailSourceKind';
 import type { InvoiceDetailStatus } from './invoiceDetailStatus';
 import type { InvoiceDocument } from './invoiceDocument';
 import type { InvoiceEvent } from './invoiceEvent';
@@ -28,7 +29,7 @@ export interface InvoiceDetail {
   openingAsOf: Date | null;
   historicalSource: HistoricalInvoiceSource | null;
   id: string;
-  leadId: string;
+  leadId: string | null;
   /** @nullable */
   projectId: string | null;
   /** @nullable */
@@ -85,4 +86,9 @@ export interface InvoiceDetail {
   availableValueEntries: InvoiceAvailableValueEntry[];
   availableValueEntriesTruncated: boolean;
   events: InvoiceEvent[];
+  customerWorkId: string | null;
+  contactId: string;
+  propertyId: string | null;
+  sourceKind: InvoiceDetailSourceKind;
+  organizationId: string;
 }

@@ -6,6 +6,7 @@ import { ArrowRight, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { contractorRequest } from "@/lib/contractor-api";
 import { canManageSettings } from "@/lib/permissions";
 import { memberAuthorityScope } from "@/lib/member-authority-scope";
+import { customerWorkLocation, customerWorkPath } from "@/lib/customer-work-links";
 
 type Queue<T> = { items: T[]; total: number; truncated: boolean };
 type AssignedWork = {
@@ -41,6 +42,8 @@ export interface ContractorDay {
     title: string;
     status: string;
     leadId: string | null;
+    contactId?: string | null;
+    customerWorkId?: string | null;
     customerLabel: string | null;
     crewNames: string[];
     scheduledStart: string | null;
@@ -372,6 +375,8 @@ function TodayContent({ me, scopeKey }: { me: MemberProfile; scopeKey: string })
                     key={item.id}
                     href={
                       /^\/invoices\?projectId=[0-9a-f-]+$/i.test(item.actionPath) ||
+                      (item.actionPath.startsWith('/invoices?') && customerWorkLocation('invoices', item.actionPath.slice('/invoices?'.length), data.organizationId).kind === 'record') ||
+                      (item.actionPath.startsWith('/projects?') && customerWorkLocation('projects', item.actionPath.slice('/projects?'.length), data.organizationId).kind === 'record') ||
                       (item.leadId !== null &&
                         /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(item.leadId) &&
                         item.actionPath === `/leads/${item.leadId}?tab=messages`)
@@ -395,9 +400,10 @@ function TodayContent({ me, scopeKey }: { me: MemberProfile; scopeKey: string })
                 {data.projects.items.map((item) => (
                   <WorkRow
                     key={item.id}
-                    href={`/projects?highlight=${encodeURIComponent(item.id)}`}
+                    href={customerWorkPath('projects', item.id, data.organizationId) || `/projects?highlight=${encodeURIComponent(item.id)}`}
                     title={item.title}
                     customer={item.customerLabel}
+                    customerHref={item.contactId ? `/contacts/${encodeURIComponent(item.contactId)}?organizationId=${encodeURIComponent(data.organizationId)}` : undefined}
                     status={item.status}
                     detail={`Crew: ${item.crewNames.length ? item.crewNames.join(", ") : "Unassigned"}`}
                   />

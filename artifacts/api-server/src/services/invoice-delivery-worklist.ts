@@ -102,6 +102,15 @@ export async function listInvoiceDeliveryWorklist(
       version: invoice.version,
       leadId: invoice.leadId,
       projectId: invoice.projectId,
+      ...(invoice.sourceKind === "customer_work"
+        ? {
+            organizationId: invoice.organizationId,
+            customerWorkId: invoice.customerWorkId,
+            contactId: invoice.contactId,
+            propertyId: invoice.propertyId,
+            sourceKind: invoice.sourceKind,
+          }
+        : {}),
       delivery,
     };
   });

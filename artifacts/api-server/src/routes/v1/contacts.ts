@@ -9,6 +9,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { requireMember } from "../../middlewares/requireMember";
 import { recordAudit } from "../../services/audit";
 import * as crm from "../../services/crm";
+import { CustomerWorkError } from "../../services/returning-customer-contract";
 
 const router: IRouter = Router();
 
@@ -185,4 +186,8 @@ router.patch(
   },
 );
 
+router.use((error: unknown, _req: Request, res: Response, next: import("express").NextFunction) => {
+  if (error instanceof CustomerWorkError) { res.status(error.status).json({error:error.message,code:error.code}); return; }
+  next(error);
+});
 export default router;

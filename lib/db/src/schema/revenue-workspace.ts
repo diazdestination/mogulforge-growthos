@@ -1,4 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -8,11 +11,13 @@ import {
   uniqueIndex,
   unique,
   uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { organizationsTable } from "./organizations";
 import { leadsTable } from "./leads";
 import { estimatesTable } from "./estimates";
 import { projectsTable } from "./projects";
+import { customerWorkRootsTable } from "./customer-work";
 
 export type ExecutionState =
   | "processing"
@@ -157,8 +162,9 @@ export const valueEntriesTable = pgTable(
       .notNull()
       .references(() => organizationsTable.id),
     leadId: uuid("lead_id")
-      .notNull()
       .references(() => leadsTable.id),
+    customerWorkId: uuid("customer_work_id"),
+    refundOfValueEntryId: uuid("refund_of_value_entry_id").references((): AnyPgColumn => valueEntriesTable.id),
     sourceReference: text("source_reference").notNull(),
     kind: text("kind").$type<ValueEntryKind>().notNull(),
     amountCents: integer("amount_cents").notNull(),
@@ -175,6 +181,13 @@ export const valueEntriesTable = pgTable(
     ),
     index("value_entry_org_lead").on(t.organizationId, t.leadId),
     unique("value_entry_org_id_uq").on(t.organizationId, t.id),
+    unique("value_entry_org_work_id_uq").on(t.organizationId, t.id, t.customerWorkId),
+    foreignKey({ columns: [t.organizationId, t.customerWorkId], foreignColumns: [customerWorkRootsTable.organizationId, customerWorkRootsTable.id], name: "value_entry_customer_work_fk" }),
+    foreignKey({ columns: [t.organizationId, t.refundOfValueEntryId, t.customerWorkId], foreignColumns: [t.organizationId, t.id, t.customerWorkId], name: "value_entry_refund_work_fk" }),
+    foreignKey({ columns: [t.organizationId, t.refundOfValueEntryId], foreignColumns: [t.organizationId, t.id], name: "value_entry_refund_tenant_fk" }),
+    check("value_entry_work_scope_ck", sql`(${t.leadId} is not null and ${t.customerWorkId} is null) or (${t.leadId} is null and ${t.customerWorkId} is not null)`),
+    check("value_entry_work_refund_ck", sql`(${t.customerWorkId} is null and ${t.refundOfValueEntryId} is null) or (${t.customerWorkId} is not null and ((${t.kind} = 'refund' and ${t.refundOfValueEntryId} is not null and ${t.refundOfValueEntryId} <> ${t.id}) or (${t.kind} <> 'refund' and ${t.refundOfValueEntryId} is null)))`),
+    index("value_entries_org_work_idx").on(t.organizationId, t.customerWorkId),
   ],
 );
 

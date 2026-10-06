@@ -5,14 +5,122 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
-import type { InvoiceDocumentInput } from './invoiceDocumentInput';
 
-export interface CreateInvoice {
+export type CreateInvoice = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   requestId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   leadId: string;
-  /** @nullable */
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   projectId?: string | null;
-  /** @nullable */
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   estimateId?: string | null;
-  document: InvoiceDocumentInput;
-}
+  document: {
+  /**
+     * @minLength 1
+     * @maxLength 150
+     */
+  title: string;
+  currency: 'USD';
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  issuerName: string;
+  /** @maxLength 500 */
+  issuerAddress?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  customerName: string;
+  /** @maxLength 500 */
+  customerAddress?: string | null;
+  dueDate?: Date | null;
+  /** @maxLength 2000 */
+  notes?: string | null;
+  /** @maxItems 100 */
+  lineItems: {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  description: string;
+  /** @pattern ^\d{1,6}(?:\.\d{1,3})?$ */
+  quantity: string;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  unitPriceCents: number;
+}[];
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  taxCents: number;
+};
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  source: {
+  kind: 'customer_work';
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId: string;
+} | {
+  kind: 'existing_customer';
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+};
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  projectId?: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId?: string | null;
+  document: {
+  /**
+     * @minLength 1
+     * @maxLength 150
+     */
+  title: string;
+  currency: 'USD';
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  issuerName: string;
+  /** @maxLength 500 */
+  issuerAddress?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  customerName: string;
+  /** @maxLength 500 */
+  customerAddress?: string | null;
+  dueDate?: Date | null;
+  /** @maxLength 2000 */
+  notes?: string | null;
+  /** @maxItems 100 */
+  lineItems: {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  description: string;
+  /** @pattern ^\d{1,6}(?:\.\d{1,3})?$ */
+  quantity: string;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  unitPriceCents: number;
+}[];
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  taxCents: number;
+};
+};

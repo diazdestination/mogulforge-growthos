@@ -16,4 +16,6 @@ projectId?: string;
  * @maximum 10000
  */
 page?: number;
+contactId?: string;
+customerWorkId?: string;
 };

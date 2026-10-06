@@ -17,6 +17,7 @@ import {
   sampleDelivery,
 } from "@/test/invoice-delivery-fixtures";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { workInvoice, workOrg, workContact, workRoot, workId } from '@/test/customer-work-fixtures';
 
 vi.mock("@/lib/contractor-api", async (original) => ({
   ...(await original<typeof import("@/lib/contractor-api")>()),
@@ -91,6 +92,95 @@ const render = (manage = true) =>
       canManage={manage}
     />,
   );
+
+const returningPreview = () => ({ ...preview, reviewVersion: 3, leadId: null, customerWorkId: workRoot, contactId: workContact, propertyId: null, sourceSha256: 'b'.repeat(64), senderIdentitySha256: 'c'.repeat(64), sender: { ...preview.sender, source: 'company_default' } });
+it.each([1, 2])('refreshes only read-only delivery evidence when draft version %s becomes an issued invoice', async draftVersion => {
+  evidence = sampleDelivery({ canPrepare: false, nextIntents: [], attentionReason: 'invoice_not_issued' });
+  function Harness() {
+    const [issued, setIssued] = useState(false);
+    return <><button onClick={() => { evidence = sampleDelivery(); setIssued(true); }}>Apply accepted issue acknowledgement</button><InvoiceDelivery
+      invoice={issued ? invoice : sampleInvoice({ version: draftVersion, status: 'draft' })} organizationId="org-a" canManage
+    /></>;
+  }
+  renderWithQuery(<Harness />);
+  await screen.findByText('0 of 5 lifetime email attempts');
+  expect(screen.queryByRole('button', { name: 'Preview invoice email' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Apply accepted issue acknowledgement' }));
+  await screen.findByRole('button', { name: 'Preview invoice email' });
+  expect(screen.queryByText('Only a currently issued, non-void invoice can be emailed.')).toBeNull();
+  const calls = vi.mocked(contractorRequest).mock.calls;
+  expect(calls.filter(([path]) => path.endsWith('/delivery'))).toHaveLength(2);
+  expect(calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+});
+it('does not let a late draft evidence read replace fresh issued eligibility', async () => {
+  let release!: (value: unknown) => void, reads = 0;
+  vi.mocked(contractorRequest).mockImplementation(async (path, options) => {
+    if (options?.method === 'POST' || !path.endsWith('/delivery')) throw new Error('Unexpected mutation');
+    if (++reads === 1) return new Promise(resolve => { release = resolve; });
+    return sampleDelivery();
+  });
+  function Harness() {
+    const [issued, setIssued] = useState(false);
+    return <><button onClick={() => setIssued(true)}>Apply issued revision</button><InvoiceDelivery invoice={issued ? invoice : sampleInvoice()} organizationId="org-a" canManage /></>;
+  }
+  renderWithQuery(<Harness />);
+  await waitFor(() => expect(release).toBeDefined());
+  fireEvent.click(screen.getByRole('button', { name: 'Apply issued revision' }));
+  await screen.findByRole('button', { name: 'Preview invoice email' });
+  await act(async () => { release(sampleDelivery({ canPrepare: false, nextIntents: [], attentionReason: 'invoice_not_issued' })); });
+  expect(screen.getByRole('button', { name: 'Preview invoice email' })).toBeTruthy();
+  expect(screen.queryByText('Only a currently issued, non-void invoice can be emailed.')).toBeNull();
+  expect(reads).toBe(2);
+  expect(vi.mocked(contractorRequest).mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+});
+it('keeps an unknown send and its original attempt held after a newer billing revision refreshes evidence', async () => {
+  failure = true;
+  function Harness() {
+    const [version, setVersion] = useState(2);
+    return <><button onClick={() => setVersion(3)}>Apply recorded billing revision</button><InvoiceDelivery invoice={{ ...invoice, version }} organizationId="org-a" canManage /></>;
+  }
+  renderWithQuery(<Harness />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Preview invoice email' }));
+  fireEvent.click(await screen.findByRole('checkbox'));
+  fireEvent.click(screen.getByRole('button', { name: 'Approve and send invoice' }));
+  await screen.findByText(/Check delivery status before doing anything else/);
+  const originalRequest = vi.mocked(contractorRequest).mock.calls.find(([path]) => path.endsWith('/send'))?.[1]?.body;
+  evidence = sampleAcceptedDelivery({ state: 'uncertain', canPrepare: false, nextIntents: [], attentionReason: 'effect_requires_review', attempts: [sampleAttempt({ state: 'indeterminate', proof: 'none' })] });
+  fireEvent.click(screen.getByRole('button', { name: 'Apply recorded billing revision' }));
+  await screen.findAllByText('Uncertain — check the original mailbox');
+  expect(screen.getByText(/Check delivery status to reconcile the saved request/)).toBeTruthy();
+  expect(screen.getByText('execution-a')).toBeTruthy();
+  expect(screen.getByText(`invoice-delivery:${invoiceId}`)).toBeTruthy();
+  expect(screen.getByText('1 of 5 lifetime email attempts')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Approve and send invoice' }).hasAttribute('disabled')).toBe(true);
+  expect(screen.queryByRole('button', { name: /Preview invoice email|Review a safe retry|Review another copy|Discard preview and review again/ })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Check delivery status' }));
+  await waitFor(() => expect(screen.queryByText(/Check delivery status to reconcile the saved request/)).toBeNull());
+  expect(screen.queryByRole('button', { name: /Preview invoice email|Review a safe retry|Review another copy/ })).toBeNull();
+  const mutations = vi.mocked(contractorRequest).mock.calls.filter(([, options]) => options?.method === 'POST');
+  expect(mutations.map(([path]) => path.split('/').at(-1))).toEqual(['preview', 'send']);
+  expect(mutations[1]?.[1]?.body).toEqual(originalRequest);
+});
+it('reviews v3 existing-customer invoice email through the same permanent send endpoint and explicit company sender', async () => {
+  vi.mocked(contractorRequest).mockImplementation(async (path) => path.endsWith('/preview') ? returningPreview() : path.endsWith('/send') ? sampleAcceptedDelivery() : sampleDelivery());
+  renderWithQuery(<InvoiceDelivery invoice={workInvoice({ status: 'issued', issuedAt: invoice.issuedAt, version: 2 })} organizationId={workOrg} canManage />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Preview invoice email' })); await screen.findByText('customer@example.invalid'); expect(screen.getByText(/does not enroll opportunity reply monitoring/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Approve and send invoice' }));
+  await waitFor(() => expect(vi.mocked(contractorRequest).mock.calls.filter(([path]) => path.endsWith('/send'))).toHaveLength(1));
+  expect(vi.mocked(contractorRequest).mock.calls.find(([path]) => path.endsWith('/send'))?.[1]?.body).toEqual({ previewId: preview.previewId, payloadSha256: preview.payloadSha256, confirmed: true });
+});
+it.each(['root', 'contact', 'property', 'sender', 'legacy'] as const)('rejects a returning preview with a mismatched %s without issuing a send', async mode => {
+  const value = returningPreview(); if (mode === 'root') value.customerWorkId = workId(999); if (mode === 'contact') value.contactId = workId(999); if (mode === 'property') (value as any).propertyId = workId(999); if (mode === 'sender') value.sender.source = 'lead_assignee';
+  vi.mocked(contractorRequest).mockImplementation(async path => path.endsWith('/preview') ? mode === 'legacy' ? preview : value : sampleDelivery());
+  renderWithQuery(<InvoiceDelivery invoice={workInvoice({ status: 'issued', issuedAt: invoice.issuedAt, version: 2 })} organizationId={workOrg} canManage />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Preview invoice email' })); await screen.findByRole('alert'); expect(screen.queryByRole('button', { name: 'Approve and send invoice' })).toBeNull(); expect(vi.mocked(contractorRequest).mock.calls.some(([path]) => path.endsWith('/send'))).toBe(false);
+});
+it('does not surface a late v3 preview after invoice or authorization identity changes', async () => {
+  let release!: (value: unknown) => void;
+  vi.mocked(contractorRequest).mockImplementation(async path => path.endsWith('/preview') ? new Promise(resolve => { release = resolve; }) : sampleDelivery());
+  function Harness() { const [current, setCurrent] = useState(true); return <><button onClick={() => setCurrent(false)}>Change actual authority</button><InvoiceDelivery invoice={workInvoice({ status: 'issued', issuedAt: invoice.issuedAt, version: current ? 2 : 3 })} organizationId={workOrg} canManage={current} /></>; }
+  renderWithQuery(<Harness />); fireEvent.click(await screen.findByRole('button', { name: 'Preview invoice email' })); await waitFor(() => expect(release).toBeDefined()); fireEvent.click(screen.getByRole('button', { name: 'Change actual authority' })); await act(async () => release(returningPreview())); expect(screen.queryByText('customer@example.invalid')).toBeNull(); expect(screen.queryByRole('button', { name: 'Approve and send invoice' })).toBeNull();
+});
 
 it("requires exact visible review and confirmation before explicit send, then shows acceptance rather than delivery", async () => {
   render();
@@ -402,7 +492,7 @@ it("invalidates a saved preview when background evidence acquires a different he
   fireEvent.click(await screen.findByRole("checkbox"));
   act(() =>
     cache.setQueryData(
-      ["invoice-delivery", "org-a", invoiceId],
+      ["invoice-delivery", "org-a", invoiceId, invoice.version, invoice.status, null],
       sampleAcceptedDelivery(),
     ),
   );

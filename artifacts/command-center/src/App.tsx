@@ -11,6 +11,7 @@ import { Loader2 } from 'lucide-react';
 import { CLIENT } from '@/lib/client.config';
 import { notificationLeadPath, notificationServicePath } from '@/lib/mobile-lead';
 import { appointmentWorkspaceLoginPath, customerWorkspaceLoginPath } from '@/lib/customer-workspace-links';
+import { customerWorkLoginPath } from '@/lib/customer-work-links';
 import { NotificationLeadGuard, TenantMobileBoundary } from '@/components/mobile-lead-boundary';
 
 // Pages
@@ -508,7 +509,7 @@ function Router() {
     // This does not accept a general returnTo or store private records in the browser.
     const recordPath = window.location.pathname + window.location.search + window.location.hash;
     if (notificationLeadPath(recordPath, window.location.origin) || notificationServicePath(recordPath, window.location.origin) ||
-        customerWorkspaceLoginPath(recordPath, window.location.origin) || appointmentWorkspaceLoginPath(recordPath, window.location.origin)) {
+        customerWorkspaceLoginPath(recordPath, window.location.origin) || appointmentWorkspaceLoginPath(recordPath, window.location.origin) || customerWorkLoginPath(recordPath, window.location.origin)) {
       return <LoginScreen initialMode="login" />;
     }
     return (

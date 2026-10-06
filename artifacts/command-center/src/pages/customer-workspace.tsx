@@ -5,7 +5,8 @@ import { getGetMeQueryKey, useGetMe } from '@workspace/api-client-react';
 import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 import { contractorRequest } from '@/lib/contractor-api';
 import { memberAuthorityScope } from '@/lib/member-authority-scope';
-import { canReadInvoices } from '@/lib/permissions';
+import { canReadInvoices, canManageInvoices, canWrite } from '@/lib/permissions';
+import { customerWorkPath, customerInvoicePath, newCustomerWorkPath } from '@/lib/customer-work-links';
 import CustomerAssetsPanel from '@/components/customer-assets-panel';
 import { WorkdayDisclosure } from '@/components/workday-ui';
 import { customerWorkspaceLocation, customerWorkspacePath } from '@/lib/customer-workspace-links';
@@ -57,12 +58,12 @@ export default function CustomerWorkspace() {
   const authority = memberAuthorityScope(me);
   return <Workspace key={`${authority}:${context.contactId}`} authority={authority} contactId={context.contactId}
     organizationId={me.organization!.id} organizationName={me.organization!.name} timezone={me.organization!.timezone}
-    invoiceAccess={canReadInvoices(me.role)} section={context.section} />;
+    invoiceAccess={canReadInvoices(me.role)} invoiceManage={canManageInvoices(me.role)} workManage={canWrite(me.role)} section={context.section} />;
 }
 
-function Workspace({ authority, contactId, organizationId, organizationName, timezone, invoiceAccess, section }: {
+function Workspace({ authority, contactId, organizationId, organizationName, timezone, invoiceAccess, invoiceManage, workManage, section }: {
   authority: string; contactId: string; organizationId: string; organizationName: string; timezone: string;
-  invoiceAccess: boolean; section: CustomerWorkspaceSection;
+  invoiceAccess: boolean; invoiceManage: boolean; workManage: boolean; section: CustomerWorkspaceSection;
 }) {
   const [refresh, setRefresh] = useState(0);
   const header = useQuery({
@@ -90,6 +91,7 @@ function Workspace({ authority, contactId, organizationId, organizationName, tim
           aria-current={section === value ? 'page' : undefined}
           className={`${button} ${section === value ? 'border-primary bg-primary/10 text-primary' : 'bg-card'}`}>{LABELS[value]}</Link>)}
       </nav>
+      {available.includes(section) && ((section === 'estimates' || section === 'projects') && workManage && data.permissions.canWrite || section === 'invoices' && invoiceManage) && <Link className={button} href={newCustomerWorkPath(section as 'estimates' | 'projects' | 'invoices', contactId, organizationId)!}>New customer {section === 'estimates' ? 'estimate' : section === 'projects' ? 'job' : 'invoice'}</Link>}
       {available.includes(section)
         ? <Records key={`${section}:${refresh}`} authority={authority} contactId={contactId} organizationId={organizationId} section={section} timezone={timezone} invoiceAccess={invoiceAccess && data.permissions.canReadInvoices} refresh={refresh} />
         : <section role="alert" className="rounded-xl border border-border bg-card p-5"><h2 className="font-semibold">This section is not available to your current role</h2><p className="mt-2 text-sm text-muted-foreground">Choose an available section above. No restricted records were requested.</p></section>}
@@ -183,9 +185,9 @@ function RecordCard({ item, organizationId, timezone }: { item: CustomerWorkspac
     // Service dueAt encodes a calendar day at noon UTC, not a booked visit time.
     case 'service': title = item.equipmentLabel; details = <><p>{label(item.serviceKind)} · {label(item.status)}</p><p>Service due: {dateOnly(item.dueAt.slice(0, 10))}</p><p>Recorded coverage: {dateOnly(item.coverageStartsOn)} – {dateOnly(item.coverageEndsOn)}</p><p className="text-xs text-muted-foreground">Recorded coverage dates are not a determination of warranty eligibility.</p>{item.completedAt && <p>Completed: {time(item.completedAt, timezone)}</p>}</>; destination = `/service?serviceObligationId=${item.id}&organizationId=${organizationId}`; destinationLabel = 'Open service'; break;
     case 'lead': title = item.serviceType || 'Opportunity'; details = <p>{label(item.status)} · {item.urgency} urgency</p>; destination = leadLink(item.id); destinationLabel = 'Open opportunity'; break;
-    case 'project': title = item.name; details = <><p>{label(item.status)}</p><p>Scheduled start: {time(item.scheduledStart, timezone)}</p><p>Scheduled end: {time(item.scheduledEnd, timezone)}</p>{item.completedAt && <p>Completed: {time(item.completedAt, timezone)}</p>}</>; destination = leadLink(item.leadId); destinationLabel = 'Open related opportunity'; break;
-    case 'estimate': title = item.title; details = <p>{label(item.status)}</p>; destination = leadLink(item.leadId); destinationLabel = 'Open related opportunity'; break;
-    case 'invoice': title = item.title; details = <><p>Invoice {item.invoiceNumber || 'number not assigned'} · {item.status}</p><p>Issued: {time(item.issuedAt, timezone)}</p><p className="text-xs text-muted-foreground">Open the invoice for its authoritative balance and details.</p></>; destination = `/invoices/${item.id}`; destinationLabel = 'Open invoice'; break;
+    case 'project': title = item.name; details = <><p>{label(item.status)}</p><p>Scheduled start: {time(item.scheduledStart, timezone)}</p><p>Scheduled end: {time(item.scheduledEnd, timezone)}</p>{item.completedAt && <p>Completed: {time(item.completedAt, timezone)}</p>}{item.leadId && <Link href={leadLink(item.leadId)} className={recordLink}>Open related opportunity</Link>}</>; destination = customerWorkPath('projects', item.id, organizationId); destinationLabel = 'Open job'; break;
+    case 'estimate': title = item.title; details = <><p>{label(item.status)}</p>{item.customerWorkId && <p className="text-xs text-muted-foreground">Staff-recorded status; not proof of sending, signature or payment.</p>}{item.leadId && <Link href={leadLink(item.leadId)} className={recordLink}>Open related opportunity</Link>}</>; destination = customerWorkPath('estimates', item.id, organizationId); destinationLabel = 'Open estimate'; break;
+    case 'invoice': title = item.title; details = <><p>Invoice {item.invoiceNumber || 'number not assigned'} · {item.status}</p><p>Issued: {time(item.issuedAt, timezone)}</p><p className="text-xs text-muted-foreground">Open the invoice for its authoritative balance and details.</p></>; destination = customerInvoicePath(item.id, organizationId); destinationLabel = 'Open invoice'; break;
     case 'task': title = item.title; details = <><p>{label(item.status)} · {item.priority} priority</p><p>Due: {time(item.dueAt, timezone)}</p>{item.completedAt && <p>Completed: {time(item.completedAt, timezone)}</p>}</>; destination = `/tasks?taskId=${item.id}`; destinationLabel = 'Open task'; break;
     case 'activity': title = item.label; details = <p>Recorded event: {time(item.occurredAt, timezone)}</p>; destination = item.leadId ? leadLink(item.leadId) : null; destinationLabel = 'Open related opportunity'; break;
   }

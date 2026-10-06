@@ -74,6 +74,7 @@ describe("CALLIE conversation setup and exact approval", () => {
   });
   it("requires reviewed facts and accepted owners and previews optional fixed handoff targets", async () => {
     const api = server(); mount(); await openPolicy(); fillEnabled();
+    await within(screen.getByLabelText("Reception daytime owner")).findByRole("option", { name: "Accepted Owner" });
     expect(within(screen.getByLabelText("Reception daytime owner")).getAllByRole("option").map(option => option.textContent)).toEqual(["Choose accepted staff", "Accepted Owner"]);
     fireEvent.change(screen.getByLabelText("Reception daytime owner"), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Prepare exact conversation-policy review" })); await screen.findByText(/Review the required company facts/); expect(api.writes()).toEqual([]);
