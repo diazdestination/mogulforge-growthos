@@ -14,6 +14,7 @@ import { parseCsv } from "./reactivation";
 import { phoneE164 } from "./twilio-controls";
 import { assertOperationalStaff, assertScheduleVersion, lockContractorSchedule, ScheduleError, type ScheduleTransaction } from "./contractor-scheduling";
 import { z } from "zod";
+import { guardWorkdayService } from "./workday-guards";
 
 const DAY_MS = 86_400_000;
 const MAX_IMPORT_ROWS = 5_000;
@@ -221,15 +222,17 @@ export async function updateServiceObligation(
   actorUserId: string,
   id: string,
   input: { status?: "active" | "completed" | "cancelled"; dueDate?: string; appointmentId?: string | null; expectedUpdatedAt?: string; assignedUserId?: string | null; completionNote?: string; coverageStartsOn?: string | null; coverageEndsOn?: string | null; coverageEvidence?: string | null },
+  execution?: { transaction: ScheduleTransaction; preserveTaskPlan: true; originalCompletionId: string },
 ) {
   const dueAt = input.dueDate === undefined ? undefined : parseServiceDate(input.dueDate);
   if (dueAt === null) return { error: "invalid_due_date" as const };
-  return db.transaction(async (tx) => {
+  const mutate = async (tx: ScheduleTransaction) => {
     await lockContractorSchedule(tx, organizationId);
     const [current] = await tx.select().from(serviceObligationsTable)
       .where(and(eq(serviceObligationsTable.id, id), eq(serviceObligationsTable.organizationId, organizationId)))
       .for("update");
     if (!current) return { error: "not_found" as const };
+    await guardWorkdayService(tx, organizationId, id, current, input, execution?.originalCompletionId);
     const [successor] = await tx.select({ id: serviceObligationsTable.id }).from(serviceObligationsTable).where(and(eq(serviceObligationsTable.organizationId, organizationId), eq(serviceObligationsTable.predecessorObligationId, current.id))).limit(1);
     if (current.status === "completed" && input.status === "completed" && input.dueDate === undefined && input.appointmentId === undefined && input.assignedUserId === undefined && input.coverageStartsOn === undefined && input.coverageEndsOn === undefined && input.coverageEvidence === undefined && (input.completionNote === undefined || input.completionNote.trim() === current.completionNote)) return { ...current, nextObligationId: successor?.id ?? null };
     assertScheduleVersion(current.updatedAt, input.expectedUpdatedAt);
@@ -271,7 +274,7 @@ export async function updateServiceObligation(
     await tx.update(crmTasksTable)
       .set({
         status: taskStatus,
-        dueAt: serviceNoticeAt(nextDue, current.noticeDays),
+        ...(execution?.preserveTaskPlan ? {} : { dueAt: serviceNoticeAt(nextDue, current.noticeDays) }),
         completedAt: taskStatus === "done" ? new Date() : null,
         ...(input.assignedUserId === undefined ? {} : { assignedUserId: input.assignedUserId }),
       })
@@ -299,7 +302,13 @@ export async function updateServiceObligation(
       await tx.insert(auditEventsTable).values({ organizationId, actorUserId, action: "service.next_visit_prepared", entityType: "service_obligation", entityId: current.id, metadata: { nextObligationId, dueDate: nextDate.toISOString().slice(0, 10), approvalUserId: policy.data.approvedByUserId } });
     }
     return { ...updated, nextObligationId };
-  });
+  };
+  return execution ? mutate(execution.transaction) : db.transaction(mutate);
+}
+
+/** Reuses native completion/anchored recurrence without another pool checkout. */
+export async function completeWorkdayServiceInTransaction(tx: ScheduleTransaction, organizationId: string, actorUserId: string, id: string, expectedUpdatedAt: string, originalCompletionId: string) {
+  return updateServiceObligation(organizationId, actorUserId, id, { status: "completed", expectedUpdatedAt }, { transaction: tx, preserveTaskPlan: true, originalCompletionId });
 }
 
 export async function approveServiceRecurrence(org: string, actor: string, id: string, input: { expectedUpdatedAt: string; intervalMonths: number | null; endDate?: string | null; agreementNote: string }) {
@@ -322,13 +331,13 @@ export async function approveServiceRecurrence(org: string, actor: string, id: s
 }
 
 /** Appointment state changes reopen the office task; service is completed only by staff. */
-export async function reconcileServiceAppointment(tx: ScheduleTransaction, org: string, appointment: typeof appointmentsTable.$inferSelect) {
+export async function reconcileServiceAppointment(tx: ScheduleTransaction, org: string, appointment: typeof appointmentsTable.$inferSelect, options: { preserveTaskPlan?: boolean } = {}) {
   const rows = await tx.select().from(serviceObligationsTable).where(and(eq(serviceObligationsTable.organizationId, org), eq(serviceObligationsTable.appointmentId, appointment.id), eq(serviceObligationsTable.status, "active"))).for("update");
   const booked = ["scheduled", "confirmed"].includes(appointment.status);
   for (const obligation of rows) {
     if (appointment.contactId !== obligation.contactId || (appointment.propertyId && obligation.propertyId && appointment.propertyId !== obligation.propertyId)) throw new ScheduleError("customer_reference_mismatch", 400);
     await tx.update(crmTasksTable).set({ status: booked ? "done" : "open", completedAt: booked ? new Date() : null,
-      description: booked ? "Office appointment is booked. Mark service complete after the visit is confirmed." : `Appointment ${appointment.status}. Review this service obligation and arrange the next office-approved step.`,
+      ...(options.preserveTaskPlan ? {} : { description: booked ? "Office appointment is booked. Mark service complete after the visit is confirmed." : `Appointment ${appointment.status}. Review this service obligation and arrange the next office-approved step.` }),
     }).where(and(eq(crmTasksTable.organizationId, org), eq(crmTasksTable.id, obligation.taskId)));
   }
 }

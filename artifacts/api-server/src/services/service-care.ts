@@ -26,6 +26,7 @@ import { lockServiceStanding, ServiceStandingError, standingCompanyProjection } 
 import { assertServiceSmsReplyStorageReady, serviceSmsReplyReference, serviceSmsReplySuffix } from "./service-sms-policy";
 import { hasServiceSmsReplyHold, reserveServiceSmsParent } from "./service-sms";
 import { markContactTouchDispatchStarted } from "./contact-touch-claim";
+import { guardWorkdayService } from "./workday-guards";
 
 const APPROVED = "service.care_reminder_approved";
 const RESPONSE = "service.care_response_recorded";
@@ -322,6 +323,7 @@ export async function bookServiceCareVisit(org: string, actor: string, id: strin
     const values = { organizationId: org, contactId: obligation.contactId, propertyId: obligation.propertyId, assignedUserId: input.assignedUserId, type: input.type, status: "confirmed" as const, scheduledStart: start, scheduledEnd: end, notes: `Office-confirmed service visit: ${obligation.equipmentLabel}. Customer confirmation recorded by staff; service completion and warranty coverage are not inferred.` };
     const appointment = input.type === "inspection" ? await insertInspectionInTransaction(tx, values) : (await tx.insert(appointmentsTable).values(values).returning())[0];
     if (!appointment) fail("capacity_conflict", "The inspection window is full. Choose another confirmed time.");
+    await guardWorkdayService(tx, org, id, obligation, { appointmentId: appointment.id });
     await tx.update(serviceObligationsTable).set({ appointmentId: appointment.id, updatedAt: new Date(Math.max(Date.now(), obligation.updatedAt.getTime() + 1)) }).where(serviceWhere(org, id));
     await tx.update(crmTasksTable).set({ status: "done", completedAt: new Date(), assignedUserId: input.assignedUserId, description: "Office-confirmed appointment linked. After the visit, explicitly mark the service complete; a booked appointment does not establish completion or warranty coverage." }).where(and(eq(crmTasksTable.organizationId, org), eq(crmTasksTable.id, obligation.taskId)));
     const { scheduleAppointmentReminder } = await import("./automation");

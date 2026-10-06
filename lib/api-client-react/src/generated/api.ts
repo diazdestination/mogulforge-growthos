@@ -124,6 +124,7 @@ import type {
   GetReferralLinkInfo200,
   GetRoiReportParams,
   GetServiceCareParams,
+  GetWorkdayAssetsParams,
   GoogleReviewsResponse,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
@@ -322,7 +323,32 @@ import type {
   WidgetHeartbeat,
   WidgetLeadResult,
   WidgetLeadSubmission,
-  WonRevenueCorrectionInput
+  WonRevenueCorrectionInput,
+  WorkdayAppointment,
+  WorkdayApproveTemplateRequest,
+  WorkdayAssetMutation,
+  WorkdayAssetPage,
+  WorkdayAttachPhotoRequest,
+  WorkdayCancelEntryRequest,
+  WorkdayCompleteRequest,
+  WorkdayCompletionPreview,
+  WorkdayCorrectRequest,
+  WorkdayCreateAssetRequest,
+  WorkdayCreateEntryRequest,
+  WorkdayCreateTemplateRequest,
+  WorkdayMutation,
+  WorkdayPhotoReservation,
+  WorkdayPreviewCompletionRequest,
+  WorkdayPreviewTemplateRequest,
+  WorkdayRequestPhotoRequest,
+  WorkdayRetireTemplateRequest,
+  WorkdayReviseTemplateRequest,
+  WorkdaySaveEntryRequest,
+  WorkdayTemplate,
+  WorkdayTemplateCatalog,
+  WorkdayTemplateMutation,
+  WorkdayTemplatePreview,
+  WorkdayUpdateAssetRequest
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -351,6 +377,1517 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetWorkdayAssetsUrl = (contactId: string,
+    params?: GetWorkdayAssetsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/contacts/${contactId}/assets?${stringifiedParams}` : `/api/v1/contacts/${contactId}/assets`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.read, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Read explicit paged customer/property assets
+ */
+export const getWorkdayAssets = async (contactId: string,
+    params?: GetWorkdayAssetsParams, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayAssetPage> => {
+
+  return customFetch<WorkdayAssetPage>(getGetWorkdayAssetsUrl(contactId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWorkdayAssetsQueryKey = (contactId: string,
+    params?: GetWorkdayAssetsParams,) => {
+    return [
+    `/api/v1/contacts/${contactId}/assets`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetWorkdayAssetsQueryOptions = <TData = Awaited<ReturnType<typeof getWorkdayAssets>>, TError = ErrorType<void>>(contactId: string,
+    params?: GetWorkdayAssetsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkdayAssets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWorkdayAssetsQueryKey(contactId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkdayAssets>>> = ({ signal }) => getWorkdayAssets(contactId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: contactId !== null && contactId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWorkdayAssets>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWorkdayAssetsQueryResult = NonNullable<Awaited<ReturnType<typeof getWorkdayAssets>>>
+export type GetWorkdayAssetsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read explicit paged customer/property assets
+ */
+
+export function useGetWorkdayAssets<TData = Awaited<ReturnType<typeof getWorkdayAssets>>, TError = ErrorType<void>>(
+ contactId: string,
+    params?: GetWorkdayAssetsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkdayAssets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWorkdayAssetsQueryOptions(contactId,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateWorkdayAssetUrl = (contactId: string,) => {
+
+
+
+
+  return `/api/v1/contacts/${contactId}/assets`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Record an explicit property asset
+ */
+export const createWorkdayAsset = async (contactId: string,
+    workdayCreateAssetRequest: WorkdayCreateAssetRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayAssetMutation> => {
+
+  return customFetch<WorkdayAssetMutation>(getCreateWorkdayAssetUrl(contactId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayCreateAssetRequest)
+  }
+);}
+
+
+
+
+
+export const getCreateWorkdayAssetMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWorkdayAsset>>, TError,{contactId: string;data: BodyType<WorkdayCreateAssetRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createWorkdayAsset>>, TError,{contactId: string;data: BodyType<WorkdayCreateAssetRequest>}, TContext> => {
+
+const mutationKey = ['createWorkdayAsset'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createWorkdayAsset>>, {contactId: string;data: BodyType<WorkdayCreateAssetRequest>}> = (props) => {
+          const {contactId,data} = props ?? {};
+
+          return  createWorkdayAsset(contactId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateWorkdayAssetMutationResult = NonNullable<Awaited<ReturnType<typeof createWorkdayAsset>>>
+    export type CreateWorkdayAssetMutationBody = BodyType<WorkdayCreateAssetRequest>
+    export type CreateWorkdayAssetMutationError = ErrorType<void>
+
+    /**
+ * @summary Record an explicit property asset
+ */
+export const useCreateWorkdayAsset = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWorkdayAsset>>, TError,{contactId: string;data: BodyType<WorkdayCreateAssetRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createWorkdayAsset>>,
+        TError,
+        {contactId: string;data: BodyType<WorkdayCreateAssetRequest>},
+        TContext
+      > => {
+      return useMutation(getCreateWorkdayAssetMutationOptions(options));
+    }
+
+export const getUpdateWorkdayAssetUrl = (assetId: string,) => {
+
+
+
+
+  return `/api/v1/assets/${assetId}`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Edit or retire recorded asset facts without reparenting
+ */
+export const updateWorkdayAsset = async (assetId: string,
+    workdayUpdateAssetRequest: WorkdayUpdateAssetRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayAssetMutation> => {
+
+  return customFetch<WorkdayAssetMutation>(getUpdateWorkdayAssetUrl(assetId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayUpdateAssetRequest)
+  }
+);}
+
+
+
+
+
+export const getUpdateWorkdayAssetMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkdayAsset>>, TError,{assetId: string;data: BodyType<WorkdayUpdateAssetRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWorkdayAsset>>, TError,{assetId: string;data: BodyType<WorkdayUpdateAssetRequest>}, TContext> => {
+
+const mutationKey = ['updateWorkdayAsset'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWorkdayAsset>>, {assetId: string;data: BodyType<WorkdayUpdateAssetRequest>}> = (props) => {
+          const {assetId,data} = props ?? {};
+
+          return  updateWorkdayAsset(assetId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWorkdayAssetMutationResult = NonNullable<Awaited<ReturnType<typeof updateWorkdayAsset>>>
+    export type UpdateWorkdayAssetMutationBody = BodyType<WorkdayUpdateAssetRequest>
+    export type UpdateWorkdayAssetMutationError = ErrorType<void>
+
+    /**
+ * @summary Edit or retire recorded asset facts without reparenting
+ */
+export const useUpdateWorkdayAsset = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkdayAsset>>, TError,{assetId: string;data: BodyType<WorkdayUpdateAssetRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateWorkdayAsset>>,
+        TError,
+        {assetId: string;data: BodyType<WorkdayUpdateAssetRequest>},
+        TContext
+      > => {
+      return useMutation(getUpdateWorkdayAssetMutationOptions(options));
+    }
+
+export const getGetWorkdayChecklistsUrl = () => {
+
+
+
+
+  return `/api/v1/work-checklists`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.read, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Read company checklist revisions and unreviewed starters
+ */
+export const getWorkdayChecklists = async ( options?: Parameters<typeof customFetch>[1]): Promise<WorkdayTemplateCatalog> => {
+
+  return customFetch<WorkdayTemplateCatalog>(getGetWorkdayChecklistsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWorkdayChecklistsQueryKey = () => {
+    return [
+    `/api/v1/work-checklists`
+    ] as const;
+    }
+
+
+export const getGetWorkdayChecklistsQueryOptions = <TData = Awaited<ReturnType<typeof getWorkdayChecklists>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkdayChecklists>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWorkdayChecklistsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkdayChecklists>>> = ({ signal }) => getWorkdayChecklists({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWorkdayChecklists>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWorkdayChecklistsQueryResult = NonNullable<Awaited<ReturnType<typeof getWorkdayChecklists>>>
+export type GetWorkdayChecklistsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read company checklist revisions and unreviewed starters
+ */
+
+export function useGetWorkdayChecklists<TData = Awaited<ReturnType<typeof getWorkdayChecklists>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkdayChecklists>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWorkdayChecklistsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateWorkdayChecklistUrl = () => {
+
+
+
+
+  return `/api/v1/work-checklists`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires settings.manage, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Save a company draft, never auto-review a research starter
+ */
+export const createWorkdayChecklist = async (workdayCreateTemplateRequest: WorkdayCreateTemplateRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayTemplateMutation> => {
+
+  return customFetch<WorkdayTemplateMutation>(getCreateWorkdayChecklistUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayCreateTemplateRequest)
+  }
+);}
+
+
+
+
+
+export const getCreateWorkdayChecklistMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWorkdayChecklist>>, TError,{data: BodyType<WorkdayCreateTemplateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createWorkdayChecklist>>, TError,{data: BodyType<WorkdayCreateTemplateRequest>}, TContext> => {
+
+const mutationKey = ['createWorkdayChecklist'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createWorkdayChecklist>>, {data: BodyType<WorkdayCreateTemplateRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createWorkdayChecklist(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateWorkdayChecklistMutationResult = NonNullable<Awaited<ReturnType<typeof createWorkdayChecklist>>>
+    export type CreateWorkdayChecklistMutationBody = BodyType<WorkdayCreateTemplateRequest>
+    export type CreateWorkdayChecklistMutationError = ErrorType<void>
+
+    /**
+ * @summary Save a company draft, never auto-review a research starter
+ */
+export const useCreateWorkdayChecklist = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWorkdayChecklist>>, TError,{data: BodyType<WorkdayCreateTemplateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createWorkdayChecklist>>,
+        TError,
+        {data: BodyType<WorkdayCreateTemplateRequest>},
+        TContext
+      > => {
+      return useMutation(getCreateWorkdayChecklistMutationOptions(options));
+    }
+
+export const getGetWorkdayChecklistUrl = (templateId: string,) => {
+
+
+
+
+  return `/api/v1/work-checklists/${templateId}`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.read, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Read exact company checklist history
+ */
+export const getWorkdayChecklist = async (templateId: string, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayTemplate> => {
+
+  return customFetch<WorkdayTemplate>(getGetWorkdayChecklistUrl(templateId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWorkdayChecklistQueryKey = (templateId: string,) => {
+    return [
+    `/api/v1/work-checklists/${templateId}`
+    ] as const;
+    }
+
+
+export const getGetWorkdayChecklistQueryOptions = <TData = Awaited<ReturnType<typeof getWorkdayChecklist>>, TError = ErrorType<void>>(templateId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkdayChecklist>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWorkdayChecklistQueryKey(templateId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkdayChecklist>>> = ({ signal }) => getWorkdayChecklist(templateId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: templateId !== null && templateId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWorkdayChecklist>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWorkdayChecklistQueryResult = NonNullable<Awaited<ReturnType<typeof getWorkdayChecklist>>>
+export type GetWorkdayChecklistQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read exact company checklist history
+ */
+
+export function useGetWorkdayChecklist<TData = Awaited<ReturnType<typeof getWorkdayChecklist>>, TError = ErrorType<void>>(
+ templateId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkdayChecklist>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWorkdayChecklistQueryOptions(templateId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReviseWorkdayChecklistUrl = (templateId: string,) => {
+
+
+
+
+  return `/api/v1/work-checklists/${templateId}/revisions`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires settings.manage, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Create a new immutable draft revision
+ */
+export const reviseWorkdayChecklist = async (templateId: string,
+    workdayReviseTemplateRequest: WorkdayReviseTemplateRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayTemplateMutation> => {
+
+  return customFetch<WorkdayTemplateMutation>(getReviseWorkdayChecklistUrl(templateId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayReviseTemplateRequest)
+  }
+);}
+
+
+
+
+
+export const getReviseWorkdayChecklistMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviseWorkdayChecklist>>, TError,{templateId: string;data: BodyType<WorkdayReviseTemplateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviseWorkdayChecklist>>, TError,{templateId: string;data: BodyType<WorkdayReviseTemplateRequest>}, TContext> => {
+
+const mutationKey = ['reviseWorkdayChecklist'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviseWorkdayChecklist>>, {templateId: string;data: BodyType<WorkdayReviseTemplateRequest>}> = (props) => {
+          const {templateId,data} = props ?? {};
+
+          return  reviseWorkdayChecklist(templateId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviseWorkdayChecklistMutationResult = NonNullable<Awaited<ReturnType<typeof reviseWorkdayChecklist>>>
+    export type ReviseWorkdayChecklistMutationBody = BodyType<WorkdayReviseTemplateRequest>
+    export type ReviseWorkdayChecklistMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a new immutable draft revision
+ */
+export const useReviseWorkdayChecklist = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviseWorkdayChecklist>>, TError,{templateId: string;data: BodyType<WorkdayReviseTemplateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviseWorkdayChecklist>>,
+        TError,
+        {templateId: string;data: BodyType<WorkdayReviseTemplateRequest>},
+        TContext
+      > => {
+      return useMutation(getReviseWorkdayChecklistMutationOptions(options));
+    }
+
+export const getPreviewWorkdayChecklistUrl = (templateId: string,) => {
+
+
+
+
+  return `/api/v1/work-checklists/${templateId}/preview`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires settings.manage, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Review exact saved company instructions
+ */
+export const previewWorkdayChecklist = async (templateId: string,
+    workdayPreviewTemplateRequest: WorkdayPreviewTemplateRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayTemplatePreview> => {
+
+  return customFetch<WorkdayTemplatePreview>(getPreviewWorkdayChecklistUrl(templateId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayPreviewTemplateRequest)
+  }
+);}
+
+
+
+
+
+export const getPreviewWorkdayChecklistMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewWorkdayChecklist>>, TError,{templateId: string;data: BodyType<WorkdayPreviewTemplateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewWorkdayChecklist>>, TError,{templateId: string;data: BodyType<WorkdayPreviewTemplateRequest>}, TContext> => {
+
+const mutationKey = ['previewWorkdayChecklist'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewWorkdayChecklist>>, {templateId: string;data: BodyType<WorkdayPreviewTemplateRequest>}> = (props) => {
+          const {templateId,data} = props ?? {};
+
+          return  previewWorkdayChecklist(templateId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewWorkdayChecklistMutationResult = NonNullable<Awaited<ReturnType<typeof previewWorkdayChecklist>>>
+    export type PreviewWorkdayChecklistMutationBody = BodyType<WorkdayPreviewTemplateRequest>
+    export type PreviewWorkdayChecklistMutationError = ErrorType<void>
+
+    /**
+ * @summary Review exact saved company instructions
+ */
+export const usePreviewWorkdayChecklist = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewWorkdayChecklist>>, TError,{templateId: string;data: BodyType<WorkdayPreviewTemplateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewWorkdayChecklist>>,
+        TError,
+        {templateId: string;data: BodyType<WorkdayPreviewTemplateRequest>},
+        TContext
+      > => {
+      return useMutation(getPreviewWorkdayChecklistMutationOptions(options));
+    }
+
+export const getApproveWorkdayChecklistUrl = (templateId: string,) => {
+
+
+
+
+  return `/api/v1/work-checklists/${templateId}/approve`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires settings.manage, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Approve the actor-bound exact revision
+ */
+export const approveWorkdayChecklist = async (templateId: string,
+    workdayApproveTemplateRequest: WorkdayApproveTemplateRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayTemplateMutation> => {
+
+  return customFetch<WorkdayTemplateMutation>(getApproveWorkdayChecklistUrl(templateId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayApproveTemplateRequest)
+  }
+);}
+
+
+
+
+
+export const getApproveWorkdayChecklistMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveWorkdayChecklist>>, TError,{templateId: string;data: BodyType<WorkdayApproveTemplateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveWorkdayChecklist>>, TError,{templateId: string;data: BodyType<WorkdayApproveTemplateRequest>}, TContext> => {
+
+const mutationKey = ['approveWorkdayChecklist'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveWorkdayChecklist>>, {templateId: string;data: BodyType<WorkdayApproveTemplateRequest>}> = (props) => {
+          const {templateId,data} = props ?? {};
+
+          return  approveWorkdayChecklist(templateId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveWorkdayChecklistMutationResult = NonNullable<Awaited<ReturnType<typeof approveWorkdayChecklist>>>
+    export type ApproveWorkdayChecklistMutationBody = BodyType<WorkdayApproveTemplateRequest>
+    export type ApproveWorkdayChecklistMutationError = ErrorType<void>
+
+    /**
+ * @summary Approve the actor-bound exact revision
+ */
+export const useApproveWorkdayChecklist = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveWorkdayChecklist>>, TError,{templateId: string;data: BodyType<WorkdayApproveTemplateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveWorkdayChecklist>>,
+        TError,
+        {templateId: string;data: BodyType<WorkdayApproveTemplateRequest>},
+        TContext
+      > => {
+      return useMutation(getApproveWorkdayChecklistMutationOptions(options));
+    }
+
+export const getRetireWorkdayChecklistUrl = (templateId: string,) => {
+
+
+
+
+  return `/api/v1/work-checklists/${templateId}/retire`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires settings.manage, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Block new enrollment without rewriting history
+ */
+export const retireWorkdayChecklist = async (templateId: string,
+    workdayRetireTemplateRequest: WorkdayRetireTemplateRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayTemplateMutation> => {
+
+  return customFetch<WorkdayTemplateMutation>(getRetireWorkdayChecklistUrl(templateId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayRetireTemplateRequest)
+  }
+);}
+
+
+
+
+
+export const getRetireWorkdayChecklistMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retireWorkdayChecklist>>, TError,{templateId: string;data: BodyType<WorkdayRetireTemplateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof retireWorkdayChecklist>>, TError,{templateId: string;data: BodyType<WorkdayRetireTemplateRequest>}, TContext> => {
+
+const mutationKey = ['retireWorkdayChecklist'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retireWorkdayChecklist>>, {templateId: string;data: BodyType<WorkdayRetireTemplateRequest>}> = (props) => {
+          const {templateId,data} = props ?? {};
+
+          return  retireWorkdayChecklist(templateId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetireWorkdayChecklistMutationResult = NonNullable<Awaited<ReturnType<typeof retireWorkdayChecklist>>>
+    export type RetireWorkdayChecklistMutationBody = BodyType<WorkdayRetireTemplateRequest>
+    export type RetireWorkdayChecklistMutationError = ErrorType<void>
+
+    /**
+ * @summary Block new enrollment without rewriting history
+ */
+export const useRetireWorkdayChecklist = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retireWorkdayChecklist>>, TError,{templateId: string;data: BodyType<WorkdayRetireTemplateRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof retireWorkdayChecklist>>,
+        TError,
+        {templateId: string;data: BodyType<WorkdayRetireTemplateRequest>},
+        TContext
+      > => {
+      return useMutation(getRetireWorkdayChecklistMutationOptions(options));
+    }
+
+export const getGetAppointmentWorkUrl = (appointmentId: string,) => {
+
+
+
+
+  return `/api/v1/appointments/${appointmentId}/work`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.read, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Read exact native visit work and separate service outcomes
+ */
+export const getAppointmentWork = async (appointmentId: string, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayAppointment> => {
+
+  return customFetch<WorkdayAppointment>(getGetAppointmentWorkUrl(appointmentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAppointmentWorkQueryKey = (appointmentId: string,) => {
+    return [
+    `/api/v1/appointments/${appointmentId}/work`
+    ] as const;
+    }
+
+
+export const getGetAppointmentWorkQueryOptions = <TData = Awaited<ReturnType<typeof getAppointmentWork>>, TError = ErrorType<void>>(appointmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAppointmentWork>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAppointmentWorkQueryKey(appointmentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAppointmentWork>>> = ({ signal }) => getAppointmentWork(appointmentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: appointmentId !== null && appointmentId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAppointmentWork>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAppointmentWorkQueryResult = NonNullable<Awaited<ReturnType<typeof getAppointmentWork>>>
+export type GetAppointmentWorkQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read exact native visit work and separate service outcomes
+ */
+
+export function useGetAppointmentWork<TData = Awaited<ReturnType<typeof getAppointmentWork>>, TError = ErrorType<void>>(
+ appointmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAppointmentWork>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAppointmentWorkQueryOptions(appointmentId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateAppointmentWorkEntryUrl = (appointmentId: string,) => {
+
+
+
+
+  return `/api/v1/appointments/${appointmentId}/work/entries`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Explicitly prepare an asset/checklist entry
+ */
+export const createAppointmentWorkEntry = async (appointmentId: string,
+    workdayCreateEntryRequest: WorkdayCreateEntryRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayMutation> => {
+
+  return customFetch<WorkdayMutation>(getCreateAppointmentWorkEntryUrl(appointmentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayCreateEntryRequest)
+  }
+);}
+
+
+
+
+
+export const getCreateAppointmentWorkEntryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAppointmentWorkEntry>>, TError,{appointmentId: string;data: BodyType<WorkdayCreateEntryRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAppointmentWorkEntry>>, TError,{appointmentId: string;data: BodyType<WorkdayCreateEntryRequest>}, TContext> => {
+
+const mutationKey = ['createAppointmentWorkEntry'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAppointmentWorkEntry>>, {appointmentId: string;data: BodyType<WorkdayCreateEntryRequest>}> = (props) => {
+          const {appointmentId,data} = props ?? {};
+
+          return  createAppointmentWorkEntry(appointmentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAppointmentWorkEntryMutationResult = NonNullable<Awaited<ReturnType<typeof createAppointmentWorkEntry>>>
+    export type CreateAppointmentWorkEntryMutationBody = BodyType<WorkdayCreateEntryRequest>
+    export type CreateAppointmentWorkEntryMutationError = ErrorType<void>
+
+    /**
+ * @summary Explicitly prepare an asset/checklist entry
+ */
+export const useCreateAppointmentWorkEntry = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAppointmentWorkEntry>>, TError,{appointmentId: string;data: BodyType<WorkdayCreateEntryRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAppointmentWorkEntry>>,
+        TError,
+        {appointmentId: string;data: BodyType<WorkdayCreateEntryRequest>},
+        TContext
+      > => {
+      return useMutation(getCreateAppointmentWorkEntryMutationOptions(options));
+    }
+
+export const getSaveAppointmentWorkEntryUrl = (appointmentId: string,
+    entryId: string,) => {
+
+
+
+
+  return `/api/v1/appointments/${appointmentId}/work/entries/${entryId}`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Save actual field progress at the exact version
+ */
+export const saveAppointmentWorkEntry = async (appointmentId: string,
+    entryId: string,
+    workdaySaveEntryRequest: WorkdaySaveEntryRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayMutation> => {
+
+  return customFetch<WorkdayMutation>(getSaveAppointmentWorkEntryUrl(appointmentId,entryId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdaySaveEntryRequest)
+  }
+);}
+
+
+
+
+
+export const getSaveAppointmentWorkEntryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveAppointmentWorkEntry>>, TError,{appointmentId: string;entryId: string;data: BodyType<WorkdaySaveEntryRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveAppointmentWorkEntry>>, TError,{appointmentId: string;entryId: string;data: BodyType<WorkdaySaveEntryRequest>}, TContext> => {
+
+const mutationKey = ['saveAppointmentWorkEntry'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveAppointmentWorkEntry>>, {appointmentId: string;entryId: string;data: BodyType<WorkdaySaveEntryRequest>}> = (props) => {
+          const {appointmentId,entryId,data} = props ?? {};
+
+          return  saveAppointmentWorkEntry(appointmentId,entryId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveAppointmentWorkEntryMutationResult = NonNullable<Awaited<ReturnType<typeof saveAppointmentWorkEntry>>>
+    export type SaveAppointmentWorkEntryMutationBody = BodyType<WorkdaySaveEntryRequest>
+    export type SaveAppointmentWorkEntryMutationError = ErrorType<void>
+
+    /**
+ * @summary Save actual field progress at the exact version
+ */
+export const useSaveAppointmentWorkEntry = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveAppointmentWorkEntry>>, TError,{appointmentId: string;entryId: string;data: BodyType<WorkdaySaveEntryRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveAppointmentWorkEntry>>,
+        TError,
+        {appointmentId: string;entryId: string;data: BodyType<WorkdaySaveEntryRequest>},
+        TContext
+      > => {
+      return useMutation(getSaveAppointmentWorkEntryMutationOptions(options));
+    }
+
+export const getCancelAppointmentWorkEntryUrl = (appointmentId: string,
+    entryId: string,) => {
+
+
+
+
+  return `/api/v1/appointments/${appointmentId}/work/entries/${entryId}/cancel`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Cancel preparation without deleting recorded history
+ */
+export const cancelAppointmentWorkEntry = async (appointmentId: string,
+    entryId: string,
+    workdayCancelEntryRequest: WorkdayCancelEntryRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayMutation> => {
+
+  return customFetch<WorkdayMutation>(getCancelAppointmentWorkEntryUrl(appointmentId,entryId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayCancelEntryRequest)
+  }
+);}
+
+
+
+
+
+export const getCancelAppointmentWorkEntryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelAppointmentWorkEntry>>, TError,{appointmentId: string;entryId: string;data: BodyType<WorkdayCancelEntryRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelAppointmentWorkEntry>>, TError,{appointmentId: string;entryId: string;data: BodyType<WorkdayCancelEntryRequest>}, TContext> => {
+
+const mutationKey = ['cancelAppointmentWorkEntry'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelAppointmentWorkEntry>>, {appointmentId: string;entryId: string;data: BodyType<WorkdayCancelEntryRequest>}> = (props) => {
+          const {appointmentId,entryId,data} = props ?? {};
+
+          return  cancelAppointmentWorkEntry(appointmentId,entryId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelAppointmentWorkEntryMutationResult = NonNullable<Awaited<ReturnType<typeof cancelAppointmentWorkEntry>>>
+    export type CancelAppointmentWorkEntryMutationBody = BodyType<WorkdayCancelEntryRequest>
+    export type CancelAppointmentWorkEntryMutationError = ErrorType<void>
+
+    /**
+ * @summary Cancel preparation without deleting recorded history
+ */
+export const useCancelAppointmentWorkEntry = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelAppointmentWorkEntry>>, TError,{appointmentId: string;entryId: string;data: BodyType<WorkdayCancelEntryRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelAppointmentWorkEntry>>,
+        TError,
+        {appointmentId: string;entryId: string;data: BodyType<WorkdayCancelEntryRequest>},
+        TContext
+      > => {
+      return useMutation(getCancelAppointmentWorkEntryMutationOptions(options));
+    }
+
+export const getPreviewAppointmentWorkCompletionUrl = (appointmentId: string,) => {
+
+
+
+
+  return `/api/v1/appointments/${appointmentId}/work/completion-preview`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Review all saved work and explicitly performed services
+ */
+export const previewAppointmentWorkCompletion = async (appointmentId: string,
+    workdayPreviewCompletionRequest: WorkdayPreviewCompletionRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayCompletionPreview> => {
+
+  return customFetch<WorkdayCompletionPreview>(getPreviewAppointmentWorkCompletionUrl(appointmentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayPreviewCompletionRequest)
+  }
+);}
+
+
+
+
+
+export const getPreviewAppointmentWorkCompletionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewAppointmentWorkCompletion>>, TError,{appointmentId: string;data: BodyType<WorkdayPreviewCompletionRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewAppointmentWorkCompletion>>, TError,{appointmentId: string;data: BodyType<WorkdayPreviewCompletionRequest>}, TContext> => {
+
+const mutationKey = ['previewAppointmentWorkCompletion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewAppointmentWorkCompletion>>, {appointmentId: string;data: BodyType<WorkdayPreviewCompletionRequest>}> = (props) => {
+          const {appointmentId,data} = props ?? {};
+
+          return  previewAppointmentWorkCompletion(appointmentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewAppointmentWorkCompletionMutationResult = NonNullable<Awaited<ReturnType<typeof previewAppointmentWorkCompletion>>>
+    export type PreviewAppointmentWorkCompletionMutationBody = BodyType<WorkdayPreviewCompletionRequest>
+    export type PreviewAppointmentWorkCompletionMutationError = ErrorType<void>
+
+    /**
+ * @summary Review all saved work and explicitly performed services
+ */
+export const usePreviewAppointmentWorkCompletion = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewAppointmentWorkCompletion>>, TError,{appointmentId: string;data: BodyType<WorkdayPreviewCompletionRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewAppointmentWorkCompletion>>,
+        TError,
+        {appointmentId: string;data: BodyType<WorkdayPreviewCompletionRequest>},
+        TContext
+      > => {
+      return useMutation(getPreviewAppointmentWorkCompletionMutationOptions(options));
+    }
+
+export const getCompleteAppointmentWorkUrl = (appointmentId: string,) => {
+
+
+
+
+  return `/api/v1/appointments/${appointmentId}/work/complete`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Record one atomic staff-attested completion
+ */
+export const completeAppointmentWork = async (appointmentId: string,
+    workdayCompleteRequest: WorkdayCompleteRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayMutation> => {
+
+  return customFetch<WorkdayMutation>(getCompleteAppointmentWorkUrl(appointmentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayCompleteRequest)
+  }
+);}
+
+
+
+
+
+export const getCompleteAppointmentWorkMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeAppointmentWork>>, TError,{appointmentId: string;data: BodyType<WorkdayCompleteRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeAppointmentWork>>, TError,{appointmentId: string;data: BodyType<WorkdayCompleteRequest>}, TContext> => {
+
+const mutationKey = ['completeAppointmentWork'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeAppointmentWork>>, {appointmentId: string;data: BodyType<WorkdayCompleteRequest>}> = (props) => {
+          const {appointmentId,data} = props ?? {};
+
+          return  completeAppointmentWork(appointmentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteAppointmentWorkMutationResult = NonNullable<Awaited<ReturnType<typeof completeAppointmentWork>>>
+    export type CompleteAppointmentWorkMutationBody = BodyType<WorkdayCompleteRequest>
+    export type CompleteAppointmentWorkMutationError = ErrorType<void>
+
+    /**
+ * @summary Record one atomic staff-attested completion
+ */
+export const useCompleteAppointmentWork = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeAppointmentWork>>, TError,{appointmentId: string;data: BodyType<WorkdayCompleteRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeAppointmentWork>>,
+        TError,
+        {appointmentId: string;data: BodyType<WorkdayCompleteRequest>},
+        TContext
+      > => {
+      return useMutation(getCompleteAppointmentWorkMutationOptions(options));
+    }
+
+export const getCorrectAppointmentWorkUrl = (appointmentId: string,
+    completionId: string,) => {
+
+
+
+
+  return `/api/v1/appointments/${appointmentId}/work/completions/${completionId}/corrections`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Append a note without replaying native effects
+ */
+export const correctAppointmentWork = async (appointmentId: string,
+    completionId: string,
+    workdayCorrectRequest: WorkdayCorrectRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayMutation> => {
+
+  return customFetch<WorkdayMutation>(getCorrectAppointmentWorkUrl(appointmentId,completionId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayCorrectRequest)
+  }
+);}
+
+
+
+
+
+export const getCorrectAppointmentWorkMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof correctAppointmentWork>>, TError,{appointmentId: string;completionId: string;data: BodyType<WorkdayCorrectRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof correctAppointmentWork>>, TError,{appointmentId: string;completionId: string;data: BodyType<WorkdayCorrectRequest>}, TContext> => {
+
+const mutationKey = ['correctAppointmentWork'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof correctAppointmentWork>>, {appointmentId: string;completionId: string;data: BodyType<WorkdayCorrectRequest>}> = (props) => {
+          const {appointmentId,completionId,data} = props ?? {};
+
+          return  correctAppointmentWork(appointmentId,completionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CorrectAppointmentWorkMutationResult = NonNullable<Awaited<ReturnType<typeof correctAppointmentWork>>>
+    export type CorrectAppointmentWorkMutationBody = BodyType<WorkdayCorrectRequest>
+    export type CorrectAppointmentWorkMutationError = ErrorType<void>
+
+    /**
+ * @summary Append a note without replaying native effects
+ */
+export const useCorrectAppointmentWork = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof correctAppointmentWork>>, TError,{appointmentId: string;completionId: string;data: BodyType<WorkdayCorrectRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof correctAppointmentWork>>,
+        TError,
+        {appointmentId: string;completionId: string;data: BodyType<WorkdayCorrectRequest>},
+        TContext
+      > => {
+      return useMutation(getCorrectAppointmentWorkMutationOptions(options));
+    }
+
+export const getReserveAppointmentWorkPhotoUrl = (appointmentId: string,
+    entryId: string,) => {
+
+
+
+
+  return `/api/v1/appointments/${appointmentId}/work/entries/${entryId}/photos/request-url`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Reserve one exact native private image upload
+ */
+export const reserveAppointmentWorkPhoto = async (appointmentId: string,
+    entryId: string,
+    workdayRequestPhotoRequest: WorkdayRequestPhotoRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayPhotoReservation> => {
+
+  return customFetch<WorkdayPhotoReservation>(getReserveAppointmentWorkPhotoUrl(appointmentId,entryId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayRequestPhotoRequest)
+  }
+);}
+
+
+
+
+
+export const getReserveAppointmentWorkPhotoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reserveAppointmentWorkPhoto>>, TError,{appointmentId: string;entryId: string;data: BodyType<WorkdayRequestPhotoRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reserveAppointmentWorkPhoto>>, TError,{appointmentId: string;entryId: string;data: BodyType<WorkdayRequestPhotoRequest>}, TContext> => {
+
+const mutationKey = ['reserveAppointmentWorkPhoto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reserveAppointmentWorkPhoto>>, {appointmentId: string;entryId: string;data: BodyType<WorkdayRequestPhotoRequest>}> = (props) => {
+          const {appointmentId,entryId,data} = props ?? {};
+
+          return  reserveAppointmentWorkPhoto(appointmentId,entryId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReserveAppointmentWorkPhotoMutationResult = NonNullable<Awaited<ReturnType<typeof reserveAppointmentWorkPhoto>>>
+    export type ReserveAppointmentWorkPhotoMutationBody = BodyType<WorkdayRequestPhotoRequest>
+    export type ReserveAppointmentWorkPhotoMutationError = ErrorType<void>
+
+    /**
+ * @summary Reserve one exact native private image upload
+ */
+export const useReserveAppointmentWorkPhoto = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reserveAppointmentWorkPhoto>>, TError,{appointmentId: string;entryId: string;data: BodyType<WorkdayRequestPhotoRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reserveAppointmentWorkPhoto>>,
+        TError,
+        {appointmentId: string;entryId: string;data: BodyType<WorkdayRequestPhotoRequest>},
+        TContext
+      > => {
+      return useMutation(getReserveAppointmentWorkPhotoMutationOptions(options));
+    }
+
+export const getAttachAppointmentWorkPhotoUrl = (appointmentId: string,
+    entryId: string,) => {
+
+
+
+
+  return `/api/v1/appointments/${appointmentId}/work/entries/${entryId}/photos`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Confirm the reserved exact work image
+ */
+export const attachAppointmentWorkPhoto = async (appointmentId: string,
+    entryId: string,
+    workdayAttachPhotoRequest: WorkdayAttachPhotoRequest, options?: Parameters<typeof customFetch>[1]): Promise<WorkdayMutation> => {
+
+  return customFetch<WorkdayMutation>(getAttachAppointmentWorkPhotoUrl(appointmentId,entryId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(workdayAttachPhotoRequest)
+  }
+);}
+
+
+
+
+
+export const getAttachAppointmentWorkPhotoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attachAppointmentWorkPhoto>>, TError,{appointmentId: string;entryId: string;data: BodyType<WorkdayAttachPhotoRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof attachAppointmentWorkPhoto>>, TError,{appointmentId: string;entryId: string;data: BodyType<WorkdayAttachPhotoRequest>}, TContext> => {
+
+const mutationKey = ['attachAppointmentWorkPhoto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof attachAppointmentWorkPhoto>>, {appointmentId: string;entryId: string;data: BodyType<WorkdayAttachPhotoRequest>}> = (props) => {
+          const {appointmentId,entryId,data} = props ?? {};
+
+          return  attachAppointmentWorkPhoto(appointmentId,entryId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AttachAppointmentWorkPhotoMutationResult = NonNullable<Awaited<ReturnType<typeof attachAppointmentWorkPhoto>>>
+    export type AttachAppointmentWorkPhotoMutationBody = BodyType<WorkdayAttachPhotoRequest>
+    export type AttachAppointmentWorkPhotoMutationError = ErrorType<void>
+
+    /**
+ * @summary Confirm the reserved exact work image
+ */
+export const useAttachAppointmentWorkPhoto = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attachAppointmentWorkPhoto>>, TError,{appointmentId: string;entryId: string;data: BodyType<WorkdayAttachPhotoRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof attachAppointmentWorkPhoto>>,
+        TError,
+        {appointmentId: string;entryId: string;data: BodyType<WorkdayAttachPhotoRequest>},
+        TContext
+      > => {
+      return useMutation(getAttachAppointmentWorkPhotoMutationOptions(options));
+    }
+
+export const getGetAppointmentWorkPhotoUrl = (appointmentId: string,
+    photoId: string,) => {
+
+
+
+
+  return `/api/v1/appointments/${appointmentId}/work/photos/${photoId}/content`
+}
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.read, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Read exact authenticated private image bytes
+ */
+export const getAppointmentWorkPhoto = async (appointmentId: string,
+    photoId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetAppointmentWorkPhotoUrl(appointmentId,photoId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAppointmentWorkPhotoQueryKey = (appointmentId: string,
+    photoId: string,) => {
+    return [
+    `/api/v1/appointments/${appointmentId}/work/photos/${photoId}/content`
+    ] as const;
+    }
+
+
+export const getGetAppointmentWorkPhotoQueryOptions = <TData = Awaited<ReturnType<typeof getAppointmentWorkPhoto>>, TError = ErrorType<void>>(appointmentId: string,
+    photoId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAppointmentWorkPhoto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAppointmentWorkPhotoQueryKey(appointmentId,photoId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAppointmentWorkPhoto>>> = ({ signal }) => getAppointmentWorkPhoto(appointmentId,photoId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: appointmentId !== null && appointmentId !== undefined && photoId !== null && photoId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAppointmentWorkPhoto>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAppointmentWorkPhotoQueryResult = NonNullable<Awaited<ReturnType<typeof getAppointmentWorkPhoto>>>
+export type GetAppointmentWorkPhotoQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read exact authenticated private image bytes
+ */
+
+export function useGetAppointmentWorkPhoto<TData = Awaited<ReturnType<typeof getAppointmentWorkPhoto>>, TError = ErrorType<void>>(
+ appointmentId: string,
+    photoId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAppointmentWorkPhoto>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAppointmentWorkPhotoQueryOptions(appointmentId,photoId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetCallieReceptionUrl = () => {
 

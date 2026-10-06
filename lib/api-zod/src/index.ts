@@ -12,3 +12,5 @@ export type { ListServiceSmsRepliesParams } from "./generated/types/listServiceS
 export { ListServiceSmsRepliesParams as ListServiceSmsRepliesPathParams } from "./generated/api";
 export type { GetCustomerWorkspaceSectionParams } from "./generated/types/getCustomerWorkspaceSectionParams";
 export { GetCustomerWorkspaceSectionParams as GetCustomerWorkspaceSectionPathParams } from "./generated/api";
+export type { GetWorkdayAssetsParams } from "./generated/types/getWorkdayAssetsParams";
+export { GetWorkdayAssetsParams as GetWorkdayAssetsPathParams } from "./generated/api";

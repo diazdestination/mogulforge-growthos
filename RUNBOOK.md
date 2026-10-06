@@ -3,6 +3,32 @@
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 
+October6 Contractor Workday source follows the researched frozen contract and
+reports/contractor-workday-operator-2026-10-06.md. Existing Today→customer Service
+& equipment→exact appointment/Visit work and Service Desk/Company checklists
+are the canonical paths. Company review never comes from a starter GET; recorded
+dates/observations are not warranty eligibility or customer acceptance. Office
+can cancel held drafts explicitly; retained parent IDs require a separate visit,
+not reparenting or relaxing exact customer validators. Sealed effects never replay.
+
+Offline review: node scripts/contractor-workday-schema-preview.mjs generates0016
+after0015 (133→139), and node scripts/contractor-workday-api-spec.mjs projects the
+20 human-session operations. Compatible recovery uses the existing synthetic
+contractor-recovery-drill.mjs; it opens no existing/hosted database and proves
+neither managed restore nor production RPO/RTO. Built QA uses
+node artifacts/api-server/scripts/preview-runtime-isolated.mjs --contractor-workday
+with fictional HVAC/roofing DNC customers, fresh in-memory loopback4192, no
+provider credentials, scheduler off and outbound held. Do not reuse a live DB.
+
+Private exact-head PG16/release receipts live in the October6 workday handoff.
+Only a clean reviewed committed head may use its owned-container supplemental
+verifier; it never starts the host, pulls an image, reads.env or relaxes sockets.
+Preserve original6containers/4volumes/backups; a smoke pass is not permanent Docker
+repair. Supplemental/local proof does not replace full GitHub candidate/main
+tests/types/both-build/Docker/cleanup or all independent barriers. Push does NOT
+trigger ci.yml: root dispatches once after guarded accepted-tree merge. No
+provider/hosted/schema/account/real-message/import/financial activation is implied.
+
 Active CALLIE conversation engineering follows
 `reports/callie-conversation-contract-2026-10-05.md`. Baseline PR23/mainafcb72a and
 exact-main CI37390525754 are fully accepted. Existing Calls remains the work entry;

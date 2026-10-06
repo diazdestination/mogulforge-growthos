@@ -2,6 +2,7 @@ import { activitiesTable, db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
 import { ObjectStorageService } from "../lib/objectStorage";
+import { expireWorkdayPhotoReservations, storedObjectIsReferenced } from "../lib/stored-object-retention";
 
 /** Grace period before an unreferenced upload is considered orphaned. */
 export const DEFAULT_UPLOAD_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -12,6 +13,8 @@ export const DEFAULT_UPLOAD_MAX_AGE_MS = 24 * 60 * 60 * 1000;
  * lead damage photos and must never be deleted.
  */
 export async function isUploadReferenced(objectPath: string): Promise<boolean> {
+  const native = /^\/objects\/uploads\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(objectPath);
+  if (native) return storedObjectIsReferenced(db, native[1]);
   const rows = await db
     .select({ id: activitiesTable.id })
     .from(activitiesTable)
@@ -29,7 +32,7 @@ export interface UploadObject {
   /** Creation time of the object. */
   createdAt: Date;
   /** Delete this object from the bucket. */
-  remove: () => Promise<void>;
+  remove: () => Promise<void | boolean>;
 }
 
 /** Lists objects under the private `uploads/` prefix in the bucket. */
@@ -62,6 +65,7 @@ export async function cleanupOrphanedUploads(options?: {
   const list = options?.listObjects ?? listUploadObjects;
 
   const result: CleanupResult = { scanned: 0, deleted: 0, kept: 0, errors: 0 };
+  await expireWorkdayPhotoReservations(now);
   const objects = await list();
   for (const obj of objects) {
     result.scanned += 1;
@@ -76,8 +80,8 @@ export async function cleanupOrphanedUploads(options?: {
         result.kept += 1;
         continue;
       }
-      await obj.remove();
-      result.deleted += 1;
+      if (await obj.remove() === false) result.kept += 1;
+      else result.deleted += 1;
     } catch (err) {
       result.errors += 1;
       console.error(

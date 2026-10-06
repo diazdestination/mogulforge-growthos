@@ -7,6 +7,7 @@ import CustomerWorkspace from './customer-workspace';
 import { customerWorkspaceHeaderSchema, customerWorkspacePageSchema } from '../../../api-server/src/services/customer-workspace-contract';
 import { GetCustomerWorkspaceResponse, GetCustomerWorkspaceSectionResponse } from '../../../../lib/api-zod/src/generated/api';
 import { workspaceHeader, workspacePage, workspaceOrg as org, workspaceContact as contact, workspaceId } from '@/test/customer-workspace-fixtures';
+import { asset as workdayAsset, assets as workdayAssets } from '@/test/workday-fixtures';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const basePath = `/contacts/${contact}?organizationId=${org}`;
@@ -51,6 +52,15 @@ it('loads just the header and visits for a service-only customer, and uses a rea
   expect(customerWorkspacePageSchema.safeParse(workspacePage('appointments')).success).toBe(true);
   expect(GetCustomerWorkspaceResponse.safeParse(workspaceHeader()).success).toBe(true);
   for (const section of workspaceHeader().availableSections) expect(GetCustomerWorkspaceSectionResponse.safeParse(workspacePage(section)).success).toBe(true);
+});
+
+it('keeps equipment within the existing nine sections, lazy on open and preserves its draft through unchanged member polling', async () => {
+  const asset = workdayAsset({ organizationId: org, contactId: contact, propertyId: workspaceId(3) });
+  const { client, calls, state } = setup({ search: `?organizationId=${org}&section=services`, respond: url => url.pathname.endsWith('/assets') ? json(workdayAssets({ organizationId: org, contactId: contact, items: [asset] })) : undefined });
+  await screen.findByRole('link', { name: 'Open service' }); expect(within(screen.getByRole('navigation', { name: 'Customer record sections' })).getAllByRole('link')).toHaveLength(9); expect(calls.some(path => path.endsWith('/assets'))).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: 'Open equipment & assets' })); fireEvent.click(await screen.findByRole('button', { name: 'Edit Fictional north unit' })); fireEvent.change(screen.getByLabelText('Asset name'), { target: { value: 'Unfinished recorded asset name' } });
+  await act(async () => { await client.invalidateQueries({ queryKey: getGetMeQueryKey() }); }); expect((screen.getByLabelText('Asset name') as HTMLInputElement).value).toBe('Unfinished recorded asset name'); expect(calls.filter(path => path.endsWith('/assets'))).toHaveLength(1);
+  state.meStatus = 503; await act(async () => { await client.invalidateQueries({ queryKey: getGetMeQueryKey() }); }); await screen.findByText(/Current company access could not be verified/); expect(screen.queryByLabelText('Asset name')).toBeNull();
 });
 
 it('lazily navigates exact service, lead, task, invoice links while keeping jobs and estimates as related opportunities', async () => {

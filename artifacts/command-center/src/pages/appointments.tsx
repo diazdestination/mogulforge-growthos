@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useListAppointments, useCreateAppointment, useUpdateAppointment, getListAppointmentsQueryKey, AppointmentStatus, AppointmentType, useListUsers, getListUsersQueryKey, useGetInspectionAvailability, getGetInspectionAvailabilityQueryKey, type MemberProfile } from '@workspace/api-client-react';
-import { useSearch } from 'wouter';
+import { Link, useSearch } from 'wouter';
 import LeadSelect from '@/components/lead-select';
 import ContactSelect from '@/components/contact-select';
 import CustomerPropertySelect from '@/components/customer-property-select';
@@ -107,10 +107,11 @@ function AppointmentsContent({ me, scopeKey }: { me: MemberProfile; scopeKey: st
       </header>
 
       <div className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
-        <AppointmentLinkedCard search={search} organizationId={me.organization!.id} scopeKey={scopeKey} refreshKey={linkedRevision} onShowDay={start => { setDate(localDateTime(start).slice(0, 10)); setDays(1); setAssignedUserId(''); }} />
+        <AppointmentLinkedCard search={search} organizationId={me.organization!.id} scopeKey={scopeKey} refreshKey={linkedRevision} onShowDay={start => { setDate(localDateTime(start).slice(0, 10)); setDays(1); setAssignedUserId(''); }} onWorkCompleted={() => { if (alive.current) void queryClient.invalidateQueries({ queryKey: [...getListAppointmentsQueryKey(params), scopeKey], exact: true }); }} />
         {statusReview && <div role="alert" className="mx-auto mb-5 max-w-5xl space-y-2 rounded-lg border border-destructive p-4">
           <p className="font-semibold">Appointment update needs review</p>
           <p className="text-sm">The requested change to {statusReview.status.replaceAll('_', ' ')} was not confirmed. It may already have saved, or another team member may have changed the record. Review the current appointment before deciding what to do next. No change is retried automatically.</p>
+          {statusReview.status === 'completed' && <p className="text-sm">Visits with required structured work must be completed through their reviewed work record. <Link className="inline-flex min-h-11 items-center underline" href={`/appointments?appointmentId=${statusReview.id}&organizationId=${me.organization!.id}`}>Open visit work</Link></p>}
           {reviewError && <p className="text-sm">{reviewError}</p>}
           {canEdit && <button type="button" disabled={reviewing} className="min-h-11 rounded border px-3 py-2 text-sm disabled:opacity-50" onClick={() => void reviewStatusChange()}>Refresh and review appointment</button>}
         </div>}
@@ -413,6 +414,7 @@ function ApptFormModal({ appt, onClose, scopeKey, organizationId }: { appt?: any
               <span>{submitError}</span>
             </div>
           )}
+          {submitError && appt && status === 'completed' && <p className="text-sm">Required visit work must be reviewed and completed on its exact work record. <Link className="inline-flex min-h-11 items-center underline" onClick={onClose} href={`/appointments?appointmentId=${appt.id}&organizationId=${organizationId}`}>Open visit work</Link></p>}
 
           <div className="pt-6 md:pt-4 flex flex-col-reverse md:flex-row justify-end gap-3">
             <button type="button" onClick={onClose} className="w-full md:w-auto px-4 py-3 md:py-2 text-base md:text-sm font-semibold hover:bg-muted rounded-xl border border-transparent hover:border-border transition-all active:scale-95">Cancel</button>

@@ -6,6 +6,8 @@ import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 import { contractorRequest } from '@/lib/contractor-api';
 import { memberAuthorityScope } from '@/lib/member-authority-scope';
 import { canReadInvoices } from '@/lib/permissions';
+import CustomerAssetsPanel from '@/components/customer-assets-panel';
+import { WorkdayDisclosure } from '@/components/workday-ui';
 import { customerWorkspaceLocation, customerWorkspacePath } from '@/lib/customer-workspace-links';
 import {
   customerWorkspaceHeaderSchema, customerWorkspacePageSchema,
@@ -161,6 +163,7 @@ function Records({ authority, contactId, organizationId, section, timezone, invo
         setCursors(previous => [...previous.slice(0, pageIndex + 1), next]); setPageIndex(value => value + 1);
       }}>Older records</button>
     </div>
+    {section === 'services' && !query.isError && query.data && <WorkdayDisclosure title="Equipment & assets"><CustomerAssetsPanel organizationId={organizationId} contactId={contactId} scopeKey={authority} /></WorkdayDisclosure>}
     {section === 'properties' && <Link href="/properties" className={recordLink}>Open property directory (all customers)</Link>}
     {section === 'activity' && <p className="text-xs text-muted-foreground">History shows recorded events, not proof of delivery, a confirmed booking, completed work, or collected revenue.</p>}
   </section>;

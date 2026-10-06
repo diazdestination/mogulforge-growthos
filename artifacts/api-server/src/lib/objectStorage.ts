@@ -2,7 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { Readable } from "node:stream";
 
 import { Storage } from "@google-cloud/storage";
-import { db, storedObjectsTable, type StoredObject } from "@workspace/db";
+import { appointmentWorkPhotosTable, db, storedObjectsTable, type StoredObject } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 
 import {
@@ -13,6 +13,7 @@ import {
   setObjectAclPolicy,
 } from "./objectAcl";
 import type { ObjectFile, ObjectFileMetadata } from "./objectFile";
+import { deleteUnreferencedStoredObject } from "./stored-object-retention";
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 const LOCAL_UPLOAD_PATH = "/api/v1/public/uploads/local";
@@ -51,7 +52,7 @@ export interface UploadUrlOptions {
 export interface StoredUpload {
   objectPath: string;
   createdAt: Date;
-  remove: () => Promise<void>;
+  remove: () => Promise<void | boolean>;
 }
 
 export class ObjectNotFoundError extends Error {
@@ -173,9 +174,7 @@ class PostgresObjectFile implements ObjectFile {
   }
 
   async delete(): Promise<void> {
-    await db
-      .delete(storedObjectsTable)
-      .where(eq(storedObjectsTable.id, this.row.id));
+    await deleteUnreferencedStoredObject(this.row.id);
   }
 }
 
@@ -323,6 +322,10 @@ export class ObjectStorageService {
             : eq(storedObjectsTable.id, match[1]),
         );
       if (!row) throw new ObjectNotFoundError();
+      // Visit-owned objects are only exposed by the exact authenticated work
+      // content route, never adopted by older lead/portal attachment grants.
+      const [visitReservation] = await db.select({ id: appointmentWorkPhotosTable.id }).from(appointmentWorkPhotosTable).where(eq(appointmentWorkPhotosTable.reservedObjectId, row.id)).limit(1);
+      if (visitReservation) throw new ObjectNotFoundError();
       return new PostgresObjectFile(row);
     }
     // Legacy GCS/Replit uploads have no authoritative, server-owned tenant
@@ -393,11 +396,7 @@ export class ObjectStorageService {
       return rows.map((row) => ({
         objectPath: `/objects/uploads/${row.id}`,
         createdAt: row.createdAt,
-        remove: async () => {
-          await db
-            .delete(storedObjectsTable)
-            .where(eq(storedObjectsTable.id, row.id));
-        },
+        remove: () => deleteUnreferencedStoredObject(row.id),
       }));
     }
     let privateDir = this.getPrivateObjectDir();

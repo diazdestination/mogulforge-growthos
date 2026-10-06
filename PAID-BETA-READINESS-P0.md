@@ -7,6 +7,15 @@
 
 ## Mission
 
+**October6 researched workday scope:** PR24/main3f1f1b5 and exact-mainCI37407237259
+are fully accepted. Owner approved common HVAC/roofing research and source work
+before client exports, with later adaptation. Frozen contractor-workday contract
+adds explicit assets, reviewed checklists and native visit completion/private
+evidence (six tables ->139) while preserving old records/authority. Research is
+not actual contractor facts or warranty/import approval. This bounded engineering
+exception changes no exact-release, hosted/provider/device/company acceptance,
+payment or deployment requirement. Later exports and actual requirements remain.
+
 **October5 CALLIE conversation scope:** PR23/mainafcb72a and exact-main
 CI37390525754 passed the fullPG16 gate and independent review. The owner approved
 the next wave under `reports/callie-conversation-contract-2026-10-05.md`: natural

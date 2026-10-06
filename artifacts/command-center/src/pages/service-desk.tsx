@@ -8,6 +8,9 @@ import { memberAuthorityScope } from '@/lib/member-authority-scope';
 import ServiceObligationEditor, { type ServiceRow } from '@/components/service-obligation-editor';
 import ServiceCarePanel from '@/components/service-care-panel';
 import { ServiceWatchPanel, ServiceWatchQueue } from '@/components/service-watch-panel';
+import CompanyChecklistsPanel from '@/components/company-checklists-panel';
+import { WorkdayDisclosure } from '@/components/workday-ui';
+import { appointmentWorkspaceLoginPath } from '@/lib/customer-workspace-links';
 
 type ServiceKind = 'warranty_check' | 'maintenance' | 'service_plan';
 type ServiceStatus = 'active' | 'completed' | 'cancelled';
@@ -210,6 +213,7 @@ function ServiceDeskContent({ me, scopeKey }: { me: MemberProfile; scopeKey: str
       {me?.organization?.id && <ServiceWatchQueue key={me.organization.id} organizationId={me.organization.id} revision={watchRevision} onOpen={id => { setWatchId(id); setWatchCare(false); }} />}
       {me?.organization?.id && watchId && <ServiceWatchPanel key={`${scopeKey}:${watchId}:${watchRevision}`} scopeKey={scopeKey} obligationId={watchId} editable={editable} onChanged={refreshOfficeWork} onClose={() => { setWatchId(null); setWatchCare(false); }} onOpenCare={() => setWatchCare(true)} />}
       {me?.organization?.id && watchId && watchCare && <ServiceCarePanel key={`watch-care:${scopeKey}:${watchId}`} scopeKey={scopeKey} manageStanding={manageStanding} obligationId={watchId} editable={editable} onChanged={refreshOfficeWork} onClose={() => setWatchCare(false)} />}
+      <WorkdayDisclosure title="Company checklists"><CompanyChecklistsPanel organizationId={me.organization!.id} scopeKey={scopeKey} /></WorkdayDisclosure>
       <section className="rounded-xl border bg-card p-4 space-y-3" aria-label="Service records">
         <h2 className="font-semibold">{recordStatus === 'active' ? 'Upcoming service' : 'Service history'}</h2>
         <div className="flex flex-wrap items-end gap-3">
@@ -226,7 +230,7 @@ function ServiceDeskContent({ me, scopeKey }: { me: MemberProfile; scopeKey: str
                   <Link className="inline-flex min-h-11 items-center underline underline-offset-4" href={`/contacts/${encodeURIComponent(obligation.contactId)}?organizationId=${encodeURIComponent(me.organization!.id)}`}>Customer record</Link>
                   {obligation.propertyId === null && <p className="text-muted-foreground">No property linked</p>}
                   <p className="text-muted-foreground">Due {obligation.dueAt.slice(0, 10)} · Staff task {task.status} · {obligation.source}</p>
-                  {obligation.appointmentId && <p>Appointment linked</p>}
+                  {obligation.appointmentId && <p>Appointment linked {appointmentWorkspaceLoginPath(`/appointments?appointmentId=${obligation.appointmentId}&organizationId=${me.organization!.id}`, 'https://growthos.invalid') && <Link className="inline-flex min-h-11 items-center underline" href={`/appointments?appointmentId=${obligation.appointmentId}&organizationId=${me.organization!.id}`}>Open visit work</Link>}</p>}
                   <p className="text-muted-foreground">{obligation.recurrence ? `Agreed every ${obligation.recurrence.intervalMonths} months` : 'One-time service'} · {task.assignedUserId ? 'Staff assigned' : 'Staff assignment needed'}</p>
                   {(obligation.coverageStartsOn || obligation.coverageEndsOn) && <p className="text-muted-foreground">Recorded coverage: {obligation.coverageStartsOn || 'Start not recorded'} to {obligation.coverageEndsOn || 'End not recorded'}</p>}
                   {recordStatus !== 'active' && <div className="mt-2 space-y-1">
@@ -241,7 +245,7 @@ function ServiceDeskContent({ me, scopeKey }: { me: MemberProfile; scopeKey: str
                 <button type="button" disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setCareId(careId === obligation.id ? null : obligation.id)}>Customer care & booking</button>
                 <button type="button" disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => { setWatchId(obligation.id); setWatchCare(false); }}>Review service watch</button>
                 {careId === obligation.id && <ServiceCarePanel key={`${scopeKey}:${obligation.id}`} scopeKey={scopeKey} manageStanding={manageStanding} obligationId={obligation.id} editable={editable} onClose={() => setCareId(null)} onChanged={() => refresh({ background: true })} />}
-                {editable && recordStatus === 'active' && editingId === obligation.id && <ServiceObligationEditor key={`${obligation.id}:${obligation.updatedAt}`} scopeKey={scopeKey} row={row} onClose={() => setEditingId(null)} onSaved={async message => { if (mounted.current) { setNotice(message); await refresh(); } }} />}
+                {editable && recordStatus === 'active' && editingId === obligation.id && <ServiceObligationEditor key={`${obligation.id}:${obligation.updatedAt}`} scopeKey={scopeKey} organizationId={me.organization!.id} row={row} onClose={() => setEditingId(null)} onSaved={async message => { if (mounted.current) { setNotice(message); await refresh(); } }} />}
                 {editable && recordStatus === 'cancelled' && <button type="button" disabled={busy} className="min-h-11 rounded border px-3 py-2 disabled:opacity-50" onClick={() => setReopening(row)}>Review reopening</button>}
                 {editable && recordStatus === 'cancelled' && reopening?.obligation.id === obligation.id && <div role="group" aria-label="Reopen service review" className="w-full space-y-2 border-t pt-3">
                   <p>Reopen this cancelled service as active staff follow-up? Its recurrence approval is cleared. A new agreement review and explicit approval are required before future recurring tasks. This does not book an appointment or contact the customer.</p>

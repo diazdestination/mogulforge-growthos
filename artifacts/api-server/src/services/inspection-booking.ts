@@ -98,6 +98,11 @@ export async function updateInspectionIfAvailable(
 }
 
 export async function updateInspectionInTransaction(tx: ScheduleTransaction, organizationId: string, appointmentId: string, set: Partial<AppointmentInsert>, window: { start: Date; end?: Date | null }): Promise<AppointmentRow | null | "conflict"> {
+  await lockContractorSchedule(tx, organizationId);
+  const [current] = await tx.select().from(appointmentsTable).where(and(eq(appointmentsTable.organizationId, organizationId), eq(appointmentsTable.id, appointmentId)));
+  if (!current) return null;
+  const { guardWorkdayAppointment } = await import("./workday-guards");
+  await guardWorkdayAppointment(tx, organizationId, appointmentId, current, set);
   const maxBookingsPerWindow = await inspectionCapacity(tx, organizationId);
   const start = window.start;
   const end = window.end ?? new Date(start.getTime() + 2 * 3_600_000);

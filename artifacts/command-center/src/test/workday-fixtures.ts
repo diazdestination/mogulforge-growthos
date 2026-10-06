@@ -1,0 +1,26 @@
+import type { z } from 'zod/v4';
+import { type AppointmentWork, type WorkdayAsset, type WorkdayDefinition, type WorkdayEntry, type WorkdayTemplate, workdayAssetPageSchema, workdayTemplateCatalogSchema, type WorkdayCompletion } from '@/components/workday-contract';
+
+export const wid = (n: number) => `50000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+export const org = wid(1), contact = wid(2), property = wid(3), appointment = wid(4), templateId = wid(5), revisionId = wid(6), assetId = wid(7), entryId = wid(8), serviceId = wid(9), instant = '2026-10-06T13:00:00.000Z';
+export const definition = (): WorkdayDefinition => ({ name: 'Synthetic unit visit', trade: 'hvac', description: 'Company-reviewed fictional instructions, not warranty terms.', items: [
+  { key: 'condition', label: 'Visible condition', kind: 'result', required: true, allowNotApplicable: false, unit: null },
+  { key: 'observation', label: 'Staff observation', kind: 'text', required: false, allowNotApplicable: true, unit: null },
+  { key: 'reading', label: 'Recorded reading', kind: 'number', required: false, allowNotApplicable: true, unit: 'company unit' },
+  { key: 'evidence', label: 'Visit evidence', kind: 'photo', required: false, allowNotApplicable: true, unit: null },
+] });
+export function template(overrides: Partial<WorkdayTemplate> = {}): WorkdayTemplate {
+  const revision = { id: revisionId, templateId, version: 1, definition: definition(), definitionSha256: 'a'.repeat(64), baselineId: null, baselineVersion: null, createdAt: instant, createdByUserId: 'staff-a', reviewedAt: instant, reviewedByUserId: 'staff-a' };
+  return { id: templateId, organizationId: org, version: 2, status: 'reviewed', latestRevision: revision, approvedRevision: revision, createdAt: instant, updatedAt: instant, ...overrides };
+}
+export function asset(overrides: Partial<WorkdayAsset> = {}): WorkdayAsset {
+  return { id: assetId, organizationId: org, contactId: contact, propertyId: property, category: 'hvac_equipment', label: 'Fictional north unit', manufacturer: null, model: null, serial: null, location: 'North mechanical room', installedOn: null, notes: null, warrantyStartsOn: null, warrantyEndsOn: null, warrantySource: null, attributes: [], version: 1, status: 'active', createdAt: instant, updatedAt: instant, currentParentCoherent: true, canEdit: true, ...overrides };
+}
+export function assets(overrides: Partial<z.infer<typeof workdayAssetPageSchema>> = {}): z.infer<typeof workdayAssetPageSchema> { return { organizationId: org, contactId: contact, propertyId: null, items: [asset()], nextCursor: null, hasMore: false, limit: 25, canCreate: true, ...overrides }; }
+export function catalog(overrides: Partial<z.infer<typeof workdayTemplateCatalogSchema>> = {}): z.infer<typeof workdayTemplateCatalogSchema> { return { organizationId: org, templates: [template()], starters: [{ id: 'synthetic_baseline', version: 1, title: 'Synthetic suggested visit', description: 'Company review required before use.', sourceUrls: ['https://example.test/primary-reference'], definition: definition() }], canManage: true, limit: 100, limitReached: false, ...overrides }; }
+export function entry(overrides: Partial<WorkdayEntry> = {}): WorkdayEntry {
+  const { organizationId: _org, contactId: _contact, propertyId: _property, status: _status, createdAt: _created, updatedAt: _updated, currentParentCoherent: _coherent, canEdit: _edit, ...snapshot } = asset();
+  return { id: entryId, appointmentId: appointment, contactId: contact, propertyId: property, assetId, serviceObligationId: serviceId, version: 1, state: 'draft', checklist: template().latestRevision, assetSnapshot: snapshot, answers: [{ itemKey: 'condition', result: 'done', value: null, reason: null }], notes: 'Original saved work note', photos: [], completionId: null, createdAt: instant, updatedAt: instant, holdReasons: [], ...overrides };
+}
+export function work(overrides: Partial<AppointmentWork> = {}): AppointmentWork { return { organizationId: org, appointment: { id: appointment, contactId: contact, propertyId: property, leadId: null, assignedUserId: 'technician-a', status: 'confirmed', type: 'other', scheduledStart: instant, scheduledEnd: null, updatedAt: instant, notes: 'Original private schedule note', customerLabel: 'Fictional customer', propertyLabel: '12 Fictional Way' }, entries: [entry()], completion: null, corrections: [], correctionsHasMore: false, linkedServices: [{ id: serviceId, equipmentLabel: 'Historical label remains separate', status: 'active', updatedAt: instant }], capabilities: { canPrepare: true, canEdit: true, canCancel: true, canComplete: true, canCorrect: false, requiresActingNote: false, reasons: [] }, ...overrides }; }
+export function completion(overrides: Partial<WorkdayCompletion> = {}): WorkdayCompletion { return { id: wid(20), appointmentId: appointment, contactId: contact, propertyId: property, requestId: wid(21), performedAt: instant, recordedAt: instant, recordedByUserId: 'staff-a', performerUserId: 'technician-a', actingNote: null, summary: 'Original completed visit summary', outcome: 'completed', followupTaskId: null, entries: [{ id: entryId, version: 1, checklistRevisionId: revisionId, assetId }], services: [], nativeAppointmentStatus: 'completed', ...overrides }; }

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { getListAppointmentsQueryKey, getListUsersQueryKey, useListAppointments, useListUsers } from '@workspace/api-client-react';
 import { canAssignWork, scheduleTimezone } from '@/lib/contractor-schedule';
+import { Link } from 'wouter';
+import { appointmentWorkspaceLoginPath } from '@/lib/customer-workspace-links';
 
 export type ServiceRow = {
   obligation: { id: string; contactId: string; propertyId?: string | null; kind: 'warranty_check' | 'maintenance' | 'service_plan'; equipmentLabel: string; dueAt: string; status: 'active' | 'completed' | 'cancelled'; source: string; appointmentId: string | null; updatedAt: string; recurrence: { intervalMonths: number; anchorDate: string; endDate: string | null; agreementNote: string } | null; coverageStartsOn: string | null; coverageEndsOn: string | null; coverageEvidence: string | null; completionNote?: string | null; completedAt?: string | null };
@@ -16,7 +18,7 @@ async function save(path: string, body: unknown, method = 'PATCH') {
   return result;
 }
 
-export default function ServiceObligationEditor({ row, onSaved, onClose, scopeKey = '' }: { row: ServiceRow; onSaved: (notice: string) => Promise<void>; onClose: () => void; scopeKey?: string }) {
+export default function ServiceObligationEditor({ row, onSaved, onClose, scopeKey = '', organizationId }: { row: ServiceRow; onSaved: (notice: string) => Promise<void>; onClose: () => void; scopeKey?: string; organizationId?: string }) {
   const { obligation: item, task } = row;
   const [dueDate, setDueDate] = useState(item.dueAt.slice(0, 10));
   const [assignedUserId, setAssignedUserId] = useState(task.assignedUserId ?? '');
@@ -51,6 +53,7 @@ export default function ServiceObligationEditor({ row, onSaved, onClose, scopeKe
   return <div className="mt-3 w-full min-w-0 space-y-6 border-t pt-4">
     <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-semibold">Manage service</h3><button className={button} onClick={onClose}>Close</button></div>
     {error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm">{error}</p>}
+    {item.appointmentId && organizationId && appointmentWorkspaceLoginPath(`/appointments?appointmentId=${item.appointmentId}&organizationId=${organizationId}`, 'https://growthos.invalid') && <p className="text-sm">If this visit has required structured work, complete its reviewed checklist there before completing this service. <Link className="inline-flex min-h-11 items-center underline" href={`/appointments?appointmentId=${item.appointmentId}&organizationId=${organizationId}`}>Open visit work</Link></p>}
     <form className="space-y-3" onSubmit={event => { event.preventDefault(); void work(() => update()); }}>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="min-w-0 text-sm">Service due date<input className={field} type="date" required value={dueDate} onChange={event => setDueDate(event.target.value)} /></label>

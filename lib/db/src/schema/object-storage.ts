@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -44,6 +45,7 @@ export const storedObjectsTable = pgTable(
       .defaultNow(),
   },
   (table) => [
+    unique("stored_objects_org_id_uq").on(table.organizationId, table.id),
     index("stored_objects_org_created_idx").on(
       table.organizationId,
       table.createdAt,

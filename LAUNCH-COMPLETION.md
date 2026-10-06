@@ -6,6 +6,18 @@ change hosted schema/credentials, send customer messages, spend money, or cancel
 an incumbent subscription. Both companies must replace their actual required
 workflows; payment collection inside GrowthOS is deferred.
 
+October6 update: PR24 CALLIE source and exact-mainCI37407237259 are complete,
+not liveL4 acceptance. Owner-approved researched Contractor Workday source adds
+property equipment, reviewed company checklists, saved typed/photo visit work,
+explicit office held-draft recovery and atomic original completion/selected
+service successor/follow-up. Its six-table139-total release proof is recorded
+in the current workday receipt/GitHub/Jarvis STATE, not assumed from UI tests.
+This addresses the equipment/checklist portion of L7 and recorded completion
+portion of L5 only. Contact-only billable jobs, actual samples/migration mappings,
+all required mailbox/campaign scope and actual two-company/provider/device/
+managed staging/recovery gates remain. Earlier candidate descriptions below
+are historical; no full launch item closes merely from this engineering wave.
+
 ## How this checklist closes
 
 Each requirement needs separate code/test, exact-release staging, provider/device

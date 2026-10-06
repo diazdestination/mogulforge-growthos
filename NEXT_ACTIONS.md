@@ -1,5 +1,28 @@
 # Next acceptance work
 
+October6 current source slice is researched Contractor Workday Completion under
+reports/contractor-workday-contract-2026-10-06.md, after fully accepted PR24/main
+3f1f1b5/exact-mainCI37407237259. Earlier active-wave entries are history, never
+instructions to replay completed releases. Editable HVAC/roofing suggestions
+replace the source-design sample hold only; real import mappings and warranty
+terms still require actual approved contractor inputs.
+
+Root release acceptance: final frozen source/types/UI/both builds, built exact
+visit workflows/office hold recovery at320/390/desktop,139-table additive delta,
+26-dataset closed export, compatible synthetic90→139restore with67SELECT-only
+app probes and16new SQL negatives, actual PG16 new+old writer barriers including
+the previously locally-failed portal cap race, independently reviewed exact
+candidate CI, guarded merge/tree equality, ONE ci.yml exact-main dispatch and
+full accepted main proof. Consult private WORKDAY.md/current GitHub/Jarvis STATE
+for identities and completed steps; never duplicate/cancel an active CI run.
+
+After this bounded source release, the fixed launch gaps still need their own
+authority/inputs: exact-release held hosted staging/schema/managed recovery,
+actual mailbox/call/SMS/device acceptance, migration/reconciliation and both
+contractor full-workday sign-offs. No incumbent cancellation or live customer
+cutover follows from green code. Deferred contractor payment processing remains
+outside launch; missing contact-only billable job support is not renamed a test.
+
 October5 CALLIE conversation is now the active owner-authorized engineering wave.
 PR23/mainafcb72a and exact-main CI37390525754 passed and were independently
 accepted. Follow `reports/callie-conversation-contract-2026-10-05.md`: preserve
