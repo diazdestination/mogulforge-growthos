@@ -94,16 +94,37 @@ export function InvoiceDelivery({
     [confirmed, setConfirmed] = useState(false),
     [copyAcknowledged, setCopyAcknowledged] = useState(false);
   const [reason, setReason] = useState(""),
-    [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [checkRequired, setCheckRequired] = useState(false),
     [expired, setExpired] = useState(false);
-  const inFlight = useRef(false);
+  // An old invoice snapshot must not publish content, but its own operation can
+  // release its spinner after a billing revision. Authority/target changes create
+  // a different owner; an old completion cannot release that owner's operation.
+  const ownerIdentity = JSON.stringify([authorityScope ?? organizationId, organizationId, invoice.id, invoice.customerWorkId ?? invoice.leadId, invoice.contactId, invoice.propertyId, canManage]);
+  const owner = useRef({ identity: ownerIdentity, active: true });
+  if (owner.current.identity !== ownerIdentity) owner.current = { identity: ownerIdentity, active: true };
+  useEffect(() => { const original = owner.current; original.active = true; return () => { original.active = false; }; }, [ownerIdentity]);
+  type Operation = { owner: typeof owner.current };
+  const inFlight = useRef<Operation | null>(null);
+  const [busyOperation, setBusyOperation] = useState<Operation | null>(null);
+  const busy = busyOperation?.owner === owner.current;
   const identity = `${authorityScope ?? organizationId}:${invoice.id}:${invoice.version}:${invoice.status}:${invoice.customerWorkId ?? invoice.leadId}:${canManage}`;
   const memberCurrent = () => !authorityScope || currentMemberAuthorityMatches(cache, authorityScope);
   const lifecycle = useRef({ identity, active: true });
   if (lifecycle.current.identity !== identity) lifecycle.current = { identity, active: true };
   useEffect(() => { const original = lifecycle.current; original.active = true; return () => { original.active = false; }; }, [identity]);
+  function startOperation(): Operation {
+    const operation = { owner: owner.current };
+    inFlight.current = operation;
+    setBusyOperation(operation);
+    return operation;
+  }
+  function finishOperation(operation: Operation) {
+    if (inFlight.current !== operation) return;
+    inFlight.current = null;
+    if (operation.owner === owner.current && operation.owner.active && memberCurrent())
+      setBusyOperation(current => current === operation ? null : current);
+  }
   const matchesSource = (value: InvoiceEmailPreview) => invoice.customerWorkId
     ? value.reviewVersion === 3 && value.customerWorkId === invoice.customerWorkId && value.contactId === invoice.contactId && value.propertyId === invoice.propertyId && value.sender.source === 'company_default'
     : value.reviewVersion !== 3;
@@ -149,7 +170,7 @@ export function InvoiceDelivery({
   async function prepare(intent: InvoiceDeliveryIntent) {
     const token = lifecycle.current, current = () => token.active && lifecycle.current === token && memberCurrent();
     if (
-      inFlight.current ||
+      inFlight.current?.owner === owner.current ||
       !current() ||
       !modes.includes(intent) ||
       (intent !== "initial" &&
@@ -159,8 +180,7 @@ export function InvoiceDelivery({
     const head = evidence.data!.latestExecutionId,
       ordinal = evidence.data!.attemptCount + 1,
       approvedReason = intent === "initial" ? null : reason.trim();
-    inFlight.current = true;
-    setBusy(true);
+    const operation = startOperation();
     setError("");
     discard();
     try {
@@ -194,15 +214,13 @@ export function InvoiceDelivery({
     } catch (failure) {
       if (current()) setError(failureMessage(failure));
     } finally {
-      inFlight.current = false;
-      if (current()) setBusy(false);
+      finishOperation(operation);
     }
   }
   async function refresh() {
     const token = lifecycle.current, current = () => token.active && lifecycle.current === token && memberCurrent();
-    if (inFlight.current || !current()) return;
-    inFlight.current = true;
-    setBusy(true);
+    if (inFlight.current?.owner === owner.current || !current()) return;
+    const operation = startOperation();
     discard();
     try {
       const result = await evidence.refetch();
@@ -211,14 +229,13 @@ export function InvoiceDelivery({
         setError("");
       }
     } finally {
-      inFlight.current = false;
-      if (current()) setBusy(false);
+      finishOperation(operation);
     }
   }
   async function send() {
     const token = lifecycle.current, current = () => token.active && lifecycle.current === token && memberCurrent();
     if (
-      inFlight.current ||
+      inFlight.current?.owner === owner.current ||
       !current() ||
       !preview ||
       !confirmed ||
@@ -228,9 +245,8 @@ export function InvoiceDelivery({
       Date.parse(preview.expiresAt) <= Date.now()
     )
       return;
-    inFlight.current = true;
+    const operation = startOperation();
     setError("");
-    setBusy(true);
     setCheckRequired(true);
     try {
       await contractorRequest(`${path}/send`, {
@@ -259,8 +275,7 @@ export function InvoiceDelivery({
         `${failureMessage(failure)} Check delivery status before doing anything else; do not send a separate copy.`,
       );
     } finally {
-      inFlight.current = false;
-      if (current()) setBusy(false);
+      finishOperation(operation);
     }
   }
   return (
