@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CallieIntakeSummaryCallbackWindow } from './callieIntakeSummaryCallbackWindow';
+import type { CallieIntakeSummaryMode } from './callieIntakeSummaryMode';
 import type { CallieIntakeSummaryOwner } from './callieIntakeSummaryOwner';
 import type { CallieIntakeSummaryRequestIntent } from './callieIntakeSummaryRequestIntent';
 import type { CallieIntakeSummaryServiceIntent } from './callieIntakeSummaryServiceIntent';
@@ -36,4 +37,6 @@ export interface CallieIntakeSummary {
   smsProof: CallieIntakeSummarySmsProof;
   confirmedAt: Date | null;
   appointmentId: string | null;
+  organizationId: string;
+  mode: CallieIntakeSummaryMode;
 }

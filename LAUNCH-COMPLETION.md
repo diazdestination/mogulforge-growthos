@@ -20,7 +20,7 @@ HOUSECALL-PRO-REPLACEMENT-GATE.md.
 | L1 | An email reply reaches the correct lead or service work item and responsible office staff | Microsoft tracked-service loop is integrated; the lead-replies candidate adds individually prepared/reviewed native BIE email, separate lead permission and canonical hold/task/handling. General compose/campaign/Gmail typed intake is not delivered; actual required mailbox contexts, authorization, continuity and reply acceptance remain open. |
 | L2 | Staff can reliably join/sign in and recover access | Durable verification/reset/invitation send ledger, exact signed callback reconciliation and staff delivery evidence implemented in the candidate. Configure stable platform context and prove actual inbox receipt/access separately; uncertain attempts cannot be automatically retried. |
 | L3 | Customers receive usable invoices; staff see accurate external balances | PR18/mainfa7c827 and its exact CI passed: append-only attempt history and explicitly reviewed proven-no-dispatch retry or additional copy are built. Hosted/provider/document acceptance remains required. The bounded invoice-page view is not a global delivery-state exception filter. No payment processing. |
-| L4 | Missed calls are recovered promptly without uncontrolled messages | Current CALLIE candidate adds owner-reviewed forward-only policy, bounded keypad qualification, caller-originated one-call acknowledgment, accountable handoff and explicit office-confirmed booking. This does not deliver freeform conversational reception or autonomous confirmed booking, nor close L4. Finish required remaining scope and prove actual routing, consent, stop, handoff and failure behavior. |
+| L4 | Missed calls are recovered promptly without uncontrolled messages | Bounded keypad/one-call acknowledgment and office booking are built. October5 conversation engineering now follows the frozen CALLIE contract: natural intake, voice-only v2 approval and a controlled original-call handoff over existing Twilio routing. Its implementation/new source gates are pending; actual audio/routing/consent/stop/transfer/failure and any required autonomous confirmed booking still need acceptance. L4 remains open. |
 | L5 | HVAC service obligations produce timely reminders, responses and visits | Current standing-service candidate adds exact forward-only series approval, shared one-reminder ownership, signed service SMS evidence/office holds and typed Microsoft reply authority. No backlog, warranty inference or automatic booking. Close exact release CI, then prove each actual agreement, sender, response, visit and completion/next date. |
 | L6 | Lead recovery and campaigns produce accountable opportunities | Current finite two-message Microsoft candidate adds exact review/start/stop, permanent ownership, shared contact allowances and fresh completed-sync/reply gates. Finish exact release verification; confirm remaining required campaign scope and prove actual reply/opt-out stops and accountable outcomes. This bounded slice does not close full L6. |
 | L7 | The office and technician can find and finish each customer's work simply | October5 candidate implements canonical nine-section customer history, exact appointment links and explicit new-service property selection. Finish exact release CI; confirm actual equipment/checklist needs, repeat-customer jobs, multi-property work and required scheduling details. No duplicate customer or invented acquisition lead. |
@@ -29,7 +29,18 @@ HOUSECALL-PRO-REPLACEMENT-GATE.md.
 | L10 | The selected release is recoverable, isolated and supportable | Exact-head/main CI, reviewed hosted schema, compatible restore, always-on scheduler, actionable failure alerts, two-company isolation, privacy/export/retention and AI cost/runtime acceptance. |
 | L11 | Selling/onboarding is repeatable and honestly valuable | GrowthOS subscription test flow (separate from contractor collection), explicit included scope/allowances, setup/support effort, complete company workday acceptance and one conservatively evidenced inquiry-to-outcome chain. |
 
-## Active implementation: NEW manual-appointment property selection
+## Active implementation: CALLIE conversation
+
+PR23/mainafcb72a and exact-main CI37390525754 passed. The owner approved the next
+wave in `reports/callie-conversation-contract-2026-10-05.md`. It targets confirmed
+L4 reception work for both contractors: natural caller statements, one original
+office workflow, explicit voice-only policy and a governed custom Twilio cold
+handoff. Expected review-only0015 adds three tables (133total). Preserve legacy
+DTMF/SMS authority and unknown receipts. New full candidate/main, synthetic
+recovery and built UI proof are required; hosted/provider/company gates remain.
+This wave does not invent equipment or source-migration facts or close all L4.
+
+## Previous implementation: NEW manual-appointment property selection
 
 PR22/main6cbf0ae and exact-main CI37383108807 passed. Continue only the frozen
 `reports/manual-appointment-property-contract-2026-10-05.md`: explicit optional

@@ -51,7 +51,7 @@ async function blockIntake(intake: Intake, reason: string, state: CallieState = 
 /** No identity/consent is invented: this validates one exact signed SMS grant. */
 async function exactGrant(reader: CallieReader, org: string, intakeId: string, now: Date, allowedStates: CallieState[]) {
   const [intake] = await reader.select().from(intakes).where(and(eq(intakes.organizationId, org), eq(intakes.id, intakeId)));
-  if (!intake || !allowedStates.includes(intake.state) || intake.stage !== "complete" || intake.appointmentId || intake.resolvedAt) denyCallie("intake_not_sendable");
+  if (!intake || intake.mode !== "keypad" || !allowedStates.includes(intake.state) || intake.stage !== "complete" || intake.appointmentId || intake.resolvedAt) denyCallie("intake_not_sendable");
   const [call] = await reader.select().from(twilioCallsTable).where(and(eq(twilioCallsTable.organizationId, org), eq(twilioCallsTable.id, intake.callId)));
   if (!call || !isMissedInbound(call) || ["failed", "busy", "no-answer", "canceled"].includes(call.status) || call.accountSid !== intake.accountSid || call.providerSid !== intake.providerCallSid ||
       call.phone !== intake.fromPhone) denyCallie("original_call_changed");
@@ -280,12 +280,14 @@ async function monitorIntake(row: Intake) {
 /** Bounded, rotating work. No historical enrollment and no automatic replay. */
 export async function processCallieIntakes(organizationId?: string) {
   const pending = await db.select().from(intakes).where(and(organizationId ? eq(intakes.organizationId, organizationId) : undefined,
+    eq(intakes.mode, "keypad"),
     inArray(intakes.state, ["confirmed", "deferred"]), lte(intakes.ackDueAt, new Date()), customerWorkAllowedSql(intakes.organizationId))).orderBy(asc(intakes.updatedAt)).limit(20);
   for (const row of pending) {
     try { const claim = await claimAcknowledgment(row.organizationId, row.id); if (claim) await dispatchAcknowledgment(claim); }
     catch (error) { if (!(error instanceof CallieError)) throw error; await blockIntake(row, error.code); }
   }
   const watching = await db.select().from(intakes).where(and(organizationId ? eq(intakes.organizationId, organizationId) : undefined,
+    eq(intakes.mode, "keypad"),
     sql`${intakes.state} not in ('resolved','cancelled','booked')`, customerWorkAllowedSql(intakes.organizationId))).orderBy(asc(intakes.updatedAt)).limit(50);
   for (const row of watching) await monitorIntake(row);
 }

@@ -9,6 +9,1026 @@ import * as zod from 'zod';
 
 
 /**
+ * Current accepted active verified staff session only; no API-key authority. Requires crm.read. Shared policy head selects exactly one future-call mode. Binding metadata and exact policy approval do not configure a provider or prove live audio/transfer. Caller statements are unverified; no identity, SMS permission, confirmed visit or emergency dispatch is inferred. Original uncertain effects remain non-retryable.
+ * @summary Read conversation setup and separate current source mode
+ */
+export const getCallieReceptionResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCallieReceptionResponseVersionMin = 0;
+export const getCallieReceptionResponseVersionMax = 9007199254740991;
+
+export const getCallieReceptionResponseRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCallieReceptionResponseBindingAgentIdMax = 128;
+
+
+export const getCallieReceptionResponseBindingAgentIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCallieReceptionResponseBindingAgentVersionIdMax = 128;
+
+
+export const getCallieReceptionResponseBindingAgentVersionIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCallieReceptionResponseBindingBranchIdMax = 128;
+
+
+export const getCallieReceptionResponseBindingBranchIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCallieReceptionResponseBindingCredentialKeyMax = 60;
+
+
+export const getCallieReceptionResponseBindingCredentialKeyRegExp = new RegExp('^[A-Z][A-Z0-9_]*$');
+export const getCallieReceptionResponseBindingConfigurationSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getCallieReceptionResponseBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCallieReceptionResponseBindingVersionExclusiveMin = 0;
+export const getCallieReceptionResponseBindingVersionMax = 9007199254740991;
+
+export const getCallieReceptionResponsePolicyTimezoneMax = 80;
+
+export const getCallieReceptionResponsePolicyDaysItemMax = 7;
+
+export const getCallieReceptionResponsePolicyDaysMax = 7;
+
+export const getCallieReceptionResponsePolicyOpensAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const getCallieReceptionResponsePolicyClosesAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const getCallieReceptionResponsePolicyBusinessHoursOwnerIdMax = 128;
+
+
+export const getCallieReceptionResponsePolicyBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCallieReceptionResponsePolicyAfterHoursOwnerIdMax = 128;
+
+
+export const getCallieReceptionResponsePolicyAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCallieReceptionResponsePolicyResponseMinutesMin = 5;
+export const getCallieReceptionResponsePolicyResponseMinutesMax = 1440;
+
+export const getCallieReceptionResponsePolicyBusinessFactsMax = 1200;
+
+export const getCallieReceptionResponsePolicyCallerDisclosureMax = 500;
+
+export const getCallieReceptionResponsePolicyMaxConversationSecondsMin = 60;
+export const getCallieReceptionResponsePolicyMaxConversationSecondsMax = 600;
+
+export const getCallieReceptionResponsePolicyMaxToolCallsMin = 3;
+export const getCallieReceptionResponsePolicyMaxToolCallsMax = 12;
+
+export const getCallieReceptionResponsePolicyRetentionDaysMax = 30;
+
+export const getCallieReceptionResponsePolicyBusinessHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const getCallieReceptionResponsePolicyAfterHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const getCallieReceptionResponseApprovedSnapshotTimezoneMax = 80;
+
+export const getCallieReceptionResponseApprovedSnapshotDaysItemMax = 7;
+
+export const getCallieReceptionResponseApprovedSnapshotDaysMax = 7;
+
+export const getCallieReceptionResponseApprovedSnapshotOpensAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const getCallieReceptionResponseApprovedSnapshotClosesAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const getCallieReceptionResponseApprovedSnapshotBusinessHoursOwnerIdMax = 128;
+
+
+export const getCallieReceptionResponseApprovedSnapshotBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCallieReceptionResponseApprovedSnapshotAfterHoursOwnerIdMax = 128;
+
+
+export const getCallieReceptionResponseApprovedSnapshotAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCallieReceptionResponseApprovedSnapshotResponseMinutesMin = 5;
+export const getCallieReceptionResponseApprovedSnapshotResponseMinutesMax = 1440;
+
+export const getCallieReceptionResponseApprovedSnapshotBusinessFactsMax = 1200;
+
+export const getCallieReceptionResponseApprovedSnapshotCallerDisclosureMax = 500;
+
+export const getCallieReceptionResponseApprovedSnapshotMaxConversationSecondsMin = 60;
+export const getCallieReceptionResponseApprovedSnapshotMaxConversationSecondsMax = 600;
+
+export const getCallieReceptionResponseApprovedSnapshotMaxToolCallsMin = 3;
+export const getCallieReceptionResponseApprovedSnapshotMaxToolCallsMax = 12;
+
+export const getCallieReceptionResponseApprovedSnapshotRetentionDaysMax = 30;
+
+export const getCallieReceptionResponseApprovedSnapshotBusinessHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const getCallieReceptionResponseApprovedSnapshotAfterHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const getCallieReceptionResponseApprovedSnapshotVoiceBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCallieReceptionResponseApprovedSnapshotVoiceBindingAccountSidRegExp = new RegExp('^AC[a-f0-9]{32}$');
+export const getCallieReceptionResponseApprovedSnapshotVoiceBindingSenderRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const getCallieReceptionResponseApprovedSnapshotVoiceBindingStaffPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const getCallieReceptionResponseApprovedSnapshotVoiceBindingBusinessNameMax = 120;
+
+export const getCallieReceptionResponseApprovedSnapshotReceptionBindingAgentIdMax = 128;
+
+
+export const getCallieReceptionResponseApprovedSnapshotReceptionBindingAgentIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCallieReceptionResponseApprovedSnapshotReceptionBindingAgentVersionIdMax = 128;
+
+
+export const getCallieReceptionResponseApprovedSnapshotReceptionBindingAgentVersionIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCallieReceptionResponseApprovedSnapshotReceptionBindingBranchIdMax = 128;
+
+
+export const getCallieReceptionResponseApprovedSnapshotReceptionBindingBranchIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCallieReceptionResponseApprovedSnapshotReceptionBindingCredentialKeyMax = 60;
+
+
+export const getCallieReceptionResponseApprovedSnapshotReceptionBindingCredentialKeyRegExp = new RegExp('^[A-Z][A-Z0-9_]*$');
+export const getCallieReceptionResponseApprovedSnapshotReceptionBindingConfigurationSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getCallieReceptionResponseApprovedSnapshotReceptionBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCallieReceptionResponseApprovedSnapshotReceptionBindingVersionExclusiveMin = 0;
+export const getCallieReceptionResponseApprovedSnapshotReceptionBindingVersionMax = 9007199254740991;
+
+export const getCallieReceptionResponseApprovedSnapshotPromptMax = 8000;
+
+export const getCallieReceptionResponseReadinessReasonMax = 120;
+
+
+
+export const GetCallieReceptionResponse = zod.object({
+  "organizationId": zod.uuid().regex(getCallieReceptionResponseOrganizationIdRegExp),
+  "version": zod.int().min(getCallieReceptionResponseVersionMin).max(getCallieReceptionResponseVersionMax),
+  "revisionId": zod.uuid().regex(getCallieReceptionResponseRevisionIdRegExp).nullable(),
+  "currentMode": zod.enum(['keypad', 'conversation']),
+  "currentEnabled": zod.boolean(),
+  "binding": zod.object({
+  "enabled": zod.boolean(),
+  "agentId": zod.string().min(1).max(getCallieReceptionResponseBindingAgentIdMax).regex(getCallieReceptionResponseBindingAgentIdRegExp),
+  "agentVersionId": zod.string().min(1).max(getCallieReceptionResponseBindingAgentVersionIdMax).regex(getCallieReceptionResponseBindingAgentVersionIdRegExp),
+  "branchId": zod.string().min(1).max(getCallieReceptionResponseBindingBranchIdMax).regex(getCallieReceptionResponseBindingBranchIdRegExp).nullable(),
+  "environment": zod.enum(['production', 'staging']),
+  "credentialKey": zod.string().min(1).max(getCallieReceptionResponseBindingCredentialKeyMax).regex(getCallieReceptionResponseBindingCredentialKeyRegExp),
+  "configurationSha256": zod.string().regex(getCallieReceptionResponseBindingConfigurationSha256RegExp),
+  "id": zod.uuid().regex(getCallieReceptionResponseBindingIdRegExp),
+  "version": zod.int().gt(getCallieReceptionResponseBindingVersionExclusiveMin).max(getCallieReceptionResponseBindingVersionMax),
+  "updatedAt": zod.coerce.date(),
+  "credentialsConfigured": zod.boolean(),
+  "webhookConfigured": zod.boolean()
+}).nullable(),
+  "policy": zod.object({
+  "mode": zod.enum(['conversation']),
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(getCallieReceptionResponsePolicyTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(getCallieReceptionResponsePolicyDaysItemMax)).min(1).max(getCallieReceptionResponsePolicyDaysMax),
+  "opensAt": zod.string().regex(getCallieReceptionResponsePolicyOpensAtRegExp),
+  "closesAt": zod.string().regex(getCallieReceptionResponsePolicyClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(getCallieReceptionResponsePolicyBusinessHoursOwnerIdMax).regex(getCallieReceptionResponsePolicyBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(getCallieReceptionResponsePolicyAfterHoursOwnerIdMax).regex(getCallieReceptionResponsePolicyAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(getCallieReceptionResponsePolicyResponseMinutesMin).max(getCallieReceptionResponsePolicyResponseMinutesMax),
+  "businessFacts": zod.string().max(getCallieReceptionResponsePolicyBusinessFactsMax),
+  "callerDisclosure": zod.string().max(getCallieReceptionResponsePolicyCallerDisclosureMax),
+  "maxConversationSeconds": zod.int().min(getCallieReceptionResponsePolicyMaxConversationSecondsMin).max(getCallieReceptionResponsePolicyMaxConversationSecondsMax),
+  "maxToolCalls": zod.int().min(getCallieReceptionResponsePolicyMaxToolCallsMin).max(getCallieReceptionResponsePolicyMaxToolCallsMax),
+  "retentionDays": zod.int().min(1).max(getCallieReceptionResponsePolicyRetentionDaysMax),
+  "businessHoursTransferPhone": zod.string().regex(getCallieReceptionResponsePolicyBusinessHoursTransferPhoneRegExp).nullable(),
+  "afterHoursTransferPhone": zod.string().regex(getCallieReceptionResponsePolicyAfterHoursTransferPhoneRegExp).nullable()
+}),
+  "approvedSnapshot": zod.object({
+  "mode": zod.enum(['conversation']),
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(getCallieReceptionResponseApprovedSnapshotTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(getCallieReceptionResponseApprovedSnapshotDaysItemMax)).min(1).max(getCallieReceptionResponseApprovedSnapshotDaysMax),
+  "opensAt": zod.string().regex(getCallieReceptionResponseApprovedSnapshotOpensAtRegExp),
+  "closesAt": zod.string().regex(getCallieReceptionResponseApprovedSnapshotClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(getCallieReceptionResponseApprovedSnapshotBusinessHoursOwnerIdMax).regex(getCallieReceptionResponseApprovedSnapshotBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(getCallieReceptionResponseApprovedSnapshotAfterHoursOwnerIdMax).regex(getCallieReceptionResponseApprovedSnapshotAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(getCallieReceptionResponseApprovedSnapshotResponseMinutesMin).max(getCallieReceptionResponseApprovedSnapshotResponseMinutesMax),
+  "businessFacts": zod.string().max(getCallieReceptionResponseApprovedSnapshotBusinessFactsMax),
+  "callerDisclosure": zod.string().max(getCallieReceptionResponseApprovedSnapshotCallerDisclosureMax),
+  "maxConversationSeconds": zod.int().min(getCallieReceptionResponseApprovedSnapshotMaxConversationSecondsMin).max(getCallieReceptionResponseApprovedSnapshotMaxConversationSecondsMax),
+  "maxToolCalls": zod.int().min(getCallieReceptionResponseApprovedSnapshotMaxToolCallsMin).max(getCallieReceptionResponseApprovedSnapshotMaxToolCallsMax),
+  "retentionDays": zod.int().min(1).max(getCallieReceptionResponseApprovedSnapshotRetentionDaysMax),
+  "businessHoursTransferPhone": zod.string().regex(getCallieReceptionResponseApprovedSnapshotBusinessHoursTransferPhoneRegExp).nullable(),
+  "afterHoursTransferPhone": zod.string().regex(getCallieReceptionResponseApprovedSnapshotAfterHoursTransferPhoneRegExp).nullable(),
+  "templateVersion": zod.enum(['callie-conversation.v2']),
+  "toolVersion": zod.enum(['callie-reception-tools.v1']),
+  "voiceBinding": zod.object({
+  "id": zod.uuid().regex(getCallieReceptionResponseApprovedSnapshotVoiceBindingIdRegExp),
+  "accountSid": zod.string().regex(getCallieReceptionResponseApprovedSnapshotVoiceBindingAccountSidRegExp),
+  "sender": zod.string().regex(getCallieReceptionResponseApprovedSnapshotVoiceBindingSenderRegExp),
+  "staffPhone": zod.string().regex(getCallieReceptionResponseApprovedSnapshotVoiceBindingStaffPhoneRegExp),
+  "origin": zod.url(),
+  "businessName": zod.string().min(1).max(getCallieReceptionResponseApprovedSnapshotVoiceBindingBusinessNameMax)
+}).nullable(),
+  "receptionBinding": zod.object({
+  "enabled": zod.boolean(),
+  "agentId": zod.string().min(1).max(getCallieReceptionResponseApprovedSnapshotReceptionBindingAgentIdMax).regex(getCallieReceptionResponseApprovedSnapshotReceptionBindingAgentIdRegExp),
+  "agentVersionId": zod.string().min(1).max(getCallieReceptionResponseApprovedSnapshotReceptionBindingAgentVersionIdMax).regex(getCallieReceptionResponseApprovedSnapshotReceptionBindingAgentVersionIdRegExp),
+  "branchId": zod.string().min(1).max(getCallieReceptionResponseApprovedSnapshotReceptionBindingBranchIdMax).regex(getCallieReceptionResponseApprovedSnapshotReceptionBindingBranchIdRegExp).nullable(),
+  "environment": zod.enum(['production', 'staging']),
+  "credentialKey": zod.string().min(1).max(getCallieReceptionResponseApprovedSnapshotReceptionBindingCredentialKeyMax).regex(getCallieReceptionResponseApprovedSnapshotReceptionBindingCredentialKeyRegExp),
+  "configurationSha256": zod.string().regex(getCallieReceptionResponseApprovedSnapshotReceptionBindingConfigurationSha256RegExp),
+  "id": zod.uuid().regex(getCallieReceptionResponseApprovedSnapshotReceptionBindingIdRegExp),
+  "version": zod.int().gt(getCallieReceptionResponseApprovedSnapshotReceptionBindingVersionExclusiveMin).max(getCallieReceptionResponseApprovedSnapshotReceptionBindingVersionMax)
+}).nullable(),
+  "prompt": zod.string().min(1).max(getCallieReceptionResponseApprovedSnapshotPromptMax)
+}).nullable(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "readiness": zod.object({
+  "state": zod.enum(['off', 'setup_incomplete', 'approved_but_held', 'approved_for_future_eligible_calls']),
+  "ready": zod.boolean(),
+  "reason": zod.string().min(1).max(getCallieReceptionResponseReadinessReasonMax).nullable()
+}),
+  "boundary": zod.enum(['Voice-only missed-call reception. Requests are unverified; no automatic booking or messaging permission.'])
+})
+
+
+/**
+ * Current accepted active verified staff session only; no API-key authority. Requires settings.manage. Shared policy head selects exactly one future-call mode. Binding metadata and exact policy approval do not configure a provider or prove live audio/transfer. Caller statements are unverified; no identity, SMS permission, confirmed visit or emergency dispatch is inferred. Original uncertain effects remain non-retryable.
+ * @summary Save exact non-secret company provider identity
+ */
+export const saveCallieReceptionBindingBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveCallieReceptionBindingBodyExpectedVersionMin = 0;
+export const saveCallieReceptionBindingBodyExpectedVersionMax = 9007199254740991;
+
+export const saveCallieReceptionBindingBodyBindingAgentIdMax = 128;
+
+
+export const saveCallieReceptionBindingBodyBindingAgentIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveCallieReceptionBindingBodyBindingAgentVersionIdMax = 128;
+
+
+export const saveCallieReceptionBindingBodyBindingAgentVersionIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveCallieReceptionBindingBodyBindingBranchIdMax = 128;
+
+
+export const saveCallieReceptionBindingBodyBindingBranchIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveCallieReceptionBindingBodyBindingCredentialKeyMax = 60;
+
+
+export const saveCallieReceptionBindingBodyBindingCredentialKeyRegExp = new RegExp('^[A-Z][A-Z0-9_]*$');
+export const saveCallieReceptionBindingBodyBindingConfigurationSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const SaveCallieReceptionBindingBody = zod.object({
+  "requestId": zod.uuid().regex(saveCallieReceptionBindingBodyRequestIdRegExp),
+  "expectedVersion": zod.int().min(saveCallieReceptionBindingBodyExpectedVersionMin).max(saveCallieReceptionBindingBodyExpectedVersionMax),
+  "binding": zod.object({
+  "enabled": zod.boolean(),
+  "agentId": zod.string().min(1).max(saveCallieReceptionBindingBodyBindingAgentIdMax).regex(saveCallieReceptionBindingBodyBindingAgentIdRegExp),
+  "agentVersionId": zod.string().min(1).max(saveCallieReceptionBindingBodyBindingAgentVersionIdMax).regex(saveCallieReceptionBindingBodyBindingAgentVersionIdRegExp),
+  "branchId": zod.string().min(1).max(saveCallieReceptionBindingBodyBindingBranchIdMax).regex(saveCallieReceptionBindingBodyBindingBranchIdRegExp).nullable(),
+  "environment": zod.enum(['production', 'staging']),
+  "credentialKey": zod.string().min(1).max(saveCallieReceptionBindingBodyBindingCredentialKeyMax).regex(saveCallieReceptionBindingBodyBindingCredentialKeyRegExp),
+  "configurationSha256": zod.string().regex(saveCallieReceptionBindingBodyBindingConfigurationSha256RegExp)
+}),
+  "confirmed": zod.literal(true)
+})
+
+export const saveCallieReceptionBindingResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveCallieReceptionBindingResponseVersionMin = 0;
+export const saveCallieReceptionBindingResponseVersionMax = 9007199254740991;
+
+export const saveCallieReceptionBindingResponseRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveCallieReceptionBindingResponseBindingAgentIdMax = 128;
+
+
+export const saveCallieReceptionBindingResponseBindingAgentIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveCallieReceptionBindingResponseBindingAgentVersionIdMax = 128;
+
+
+export const saveCallieReceptionBindingResponseBindingAgentVersionIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveCallieReceptionBindingResponseBindingBranchIdMax = 128;
+
+
+export const saveCallieReceptionBindingResponseBindingBranchIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveCallieReceptionBindingResponseBindingCredentialKeyMax = 60;
+
+
+export const saveCallieReceptionBindingResponseBindingCredentialKeyRegExp = new RegExp('^[A-Z][A-Z0-9_]*$');
+export const saveCallieReceptionBindingResponseBindingConfigurationSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const saveCallieReceptionBindingResponseBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveCallieReceptionBindingResponseBindingVersionExclusiveMin = 0;
+export const saveCallieReceptionBindingResponseBindingVersionMax = 9007199254740991;
+
+export const saveCallieReceptionBindingResponsePolicyTimezoneMax = 80;
+
+export const saveCallieReceptionBindingResponsePolicyDaysItemMax = 7;
+
+export const saveCallieReceptionBindingResponsePolicyDaysMax = 7;
+
+export const saveCallieReceptionBindingResponsePolicyOpensAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const saveCallieReceptionBindingResponsePolicyClosesAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const saveCallieReceptionBindingResponsePolicyBusinessHoursOwnerIdMax = 128;
+
+
+export const saveCallieReceptionBindingResponsePolicyBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveCallieReceptionBindingResponsePolicyAfterHoursOwnerIdMax = 128;
+
+
+export const saveCallieReceptionBindingResponsePolicyAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveCallieReceptionBindingResponsePolicyResponseMinutesMin = 5;
+export const saveCallieReceptionBindingResponsePolicyResponseMinutesMax = 1440;
+
+export const saveCallieReceptionBindingResponsePolicyBusinessFactsMax = 1200;
+
+export const saveCallieReceptionBindingResponsePolicyCallerDisclosureMax = 500;
+
+export const saveCallieReceptionBindingResponsePolicyMaxConversationSecondsMin = 60;
+export const saveCallieReceptionBindingResponsePolicyMaxConversationSecondsMax = 600;
+
+export const saveCallieReceptionBindingResponsePolicyMaxToolCallsMin = 3;
+export const saveCallieReceptionBindingResponsePolicyMaxToolCallsMax = 12;
+
+export const saveCallieReceptionBindingResponsePolicyRetentionDaysMax = 30;
+
+export const saveCallieReceptionBindingResponsePolicyBusinessHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const saveCallieReceptionBindingResponsePolicyAfterHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotTimezoneMax = 80;
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotDaysItemMax = 7;
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotDaysMax = 7;
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotOpensAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotClosesAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotBusinessHoursOwnerIdMax = 128;
+
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotAfterHoursOwnerIdMax = 128;
+
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotResponseMinutesMin = 5;
+export const saveCallieReceptionBindingResponseApprovedSnapshotResponseMinutesMax = 1440;
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotBusinessFactsMax = 1200;
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotCallerDisclosureMax = 500;
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotMaxConversationSecondsMin = 60;
+export const saveCallieReceptionBindingResponseApprovedSnapshotMaxConversationSecondsMax = 600;
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotMaxToolCallsMin = 3;
+export const saveCallieReceptionBindingResponseApprovedSnapshotMaxToolCallsMax = 12;
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotRetentionDaysMax = 30;
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotBusinessHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotAfterHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotVoiceBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotVoiceBindingAccountSidRegExp = new RegExp('^AC[a-f0-9]{32}$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotVoiceBindingSenderRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotVoiceBindingStaffPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotVoiceBindingBusinessNameMax = 120;
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingAgentIdMax = 128;
+
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingAgentIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingAgentVersionIdMax = 128;
+
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingAgentVersionIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingBranchIdMax = 128;
+
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingBranchIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingCredentialKeyMax = 60;
+
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingCredentialKeyRegExp = new RegExp('^[A-Z][A-Z0-9_]*$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingConfigurationSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingVersionExclusiveMin = 0;
+export const saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingVersionMax = 9007199254740991;
+
+export const saveCallieReceptionBindingResponseApprovedSnapshotPromptMax = 8000;
+
+export const saveCallieReceptionBindingResponseReadinessReasonMax = 120;
+
+
+
+export const SaveCallieReceptionBindingResponse = zod.object({
+  "organizationId": zod.uuid().regex(saveCallieReceptionBindingResponseOrganizationIdRegExp),
+  "version": zod.int().min(saveCallieReceptionBindingResponseVersionMin).max(saveCallieReceptionBindingResponseVersionMax),
+  "revisionId": zod.uuid().regex(saveCallieReceptionBindingResponseRevisionIdRegExp).nullable(),
+  "currentMode": zod.enum(['keypad', 'conversation']),
+  "currentEnabled": zod.boolean(),
+  "binding": zod.object({
+  "enabled": zod.boolean(),
+  "agentId": zod.string().min(1).max(saveCallieReceptionBindingResponseBindingAgentIdMax).regex(saveCallieReceptionBindingResponseBindingAgentIdRegExp),
+  "agentVersionId": zod.string().min(1).max(saveCallieReceptionBindingResponseBindingAgentVersionIdMax).regex(saveCallieReceptionBindingResponseBindingAgentVersionIdRegExp),
+  "branchId": zod.string().min(1).max(saveCallieReceptionBindingResponseBindingBranchIdMax).regex(saveCallieReceptionBindingResponseBindingBranchIdRegExp).nullable(),
+  "environment": zod.enum(['production', 'staging']),
+  "credentialKey": zod.string().min(1).max(saveCallieReceptionBindingResponseBindingCredentialKeyMax).regex(saveCallieReceptionBindingResponseBindingCredentialKeyRegExp),
+  "configurationSha256": zod.string().regex(saveCallieReceptionBindingResponseBindingConfigurationSha256RegExp),
+  "id": zod.uuid().regex(saveCallieReceptionBindingResponseBindingIdRegExp),
+  "version": zod.int().gt(saveCallieReceptionBindingResponseBindingVersionExclusiveMin).max(saveCallieReceptionBindingResponseBindingVersionMax),
+  "updatedAt": zod.coerce.date(),
+  "credentialsConfigured": zod.boolean(),
+  "webhookConfigured": zod.boolean()
+}).nullable(),
+  "policy": zod.object({
+  "mode": zod.enum(['conversation']),
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(saveCallieReceptionBindingResponsePolicyTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(saveCallieReceptionBindingResponsePolicyDaysItemMax)).min(1).max(saveCallieReceptionBindingResponsePolicyDaysMax),
+  "opensAt": zod.string().regex(saveCallieReceptionBindingResponsePolicyOpensAtRegExp),
+  "closesAt": zod.string().regex(saveCallieReceptionBindingResponsePolicyClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(saveCallieReceptionBindingResponsePolicyBusinessHoursOwnerIdMax).regex(saveCallieReceptionBindingResponsePolicyBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(saveCallieReceptionBindingResponsePolicyAfterHoursOwnerIdMax).regex(saveCallieReceptionBindingResponsePolicyAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(saveCallieReceptionBindingResponsePolicyResponseMinutesMin).max(saveCallieReceptionBindingResponsePolicyResponseMinutesMax),
+  "businessFacts": zod.string().max(saveCallieReceptionBindingResponsePolicyBusinessFactsMax),
+  "callerDisclosure": zod.string().max(saveCallieReceptionBindingResponsePolicyCallerDisclosureMax),
+  "maxConversationSeconds": zod.int().min(saveCallieReceptionBindingResponsePolicyMaxConversationSecondsMin).max(saveCallieReceptionBindingResponsePolicyMaxConversationSecondsMax),
+  "maxToolCalls": zod.int().min(saveCallieReceptionBindingResponsePolicyMaxToolCallsMin).max(saveCallieReceptionBindingResponsePolicyMaxToolCallsMax),
+  "retentionDays": zod.int().min(1).max(saveCallieReceptionBindingResponsePolicyRetentionDaysMax),
+  "businessHoursTransferPhone": zod.string().regex(saveCallieReceptionBindingResponsePolicyBusinessHoursTransferPhoneRegExp).nullable(),
+  "afterHoursTransferPhone": zod.string().regex(saveCallieReceptionBindingResponsePolicyAfterHoursTransferPhoneRegExp).nullable()
+}),
+  "approvedSnapshot": zod.object({
+  "mode": zod.enum(['conversation']),
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(saveCallieReceptionBindingResponseApprovedSnapshotTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(saveCallieReceptionBindingResponseApprovedSnapshotDaysItemMax)).min(1).max(saveCallieReceptionBindingResponseApprovedSnapshotDaysMax),
+  "opensAt": zod.string().regex(saveCallieReceptionBindingResponseApprovedSnapshotOpensAtRegExp),
+  "closesAt": zod.string().regex(saveCallieReceptionBindingResponseApprovedSnapshotClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(saveCallieReceptionBindingResponseApprovedSnapshotBusinessHoursOwnerIdMax).regex(saveCallieReceptionBindingResponseApprovedSnapshotBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(saveCallieReceptionBindingResponseApprovedSnapshotAfterHoursOwnerIdMax).regex(saveCallieReceptionBindingResponseApprovedSnapshotAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(saveCallieReceptionBindingResponseApprovedSnapshotResponseMinutesMin).max(saveCallieReceptionBindingResponseApprovedSnapshotResponseMinutesMax),
+  "businessFacts": zod.string().max(saveCallieReceptionBindingResponseApprovedSnapshotBusinessFactsMax),
+  "callerDisclosure": zod.string().max(saveCallieReceptionBindingResponseApprovedSnapshotCallerDisclosureMax),
+  "maxConversationSeconds": zod.int().min(saveCallieReceptionBindingResponseApprovedSnapshotMaxConversationSecondsMin).max(saveCallieReceptionBindingResponseApprovedSnapshotMaxConversationSecondsMax),
+  "maxToolCalls": zod.int().min(saveCallieReceptionBindingResponseApprovedSnapshotMaxToolCallsMin).max(saveCallieReceptionBindingResponseApprovedSnapshotMaxToolCallsMax),
+  "retentionDays": zod.int().min(1).max(saveCallieReceptionBindingResponseApprovedSnapshotRetentionDaysMax),
+  "businessHoursTransferPhone": zod.string().regex(saveCallieReceptionBindingResponseApprovedSnapshotBusinessHoursTransferPhoneRegExp).nullable(),
+  "afterHoursTransferPhone": zod.string().regex(saveCallieReceptionBindingResponseApprovedSnapshotAfterHoursTransferPhoneRegExp).nullable(),
+  "templateVersion": zod.enum(['callie-conversation.v2']),
+  "toolVersion": zod.enum(['callie-reception-tools.v1']),
+  "voiceBinding": zod.object({
+  "id": zod.uuid().regex(saveCallieReceptionBindingResponseApprovedSnapshotVoiceBindingIdRegExp),
+  "accountSid": zod.string().regex(saveCallieReceptionBindingResponseApprovedSnapshotVoiceBindingAccountSidRegExp),
+  "sender": zod.string().regex(saveCallieReceptionBindingResponseApprovedSnapshotVoiceBindingSenderRegExp),
+  "staffPhone": zod.string().regex(saveCallieReceptionBindingResponseApprovedSnapshotVoiceBindingStaffPhoneRegExp),
+  "origin": zod.url(),
+  "businessName": zod.string().min(1).max(saveCallieReceptionBindingResponseApprovedSnapshotVoiceBindingBusinessNameMax)
+}).nullable(),
+  "receptionBinding": zod.object({
+  "enabled": zod.boolean(),
+  "agentId": zod.string().min(1).max(saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingAgentIdMax).regex(saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingAgentIdRegExp),
+  "agentVersionId": zod.string().min(1).max(saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingAgentVersionIdMax).regex(saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingAgentVersionIdRegExp),
+  "branchId": zod.string().min(1).max(saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingBranchIdMax).regex(saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingBranchIdRegExp).nullable(),
+  "environment": zod.enum(['production', 'staging']),
+  "credentialKey": zod.string().min(1).max(saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingCredentialKeyMax).regex(saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingCredentialKeyRegExp),
+  "configurationSha256": zod.string().regex(saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingConfigurationSha256RegExp),
+  "id": zod.uuid().regex(saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingIdRegExp),
+  "version": zod.int().gt(saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingVersionExclusiveMin).max(saveCallieReceptionBindingResponseApprovedSnapshotReceptionBindingVersionMax)
+}).nullable(),
+  "prompt": zod.string().min(1).max(saveCallieReceptionBindingResponseApprovedSnapshotPromptMax)
+}).nullable(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "readiness": zod.object({
+  "state": zod.enum(['off', 'setup_incomplete', 'approved_but_held', 'approved_for_future_eligible_calls']),
+  "ready": zod.boolean(),
+  "reason": zod.string().min(1).max(saveCallieReceptionBindingResponseReadinessReasonMax).nullable()
+}),
+  "boundary": zod.enum(['Voice-only missed-call reception. Requests are unverified; no automatic booking or messaging permission.'])
+})
+
+
+/**
+ * Current accepted active verified staff session only; no API-key authority. Requires settings.manage. Shared policy head selects exactly one future-call mode. Binding metadata and exact policy approval do not configure a provider or prove live audio/transfer. Caller statements are unverified; no identity, SMS permission, confirmed visit or emergency dispatch is inferred. Original uncertain effects remain non-retryable.
+ * @summary Review an expiring actor-bound conversational policy
+ */
+export const previewCallieReceptionPolicyBodyExpectedVersionMin = 0;
+export const previewCallieReceptionPolicyBodyExpectedVersionMax = 9007199254740991;
+
+export const previewCallieReceptionPolicyBodyPolicyTimezoneMax = 80;
+
+export const previewCallieReceptionPolicyBodyPolicyDaysItemMax = 7;
+
+export const previewCallieReceptionPolicyBodyPolicyDaysMax = 7;
+
+export const previewCallieReceptionPolicyBodyPolicyOpensAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const previewCallieReceptionPolicyBodyPolicyClosesAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const previewCallieReceptionPolicyBodyPolicyBusinessHoursOwnerIdMax = 128;
+
+
+export const previewCallieReceptionPolicyBodyPolicyBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const previewCallieReceptionPolicyBodyPolicyAfterHoursOwnerIdMax = 128;
+
+
+export const previewCallieReceptionPolicyBodyPolicyAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const previewCallieReceptionPolicyBodyPolicyResponseMinutesMin = 5;
+export const previewCallieReceptionPolicyBodyPolicyResponseMinutesMax = 1440;
+
+export const previewCallieReceptionPolicyBodyPolicyBusinessFactsMax = 1200;
+
+export const previewCallieReceptionPolicyBodyPolicyCallerDisclosureMax = 500;
+
+export const previewCallieReceptionPolicyBodyPolicyMaxConversationSecondsMin = 60;
+export const previewCallieReceptionPolicyBodyPolicyMaxConversationSecondsMax = 600;
+
+export const previewCallieReceptionPolicyBodyPolicyMaxToolCallsMin = 3;
+export const previewCallieReceptionPolicyBodyPolicyMaxToolCallsMax = 12;
+
+export const previewCallieReceptionPolicyBodyPolicyRetentionDaysMax = 30;
+
+export const previewCallieReceptionPolicyBodyPolicyBusinessHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const previewCallieReceptionPolicyBodyPolicyAfterHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+
+
+export const PreviewCallieReceptionPolicyBody = zod.object({
+  "expectedVersion": zod.int().min(previewCallieReceptionPolicyBodyExpectedVersionMin).max(previewCallieReceptionPolicyBodyExpectedVersionMax),
+  "policy": zod.object({
+  "mode": zod.enum(['conversation']),
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(previewCallieReceptionPolicyBodyPolicyTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(previewCallieReceptionPolicyBodyPolicyDaysItemMax)).min(1).max(previewCallieReceptionPolicyBodyPolicyDaysMax),
+  "opensAt": zod.string().regex(previewCallieReceptionPolicyBodyPolicyOpensAtRegExp),
+  "closesAt": zod.string().regex(previewCallieReceptionPolicyBodyPolicyClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(previewCallieReceptionPolicyBodyPolicyBusinessHoursOwnerIdMax).regex(previewCallieReceptionPolicyBodyPolicyBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(previewCallieReceptionPolicyBodyPolicyAfterHoursOwnerIdMax).regex(previewCallieReceptionPolicyBodyPolicyAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(previewCallieReceptionPolicyBodyPolicyResponseMinutesMin).max(previewCallieReceptionPolicyBodyPolicyResponseMinutesMax),
+  "businessFacts": zod.string().max(previewCallieReceptionPolicyBodyPolicyBusinessFactsMax),
+  "callerDisclosure": zod.string().max(previewCallieReceptionPolicyBodyPolicyCallerDisclosureMax),
+  "maxConversationSeconds": zod.int().min(previewCallieReceptionPolicyBodyPolicyMaxConversationSecondsMin).max(previewCallieReceptionPolicyBodyPolicyMaxConversationSecondsMax),
+  "maxToolCalls": zod.int().min(previewCallieReceptionPolicyBodyPolicyMaxToolCallsMin).max(previewCallieReceptionPolicyBodyPolicyMaxToolCallsMax),
+  "retentionDays": zod.int().min(1).max(previewCallieReceptionPolicyBodyPolicyRetentionDaysMax),
+  "businessHoursTransferPhone": zod.string().regex(previewCallieReceptionPolicyBodyPolicyBusinessHoursTransferPhoneRegExp).nullable(),
+  "afterHoursTransferPhone": zod.string().regex(previewCallieReceptionPolicyBodyPolicyAfterHoursTransferPhoneRegExp).nullable()
+})
+})
+
+export const previewCallieReceptionPolicyResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewCallieReceptionPolicyResponseExpectedVersionMin = 0;
+export const previewCallieReceptionPolicyResponseExpectedVersionMax = 9007199254740991;
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotActorUserIdMax = 128;
+
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotActorUserIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotReviewIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotExpectedVersionMin = 0;
+export const previewCallieReceptionPolicyResponseExpectedSnapshotExpectedVersionMax = 9007199254740991;
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyTimezoneMax = 80;
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyDaysItemMax = 7;
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyDaysMax = 7;
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyOpensAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyClosesAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyBusinessHoursOwnerIdMax = 128;
+
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyAfterHoursOwnerIdMax = 128;
+
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyResponseMinutesMin = 5;
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyResponseMinutesMax = 1440;
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyBusinessFactsMax = 1200;
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyCallerDisclosureMax = 500;
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyMaxConversationSecondsMin = 60;
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyMaxConversationSecondsMax = 600;
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyMaxToolCallsMin = 3;
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyMaxToolCallsMax = 12;
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyRetentionDaysMax = 30;
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyBusinessHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyAfterHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyVoiceBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyVoiceBindingAccountSidRegExp = new RegExp('^AC[a-f0-9]{32}$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyVoiceBindingSenderRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyVoiceBindingStaffPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyVoiceBindingBusinessNameMax = 120;
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingAgentIdMax = 128;
+
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingAgentIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingAgentVersionIdMax = 128;
+
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingAgentVersionIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingBranchIdMax = 128;
+
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingBranchIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingCredentialKeyMax = 60;
+
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingCredentialKeyRegExp = new RegExp('^[A-Z][A-Z0-9_]*$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingConfigurationSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingVersionExclusiveMin = 0;
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingVersionMax = 9007199254740991;
+
+export const previewCallieReceptionPolicyResponseExpectedSnapshotPolicyPromptMax = 8000;
+
+export const previewCallieReceptionPolicyResponsePreviewHashRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const PreviewCallieReceptionPolicyResponse = zod.object({
+  "organizationId": zod.uuid().regex(previewCallieReceptionPolicyResponseOrganizationIdRegExp),
+  "expectedVersion": zod.int().min(previewCallieReceptionPolicyResponseExpectedVersionMin).max(previewCallieReceptionPolicyResponseExpectedVersionMax),
+  "expectedSnapshot": zod.object({
+  "schemaVersion": zod.enum(['callie-reception-preview.v1']),
+  "organizationId": zod.uuid().regex(previewCallieReceptionPolicyResponseExpectedSnapshotOrganizationIdRegExp),
+  "actorUserId": zod.string().min(1).max(previewCallieReceptionPolicyResponseExpectedSnapshotActorUserIdMax).regex(previewCallieReceptionPolicyResponseExpectedSnapshotActorUserIdRegExp),
+  "reviewId": zod.uuid().regex(previewCallieReceptionPolicyResponseExpectedSnapshotReviewIdRegExp),
+  "expectedVersion": zod.int().min(previewCallieReceptionPolicyResponseExpectedSnapshotExpectedVersionMin).max(previewCallieReceptionPolicyResponseExpectedSnapshotExpectedVersionMax),
+  "issuedAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "policy": zod.object({
+  "mode": zod.enum(['conversation']),
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyDaysItemMax)).min(1).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyDaysMax),
+  "opensAt": zod.string().regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyOpensAtRegExp),
+  "closesAt": zod.string().regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyBusinessHoursOwnerIdMax).regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyAfterHoursOwnerIdMax).regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyResponseMinutesMin).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyResponseMinutesMax),
+  "businessFacts": zod.string().max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyBusinessFactsMax),
+  "callerDisclosure": zod.string().max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyCallerDisclosureMax),
+  "maxConversationSeconds": zod.int().min(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyMaxConversationSecondsMin).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyMaxConversationSecondsMax),
+  "maxToolCalls": zod.int().min(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyMaxToolCallsMin).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyMaxToolCallsMax),
+  "retentionDays": zod.int().min(1).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyRetentionDaysMax),
+  "businessHoursTransferPhone": zod.string().regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyBusinessHoursTransferPhoneRegExp).nullable(),
+  "afterHoursTransferPhone": zod.string().regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyAfterHoursTransferPhoneRegExp).nullable(),
+  "templateVersion": zod.enum(['callie-conversation.v2']),
+  "toolVersion": zod.enum(['callie-reception-tools.v1']),
+  "voiceBinding": zod.object({
+  "id": zod.uuid().regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyVoiceBindingIdRegExp),
+  "accountSid": zod.string().regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyVoiceBindingAccountSidRegExp),
+  "sender": zod.string().regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyVoiceBindingSenderRegExp),
+  "staffPhone": zod.string().regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyVoiceBindingStaffPhoneRegExp),
+  "origin": zod.url(),
+  "businessName": zod.string().min(1).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyVoiceBindingBusinessNameMax)
+}).nullable(),
+  "receptionBinding": zod.object({
+  "enabled": zod.boolean(),
+  "agentId": zod.string().min(1).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingAgentIdMax).regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingAgentIdRegExp),
+  "agentVersionId": zod.string().min(1).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingAgentVersionIdMax).regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingAgentVersionIdRegExp),
+  "branchId": zod.string().min(1).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingBranchIdMax).regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingBranchIdRegExp).nullable(),
+  "environment": zod.enum(['production', 'staging']),
+  "credentialKey": zod.string().min(1).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingCredentialKeyMax).regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingCredentialKeyRegExp),
+  "configurationSha256": zod.string().regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingConfigurationSha256RegExp),
+  "id": zod.uuid().regex(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingIdRegExp),
+  "version": zod.int().gt(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingVersionExclusiveMin).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyReceptionBindingVersionMax)
+}).nullable(),
+  "prompt": zod.string().min(1).max(previewCallieReceptionPolicyResponseExpectedSnapshotPolicyPromptMax)
+})
+}),
+  "previewHash": zod.string().regex(previewCallieReceptionPolicyResponsePreviewHashRegExp),
+  "expiresAt": zod.coerce.date()
+})
+
+
+/**
+ * Current accepted active verified staff session only; no API-key authority. Requires settings.manage. Shared policy head selects exactly one future-call mode. Binding metadata and exact policy approval do not configure a provider or prove live audio/transfer. Caller statements are unverified; no identity, SMS permission, confirmed visit or emergency dispatch is inferred. Original uncertain effects remain non-retryable.
+ * @summary Approve the exact future-call conversational policy
+ */
+export const approveCallieReceptionPolicyBodyExpectedVersionMin = 0;
+export const approveCallieReceptionPolicyBodyExpectedVersionMax = 9007199254740991;
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotActorUserIdMax = 128;
+
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotActorUserIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotReviewIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotExpectedVersionMin = 0;
+export const approveCallieReceptionPolicyBodyExpectedSnapshotExpectedVersionMax = 9007199254740991;
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyTimezoneMax = 80;
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyDaysItemMax = 7;
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyDaysMax = 7;
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyOpensAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyClosesAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyBusinessHoursOwnerIdMax = 128;
+
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyAfterHoursOwnerIdMax = 128;
+
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyResponseMinutesMin = 5;
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyResponseMinutesMax = 1440;
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyBusinessFactsMax = 1200;
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyCallerDisclosureMax = 500;
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyMaxConversationSecondsMin = 60;
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyMaxConversationSecondsMax = 600;
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyMaxToolCallsMin = 3;
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyMaxToolCallsMax = 12;
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyRetentionDaysMax = 30;
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyBusinessHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyAfterHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyVoiceBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyVoiceBindingAccountSidRegExp = new RegExp('^AC[a-f0-9]{32}$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyVoiceBindingSenderRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyVoiceBindingStaffPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyVoiceBindingBusinessNameMax = 120;
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingAgentIdMax = 128;
+
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingAgentIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingAgentVersionIdMax = 128;
+
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingAgentVersionIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingBranchIdMax = 128;
+
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingBranchIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingCredentialKeyMax = 60;
+
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingCredentialKeyRegExp = new RegExp('^[A-Z][A-Z0-9_]*$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingConfigurationSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingVersionExclusiveMin = 0;
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingVersionMax = 9007199254740991;
+
+export const approveCallieReceptionPolicyBodyExpectedSnapshotPolicyPromptMax = 8000;
+
+export const approveCallieReceptionPolicyBodyPreviewHashRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const ApproveCallieReceptionPolicyBody = zod.object({
+  "expectedVersion": zod.int().min(approveCallieReceptionPolicyBodyExpectedVersionMin).max(approveCallieReceptionPolicyBodyExpectedVersionMax),
+  "expectedSnapshot": zod.object({
+  "schemaVersion": zod.enum(['callie-reception-preview.v1']),
+  "organizationId": zod.uuid().regex(approveCallieReceptionPolicyBodyExpectedSnapshotOrganizationIdRegExp),
+  "actorUserId": zod.string().min(1).max(approveCallieReceptionPolicyBodyExpectedSnapshotActorUserIdMax).regex(approveCallieReceptionPolicyBodyExpectedSnapshotActorUserIdRegExp),
+  "reviewId": zod.uuid().regex(approveCallieReceptionPolicyBodyExpectedSnapshotReviewIdRegExp),
+  "expectedVersion": zod.int().min(approveCallieReceptionPolicyBodyExpectedSnapshotExpectedVersionMin).max(approveCallieReceptionPolicyBodyExpectedSnapshotExpectedVersionMax),
+  "issuedAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "policy": zod.object({
+  "mode": zod.enum(['conversation']),
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyDaysItemMax)).min(1).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyDaysMax),
+  "opensAt": zod.string().regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyOpensAtRegExp),
+  "closesAt": zod.string().regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyBusinessHoursOwnerIdMax).regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyAfterHoursOwnerIdMax).regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyResponseMinutesMin).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyResponseMinutesMax),
+  "businessFacts": zod.string().max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyBusinessFactsMax),
+  "callerDisclosure": zod.string().max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyCallerDisclosureMax),
+  "maxConversationSeconds": zod.int().min(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyMaxConversationSecondsMin).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyMaxConversationSecondsMax),
+  "maxToolCalls": zod.int().min(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyMaxToolCallsMin).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyMaxToolCallsMax),
+  "retentionDays": zod.int().min(1).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyRetentionDaysMax),
+  "businessHoursTransferPhone": zod.string().regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyBusinessHoursTransferPhoneRegExp).nullable(),
+  "afterHoursTransferPhone": zod.string().regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyAfterHoursTransferPhoneRegExp).nullable(),
+  "templateVersion": zod.enum(['callie-conversation.v2']),
+  "toolVersion": zod.enum(['callie-reception-tools.v1']),
+  "voiceBinding": zod.object({
+  "id": zod.uuid().regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyVoiceBindingIdRegExp),
+  "accountSid": zod.string().regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyVoiceBindingAccountSidRegExp),
+  "sender": zod.string().regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyVoiceBindingSenderRegExp),
+  "staffPhone": zod.string().regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyVoiceBindingStaffPhoneRegExp),
+  "origin": zod.url(),
+  "businessName": zod.string().min(1).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyVoiceBindingBusinessNameMax)
+}).nullable(),
+  "receptionBinding": zod.object({
+  "enabled": zod.boolean(),
+  "agentId": zod.string().min(1).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingAgentIdMax).regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingAgentIdRegExp),
+  "agentVersionId": zod.string().min(1).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingAgentVersionIdMax).regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingAgentVersionIdRegExp),
+  "branchId": zod.string().min(1).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingBranchIdMax).regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingBranchIdRegExp).nullable(),
+  "environment": zod.enum(['production', 'staging']),
+  "credentialKey": zod.string().min(1).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingCredentialKeyMax).regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingCredentialKeyRegExp),
+  "configurationSha256": zod.string().regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingConfigurationSha256RegExp),
+  "id": zod.uuid().regex(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingIdRegExp),
+  "version": zod.int().gt(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingVersionExclusiveMin).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyReceptionBindingVersionMax)
+}).nullable(),
+  "prompt": zod.string().min(1).max(approveCallieReceptionPolicyBodyExpectedSnapshotPolicyPromptMax)
+})
+}),
+  "previewHash": zod.string().regex(approveCallieReceptionPolicyBodyPreviewHashRegExp),
+  "confirmed": zod.literal(true)
+})
+
+export const approveCallieReceptionPolicyResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveCallieReceptionPolicyResponseVersionMin = 0;
+export const approveCallieReceptionPolicyResponseVersionMax = 9007199254740991;
+
+export const approveCallieReceptionPolicyResponseRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveCallieReceptionPolicyResponseBindingAgentIdMax = 128;
+
+
+export const approveCallieReceptionPolicyResponseBindingAgentIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyResponseBindingAgentVersionIdMax = 128;
+
+
+export const approveCallieReceptionPolicyResponseBindingAgentVersionIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyResponseBindingBranchIdMax = 128;
+
+
+export const approveCallieReceptionPolicyResponseBindingBranchIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyResponseBindingCredentialKeyMax = 60;
+
+
+export const approveCallieReceptionPolicyResponseBindingCredentialKeyRegExp = new RegExp('^[A-Z][A-Z0-9_]*$');
+export const approveCallieReceptionPolicyResponseBindingConfigurationSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveCallieReceptionPolicyResponseBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveCallieReceptionPolicyResponseBindingVersionExclusiveMin = 0;
+export const approveCallieReceptionPolicyResponseBindingVersionMax = 9007199254740991;
+
+export const approveCallieReceptionPolicyResponsePolicyTimezoneMax = 80;
+
+export const approveCallieReceptionPolicyResponsePolicyDaysItemMax = 7;
+
+export const approveCallieReceptionPolicyResponsePolicyDaysMax = 7;
+
+export const approveCallieReceptionPolicyResponsePolicyOpensAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCallieReceptionPolicyResponsePolicyClosesAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCallieReceptionPolicyResponsePolicyBusinessHoursOwnerIdMax = 128;
+
+
+export const approveCallieReceptionPolicyResponsePolicyBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyResponsePolicyAfterHoursOwnerIdMax = 128;
+
+
+export const approveCallieReceptionPolicyResponsePolicyAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyResponsePolicyResponseMinutesMin = 5;
+export const approveCallieReceptionPolicyResponsePolicyResponseMinutesMax = 1440;
+
+export const approveCallieReceptionPolicyResponsePolicyBusinessFactsMax = 1200;
+
+export const approveCallieReceptionPolicyResponsePolicyCallerDisclosureMax = 500;
+
+export const approveCallieReceptionPolicyResponsePolicyMaxConversationSecondsMin = 60;
+export const approveCallieReceptionPolicyResponsePolicyMaxConversationSecondsMax = 600;
+
+export const approveCallieReceptionPolicyResponsePolicyMaxToolCallsMin = 3;
+export const approveCallieReceptionPolicyResponsePolicyMaxToolCallsMax = 12;
+
+export const approveCallieReceptionPolicyResponsePolicyRetentionDaysMax = 30;
+
+export const approveCallieReceptionPolicyResponsePolicyBusinessHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCallieReceptionPolicyResponsePolicyAfterHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotTimezoneMax = 80;
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotDaysItemMax = 7;
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotDaysMax = 7;
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotOpensAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotClosesAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotBusinessHoursOwnerIdMax = 128;
+
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotAfterHoursOwnerIdMax = 128;
+
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotResponseMinutesMin = 5;
+export const approveCallieReceptionPolicyResponseApprovedSnapshotResponseMinutesMax = 1440;
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotBusinessFactsMax = 1200;
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotCallerDisclosureMax = 500;
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotMaxConversationSecondsMin = 60;
+export const approveCallieReceptionPolicyResponseApprovedSnapshotMaxConversationSecondsMax = 600;
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotMaxToolCallsMin = 3;
+export const approveCallieReceptionPolicyResponseApprovedSnapshotMaxToolCallsMax = 12;
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotRetentionDaysMax = 30;
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotBusinessHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotAfterHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotVoiceBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotVoiceBindingAccountSidRegExp = new RegExp('^AC[a-f0-9]{32}$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotVoiceBindingSenderRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotVoiceBindingStaffPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotVoiceBindingBusinessNameMax = 120;
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingAgentIdMax = 128;
+
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingAgentIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingAgentVersionIdMax = 128;
+
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingAgentVersionIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingBranchIdMax = 128;
+
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingBranchIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingCredentialKeyMax = 60;
+
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingCredentialKeyRegExp = new RegExp('^[A-Z][A-Z0-9_]*$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingConfigurationSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingVersionExclusiveMin = 0;
+export const approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingVersionMax = 9007199254740991;
+
+export const approveCallieReceptionPolicyResponseApprovedSnapshotPromptMax = 8000;
+
+export const approveCallieReceptionPolicyResponseReadinessReasonMax = 120;
+
+
+
+export const ApproveCallieReceptionPolicyResponse = zod.object({
+  "organizationId": zod.uuid().regex(approveCallieReceptionPolicyResponseOrganizationIdRegExp),
+  "version": zod.int().min(approveCallieReceptionPolicyResponseVersionMin).max(approveCallieReceptionPolicyResponseVersionMax),
+  "revisionId": zod.uuid().regex(approveCallieReceptionPolicyResponseRevisionIdRegExp).nullable(),
+  "currentMode": zod.enum(['keypad', 'conversation']),
+  "currentEnabled": zod.boolean(),
+  "binding": zod.object({
+  "enabled": zod.boolean(),
+  "agentId": zod.string().min(1).max(approveCallieReceptionPolicyResponseBindingAgentIdMax).regex(approveCallieReceptionPolicyResponseBindingAgentIdRegExp),
+  "agentVersionId": zod.string().min(1).max(approveCallieReceptionPolicyResponseBindingAgentVersionIdMax).regex(approveCallieReceptionPolicyResponseBindingAgentVersionIdRegExp),
+  "branchId": zod.string().min(1).max(approveCallieReceptionPolicyResponseBindingBranchIdMax).regex(approveCallieReceptionPolicyResponseBindingBranchIdRegExp).nullable(),
+  "environment": zod.enum(['production', 'staging']),
+  "credentialKey": zod.string().min(1).max(approveCallieReceptionPolicyResponseBindingCredentialKeyMax).regex(approveCallieReceptionPolicyResponseBindingCredentialKeyRegExp),
+  "configurationSha256": zod.string().regex(approveCallieReceptionPolicyResponseBindingConfigurationSha256RegExp),
+  "id": zod.uuid().regex(approveCallieReceptionPolicyResponseBindingIdRegExp),
+  "version": zod.int().gt(approveCallieReceptionPolicyResponseBindingVersionExclusiveMin).max(approveCallieReceptionPolicyResponseBindingVersionMax),
+  "updatedAt": zod.coerce.date(),
+  "credentialsConfigured": zod.boolean(),
+  "webhookConfigured": zod.boolean()
+}).nullable(),
+  "policy": zod.object({
+  "mode": zod.enum(['conversation']),
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(approveCallieReceptionPolicyResponsePolicyTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(approveCallieReceptionPolicyResponsePolicyDaysItemMax)).min(1).max(approveCallieReceptionPolicyResponsePolicyDaysMax),
+  "opensAt": zod.string().regex(approveCallieReceptionPolicyResponsePolicyOpensAtRegExp),
+  "closesAt": zod.string().regex(approveCallieReceptionPolicyResponsePolicyClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(approveCallieReceptionPolicyResponsePolicyBusinessHoursOwnerIdMax).regex(approveCallieReceptionPolicyResponsePolicyBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(approveCallieReceptionPolicyResponsePolicyAfterHoursOwnerIdMax).regex(approveCallieReceptionPolicyResponsePolicyAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(approveCallieReceptionPolicyResponsePolicyResponseMinutesMin).max(approveCallieReceptionPolicyResponsePolicyResponseMinutesMax),
+  "businessFacts": zod.string().max(approveCallieReceptionPolicyResponsePolicyBusinessFactsMax),
+  "callerDisclosure": zod.string().max(approveCallieReceptionPolicyResponsePolicyCallerDisclosureMax),
+  "maxConversationSeconds": zod.int().min(approveCallieReceptionPolicyResponsePolicyMaxConversationSecondsMin).max(approveCallieReceptionPolicyResponsePolicyMaxConversationSecondsMax),
+  "maxToolCalls": zod.int().min(approveCallieReceptionPolicyResponsePolicyMaxToolCallsMin).max(approveCallieReceptionPolicyResponsePolicyMaxToolCallsMax),
+  "retentionDays": zod.int().min(1).max(approveCallieReceptionPolicyResponsePolicyRetentionDaysMax),
+  "businessHoursTransferPhone": zod.string().regex(approveCallieReceptionPolicyResponsePolicyBusinessHoursTransferPhoneRegExp).nullable(),
+  "afterHoursTransferPhone": zod.string().regex(approveCallieReceptionPolicyResponsePolicyAfterHoursTransferPhoneRegExp).nullable()
+}),
+  "approvedSnapshot": zod.object({
+  "mode": zod.enum(['conversation']),
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(approveCallieReceptionPolicyResponseApprovedSnapshotTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(approveCallieReceptionPolicyResponseApprovedSnapshotDaysItemMax)).min(1).max(approveCallieReceptionPolicyResponseApprovedSnapshotDaysMax),
+  "opensAt": zod.string().regex(approveCallieReceptionPolicyResponseApprovedSnapshotOpensAtRegExp),
+  "closesAt": zod.string().regex(approveCallieReceptionPolicyResponseApprovedSnapshotClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(approveCallieReceptionPolicyResponseApprovedSnapshotBusinessHoursOwnerIdMax).regex(approveCallieReceptionPolicyResponseApprovedSnapshotBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(approveCallieReceptionPolicyResponseApprovedSnapshotAfterHoursOwnerIdMax).regex(approveCallieReceptionPolicyResponseApprovedSnapshotAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(approveCallieReceptionPolicyResponseApprovedSnapshotResponseMinutesMin).max(approveCallieReceptionPolicyResponseApprovedSnapshotResponseMinutesMax),
+  "businessFacts": zod.string().max(approveCallieReceptionPolicyResponseApprovedSnapshotBusinessFactsMax),
+  "callerDisclosure": zod.string().max(approveCallieReceptionPolicyResponseApprovedSnapshotCallerDisclosureMax),
+  "maxConversationSeconds": zod.int().min(approveCallieReceptionPolicyResponseApprovedSnapshotMaxConversationSecondsMin).max(approveCallieReceptionPolicyResponseApprovedSnapshotMaxConversationSecondsMax),
+  "maxToolCalls": zod.int().min(approveCallieReceptionPolicyResponseApprovedSnapshotMaxToolCallsMin).max(approveCallieReceptionPolicyResponseApprovedSnapshotMaxToolCallsMax),
+  "retentionDays": zod.int().min(1).max(approveCallieReceptionPolicyResponseApprovedSnapshotRetentionDaysMax),
+  "businessHoursTransferPhone": zod.string().regex(approveCallieReceptionPolicyResponseApprovedSnapshotBusinessHoursTransferPhoneRegExp).nullable(),
+  "afterHoursTransferPhone": zod.string().regex(approveCallieReceptionPolicyResponseApprovedSnapshotAfterHoursTransferPhoneRegExp).nullable(),
+  "templateVersion": zod.enum(['callie-conversation.v2']),
+  "toolVersion": zod.enum(['callie-reception-tools.v1']),
+  "voiceBinding": zod.object({
+  "id": zod.uuid().regex(approveCallieReceptionPolicyResponseApprovedSnapshotVoiceBindingIdRegExp),
+  "accountSid": zod.string().regex(approveCallieReceptionPolicyResponseApprovedSnapshotVoiceBindingAccountSidRegExp),
+  "sender": zod.string().regex(approveCallieReceptionPolicyResponseApprovedSnapshotVoiceBindingSenderRegExp),
+  "staffPhone": zod.string().regex(approveCallieReceptionPolicyResponseApprovedSnapshotVoiceBindingStaffPhoneRegExp),
+  "origin": zod.url(),
+  "businessName": zod.string().min(1).max(approveCallieReceptionPolicyResponseApprovedSnapshotVoiceBindingBusinessNameMax)
+}).nullable(),
+  "receptionBinding": zod.object({
+  "enabled": zod.boolean(),
+  "agentId": zod.string().min(1).max(approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingAgentIdMax).regex(approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingAgentIdRegExp),
+  "agentVersionId": zod.string().min(1).max(approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingAgentVersionIdMax).regex(approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingAgentVersionIdRegExp),
+  "branchId": zod.string().min(1).max(approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingBranchIdMax).regex(approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingBranchIdRegExp).nullable(),
+  "environment": zod.enum(['production', 'staging']),
+  "credentialKey": zod.string().min(1).max(approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingCredentialKeyMax).regex(approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingCredentialKeyRegExp),
+  "configurationSha256": zod.string().regex(approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingConfigurationSha256RegExp),
+  "id": zod.uuid().regex(approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingIdRegExp),
+  "version": zod.int().gt(approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingVersionExclusiveMin).max(approveCallieReceptionPolicyResponseApprovedSnapshotReceptionBindingVersionMax)
+}).nullable(),
+  "prompt": zod.string().min(1).max(approveCallieReceptionPolicyResponseApprovedSnapshotPromptMax)
+}).nullable(),
+  "approvedAt": zod.coerce.date().nullable(),
+  "readiness": zod.object({
+  "state": zod.enum(['off', 'setup_incomplete', 'approved_but_held', 'approved_for_future_eligible_calls']),
+  "ready": zod.boolean(),
+  "reason": zod.string().min(1).max(approveCallieReceptionPolicyResponseReadinessReasonMax).nullable()
+}),
+  "boundary": zod.enum(['Voice-only missed-call reception. Requests are unverified; no automatic booking or messaging permission.'])
+})
+
+
+/**
  * Read-only canonical customer records for current accepted staff. Company comes only from the session. No writes, financial totals, raw activity/mailbox contents or inferred parent links. Sending holds do not block historical reading. Section pages contain at most 25 valid rows in created-descending order, using company/customer/section-bound keyset cursors; not a frozen export.
  * @summary Read a canonical customer header and available sections
  */
@@ -3081,56 +4101,168 @@ export const ReviewServiceSmsReplyResponse = zod.object({
  */
 export const getCalliePolicyResponseVersionMin = 0;
 
-export const getCalliePolicyResponsePolicyTimezoneMax = 80;
+export const getCalliePolicyResponsePolicyOneTimezoneMax = 80;
 
-export const getCalliePolicyResponsePolicyDaysItemMax = 7;
+export const getCalliePolicyResponsePolicyOneDaysItemMax = 7;
 
-export const getCalliePolicyResponsePolicyDaysMax = 7;
+export const getCalliePolicyResponsePolicyOneDaysMax = 7;
 
-export const getCalliePolicyResponsePolicyOpensAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
-export const getCalliePolicyResponsePolicyClosesAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
-export const getCalliePolicyResponsePolicyBusinessHoursOwnerIdMax = 128;
-
-
-export const getCalliePolicyResponsePolicyBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
-export const getCalliePolicyResponsePolicyAfterHoursOwnerIdMax = 128;
+export const getCalliePolicyResponsePolicyOneOpensAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+export const getCalliePolicyResponsePolicyOneClosesAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+export const getCalliePolicyResponsePolicyOneBusinessHoursOwnerIdMax = 128;
 
 
-export const getCalliePolicyResponsePolicyAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
-export const getCalliePolicyResponsePolicyResponseMinutesMin = 5;
-export const getCalliePolicyResponsePolicyResponseMinutesMax = 1440;
+export const getCalliePolicyResponsePolicyOneBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCalliePolicyResponsePolicyOneAfterHoursOwnerIdMax = 128;
 
-export const getCalliePolicyResponseSnapshotDaysItemMax = 7;
 
-export const getCalliePolicyResponseSnapshotDaysMax = 7;
+export const getCalliePolicyResponsePolicyOneAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCalliePolicyResponsePolicyOneResponseMinutesMin = 5;
+export const getCalliePolicyResponsePolicyOneResponseMinutesMax = 1440;
 
-export const getCalliePolicyResponseSnapshotResponseMinutesMin = 5;
-export const getCalliePolicyResponseSnapshotResponseMinutesMax = 1440;
+export const getCalliePolicyResponsePolicyTwoTimezoneMax = 80;
+
+export const getCalliePolicyResponsePolicyTwoDaysItemMax = 7;
+
+export const getCalliePolicyResponsePolicyTwoDaysMax = 7;
+
+export const getCalliePolicyResponsePolicyTwoOpensAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const getCalliePolicyResponsePolicyTwoClosesAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const getCalliePolicyResponsePolicyTwoBusinessHoursOwnerIdMax = 128;
+
+
+export const getCalliePolicyResponsePolicyTwoBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCalliePolicyResponsePolicyTwoAfterHoursOwnerIdMax = 128;
+
+
+export const getCalliePolicyResponsePolicyTwoAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCalliePolicyResponsePolicyTwoResponseMinutesMin = 5;
+export const getCalliePolicyResponsePolicyTwoResponseMinutesMax = 1440;
+
+export const getCalliePolicyResponsePolicyTwoBusinessFactsMax = 1200;
+
+export const getCalliePolicyResponsePolicyTwoCallerDisclosureMax = 500;
+
+export const getCalliePolicyResponsePolicyTwoMaxConversationSecondsMin = 60;
+export const getCalliePolicyResponsePolicyTwoMaxConversationSecondsMax = 600;
+
+export const getCalliePolicyResponsePolicyTwoMaxToolCallsMin = 3;
+export const getCalliePolicyResponsePolicyTwoMaxToolCallsMax = 12;
+
+export const getCalliePolicyResponsePolicyTwoRetentionDaysMax = 30;
+
+export const getCalliePolicyResponsePolicyTwoBusinessHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const getCalliePolicyResponsePolicyTwoAfterHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const getCalliePolicyResponseSnapshotOneDaysItemMax = 7;
+
+export const getCalliePolicyResponseSnapshotOneDaysMax = 7;
+
+export const getCalliePolicyResponseSnapshotOneResponseMinutesMin = 5;
+export const getCalliePolicyResponseSnapshotOneResponseMinutesMax = 1440;
+
+export const getCalliePolicyResponseSnapshotTwoTimezoneMax = 80;
+
+export const getCalliePolicyResponseSnapshotTwoDaysItemMax = 7;
+
+export const getCalliePolicyResponseSnapshotTwoDaysMax = 7;
+
+export const getCalliePolicyResponseSnapshotTwoOpensAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const getCalliePolicyResponseSnapshotTwoClosesAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const getCalliePolicyResponseSnapshotTwoBusinessHoursOwnerIdMax = 128;
+
+
+export const getCalliePolicyResponseSnapshotTwoBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCalliePolicyResponseSnapshotTwoAfterHoursOwnerIdMax = 128;
+
+
+export const getCalliePolicyResponseSnapshotTwoAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCalliePolicyResponseSnapshotTwoResponseMinutesMin = 5;
+export const getCalliePolicyResponseSnapshotTwoResponseMinutesMax = 1440;
+
+export const getCalliePolicyResponseSnapshotTwoBusinessFactsMax = 1200;
+
+export const getCalliePolicyResponseSnapshotTwoCallerDisclosureMax = 500;
+
+export const getCalliePolicyResponseSnapshotTwoMaxConversationSecondsMin = 60;
+export const getCalliePolicyResponseSnapshotTwoMaxConversationSecondsMax = 600;
+
+export const getCalliePolicyResponseSnapshotTwoMaxToolCallsMin = 3;
+export const getCalliePolicyResponseSnapshotTwoMaxToolCallsMax = 12;
+
+export const getCalliePolicyResponseSnapshotTwoRetentionDaysMax = 30;
+
+export const getCalliePolicyResponseSnapshotTwoBusinessHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const getCalliePolicyResponseSnapshotTwoAfterHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const getCalliePolicyResponseSnapshotTwoVoiceBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCalliePolicyResponseSnapshotTwoVoiceBindingAccountSidRegExp = new RegExp('^AC[a-f0-9]{32}$');
+export const getCalliePolicyResponseSnapshotTwoVoiceBindingSenderRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const getCalliePolicyResponseSnapshotTwoVoiceBindingStaffPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const getCalliePolicyResponseSnapshotTwoVoiceBindingBusinessNameMax = 120;
+
+export const getCalliePolicyResponseSnapshotTwoReceptionBindingAgentIdMax = 128;
+
+
+export const getCalliePolicyResponseSnapshotTwoReceptionBindingAgentIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCalliePolicyResponseSnapshotTwoReceptionBindingAgentVersionIdMax = 128;
+
+
+export const getCalliePolicyResponseSnapshotTwoReceptionBindingAgentVersionIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCalliePolicyResponseSnapshotTwoReceptionBindingBranchIdMax = 128;
+
+
+export const getCalliePolicyResponseSnapshotTwoReceptionBindingBranchIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCalliePolicyResponseSnapshotTwoReceptionBindingCredentialKeyMax = 60;
+
+
+export const getCalliePolicyResponseSnapshotTwoReceptionBindingCredentialKeyRegExp = new RegExp('^[A-Z][A-Z0-9_]*$');
+export const getCalliePolicyResponseSnapshotTwoReceptionBindingConfigurationSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getCalliePolicyResponseSnapshotTwoReceptionBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCalliePolicyResponseSnapshotTwoReceptionBindingVersionExclusiveMin = 0;
+export const getCalliePolicyResponseSnapshotTwoReceptionBindingVersionMax = 9007199254740991;
+
+export const getCalliePolicyResponseSnapshotTwoPromptMax = 8000;
 
 
 
 export const GetCalliePolicyResponse = zod.object({
   "version": zod.int().min(getCalliePolicyResponseVersionMin),
   "revisionId": zod.union([zod.uuid(),zod.null()]),
-  "policy": zod.object({
+  "policy": zod.union([zod.object({
   "enabled": zod.boolean(),
-  "timezone": zod.string().min(1).max(getCalliePolicyResponsePolicyTimezoneMax),
-  "days": zod.array(zod.int().min(1).max(getCalliePolicyResponsePolicyDaysItemMax)).min(1).max(getCalliePolicyResponsePolicyDaysMax),
-  "opensAt": zod.string().regex(getCalliePolicyResponsePolicyOpensAtRegExp),
-  "closesAt": zod.string().regex(getCalliePolicyResponsePolicyClosesAtRegExp),
-  "businessHoursOwnerId": zod.string().min(1).max(getCalliePolicyResponsePolicyBusinessHoursOwnerIdMax).regex(getCalliePolicyResponsePolicyBusinessHoursOwnerIdRegExp).nullable(),
-  "afterHoursOwnerId": zod.string().min(1).max(getCalliePolicyResponsePolicyAfterHoursOwnerIdMax).regex(getCalliePolicyResponsePolicyAfterHoursOwnerIdRegExp).nullable(),
-  "responseMinutes": zod.int().min(getCalliePolicyResponsePolicyResponseMinutesMin).max(getCalliePolicyResponsePolicyResponseMinutesMax)
-}),
-  "snapshot": zod.object({
+  "timezone": zod.string().min(1).max(getCalliePolicyResponsePolicyOneTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(getCalliePolicyResponsePolicyOneDaysItemMax)).min(1).max(getCalliePolicyResponsePolicyOneDaysMax),
+  "opensAt": zod.string().regex(getCalliePolicyResponsePolicyOneOpensAtRegExp),
+  "closesAt": zod.string().regex(getCalliePolicyResponsePolicyOneClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(getCalliePolicyResponsePolicyOneBusinessHoursOwnerIdMax).regex(getCalliePolicyResponsePolicyOneBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(getCalliePolicyResponsePolicyOneAfterHoursOwnerIdMax).regex(getCalliePolicyResponsePolicyOneAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(getCalliePolicyResponsePolicyOneResponseMinutesMin).max(getCalliePolicyResponsePolicyOneResponseMinutesMax)
+}),zod.object({
+  "mode": zod.enum(['conversation']),
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(getCalliePolicyResponsePolicyTwoTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(getCalliePolicyResponsePolicyTwoDaysItemMax)).min(1).max(getCalliePolicyResponsePolicyTwoDaysMax),
+  "opensAt": zod.string().regex(getCalliePolicyResponsePolicyTwoOpensAtRegExp),
+  "closesAt": zod.string().regex(getCalliePolicyResponsePolicyTwoClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(getCalliePolicyResponsePolicyTwoBusinessHoursOwnerIdMax).regex(getCalliePolicyResponsePolicyTwoBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(getCalliePolicyResponsePolicyTwoAfterHoursOwnerIdMax).regex(getCalliePolicyResponsePolicyTwoAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(getCalliePolicyResponsePolicyTwoResponseMinutesMin).max(getCalliePolicyResponsePolicyTwoResponseMinutesMax),
+  "businessFacts": zod.string().max(getCalliePolicyResponsePolicyTwoBusinessFactsMax),
+  "callerDisclosure": zod.string().max(getCalliePolicyResponsePolicyTwoCallerDisclosureMax),
+  "maxConversationSeconds": zod.int().min(getCalliePolicyResponsePolicyTwoMaxConversationSecondsMin).max(getCalliePolicyResponsePolicyTwoMaxConversationSecondsMax),
+  "maxToolCalls": zod.int().min(getCalliePolicyResponsePolicyTwoMaxToolCallsMin).max(getCalliePolicyResponsePolicyTwoMaxToolCallsMax),
+  "retentionDays": zod.int().min(1).max(getCalliePolicyResponsePolicyTwoRetentionDaysMax),
+  "businessHoursTransferPhone": zod.string().regex(getCalliePolicyResponsePolicyTwoBusinessHoursTransferPhoneRegExp).nullable(),
+  "afterHoursTransferPhone": zod.string().regex(getCalliePolicyResponsePolicyTwoAfterHoursTransferPhoneRegExp).nullable()
+})]),
+  "snapshot": zod.union([zod.object({
   "enabled": zod.boolean(),
   "timezone": zod.string(),
-  "days": zod.array(zod.int().min(1).max(getCalliePolicyResponseSnapshotDaysItemMax)).max(getCalliePolicyResponseSnapshotDaysMax),
+  "days": zod.array(zod.int().min(1).max(getCalliePolicyResponseSnapshotOneDaysItemMax)).max(getCalliePolicyResponseSnapshotOneDaysMax),
   "opensAt": zod.string(),
   "closesAt": zod.string(),
   "businessHoursOwnerId": zod.union([zod.string(),zod.null()]),
   "afterHoursOwnerId": zod.union([zod.string(),zod.null()]),
-  "responseMinutes": zod.int().min(getCalliePolicyResponseSnapshotResponseMinutesMin).max(getCalliePolicyResponseSnapshotResponseMinutesMax),
+  "responseMinutes": zod.int().min(getCalliePolicyResponseSnapshotOneResponseMinutesMin).max(getCalliePolicyResponseSnapshotOneResponseMinutesMax),
   "templateVersion": zod.enum(['callie-intake.v1']),
   "prompts": zod.object({
   "service": zod.string(),
@@ -3150,7 +4282,46 @@ export const GetCalliePolicyResponse = zod.object({
   "origin": zod.url(),
   "businessName": zod.string()
 }),zod.null()])
-}),
+}),zod.object({
+  "mode": zod.enum(['conversation']),
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(getCalliePolicyResponseSnapshotTwoTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(getCalliePolicyResponseSnapshotTwoDaysItemMax)).min(1).max(getCalliePolicyResponseSnapshotTwoDaysMax),
+  "opensAt": zod.string().regex(getCalliePolicyResponseSnapshotTwoOpensAtRegExp),
+  "closesAt": zod.string().regex(getCalliePolicyResponseSnapshotTwoClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(getCalliePolicyResponseSnapshotTwoBusinessHoursOwnerIdMax).regex(getCalliePolicyResponseSnapshotTwoBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(getCalliePolicyResponseSnapshotTwoAfterHoursOwnerIdMax).regex(getCalliePolicyResponseSnapshotTwoAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(getCalliePolicyResponseSnapshotTwoResponseMinutesMin).max(getCalliePolicyResponseSnapshotTwoResponseMinutesMax),
+  "businessFacts": zod.string().max(getCalliePolicyResponseSnapshotTwoBusinessFactsMax),
+  "callerDisclosure": zod.string().max(getCalliePolicyResponseSnapshotTwoCallerDisclosureMax),
+  "maxConversationSeconds": zod.int().min(getCalliePolicyResponseSnapshotTwoMaxConversationSecondsMin).max(getCalliePolicyResponseSnapshotTwoMaxConversationSecondsMax),
+  "maxToolCalls": zod.int().min(getCalliePolicyResponseSnapshotTwoMaxToolCallsMin).max(getCalliePolicyResponseSnapshotTwoMaxToolCallsMax),
+  "retentionDays": zod.int().min(1).max(getCalliePolicyResponseSnapshotTwoRetentionDaysMax),
+  "businessHoursTransferPhone": zod.string().regex(getCalliePolicyResponseSnapshotTwoBusinessHoursTransferPhoneRegExp).nullable(),
+  "afterHoursTransferPhone": zod.string().regex(getCalliePolicyResponseSnapshotTwoAfterHoursTransferPhoneRegExp).nullable(),
+  "templateVersion": zod.enum(['callie-conversation.v2']),
+  "toolVersion": zod.enum(['callie-reception-tools.v1']),
+  "voiceBinding": zod.object({
+  "id": zod.uuid().regex(getCalliePolicyResponseSnapshotTwoVoiceBindingIdRegExp),
+  "accountSid": zod.string().regex(getCalliePolicyResponseSnapshotTwoVoiceBindingAccountSidRegExp),
+  "sender": zod.string().regex(getCalliePolicyResponseSnapshotTwoVoiceBindingSenderRegExp),
+  "staffPhone": zod.string().regex(getCalliePolicyResponseSnapshotTwoVoiceBindingStaffPhoneRegExp),
+  "origin": zod.url(),
+  "businessName": zod.string().min(1).max(getCalliePolicyResponseSnapshotTwoVoiceBindingBusinessNameMax)
+}).nullable(),
+  "receptionBinding": zod.object({
+  "enabled": zod.boolean(),
+  "agentId": zod.string().min(1).max(getCalliePolicyResponseSnapshotTwoReceptionBindingAgentIdMax).regex(getCalliePolicyResponseSnapshotTwoReceptionBindingAgentIdRegExp),
+  "agentVersionId": zod.string().min(1).max(getCalliePolicyResponseSnapshotTwoReceptionBindingAgentVersionIdMax).regex(getCalliePolicyResponseSnapshotTwoReceptionBindingAgentVersionIdRegExp),
+  "branchId": zod.string().min(1).max(getCalliePolicyResponseSnapshotTwoReceptionBindingBranchIdMax).regex(getCalliePolicyResponseSnapshotTwoReceptionBindingBranchIdRegExp).nullable(),
+  "environment": zod.enum(['production', 'staging']),
+  "credentialKey": zod.string().min(1).max(getCalliePolicyResponseSnapshotTwoReceptionBindingCredentialKeyMax).regex(getCalliePolicyResponseSnapshotTwoReceptionBindingCredentialKeyRegExp),
+  "configurationSha256": zod.string().regex(getCalliePolicyResponseSnapshotTwoReceptionBindingConfigurationSha256RegExp),
+  "id": zod.uuid().regex(getCalliePolicyResponseSnapshotTwoReceptionBindingIdRegExp),
+  "version": zod.int().gt(getCalliePolicyResponseSnapshotTwoReceptionBindingVersionExclusiveMin).max(getCalliePolicyResponseSnapshotTwoReceptionBindingVersionMax)
+}).nullable(),
+  "prompt": zod.string().min(1).max(getCalliePolicyResponseSnapshotTwoPromptMax)
+})]),
   "approvedAt": zod.union([zod.coerce.date(),zod.null()]),
   "readiness": zod.object({
   "ready": zod.boolean(),
@@ -3325,56 +4496,168 @@ export const ApproveCalliePolicyBody = zod.object({
 
 export const approveCalliePolicyResponseVersionMin = 0;
 
-export const approveCalliePolicyResponsePolicyTimezoneMax = 80;
+export const approveCalliePolicyResponsePolicyOneTimezoneMax = 80;
 
-export const approveCalliePolicyResponsePolicyDaysItemMax = 7;
+export const approveCalliePolicyResponsePolicyOneDaysItemMax = 7;
 
-export const approveCalliePolicyResponsePolicyDaysMax = 7;
+export const approveCalliePolicyResponsePolicyOneDaysMax = 7;
 
-export const approveCalliePolicyResponsePolicyOpensAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
-export const approveCalliePolicyResponsePolicyClosesAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
-export const approveCalliePolicyResponsePolicyBusinessHoursOwnerIdMax = 128;
-
-
-export const approveCalliePolicyResponsePolicyBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
-export const approveCalliePolicyResponsePolicyAfterHoursOwnerIdMax = 128;
+export const approveCalliePolicyResponsePolicyOneOpensAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCalliePolicyResponsePolicyOneClosesAtRegExp = new RegExp('^(?:[01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCalliePolicyResponsePolicyOneBusinessHoursOwnerIdMax = 128;
 
 
-export const approveCalliePolicyResponsePolicyAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
-export const approveCalliePolicyResponsePolicyResponseMinutesMin = 5;
-export const approveCalliePolicyResponsePolicyResponseMinutesMax = 1440;
+export const approveCalliePolicyResponsePolicyOneBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCalliePolicyResponsePolicyOneAfterHoursOwnerIdMax = 128;
 
-export const approveCalliePolicyResponseSnapshotDaysItemMax = 7;
 
-export const approveCalliePolicyResponseSnapshotDaysMax = 7;
+export const approveCalliePolicyResponsePolicyOneAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCalliePolicyResponsePolicyOneResponseMinutesMin = 5;
+export const approveCalliePolicyResponsePolicyOneResponseMinutesMax = 1440;
 
-export const approveCalliePolicyResponseSnapshotResponseMinutesMin = 5;
-export const approveCalliePolicyResponseSnapshotResponseMinutesMax = 1440;
+export const approveCalliePolicyResponsePolicyTwoTimezoneMax = 80;
+
+export const approveCalliePolicyResponsePolicyTwoDaysItemMax = 7;
+
+export const approveCalliePolicyResponsePolicyTwoDaysMax = 7;
+
+export const approveCalliePolicyResponsePolicyTwoOpensAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCalliePolicyResponsePolicyTwoClosesAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCalliePolicyResponsePolicyTwoBusinessHoursOwnerIdMax = 128;
+
+
+export const approveCalliePolicyResponsePolicyTwoBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCalliePolicyResponsePolicyTwoAfterHoursOwnerIdMax = 128;
+
+
+export const approveCalliePolicyResponsePolicyTwoAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCalliePolicyResponsePolicyTwoResponseMinutesMin = 5;
+export const approveCalliePolicyResponsePolicyTwoResponseMinutesMax = 1440;
+
+export const approveCalliePolicyResponsePolicyTwoBusinessFactsMax = 1200;
+
+export const approveCalliePolicyResponsePolicyTwoCallerDisclosureMax = 500;
+
+export const approveCalliePolicyResponsePolicyTwoMaxConversationSecondsMin = 60;
+export const approveCalliePolicyResponsePolicyTwoMaxConversationSecondsMax = 600;
+
+export const approveCalliePolicyResponsePolicyTwoMaxToolCallsMin = 3;
+export const approveCalliePolicyResponsePolicyTwoMaxToolCallsMax = 12;
+
+export const approveCalliePolicyResponsePolicyTwoRetentionDaysMax = 30;
+
+export const approveCalliePolicyResponsePolicyTwoBusinessHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCalliePolicyResponsePolicyTwoAfterHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCalliePolicyResponseSnapshotOneDaysItemMax = 7;
+
+export const approveCalliePolicyResponseSnapshotOneDaysMax = 7;
+
+export const approveCalliePolicyResponseSnapshotOneResponseMinutesMin = 5;
+export const approveCalliePolicyResponseSnapshotOneResponseMinutesMax = 1440;
+
+export const approveCalliePolicyResponseSnapshotTwoTimezoneMax = 80;
+
+export const approveCalliePolicyResponseSnapshotTwoDaysItemMax = 7;
+
+export const approveCalliePolicyResponseSnapshotTwoDaysMax = 7;
+
+export const approveCalliePolicyResponseSnapshotTwoOpensAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCalliePolicyResponseSnapshotTwoClosesAtRegExp = new RegExp('^([01]\\d|2[0-3]):[0-5]\\d$');
+export const approveCalliePolicyResponseSnapshotTwoBusinessHoursOwnerIdMax = 128;
+
+
+export const approveCalliePolicyResponseSnapshotTwoBusinessHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCalliePolicyResponseSnapshotTwoAfterHoursOwnerIdMax = 128;
+
+
+export const approveCalliePolicyResponseSnapshotTwoAfterHoursOwnerIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCalliePolicyResponseSnapshotTwoResponseMinutesMin = 5;
+export const approveCalliePolicyResponseSnapshotTwoResponseMinutesMax = 1440;
+
+export const approveCalliePolicyResponseSnapshotTwoBusinessFactsMax = 1200;
+
+export const approveCalliePolicyResponseSnapshotTwoCallerDisclosureMax = 500;
+
+export const approveCalliePolicyResponseSnapshotTwoMaxConversationSecondsMin = 60;
+export const approveCalliePolicyResponseSnapshotTwoMaxConversationSecondsMax = 600;
+
+export const approveCalliePolicyResponseSnapshotTwoMaxToolCallsMin = 3;
+export const approveCalliePolicyResponseSnapshotTwoMaxToolCallsMax = 12;
+
+export const approveCalliePolicyResponseSnapshotTwoRetentionDaysMax = 30;
+
+export const approveCalliePolicyResponseSnapshotTwoBusinessHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCalliePolicyResponseSnapshotTwoAfterHoursTransferPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCalliePolicyResponseSnapshotTwoVoiceBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveCalliePolicyResponseSnapshotTwoVoiceBindingAccountSidRegExp = new RegExp('^AC[a-f0-9]{32}$');
+export const approveCalliePolicyResponseSnapshotTwoVoiceBindingSenderRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCalliePolicyResponseSnapshotTwoVoiceBindingStaffPhoneRegExp = new RegExp('^\\+1[2-9]\\d{9}$');
+export const approveCalliePolicyResponseSnapshotTwoVoiceBindingBusinessNameMax = 120;
+
+export const approveCalliePolicyResponseSnapshotTwoReceptionBindingAgentIdMax = 128;
+
+
+export const approveCalliePolicyResponseSnapshotTwoReceptionBindingAgentIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCalliePolicyResponseSnapshotTwoReceptionBindingAgentVersionIdMax = 128;
+
+
+export const approveCalliePolicyResponseSnapshotTwoReceptionBindingAgentVersionIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCalliePolicyResponseSnapshotTwoReceptionBindingBranchIdMax = 128;
+
+
+export const approveCalliePolicyResponseSnapshotTwoReceptionBindingBranchIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const approveCalliePolicyResponseSnapshotTwoReceptionBindingCredentialKeyMax = 60;
+
+
+export const approveCalliePolicyResponseSnapshotTwoReceptionBindingCredentialKeyRegExp = new RegExp('^[A-Z][A-Z0-9_]*$');
+export const approveCalliePolicyResponseSnapshotTwoReceptionBindingConfigurationSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveCalliePolicyResponseSnapshotTwoReceptionBindingIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveCalliePolicyResponseSnapshotTwoReceptionBindingVersionExclusiveMin = 0;
+export const approveCalliePolicyResponseSnapshotTwoReceptionBindingVersionMax = 9007199254740991;
+
+export const approveCalliePolicyResponseSnapshotTwoPromptMax = 8000;
 
 
 
 export const ApproveCalliePolicyResponse = zod.object({
   "version": zod.int().min(approveCalliePolicyResponseVersionMin),
   "revisionId": zod.union([zod.uuid(),zod.null()]),
-  "policy": zod.object({
+  "policy": zod.union([zod.object({
   "enabled": zod.boolean(),
-  "timezone": zod.string().min(1).max(approveCalliePolicyResponsePolicyTimezoneMax),
-  "days": zod.array(zod.int().min(1).max(approveCalliePolicyResponsePolicyDaysItemMax)).min(1).max(approveCalliePolicyResponsePolicyDaysMax),
-  "opensAt": zod.string().regex(approveCalliePolicyResponsePolicyOpensAtRegExp),
-  "closesAt": zod.string().regex(approveCalliePolicyResponsePolicyClosesAtRegExp),
-  "businessHoursOwnerId": zod.string().min(1).max(approveCalliePolicyResponsePolicyBusinessHoursOwnerIdMax).regex(approveCalliePolicyResponsePolicyBusinessHoursOwnerIdRegExp).nullable(),
-  "afterHoursOwnerId": zod.string().min(1).max(approveCalliePolicyResponsePolicyAfterHoursOwnerIdMax).regex(approveCalliePolicyResponsePolicyAfterHoursOwnerIdRegExp).nullable(),
-  "responseMinutes": zod.int().min(approveCalliePolicyResponsePolicyResponseMinutesMin).max(approveCalliePolicyResponsePolicyResponseMinutesMax)
-}),
-  "snapshot": zod.object({
+  "timezone": zod.string().min(1).max(approveCalliePolicyResponsePolicyOneTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(approveCalliePolicyResponsePolicyOneDaysItemMax)).min(1).max(approveCalliePolicyResponsePolicyOneDaysMax),
+  "opensAt": zod.string().regex(approveCalliePolicyResponsePolicyOneOpensAtRegExp),
+  "closesAt": zod.string().regex(approveCalliePolicyResponsePolicyOneClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(approveCalliePolicyResponsePolicyOneBusinessHoursOwnerIdMax).regex(approveCalliePolicyResponsePolicyOneBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(approveCalliePolicyResponsePolicyOneAfterHoursOwnerIdMax).regex(approveCalliePolicyResponsePolicyOneAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(approveCalliePolicyResponsePolicyOneResponseMinutesMin).max(approveCalliePolicyResponsePolicyOneResponseMinutesMax)
+}),zod.object({
+  "mode": zod.enum(['conversation']),
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(approveCalliePolicyResponsePolicyTwoTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(approveCalliePolicyResponsePolicyTwoDaysItemMax)).min(1).max(approveCalliePolicyResponsePolicyTwoDaysMax),
+  "opensAt": zod.string().regex(approveCalliePolicyResponsePolicyTwoOpensAtRegExp),
+  "closesAt": zod.string().regex(approveCalliePolicyResponsePolicyTwoClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(approveCalliePolicyResponsePolicyTwoBusinessHoursOwnerIdMax).regex(approveCalliePolicyResponsePolicyTwoBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(approveCalliePolicyResponsePolicyTwoAfterHoursOwnerIdMax).regex(approveCalliePolicyResponsePolicyTwoAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(approveCalliePolicyResponsePolicyTwoResponseMinutesMin).max(approveCalliePolicyResponsePolicyTwoResponseMinutesMax),
+  "businessFacts": zod.string().max(approveCalliePolicyResponsePolicyTwoBusinessFactsMax),
+  "callerDisclosure": zod.string().max(approveCalliePolicyResponsePolicyTwoCallerDisclosureMax),
+  "maxConversationSeconds": zod.int().min(approveCalliePolicyResponsePolicyTwoMaxConversationSecondsMin).max(approveCalliePolicyResponsePolicyTwoMaxConversationSecondsMax),
+  "maxToolCalls": zod.int().min(approveCalliePolicyResponsePolicyTwoMaxToolCallsMin).max(approveCalliePolicyResponsePolicyTwoMaxToolCallsMax),
+  "retentionDays": zod.int().min(1).max(approveCalliePolicyResponsePolicyTwoRetentionDaysMax),
+  "businessHoursTransferPhone": zod.string().regex(approveCalliePolicyResponsePolicyTwoBusinessHoursTransferPhoneRegExp).nullable(),
+  "afterHoursTransferPhone": zod.string().regex(approveCalliePolicyResponsePolicyTwoAfterHoursTransferPhoneRegExp).nullable()
+})]),
+  "snapshot": zod.union([zod.object({
   "enabled": zod.boolean(),
   "timezone": zod.string(),
-  "days": zod.array(zod.int().min(1).max(approveCalliePolicyResponseSnapshotDaysItemMax)).max(approveCalliePolicyResponseSnapshotDaysMax),
+  "days": zod.array(zod.int().min(1).max(approveCalliePolicyResponseSnapshotOneDaysItemMax)).max(approveCalliePolicyResponseSnapshotOneDaysMax),
   "opensAt": zod.string(),
   "closesAt": zod.string(),
   "businessHoursOwnerId": zod.union([zod.string(),zod.null()]),
   "afterHoursOwnerId": zod.union([zod.string(),zod.null()]),
-  "responseMinutes": zod.int().min(approveCalliePolicyResponseSnapshotResponseMinutesMin).max(approveCalliePolicyResponseSnapshotResponseMinutesMax),
+  "responseMinutes": zod.int().min(approveCalliePolicyResponseSnapshotOneResponseMinutesMin).max(approveCalliePolicyResponseSnapshotOneResponseMinutesMax),
   "templateVersion": zod.enum(['callie-intake.v1']),
   "prompts": zod.object({
   "service": zod.string(),
@@ -3394,7 +4677,46 @@ export const ApproveCalliePolicyResponse = zod.object({
   "origin": zod.url(),
   "businessName": zod.string()
 }),zod.null()])
-}),
+}),zod.object({
+  "mode": zod.enum(['conversation']),
+  "enabled": zod.boolean(),
+  "timezone": zod.string().min(1).max(approveCalliePolicyResponseSnapshotTwoTimezoneMax),
+  "days": zod.array(zod.int().min(1).max(approveCalliePolicyResponseSnapshotTwoDaysItemMax)).min(1).max(approveCalliePolicyResponseSnapshotTwoDaysMax),
+  "opensAt": zod.string().regex(approveCalliePolicyResponseSnapshotTwoOpensAtRegExp),
+  "closesAt": zod.string().regex(approveCalliePolicyResponseSnapshotTwoClosesAtRegExp),
+  "businessHoursOwnerId": zod.string().min(1).max(approveCalliePolicyResponseSnapshotTwoBusinessHoursOwnerIdMax).regex(approveCalliePolicyResponseSnapshotTwoBusinessHoursOwnerIdRegExp).nullable(),
+  "afterHoursOwnerId": zod.string().min(1).max(approveCalliePolicyResponseSnapshotTwoAfterHoursOwnerIdMax).regex(approveCalliePolicyResponseSnapshotTwoAfterHoursOwnerIdRegExp).nullable(),
+  "responseMinutes": zod.int().min(approveCalliePolicyResponseSnapshotTwoResponseMinutesMin).max(approveCalliePolicyResponseSnapshotTwoResponseMinutesMax),
+  "businessFacts": zod.string().max(approveCalliePolicyResponseSnapshotTwoBusinessFactsMax),
+  "callerDisclosure": zod.string().max(approveCalliePolicyResponseSnapshotTwoCallerDisclosureMax),
+  "maxConversationSeconds": zod.int().min(approveCalliePolicyResponseSnapshotTwoMaxConversationSecondsMin).max(approveCalliePolicyResponseSnapshotTwoMaxConversationSecondsMax),
+  "maxToolCalls": zod.int().min(approveCalliePolicyResponseSnapshotTwoMaxToolCallsMin).max(approveCalliePolicyResponseSnapshotTwoMaxToolCallsMax),
+  "retentionDays": zod.int().min(1).max(approveCalliePolicyResponseSnapshotTwoRetentionDaysMax),
+  "businessHoursTransferPhone": zod.string().regex(approveCalliePolicyResponseSnapshotTwoBusinessHoursTransferPhoneRegExp).nullable(),
+  "afterHoursTransferPhone": zod.string().regex(approveCalliePolicyResponseSnapshotTwoAfterHoursTransferPhoneRegExp).nullable(),
+  "templateVersion": zod.enum(['callie-conversation.v2']),
+  "toolVersion": zod.enum(['callie-reception-tools.v1']),
+  "voiceBinding": zod.object({
+  "id": zod.uuid().regex(approveCalliePolicyResponseSnapshotTwoVoiceBindingIdRegExp),
+  "accountSid": zod.string().regex(approveCalliePolicyResponseSnapshotTwoVoiceBindingAccountSidRegExp),
+  "sender": zod.string().regex(approveCalliePolicyResponseSnapshotTwoVoiceBindingSenderRegExp),
+  "staffPhone": zod.string().regex(approveCalliePolicyResponseSnapshotTwoVoiceBindingStaffPhoneRegExp),
+  "origin": zod.url(),
+  "businessName": zod.string().min(1).max(approveCalliePolicyResponseSnapshotTwoVoiceBindingBusinessNameMax)
+}).nullable(),
+  "receptionBinding": zod.object({
+  "enabled": zod.boolean(),
+  "agentId": zod.string().min(1).max(approveCalliePolicyResponseSnapshotTwoReceptionBindingAgentIdMax).regex(approveCalliePolicyResponseSnapshotTwoReceptionBindingAgentIdRegExp),
+  "agentVersionId": zod.string().min(1).max(approveCalliePolicyResponseSnapshotTwoReceptionBindingAgentVersionIdMax).regex(approveCalliePolicyResponseSnapshotTwoReceptionBindingAgentVersionIdRegExp),
+  "branchId": zod.string().min(1).max(approveCalliePolicyResponseSnapshotTwoReceptionBindingBranchIdMax).regex(approveCalliePolicyResponseSnapshotTwoReceptionBindingBranchIdRegExp).nullable(),
+  "environment": zod.enum(['production', 'staging']),
+  "credentialKey": zod.string().min(1).max(approveCalliePolicyResponseSnapshotTwoReceptionBindingCredentialKeyMax).regex(approveCalliePolicyResponseSnapshotTwoReceptionBindingCredentialKeyRegExp),
+  "configurationSha256": zod.string().regex(approveCalliePolicyResponseSnapshotTwoReceptionBindingConfigurationSha256RegExp),
+  "id": zod.uuid().regex(approveCalliePolicyResponseSnapshotTwoReceptionBindingIdRegExp),
+  "version": zod.int().gt(approveCalliePolicyResponseSnapshotTwoReceptionBindingVersionExclusiveMin).max(approveCalliePolicyResponseSnapshotTwoReceptionBindingVersionMax)
+}).nullable(),
+  "prompt": zod.string().min(1).max(approveCalliePolicyResponseSnapshotTwoPromptMax)
+})]),
   "approvedAt": zod.union([zod.coerce.date(),zod.null()]),
   "readiness": zod.object({
   "ready": zod.boolean(),
@@ -3438,7 +4760,7 @@ export const ListCallieIntakesResponse = zod.object({
   "id": zod.uuid(),
   "callId": zod.uuid(),
   "version": zod.int().min(1),
-  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked']),
+  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked', 'office_pending']),
   "stage": zod.enum(['admitted', 'service', 'request', 'window', 'consent', 'complete']),
   "reason": zod.string(),
   "phone": zod.string(),
@@ -3461,7 +4783,9 @@ export const ListCallieIntakesResponse = zod.object({
   "callbackWindow": zod.union([zod.enum(['morning', 'afternoon', 'any']),zod.null()]),
   "smsProof": zod.enum(['single_call_confirmed', 'confirmation_expired', 'awaiting_caller_confirmation', 'not_confirmed']),
   "confirmedAt": zod.union([zod.coerce.date(),zod.null()]),
-  "appointmentId": zod.union([zod.uuid(),zod.null()])
+  "appointmentId": zod.union([zod.uuid(),zod.null()]),
+  "organizationId": zod.uuid(),
+  "mode": zod.enum(['keypad', 'conversation'])
 })).max(listCallieIntakesResponseItemsMax),
   "companyHeld": zod.boolean(),
   "boundary": zod.string()
@@ -3482,13 +4806,39 @@ export const getCallieIntakeResponseBookingOptionsPropertiesMax = 100;
 
 export const getCallieIntakeResponseBookingOptionsStaffMax = 200;
 
+export const getCallieIntakeResponseReceptionOneSessionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getCallieIntakeResponseReceptionOneReasonMax = 120;
+
+export const getCallieIntakeResponseReceptionOneToolsUsedMin = 0;
+export const getCallieIntakeResponseReceptionOneToolsUsedMax = 9007199254740991;
+
+export const getCallieIntakeResponseReceptionOneMaxToolCallsExclusiveMin = 0;
+export const getCallieIntakeResponseReceptionOneMaxToolCallsMax = 9007199254740991;
+
+export const getCallieIntakeResponseReceptionOneRegistrationStateMax = 40;
+
+export const getCallieIntakeResponseReceptionOneConversationIdMax = 128;
+
+
+export const getCallieIntakeResponseReceptionOneConversationIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const getCallieIntakeResponseReceptionOneConversationFactsCallerNameMax = 120;
+
+export const getCallieIntakeResponseReceptionOneConversationFactsDescribedLocationMax = 300;
+
+export const getCallieIntakeResponseReceptionOneConversationFactsProblemMax = 1200;
+
+export const getCallieIntakeResponseReceptionOneConversationFactsCallbackPreferenceMax = 200;
+
+export const getCallieIntakeResponseReceptionOneConversationSummaryMax = 1600;
+
+export const getCallieIntakeResponseReceptionOneTransferChildCallSidRegExp = new RegExp('^CA[a-f0-9]{32}$');
 
 
 export const GetCallieIntakeResponse = zod.object({
   "id": zod.uuid(),
   "callId": zod.uuid(),
   "version": zod.int().min(1),
-  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked']),
+  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked', 'office_pending']),
   "stage": zod.enum(['admitted', 'service', 'request', 'window', 'consent', 'complete']),
   "reason": zod.string(),
   "phone": zod.string(),
@@ -3556,7 +4906,46 @@ export const GetCallieIntakeResponse = zod.object({
   "canBook": zod.boolean(),
   "blockReason": zod.union([zod.string(),zod.null()])
 }),
-  "evidence": zod.enum(['caller_choices_are_requests_not_identity_or_confirmed_appointments'])
+  "evidence": zod.enum(['caller_choices_are_requests_not_identity_or_confirmed_appointments']),
+  "reception": zod.union([zod.object({
+  "sessionId": zod.uuid().regex(getCallieIntakeResponseReceptionOneSessionIdRegExp),
+  "state": zod.enum(['admitted', 'registering', 'registered', 'active', 'completed', 'interrupted', 'blocked', 'indeterminate', 'expired']),
+  "reason": zod.string().min(1).max(getCallieIntakeResponseReceptionOneReasonMax),
+  "toolsUsed": zod.int().min(getCallieIntakeResponseReceptionOneToolsUsedMin).max(getCallieIntakeResponseReceptionOneToolsUsedMax),
+  "maxToolCalls": zod.int().gt(getCallieIntakeResponseReceptionOneMaxToolCallsExclusiveMin).max(getCallieIntakeResponseReceptionOneMaxToolCallsMax),
+  "registration": zod.object({
+  "state": zod.string().max(getCallieIntakeResponseReceptionOneRegistrationStateMax).nullable(),
+  "acceptedAt": zod.coerce.date().nullable()
+}),
+  "conversation": zod.object({
+  "id": zod.string().min(1).max(getCallieIntakeResponseReceptionOneConversationIdMax).regex(getCallieIntakeResponseReceptionOneConversationIdRegExp).nullable(),
+  "boundAt": zod.coerce.date().nullable(),
+  "endedAt": zod.coerce.date().nullable(),
+  "outcome": zod.enum(['pending', 'completed', 'interrupted', 'empty', 'unknown']),
+  "facts": zod.object({
+  "callerName": zod.string().max(getCallieIntakeResponseReceptionOneConversationFactsCallerNameMax).nullable(),
+  "describedLocation": zod.string().max(getCallieIntakeResponseReceptionOneConversationFactsDescribedLocationMax).nullable(),
+  "problem": zod.string().max(getCallieIntakeResponseReceptionOneConversationFactsProblemMax).nullable(),
+  "serviceIntent": zod.enum(['repair', 'replacement', 'maintenance', 'other']).nullable(),
+  "requestIntent": zod.enum(['callback', 'visit']).nullable(),
+  "urgency": zod.enum(['routine', 'urgent', 'unspecified']),
+  "callbackPreference": zod.string().max(getCallieIntakeResponseReceptionOneConversationFactsCallbackPreferenceMax).nullable()
+}).nullable(),
+  "summary": zod.string().max(getCallieIntakeResponseReceptionOneConversationSummaryMax).nullable(),
+  "contentExpiresAt": zod.coerce.date(),
+  "contentExpired": zod.boolean()
+}),
+  "transfer": zod.object({
+  "state": zod.enum(['not_requested', 'claiming', 'redirect_accepted', 'ringing', 'phone_answered', 'not_answered', 'failed', 'indeterminate', 'blocked']),
+  "requestedAt": zod.coerce.date().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "childCallSid": zod.string().regex(getCallieIntakeResponseReceptionOneTransferChildCallSidRegExp).nullable(),
+  "completedAt": zod.coerce.date().nullable()
+}),
+  "boundary": zod.enum(['Caller statements are unverified. A phone answer is not proof of human acceptance; only office-saved appointments are confirmed.'])
+}),zod.null()]),
+  "organizationId": zod.uuid(),
+  "mode": zod.enum(['keypad', 'conversation'])
 })
 
 
@@ -3604,6 +4993,32 @@ export const updateCallieOfficeResponseDetailBookingOptionsPropertiesMax = 100;
 
 export const updateCallieOfficeResponseDetailBookingOptionsStaffMax = 200;
 
+export const updateCallieOfficeResponseDetailReceptionOneSessionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateCallieOfficeResponseDetailReceptionOneReasonMax = 120;
+
+export const updateCallieOfficeResponseDetailReceptionOneToolsUsedMin = 0;
+export const updateCallieOfficeResponseDetailReceptionOneToolsUsedMax = 9007199254740991;
+
+export const updateCallieOfficeResponseDetailReceptionOneMaxToolCallsExclusiveMin = 0;
+export const updateCallieOfficeResponseDetailReceptionOneMaxToolCallsMax = 9007199254740991;
+
+export const updateCallieOfficeResponseDetailReceptionOneRegistrationStateMax = 40;
+
+export const updateCallieOfficeResponseDetailReceptionOneConversationIdMax = 128;
+
+
+export const updateCallieOfficeResponseDetailReceptionOneConversationIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const updateCallieOfficeResponseDetailReceptionOneConversationFactsCallerNameMax = 120;
+
+export const updateCallieOfficeResponseDetailReceptionOneConversationFactsDescribedLocationMax = 300;
+
+export const updateCallieOfficeResponseDetailReceptionOneConversationFactsProblemMax = 1200;
+
+export const updateCallieOfficeResponseDetailReceptionOneConversationFactsCallbackPreferenceMax = 200;
+
+export const updateCallieOfficeResponseDetailReceptionOneConversationSummaryMax = 1600;
+
+export const updateCallieOfficeResponseDetailReceptionOneTransferChildCallSidRegExp = new RegExp('^CA[a-f0-9]{32}$');
 
 
 export const UpdateCallieOfficeResponse = zod.object({
@@ -3611,7 +5026,7 @@ export const UpdateCallieOfficeResponse = zod.object({
   "id": zod.uuid(),
   "callId": zod.uuid(),
   "version": zod.int().min(1),
-  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked']),
+  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked', 'office_pending']),
   "stage": zod.enum(['admitted', 'service', 'request', 'window', 'consent', 'complete']),
   "reason": zod.string(),
   "phone": zod.string(),
@@ -3679,7 +5094,46 @@ export const UpdateCallieOfficeResponse = zod.object({
   "canBook": zod.boolean(),
   "blockReason": zod.union([zod.string(),zod.null()])
 }),
-  "evidence": zod.enum(['caller_choices_are_requests_not_identity_or_confirmed_appointments'])
+  "evidence": zod.enum(['caller_choices_are_requests_not_identity_or_confirmed_appointments']),
+  "reception": zod.union([zod.object({
+  "sessionId": zod.uuid().regex(updateCallieOfficeResponseDetailReceptionOneSessionIdRegExp),
+  "state": zod.enum(['admitted', 'registering', 'registered', 'active', 'completed', 'interrupted', 'blocked', 'indeterminate', 'expired']),
+  "reason": zod.string().min(1).max(updateCallieOfficeResponseDetailReceptionOneReasonMax),
+  "toolsUsed": zod.int().min(updateCallieOfficeResponseDetailReceptionOneToolsUsedMin).max(updateCallieOfficeResponseDetailReceptionOneToolsUsedMax),
+  "maxToolCalls": zod.int().gt(updateCallieOfficeResponseDetailReceptionOneMaxToolCallsExclusiveMin).max(updateCallieOfficeResponseDetailReceptionOneMaxToolCallsMax),
+  "registration": zod.object({
+  "state": zod.string().max(updateCallieOfficeResponseDetailReceptionOneRegistrationStateMax).nullable(),
+  "acceptedAt": zod.coerce.date().nullable()
+}),
+  "conversation": zod.object({
+  "id": zod.string().min(1).max(updateCallieOfficeResponseDetailReceptionOneConversationIdMax).regex(updateCallieOfficeResponseDetailReceptionOneConversationIdRegExp).nullable(),
+  "boundAt": zod.coerce.date().nullable(),
+  "endedAt": zod.coerce.date().nullable(),
+  "outcome": zod.enum(['pending', 'completed', 'interrupted', 'empty', 'unknown']),
+  "facts": zod.object({
+  "callerName": zod.string().max(updateCallieOfficeResponseDetailReceptionOneConversationFactsCallerNameMax).nullable(),
+  "describedLocation": zod.string().max(updateCallieOfficeResponseDetailReceptionOneConversationFactsDescribedLocationMax).nullable(),
+  "problem": zod.string().max(updateCallieOfficeResponseDetailReceptionOneConversationFactsProblemMax).nullable(),
+  "serviceIntent": zod.enum(['repair', 'replacement', 'maintenance', 'other']).nullable(),
+  "requestIntent": zod.enum(['callback', 'visit']).nullable(),
+  "urgency": zod.enum(['routine', 'urgent', 'unspecified']),
+  "callbackPreference": zod.string().max(updateCallieOfficeResponseDetailReceptionOneConversationFactsCallbackPreferenceMax).nullable()
+}).nullable(),
+  "summary": zod.string().max(updateCallieOfficeResponseDetailReceptionOneConversationSummaryMax).nullable(),
+  "contentExpiresAt": zod.coerce.date(),
+  "contentExpired": zod.boolean()
+}),
+  "transfer": zod.object({
+  "state": zod.enum(['not_requested', 'claiming', 'redirect_accepted', 'ringing', 'phone_answered', 'not_answered', 'failed', 'indeterminate', 'blocked']),
+  "requestedAt": zod.coerce.date().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "childCallSid": zod.string().regex(updateCallieOfficeResponseDetailReceptionOneTransferChildCallSidRegExp).nullable(),
+  "completedAt": zod.coerce.date().nullable()
+}),
+  "boundary": zod.enum(['Caller statements are unverified. A phone answer is not proof of human acceptance; only office-saved appointments are confirmed.'])
+}),zod.null()]),
+  "organizationId": zod.uuid(),
+  "mode": zod.enum(['keypad', 'conversation'])
 }),
   "replayed": zod.boolean()
 })
@@ -3730,6 +5184,32 @@ export const reviewCallieCallerResponseDetailBookingOptionsPropertiesMax = 100;
 
 export const reviewCallieCallerResponseDetailBookingOptionsStaffMax = 200;
 
+export const reviewCallieCallerResponseDetailReceptionOneSessionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reviewCallieCallerResponseDetailReceptionOneReasonMax = 120;
+
+export const reviewCallieCallerResponseDetailReceptionOneToolsUsedMin = 0;
+export const reviewCallieCallerResponseDetailReceptionOneToolsUsedMax = 9007199254740991;
+
+export const reviewCallieCallerResponseDetailReceptionOneMaxToolCallsExclusiveMin = 0;
+export const reviewCallieCallerResponseDetailReceptionOneMaxToolCallsMax = 9007199254740991;
+
+export const reviewCallieCallerResponseDetailReceptionOneRegistrationStateMax = 40;
+
+export const reviewCallieCallerResponseDetailReceptionOneConversationIdMax = 128;
+
+
+export const reviewCallieCallerResponseDetailReceptionOneConversationIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const reviewCallieCallerResponseDetailReceptionOneConversationFactsCallerNameMax = 120;
+
+export const reviewCallieCallerResponseDetailReceptionOneConversationFactsDescribedLocationMax = 300;
+
+export const reviewCallieCallerResponseDetailReceptionOneConversationFactsProblemMax = 1200;
+
+export const reviewCallieCallerResponseDetailReceptionOneConversationFactsCallbackPreferenceMax = 200;
+
+export const reviewCallieCallerResponseDetailReceptionOneConversationSummaryMax = 1600;
+
+export const reviewCallieCallerResponseDetailReceptionOneTransferChildCallSidRegExp = new RegExp('^CA[a-f0-9]{32}$');
 
 
 export const ReviewCallieCallerResponse = zod.object({
@@ -3737,7 +5217,7 @@ export const ReviewCallieCallerResponse = zod.object({
   "id": zod.uuid(),
   "callId": zod.uuid(),
   "version": zod.int().min(1),
-  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked']),
+  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked', 'office_pending']),
   "stage": zod.enum(['admitted', 'service', 'request', 'window', 'consent', 'complete']),
   "reason": zod.string(),
   "phone": zod.string(),
@@ -3805,7 +5285,46 @@ export const ReviewCallieCallerResponse = zod.object({
   "canBook": zod.boolean(),
   "blockReason": zod.union([zod.string(),zod.null()])
 }),
-  "evidence": zod.enum(['caller_choices_are_requests_not_identity_or_confirmed_appointments'])
+  "evidence": zod.enum(['caller_choices_are_requests_not_identity_or_confirmed_appointments']),
+  "reception": zod.union([zod.object({
+  "sessionId": zod.uuid().regex(reviewCallieCallerResponseDetailReceptionOneSessionIdRegExp),
+  "state": zod.enum(['admitted', 'registering', 'registered', 'active', 'completed', 'interrupted', 'blocked', 'indeterminate', 'expired']),
+  "reason": zod.string().min(1).max(reviewCallieCallerResponseDetailReceptionOneReasonMax),
+  "toolsUsed": zod.int().min(reviewCallieCallerResponseDetailReceptionOneToolsUsedMin).max(reviewCallieCallerResponseDetailReceptionOneToolsUsedMax),
+  "maxToolCalls": zod.int().gt(reviewCallieCallerResponseDetailReceptionOneMaxToolCallsExclusiveMin).max(reviewCallieCallerResponseDetailReceptionOneMaxToolCallsMax),
+  "registration": zod.object({
+  "state": zod.string().max(reviewCallieCallerResponseDetailReceptionOneRegistrationStateMax).nullable(),
+  "acceptedAt": zod.coerce.date().nullable()
+}),
+  "conversation": zod.object({
+  "id": zod.string().min(1).max(reviewCallieCallerResponseDetailReceptionOneConversationIdMax).regex(reviewCallieCallerResponseDetailReceptionOneConversationIdRegExp).nullable(),
+  "boundAt": zod.coerce.date().nullable(),
+  "endedAt": zod.coerce.date().nullable(),
+  "outcome": zod.enum(['pending', 'completed', 'interrupted', 'empty', 'unknown']),
+  "facts": zod.object({
+  "callerName": zod.string().max(reviewCallieCallerResponseDetailReceptionOneConversationFactsCallerNameMax).nullable(),
+  "describedLocation": zod.string().max(reviewCallieCallerResponseDetailReceptionOneConversationFactsDescribedLocationMax).nullable(),
+  "problem": zod.string().max(reviewCallieCallerResponseDetailReceptionOneConversationFactsProblemMax).nullable(),
+  "serviceIntent": zod.enum(['repair', 'replacement', 'maintenance', 'other']).nullable(),
+  "requestIntent": zod.enum(['callback', 'visit']).nullable(),
+  "urgency": zod.enum(['routine', 'urgent', 'unspecified']),
+  "callbackPreference": zod.string().max(reviewCallieCallerResponseDetailReceptionOneConversationFactsCallbackPreferenceMax).nullable()
+}).nullable(),
+  "summary": zod.string().max(reviewCallieCallerResponseDetailReceptionOneConversationSummaryMax).nullable(),
+  "contentExpiresAt": zod.coerce.date(),
+  "contentExpired": zod.boolean()
+}),
+  "transfer": zod.object({
+  "state": zod.enum(['not_requested', 'claiming', 'redirect_accepted', 'ringing', 'phone_answered', 'not_answered', 'failed', 'indeterminate', 'blocked']),
+  "requestedAt": zod.coerce.date().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "childCallSid": zod.string().regex(reviewCallieCallerResponseDetailReceptionOneTransferChildCallSidRegExp).nullable(),
+  "completedAt": zod.coerce.date().nullable()
+}),
+  "boundary": zod.enum(['Caller statements are unverified. A phone answer is not proof of human acceptance; only office-saved appointments are confirmed.'])
+}),zod.null()]),
+  "organizationId": zod.uuid(),
+  "mode": zod.enum(['keypad', 'conversation'])
 }),
   "replayed": zod.boolean()
 })
@@ -3849,6 +5368,32 @@ export const bookCallieVisitResponseDetailBookingOptionsPropertiesMax = 100;
 
 export const bookCallieVisitResponseDetailBookingOptionsStaffMax = 200;
 
+export const bookCallieVisitResponseDetailReceptionOneSessionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const bookCallieVisitResponseDetailReceptionOneReasonMax = 120;
+
+export const bookCallieVisitResponseDetailReceptionOneToolsUsedMin = 0;
+export const bookCallieVisitResponseDetailReceptionOneToolsUsedMax = 9007199254740991;
+
+export const bookCallieVisitResponseDetailReceptionOneMaxToolCallsExclusiveMin = 0;
+export const bookCallieVisitResponseDetailReceptionOneMaxToolCallsMax = 9007199254740991;
+
+export const bookCallieVisitResponseDetailReceptionOneRegistrationStateMax = 40;
+
+export const bookCallieVisitResponseDetailReceptionOneConversationIdMax = 128;
+
+
+export const bookCallieVisitResponseDetailReceptionOneConversationIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const bookCallieVisitResponseDetailReceptionOneConversationFactsCallerNameMax = 120;
+
+export const bookCallieVisitResponseDetailReceptionOneConversationFactsDescribedLocationMax = 300;
+
+export const bookCallieVisitResponseDetailReceptionOneConversationFactsProblemMax = 1200;
+
+export const bookCallieVisitResponseDetailReceptionOneConversationFactsCallbackPreferenceMax = 200;
+
+export const bookCallieVisitResponseDetailReceptionOneConversationSummaryMax = 1600;
+
+export const bookCallieVisitResponseDetailReceptionOneTransferChildCallSidRegExp = new RegExp('^CA[a-f0-9]{32}$');
 
 
 export const BookCallieVisitResponse = zod.object({
@@ -3856,7 +5401,7 @@ export const BookCallieVisitResponse = zod.object({
   "id": zod.uuid(),
   "callId": zod.uuid(),
   "version": zod.int().min(1),
-  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked']),
+  "state": zod.enum(['admitted', 'collecting', 'awaiting_sms', 'confirmed', 'deferred', 'dispatching', 'accepted', 'blocked', 'indeterminate', 'resolved', 'cancelled', 'booked', 'office_pending']),
   "stage": zod.enum(['admitted', 'service', 'request', 'window', 'consent', 'complete']),
   "reason": zod.string(),
   "phone": zod.string(),
@@ -3924,7 +5469,46 @@ export const BookCallieVisitResponse = zod.object({
   "canBook": zod.boolean(),
   "blockReason": zod.union([zod.string(),zod.null()])
 }),
-  "evidence": zod.enum(['caller_choices_are_requests_not_identity_or_confirmed_appointments'])
+  "evidence": zod.enum(['caller_choices_are_requests_not_identity_or_confirmed_appointments']),
+  "reception": zod.union([zod.object({
+  "sessionId": zod.uuid().regex(bookCallieVisitResponseDetailReceptionOneSessionIdRegExp),
+  "state": zod.enum(['admitted', 'registering', 'registered', 'active', 'completed', 'interrupted', 'blocked', 'indeterminate', 'expired']),
+  "reason": zod.string().min(1).max(bookCallieVisitResponseDetailReceptionOneReasonMax),
+  "toolsUsed": zod.int().min(bookCallieVisitResponseDetailReceptionOneToolsUsedMin).max(bookCallieVisitResponseDetailReceptionOneToolsUsedMax),
+  "maxToolCalls": zod.int().gt(bookCallieVisitResponseDetailReceptionOneMaxToolCallsExclusiveMin).max(bookCallieVisitResponseDetailReceptionOneMaxToolCallsMax),
+  "registration": zod.object({
+  "state": zod.string().max(bookCallieVisitResponseDetailReceptionOneRegistrationStateMax).nullable(),
+  "acceptedAt": zod.coerce.date().nullable()
+}),
+  "conversation": zod.object({
+  "id": zod.string().min(1).max(bookCallieVisitResponseDetailReceptionOneConversationIdMax).regex(bookCallieVisitResponseDetailReceptionOneConversationIdRegExp).nullable(),
+  "boundAt": zod.coerce.date().nullable(),
+  "endedAt": zod.coerce.date().nullable(),
+  "outcome": zod.enum(['pending', 'completed', 'interrupted', 'empty', 'unknown']),
+  "facts": zod.object({
+  "callerName": zod.string().max(bookCallieVisitResponseDetailReceptionOneConversationFactsCallerNameMax).nullable(),
+  "describedLocation": zod.string().max(bookCallieVisitResponseDetailReceptionOneConversationFactsDescribedLocationMax).nullable(),
+  "problem": zod.string().max(bookCallieVisitResponseDetailReceptionOneConversationFactsProblemMax).nullable(),
+  "serviceIntent": zod.enum(['repair', 'replacement', 'maintenance', 'other']).nullable(),
+  "requestIntent": zod.enum(['callback', 'visit']).nullable(),
+  "urgency": zod.enum(['routine', 'urgent', 'unspecified']),
+  "callbackPreference": zod.string().max(bookCallieVisitResponseDetailReceptionOneConversationFactsCallbackPreferenceMax).nullable()
+}).nullable(),
+  "summary": zod.string().max(bookCallieVisitResponseDetailReceptionOneConversationSummaryMax).nullable(),
+  "contentExpiresAt": zod.coerce.date(),
+  "contentExpired": zod.boolean()
+}),
+  "transfer": zod.object({
+  "state": zod.enum(['not_requested', 'claiming', 'redirect_accepted', 'ringing', 'phone_answered', 'not_answered', 'failed', 'indeterminate', 'blocked']),
+  "requestedAt": zod.coerce.date().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "childCallSid": zod.string().regex(bookCallieVisitResponseDetailReceptionOneTransferChildCallSidRegExp).nullable(),
+  "completedAt": zod.coerce.date().nullable()
+}),
+  "boundary": zod.enum(['Caller statements are unverified. A phone answer is not proof of human acceptance; only office-saved appointments are confirmed.'])
+}),zod.null()]),
+  "organizationId": zod.uuid(),
+  "mode": zod.enum(['keypad', 'conversation'])
 }),
   "replayed": zod.boolean()
 })
@@ -4575,8 +6159,6 @@ export const CreateContactResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
-
-
 export const GetContactParams = zod.object({
   "id": zod.uuid()
 })

@@ -14,6 +14,8 @@ import {
   crmTasksTable,
   valueEntriesTable,
   activitiesTable,
+  DEFAULT_SENDING_HOURS,
+  revenueExecutionsTable,
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { beforeAll, afterAll, describe, it, expect } from "vitest";
@@ -21,6 +23,8 @@ import app from "../../app";
 import { createSession } from "../../lib/auth";
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
 import { executeBieProposal, reviewBieProposal } from "../../services/bie";
+import { nextAllowedSendTime } from "../../services/send-gate";
+import { getSendingHours, updateOrgSettings } from "../../services/settings";
 
 let server: Server,
   base: string,
@@ -90,6 +94,11 @@ beforeAll(async () => {
       )
       .returning()
   ).map((r) => r.id);
+  // These tests isolate provider/reply guards, not the wall-clock sending window.
+  // Configure only this fictional org; production defaults and caps stay intact.
+  await updateOrgSettings(org, {
+    sendingHours: { ...DEFAULT_SENDING_HOURS, quietHoursEnabled: false },
+  });
   const session = async (role: "owner" | "viewer") => {
     const [u] = await db
       .insert(usersTable)
@@ -174,6 +183,19 @@ afterAll(async () => {
 });
 
 describe("tenant-scoped revenue workspace", () => {
+  it("isolates the fictional sending window without weakening production quiet hours or caps", async () => {
+    const hours = await getSendingHours(org);
+    expect(hours).toEqual({ ...DEFAULT_SENDING_HOURS, quietHoursEnabled: false });
+    const daytime = new Date("2026-10-05T16:00:00.000Z");
+    const afterHours = new Date("2026-10-06T01:55:22.000Z");
+    expect(nextAllowedSendTime(hours, daytime)).toBeNull();
+    expect(nextAllowedSendTime(hours, afterHours)).toBeNull();
+    expect(DEFAULT_SENDING_HOURS.quietHoursEnabled).toBe(true);
+    expect(nextAllowedSendTime(DEFAULT_SENDING_HOURS, daytime)).toBeNull();
+    expect(nextAllowedSendTime(DEFAULT_SENDING_HOURS, afterHours)).toEqual(
+      new Date("2026-10-06T12:00:00.000Z"),
+    );
+  });
   it("enforces session, owner approvals and strict field validation", async () => {
     expect((await call("/revenue/desk", undefined, "")).status).toBe(401);
     expect((await call("/revenue/profile", profile(), viewerSid)).status).toBe(
@@ -463,6 +485,9 @@ describe("tenant-scoped revenue workspace", () => {
     const result = await executeBieProposal(org, p.id, actor);
     expect(result?.status).toBe("blocked");
     expect(result?.executionDetail).toContain("not ready");
+    expect(await db.select({ state: revenueExecutionsTable.state }).from(revenueExecutionsTable)
+      .where(and(eq(revenueExecutionsTable.organizationId, org), eq(revenueExecutionsTable.actionKey, `bie:${p.id}`))))
+      .toEqual([{ state: "blocked" }]);
   });
   it("rejects stale and unprepared email approvals, then stops a historical reviewed action on a new reply", async () => {
     const payload = {
@@ -495,16 +520,20 @@ describe("tenant-scoped revenue workspace", () => {
     // Preserve the separate existing-approval safety test; no new email may
     // silently acquire a review or mailbox snapshot from this transition.
     await db.update(bieActionProposalsTable).set({ status: "approved", reviewedByUserId: actor }).where(eq(bieActionProposalsTable.id, p.id));
-    await db.insert(activitiesTable).values({
+    const [reply] = await db.insert(activitiesTable).values({
       organizationId: org,
       leadId: lead,
       type: "portal_message",
       title: "LOCAL QA customer reply",
-      createdAt: new Date(Date.now() + 100),
-    });
+      occurredAt: new Date(p.createdAt.getTime() + 100),
+    }).returning();
+    expect(reply.occurredAt.getTime()).toBeGreaterThan(p.createdAt.getTime());
     const result = await executeBieProposal(org, p.id, actor);
     expect(result?.status).toBe("blocked");
     expect(result?.executionDetail).toContain("New customer activity");
+    expect(await db.select({ state: revenueExecutionsTable.state }).from(revenueExecutionsTable)
+      .where(and(eq(revenueExecutionsTable.organizationId, org), eq(revenueExecutionsTable.actionKey, `bie:${p.id}`))))
+      .toEqual([{ state: "blocked" }]);
   });
   it("refuses execution after the approving staff member is deactivated", async () => {
     const [p] = await db

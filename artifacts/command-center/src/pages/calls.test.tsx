@@ -4,7 +4,8 @@ import { getGetMeQueryKey } from "@workspace/api-client-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
-import { mockApi, sampleMe } from "@/test/mock-api";
+import { mockApi } from "@/test/mock-api";
+import { callieMe as sampleMe, receptionView, savedPolicy } from "@/test/callie-fixtures";
 import { renderWithQuery } from "@/test/render";
 import Calls from "./calls";
 
@@ -19,8 +20,10 @@ function server(role = "owner", state = "needs_review", override?: (req: Request
     const path = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "http://localhost").pathname;
     const req = { path, method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : {} }; requests.push(req);
     const custom = override?.(req); if (custom) return custom;
+    if (path === "/api/v1/me") return json(sampleMe(role));
+    if (path === "/api/v1/communications/callie/reception") return json(receptionView());
     if (path === "/api/v1/users") return json([{ ...sampleMe(role), operationallyEligible: true }]);
-    if (path === "/api/v1/communications/callie/policy") return json({ version: 0, policy: { ...policy, enabled: false }, snapshot: { ...policy, enabled: false }, approvedAt: null, readiness: { ready: false, reason: "policy_disabled_or_revised" } });
+    if (path === "/api/v1/communications/callie/policy") return json(savedPolicy());
     if (path === "/api/v1/communications/callie") return json({ scope: "attention", offset: 0, pageSize: 25, hasMore: false, items: [], companyHeld: false, boundary: "This page contains admitted requests only." });
     if (path === "/api/v1/communications/missed-call-care") return json({ policy, version: 1, body: "Thanks for calling. This does not confirm an appointment.", templateVersion: "missed-call-care.v1", items: [item(state)], companyPaused: false, environmentHeld: false });
     if (path === "/api/v1/communications/voice/call-1/care") return json({ caseId: "case-1", version: 1, snapshot, eligibility: { ready: true, reason: null } });
@@ -32,6 +35,26 @@ function server(role = "owner", state = "needs_review", override?: (req: Request
 async function renderCalls() { const value = renderWithQuery(<Router hook={memoryLocation({ path: "/calls" }).hook}><Calls /></Router>); fireEvent.click(await screen.findByText("Business calls and individually reviewed recovery")); return value; }
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 describe("CALLIE missed-call recovery controls", () => {
+  it("shows an actionable access error instead of retaining sensitive call controls", async () => {
+    let failed = false;
+    const requests = server("owner", "needs_review", req => failed && req.path === "/api/v1/me" ? json({ error: "Unavailable" }, 503) : undefined);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><Router hook={memoryLocation({ path: "/calls" }).hook}><Calls /></Router></QueryClientProvider>);
+    await screen.findByRole("region", { name: "CALLIE automatic intake" }); failed = true;
+    await act(async () => { await client.refetchQueries({ queryKey: getGetMeQueryKey() }); });
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", expect.stringContaining("Company access could not be verified"));
+    expect(screen.queryByRole("region", { name: "CALLIE automatic intake" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Business calls" })).toBeNull();
+    failed = false; fireEvent.click(screen.getByRole("button", { name: "Check call access" }));
+    await screen.findByRole("region", { name: "CALLIE automatic intake" });
+    expect(requests.every(req => req.method === "GET")).toBe(true); cleanup(); client.clear();
+  });
+  it("does not open call records or provider controls for inactive staff", async () => {
+    const requests = server("owner", "needs_review", req => req.path === "/api/v1/me" ? json({ ...sampleMe("owner"), isActive: false }) : undefined);
+    renderWithQuery(<Router hook={memoryLocation({ path: "/calls" }).hook}><Calls /></Router>);
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Active company access is required to open calls.");
+    expect(requests.some(req => req.path.startsWith("/api/v1/communications/"))).toBe(false);
+  });
   it("preserves legacy voice drafts and care approvals through unchanged successful profile checks", async () => {
     const requests = server(), client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     render(<QueryClientProvider client={client}><Router hook={memoryLocation({ path: "/calls" }).hook}><Calls /></Router></QueryClientProvider>);

@@ -1236,6 +1236,8 @@ export async function processScheduledWork(organizationId?: string, observe?: St
   await stage("callie-intake", async () => {
     const { processCallieIntakes } = await import("./callie-runtime");
     await processCallieIntakes(organizationId);
+    const { processCallieReception } = await import("./callie-reception-runtime");
+    await processCallieReception(organizationId);
   });
   await stage("service-watch", async () => {
     const { processServiceWatch } = await import("./service-watch");
@@ -1286,6 +1288,8 @@ export async function processScheduledWork(organizationId?: string, observe?: St
     await purgeExpiredServiceReplyContent();
     const { purgeExpiredServiceSmsReplyContent } = await import("./service-sms");
     await purgeExpiredServiceSmsReplyContent();
+    const { purgeExpiredCallieReceptionContent } = await import("./callie-reception-runtime");
+    await purgeExpiredCallieReceptionContent();
   });
   await stage("lead-reply-retention", async () => {
     const { purgeExpiredLeadReplyContent } = await import("./mailbox-communication");

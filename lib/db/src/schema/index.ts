@@ -57,6 +57,7 @@ export * from "./revenue-workspace";
 export * from "./scheduler";
 export * from "./missed-call-care";
 export * from "./callie";
+export * from "./callie-reception";
 export * from "./service-standing";
 export * from "./service-sms";
 export * from "./financial-migration";

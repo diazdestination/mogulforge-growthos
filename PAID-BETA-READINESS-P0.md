@@ -7,6 +7,15 @@
 
 ## Mission
 
+**October5 CALLIE conversation scope:** PR23/mainafcb72a and exact-main
+CI37390525754 passed the fullPG16 gate and independent review. The owner approved
+the next wave under `reports/callie-conversation-contract-2026-10-05.md`: natural
+missed-call intake over the existing signed route, explicit voice-only v2 policy,
+original-call registration/transfer ownership and canonical office work. Expected
+review-only0015 adds three tables (133total). New source/test/CI proof is pending.
+This does not close fullL4, hosted/provider/device acceptance, actual company
+workdays, payment/deployment authority or either replacement card.
+
 **October 5 bounded manual-appointment scope:** PR22/main6cbf0ae and exact-main
 CI37383108807 passed the full PostgreSQL16 gate. The owner-authorized follow-on
 is `reports/manual-appointment-property-contract-2026-10-05.md`: explicit new-

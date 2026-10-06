@@ -3,8 +3,8 @@
  * deletion order, retention policy, or proof of complete account ownership.
  * Every new table must receive an explicit classification before preview runs.
  */
-export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-03.inventory-v12";
-export const DATA_LIFECYCLE_EXPECTED_TABLES = 130;
+export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-05.inventory-v13";
+export const DATA_LIFECYCLE_EXPECTED_TABLES = 133;
 export const DATA_LIFECYCLE_ROW_LIMIT = 10_000;
 
 export type InventoryCategory =
@@ -45,6 +45,9 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("callie_ack_dispatches", "communications"),
   direct("callie_intakes", "communications"),
   direct("callie_policy_revisions", "configuration"),
+  direct("callie_reception_bindings", "configuration"),
+  direct("callie_reception_sessions", "communications"),
+  direct("callie_reception_events", "communications"),
   direct("capture_deliveries", "acquisition"),
   direct("capture_endpoints", "acquisition"),
   direct("claim_canonical_graphs", "intelligence"),

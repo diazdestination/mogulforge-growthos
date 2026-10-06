@@ -78,7 +78,7 @@ async function reviewSnapshot(org: string, policy: CalliePolicySettings, reader:
 /** SELECT-only exact current operational authority; no retrospective admission. */
 export async function assertCallieCurrentAuthority(org: string, revisionId?: string, options: { reader?: CallieReader; at?: Date; requireSms?: boolean; checkHolds?: boolean } = {}) {
   const reader = options.reader ?? db, revision = await currentCallieRevision(org, reader);
-  if (!revision || (revisionId && revision.id !== revisionId) || !revision.enabled || !revision.snapshot.enabled) denyCallie("policy_disabled_or_revised");
+  if (!revision || (revisionId && revision.id !== revisionId) || !revision.enabled || !revision.snapshot.enabled || revision.snapshot.templateVersion !== "callie-intake.v1") denyCallie("policy_disabled_or_revised");
   // The strict settings schema must not treat immutable prompt/binding fields as
   // settings. Validate the complete settings projection and canonical snapshot.
   const settings = calliePolicySettingsSchema.safeParse({ enabled: revision.snapshot.enabled, timezone: revision.snapshot.timezone, days: revision.snapshot.days,
@@ -103,7 +103,9 @@ export async function assertCallieCurrentAuthority(org: string, revisionId?: str
 
 export async function getCalliePolicy(org: string) {
   const revision = await currentCallieRevision(org);
-  const snapshot = revision?.snapshot ?? buildCalliePolicySnapshot(DEFAULT_CALLIE_POLICY, null);
+  // Selecting keypad from a v2 head prepares a NEW v1 review, never casts or
+  // retroactively changes the already-approved conversation snapshot.
+  const snapshot = revision?.snapshot.templateVersion === "callie-intake.v1" ? revision.snapshot : buildCalliePolicySnapshot(DEFAULT_CALLIE_POLICY, null);
   let readiness: { ready: boolean; reason: string | null };
   try { await assertCallieCurrentAuthority(org, revision?.id); readiness = { ready: true, reason: null }; }
   catch (error) { if (!(error instanceof CallieError)) throw error; readiness = { ready: false, reason: error.code }; }

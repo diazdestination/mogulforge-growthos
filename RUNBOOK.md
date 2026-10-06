@@ -3,6 +3,16 @@
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 
+Active CALLIE conversation engineering follows
+`reports/callie-conversation-contract-2026-10-05.md`. Baseline PR23/mainafcb72a and
+exact-main CI37390525754 are fully accepted. Existing Calls remains the work entry;
+selected conversational routing will keep GrowthOS's signed staff-first Twilio
+flow. The custom handoff is a separately governed original-call redirect, not an
+ElevenLabs native transfer. Source settings stay default-off/held until separately
+approved actual providers/routes/configuration and phone acceptance are complete.
+No account import, live test button, automatic booking/SMS permission, hosted
+schema change or deployment is authorized by this engineering continuation.
+
 Active bounded manual-visit extension follows
 `reports/manual-appointment-property-contract-2026-10-05.md`. PR22 source release
 is complete at main6cbf0ae with exact-main CI37383108807. New manual property

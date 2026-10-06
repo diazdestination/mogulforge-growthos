@@ -82,8 +82,8 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
     promise: 'Turn a missed call into an owned callback, then a real opportunity.',
     portrait: '/agent-profiles/callie.webp', workspace: '/calls', workspaceLabel: 'Open calls',
     tasks: [
-      { title: 'Missed call detection & response', stage: 'setup', reality: 'Tenant-scoped Twilio intake creates a staff callback task in local code. It is not live for either pilot client.' },
-      { title: 'SMS & voicemail follow-up', stage: 'planned', reality: 'Automatic missed-call texts and AI voice answering are not implemented or activated in GrowthOS.' },
+      { title: 'Missed call detection & reception', stage: 'setup', reality: 'The company-scoped staff-first call flow supports a reviewed choice of keypad intake or voice-only conversation, with one accountable callback task. Provider setup and real audio/phone acceptance remain; neither pilot is live.' },
+      { title: 'Follow-up & human handoff', stage: 'setup', reality: 'Keypad mode supports one caller-confirmed text; conversation mode can attempt one reviewed fixed handoff. A phone answer may be voicemail. Neither confirms a visit or grants general messaging permission.' },
       { title: 'Lead qualification & routing', stage: 'workspace', reality: 'Staff can review a call and create an opportunity when confirmed. Autonomous qualification is not live.' },
       { title: 'Call analytics & reporting', stage: 'workspace', reality: 'The Calls workspace records calls and callback outcomes; provider-connected analytics need live acceptance.' },
     ],

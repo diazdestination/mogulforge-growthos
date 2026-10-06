@@ -20,6 +20,8 @@ import { seedCalliePreview } from "./callie-preview-fixture.mjs";
 import { seedStandingServicePreview } from "./standing-service-preview-fixture.mjs";
 import { seedSourceNurturePreview } from "./source-nurture-preview-fixture.mjs";
 import { seedCustomerWorkspacePreview } from "./customer-workspace-preview-fixture.mjs";
+import { seedCallieConversationPreview } from "./callie-conversation-preview-fixture.mjs";
+import { credentialCodec } from "../../../scripts/restore-drill-fixture.mjs";
 
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const database = path.resolve(api, "../../lib/db");
@@ -56,6 +58,8 @@ Object.assign(env, {
 // a provider key, is never persisted and does not clear any outbound hold.
 if (process.argv.includes("--standing-service"))
   env.EMAIL_INTELLIGENCE_ENCRYPTION_KEY = randomBytes(32).toString("hex");
+if (process.argv.includes("--callie-conversation"))
+  env.OAUTH_TOKEN_ENCRYPTION_KEY = randomBytes(32).toString("base64");
 let child;
 const cacheRoot = path.join(api, "node_modules/.cache");
 await mkdir(cacheRoot, { recursive: true });
@@ -105,6 +109,11 @@ try {
     if (process.argv.includes("--standing-service")) await seedStandingServicePreview(client, org.id, user.id);
     if (process.argv.includes("--source-nurture")) await seedSourceNurturePreview(client, org.id, user.id);
     if (process.argv.includes("--customer-workspace")) await seedCustomerWorkspacePreview(client, org.id, user.id);
+    if (process.argv.includes("--callie-conversation")) {
+      const codec = await credentialCodec(env.OAUTH_TOKEN_ENCRYPTION_KEY);
+      const reception = await seedCallieConversationPreview(client, org.id, user.id, codec);
+      console.log(`Synthetic conversation: ${reception.routes.office}. Unknown original effects remain owned; no provider is connected.`);
+    }
     await client.query(
       "INSERT INTO scheduled_actions(organization_id,action,context,run_at,status,attempts,last_error) VALUES ($1,$2,'{}',now()-interval '1 hour','failed',3,'Synthetic preparation failure for visual QA')",
       [

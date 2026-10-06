@@ -63,7 +63,7 @@ describe("CALLIE bounded office work", () => {
   it.each(["contact", "property", "technician", "choice", "task"])("rejects a stale exact office agreement after %s changes", async changed => {
     const f = await fixture(true), input = await booking(f);
     if (changed === "contact") await db.update(contactsTable).set({ phone: "+12025550124" }).where(eq(contactsTable.id, f.contact.id));
-    if (changed === "property") await db.update(propertiesTable).set({ addressLine1: "2 Changed Lane" }).where(eq(propertiesTable.id, f.property.id));
+    if (changed === "property") await db.update(propertiesTable).set({ addressLine1: "2 Changed Lane", updatedAt: f.property.updatedAt }).where(eq(propertiesTable.id, f.property.id));
     if (changed === "technician") await db.update(usersTable).set({ isActive: false }).where(eq(usersTable.id, f.office.id));
     if (changed === "choice") await db.update(callieIntakesTable).set({ requestIntent: "callback" }).where(eq(callieIntakesTable.id, f.intake.id));
     if (changed === "task") await db.update(crmTasksTable).set({ assignedUserId: f.office.id }).where(eq(crmTasksTable.id, f.task.id));

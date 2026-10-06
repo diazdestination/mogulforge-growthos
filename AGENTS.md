@@ -1,5 +1,18 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## October 5 CALLIE conversation continuation
+
+PR23/mainafcb72a and exact-main CI37390525754 passed and were independently
+accepted. The owner authorized the next big wave. Its frozen engineering scope
+is `reports/callie-conversation-contract-2026-10-05.md`: GrowthOS-owned signed
+staff-first missed-call admission, ElevenLabs conversational intake, narrowly
+scoped tools, one governed custom Twilio human-handoff attempt, the canonical
+office workflow and explicit voice-only v2 policy. Preserve old DTMF/SMS claims,
+unknown effects and staff work. Use coordinated runtime, experience and companion
+lanes; root owns integration/schema review/recovery/Git/CI/release. No provider or
+hosted activation, real messages/calls, spending, equipment/migration invention or
+contractor cutover. Earlier active-wave headings below are historical.
+
 ## October 5 manual-appointment property continuation
 
 PR22/main6cbf0ae passed exact-main CI37383108807; its customer-workspace source

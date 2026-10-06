@@ -7,14 +7,16 @@
  */
 import type { CalliePolicyReadiness } from './calliePolicyReadiness';
 import type { CalliePolicySnapshot } from './calliePolicySnapshot';
+import type { CallieReceptionSettings } from './callieReceptionSettings';
+import type { CallieReceptionSnapshot } from './callieReceptionSnapshot';
 import type { MissedCallCarePolicy } from './missedCallCarePolicy';
 
 export interface CalliePolicy {
   /** @minimum 0 */
   version: number;
   revisionId: string | null;
-  policy: MissedCallCarePolicy;
-  snapshot: CalliePolicySnapshot;
+  policy: MissedCallCarePolicy | CallieReceptionSettings;
+  snapshot: CalliePolicySnapshot | CallieReceptionSnapshot;
   approvedAt: Date | null;
   readiness: CalliePolicyReadiness;
   automaticUnknownCallerEnrollment: false;
