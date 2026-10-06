@@ -27,8 +27,16 @@ export const CUSTOMER_EXPORT_DATASETS: readonly Dataset[] = [
   { table: "revenue_executions", fields: ["id", "kind", "state", "expires_at", "created_at", "completed_at"] },
   { table: "revenue_execution_events", fields: ["id", "execution_id", "state", "created_at"], references: { execution_id: "revenue_executions" } },
   { table: "stored_objects", fields: ["id", "content_type", "size_bytes", "created_at"] },
+  { table: "property_assets", fields: ["id", "contact_id", "property_id", "version", "status", "facts", "created_at", "updated_at"], references: { contact_id: "contacts", property_id: "properties" } },
+  { table: "work_checklist_templates", fields: ["id", "version", "status", "created_at", "updated_at"] },
+  { table: "work_checklist_revisions", fields: ["id", "template_id", "version", "definition", "definition_sha256", "baseline_id", "baseline_version", "reviewed_at", "created_at"], computedFields: ["exported_definition_sha256"], references: { template_id: "work_checklist_templates" } },
+  { table: "appointment_work_completions", fields: ["id", "appointment_id", "contact_id", "property_id", "original_completion_id", "snapshot", "created_at"], references: { appointment_id: "appointments", contact_id: "contacts", property_id: "properties", original_completion_id: "appointment_work_completions" } },
+  { table: "appointment_work_entries", fields: ["id", "appointment_id", "contact_id", "property_id", "asset_id", "service_obligation_id", "checklist_revision_id", "version", "state", "asset_snapshot", "answers", "notes", "completion_id", "created_at", "updated_at"], references: { appointment_id: "appointments", contact_id: "contacts", property_id: "properties", asset_id: "property_assets", service_obligation_id: "service_obligations", checklist_revision_id: "work_checklist_revisions", completion_id: "appointment_work_completions" } },
+  { table: "appointment_work_photos", fields: ["id", "appointment_id", "entry_id", "object_id", "state", "item_key", "caption", "content_type", "size_bytes", "object_sha256", "attached_at", "created_at"], references: { appointment_id: "appointments", entry_id: "appointment_work_entries", object_id: "stored_objects" } },
 ] as const;
 export const CUSTOMER_EXPORT_EXCLUSIONS = [
+  "Workday assets, reviewed checklist definitions, entry answers and projected completion/correction business records are included by closed allowlists. Staff identities, acting notes, raw parent/task/evidence snapshots, command/retry hashes, request IDs, preview tokens, upload reservations/capabilities and private object paths are excluded. Photo records are metadata only, not binary evidence or a re-import/activation grant. Recorded warranty dates and worker observations are not verified coverage or workmanship. The archive digest covers the projected export, not the original internal completion snapshot.",
+  "Checklist definition_sha256 verifies the original canonical saved definition before export. exported_definition_sha256 covers its closed canonical export projection; these may differ when future/private fields are excluded. Neither digest is approval, compliance or permission to activate/import work.",
   "Credentials, passwords, sessions, identity tokens, API keys and provider/billing configuration are excluded.",
   "Mailbox read credentials/cursors, separate lead-monitoring permissions, provider identities, raw reply content, immutable lead/service parent/receipt/review evidence and platform identity-email delivery records are excluded. They remain in inventory/backups and require a separately reviewed communications/security export; this core export is not a complete mailbox or identity archive. Linked office tasks are included without raw email content.",
   "Opaque activity/import/attribution metadata, provider error details, staff identities and device/IP data are excluded.",
@@ -57,6 +65,26 @@ const invoiceDocument = z.object({
 const recurrence = z.object({ mode: z.literal("calendar_months"), intervalMonths: z.number().int().min(1).max(60), anchorDate: z.iso.date(), endDate: z.iso.date().nullable(), agreementNote: z.string(), approvedAt: z.string() });
 const historicalSource = z.object({ sourceSystem: z.string(), sourceAccount: z.string(), externalId: z.string(), cutoffAt: z.string(), recordSha256: z.string().regex(/^[a-f0-9]{64}$/) });
 const watchReasons = z.array(z.enum(["reminder_needs_review", "no_response_recorded", "reminder_blocked", "send_unknown", "visit_cancelled", "visit_no_show", "service_overdue", "response_needs_action", "next_action_overdue", "owner_required", "source_review_required", "reply_received_review"])).max(12);
+const workdayFacts = z.object({
+  category: z.enum(["hvac_equipment", "roof_system", "other"]), label: z.string(),
+  manufacturer: z.string().nullable(), model: z.string().nullable(), serial: z.string().nullable(),
+  location: z.string().nullable(), installedOn: z.iso.date().nullable(), notes: z.string().nullable(),
+  warrantyStartsOn: z.iso.date().nullable(), warrantyEndsOn: z.iso.date().nullable(), warrantySource: z.string().nullable(),
+  attributes: z.array(z.object({ label: z.string(), value: z.string() })).max(20),
+});
+const workdayDefinition = z.object({ name: z.string(), trade: z.enum(["hvac", "roofing", "general"]), description: z.string(),
+  items: z.array(z.object({ key: z.string(), label: z.string(), kind: z.enum(["result", "text", "number", "photo"]), required: z.boolean(), allowNotApplicable: z.boolean(), unit: z.string().nullable() })).max(50),
+});
+const workdayAnswers = z.array(z.object({ itemKey: z.string(), result: z.enum(["done", "needs_attention", "not_applicable"]), value: z.union([z.string(), z.number().finite()]).nullable(), reason: z.string().nullable() })).max(50);
+const workdayCompletionResult = z.object({
+  id: z.uuid(), appointmentId: z.uuid(), contactId: z.uuid(), propertyId: z.uuid().nullable(),
+  performedAt: z.string(), recordedAt: z.string(), summary: z.string(), outcome: z.enum(["completed", "needs_followup"]), followupTaskId: z.uuid().nullable(),
+  entries: z.array(z.object({ id: z.uuid(), version: z.number().int(), checklistRevisionId: z.uuid(), assetId: z.uuid().nullable() })).max(20),
+  services: z.array(z.object({ id: z.uuid(), nextObligationId: z.uuid().nullable() })).max(20), nativeAppointmentStatus: z.literal("completed"),
+});
+const canonicalWorkday = (value: unknown): string => Array.isArray(value) ? `[${value.map(canonicalWorkday).join(",")}]`
+  : value && typeof value === "object" ? `{${Object.entries(value).sort(([a],[b]) => a.localeCompare(b)).map(([key,item]) => `${JSON.stringify(key)}:${canonicalWorkday(item)}`).join(",")}}` : JSON.stringify(value) ?? "null";
+const workdayDefinitionDigest = (value: unknown) => createHash("sha256").update(canonicalWorkday(value)).digest("hex");
 const unavailable = () => new CustomerLifecycleError(503, "customer_export_unavailable", "The export could not be prepared. No data was changed. Try again or ask your GrowthOS operator for help.");
 type ExportClient = Pick<pg.Client, "connect" | "query" | "end" | "on">;
 
@@ -126,6 +154,21 @@ export function createCustomerLifecycleExporter({
           }
           if (definition.table === "service_obligations") for (const row of rows) row.recurrence = row.recurrence === null ? null : recurrence.parse(row.recurrence);
           if (definition.table === "service_watch_cases") for (const row of rows) row.reasons = watchReasons.parse(row.reasons);
+          if (definition.table === "property_assets") for (const row of rows) row.facts = workdayFacts.parse(row.facts);
+          if (definition.table === "work_checklist_revisions") for (const row of rows) {
+            if (row.definition_sha256 !== workdayDefinitionDigest(row.definition)) throw unavailable();
+            row.definition = workdayDefinition.parse(row.definition);
+            row.exported_definition_sha256 = workdayDefinitionDigest(row.definition);
+          }
+          if (definition.table === "appointment_work_entries") for (const row of rows) {
+            row.asset_snapshot = row.asset_snapshot === null ? null : workdayFacts.extend({ id: z.uuid(), version: z.number().int() }).parse(row.asset_snapshot);
+            row.answers = workdayAnswers.parse(row.answers);
+          }
+          if (definition.table === "appointment_work_completions") for (const row of rows) {
+            row.snapshot = row.original_completion_id === null
+              ? z.object({ result: workdayCompletionResult }).parse(row.snapshot)
+              : z.object({ note: z.string() }).parse(row.snapshot);
+          }
           bytes += Buffer.byteLength(JSON.stringify(rows));
           if (bytes > maxBytes) throw new CustomerLifecycleError(413, "customer_export_limit", "This company exceeds the core export size. Ask your GrowthOS operator for an expanded export. No partial file was produced.");
           data[definition.table] = rows;

@@ -32,6 +32,7 @@ import {
 } from "./inspection-booking";
 import { appointmentCustomer, assertHistoricalStaff, assertOperationalStaff, assertResourceWindow, assertScheduleInterval, assertScheduleVersion, ensureInvoicePreparationTask, lockContractorSchedule, ScheduleError, type ScheduleTransaction } from "./contractor-scheduling";
 import { reconcileServiceAppointment } from "./service-obligations";
+import { guardWorkdayAppointment, retainsWorkdayLeadHistory } from "./workday-guards";
 import { lockReplyLead } from "./response-correlation";
 
 /**
@@ -694,6 +695,9 @@ export async function mergeLeads(
     const survivor = leads.find((lead) => lead.id === survivorId);
     const source = leads.find((lead) => lead.id === sourceId);
     if (!survivor || !source) return { ok: false as const, error: "not_found" as const };
+    // Work evidence is retained on its original opportunity. Reuse the existing
+    // history-retention refusal rather than bulk-moving prepared/sealed parents.
+    if (await retainsWorkdayLeadHistory(tx, organizationId, sourceId)) return { ok: false as const, error: OUTREACH_HISTORY_RETAINED };
     const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(
       eq(invoicesTable.organizationId, organizationId), inArray(invoicesTable.leadId, [survivorId, sourceId]),
     )).limit(1);
@@ -1172,16 +1176,17 @@ export async function updateAppointment(
   organizationId: string,
   id: string,
   input: Partial<typeof appointmentsTable.$inferInsert> & { expectedUpdatedAt?: string | Date },
+  execution?: { transaction: ScheduleTransaction; preserveServiceTaskPlan: true; originalCompletionId: string },
 ): Promise<typeof appointmentsTable.$inferSelect | null | "conflict" | "past_start"> {
   const { organizationId: _ignored, id: _id, expectedUpdatedAt, ...safe } = input;
   const ok = await validateOrgRefs(organizationId, {
     leadId: input.leadId,
     contactId: input.contactId,
     propertyId: input.propertyId,
-  });
+  }, execution?.transaction ?? db);
   if (!ok) return null;
   let becameCancelled = false;
-  const result = await db.transaction(async tx => {
+  const mutate = async (tx: ScheduleTransaction) => {
   await lockContractorSchedule(tx, organizationId);
   const [existing] = await tx
     .select()
@@ -1193,8 +1198,17 @@ export async function updateAppointment(
       ),
     );
   if (!existing) return null;
+  await guardWorkdayAppointment(tx, organizationId, id, existing, safe, execution?.originalCompletionId);
   assertScheduleVersion(existing.updatedAt, expectedUpdatedAt);
-  safe.contactId = await appointmentCustomer(tx, organizationId, { leadId: input.leadId === undefined ? existing.leadId : input.leadId, contactId: input.contactId === undefined ? existing.contactId : input.contactId, propertyId: input.propertyId === undefined ? existing.propertyId : input.propertyId });
+  const resolvedCustomerId = await appointmentCustomer(tx, organizationId, { leadId: input.leadId === undefined ? existing.leadId : input.leadId, contactId: input.contactId === undefined ? existing.contactId : input.contactId, propertyId: input.propertyId === undefined ? existing.propertyId : input.propertyId });
+  // Work completion records the resolved customer in its immutable evidence but
+  // does not backfill a historical lead-only appointment's native null parent.
+  safe.contactId = execution ? existing.contactId : resolvedCustomerId;
+  // A generic edit must not use implicit lead resolution to bypass the retained
+  // work-lineage guard when the caller did not explicitly supply a customer.
+  if (safe.contactId !== existing.contactId && input.contactId === undefined) {
+    await guardWorkdayAppointment(tx, organizationId, id, existing, safe, execution?.originalCompletionId);
+  }
   // A start-only move preserves the already recorded duration. Explicit end
   // edits are validated below; the UI sends both endpoints.
   if (input.scheduledStart !== undefined && input.scheduledEnd === undefined) {
@@ -1289,14 +1303,20 @@ export async function updateAppointment(
       await cancelAppointmentReminders(organizationId, row.id, tx);
       await scheduleAppointmentReminder(organizationId, row, undefined, tx);
     }
-    await reconcileServiceAppointment(tx, organizationId, row);
+    await reconcileServiceAppointment(tx, organizationId, execution ? { ...row, contactId: resolvedCustomerId } : row, { preserveTaskPlan: execution?.preserveServiceTaskPlan === true });
   }
   return row ?? null;
-  });
-  if (result && typeof result !== "string" && becameCancelled) {
+  };
+  const result = execution ? await mutate(execution.transaction) : await db.transaction(mutate);
+  if (!execution && result && typeof result !== "string" && becameCancelled) {
     void dispatchWebhookEvent(organizationId, "appointment.cancelled", { appointmentId: result.id, leadId: result.leadId, contactId: result.contactId }).catch(() => {});
   }
   return result;
+}
+
+/** Internal same-transaction composition; all original scheduling and work guards still run. */
+export async function completeWorkdayAppointmentInTransaction(tx: ScheduleTransaction, organizationId: string, id: string, expectedUpdatedAt: string, originalCompletionId: string) {
+  return updateAppointment(organizationId, id, { status: "completed", expectedUpdatedAt }, { transaction: tx, preserveServiceTaskPlan: true, originalCompletionId });
 }
 
 // ---------- users / dashboard / audit ----------

@@ -3,6 +3,8 @@ import { Link } from 'wouter';
 import { customerWorkspaceAppointmentDetailSchema, type CustomerWorkspaceAppointmentDetail } from '../../../api-server/src/services/customer-workspace-contract';
 import { appointmentWorkspaceLoginPath, customerWorkspacePath } from '@/lib/customer-workspace-links';
 import { scheduleTimezone } from '@/lib/contractor-schedule';
+import VisitWorkPanel from './visit-work-panel';
+import { WorkdayDisclosure } from './workday-ui';
 
 type Props = {
   search: string;
@@ -10,6 +12,7 @@ type Props = {
   scopeKey: string;
   refreshKey: number;
   onShowDay: (start: string) => void;
+  onWorkCompleted?: () => void;
 };
 
 export default function AppointmentLinkedCard(props: Props) {
@@ -21,7 +24,7 @@ export default function AppointmentLinkedCard(props: Props) {
   return <SelectedAppointment key={`${props.scopeKey}:${path}`} {...props} appointmentId={params.get('appointmentId')!} />;
 }
 
-function SelectedAppointment({ organizationId, appointmentId, refreshKey, onShowDay }: Props & { appointmentId: string }) {
+function SelectedAppointment({ organizationId, appointmentId, scopeKey, refreshKey, onShowDay, onWorkCompleted }: Props & { appointmentId: string }) {
   const [detail, setDetail] = useState<CustomerWorkspaceAppointmentDetail | null>(null);
   const [failed, setFailed] = useState(false), [loading, setLoading] = useState(true), [revision, setRevision] = useState(0);
   const sequence = useRef(0);
@@ -58,6 +61,14 @@ function SelectedAppointment({ organizationId, appointmentId, refreshKey, onShow
         <button type="button" className="min-h-11 rounded border px-3 py-2 text-sm" onClick={() => onShowDay(detail.appointment.scheduledStart)}>Show this day in schedule</button>
         <button type="button" className="min-h-11 underline" onClick={() => setRevision(value => value + 1)}>Refresh linked appointment</button>
       </div>
+      <WorkdayDisclosure title="Visit work"><VisitWorkPanel organizationId={organizationId} appointmentId={appointmentId} scopeKey={scopeKey} onCompleted={work => {
+        // This is the validated atomic mutation result, not optimistic status.
+        // Keep the panel mounted so its immutable completion remains visible.
+        if (work.organizationId !== organizationId || work.appointment.id !== appointmentId || work.appointment.status !== 'completed' || work.completion?.appointmentId !== appointmentId) return;
+        setDetail(current => current && current.organizationId === organizationId && current.appointment.id === appointmentId
+          ? { ...current, appointment: { ...current.appointment, status: work.appointment.status, updatedAt: work.appointment.updatedAt } } : current);
+        onWorkCompleted?.();
+      }} /></WorkdayDisclosure>
     </>}
   </section>;
 }

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import Appointments from './appointments';
 import { mockApi, sampleMe } from '@/test/mock-api';
 import { localDateTime } from '@/lib/contractor-schedule';
+import { work as workdayWork, entry as workdayEntry, completion as workdayCompletion } from '@/test/workday-fixtures';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const org = id(1), appointmentId = id(2), contactId = id(3);
@@ -13,13 +14,14 @@ const time = '2035-07-01T14:00:00.000Z';
 const appointment = () => ({ kind: 'appointment', id: appointmentId, createdAt: '2026-10-03T00:00:00.000Z', updatedAt: '2026-10-03T01:00:00.000Z', type: 'inspection', status: 'confirmed', scheduledStart: time, scheduledEnd: '2035-07-01T15:00:00.000Z', contactId, leadId: null, property: null, owner: { id: 'staff', name: 'Synthetic Technician' } });
 const detail = () => ({ organizationId: org, appointment: appointment(), permissions: { canWrite: true } });
 const path = `/appointments?appointmentId=${appointmentId}&organizationId=${org}`;
-function setup({ location = path, read }: { location?: string; read?: (url: string) => Response | Promise<Response> | undefined } = {}) {
+function setup({ location = path, read, write }: { location?: string; read?: (url: string) => Response | Promise<Response> | undefined; write?: (url: string, init?: RequestInit) => Response | Promise<Response> | undefined } = {}) {
   let profile = { ...sampleMe('admin'), organization: { id: org, name: 'Synthetic HVAC', slug: 'synthetic', timezone: 'UTC' } };
   let failed = false;
   const fetch = mockApi('admin'); const fallback = fetch.getMockImplementation()!;
   fetch.mockImplementation(async (input, init) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     if (url === '/api/v1/me') return failed ? Response.json({ error: 'Unavailable' }, { status: 403 }) : Response.json(profile);
+    if (init?.method && init.method !== 'GET') { const result = write?.(url, init); if (result) return result; }
     if ((!init?.method || init.method === 'GET') && url.startsWith('/api/v1/appointments')) {
       const override = read?.(url); if (override) return override;
       return Response.json(url.split('?')[0] === `/api/v1/appointments/${appointmentId}` ? detail() : []);
@@ -33,6 +35,34 @@ function setup({ location = path, read }: { location?: string; read?: (url: stri
 }
 afterEach(() => { cleanup(); window.history.replaceState(null, '', '/'); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 describe('exact selected appointments', () => {
+  it('propagates confirmed two-entry completion to the enclosing exact summary and read-back schedule without unmounting work', async () => {
+    let savedStatus: 'scheduled' | 'completed' = 'scheduled';
+    let native = workdayWork(); native.organizationId = org; native.appointment = { ...native.appointment, id: appointmentId, contactId, propertyId: null, status: 'scheduled', updatedAt: appointment().updatedAt };
+    native.entries = [30, 31].map(number => workdayEntry({ id: id(number), appointmentId, contactId, propertyId: null, assetId: null, assetSnapshot: null, serviceObligationId: null })); native.linkedServices = []; native.capabilities.canPrepare = false;
+    const { fetch } = setup({ read: url => url === `/api/v1/appointments/${appointmentId}/work` ? Response.json(native) : url === `/api/v1/appointments/${appointmentId}` ? Response.json({ ...detail(), appointment: { ...appointment(), status: savedStatus } }) : url.includes('?') ? Response.json([{ ...appointment(), status: savedStatus, leadLabel: 'Fictional work customer', assignedUserId: 'staff', notes: 'Full native notes' }]) : undefined,
+      write: (url, init) => {
+        const body = JSON.parse(String(init?.body));
+        if (url.endsWith('/completion-preview')) return Response.json({ organizationId: org, appointmentId, expiresAt: new Date(Date.now() + 60000).toISOString(), previewToken: 'two-entry-exact-review', entries: native.entries, intent: body, serviceVersions: [], warning: 'Staff-recorded work; not warranty coverage, customer acceptance, invoice delivery or payment.' });
+        if (url.endsWith('/complete')) { savedStatus = 'completed'; const completed = workdayCompletion({ id: id(50), appointmentId, contactId, propertyId: null, requestId: body.requestId, summary: 'Saved two-entry completion', entries: native.entries.map(entry => ({ id: entry.id, version: entry.version, checklistRevisionId: entry.checklist.id, assetId: null })) }); native = { ...native, appointment: { ...native.appointment, status: 'completed', updatedAt: new Date().toISOString() }, completion: completed, entries: native.entries.map(entry => ({ ...entry, state: 'finalized', completionId: completed.id })), capabilities: { ...native.capabilities, canEdit: false, canCancel: false, canComplete: false } }; return Response.json({ organizationId: org, work: native, receipt: { requestId: body.requestId, replayed: false } }); }
+        return undefined;
+      },
+    });
+    await screen.findByText('Synthetic Technician'); const summaryStatus = screen.getByText('Recorded status').parentElement!; expect(summaryStatus.textContent).toContain('scheduled'); expect((screen.getByTestId('appointment-status-select') as HTMLSelectElement).value).toBe('scheduled');
+    fireEvent.click(screen.getByRole('button', { name: 'Open visit work' })); await screen.findByLabelText('Completion summary'); const panelBefore = screen.getByRole('heading', { name: 'Visit work', exact: true }).closest('section');
+    fireEvent.change(screen.getByLabelText('Completion summary'), { target: { value: 'Saved two-entry completion' } }); fireEvent.click(screen.getByRole('button', { name: 'Review exact completion' })); await screen.findByRole('region', { name: 'Exact completion review' }); fireEvent.click(screen.getByLabelText('I checked the saved work and selected service outcomes.')); fireEvent.click(screen.getByRole('button', { name: 'Record reviewed completion' }));
+    await screen.findByRole('region', { name: 'Recorded work completion' }); await waitFor(() => expect((screen.getByTestId('appointment-status-select') as HTMLSelectElement).value).toBe('completed')); expect(screen.getByText('Recorded status').parentElement?.textContent).toContain('completed');
+    expect(screen.getByRole('heading', { name: 'Visit work', exact: true }).closest('section')).toBe(panelBefore); expect(screen.getByRole('button', { name: 'Close visit work' })).toBeTruthy(); expect(screen.getByText('Saved two-entry completion')).toBeTruthy();
+    expect(fetch.mock.calls.filter(([url]) => String(url) === `/api/v1/appointments/${appointmentId}/work`)).toHaveLength(1); expect(fetch.mock.calls.filter(([url]) => String(url) === `/api/v1/appointments/${appointmentId}`)).toHaveLength(1); expect(fetch.mock.calls.filter(([url]) => String(url).startsWith('/api/v1/appointments?')).length).toBeGreaterThan(1);
+    expect(fetch.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(0);
+  });
+  it('opens visit work only on explicit action, preserves its draft on unchanged profile and removes it on access failure', async () => {
+    const native = workdayWork(); native.organizationId = org; native.appointment = { ...native.appointment, id: appointmentId, contactId, propertyId: null }; native.entries = [workdayEntry({ appointmentId, contactId, propertyId: null, assetId: null, assetSnapshot: null, serviceObligationId: null })]; native.linkedServices = []; native.capabilities.canPrepare = false;
+    const { fetch, client, fail } = setup({ read: url => url === `/api/v1/appointments/${appointmentId}/work` ? Response.json(native) : undefined });
+    await screen.findByText('Synthetic Technician'); expect(fetch.mock.calls.some(([url]) => String(url).endsWith('/work'))).toBe(false); fireEvent.click(screen.getByRole('button', { name: 'Open visit work' }));
+    const notes = await screen.findByLabelText('Work notes for Synthetic unit visit'); fireEvent.change(notes, { target: { value: 'Unfinished technician observation' } });
+    await act(async () => { await client.refetchQueries({ queryKey: getGetMeQueryKey() }); }); expect((screen.getByLabelText('Work notes for Synthetic unit visit') as HTMLTextAreaElement).value).toBe('Unfinished technician observation'); expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/work'))).toHaveLength(1);
+    fail(); await act(async () => { await client.refetchQueries({ queryKey: getGetMeQueryKey() }); }); await screen.findByText(/Company access could not be verified/); expect(screen.queryByLabelText('Work notes for Synthetic unit visit')).toBeNull();
+  });
   it('opens an older exact appointment independently of an empty current schedule and pins its customer link', async () => {
     const { fetch } = setup();
     const selected = await screen.findByRole('region', { name: 'Selected appointment' });

@@ -3,8 +3,8 @@
  * deletion order, retention policy, or proof of complete account ownership.
  * Every new table must receive an explicit classification before preview runs.
  */
-export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-05.inventory-v13";
-export const DATA_LIFECYCLE_EXPECTED_TABLES = 133;
+export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-06.inventory-v14";
+export const DATA_LIFECYCLE_EXPECTED_TABLES = 139;
 export const DATA_LIFECYCLE_ROW_LIMIT = 10_000;
 
 export type InventoryCategory =
@@ -32,6 +32,9 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("api_idempotency_keys", "audit"),
   direct("api_keys", "account_access"),
   direct("appointments", "crm"),
+  direct("appointment_work_entries", "crm"),
+  direct("appointment_work_completions", "audit"),
+  direct("appointment_work_photos", "media"),
   direct("assistant_history", "intelligence"),
   direct("audit_events", "audit"),
   direct("authorized_domains", "configuration"),
@@ -120,6 +123,7 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("project_stories", "crm"),
   direct("projects", "crm"),
   direct("properties", "crm"),
+  direct("property_assets", "crm"),
   excluded("rate_limit_counters", "shared_runtime"),
   direct("reactivation_campaign_leads", "automation"),
   direct("reactivation_campaigns", "automation"),
@@ -129,6 +133,8 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("scheduled_actions", "automation"),
   excluded("scheduler_runtime", "shared_runtime"),
   direct("service_obligations", "crm"),
+  direct("work_checklist_templates", "configuration"),
+  direct("work_checklist_revisions", "configuration"),
   direct("service_sms_parents", "communications"),
   direct("service_sms_replies", "communications"),
   direct("service_standing_enrollments", "automation"),

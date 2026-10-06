@@ -1,5 +1,32 @@
 # GrowthOS project state
 
+## October6 researched Contractor Workday integration
+
+The owner approved researched common HVAC/roofing baselines without waiting for
+actual source exports; later real samples can revise configurations/mappings.
+Frozen contract: reports/contractor-workday-contract-2026-10-06.md. Research and
+operator/runtime reports document evidence boundaries. Baseline PR24 is complete
+at main3f1f1b54f8436303d66e53083f62155431e9adef, exact-mainCI37407237259 accepted;
+its reminder was deleted. Earlier active-wave headings below are history.
+
+Implemented source: explicit property equipment, company-reviewed immutable
+checklists, multiple saved visit entries, private exact-entry photos and one
+atomic original completion/follow-up/native service-successor flow. The existing
+customer/appointment/service interfaces stay canonical. Held drafts have explicit
+office cancellation; retained customer/property/lead lineage cannot be rewritten.
+Completion refreshes the canonical appointment status without closing evidence.
+Six additive tables extend133→139; reviewed-only0016 is not hosted application.
+The core business export adds six closed datasets, not private actor/capability
+contexts or binary media. No majority-market-share/warranty certification claim.
+
+Candidate and exact-main release identity/proof must be read from current GitHub
+checks and the private growthos-workday-2026-10-06/WORKDAY.md receipt/Jarvis STATE;
+local source/UI/recovery evidence is not that full PostgreSQL release gate.
+Actual provider/account/audio/phone, managed staging/backup, migration and each
+contractor workday acceptance remain open. Contact-only projects/invoices and
+the wider required campaign/mailbox scope are not supplied by this slice.
+No deployment, provider activation, real import/message, payment or cancellation.
+
 ## October 5 CALLIE conversation (active engineering wave)
 
 The owner authorized the next big wave after PR23 passed exact-main verification.

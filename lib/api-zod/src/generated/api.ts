@@ -9,6 +9,3679 @@ import * as zod from 'zod';
 
 
 /**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.read, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Read explicit paged customer/property assets
+ */
+export const GetWorkdayAssetsParams = zod.object({
+  "contactId": zod.uuid()
+})
+
+export const getWorkdayAssetsQueryCursorMax = 1000;
+
+
+
+export const GetWorkdayAssetsQueryParams = zod.object({
+  "propertyId": zod.uuid().optional(),
+  "cursor": zod.coerce.string().max(getWorkdayAssetsQueryCursorMax).optional()
+})
+
+export const getWorkdayAssetsResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayAssetsResponseContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayAssetsResponsePropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayAssetsResponseItemsItemLabelMax = 160;
+
+export const getWorkdayAssetsResponseItemsItemManufacturerMax = 160;
+
+export const getWorkdayAssetsResponseItemsItemModelMax = 160;
+
+export const getWorkdayAssetsResponseItemsItemSerialMax = 160;
+
+export const getWorkdayAssetsResponseItemsItemLocationMax = 300;
+
+export const getWorkdayAssetsResponseItemsItemInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getWorkdayAssetsResponseItemsItemNotesMax = 2000;
+
+export const getWorkdayAssetsResponseItemsItemWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getWorkdayAssetsResponseItemsItemWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getWorkdayAssetsResponseItemsItemWarrantySourceMax = 1000;
+
+export const getWorkdayAssetsResponseItemsItemAttributesItemLabelMax = 80;
+
+export const getWorkdayAssetsResponseItemsItemAttributesItemValueMax = 300;
+
+export const getWorkdayAssetsResponseItemsItemAttributesMax = 20;
+
+export const getWorkdayAssetsResponseItemsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayAssetsResponseItemsItemOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayAssetsResponseItemsItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayAssetsResponseItemsItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayAssetsResponseItemsItemVersionMax = 9007199254740991;
+
+export const getWorkdayAssetsResponseItemsMax = 25;
+
+
+
+export const GetWorkdayAssetsResponse = zod.object({
+  "organizationId": zod.uuid().regex(getWorkdayAssetsResponseOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getWorkdayAssetsResponseContactIdRegExp),
+  "propertyId": zod.uuid().regex(getWorkdayAssetsResponsePropertyIdRegExp).nullable(),
+  "items": zod.array(zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(getWorkdayAssetsResponseItemsItemLabelMax),
+  "manufacturer": zod.string().max(getWorkdayAssetsResponseItemsItemManufacturerMax).nullable(),
+  "model": zod.string().max(getWorkdayAssetsResponseItemsItemModelMax).nullable(),
+  "serial": zod.string().max(getWorkdayAssetsResponseItemsItemSerialMax).nullable(),
+  "location": zod.string().max(getWorkdayAssetsResponseItemsItemLocationMax).nullable(),
+  "installedOn": zod.string().regex(getWorkdayAssetsResponseItemsItemInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(getWorkdayAssetsResponseItemsItemNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(getWorkdayAssetsResponseItemsItemWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(getWorkdayAssetsResponseItemsItemWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(getWorkdayAssetsResponseItemsItemWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(getWorkdayAssetsResponseItemsItemAttributesItemLabelMax),
+  "value": zod.string().min(1).max(getWorkdayAssetsResponseItemsItemAttributesItemValueMax)
+})).max(getWorkdayAssetsResponseItemsItemAttributesMax),
+  "id": zod.uuid().regex(getWorkdayAssetsResponseItemsItemIdRegExp),
+  "organizationId": zod.uuid().regex(getWorkdayAssetsResponseItemsItemOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(getWorkdayAssetsResponseItemsItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(getWorkdayAssetsResponseItemsItemPropertyIdRegExp),
+  "version": zod.int().min(1).max(getWorkdayAssetsResponseItemsItemVersionMax),
+  "status": zod.enum(['active', 'retired']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "currentParentCoherent": zod.boolean(),
+  "canEdit": zod.boolean()
+})).max(getWorkdayAssetsResponseItemsMax),
+  "nextCursor": zod.string().nullable(),
+  "hasMore": zod.boolean(),
+  "limit": zod.literal(25),
+  "canCreate": zod.boolean()
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Record an explicit property asset
+ */
+export const CreateWorkdayAssetParams = zod.object({
+  "contactId": zod.uuid()
+})
+
+export const createWorkdayAssetBodyLabelMax = 160;
+
+export const createWorkdayAssetBodyManufacturerMax = 160;
+
+export const createWorkdayAssetBodyModelMax = 160;
+
+export const createWorkdayAssetBodySerialMax = 160;
+
+export const createWorkdayAssetBodyLocationMax = 300;
+
+export const createWorkdayAssetBodyInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createWorkdayAssetBodyNotesMax = 2000;
+
+export const createWorkdayAssetBodyWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createWorkdayAssetBodyWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createWorkdayAssetBodyWarrantySourceMax = 1000;
+
+export const createWorkdayAssetBodyAttributesItemLabelMax = 80;
+
+export const createWorkdayAssetBodyAttributesItemValueMax = 300;
+
+export const createWorkdayAssetBodyAttributesMax = 20;
+
+export const createWorkdayAssetBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayAssetBodyPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const CreateWorkdayAssetBody = zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(createWorkdayAssetBodyLabelMax),
+  "manufacturer": zod.string().max(createWorkdayAssetBodyManufacturerMax).nullable(),
+  "model": zod.string().max(createWorkdayAssetBodyModelMax).nullable(),
+  "serial": zod.string().max(createWorkdayAssetBodySerialMax).nullable(),
+  "location": zod.string().max(createWorkdayAssetBodyLocationMax).nullable(),
+  "installedOn": zod.string().regex(createWorkdayAssetBodyInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(createWorkdayAssetBodyNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(createWorkdayAssetBodyWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(createWorkdayAssetBodyWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(createWorkdayAssetBodyWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(createWorkdayAssetBodyAttributesItemLabelMax),
+  "value": zod.string().min(1).max(createWorkdayAssetBodyAttributesItemValueMax)
+})).max(createWorkdayAssetBodyAttributesMax),
+  "requestId": zod.uuid().regex(createWorkdayAssetBodyRequestIdRegExp),
+  "propertyId": zod.uuid().regex(createWorkdayAssetBodyPropertyIdRegExp)
+})
+
+export const createWorkdayAssetResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayAssetResponseAssetLabelMax = 160;
+
+export const createWorkdayAssetResponseAssetManufacturerMax = 160;
+
+export const createWorkdayAssetResponseAssetModelMax = 160;
+
+export const createWorkdayAssetResponseAssetSerialMax = 160;
+
+export const createWorkdayAssetResponseAssetLocationMax = 300;
+
+export const createWorkdayAssetResponseAssetInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createWorkdayAssetResponseAssetNotesMax = 2000;
+
+export const createWorkdayAssetResponseAssetWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createWorkdayAssetResponseAssetWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createWorkdayAssetResponseAssetWarrantySourceMax = 1000;
+
+export const createWorkdayAssetResponseAssetAttributesItemLabelMax = 80;
+
+export const createWorkdayAssetResponseAssetAttributesItemValueMax = 300;
+
+export const createWorkdayAssetResponseAssetAttributesMax = 20;
+
+export const createWorkdayAssetResponseAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayAssetResponseAssetOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayAssetResponseAssetContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayAssetResponseAssetPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayAssetResponseAssetVersionMax = 9007199254740991;
+
+export const createWorkdayAssetResponseReceiptRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const CreateWorkdayAssetResponse = zod.object({
+  "organizationId": zod.uuid().regex(createWorkdayAssetResponseOrganizationIdRegExp),
+  "asset": zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(createWorkdayAssetResponseAssetLabelMax),
+  "manufacturer": zod.string().max(createWorkdayAssetResponseAssetManufacturerMax).nullable(),
+  "model": zod.string().max(createWorkdayAssetResponseAssetModelMax).nullable(),
+  "serial": zod.string().max(createWorkdayAssetResponseAssetSerialMax).nullable(),
+  "location": zod.string().max(createWorkdayAssetResponseAssetLocationMax).nullable(),
+  "installedOn": zod.string().regex(createWorkdayAssetResponseAssetInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(createWorkdayAssetResponseAssetNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(createWorkdayAssetResponseAssetWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(createWorkdayAssetResponseAssetWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(createWorkdayAssetResponseAssetWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(createWorkdayAssetResponseAssetAttributesItemLabelMax),
+  "value": zod.string().min(1).max(createWorkdayAssetResponseAssetAttributesItemValueMax)
+})).max(createWorkdayAssetResponseAssetAttributesMax),
+  "id": zod.uuid().regex(createWorkdayAssetResponseAssetIdRegExp),
+  "organizationId": zod.uuid().regex(createWorkdayAssetResponseAssetOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(createWorkdayAssetResponseAssetContactIdRegExp),
+  "propertyId": zod.uuid().regex(createWorkdayAssetResponseAssetPropertyIdRegExp),
+  "version": zod.int().min(1).max(createWorkdayAssetResponseAssetVersionMax),
+  "status": zod.enum(['active', 'retired']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "currentParentCoherent": zod.boolean(),
+  "canEdit": zod.boolean()
+}),
+  "receipt": zod.object({
+  "requestId": zod.uuid().regex(createWorkdayAssetResponseReceiptRequestIdRegExp),
+  "replayed": zod.boolean()
+})
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Edit or retire recorded asset facts without reparenting
+ */
+export const UpdateWorkdayAssetParams = zod.object({
+  "assetId": zod.uuid()
+})
+
+export const updateWorkdayAssetBodyLabelMax = 160;
+
+export const updateWorkdayAssetBodyManufacturerMax = 160;
+
+export const updateWorkdayAssetBodyModelMax = 160;
+
+export const updateWorkdayAssetBodySerialMax = 160;
+
+export const updateWorkdayAssetBodyLocationMax = 300;
+
+export const updateWorkdayAssetBodyInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateWorkdayAssetBodyNotesMax = 2000;
+
+export const updateWorkdayAssetBodyWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateWorkdayAssetBodyWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateWorkdayAssetBodyWarrantySourceMax = 1000;
+
+export const updateWorkdayAssetBodyAttributesItemLabelMax = 80;
+
+export const updateWorkdayAssetBodyAttributesItemValueMax = 300;
+
+export const updateWorkdayAssetBodyAttributesMax = 20;
+
+export const updateWorkdayAssetBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateWorkdayAssetBodyExpectedVersionMax = 9007199254740991;
+
+
+
+export const UpdateWorkdayAssetBody = zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(updateWorkdayAssetBodyLabelMax),
+  "manufacturer": zod.string().max(updateWorkdayAssetBodyManufacturerMax).nullable(),
+  "model": zod.string().max(updateWorkdayAssetBodyModelMax).nullable(),
+  "serial": zod.string().max(updateWorkdayAssetBodySerialMax).nullable(),
+  "location": zod.string().max(updateWorkdayAssetBodyLocationMax).nullable(),
+  "installedOn": zod.string().regex(updateWorkdayAssetBodyInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(updateWorkdayAssetBodyNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(updateWorkdayAssetBodyWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(updateWorkdayAssetBodyWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(updateWorkdayAssetBodyWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(updateWorkdayAssetBodyAttributesItemLabelMax),
+  "value": zod.string().min(1).max(updateWorkdayAssetBodyAttributesItemValueMax)
+})).max(updateWorkdayAssetBodyAttributesMax),
+  "requestId": zod.uuid().regex(updateWorkdayAssetBodyRequestIdRegExp),
+  "expectedVersion": zod.int().min(1).max(updateWorkdayAssetBodyExpectedVersionMax),
+  "status": zod.enum(['active', 'retired'])
+})
+
+export const updateWorkdayAssetResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateWorkdayAssetResponseAssetLabelMax = 160;
+
+export const updateWorkdayAssetResponseAssetManufacturerMax = 160;
+
+export const updateWorkdayAssetResponseAssetModelMax = 160;
+
+export const updateWorkdayAssetResponseAssetSerialMax = 160;
+
+export const updateWorkdayAssetResponseAssetLocationMax = 300;
+
+export const updateWorkdayAssetResponseAssetInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateWorkdayAssetResponseAssetNotesMax = 2000;
+
+export const updateWorkdayAssetResponseAssetWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateWorkdayAssetResponseAssetWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateWorkdayAssetResponseAssetWarrantySourceMax = 1000;
+
+export const updateWorkdayAssetResponseAssetAttributesItemLabelMax = 80;
+
+export const updateWorkdayAssetResponseAssetAttributesItemValueMax = 300;
+
+export const updateWorkdayAssetResponseAssetAttributesMax = 20;
+
+export const updateWorkdayAssetResponseAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateWorkdayAssetResponseAssetOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateWorkdayAssetResponseAssetContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateWorkdayAssetResponseAssetPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateWorkdayAssetResponseAssetVersionMax = 9007199254740991;
+
+export const updateWorkdayAssetResponseReceiptRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const UpdateWorkdayAssetResponse = zod.object({
+  "organizationId": zod.uuid().regex(updateWorkdayAssetResponseOrganizationIdRegExp),
+  "asset": zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(updateWorkdayAssetResponseAssetLabelMax),
+  "manufacturer": zod.string().max(updateWorkdayAssetResponseAssetManufacturerMax).nullable(),
+  "model": zod.string().max(updateWorkdayAssetResponseAssetModelMax).nullable(),
+  "serial": zod.string().max(updateWorkdayAssetResponseAssetSerialMax).nullable(),
+  "location": zod.string().max(updateWorkdayAssetResponseAssetLocationMax).nullable(),
+  "installedOn": zod.string().regex(updateWorkdayAssetResponseAssetInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(updateWorkdayAssetResponseAssetNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(updateWorkdayAssetResponseAssetWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(updateWorkdayAssetResponseAssetWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(updateWorkdayAssetResponseAssetWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(updateWorkdayAssetResponseAssetAttributesItemLabelMax),
+  "value": zod.string().min(1).max(updateWorkdayAssetResponseAssetAttributesItemValueMax)
+})).max(updateWorkdayAssetResponseAssetAttributesMax),
+  "id": zod.uuid().regex(updateWorkdayAssetResponseAssetIdRegExp),
+  "organizationId": zod.uuid().regex(updateWorkdayAssetResponseAssetOrganizationIdRegExp),
+  "contactId": zod.uuid().regex(updateWorkdayAssetResponseAssetContactIdRegExp),
+  "propertyId": zod.uuid().regex(updateWorkdayAssetResponseAssetPropertyIdRegExp),
+  "version": zod.int().min(1).max(updateWorkdayAssetResponseAssetVersionMax),
+  "status": zod.enum(['active', 'retired']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "currentParentCoherent": zod.boolean(),
+  "canEdit": zod.boolean()
+}),
+  "receipt": zod.object({
+  "requestId": zod.uuid().regex(updateWorkdayAssetResponseReceiptRequestIdRegExp),
+  "replayed": zod.boolean()
+})
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.read, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Read company checklist revisions and unreviewed starters
+ */
+export const getWorkdayChecklistsResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayChecklistsResponseTemplatesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayChecklistsResponseTemplatesItemOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayChecklistsResponseTemplatesItemVersionMax = 9007199254740991;
+
+export const getWorkdayChecklistsResponseTemplatesItemLatestRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayChecklistsResponseTemplatesItemLatestRevisionTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayChecklistsResponseTemplatesItemLatestRevisionVersionMax = 9007199254740991;
+
+export const getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionNameMax = 120;
+
+export const getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionDescriptionMax = 1000;
+
+export const getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionItemsItemLabelMax = 200;
+
+export const getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionItemsItemUnitMax = 30;
+
+export const getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionItemsMax = 50;
+
+export const getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getWorkdayChecklistsResponseTemplatesItemLatestRevisionBaselineVersionMin = -9007199254740991;
+export const getWorkdayChecklistsResponseTemplatesItemLatestRevisionBaselineVersionMax = 9007199254740991;
+
+export const getWorkdayChecklistsResponseTemplatesItemApprovedRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayChecklistsResponseTemplatesItemApprovedRevisionTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayChecklistsResponseTemplatesItemApprovedRevisionVersionMax = 9007199254740991;
+
+export const getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionNameMax = 120;
+
+export const getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionDescriptionMax = 1000;
+
+export const getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionItemsItemLabelMax = 200;
+
+export const getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionItemsItemUnitMax = 30;
+
+export const getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionItemsMax = 50;
+
+export const getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getWorkdayChecklistsResponseTemplatesItemApprovedRevisionBaselineVersionMin = -9007199254740991;
+export const getWorkdayChecklistsResponseTemplatesItemApprovedRevisionBaselineVersionMax = 9007199254740991;
+
+export const getWorkdayChecklistsResponseTemplatesMax = 100;
+
+export const getWorkdayChecklistsResponseStartersItemDefinitionNameMax = 120;
+
+export const getWorkdayChecklistsResponseStartersItemDefinitionDescriptionMax = 1000;
+
+export const getWorkdayChecklistsResponseStartersItemDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const getWorkdayChecklistsResponseStartersItemDefinitionItemsItemLabelMax = 200;
+
+export const getWorkdayChecklistsResponseStartersItemDefinitionItemsItemUnitMax = 30;
+
+export const getWorkdayChecklistsResponseStartersItemDefinitionItemsMax = 50;
+
+
+
+export const GetWorkdayChecklistsResponse = zod.object({
+  "organizationId": zod.uuid().regex(getWorkdayChecklistsResponseOrganizationIdRegExp),
+  "templates": zod.array(zod.object({
+  "id": zod.uuid().regex(getWorkdayChecklistsResponseTemplatesItemIdRegExp),
+  "organizationId": zod.uuid().regex(getWorkdayChecklistsResponseTemplatesItemOrganizationIdRegExp),
+  "version": zod.int().min(1).max(getWorkdayChecklistsResponseTemplatesItemVersionMax),
+  "status": zod.enum(['draft', 'reviewed', 'retired']),
+  "latestRevision": zod.object({
+  "id": zod.uuid().regex(getWorkdayChecklistsResponseTemplatesItemLatestRevisionIdRegExp),
+  "templateId": zod.uuid().regex(getWorkdayChecklistsResponseTemplatesItemLatestRevisionTemplateIdRegExp),
+  "version": zod.int().min(1).max(getWorkdayChecklistsResponseTemplatesItemLatestRevisionVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(getWorkdayChecklistsResponseTemplatesItemLatestRevisionDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(getWorkdayChecklistsResponseTemplatesItemLatestRevisionBaselineVersionMin).max(getWorkdayChecklistsResponseTemplatesItemLatestRevisionBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "approvedRevision": zod.object({
+  "id": zod.uuid().regex(getWorkdayChecklistsResponseTemplatesItemApprovedRevisionIdRegExp),
+  "templateId": zod.uuid().regex(getWorkdayChecklistsResponseTemplatesItemApprovedRevisionTemplateIdRegExp),
+  "version": zod.int().min(1).max(getWorkdayChecklistsResponseTemplatesItemApprovedRevisionVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(getWorkdayChecklistsResponseTemplatesItemApprovedRevisionDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(getWorkdayChecklistsResponseTemplatesItemApprovedRevisionBaselineVersionMin).max(getWorkdayChecklistsResponseTemplatesItemApprovedRevisionBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})).max(getWorkdayChecklistsResponseTemplatesMax),
+  "starters": zod.array(zod.object({
+  "id": zod.string(),
+  "version": zod.literal(1),
+  "title": zod.string(),
+  "description": zod.string(),
+  "sourceUrls": zod.array(zod.url()),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(getWorkdayChecklistsResponseStartersItemDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(getWorkdayChecklistsResponseStartersItemDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(getWorkdayChecklistsResponseStartersItemDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(getWorkdayChecklistsResponseStartersItemDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(getWorkdayChecklistsResponseStartersItemDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(getWorkdayChecklistsResponseStartersItemDefinitionItemsMax)
+})
+})),
+  "canManage": zod.boolean(),
+  "limit": zod.literal(100),
+  "limitReached": zod.boolean()
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires settings.manage, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Save a company draft, never auto-review a research starter
+ */
+export const createWorkdayChecklistBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayChecklistBodyDefinitionNameMax = 120;
+
+export const createWorkdayChecklistBodyDefinitionDescriptionMax = 1000;
+
+export const createWorkdayChecklistBodyDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const createWorkdayChecklistBodyDefinitionItemsItemLabelMax = 200;
+
+export const createWorkdayChecklistBodyDefinitionItemsItemUnitMax = 30;
+
+export const createWorkdayChecklistBodyDefinitionItemsMax = 50;
+
+export const createWorkdayChecklistBodyBaselineIdMax = 100;
+
+
+
+export const CreateWorkdayChecklistBody = zod.object({
+  "requestId": zod.uuid().regex(createWorkdayChecklistBodyRequestIdRegExp),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(createWorkdayChecklistBodyDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(createWorkdayChecklistBodyDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(createWorkdayChecklistBodyDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(createWorkdayChecklistBodyDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(createWorkdayChecklistBodyDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(createWorkdayChecklistBodyDefinitionItemsMax)
+}),
+  "baselineId": zod.string().max(createWorkdayChecklistBodyBaselineIdMax).nullish()
+})
+
+export const createWorkdayChecklistResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayChecklistResponseTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayChecklistResponseTemplateOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayChecklistResponseTemplateVersionMax = 9007199254740991;
+
+export const createWorkdayChecklistResponseTemplateLatestRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayChecklistResponseTemplateLatestRevisionTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayChecklistResponseTemplateLatestRevisionVersionMax = 9007199254740991;
+
+export const createWorkdayChecklistResponseTemplateLatestRevisionDefinitionNameMax = 120;
+
+export const createWorkdayChecklistResponseTemplateLatestRevisionDefinitionDescriptionMax = 1000;
+
+export const createWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const createWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemLabelMax = 200;
+
+export const createWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemUnitMax = 30;
+
+export const createWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsMax = 50;
+
+export const createWorkdayChecklistResponseTemplateLatestRevisionDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const createWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMin = -9007199254740991;
+export const createWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMax = 9007199254740991;
+
+export const createWorkdayChecklistResponseTemplateApprovedRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayChecklistResponseTemplateApprovedRevisionTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createWorkdayChecklistResponseTemplateApprovedRevisionVersionMax = 9007199254740991;
+
+export const createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionNameMax = 120;
+
+export const createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionDescriptionMax = 1000;
+
+export const createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemLabelMax = 200;
+
+export const createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemUnitMax = 30;
+
+export const createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsMax = 50;
+
+export const createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const createWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMin = -9007199254740991;
+export const createWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMax = 9007199254740991;
+
+export const createWorkdayChecklistResponseReceiptRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const CreateWorkdayChecklistResponse = zod.object({
+  "organizationId": zod.uuid().regex(createWorkdayChecklistResponseOrganizationIdRegExp),
+  "template": zod.object({
+  "id": zod.uuid().regex(createWorkdayChecklistResponseTemplateIdRegExp),
+  "organizationId": zod.uuid().regex(createWorkdayChecklistResponseTemplateOrganizationIdRegExp),
+  "version": zod.int().min(1).max(createWorkdayChecklistResponseTemplateVersionMax),
+  "status": zod.enum(['draft', 'reviewed', 'retired']),
+  "latestRevision": zod.object({
+  "id": zod.uuid().regex(createWorkdayChecklistResponseTemplateLatestRevisionIdRegExp),
+  "templateId": zod.uuid().regex(createWorkdayChecklistResponseTemplateLatestRevisionTemplateIdRegExp),
+  "version": zod.int().min(1).max(createWorkdayChecklistResponseTemplateLatestRevisionVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(createWorkdayChecklistResponseTemplateLatestRevisionDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(createWorkdayChecklistResponseTemplateLatestRevisionDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(createWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(createWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(createWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(createWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(createWorkdayChecklistResponseTemplateLatestRevisionDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(createWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMin).max(createWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "approvedRevision": zod.object({
+  "id": zod.uuid().regex(createWorkdayChecklistResponseTemplateApprovedRevisionIdRegExp),
+  "templateId": zod.uuid().regex(createWorkdayChecklistResponseTemplateApprovedRevisionTemplateIdRegExp),
+  "version": zod.int().min(1).max(createWorkdayChecklistResponseTemplateApprovedRevisionVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(createWorkdayChecklistResponseTemplateApprovedRevisionDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(createWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMin).max(createWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "receipt": zod.object({
+  "requestId": zod.uuid().regex(createWorkdayChecklistResponseReceiptRequestIdRegExp),
+  "replayed": zod.boolean()
+})
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.read, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Read exact company checklist history
+ */
+export const GetWorkdayChecklistParams = zod.object({
+  "templateId": zod.uuid()
+})
+
+export const getWorkdayChecklistResponseIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayChecklistResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayChecklistResponseVersionMax = 9007199254740991;
+
+export const getWorkdayChecklistResponseLatestRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayChecklistResponseLatestRevisionTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayChecklistResponseLatestRevisionVersionMax = 9007199254740991;
+
+export const getWorkdayChecklistResponseLatestRevisionDefinitionNameMax = 120;
+
+export const getWorkdayChecklistResponseLatestRevisionDefinitionDescriptionMax = 1000;
+
+export const getWorkdayChecklistResponseLatestRevisionDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const getWorkdayChecklistResponseLatestRevisionDefinitionItemsItemLabelMax = 200;
+
+export const getWorkdayChecklistResponseLatestRevisionDefinitionItemsItemUnitMax = 30;
+
+export const getWorkdayChecklistResponseLatestRevisionDefinitionItemsMax = 50;
+
+export const getWorkdayChecklistResponseLatestRevisionDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getWorkdayChecklistResponseLatestRevisionBaselineVersionMin = -9007199254740991;
+export const getWorkdayChecklistResponseLatestRevisionBaselineVersionMax = 9007199254740991;
+
+export const getWorkdayChecklistResponseApprovedRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayChecklistResponseApprovedRevisionTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getWorkdayChecklistResponseApprovedRevisionVersionMax = 9007199254740991;
+
+export const getWorkdayChecklistResponseApprovedRevisionDefinitionNameMax = 120;
+
+export const getWorkdayChecklistResponseApprovedRevisionDefinitionDescriptionMax = 1000;
+
+export const getWorkdayChecklistResponseApprovedRevisionDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const getWorkdayChecklistResponseApprovedRevisionDefinitionItemsItemLabelMax = 200;
+
+export const getWorkdayChecklistResponseApprovedRevisionDefinitionItemsItemUnitMax = 30;
+
+export const getWorkdayChecklistResponseApprovedRevisionDefinitionItemsMax = 50;
+
+export const getWorkdayChecklistResponseApprovedRevisionDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getWorkdayChecklistResponseApprovedRevisionBaselineVersionMin = -9007199254740991;
+export const getWorkdayChecklistResponseApprovedRevisionBaselineVersionMax = 9007199254740991;
+
+
+
+export const GetWorkdayChecklistResponse = zod.object({
+  "id": zod.uuid().regex(getWorkdayChecklistResponseIdRegExp),
+  "organizationId": zod.uuid().regex(getWorkdayChecklistResponseOrganizationIdRegExp),
+  "version": zod.int().min(1).max(getWorkdayChecklistResponseVersionMax),
+  "status": zod.enum(['draft', 'reviewed', 'retired']),
+  "latestRevision": zod.object({
+  "id": zod.uuid().regex(getWorkdayChecklistResponseLatestRevisionIdRegExp),
+  "templateId": zod.uuid().regex(getWorkdayChecklistResponseLatestRevisionTemplateIdRegExp),
+  "version": zod.int().min(1).max(getWorkdayChecklistResponseLatestRevisionVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(getWorkdayChecklistResponseLatestRevisionDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(getWorkdayChecklistResponseLatestRevisionDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(getWorkdayChecklistResponseLatestRevisionDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(getWorkdayChecklistResponseLatestRevisionDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(getWorkdayChecklistResponseLatestRevisionDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(getWorkdayChecklistResponseLatestRevisionDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(getWorkdayChecklistResponseLatestRevisionDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(getWorkdayChecklistResponseLatestRevisionBaselineVersionMin).max(getWorkdayChecklistResponseLatestRevisionBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "approvedRevision": zod.object({
+  "id": zod.uuid().regex(getWorkdayChecklistResponseApprovedRevisionIdRegExp),
+  "templateId": zod.uuid().regex(getWorkdayChecklistResponseApprovedRevisionTemplateIdRegExp),
+  "version": zod.int().min(1).max(getWorkdayChecklistResponseApprovedRevisionVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(getWorkdayChecklistResponseApprovedRevisionDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(getWorkdayChecklistResponseApprovedRevisionDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(getWorkdayChecklistResponseApprovedRevisionDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(getWorkdayChecklistResponseApprovedRevisionDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(getWorkdayChecklistResponseApprovedRevisionDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(getWorkdayChecklistResponseApprovedRevisionDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(getWorkdayChecklistResponseApprovedRevisionDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(getWorkdayChecklistResponseApprovedRevisionBaselineVersionMin).max(getWorkdayChecklistResponseApprovedRevisionBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires settings.manage, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Create a new immutable draft revision
+ */
+export const ReviseWorkdayChecklistParams = zod.object({
+  "templateId": zod.uuid()
+})
+
+export const reviseWorkdayChecklistBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reviseWorkdayChecklistBodyExpectedVersionMax = 9007199254740991;
+
+export const reviseWorkdayChecklistBodyDefinitionNameMax = 120;
+
+export const reviseWorkdayChecklistBodyDefinitionDescriptionMax = 1000;
+
+export const reviseWorkdayChecklistBodyDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const reviseWorkdayChecklistBodyDefinitionItemsItemLabelMax = 200;
+
+export const reviseWorkdayChecklistBodyDefinitionItemsItemUnitMax = 30;
+
+export const reviseWorkdayChecklistBodyDefinitionItemsMax = 50;
+
+
+
+export const ReviseWorkdayChecklistBody = zod.object({
+  "requestId": zod.uuid().regex(reviseWorkdayChecklistBodyRequestIdRegExp),
+  "expectedVersion": zod.int().min(1).max(reviseWorkdayChecklistBodyExpectedVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(reviseWorkdayChecklistBodyDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(reviseWorkdayChecklistBodyDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(reviseWorkdayChecklistBodyDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(reviseWorkdayChecklistBodyDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(reviseWorkdayChecklistBodyDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(reviseWorkdayChecklistBodyDefinitionItemsMax)
+})
+})
+
+export const reviseWorkdayChecklistResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reviseWorkdayChecklistResponseTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reviseWorkdayChecklistResponseTemplateOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reviseWorkdayChecklistResponseTemplateVersionMax = 9007199254740991;
+
+export const reviseWorkdayChecklistResponseTemplateLatestRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reviseWorkdayChecklistResponseTemplateLatestRevisionTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reviseWorkdayChecklistResponseTemplateLatestRevisionVersionMax = 9007199254740991;
+
+export const reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionNameMax = 120;
+
+export const reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionDescriptionMax = 1000;
+
+export const reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemLabelMax = 200;
+
+export const reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemUnitMax = 30;
+
+export const reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsMax = 50;
+
+export const reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const reviseWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMin = -9007199254740991;
+export const reviseWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMax = 9007199254740991;
+
+export const reviseWorkdayChecklistResponseTemplateApprovedRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reviseWorkdayChecklistResponseTemplateApprovedRevisionTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reviseWorkdayChecklistResponseTemplateApprovedRevisionVersionMax = 9007199254740991;
+
+export const reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionNameMax = 120;
+
+export const reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionDescriptionMax = 1000;
+
+export const reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemLabelMax = 200;
+
+export const reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemUnitMax = 30;
+
+export const reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsMax = 50;
+
+export const reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const reviseWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMin = -9007199254740991;
+export const reviseWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMax = 9007199254740991;
+
+export const reviseWorkdayChecklistResponseReceiptRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const ReviseWorkdayChecklistResponse = zod.object({
+  "organizationId": zod.uuid().regex(reviseWorkdayChecklistResponseOrganizationIdRegExp),
+  "template": zod.object({
+  "id": zod.uuid().regex(reviseWorkdayChecklistResponseTemplateIdRegExp),
+  "organizationId": zod.uuid().regex(reviseWorkdayChecklistResponseTemplateOrganizationIdRegExp),
+  "version": zod.int().min(1).max(reviseWorkdayChecklistResponseTemplateVersionMax),
+  "status": zod.enum(['draft', 'reviewed', 'retired']),
+  "latestRevision": zod.object({
+  "id": zod.uuid().regex(reviseWorkdayChecklistResponseTemplateLatestRevisionIdRegExp),
+  "templateId": zod.uuid().regex(reviseWorkdayChecklistResponseTemplateLatestRevisionTemplateIdRegExp),
+  "version": zod.int().min(1).max(reviseWorkdayChecklistResponseTemplateLatestRevisionVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(reviseWorkdayChecklistResponseTemplateLatestRevisionDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(reviseWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMin).max(reviseWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "approvedRevision": zod.object({
+  "id": zod.uuid().regex(reviseWorkdayChecklistResponseTemplateApprovedRevisionIdRegExp),
+  "templateId": zod.uuid().regex(reviseWorkdayChecklistResponseTemplateApprovedRevisionTemplateIdRegExp),
+  "version": zod.int().min(1).max(reviseWorkdayChecklistResponseTemplateApprovedRevisionVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(reviseWorkdayChecklistResponseTemplateApprovedRevisionDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(reviseWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMin).max(reviseWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "receipt": zod.object({
+  "requestId": zod.uuid().regex(reviseWorkdayChecklistResponseReceiptRequestIdRegExp),
+  "replayed": zod.boolean()
+})
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires settings.manage, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Review exact saved company instructions
+ */
+export const PreviewWorkdayChecklistParams = zod.object({
+  "templateId": zod.uuid()
+})
+
+export const previewWorkdayChecklistBodyExpectedVersionMax = 9007199254740991;
+
+export const previewWorkdayChecklistBodyRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const PreviewWorkdayChecklistBody = zod.object({
+  "expectedVersion": zod.int().min(1).max(previewWorkdayChecklistBodyExpectedVersionMax),
+  "revisionId": zod.uuid().regex(previewWorkdayChecklistBodyRevisionIdRegExp)
+})
+
+export const previewWorkdayChecklistResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewWorkdayChecklistResponseTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewWorkdayChecklistResponseExpectedVersionMax = 9007199254740991;
+
+export const previewWorkdayChecklistResponseRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewWorkdayChecklistResponseRevisionTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewWorkdayChecklistResponseRevisionVersionMax = 9007199254740991;
+
+export const previewWorkdayChecklistResponseRevisionDefinitionNameMax = 120;
+
+export const previewWorkdayChecklistResponseRevisionDefinitionDescriptionMax = 1000;
+
+export const previewWorkdayChecklistResponseRevisionDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const previewWorkdayChecklistResponseRevisionDefinitionItemsItemLabelMax = 200;
+
+export const previewWorkdayChecklistResponseRevisionDefinitionItemsItemUnitMax = 30;
+
+export const previewWorkdayChecklistResponseRevisionDefinitionItemsMax = 50;
+
+export const previewWorkdayChecklistResponseRevisionDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewWorkdayChecklistResponseRevisionBaselineVersionMin = -9007199254740991;
+export const previewWorkdayChecklistResponseRevisionBaselineVersionMax = 9007199254740991;
+
+
+
+export const PreviewWorkdayChecklistResponse = zod.object({
+  "organizationId": zod.uuid().regex(previewWorkdayChecklistResponseOrganizationIdRegExp),
+  "templateId": zod.uuid().regex(previewWorkdayChecklistResponseTemplateIdRegExp),
+  "expectedVersion": zod.int().min(1).max(previewWorkdayChecklistResponseExpectedVersionMax),
+  "revision": zod.object({
+  "id": zod.uuid().regex(previewWorkdayChecklistResponseRevisionIdRegExp),
+  "templateId": zod.uuid().regex(previewWorkdayChecklistResponseRevisionTemplateIdRegExp),
+  "version": zod.int().min(1).max(previewWorkdayChecklistResponseRevisionVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(previewWorkdayChecklistResponseRevisionDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(previewWorkdayChecklistResponseRevisionDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(previewWorkdayChecklistResponseRevisionDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(previewWorkdayChecklistResponseRevisionDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(previewWorkdayChecklistResponseRevisionDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(previewWorkdayChecklistResponseRevisionDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(previewWorkdayChecklistResponseRevisionDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(previewWorkdayChecklistResponseRevisionBaselineVersionMin).max(previewWorkdayChecklistResponseRevisionBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "expiresAt": zod.coerce.date(),
+  "previewToken": zod.string()
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires settings.manage, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Approve the actor-bound exact revision
+ */
+export const ApproveWorkdayChecklistParams = zod.object({
+  "templateId": zod.uuid()
+})
+
+export const approveWorkdayChecklistBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveWorkdayChecklistBodyPreviewTokenMax = 10000;
+
+
+
+export const ApproveWorkdayChecklistBody = zod.object({
+  "requestId": zod.uuid().regex(approveWorkdayChecklistBodyRequestIdRegExp),
+  "previewToken": zod.string().min(1).max(approveWorkdayChecklistBodyPreviewTokenMax),
+  "confirmed": zod.literal(true)
+})
+
+export const approveWorkdayChecklistResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveWorkdayChecklistResponseTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveWorkdayChecklistResponseTemplateOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveWorkdayChecklistResponseTemplateVersionMax = 9007199254740991;
+
+export const approveWorkdayChecklistResponseTemplateLatestRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveWorkdayChecklistResponseTemplateLatestRevisionTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveWorkdayChecklistResponseTemplateLatestRevisionVersionMax = 9007199254740991;
+
+export const approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionNameMax = 120;
+
+export const approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionDescriptionMax = 1000;
+
+export const approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemLabelMax = 200;
+
+export const approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemUnitMax = 30;
+
+export const approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsMax = 50;
+
+export const approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMin = -9007199254740991;
+export const approveWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMax = 9007199254740991;
+
+export const approveWorkdayChecklistResponseTemplateApprovedRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveWorkdayChecklistResponseTemplateApprovedRevisionTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const approveWorkdayChecklistResponseTemplateApprovedRevisionVersionMax = 9007199254740991;
+
+export const approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionNameMax = 120;
+
+export const approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionDescriptionMax = 1000;
+
+export const approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemLabelMax = 200;
+
+export const approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemUnitMax = 30;
+
+export const approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsMax = 50;
+
+export const approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const approveWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMin = -9007199254740991;
+export const approveWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMax = 9007199254740991;
+
+export const approveWorkdayChecklistResponseReceiptRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const ApproveWorkdayChecklistResponse = zod.object({
+  "organizationId": zod.uuid().regex(approveWorkdayChecklistResponseOrganizationIdRegExp),
+  "template": zod.object({
+  "id": zod.uuid().regex(approveWorkdayChecklistResponseTemplateIdRegExp),
+  "organizationId": zod.uuid().regex(approveWorkdayChecklistResponseTemplateOrganizationIdRegExp),
+  "version": zod.int().min(1).max(approveWorkdayChecklistResponseTemplateVersionMax),
+  "status": zod.enum(['draft', 'reviewed', 'retired']),
+  "latestRevision": zod.object({
+  "id": zod.uuid().regex(approveWorkdayChecklistResponseTemplateLatestRevisionIdRegExp),
+  "templateId": zod.uuid().regex(approveWorkdayChecklistResponseTemplateLatestRevisionTemplateIdRegExp),
+  "version": zod.int().min(1).max(approveWorkdayChecklistResponseTemplateLatestRevisionVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(approveWorkdayChecklistResponseTemplateLatestRevisionDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(approveWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMin).max(approveWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "approvedRevision": zod.object({
+  "id": zod.uuid().regex(approveWorkdayChecklistResponseTemplateApprovedRevisionIdRegExp),
+  "templateId": zod.uuid().regex(approveWorkdayChecklistResponseTemplateApprovedRevisionTemplateIdRegExp),
+  "version": zod.int().min(1).max(approveWorkdayChecklistResponseTemplateApprovedRevisionVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(approveWorkdayChecklistResponseTemplateApprovedRevisionDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(approveWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMin).max(approveWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "receipt": zod.object({
+  "requestId": zod.uuid().regex(approveWorkdayChecklistResponseReceiptRequestIdRegExp),
+  "replayed": zod.boolean()
+})
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires settings.manage, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Block new enrollment without rewriting history
+ */
+export const RetireWorkdayChecklistParams = zod.object({
+  "templateId": zod.uuid()
+})
+
+export const retireWorkdayChecklistBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const retireWorkdayChecklistBodyExpectedVersionMax = 9007199254740991;
+
+export const retireWorkdayChecklistBodyReasonMax = 2000;
+
+
+
+export const RetireWorkdayChecklistBody = zod.object({
+  "requestId": zod.uuid().regex(retireWorkdayChecklistBodyRequestIdRegExp),
+  "expectedVersion": zod.int().min(1).max(retireWorkdayChecklistBodyExpectedVersionMax),
+  "reason": zod.string().min(1).max(retireWorkdayChecklistBodyReasonMax),
+  "confirmed": zod.literal(true)
+})
+
+export const retireWorkdayChecklistResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const retireWorkdayChecklistResponseTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const retireWorkdayChecklistResponseTemplateOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const retireWorkdayChecklistResponseTemplateVersionMax = 9007199254740991;
+
+export const retireWorkdayChecklistResponseTemplateLatestRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const retireWorkdayChecklistResponseTemplateLatestRevisionTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const retireWorkdayChecklistResponseTemplateLatestRevisionVersionMax = 9007199254740991;
+
+export const retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionNameMax = 120;
+
+export const retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionDescriptionMax = 1000;
+
+export const retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemLabelMax = 200;
+
+export const retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemUnitMax = 30;
+
+export const retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsMax = 50;
+
+export const retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const retireWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMin = -9007199254740991;
+export const retireWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMax = 9007199254740991;
+
+export const retireWorkdayChecklistResponseTemplateApprovedRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const retireWorkdayChecklistResponseTemplateApprovedRevisionTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const retireWorkdayChecklistResponseTemplateApprovedRevisionVersionMax = 9007199254740991;
+
+export const retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionNameMax = 120;
+
+export const retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionDescriptionMax = 1000;
+
+export const retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemLabelMax = 200;
+
+export const retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemUnitMax = 30;
+
+export const retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsMax = 50;
+
+export const retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const retireWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMin = -9007199254740991;
+export const retireWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMax = 9007199254740991;
+
+export const retireWorkdayChecklistResponseReceiptRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const RetireWorkdayChecklistResponse = zod.object({
+  "organizationId": zod.uuid().regex(retireWorkdayChecklistResponseOrganizationIdRegExp),
+  "template": zod.object({
+  "id": zod.uuid().regex(retireWorkdayChecklistResponseTemplateIdRegExp),
+  "organizationId": zod.uuid().regex(retireWorkdayChecklistResponseTemplateOrganizationIdRegExp),
+  "version": zod.int().min(1).max(retireWorkdayChecklistResponseTemplateVersionMax),
+  "status": zod.enum(['draft', 'reviewed', 'retired']),
+  "latestRevision": zod.object({
+  "id": zod.uuid().regex(retireWorkdayChecklistResponseTemplateLatestRevisionIdRegExp),
+  "templateId": zod.uuid().regex(retireWorkdayChecklistResponseTemplateLatestRevisionTemplateIdRegExp),
+  "version": zod.int().min(1).max(retireWorkdayChecklistResponseTemplateLatestRevisionVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(retireWorkdayChecklistResponseTemplateLatestRevisionDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(retireWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMin).max(retireWorkdayChecklistResponseTemplateLatestRevisionBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "approvedRevision": zod.object({
+  "id": zod.uuid().regex(retireWorkdayChecklistResponseTemplateApprovedRevisionIdRegExp),
+  "templateId": zod.uuid().regex(retireWorkdayChecklistResponseTemplateApprovedRevisionTemplateIdRegExp),
+  "version": zod.int().min(1).max(retireWorkdayChecklistResponseTemplateApprovedRevisionVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(retireWorkdayChecklistResponseTemplateApprovedRevisionDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(retireWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMin).max(retireWorkdayChecklistResponseTemplateApprovedRevisionBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "receipt": zod.object({
+  "requestId": zod.uuid().regex(retireWorkdayChecklistResponseReceiptRequestIdRegExp),
+  "replayed": zod.boolean()
+})
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.read, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Read exact native visit work and separate service outcomes
+ */
+export const GetAppointmentWorkParams = zod.object({
+  "appointmentId": zod.uuid()
+})
+
+export const getAppointmentWorkResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseAppointmentContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseAppointmentPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseAppointmentLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseEntriesItemAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseEntriesItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseEntriesItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseEntriesItemServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseEntriesItemVersionMax = 9007199254740991;
+
+export const getAppointmentWorkResponseEntriesItemChecklistIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseEntriesItemChecklistTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseEntriesItemChecklistVersionMax = 9007199254740991;
+
+export const getAppointmentWorkResponseEntriesItemChecklistDefinitionNameMax = 120;
+
+export const getAppointmentWorkResponseEntriesItemChecklistDefinitionDescriptionMax = 1000;
+
+export const getAppointmentWorkResponseEntriesItemChecklistDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const getAppointmentWorkResponseEntriesItemChecklistDefinitionItemsItemLabelMax = 200;
+
+export const getAppointmentWorkResponseEntriesItemChecklistDefinitionItemsItemUnitMax = 30;
+
+export const getAppointmentWorkResponseEntriesItemChecklistDefinitionItemsMax = 50;
+
+export const getAppointmentWorkResponseEntriesItemChecklistDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getAppointmentWorkResponseEntriesItemChecklistBaselineVersionMin = -9007199254740991;
+export const getAppointmentWorkResponseEntriesItemChecklistBaselineVersionMax = 9007199254740991;
+
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotLabelMax = 160;
+
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotManufacturerMax = 160;
+
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotModelMax = 160;
+
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotSerialMax = 160;
+
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotLocationMax = 300;
+
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotNotesMax = 2000;
+
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotWarrantySourceMax = 1000;
+
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotAttributesItemLabelMax = 80;
+
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotAttributesItemValueMax = 300;
+
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotAttributesMax = 20;
+
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseEntriesItemAssetSnapshotVersionMax = 9007199254740991;
+
+export const getAppointmentWorkResponseEntriesItemAnswersItemItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const getAppointmentWorkResponseEntriesItemAnswersItemValueOneMax = 2000;
+
+export const getAppointmentWorkResponseEntriesItemAnswersItemReasonMax = 1000;
+
+export const getAppointmentWorkResponseEntriesItemPhotosItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseEntriesItemPhotosItemEntryIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseEntriesItemPhotosItemSizeBytesMax = 10485760;
+
+export const getAppointmentWorkResponseEntriesItemPhotosMax = 50;
+
+export const getAppointmentWorkResponseEntriesItemCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseEntriesMax = 20;
+
+export const getAppointmentWorkResponseCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseCompletionAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseCompletionContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseCompletionPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseCompletionRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseCompletionFollowupTaskIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseCompletionEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseCompletionEntriesItemVersionMax = 9007199254740991;
+
+export const getAppointmentWorkResponseCompletionEntriesItemChecklistRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseCompletionEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseCompletionServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseCompletionServicesItemNextObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseCorrectionsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseCorrectionsItemOriginalCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getAppointmentWorkResponseCorrectionsMax = 25;
+
+export const getAppointmentWorkResponseLinkedServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const GetAppointmentWorkResponse = zod.object({
+  "organizationId": zod.uuid().regex(getAppointmentWorkResponseOrganizationIdRegExp),
+  "appointment": zod.object({
+  "id": zod.uuid().regex(getAppointmentWorkResponseAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(getAppointmentWorkResponseAppointmentContactIdRegExp).nullable(),
+  "propertyId": zod.uuid().regex(getAppointmentWorkResponseAppointmentPropertyIdRegExp).nullable(),
+  "leadId": zod.uuid().regex(getAppointmentWorkResponseAppointmentLeadIdRegExp).nullable(),
+  "assignedUserId": zod.string().nullable(),
+  "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']),
+  "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "customerLabel": zod.string().nullable(),
+  "propertyLabel": zod.string().nullable()
+}),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(getAppointmentWorkResponseEntriesItemIdRegExp),
+  "appointmentId": zod.uuid().regex(getAppointmentWorkResponseEntriesItemAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(getAppointmentWorkResponseEntriesItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(getAppointmentWorkResponseEntriesItemPropertyIdRegExp).nullable(),
+  "assetId": zod.uuid().regex(getAppointmentWorkResponseEntriesItemAssetIdRegExp).nullable(),
+  "serviceObligationId": zod.uuid().regex(getAppointmentWorkResponseEntriesItemServiceObligationIdRegExp).nullable(),
+  "version": zod.int().min(1).max(getAppointmentWorkResponseEntriesItemVersionMax),
+  "state": zod.enum(['draft', 'cancelled', 'finalized']),
+  "checklist": zod.object({
+  "id": zod.uuid().regex(getAppointmentWorkResponseEntriesItemChecklistIdRegExp),
+  "templateId": zod.uuid().regex(getAppointmentWorkResponseEntriesItemChecklistTemplateIdRegExp),
+  "version": zod.int().min(1).max(getAppointmentWorkResponseEntriesItemChecklistVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(getAppointmentWorkResponseEntriesItemChecklistDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(getAppointmentWorkResponseEntriesItemChecklistDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(getAppointmentWorkResponseEntriesItemChecklistDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(getAppointmentWorkResponseEntriesItemChecklistDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(getAppointmentWorkResponseEntriesItemChecklistDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(getAppointmentWorkResponseEntriesItemChecklistDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(getAppointmentWorkResponseEntriesItemChecklistDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(getAppointmentWorkResponseEntriesItemChecklistBaselineVersionMin).max(getAppointmentWorkResponseEntriesItemChecklistBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "assetSnapshot": zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(getAppointmentWorkResponseEntriesItemAssetSnapshotLabelMax),
+  "manufacturer": zod.string().max(getAppointmentWorkResponseEntriesItemAssetSnapshotManufacturerMax).nullable(),
+  "model": zod.string().max(getAppointmentWorkResponseEntriesItemAssetSnapshotModelMax).nullable(),
+  "serial": zod.string().max(getAppointmentWorkResponseEntriesItemAssetSnapshotSerialMax).nullable(),
+  "location": zod.string().max(getAppointmentWorkResponseEntriesItemAssetSnapshotLocationMax).nullable(),
+  "installedOn": zod.string().regex(getAppointmentWorkResponseEntriesItemAssetSnapshotInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(getAppointmentWorkResponseEntriesItemAssetSnapshotNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(getAppointmentWorkResponseEntriesItemAssetSnapshotWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(getAppointmentWorkResponseEntriesItemAssetSnapshotWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(getAppointmentWorkResponseEntriesItemAssetSnapshotWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(getAppointmentWorkResponseEntriesItemAssetSnapshotAttributesItemLabelMax),
+  "value": zod.string().min(1).max(getAppointmentWorkResponseEntriesItemAssetSnapshotAttributesItemValueMax)
+})).max(getAppointmentWorkResponseEntriesItemAssetSnapshotAttributesMax),
+  "id": zod.uuid().regex(getAppointmentWorkResponseEntriesItemAssetSnapshotIdRegExp),
+  "version": zod.int().min(1).max(getAppointmentWorkResponseEntriesItemAssetSnapshotVersionMax)
+}).nullable(),
+  "answers": zod.array(zod.object({
+  "itemKey": zod.string().regex(getAppointmentWorkResponseEntriesItemAnswersItemItemKeyRegExp),
+  "result": zod.enum(['done', 'needs_attention', 'not_applicable']),
+  "value": zod.union([zod.string().max(getAppointmentWorkResponseEntriesItemAnswersItemValueOneMax),zod.number()]).nullable(),
+  "reason": zod.string().max(getAppointmentWorkResponseEntriesItemAnswersItemReasonMax).nullable()
+})),
+  "notes": zod.string(),
+  "photos": zod.array(zod.object({
+  "id": zod.uuid().regex(getAppointmentWorkResponseEntriesItemPhotosItemIdRegExp),
+  "entryId": zod.uuid().regex(getAppointmentWorkResponseEntriesItemPhotosItemEntryIdRegExp),
+  "itemKey": zod.string().nullable(),
+  "caption": zod.string(),
+  "state": zod.enum(['reserved', 'attached', 'expired']),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp']),
+  "sizeBytes": zod.int().min(1).max(getAppointmentWorkResponseEntriesItemPhotosItemSizeBytesMax),
+  "expiresAt": zod.coerce.date(),
+  "attachedAt": zod.coerce.date().nullable(),
+  "contentPath": zod.string().nullable(),
+  "available": zod.boolean()
+})).max(getAppointmentWorkResponseEntriesItemPhotosMax),
+  "completionId": zod.uuid().regex(getAppointmentWorkResponseEntriesItemCompletionIdRegExp).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "holdReasons": zod.array(zod.string())
+})).max(getAppointmentWorkResponseEntriesMax),
+  "completion": zod.object({
+  "id": zod.uuid().regex(getAppointmentWorkResponseCompletionIdRegExp),
+  "appointmentId": zod.uuid().regex(getAppointmentWorkResponseCompletionAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(getAppointmentWorkResponseCompletionContactIdRegExp),
+  "propertyId": zod.uuid().regex(getAppointmentWorkResponseCompletionPropertyIdRegExp).nullable(),
+  "requestId": zod.uuid().regex(getAppointmentWorkResponseCompletionRequestIdRegExp),
+  "performedAt": zod.coerce.date(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string(),
+  "performerUserId": zod.string(),
+  "actingNote": zod.string().nullable(),
+  "summary": zod.string(),
+  "outcome": zod.enum(['completed', 'needs_followup']),
+  "followupTaskId": zod.uuid().regex(getAppointmentWorkResponseCompletionFollowupTaskIdRegExp).nullable(),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(getAppointmentWorkResponseCompletionEntriesItemIdRegExp),
+  "version": zod.int().min(1).max(getAppointmentWorkResponseCompletionEntriesItemVersionMax),
+  "checklistRevisionId": zod.uuid().regex(getAppointmentWorkResponseCompletionEntriesItemChecklistRevisionIdRegExp),
+  "assetId": zod.uuid().regex(getAppointmentWorkResponseCompletionEntriesItemAssetIdRegExp).nullable()
+})),
+  "services": zod.array(zod.object({
+  "id": zod.uuid().regex(getAppointmentWorkResponseCompletionServicesItemIdRegExp),
+  "nextObligationId": zod.uuid().regex(getAppointmentWorkResponseCompletionServicesItemNextObligationIdRegExp).nullable()
+})),
+  "nativeAppointmentStatus": zod.enum(['completed'])
+}).nullable(),
+  "corrections": zod.array(zod.object({
+  "id": zod.uuid().regex(getAppointmentWorkResponseCorrectionsItemIdRegExp),
+  "originalCompletionId": zod.uuid().regex(getAppointmentWorkResponseCorrectionsItemOriginalCompletionIdRegExp),
+  "note": zod.string(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string()
+})).max(getAppointmentWorkResponseCorrectionsMax),
+  "correctionsHasMore": zod.boolean(),
+  "linkedServices": zod.array(zod.object({
+  "id": zod.uuid().regex(getAppointmentWorkResponseLinkedServicesItemIdRegExp),
+  "equipmentLabel": zod.string(),
+  "status": zod.enum(['active', 'completed', 'cancelled']),
+  "updatedAt": zod.coerce.date()
+})),
+  "capabilities": zod.object({
+  "canPrepare": zod.boolean(),
+  "canEdit": zod.boolean(),
+  "canCancel": zod.boolean(),
+  "canComplete": zod.boolean(),
+  "canCorrect": zod.boolean(),
+  "requiresActingNote": zod.boolean(),
+  "reasons": zod.array(zod.string())
+})
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Explicitly prepare an asset/checklist entry
+ */
+export const CreateAppointmentWorkEntryParams = zod.object({
+  "appointmentId": zod.uuid()
+})
+
+export const createAppointmentWorkEntryBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryBodyChecklistRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryBodyAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryBodyServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryBodyActingNoteMax = 500;
+
+
+
+export const CreateAppointmentWorkEntryBody = zod.object({
+  "requestId": zod.uuid().regex(createAppointmentWorkEntryBodyRequestIdRegExp),
+  "expectedAppointmentUpdatedAt": zod.coerce.date(),
+  "checklistRevisionId": zod.uuid().regex(createAppointmentWorkEntryBodyChecklistRevisionIdRegExp),
+  "assetId": zod.uuid().regex(createAppointmentWorkEntryBodyAssetIdRegExp).nullable(),
+  "serviceObligationId": zod.uuid().regex(createAppointmentWorkEntryBodyServiceObligationIdRegExp).nullable(),
+  "actingNote": zod.string().min(1).max(createAppointmentWorkEntryBodyActingNoteMax).optional()
+})
+
+export const createAppointmentWorkEntryResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkAppointmentContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkAppointmentPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkAppointmentLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemVersionMax = 9007199254740991;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemChecklistIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemChecklistTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemChecklistVersionMax = 9007199254740991;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionNameMax = 120;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionDescriptionMax = 1000;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax = 200;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax = 30;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsMax = 50;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemChecklistBaselineVersionMin = -9007199254740991;
+export const createAppointmentWorkEntryResponseWorkEntriesItemChecklistBaselineVersionMax = 9007199254740991;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotLabelMax = 160;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotManufacturerMax = 160;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotModelMax = 160;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotSerialMax = 160;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotLocationMax = 300;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotNotesMax = 2000;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantySourceMax = 1000;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax = 80;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax = 300;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesMax = 20;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotVersionMax = 9007199254740991;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemAnswersItemItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemAnswersItemValueOneMax = 2000;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemAnswersItemReasonMax = 1000;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemPhotosItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemPhotosItemEntryIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkEntriesItemPhotosItemSizeBytesMax = 10485760;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemPhotosMax = 50;
+
+export const createAppointmentWorkEntryResponseWorkEntriesItemCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkEntriesMax = 20;
+
+export const createAppointmentWorkEntryResponseWorkCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkCompletionAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkCompletionContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkCompletionPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkCompletionRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkCompletionFollowupTaskIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkCompletionEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkCompletionEntriesItemVersionMax = 9007199254740991;
+
+export const createAppointmentWorkEntryResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkCompletionEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkCompletionServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkCompletionServicesItemNextObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkCorrectionsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkCorrectionsItemOriginalCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseWorkCorrectionsMax = 25;
+
+export const createAppointmentWorkEntryResponseWorkLinkedServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentWorkEntryResponseReceiptRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const CreateAppointmentWorkEntryResponse = zod.object({
+  "organizationId": zod.uuid().regex(createAppointmentWorkEntryResponseOrganizationIdRegExp),
+  "work": zod.object({
+  "organizationId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkOrganizationIdRegExp),
+  "appointment": zod.object({
+  "id": zod.uuid().regex(createAppointmentWorkEntryResponseWorkAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkAppointmentContactIdRegExp).nullable(),
+  "propertyId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkAppointmentPropertyIdRegExp).nullable(),
+  "leadId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkAppointmentLeadIdRegExp).nullable(),
+  "assignedUserId": zod.string().nullable(),
+  "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']),
+  "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "customerLabel": zod.string().nullable(),
+  "propertyLabel": zod.string().nullable()
+}),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(createAppointmentWorkEntryResponseWorkEntriesItemIdRegExp),
+  "appointmentId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkEntriesItemAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkEntriesItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkEntriesItemPropertyIdRegExp).nullable(),
+  "assetId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkEntriesItemAssetIdRegExp).nullable(),
+  "serviceObligationId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkEntriesItemServiceObligationIdRegExp).nullable(),
+  "version": zod.int().min(1).max(createAppointmentWorkEntryResponseWorkEntriesItemVersionMax),
+  "state": zod.enum(['draft', 'cancelled', 'finalized']),
+  "checklist": zod.object({
+  "id": zod.uuid().regex(createAppointmentWorkEntryResponseWorkEntriesItemChecklistIdRegExp),
+  "templateId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkEntriesItemChecklistTemplateIdRegExp),
+  "version": zod.int().min(1).max(createAppointmentWorkEntryResponseWorkEntriesItemChecklistVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(createAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(createAppointmentWorkEntryResponseWorkEntriesItemChecklistBaselineVersionMin).max(createAppointmentWorkEntryResponseWorkEntriesItemChecklistBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "assetSnapshot": zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotLabelMax),
+  "manufacturer": zod.string().max(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotManufacturerMax).nullable(),
+  "model": zod.string().max(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotModelMax).nullable(),
+  "serial": zod.string().max(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotSerialMax).nullable(),
+  "location": zod.string().max(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotLocationMax).nullable(),
+  "installedOn": zod.string().regex(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax),
+  "value": zod.string().min(1).max(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax)
+})).max(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesMax),
+  "id": zod.uuid().regex(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotIdRegExp),
+  "version": zod.int().min(1).max(createAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotVersionMax)
+}).nullable(),
+  "answers": zod.array(zod.object({
+  "itemKey": zod.string().regex(createAppointmentWorkEntryResponseWorkEntriesItemAnswersItemItemKeyRegExp),
+  "result": zod.enum(['done', 'needs_attention', 'not_applicable']),
+  "value": zod.union([zod.string().max(createAppointmentWorkEntryResponseWorkEntriesItemAnswersItemValueOneMax),zod.number()]).nullable(),
+  "reason": zod.string().max(createAppointmentWorkEntryResponseWorkEntriesItemAnswersItemReasonMax).nullable()
+})),
+  "notes": zod.string(),
+  "photos": zod.array(zod.object({
+  "id": zod.uuid().regex(createAppointmentWorkEntryResponseWorkEntriesItemPhotosItemIdRegExp),
+  "entryId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkEntriesItemPhotosItemEntryIdRegExp),
+  "itemKey": zod.string().nullable(),
+  "caption": zod.string(),
+  "state": zod.enum(['reserved', 'attached', 'expired']),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp']),
+  "sizeBytes": zod.int().min(1).max(createAppointmentWorkEntryResponseWorkEntriesItemPhotosItemSizeBytesMax),
+  "expiresAt": zod.coerce.date(),
+  "attachedAt": zod.coerce.date().nullable(),
+  "contentPath": zod.string().nullable(),
+  "available": zod.boolean()
+})).max(createAppointmentWorkEntryResponseWorkEntriesItemPhotosMax),
+  "completionId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkEntriesItemCompletionIdRegExp).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "holdReasons": zod.array(zod.string())
+})).max(createAppointmentWorkEntryResponseWorkEntriesMax),
+  "completion": zod.object({
+  "id": zod.uuid().regex(createAppointmentWorkEntryResponseWorkCompletionIdRegExp),
+  "appointmentId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkCompletionAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkCompletionContactIdRegExp),
+  "propertyId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkCompletionPropertyIdRegExp).nullable(),
+  "requestId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkCompletionRequestIdRegExp),
+  "performedAt": zod.coerce.date(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string(),
+  "performerUserId": zod.string(),
+  "actingNote": zod.string().nullable(),
+  "summary": zod.string(),
+  "outcome": zod.enum(['completed', 'needs_followup']),
+  "followupTaskId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkCompletionFollowupTaskIdRegExp).nullable(),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(createAppointmentWorkEntryResponseWorkCompletionEntriesItemIdRegExp),
+  "version": zod.int().min(1).max(createAppointmentWorkEntryResponseWorkCompletionEntriesItemVersionMax),
+  "checklistRevisionId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp),
+  "assetId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkCompletionEntriesItemAssetIdRegExp).nullable()
+})),
+  "services": zod.array(zod.object({
+  "id": zod.uuid().regex(createAppointmentWorkEntryResponseWorkCompletionServicesItemIdRegExp),
+  "nextObligationId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkCompletionServicesItemNextObligationIdRegExp).nullable()
+})),
+  "nativeAppointmentStatus": zod.enum(['completed'])
+}).nullable(),
+  "corrections": zod.array(zod.object({
+  "id": zod.uuid().regex(createAppointmentWorkEntryResponseWorkCorrectionsItemIdRegExp),
+  "originalCompletionId": zod.uuid().regex(createAppointmentWorkEntryResponseWorkCorrectionsItemOriginalCompletionIdRegExp),
+  "note": zod.string(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string()
+})).max(createAppointmentWorkEntryResponseWorkCorrectionsMax),
+  "correctionsHasMore": zod.boolean(),
+  "linkedServices": zod.array(zod.object({
+  "id": zod.uuid().regex(createAppointmentWorkEntryResponseWorkLinkedServicesItemIdRegExp),
+  "equipmentLabel": zod.string(),
+  "status": zod.enum(['active', 'completed', 'cancelled']),
+  "updatedAt": zod.coerce.date()
+})),
+  "capabilities": zod.object({
+  "canPrepare": zod.boolean(),
+  "canEdit": zod.boolean(),
+  "canCancel": zod.boolean(),
+  "canComplete": zod.boolean(),
+  "canCorrect": zod.boolean(),
+  "requiresActingNote": zod.boolean(),
+  "reasons": zod.array(zod.string())
+})
+}),
+  "receipt": zod.object({
+  "requestId": zod.uuid().regex(createAppointmentWorkEntryResponseReceiptRequestIdRegExp),
+  "replayed": zod.boolean()
+})
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Save actual field progress at the exact version
+ */
+export const SaveAppointmentWorkEntryParams = zod.object({
+  "appointmentId": zod.uuid(),
+  "entryId": zod.uuid()
+})
+
+export const saveAppointmentWorkEntryBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryBodyExpectedVersionMax = 9007199254740991;
+
+export const saveAppointmentWorkEntryBodyAnswersItemItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const saveAppointmentWorkEntryBodyAnswersItemValueOneMax = 2000;
+
+export const saveAppointmentWorkEntryBodyAnswersItemReasonMax = 1000;
+
+export const saveAppointmentWorkEntryBodyAnswersMax = 50;
+
+export const saveAppointmentWorkEntryBodyNotesMax = 2000;
+
+export const saveAppointmentWorkEntryBodyActingNoteMax = 500;
+
+
+
+export const SaveAppointmentWorkEntryBody = zod.object({
+  "requestId": zod.uuid().regex(saveAppointmentWorkEntryBodyRequestIdRegExp),
+  "expectedVersion": zod.int().min(1).max(saveAppointmentWorkEntryBodyExpectedVersionMax),
+  "answers": zod.array(zod.object({
+  "itemKey": zod.string().regex(saveAppointmentWorkEntryBodyAnswersItemItemKeyRegExp),
+  "result": zod.enum(['done', 'needs_attention', 'not_applicable']),
+  "value": zod.union([zod.string().max(saveAppointmentWorkEntryBodyAnswersItemValueOneMax),zod.number()]).nullable(),
+  "reason": zod.string().max(saveAppointmentWorkEntryBodyAnswersItemReasonMax).nullable()
+})).max(saveAppointmentWorkEntryBodyAnswersMax),
+  "notes": zod.string().max(saveAppointmentWorkEntryBodyNotesMax),
+  "actingNote": zod.string().min(1).max(saveAppointmentWorkEntryBodyActingNoteMax).optional()
+})
+
+export const saveAppointmentWorkEntryResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkAppointmentContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkAppointmentPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkAppointmentLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemVersionMax = 9007199254740991;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemChecklistIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemChecklistTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemChecklistVersionMax = 9007199254740991;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionNameMax = 120;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionDescriptionMax = 1000;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax = 200;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax = 30;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsMax = 50;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemChecklistBaselineVersionMin = -9007199254740991;
+export const saveAppointmentWorkEntryResponseWorkEntriesItemChecklistBaselineVersionMax = 9007199254740991;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotLabelMax = 160;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotManufacturerMax = 160;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotModelMax = 160;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotSerialMax = 160;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotLocationMax = 300;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotNotesMax = 2000;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantySourceMax = 1000;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax = 80;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax = 300;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesMax = 20;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotVersionMax = 9007199254740991;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAnswersItemItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAnswersItemValueOneMax = 2000;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemAnswersItemReasonMax = 1000;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemPhotosItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemPhotosItemEntryIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkEntriesItemPhotosItemSizeBytesMax = 10485760;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemPhotosMax = 50;
+
+export const saveAppointmentWorkEntryResponseWorkEntriesItemCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkEntriesMax = 20;
+
+export const saveAppointmentWorkEntryResponseWorkCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkCompletionAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkCompletionContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkCompletionPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkCompletionRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkCompletionFollowupTaskIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkCompletionEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkCompletionEntriesItemVersionMax = 9007199254740991;
+
+export const saveAppointmentWorkEntryResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkCompletionEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkCompletionServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkCompletionServicesItemNextObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkCorrectionsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkCorrectionsItemOriginalCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseWorkCorrectionsMax = 25;
+
+export const saveAppointmentWorkEntryResponseWorkLinkedServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveAppointmentWorkEntryResponseReceiptRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const SaveAppointmentWorkEntryResponse = zod.object({
+  "organizationId": zod.uuid().regex(saveAppointmentWorkEntryResponseOrganizationIdRegExp),
+  "work": zod.object({
+  "organizationId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkOrganizationIdRegExp),
+  "appointment": zod.object({
+  "id": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkAppointmentContactIdRegExp).nullable(),
+  "propertyId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkAppointmentPropertyIdRegExp).nullable(),
+  "leadId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkAppointmentLeadIdRegExp).nullable(),
+  "assignedUserId": zod.string().nullable(),
+  "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']),
+  "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "customerLabel": zod.string().nullable(),
+  "propertyLabel": zod.string().nullable()
+}),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkEntriesItemIdRegExp),
+  "appointmentId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkEntriesItemAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkEntriesItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkEntriesItemPropertyIdRegExp).nullable(),
+  "assetId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkEntriesItemAssetIdRegExp).nullable(),
+  "serviceObligationId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkEntriesItemServiceObligationIdRegExp).nullable(),
+  "version": zod.int().min(1).max(saveAppointmentWorkEntryResponseWorkEntriesItemVersionMax),
+  "state": zod.enum(['draft', 'cancelled', 'finalized']),
+  "checklist": zod.object({
+  "id": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkEntriesItemChecklistIdRegExp),
+  "templateId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkEntriesItemChecklistTemplateIdRegExp),
+  "version": zod.int().min(1).max(saveAppointmentWorkEntryResponseWorkEntriesItemChecklistVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(saveAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(saveAppointmentWorkEntryResponseWorkEntriesItemChecklistBaselineVersionMin).max(saveAppointmentWorkEntryResponseWorkEntriesItemChecklistBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "assetSnapshot": zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotLabelMax),
+  "manufacturer": zod.string().max(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotManufacturerMax).nullable(),
+  "model": zod.string().max(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotModelMax).nullable(),
+  "serial": zod.string().max(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotSerialMax).nullable(),
+  "location": zod.string().max(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotLocationMax).nullable(),
+  "installedOn": zod.string().regex(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax),
+  "value": zod.string().min(1).max(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax)
+})).max(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesMax),
+  "id": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotIdRegExp),
+  "version": zod.int().min(1).max(saveAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotVersionMax)
+}).nullable(),
+  "answers": zod.array(zod.object({
+  "itemKey": zod.string().regex(saveAppointmentWorkEntryResponseWorkEntriesItemAnswersItemItemKeyRegExp),
+  "result": zod.enum(['done', 'needs_attention', 'not_applicable']),
+  "value": zod.union([zod.string().max(saveAppointmentWorkEntryResponseWorkEntriesItemAnswersItemValueOneMax),zod.number()]).nullable(),
+  "reason": zod.string().max(saveAppointmentWorkEntryResponseWorkEntriesItemAnswersItemReasonMax).nullable()
+})),
+  "notes": zod.string(),
+  "photos": zod.array(zod.object({
+  "id": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkEntriesItemPhotosItemIdRegExp),
+  "entryId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkEntriesItemPhotosItemEntryIdRegExp),
+  "itemKey": zod.string().nullable(),
+  "caption": zod.string(),
+  "state": zod.enum(['reserved', 'attached', 'expired']),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp']),
+  "sizeBytes": zod.int().min(1).max(saveAppointmentWorkEntryResponseWorkEntriesItemPhotosItemSizeBytesMax),
+  "expiresAt": zod.coerce.date(),
+  "attachedAt": zod.coerce.date().nullable(),
+  "contentPath": zod.string().nullable(),
+  "available": zod.boolean()
+})).max(saveAppointmentWorkEntryResponseWorkEntriesItemPhotosMax),
+  "completionId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkEntriesItemCompletionIdRegExp).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "holdReasons": zod.array(zod.string())
+})).max(saveAppointmentWorkEntryResponseWorkEntriesMax),
+  "completion": zod.object({
+  "id": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkCompletionIdRegExp),
+  "appointmentId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkCompletionAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkCompletionContactIdRegExp),
+  "propertyId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkCompletionPropertyIdRegExp).nullable(),
+  "requestId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkCompletionRequestIdRegExp),
+  "performedAt": zod.coerce.date(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string(),
+  "performerUserId": zod.string(),
+  "actingNote": zod.string().nullable(),
+  "summary": zod.string(),
+  "outcome": zod.enum(['completed', 'needs_followup']),
+  "followupTaskId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkCompletionFollowupTaskIdRegExp).nullable(),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkCompletionEntriesItemIdRegExp),
+  "version": zod.int().min(1).max(saveAppointmentWorkEntryResponseWorkCompletionEntriesItemVersionMax),
+  "checklistRevisionId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp),
+  "assetId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkCompletionEntriesItemAssetIdRegExp).nullable()
+})),
+  "services": zod.array(zod.object({
+  "id": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkCompletionServicesItemIdRegExp),
+  "nextObligationId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkCompletionServicesItemNextObligationIdRegExp).nullable()
+})),
+  "nativeAppointmentStatus": zod.enum(['completed'])
+}).nullable(),
+  "corrections": zod.array(zod.object({
+  "id": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkCorrectionsItemIdRegExp),
+  "originalCompletionId": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkCorrectionsItemOriginalCompletionIdRegExp),
+  "note": zod.string(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string()
+})).max(saveAppointmentWorkEntryResponseWorkCorrectionsMax),
+  "correctionsHasMore": zod.boolean(),
+  "linkedServices": zod.array(zod.object({
+  "id": zod.uuid().regex(saveAppointmentWorkEntryResponseWorkLinkedServicesItemIdRegExp),
+  "equipmentLabel": zod.string(),
+  "status": zod.enum(['active', 'completed', 'cancelled']),
+  "updatedAt": zod.coerce.date()
+})),
+  "capabilities": zod.object({
+  "canPrepare": zod.boolean(),
+  "canEdit": zod.boolean(),
+  "canCancel": zod.boolean(),
+  "canComplete": zod.boolean(),
+  "canCorrect": zod.boolean(),
+  "requiresActingNote": zod.boolean(),
+  "reasons": zod.array(zod.string())
+})
+}),
+  "receipt": zod.object({
+  "requestId": zod.uuid().regex(saveAppointmentWorkEntryResponseReceiptRequestIdRegExp),
+  "replayed": zod.boolean()
+})
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Cancel preparation without deleting recorded history
+ */
+export const CancelAppointmentWorkEntryParams = zod.object({
+  "appointmentId": zod.uuid(),
+  "entryId": zod.uuid()
+})
+
+export const cancelAppointmentWorkEntryBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryBodyExpectedVersionMax = 9007199254740991;
+
+export const cancelAppointmentWorkEntryBodyReasonMax = 2000;
+
+export const cancelAppointmentWorkEntryBodyActingNoteMax = 500;
+
+
+
+export const CancelAppointmentWorkEntryBody = zod.object({
+  "requestId": zod.uuid().regex(cancelAppointmentWorkEntryBodyRequestIdRegExp),
+  "expectedVersion": zod.int().min(1).max(cancelAppointmentWorkEntryBodyExpectedVersionMax),
+  "reason": zod.string().min(1).max(cancelAppointmentWorkEntryBodyReasonMax),
+  "actingNote": zod.string().min(1).max(cancelAppointmentWorkEntryBodyActingNoteMax).optional()
+})
+
+export const cancelAppointmentWorkEntryResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkAppointmentContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkAppointmentPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkAppointmentLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemVersionMax = 9007199254740991;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistVersionMax = 9007199254740991;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionNameMax = 120;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionDescriptionMax = 1000;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax = 200;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax = 30;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsMax = 50;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistBaselineVersionMin = -9007199254740991;
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistBaselineVersionMax = 9007199254740991;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotLabelMax = 160;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotManufacturerMax = 160;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotModelMax = 160;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotSerialMax = 160;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotLocationMax = 300;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotNotesMax = 2000;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantySourceMax = 1000;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax = 80;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax = 300;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesMax = 20;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotVersionMax = 9007199254740991;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAnswersItemItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAnswersItemValueOneMax = 2000;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemAnswersItemReasonMax = 1000;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemPhotosItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemPhotosItemEntryIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemPhotosItemSizeBytesMax = 10485760;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemPhotosMax = 50;
+
+export const cancelAppointmentWorkEntryResponseWorkEntriesItemCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkEntriesMax = 20;
+
+export const cancelAppointmentWorkEntryResponseWorkCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkCompletionAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkCompletionContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkCompletionPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkCompletionRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkCompletionFollowupTaskIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkCompletionEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkCompletionEntriesItemVersionMax = 9007199254740991;
+
+export const cancelAppointmentWorkEntryResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkCompletionEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkCompletionServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkCompletionServicesItemNextObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkCorrectionsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkCorrectionsItemOriginalCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseWorkCorrectionsMax = 25;
+
+export const cancelAppointmentWorkEntryResponseWorkLinkedServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const cancelAppointmentWorkEntryResponseReceiptRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const CancelAppointmentWorkEntryResponse = zod.object({
+  "organizationId": zod.uuid().regex(cancelAppointmentWorkEntryResponseOrganizationIdRegExp),
+  "work": zod.object({
+  "organizationId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkOrganizationIdRegExp),
+  "appointment": zod.object({
+  "id": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkAppointmentContactIdRegExp).nullable(),
+  "propertyId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkAppointmentPropertyIdRegExp).nullable(),
+  "leadId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkAppointmentLeadIdRegExp).nullable(),
+  "assignedUserId": zod.string().nullable(),
+  "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']),
+  "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "customerLabel": zod.string().nullable(),
+  "propertyLabel": zod.string().nullable()
+}),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemIdRegExp),
+  "appointmentId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemPropertyIdRegExp).nullable(),
+  "assetId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetIdRegExp).nullable(),
+  "serviceObligationId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemServiceObligationIdRegExp).nullable(),
+  "version": zod.int().min(1).max(cancelAppointmentWorkEntryResponseWorkEntriesItemVersionMax),
+  "state": zod.enum(['draft', 'cancelled', 'finalized']),
+  "checklist": zod.object({
+  "id": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistIdRegExp),
+  "templateId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistTemplateIdRegExp),
+  "version": zod.int().min(1).max(cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistBaselineVersionMin).max(cancelAppointmentWorkEntryResponseWorkEntriesItemChecklistBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "assetSnapshot": zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotLabelMax),
+  "manufacturer": zod.string().max(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotManufacturerMax).nullable(),
+  "model": zod.string().max(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotModelMax).nullable(),
+  "serial": zod.string().max(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotSerialMax).nullable(),
+  "location": zod.string().max(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotLocationMax).nullable(),
+  "installedOn": zod.string().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax),
+  "value": zod.string().min(1).max(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax)
+})).max(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotAttributesMax),
+  "id": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotIdRegExp),
+  "version": zod.int().min(1).max(cancelAppointmentWorkEntryResponseWorkEntriesItemAssetSnapshotVersionMax)
+}).nullable(),
+  "answers": zod.array(zod.object({
+  "itemKey": zod.string().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemAnswersItemItemKeyRegExp),
+  "result": zod.enum(['done', 'needs_attention', 'not_applicable']),
+  "value": zod.union([zod.string().max(cancelAppointmentWorkEntryResponseWorkEntriesItemAnswersItemValueOneMax),zod.number()]).nullable(),
+  "reason": zod.string().max(cancelAppointmentWorkEntryResponseWorkEntriesItemAnswersItemReasonMax).nullable()
+})),
+  "notes": zod.string(),
+  "photos": zod.array(zod.object({
+  "id": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemPhotosItemIdRegExp),
+  "entryId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemPhotosItemEntryIdRegExp),
+  "itemKey": zod.string().nullable(),
+  "caption": zod.string(),
+  "state": zod.enum(['reserved', 'attached', 'expired']),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp']),
+  "sizeBytes": zod.int().min(1).max(cancelAppointmentWorkEntryResponseWorkEntriesItemPhotosItemSizeBytesMax),
+  "expiresAt": zod.coerce.date(),
+  "attachedAt": zod.coerce.date().nullable(),
+  "contentPath": zod.string().nullable(),
+  "available": zod.boolean()
+})).max(cancelAppointmentWorkEntryResponseWorkEntriesItemPhotosMax),
+  "completionId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkEntriesItemCompletionIdRegExp).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "holdReasons": zod.array(zod.string())
+})).max(cancelAppointmentWorkEntryResponseWorkEntriesMax),
+  "completion": zod.object({
+  "id": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkCompletionIdRegExp),
+  "appointmentId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkCompletionAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkCompletionContactIdRegExp),
+  "propertyId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkCompletionPropertyIdRegExp).nullable(),
+  "requestId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkCompletionRequestIdRegExp),
+  "performedAt": zod.coerce.date(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string(),
+  "performerUserId": zod.string(),
+  "actingNote": zod.string().nullable(),
+  "summary": zod.string(),
+  "outcome": zod.enum(['completed', 'needs_followup']),
+  "followupTaskId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkCompletionFollowupTaskIdRegExp).nullable(),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkCompletionEntriesItemIdRegExp),
+  "version": zod.int().min(1).max(cancelAppointmentWorkEntryResponseWorkCompletionEntriesItemVersionMax),
+  "checklistRevisionId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp),
+  "assetId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkCompletionEntriesItemAssetIdRegExp).nullable()
+})),
+  "services": zod.array(zod.object({
+  "id": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkCompletionServicesItemIdRegExp),
+  "nextObligationId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkCompletionServicesItemNextObligationIdRegExp).nullable()
+})),
+  "nativeAppointmentStatus": zod.enum(['completed'])
+}).nullable(),
+  "corrections": zod.array(zod.object({
+  "id": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkCorrectionsItemIdRegExp),
+  "originalCompletionId": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkCorrectionsItemOriginalCompletionIdRegExp),
+  "note": zod.string(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string()
+})).max(cancelAppointmentWorkEntryResponseWorkCorrectionsMax),
+  "correctionsHasMore": zod.boolean(),
+  "linkedServices": zod.array(zod.object({
+  "id": zod.uuid().regex(cancelAppointmentWorkEntryResponseWorkLinkedServicesItemIdRegExp),
+  "equipmentLabel": zod.string(),
+  "status": zod.enum(['active', 'completed', 'cancelled']),
+  "updatedAt": zod.coerce.date()
+})),
+  "capabilities": zod.object({
+  "canPrepare": zod.boolean(),
+  "canEdit": zod.boolean(),
+  "canCancel": zod.boolean(),
+  "canComplete": zod.boolean(),
+  "canCorrect": zod.boolean(),
+  "requiresActingNote": zod.boolean(),
+  "reasons": zod.array(zod.string())
+})
+}),
+  "receipt": zod.object({
+  "requestId": zod.uuid().regex(cancelAppointmentWorkEntryResponseReceiptRequestIdRegExp),
+  "replayed": zod.boolean()
+})
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Review all saved work and explicitly performed services
+ */
+export const PreviewAppointmentWorkCompletionParams = zod.object({
+  "appointmentId": zod.uuid()
+})
+
+export const previewAppointmentWorkCompletionBodyEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionBodyEntriesItemVersionMax = 9007199254740991;
+
+export const previewAppointmentWorkCompletionBodyEntriesMax = 20;
+
+export const previewAppointmentWorkCompletionBodyServiceObligationIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionBodyServiceObligationIdsMax = 20;
+
+export const previewAppointmentWorkCompletionBodySummaryMax = 2000;
+
+export const previewAppointmentWorkCompletionBodyFollowupAssignedUserIdMax = 200;
+
+export const previewAppointmentWorkCompletionBodyFollowupNoteMax = 2000;
+
+export const previewAppointmentWorkCompletionBodyActingNoteMax = 500;
+
+
+
+export const PreviewAppointmentWorkCompletionBody = zod.object({
+  "expectedAppointmentUpdatedAt": zod.coerce.date(),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(previewAppointmentWorkCompletionBodyEntriesItemIdRegExp),
+  "version": zod.int().min(1).max(previewAppointmentWorkCompletionBodyEntriesItemVersionMax)
+})).min(1).max(previewAppointmentWorkCompletionBodyEntriesMax),
+  "serviceObligationIds": zod.array(zod.uuid().regex(previewAppointmentWorkCompletionBodyServiceObligationIdsItemRegExp)).max(previewAppointmentWorkCompletionBodyServiceObligationIdsMax),
+  "performedAt": zod.coerce.date(),
+  "summary": zod.string().min(1).max(previewAppointmentWorkCompletionBodySummaryMax),
+  "outcome": zod.enum(['completed', 'needs_followup']),
+  "followup": zod.object({
+  "assignedUserId": zod.string().min(1).max(previewAppointmentWorkCompletionBodyFollowupAssignedUserIdMax),
+  "dueAt": zod.coerce.date(),
+  "note": zod.string().min(1).max(previewAppointmentWorkCompletionBodyFollowupNoteMax)
+}).nullable(),
+  "actingNote": zod.string().min(1).max(previewAppointmentWorkCompletionBodyActingNoteMax).optional()
+})
+
+export const previewAppointmentWorkCompletionResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseEntriesItemAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseEntriesItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseEntriesItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseEntriesItemServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseEntriesItemVersionMax = 9007199254740991;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemChecklistIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseEntriesItemChecklistTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseEntriesItemChecklistVersionMax = 9007199254740991;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionNameMax = 120;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionDescriptionMax = 1000;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionItemsItemLabelMax = 200;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionItemsItemUnitMax = 30;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionItemsMax = 50;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const previewAppointmentWorkCompletionResponseEntriesItemChecklistBaselineVersionMin = -9007199254740991;
+export const previewAppointmentWorkCompletionResponseEntriesItemChecklistBaselineVersionMax = 9007199254740991;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotLabelMax = 160;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotManufacturerMax = 160;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotModelMax = 160;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotSerialMax = 160;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotLocationMax = 300;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotNotesMax = 2000;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotWarrantySourceMax = 1000;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotAttributesItemLabelMax = 80;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotAttributesItemValueMax = 300;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotAttributesMax = 20;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotVersionMax = 9007199254740991;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemAnswersItemItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const previewAppointmentWorkCompletionResponseEntriesItemAnswersItemValueOneMax = 2000;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemAnswersItemReasonMax = 1000;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemPhotosItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseEntriesItemPhotosItemEntryIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseEntriesItemPhotosItemSizeBytesMax = 10485760;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemPhotosMax = 50;
+
+export const previewAppointmentWorkCompletionResponseEntriesItemCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseIntentEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseIntentEntriesItemVersionMax = 9007199254740991;
+
+export const previewAppointmentWorkCompletionResponseIntentEntriesMax = 20;
+
+export const previewAppointmentWorkCompletionResponseIntentServiceObligationIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const previewAppointmentWorkCompletionResponseIntentServiceObligationIdsMax = 20;
+
+export const previewAppointmentWorkCompletionResponseIntentSummaryMax = 2000;
+
+export const previewAppointmentWorkCompletionResponseIntentFollowupAssignedUserIdMax = 200;
+
+export const previewAppointmentWorkCompletionResponseIntentFollowupNoteMax = 2000;
+
+export const previewAppointmentWorkCompletionResponseIntentActingNoteMax = 500;
+
+export const previewAppointmentWorkCompletionResponseServiceVersionsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const PreviewAppointmentWorkCompletionResponse = zod.object({
+  "organizationId": zod.uuid().regex(previewAppointmentWorkCompletionResponseOrganizationIdRegExp),
+  "appointmentId": zod.uuid().regex(previewAppointmentWorkCompletionResponseAppointmentIdRegExp),
+  "expiresAt": zod.coerce.date(),
+  "previewToken": zod.string(),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(previewAppointmentWorkCompletionResponseEntriesItemIdRegExp),
+  "appointmentId": zod.uuid().regex(previewAppointmentWorkCompletionResponseEntriesItemAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(previewAppointmentWorkCompletionResponseEntriesItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(previewAppointmentWorkCompletionResponseEntriesItemPropertyIdRegExp).nullable(),
+  "assetId": zod.uuid().regex(previewAppointmentWorkCompletionResponseEntriesItemAssetIdRegExp).nullable(),
+  "serviceObligationId": zod.uuid().regex(previewAppointmentWorkCompletionResponseEntriesItemServiceObligationIdRegExp).nullable(),
+  "version": zod.int().min(1).max(previewAppointmentWorkCompletionResponseEntriesItemVersionMax),
+  "state": zod.enum(['draft', 'cancelled', 'finalized']),
+  "checklist": zod.object({
+  "id": zod.uuid().regex(previewAppointmentWorkCompletionResponseEntriesItemChecklistIdRegExp),
+  "templateId": zod.uuid().regex(previewAppointmentWorkCompletionResponseEntriesItemChecklistTemplateIdRegExp),
+  "version": zod.int().min(1).max(previewAppointmentWorkCompletionResponseEntriesItemChecklistVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(previewAppointmentWorkCompletionResponseEntriesItemChecklistDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(previewAppointmentWorkCompletionResponseEntriesItemChecklistBaselineVersionMin).max(previewAppointmentWorkCompletionResponseEntriesItemChecklistBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "assetSnapshot": zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotLabelMax),
+  "manufacturer": zod.string().max(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotManufacturerMax).nullable(),
+  "model": zod.string().max(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotModelMax).nullable(),
+  "serial": zod.string().max(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotSerialMax).nullable(),
+  "location": zod.string().max(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotLocationMax).nullable(),
+  "installedOn": zod.string().regex(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotAttributesItemLabelMax),
+  "value": zod.string().min(1).max(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotAttributesItemValueMax)
+})).max(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotAttributesMax),
+  "id": zod.uuid().regex(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotIdRegExp),
+  "version": zod.int().min(1).max(previewAppointmentWorkCompletionResponseEntriesItemAssetSnapshotVersionMax)
+}).nullable(),
+  "answers": zod.array(zod.object({
+  "itemKey": zod.string().regex(previewAppointmentWorkCompletionResponseEntriesItemAnswersItemItemKeyRegExp),
+  "result": zod.enum(['done', 'needs_attention', 'not_applicable']),
+  "value": zod.union([zod.string().max(previewAppointmentWorkCompletionResponseEntriesItemAnswersItemValueOneMax),zod.number()]).nullable(),
+  "reason": zod.string().max(previewAppointmentWorkCompletionResponseEntriesItemAnswersItemReasonMax).nullable()
+})),
+  "notes": zod.string(),
+  "photos": zod.array(zod.object({
+  "id": zod.uuid().regex(previewAppointmentWorkCompletionResponseEntriesItemPhotosItemIdRegExp),
+  "entryId": zod.uuid().regex(previewAppointmentWorkCompletionResponseEntriesItemPhotosItemEntryIdRegExp),
+  "itemKey": zod.string().nullable(),
+  "caption": zod.string(),
+  "state": zod.enum(['reserved', 'attached', 'expired']),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp']),
+  "sizeBytes": zod.int().min(1).max(previewAppointmentWorkCompletionResponseEntriesItemPhotosItemSizeBytesMax),
+  "expiresAt": zod.coerce.date(),
+  "attachedAt": zod.coerce.date().nullable(),
+  "contentPath": zod.string().nullable(),
+  "available": zod.boolean()
+})).max(previewAppointmentWorkCompletionResponseEntriesItemPhotosMax),
+  "completionId": zod.uuid().regex(previewAppointmentWorkCompletionResponseEntriesItemCompletionIdRegExp).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "holdReasons": zod.array(zod.string())
+})),
+  "intent": zod.object({
+  "expectedAppointmentUpdatedAt": zod.coerce.date(),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(previewAppointmentWorkCompletionResponseIntentEntriesItemIdRegExp),
+  "version": zod.int().min(1).max(previewAppointmentWorkCompletionResponseIntentEntriesItemVersionMax)
+})).min(1).max(previewAppointmentWorkCompletionResponseIntentEntriesMax),
+  "serviceObligationIds": zod.array(zod.uuid().regex(previewAppointmentWorkCompletionResponseIntentServiceObligationIdsItemRegExp)).max(previewAppointmentWorkCompletionResponseIntentServiceObligationIdsMax),
+  "performedAt": zod.coerce.date(),
+  "summary": zod.string().min(1).max(previewAppointmentWorkCompletionResponseIntentSummaryMax),
+  "outcome": zod.enum(['completed', 'needs_followup']),
+  "followup": zod.object({
+  "assignedUserId": zod.string().min(1).max(previewAppointmentWorkCompletionResponseIntentFollowupAssignedUserIdMax),
+  "dueAt": zod.coerce.date(),
+  "note": zod.string().min(1).max(previewAppointmentWorkCompletionResponseIntentFollowupNoteMax)
+}).nullable(),
+  "actingNote": zod.string().min(1).max(previewAppointmentWorkCompletionResponseIntentActingNoteMax).optional()
+}),
+  "serviceVersions": zod.array(zod.object({
+  "id": zod.uuid().regex(previewAppointmentWorkCompletionResponseServiceVersionsItemIdRegExp),
+  "updatedAt": zod.coerce.date()
+})),
+  "warning": zod.enum(['Staff-recorded work; not warranty coverage, customer acceptance, invoice delivery or payment.'])
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Record one atomic staff-attested completion
+ */
+export const CompleteAppointmentWorkParams = zod.object({
+  "appointmentId": zod.uuid()
+})
+
+export const completeAppointmentWorkBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkBodyPreviewTokenMax = 30000;
+
+
+
+export const CompleteAppointmentWorkBody = zod.object({
+  "requestId": zod.uuid().regex(completeAppointmentWorkBodyRequestIdRegExp),
+  "previewToken": zod.string().min(1).max(completeAppointmentWorkBodyPreviewTokenMax),
+  "confirmed": zod.literal(true)
+})
+
+export const completeAppointmentWorkResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkAppointmentContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkAppointmentPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkAppointmentLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkEntriesItemAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkEntriesItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkEntriesItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkEntriesItemServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkEntriesItemVersionMax = 9007199254740991;
+
+export const completeAppointmentWorkResponseWorkEntriesItemChecklistIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkEntriesItemChecklistTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkEntriesItemChecklistVersionMax = 9007199254740991;
+
+export const completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionNameMax = 120;
+
+export const completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionDescriptionMax = 1000;
+
+export const completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax = 200;
+
+export const completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax = 30;
+
+export const completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsMax = 50;
+
+export const completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const completeAppointmentWorkResponseWorkEntriesItemChecklistBaselineVersionMin = -9007199254740991;
+export const completeAppointmentWorkResponseWorkEntriesItemChecklistBaselineVersionMax = 9007199254740991;
+
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotLabelMax = 160;
+
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotManufacturerMax = 160;
+
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotModelMax = 160;
+
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotSerialMax = 160;
+
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotLocationMax = 300;
+
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotNotesMax = 2000;
+
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotWarrantySourceMax = 1000;
+
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax = 80;
+
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax = 300;
+
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotAttributesMax = 20;
+
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotVersionMax = 9007199254740991;
+
+export const completeAppointmentWorkResponseWorkEntriesItemAnswersItemItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const completeAppointmentWorkResponseWorkEntriesItemAnswersItemValueOneMax = 2000;
+
+export const completeAppointmentWorkResponseWorkEntriesItemAnswersItemReasonMax = 1000;
+
+export const completeAppointmentWorkResponseWorkEntriesItemPhotosItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkEntriesItemPhotosItemEntryIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkEntriesItemPhotosItemSizeBytesMax = 10485760;
+
+export const completeAppointmentWorkResponseWorkEntriesItemPhotosMax = 50;
+
+export const completeAppointmentWorkResponseWorkEntriesItemCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkEntriesMax = 20;
+
+export const completeAppointmentWorkResponseWorkCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkCompletionAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkCompletionContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkCompletionPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkCompletionRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkCompletionFollowupTaskIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkCompletionEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkCompletionEntriesItemVersionMax = 9007199254740991;
+
+export const completeAppointmentWorkResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkCompletionEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkCompletionServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkCompletionServicesItemNextObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkCorrectionsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkCorrectionsItemOriginalCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseWorkCorrectionsMax = 25;
+
+export const completeAppointmentWorkResponseWorkLinkedServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const completeAppointmentWorkResponseReceiptRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const CompleteAppointmentWorkResponse = zod.object({
+  "organizationId": zod.uuid().regex(completeAppointmentWorkResponseOrganizationIdRegExp),
+  "work": zod.object({
+  "organizationId": zod.uuid().regex(completeAppointmentWorkResponseWorkOrganizationIdRegExp),
+  "appointment": zod.object({
+  "id": zod.uuid().regex(completeAppointmentWorkResponseWorkAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(completeAppointmentWorkResponseWorkAppointmentContactIdRegExp).nullable(),
+  "propertyId": zod.uuid().regex(completeAppointmentWorkResponseWorkAppointmentPropertyIdRegExp).nullable(),
+  "leadId": zod.uuid().regex(completeAppointmentWorkResponseWorkAppointmentLeadIdRegExp).nullable(),
+  "assignedUserId": zod.string().nullable(),
+  "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']),
+  "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "customerLabel": zod.string().nullable(),
+  "propertyLabel": zod.string().nullable()
+}),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(completeAppointmentWorkResponseWorkEntriesItemIdRegExp),
+  "appointmentId": zod.uuid().regex(completeAppointmentWorkResponseWorkEntriesItemAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(completeAppointmentWorkResponseWorkEntriesItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(completeAppointmentWorkResponseWorkEntriesItemPropertyIdRegExp).nullable(),
+  "assetId": zod.uuid().regex(completeAppointmentWorkResponseWorkEntriesItemAssetIdRegExp).nullable(),
+  "serviceObligationId": zod.uuid().regex(completeAppointmentWorkResponseWorkEntriesItemServiceObligationIdRegExp).nullable(),
+  "version": zod.int().min(1).max(completeAppointmentWorkResponseWorkEntriesItemVersionMax),
+  "state": zod.enum(['draft', 'cancelled', 'finalized']),
+  "checklist": zod.object({
+  "id": zod.uuid().regex(completeAppointmentWorkResponseWorkEntriesItemChecklistIdRegExp),
+  "templateId": zod.uuid().regex(completeAppointmentWorkResponseWorkEntriesItemChecklistTemplateIdRegExp),
+  "version": zod.int().min(1).max(completeAppointmentWorkResponseWorkEntriesItemChecklistVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(completeAppointmentWorkResponseWorkEntriesItemChecklistDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(completeAppointmentWorkResponseWorkEntriesItemChecklistBaselineVersionMin).max(completeAppointmentWorkResponseWorkEntriesItemChecklistBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "assetSnapshot": zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotLabelMax),
+  "manufacturer": zod.string().max(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotManufacturerMax).nullable(),
+  "model": zod.string().max(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotModelMax).nullable(),
+  "serial": zod.string().max(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotSerialMax).nullable(),
+  "location": zod.string().max(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotLocationMax).nullable(),
+  "installedOn": zod.string().regex(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax),
+  "value": zod.string().min(1).max(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax)
+})).max(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotAttributesMax),
+  "id": zod.uuid().regex(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotIdRegExp),
+  "version": zod.int().min(1).max(completeAppointmentWorkResponseWorkEntriesItemAssetSnapshotVersionMax)
+}).nullable(),
+  "answers": zod.array(zod.object({
+  "itemKey": zod.string().regex(completeAppointmentWorkResponseWorkEntriesItemAnswersItemItemKeyRegExp),
+  "result": zod.enum(['done', 'needs_attention', 'not_applicable']),
+  "value": zod.union([zod.string().max(completeAppointmentWorkResponseWorkEntriesItemAnswersItemValueOneMax),zod.number()]).nullable(),
+  "reason": zod.string().max(completeAppointmentWorkResponseWorkEntriesItemAnswersItemReasonMax).nullable()
+})),
+  "notes": zod.string(),
+  "photos": zod.array(zod.object({
+  "id": zod.uuid().regex(completeAppointmentWorkResponseWorkEntriesItemPhotosItemIdRegExp),
+  "entryId": zod.uuid().regex(completeAppointmentWorkResponseWorkEntriesItemPhotosItemEntryIdRegExp),
+  "itemKey": zod.string().nullable(),
+  "caption": zod.string(),
+  "state": zod.enum(['reserved', 'attached', 'expired']),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp']),
+  "sizeBytes": zod.int().min(1).max(completeAppointmentWorkResponseWorkEntriesItemPhotosItemSizeBytesMax),
+  "expiresAt": zod.coerce.date(),
+  "attachedAt": zod.coerce.date().nullable(),
+  "contentPath": zod.string().nullable(),
+  "available": zod.boolean()
+})).max(completeAppointmentWorkResponseWorkEntriesItemPhotosMax),
+  "completionId": zod.uuid().regex(completeAppointmentWorkResponseWorkEntriesItemCompletionIdRegExp).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "holdReasons": zod.array(zod.string())
+})).max(completeAppointmentWorkResponseWorkEntriesMax),
+  "completion": zod.object({
+  "id": zod.uuid().regex(completeAppointmentWorkResponseWorkCompletionIdRegExp),
+  "appointmentId": zod.uuid().regex(completeAppointmentWorkResponseWorkCompletionAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(completeAppointmentWorkResponseWorkCompletionContactIdRegExp),
+  "propertyId": zod.uuid().regex(completeAppointmentWorkResponseWorkCompletionPropertyIdRegExp).nullable(),
+  "requestId": zod.uuid().regex(completeAppointmentWorkResponseWorkCompletionRequestIdRegExp),
+  "performedAt": zod.coerce.date(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string(),
+  "performerUserId": zod.string(),
+  "actingNote": zod.string().nullable(),
+  "summary": zod.string(),
+  "outcome": zod.enum(['completed', 'needs_followup']),
+  "followupTaskId": zod.uuid().regex(completeAppointmentWorkResponseWorkCompletionFollowupTaskIdRegExp).nullable(),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(completeAppointmentWorkResponseWorkCompletionEntriesItemIdRegExp),
+  "version": zod.int().min(1).max(completeAppointmentWorkResponseWorkCompletionEntriesItemVersionMax),
+  "checklistRevisionId": zod.uuid().regex(completeAppointmentWorkResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp),
+  "assetId": zod.uuid().regex(completeAppointmentWorkResponseWorkCompletionEntriesItemAssetIdRegExp).nullable()
+})),
+  "services": zod.array(zod.object({
+  "id": zod.uuid().regex(completeAppointmentWorkResponseWorkCompletionServicesItemIdRegExp),
+  "nextObligationId": zod.uuid().regex(completeAppointmentWorkResponseWorkCompletionServicesItemNextObligationIdRegExp).nullable()
+})),
+  "nativeAppointmentStatus": zod.enum(['completed'])
+}).nullable(),
+  "corrections": zod.array(zod.object({
+  "id": zod.uuid().regex(completeAppointmentWorkResponseWorkCorrectionsItemIdRegExp),
+  "originalCompletionId": zod.uuid().regex(completeAppointmentWorkResponseWorkCorrectionsItemOriginalCompletionIdRegExp),
+  "note": zod.string(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string()
+})).max(completeAppointmentWorkResponseWorkCorrectionsMax),
+  "correctionsHasMore": zod.boolean(),
+  "linkedServices": zod.array(zod.object({
+  "id": zod.uuid().regex(completeAppointmentWorkResponseWorkLinkedServicesItemIdRegExp),
+  "equipmentLabel": zod.string(),
+  "status": zod.enum(['active', 'completed', 'cancelled']),
+  "updatedAt": zod.coerce.date()
+})),
+  "capabilities": zod.object({
+  "canPrepare": zod.boolean(),
+  "canEdit": zod.boolean(),
+  "canCancel": zod.boolean(),
+  "canComplete": zod.boolean(),
+  "canCorrect": zod.boolean(),
+  "requiresActingNote": zod.boolean(),
+  "reasons": zod.array(zod.string())
+})
+}),
+  "receipt": zod.object({
+  "requestId": zod.uuid().regex(completeAppointmentWorkResponseReceiptRequestIdRegExp),
+  "replayed": zod.boolean()
+})
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Append a note without replaying native effects
+ */
+export const CorrectAppointmentWorkParams = zod.object({
+  "appointmentId": zod.uuid(),
+  "completionId": zod.uuid()
+})
+
+export const correctAppointmentWorkBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkBodyNoteMax = 2000;
+
+export const correctAppointmentWorkBodyActingNoteMax = 500;
+
+
+
+export const CorrectAppointmentWorkBody = zod.object({
+  "requestId": zod.uuid().regex(correctAppointmentWorkBodyRequestIdRegExp),
+  "note": zod.string().min(1).max(correctAppointmentWorkBodyNoteMax),
+  "actingNote": zod.string().min(1).max(correctAppointmentWorkBodyActingNoteMax).optional()
+})
+
+export const correctAppointmentWorkResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkAppointmentContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkAppointmentPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkAppointmentLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkEntriesItemAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkEntriesItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkEntriesItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkEntriesItemServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkEntriesItemVersionMax = 9007199254740991;
+
+export const correctAppointmentWorkResponseWorkEntriesItemChecklistIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkEntriesItemChecklistTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkEntriesItemChecklistVersionMax = 9007199254740991;
+
+export const correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionNameMax = 120;
+
+export const correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionDescriptionMax = 1000;
+
+export const correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax = 200;
+
+export const correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax = 30;
+
+export const correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsMax = 50;
+
+export const correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const correctAppointmentWorkResponseWorkEntriesItemChecklistBaselineVersionMin = -9007199254740991;
+export const correctAppointmentWorkResponseWorkEntriesItemChecklistBaselineVersionMax = 9007199254740991;
+
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotLabelMax = 160;
+
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotManufacturerMax = 160;
+
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotModelMax = 160;
+
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotSerialMax = 160;
+
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotLocationMax = 300;
+
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotNotesMax = 2000;
+
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotWarrantySourceMax = 1000;
+
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax = 80;
+
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax = 300;
+
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotAttributesMax = 20;
+
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotVersionMax = 9007199254740991;
+
+export const correctAppointmentWorkResponseWorkEntriesItemAnswersItemItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const correctAppointmentWorkResponseWorkEntriesItemAnswersItemValueOneMax = 2000;
+
+export const correctAppointmentWorkResponseWorkEntriesItemAnswersItemReasonMax = 1000;
+
+export const correctAppointmentWorkResponseWorkEntriesItemPhotosItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkEntriesItemPhotosItemEntryIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkEntriesItemPhotosItemSizeBytesMax = 10485760;
+
+export const correctAppointmentWorkResponseWorkEntriesItemPhotosMax = 50;
+
+export const correctAppointmentWorkResponseWorkEntriesItemCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkEntriesMax = 20;
+
+export const correctAppointmentWorkResponseWorkCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkCompletionAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkCompletionContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkCompletionPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkCompletionRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkCompletionFollowupTaskIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkCompletionEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkCompletionEntriesItemVersionMax = 9007199254740991;
+
+export const correctAppointmentWorkResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkCompletionEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkCompletionServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkCompletionServicesItemNextObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkCorrectionsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkCorrectionsItemOriginalCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseWorkCorrectionsMax = 25;
+
+export const correctAppointmentWorkResponseWorkLinkedServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const correctAppointmentWorkResponseReceiptRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const CorrectAppointmentWorkResponse = zod.object({
+  "organizationId": zod.uuid().regex(correctAppointmentWorkResponseOrganizationIdRegExp),
+  "work": zod.object({
+  "organizationId": zod.uuid().regex(correctAppointmentWorkResponseWorkOrganizationIdRegExp),
+  "appointment": zod.object({
+  "id": zod.uuid().regex(correctAppointmentWorkResponseWorkAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(correctAppointmentWorkResponseWorkAppointmentContactIdRegExp).nullable(),
+  "propertyId": zod.uuid().regex(correctAppointmentWorkResponseWorkAppointmentPropertyIdRegExp).nullable(),
+  "leadId": zod.uuid().regex(correctAppointmentWorkResponseWorkAppointmentLeadIdRegExp).nullable(),
+  "assignedUserId": zod.string().nullable(),
+  "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']),
+  "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "customerLabel": zod.string().nullable(),
+  "propertyLabel": zod.string().nullable()
+}),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(correctAppointmentWorkResponseWorkEntriesItemIdRegExp),
+  "appointmentId": zod.uuid().regex(correctAppointmentWorkResponseWorkEntriesItemAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(correctAppointmentWorkResponseWorkEntriesItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(correctAppointmentWorkResponseWorkEntriesItemPropertyIdRegExp).nullable(),
+  "assetId": zod.uuid().regex(correctAppointmentWorkResponseWorkEntriesItemAssetIdRegExp).nullable(),
+  "serviceObligationId": zod.uuid().regex(correctAppointmentWorkResponseWorkEntriesItemServiceObligationIdRegExp).nullable(),
+  "version": zod.int().min(1).max(correctAppointmentWorkResponseWorkEntriesItemVersionMax),
+  "state": zod.enum(['draft', 'cancelled', 'finalized']),
+  "checklist": zod.object({
+  "id": zod.uuid().regex(correctAppointmentWorkResponseWorkEntriesItemChecklistIdRegExp),
+  "templateId": zod.uuid().regex(correctAppointmentWorkResponseWorkEntriesItemChecklistTemplateIdRegExp),
+  "version": zod.int().min(1).max(correctAppointmentWorkResponseWorkEntriesItemChecklistVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(correctAppointmentWorkResponseWorkEntriesItemChecklistDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(correctAppointmentWorkResponseWorkEntriesItemChecklistBaselineVersionMin).max(correctAppointmentWorkResponseWorkEntriesItemChecklistBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "assetSnapshot": zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotLabelMax),
+  "manufacturer": zod.string().max(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotManufacturerMax).nullable(),
+  "model": zod.string().max(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotModelMax).nullable(),
+  "serial": zod.string().max(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotSerialMax).nullable(),
+  "location": zod.string().max(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotLocationMax).nullable(),
+  "installedOn": zod.string().regex(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax),
+  "value": zod.string().min(1).max(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax)
+})).max(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotAttributesMax),
+  "id": zod.uuid().regex(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotIdRegExp),
+  "version": zod.int().min(1).max(correctAppointmentWorkResponseWorkEntriesItemAssetSnapshotVersionMax)
+}).nullable(),
+  "answers": zod.array(zod.object({
+  "itemKey": zod.string().regex(correctAppointmentWorkResponseWorkEntriesItemAnswersItemItemKeyRegExp),
+  "result": zod.enum(['done', 'needs_attention', 'not_applicable']),
+  "value": zod.union([zod.string().max(correctAppointmentWorkResponseWorkEntriesItemAnswersItemValueOneMax),zod.number()]).nullable(),
+  "reason": zod.string().max(correctAppointmentWorkResponseWorkEntriesItemAnswersItemReasonMax).nullable()
+})),
+  "notes": zod.string(),
+  "photos": zod.array(zod.object({
+  "id": zod.uuid().regex(correctAppointmentWorkResponseWorkEntriesItemPhotosItemIdRegExp),
+  "entryId": zod.uuid().regex(correctAppointmentWorkResponseWorkEntriesItemPhotosItemEntryIdRegExp),
+  "itemKey": zod.string().nullable(),
+  "caption": zod.string(),
+  "state": zod.enum(['reserved', 'attached', 'expired']),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp']),
+  "sizeBytes": zod.int().min(1).max(correctAppointmentWorkResponseWorkEntriesItemPhotosItemSizeBytesMax),
+  "expiresAt": zod.coerce.date(),
+  "attachedAt": zod.coerce.date().nullable(),
+  "contentPath": zod.string().nullable(),
+  "available": zod.boolean()
+})).max(correctAppointmentWorkResponseWorkEntriesItemPhotosMax),
+  "completionId": zod.uuid().regex(correctAppointmentWorkResponseWorkEntriesItemCompletionIdRegExp).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "holdReasons": zod.array(zod.string())
+})).max(correctAppointmentWorkResponseWorkEntriesMax),
+  "completion": zod.object({
+  "id": zod.uuid().regex(correctAppointmentWorkResponseWorkCompletionIdRegExp),
+  "appointmentId": zod.uuid().regex(correctAppointmentWorkResponseWorkCompletionAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(correctAppointmentWorkResponseWorkCompletionContactIdRegExp),
+  "propertyId": zod.uuid().regex(correctAppointmentWorkResponseWorkCompletionPropertyIdRegExp).nullable(),
+  "requestId": zod.uuid().regex(correctAppointmentWorkResponseWorkCompletionRequestIdRegExp),
+  "performedAt": zod.coerce.date(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string(),
+  "performerUserId": zod.string(),
+  "actingNote": zod.string().nullable(),
+  "summary": zod.string(),
+  "outcome": zod.enum(['completed', 'needs_followup']),
+  "followupTaskId": zod.uuid().regex(correctAppointmentWorkResponseWorkCompletionFollowupTaskIdRegExp).nullable(),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(correctAppointmentWorkResponseWorkCompletionEntriesItemIdRegExp),
+  "version": zod.int().min(1).max(correctAppointmentWorkResponseWorkCompletionEntriesItemVersionMax),
+  "checklistRevisionId": zod.uuid().regex(correctAppointmentWorkResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp),
+  "assetId": zod.uuid().regex(correctAppointmentWorkResponseWorkCompletionEntriesItemAssetIdRegExp).nullable()
+})),
+  "services": zod.array(zod.object({
+  "id": zod.uuid().regex(correctAppointmentWorkResponseWorkCompletionServicesItemIdRegExp),
+  "nextObligationId": zod.uuid().regex(correctAppointmentWorkResponseWorkCompletionServicesItemNextObligationIdRegExp).nullable()
+})),
+  "nativeAppointmentStatus": zod.enum(['completed'])
+}).nullable(),
+  "corrections": zod.array(zod.object({
+  "id": zod.uuid().regex(correctAppointmentWorkResponseWorkCorrectionsItemIdRegExp),
+  "originalCompletionId": zod.uuid().regex(correctAppointmentWorkResponseWorkCorrectionsItemOriginalCompletionIdRegExp),
+  "note": zod.string(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string()
+})).max(correctAppointmentWorkResponseWorkCorrectionsMax),
+  "correctionsHasMore": zod.boolean(),
+  "linkedServices": zod.array(zod.object({
+  "id": zod.uuid().regex(correctAppointmentWorkResponseWorkLinkedServicesItemIdRegExp),
+  "equipmentLabel": zod.string(),
+  "status": zod.enum(['active', 'completed', 'cancelled']),
+  "updatedAt": zod.coerce.date()
+})),
+  "capabilities": zod.object({
+  "canPrepare": zod.boolean(),
+  "canEdit": zod.boolean(),
+  "canCancel": zod.boolean(),
+  "canComplete": zod.boolean(),
+  "canCorrect": zod.boolean(),
+  "requiresActingNote": zod.boolean(),
+  "reasons": zod.array(zod.string())
+})
+}),
+  "receipt": zod.object({
+  "requestId": zod.uuid().regex(correctAppointmentWorkResponseReceiptRequestIdRegExp),
+  "replayed": zod.boolean()
+})
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Reserve one exact native private image upload
+ */
+export const ReserveAppointmentWorkPhotoParams = zod.object({
+  "appointmentId": zod.uuid(),
+  "entryId": zod.uuid()
+})
+
+export const reserveAppointmentWorkPhotoBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoBodyExpectedVersionMax = 9007199254740991;
+
+export const reserveAppointmentWorkPhotoBodySizeBytesMax = 10485760;
+
+export const reserveAppointmentWorkPhotoBodyItemKeyMax = 40;
+
+export const reserveAppointmentWorkPhotoBodyCaptionMax = 500;
+
+export const reserveAppointmentWorkPhotoBodyActingNoteMax = 500;
+
+
+
+export const ReserveAppointmentWorkPhotoBody = zod.object({
+  "requestId": zod.uuid().regex(reserveAppointmentWorkPhotoBodyRequestIdRegExp),
+  "expectedVersion": zod.int().min(1).max(reserveAppointmentWorkPhotoBodyExpectedVersionMax),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp']),
+  "sizeBytes": zod.int().min(1).max(reserveAppointmentWorkPhotoBodySizeBytesMax),
+  "itemKey": zod.string().max(reserveAppointmentWorkPhotoBodyItemKeyMax).nullable(),
+  "caption": zod.string().max(reserveAppointmentWorkPhotoBodyCaptionMax),
+  "actingNote": zod.string().min(1).max(reserveAppointmentWorkPhotoBodyActingNoteMax).optional()
+})
+
+export const reserveAppointmentWorkPhotoResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkAppointmentContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkAppointmentPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkAppointmentLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemVersionMax = 9007199254740991;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistVersionMax = 9007199254740991;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionNameMax = 120;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionDescriptionMax = 1000;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax = 200;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax = 30;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsMax = 50;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistBaselineVersionMin = -9007199254740991;
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistBaselineVersionMax = 9007199254740991;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotLabelMax = 160;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotManufacturerMax = 160;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotModelMax = 160;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotSerialMax = 160;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotLocationMax = 300;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotNotesMax = 2000;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotWarrantySourceMax = 1000;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax = 80;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax = 300;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotAttributesMax = 20;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotVersionMax = 9007199254740991;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAnswersItemItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAnswersItemValueOneMax = 2000;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemAnswersItemReasonMax = 1000;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemPhotosItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemPhotosItemEntryIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemPhotosItemSizeBytesMax = 10485760;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemPhotosMax = 50;
+
+export const reserveAppointmentWorkPhotoResponseWorkEntriesItemCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkEntriesMax = 20;
+
+export const reserveAppointmentWorkPhotoResponseWorkCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkCompletionAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkCompletionContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkCompletionPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkCompletionRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkCompletionFollowupTaskIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkCompletionEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkCompletionEntriesItemVersionMax = 9007199254740991;
+
+export const reserveAppointmentWorkPhotoResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkCompletionEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkCompletionServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkCompletionServicesItemNextObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkCorrectionsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkCorrectionsItemOriginalCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseWorkCorrectionsMax = 25;
+
+export const reserveAppointmentWorkPhotoResponseWorkLinkedServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponseReceiptRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reserveAppointmentWorkPhotoResponsePhotoIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const ReserveAppointmentWorkPhotoResponse = zod.object({
+  "organizationId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseOrganizationIdRegExp),
+  "work": zod.object({
+  "organizationId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkOrganizationIdRegExp),
+  "appointment": zod.object({
+  "id": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkAppointmentContactIdRegExp).nullable(),
+  "propertyId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkAppointmentPropertyIdRegExp).nullable(),
+  "leadId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkAppointmentLeadIdRegExp).nullable(),
+  "assignedUserId": zod.string().nullable(),
+  "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']),
+  "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "customerLabel": zod.string().nullable(),
+  "propertyLabel": zod.string().nullable()
+}),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemIdRegExp),
+  "appointmentId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemPropertyIdRegExp).nullable(),
+  "assetId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetIdRegExp).nullable(),
+  "serviceObligationId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemServiceObligationIdRegExp).nullable(),
+  "version": zod.int().min(1).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemVersionMax),
+  "state": zod.enum(['draft', 'cancelled', 'finalized']),
+  "checklist": zod.object({
+  "id": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistIdRegExp),
+  "templateId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistTemplateIdRegExp),
+  "version": zod.int().min(1).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistBaselineVersionMin).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemChecklistBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "assetSnapshot": zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotLabelMax),
+  "manufacturer": zod.string().max(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotManufacturerMax).nullable(),
+  "model": zod.string().max(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotModelMax).nullable(),
+  "serial": zod.string().max(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotSerialMax).nullable(),
+  "location": zod.string().max(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotLocationMax).nullable(),
+  "installedOn": zod.string().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax),
+  "value": zod.string().min(1).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax)
+})).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotAttributesMax),
+  "id": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotIdRegExp),
+  "version": zod.int().min(1).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotVersionMax)
+}).nullable(),
+  "answers": zod.array(zod.object({
+  "itemKey": zod.string().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemAnswersItemItemKeyRegExp),
+  "result": zod.enum(['done', 'needs_attention', 'not_applicable']),
+  "value": zod.union([zod.string().max(reserveAppointmentWorkPhotoResponseWorkEntriesItemAnswersItemValueOneMax),zod.number()]).nullable(),
+  "reason": zod.string().max(reserveAppointmentWorkPhotoResponseWorkEntriesItemAnswersItemReasonMax).nullable()
+})),
+  "notes": zod.string(),
+  "photos": zod.array(zod.object({
+  "id": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemPhotosItemIdRegExp),
+  "entryId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemPhotosItemEntryIdRegExp),
+  "itemKey": zod.string().nullable(),
+  "caption": zod.string(),
+  "state": zod.enum(['reserved', 'attached', 'expired']),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp']),
+  "sizeBytes": zod.int().min(1).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemPhotosItemSizeBytesMax),
+  "expiresAt": zod.coerce.date(),
+  "attachedAt": zod.coerce.date().nullable(),
+  "contentPath": zod.string().nullable(),
+  "available": zod.boolean()
+})).max(reserveAppointmentWorkPhotoResponseWorkEntriesItemPhotosMax),
+  "completionId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkEntriesItemCompletionIdRegExp).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "holdReasons": zod.array(zod.string())
+})).max(reserveAppointmentWorkPhotoResponseWorkEntriesMax),
+  "completion": zod.object({
+  "id": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkCompletionIdRegExp),
+  "appointmentId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkCompletionAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkCompletionContactIdRegExp),
+  "propertyId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkCompletionPropertyIdRegExp).nullable(),
+  "requestId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkCompletionRequestIdRegExp),
+  "performedAt": zod.coerce.date(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string(),
+  "performerUserId": zod.string(),
+  "actingNote": zod.string().nullable(),
+  "summary": zod.string(),
+  "outcome": zod.enum(['completed', 'needs_followup']),
+  "followupTaskId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkCompletionFollowupTaskIdRegExp).nullable(),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkCompletionEntriesItemIdRegExp),
+  "version": zod.int().min(1).max(reserveAppointmentWorkPhotoResponseWorkCompletionEntriesItemVersionMax),
+  "checklistRevisionId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp),
+  "assetId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkCompletionEntriesItemAssetIdRegExp).nullable()
+})),
+  "services": zod.array(zod.object({
+  "id": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkCompletionServicesItemIdRegExp),
+  "nextObligationId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkCompletionServicesItemNextObligationIdRegExp).nullable()
+})),
+  "nativeAppointmentStatus": zod.enum(['completed'])
+}).nullable(),
+  "corrections": zod.array(zod.object({
+  "id": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkCorrectionsItemIdRegExp),
+  "originalCompletionId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkCorrectionsItemOriginalCompletionIdRegExp),
+  "note": zod.string(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string()
+})).max(reserveAppointmentWorkPhotoResponseWorkCorrectionsMax),
+  "correctionsHasMore": zod.boolean(),
+  "linkedServices": zod.array(zod.object({
+  "id": zod.uuid().regex(reserveAppointmentWorkPhotoResponseWorkLinkedServicesItemIdRegExp),
+  "equipmentLabel": zod.string(),
+  "status": zod.enum(['active', 'completed', 'cancelled']),
+  "updatedAt": zod.coerce.date()
+})),
+  "capabilities": zod.object({
+  "canPrepare": zod.boolean(),
+  "canEdit": zod.boolean(),
+  "canCancel": zod.boolean(),
+  "canComplete": zod.boolean(),
+  "canCorrect": zod.boolean(),
+  "requiresActingNote": zod.boolean(),
+  "reasons": zod.array(zod.string())
+})
+}),
+  "receipt": zod.object({
+  "requestId": zod.uuid().regex(reserveAppointmentWorkPhotoResponseReceiptRequestIdRegExp),
+  "replayed": zod.boolean()
+}),
+  "photoId": zod.uuid().regex(reserveAppointmentWorkPhotoResponsePhotoIdRegExp),
+  "uploadUrl": zod.string().nullable(),
+  "uploadExpiresAt": zod.coerce.date()
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.write, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Confirm the reserved exact work image
+ */
+export const AttachAppointmentWorkPhotoParams = zod.object({
+  "appointmentId": zod.uuid(),
+  "entryId": zod.uuid()
+})
+
+export const attachAppointmentWorkPhotoBodyRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoBodyExpectedVersionMax = 9007199254740991;
+
+export const attachAppointmentWorkPhotoBodyPhotoIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoBodyActingNoteMax = 500;
+
+
+
+export const AttachAppointmentWorkPhotoBody = zod.object({
+  "requestId": zod.uuid().regex(attachAppointmentWorkPhotoBodyRequestIdRegExp),
+  "expectedVersion": zod.int().min(1).max(attachAppointmentWorkPhotoBodyExpectedVersionMax),
+  "photoId": zod.uuid().regex(attachAppointmentWorkPhotoBodyPhotoIdRegExp),
+  "actingNote": zod.string().min(1).max(attachAppointmentWorkPhotoBodyActingNoteMax).optional()
+})
+
+export const attachAppointmentWorkPhotoResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkAppointmentContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkAppointmentPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkAppointmentLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemServiceObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemVersionMax = 9007199254740991;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistTemplateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistVersionMax = 9007199254740991;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionNameMax = 120;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionDescriptionMax = 1000;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax = 200;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax = 30;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsMax = 50;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistBaselineVersionMin = -9007199254740991;
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistBaselineVersionMax = 9007199254740991;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotLabelMax = 160;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotManufacturerMax = 160;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotModelMax = 160;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotSerialMax = 160;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotLocationMax = 300;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotNotesMax = 2000;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotWarrantySourceMax = 1000;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax = 80;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax = 300;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotAttributesMax = 20;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotVersionMax = 9007199254740991;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAnswersItemItemKeyRegExp = new RegExp('^[a-z][a-z0-9_]{0,39}$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAnswersItemValueOneMax = 2000;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemAnswersItemReasonMax = 1000;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemPhotosItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemPhotosItemEntryIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemPhotosItemSizeBytesMax = 10485760;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemPhotosMax = 50;
+
+export const attachAppointmentWorkPhotoResponseWorkEntriesItemCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkEntriesMax = 20;
+
+export const attachAppointmentWorkPhotoResponseWorkCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkCompletionAppointmentIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkCompletionContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkCompletionPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkCompletionRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkCompletionFollowupTaskIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkCompletionEntriesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkCompletionEntriesItemVersionMax = 9007199254740991;
+
+export const attachAppointmentWorkPhotoResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkCompletionEntriesItemAssetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkCompletionServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkCompletionServicesItemNextObligationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkCorrectionsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkCorrectionsItemOriginalCompletionIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseWorkCorrectionsMax = 25;
+
+export const attachAppointmentWorkPhotoResponseWorkLinkedServicesItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const attachAppointmentWorkPhotoResponseReceiptRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+export const AttachAppointmentWorkPhotoResponse = zod.object({
+  "organizationId": zod.uuid().regex(attachAppointmentWorkPhotoResponseOrganizationIdRegExp),
+  "work": zod.object({
+  "organizationId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkOrganizationIdRegExp),
+  "appointment": zod.object({
+  "id": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkAppointmentContactIdRegExp).nullable(),
+  "propertyId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkAppointmentPropertyIdRegExp).nullable(),
+  "leadId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkAppointmentLeadIdRegExp).nullable(),
+  "assignedUserId": zod.string().nullable(),
+  "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']),
+  "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']),
+  "scheduledStart": zod.coerce.date(),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "updatedAt": zod.coerce.date(),
+  "notes": zod.string().nullable(),
+  "customerLabel": zod.string().nullable(),
+  "propertyLabel": zod.string().nullable()
+}),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemIdRegExp),
+  "appointmentId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemContactIdRegExp),
+  "propertyId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemPropertyIdRegExp).nullable(),
+  "assetId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetIdRegExp).nullable(),
+  "serviceObligationId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemServiceObligationIdRegExp).nullable(),
+  "version": zod.int().min(1).max(attachAppointmentWorkPhotoResponseWorkEntriesItemVersionMax),
+  "state": zod.enum(['draft', 'cancelled', 'finalized']),
+  "checklist": zod.object({
+  "id": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistIdRegExp),
+  "templateId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistTemplateIdRegExp),
+  "version": zod.int().min(1).max(attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistVersionMax),
+  "definition": zod.object({
+  "name": zod.string().min(1).max(attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionNameMax),
+  "trade": zod.enum(['hvac', 'roofing', 'general']),
+  "description": zod.string().max(attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionDescriptionMax),
+  "items": zod.array(zod.object({
+  "key": zod.string().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsItemKeyRegExp),
+  "label": zod.string().min(1).max(attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsItemLabelMax),
+  "kind": zod.enum(['result', 'text', 'number', 'photo']),
+  "required": zod.boolean(),
+  "allowNotApplicable": zod.boolean(),
+  "unit": zod.string().min(1).max(attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsItemUnitMax).nullable()
+})).min(1).max(attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionItemsMax)
+}),
+  "definitionSha256": zod.string().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistDefinitionSha256RegExp),
+  "baselineId": zod.string().nullable(),
+  "baselineVersion": zod.int().min(attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistBaselineVersionMin).max(attachAppointmentWorkPhotoResponseWorkEntriesItemChecklistBaselineVersionMax).nullable(),
+  "createdAt": zod.coerce.date(),
+  "createdByUserId": zod.string(),
+  "reviewedAt": zod.coerce.date().nullable(),
+  "reviewedByUserId": zod.string().nullable()
+}),
+  "assetSnapshot": zod.object({
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string().min(1).max(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotLabelMax),
+  "manufacturer": zod.string().max(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotManufacturerMax).nullable(),
+  "model": zod.string().max(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotModelMax).nullable(),
+  "serial": zod.string().max(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotSerialMax).nullable(),
+  "location": zod.string().max(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotLocationMax).nullable(),
+  "installedOn": zod.string().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotInstalledOnRegExp).nullable(),
+  "notes": zod.string().max(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotNotesMax).nullable(),
+  "warrantyStartsOn": zod.string().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotWarrantyStartsOnRegExp).nullable(),
+  "warrantyEndsOn": zod.string().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotWarrantyEndsOnRegExp).nullable(),
+  "warrantySource": zod.string().max(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotWarrantySourceMax).nullable(),
+  "attributes": zod.array(zod.object({
+  "label": zod.string().min(1).max(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotAttributesItemLabelMax),
+  "value": zod.string().min(1).max(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotAttributesItemValueMax)
+})).max(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotAttributesMax),
+  "id": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotIdRegExp),
+  "version": zod.int().min(1).max(attachAppointmentWorkPhotoResponseWorkEntriesItemAssetSnapshotVersionMax)
+}).nullable(),
+  "answers": zod.array(zod.object({
+  "itemKey": zod.string().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemAnswersItemItemKeyRegExp),
+  "result": zod.enum(['done', 'needs_attention', 'not_applicable']),
+  "value": zod.union([zod.string().max(attachAppointmentWorkPhotoResponseWorkEntriesItemAnswersItemValueOneMax),zod.number()]).nullable(),
+  "reason": zod.string().max(attachAppointmentWorkPhotoResponseWorkEntriesItemAnswersItemReasonMax).nullable()
+})),
+  "notes": zod.string(),
+  "photos": zod.array(zod.object({
+  "id": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemPhotosItemIdRegExp),
+  "entryId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemPhotosItemEntryIdRegExp),
+  "itemKey": zod.string().nullable(),
+  "caption": zod.string(),
+  "state": zod.enum(['reserved', 'attached', 'expired']),
+  "contentType": zod.enum(['image/jpeg', 'image/png', 'image/webp']),
+  "sizeBytes": zod.int().min(1).max(attachAppointmentWorkPhotoResponseWorkEntriesItemPhotosItemSizeBytesMax),
+  "expiresAt": zod.coerce.date(),
+  "attachedAt": zod.coerce.date().nullable(),
+  "contentPath": zod.string().nullable(),
+  "available": zod.boolean()
+})).max(attachAppointmentWorkPhotoResponseWorkEntriesItemPhotosMax),
+  "completionId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkEntriesItemCompletionIdRegExp).nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "holdReasons": zod.array(zod.string())
+})).max(attachAppointmentWorkPhotoResponseWorkEntriesMax),
+  "completion": zod.object({
+  "id": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkCompletionIdRegExp),
+  "appointmentId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkCompletionAppointmentIdRegExp),
+  "contactId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkCompletionContactIdRegExp),
+  "propertyId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkCompletionPropertyIdRegExp).nullable(),
+  "requestId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkCompletionRequestIdRegExp),
+  "performedAt": zod.coerce.date(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string(),
+  "performerUserId": zod.string(),
+  "actingNote": zod.string().nullable(),
+  "summary": zod.string(),
+  "outcome": zod.enum(['completed', 'needs_followup']),
+  "followupTaskId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkCompletionFollowupTaskIdRegExp).nullable(),
+  "entries": zod.array(zod.object({
+  "id": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkCompletionEntriesItemIdRegExp),
+  "version": zod.int().min(1).max(attachAppointmentWorkPhotoResponseWorkCompletionEntriesItemVersionMax),
+  "checklistRevisionId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkCompletionEntriesItemChecklistRevisionIdRegExp),
+  "assetId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkCompletionEntriesItemAssetIdRegExp).nullable()
+})),
+  "services": zod.array(zod.object({
+  "id": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkCompletionServicesItemIdRegExp),
+  "nextObligationId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkCompletionServicesItemNextObligationIdRegExp).nullable()
+})),
+  "nativeAppointmentStatus": zod.enum(['completed'])
+}).nullable(),
+  "corrections": zod.array(zod.object({
+  "id": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkCorrectionsItemIdRegExp),
+  "originalCompletionId": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkCorrectionsItemOriginalCompletionIdRegExp),
+  "note": zod.string(),
+  "recordedAt": zod.coerce.date(),
+  "recordedByUserId": zod.string()
+})).max(attachAppointmentWorkPhotoResponseWorkCorrectionsMax),
+  "correctionsHasMore": zod.boolean(),
+  "linkedServices": zod.array(zod.object({
+  "id": zod.uuid().regex(attachAppointmentWorkPhotoResponseWorkLinkedServicesItemIdRegExp),
+  "equipmentLabel": zod.string(),
+  "status": zod.enum(['active', 'completed', 'cancelled']),
+  "updatedAt": zod.coerce.date()
+})),
+  "capabilities": zod.object({
+  "canPrepare": zod.boolean(),
+  "canEdit": zod.boolean(),
+  "canCancel": zod.boolean(),
+  "canComplete": zod.boolean(),
+  "canCorrect": zod.boolean(),
+  "requiresActingNote": zod.boolean(),
+  "reasons": zod.array(zod.string())
+})
+}),
+  "receipt": zod.object({
+  "requestId": zod.uuid().regex(attachAppointmentWorkPhotoResponseReceiptRequestIdRegExp),
+  "replayed": zod.boolean()
+})
+})
+
+
+/**
+ * Human accepted verified active company staff only; no API-key authority. Requires crm.read, plus current assignment or explicit office-on-behalf authority for field writes. Saved drafts/researched baselines are not company review, physical proof, warranty coverage, customer acceptance, messages or payment. Exact original request/payload and immutable historical snapshots are preserved.
+ * @summary Read exact authenticated private image bytes
+ */
+export const GetAppointmentWorkPhotoParams = zod.object({
+  "appointmentId": zod.uuid(),
+  "photoId": zod.uuid()
+})
+
+export const GetAppointmentWorkPhotoResponse = zod.unknown()
+
+
+/**
  * Current accepted active verified staff session only; no API-key authority. Requires crm.read. Shared policy head selects exactly one future-call mode. Binding metadata and exact policy approval do not configure a provider or prove live audio/transfer. Caller statements are unverified; no identity, SMS permission, confirmed visit or emergency dispatch is inferred. Original uncertain effects remain non-retryable.
  * @summary Read conversation setup and separate current source mode
  */
@@ -6159,6 +9832,8 @@ export const CreateContactResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
+
+
 export const GetContactParams = zod.object({
   "id": zod.uuid()
 })

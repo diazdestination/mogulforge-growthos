@@ -1,5 +1,20 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## October 6 UTC / October 5 Eastern researched contractor-workday continuation
+
+PR24/main3f1f1b5 and exact-mainCI37407237259 are complete and independently
+accepted. The owner authorized common HVAC/roofing workflow research and the
+next workday wave without waiting for client exports. Root records research and
+freezes reports/contractor-workday-contract-2026-10-06.md before product edits.
+Use configurable researched equipment/checklist baselines, never inferred real
+contractor facts, manufacturer warranty entitlement or invented import mappings.
+The research baseline supersedes the earlier sample-first source-design hold,
+not any release/provider/hosted/customer/financial gate. Use coordinated runtime,
+experience and companion lanes; root owns integration/schema/recovery/Git/CI.
+Planning is read-only until the contract freezes. Preserve canonical records,
+legacy history and unknown effects. No hosted/provider activation, real data,
+contacts, payments or contractor cutover. Earlier active-wave headings are history.
+
 ## October 5 CALLIE conversation continuation
 
 PR23/mainafcb72a and exact-main CI37390525754 passed and were independently

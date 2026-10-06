@@ -21,6 +21,7 @@ import { seedStandingServicePreview } from "./standing-service-preview-fixture.m
 import { seedSourceNurturePreview } from "./source-nurture-preview-fixture.mjs";
 import { seedCustomerWorkspacePreview } from "./customer-workspace-preview-fixture.mjs";
 import { seedCallieConversationPreview } from "./callie-conversation-preview-fixture.mjs";
+import { seedContractorWorkdayPreview } from "./contractor-workday-preview-fixture.mjs";
 import { credentialCodec } from "../../../scripts/restore-drill-fixture.mjs";
 
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -109,6 +110,11 @@ try {
     if (process.argv.includes("--standing-service")) await seedStandingServicePreview(client, org.id, user.id);
     if (process.argv.includes("--source-nurture")) await seedSourceNurturePreview(client, org.id, user.id);
     if (process.argv.includes("--customer-workspace")) await seedCustomerWorkspacePreview(client, org.id, user.id);
+    if (process.argv.includes("--contractor-workday")) {
+      const workday = await seedContractorWorkdayPreview(client, org.id, user.id);
+      console.log(`Synthetic workday: ${workday.customer} | ${workday.visit} | ${workday.history}. Fictional records, no providers/customer contact.`);
+      console.log(`Synthetic roofing workday: ${workday.roof.customer} | ${workday.roof.visit} | ${workday.roof.history}. Separate fictional records, no imported customer facts.`);
+    }
     if (process.argv.includes("--callie-conversation")) {
       const codec = await credentialCodec(env.OAUTH_TOKEN_ENCRYPTION_KEY);
       const reception = await seedCallieConversationPreview(client, org.id, user.id, codec);

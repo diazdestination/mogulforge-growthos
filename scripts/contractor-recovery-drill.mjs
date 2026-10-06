@@ -21,6 +21,7 @@ import { standingServiceIds, seedStandingServiceRecovery, assertStandingServiceR
 import { sourceNurtureIds, seedSourceNurtureRecovery, assertSourceNurtureRecovery, assertSourceNurtureKeys } from './source-nurture-recovery-fixture.mjs';
 import { seedCustomerWorkspaceFixture } from './customer-workspace-fixture.mjs';
 import { CALLIE_CONVERSATION_RECOVERY_SLUGS, seedCallieConversationRecovery, assertCallieConversationRecovery, assertCallieConversationKeys } from './callie-conversation-recovery-fixture.mjs';
+import { WORKDAY_RECOVERY_SLUGS, seedWorkdayRecovery, assertWorkdayRecovery, assertWorkdayKeys } from './contractor-workday-recovery-fixture.mjs';
 
 const requireApi = createRequire(new URL('../artifacts/api-server/package.json', import.meta.url));
 const requireDb = createRequire(new URL('../lib/db/package.json', import.meta.url));
@@ -31,7 +32,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const identifier = (name) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('contractor_identifier_invalid'); return `"${name}"`; };
 const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot', 'reasons', 'snapshot', 'settings', 'result', 'historical_source', 'policy', 'context_snapshot']);
-const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql', '0010_lead-replies.sql', '0011_invoice-recovery.sql', '0012_callie-intake.sql', '0013_standing-service.sql', '0014_source-nurture.sql', '0015_callie-conversation.sql'];
+const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql', '0010_lead-replies.sql', '0011_invoice-recovery.sql', '0012_callie-intake.sql', '0013_standing-service.sql', '0014_source-nurture.sql', '0015_callie-conversation.sql', '0016_contractor-workday.sql'];
 
 async function insert(database, table, row) {
   const fields = Object.keys(row);
@@ -152,6 +153,10 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       await seedCallieConversationRecovery(source, slug, codec);
       await assertCallieConversationRecovery(source, slug, codec);
     }
+    for (const slug of WORKDAY_RECOVERY_SLUGS) {
+      await seedWorkdayRecovery(source, slug);
+      await assertWorkdayRecovery(source, slug);
+    }
     await source.exec('CREATE ROLE contractor_recovery_reader; GRANT USAGE ON SCHEMA public TO contractor_recovery_reader; GRANT SELECT ON ALL TABLES IN SCHEMA public TO contractor_recovery_reader;');
     const careBaseline = await fingerprints(source);
     await assertCareTenantKeys(source, slugs[0], slugs[1]);
@@ -163,6 +168,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     const standingServiceConstraintChecks = await assertStandingServiceKeys(source, slugs[0], slugs[1]);
     const nurtureConstraintChecks = await assertSourceNurtureKeys(source, slugs[0], slugs[1]);
     const conversationConstraints = await assertCallieConversationKeys(source);
+    const workdayConstraints = await assertWorkdayKeys(source);
     assert.deepEqual(await fingerprints(source), careBaseline);
     // Prove the reviewed active-service exception cannot mask an unpaused
     // company or another active obligation. These transactions always roll back.
@@ -227,6 +233,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     for (const slug of slugs) await assertStandingServiceRecovery(restored,slug);
     for (const slug of slugs) await assertSourceNurtureRecovery(restored,slug);
     for (const slug of CALLIE_CONVERSATION_RECOVERY_SLUGS) await assertCallieConversationRecovery(restored, slug, codec);
+    for (const slug of WORKDAY_RECOVERY_SLUGS) await assertWorkdayRecovery(restored, slug);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM billing_checkouts WHERE state='reconcile'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM customer_lifecycle WHERE state='paused'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM staff_invitations WHERE state='pending' AND delivery_state='unconfirmed'")).rows[0].n, 2);
@@ -258,6 +265,9 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       callieConstraintChecks, callieUnknownGrantPreserved: true, callieDisabledHeadPreserved: true, callieUnverifiedCallerPreserved: true, callieChallengeEncryptionVerified: true,
       standingServiceConstraintChecks, standingDisabledHeadPreserved: true, standingUnknownSendPreserved: true, serviceSmsHoldAfterPurgePreserved: true, ambiguousServiceSmsPreserved: true,
       nurtureConstraintChecks, nurtureStoppedOwnershipPreserved: true, nurtureUnknownNeverAdvanced: true, nurtureFailedSyncPreserved: true, nurtureReplyHoldAfterPurgePreserved: true,
+      workdayConstraintChecks: workdayConstraints, workdayCapturedHistoryPreserved: true,
+      workdayImmutableRevisionPreserved: true, workdayPrivatePhotosPreserved: true,
+      workdayNoAcquisitionLeadCreated: true, workdayReadVerified: app.workdayReadVerified,
       callieConversationConstraintChecks: conversationConstraints.count,
       callieConversationUnknownEffectsPreserved: true, callieConversationStaffWorkPreserved: true,
       callieConversationContentPurgePreserved: true, callieConversationDisabledHeadPreserved: true,

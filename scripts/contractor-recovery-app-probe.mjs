@@ -12,6 +12,7 @@ import { standingServiceIds } from './standing-service-recovery-fixture.mjs';
 import { sourceNurtureIds } from './source-nurture-recovery-fixture.mjs';
 import { customerWorkspaceIds } from './customer-workspace-fixture.mjs';
 import { CALLIE_CONVERSATION_RECOVERY_SLUGS, callieConversationFixtureIds } from './callie-conversation-recovery-fixture.mjs';
+import { WORKDAY_RECOVERY_SLUGS, workdayFixtureIds, WORKDAY_FIXTURE_PNG } from './contractor-workday-recovery-fixture.mjs';
 
 const target = new URL(process.env.DATABASE_URL ?? '');
 if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.hostname !== '127.0.0.1' || target.pathname !== '/postgres' || process.env.CONTRACTOR_SYNTHETIC_RECOVERY !== 'true' || process.env.NODE_ENV !== 'test') throw new Error('contractor_probe_target_invalid');
@@ -225,7 +226,51 @@ try {
     assert.equal(update.status, 405); await update.arrayBuffer();
     assert.equal(databaseFailed, false);
   }
-  process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, tenantBoundariesVerified: true, customerWorkspaceVerified: true, callieConversationReadVerified: true, readChecks: good.length + receptionReadChecks, writeBlocked: true })}\n`);
+  let workdayReadChecks = 0;
+  for (const [index,slug] of WORKDAY_RECOVERY_SLUGS.entries()) {
+    const workday=workdayFixtureIds(slug), foreign=workdayFixtureIds(WORKDAY_RECOVERY_SLUGS[1-index]);
+    const workHeaders={authorization:`Bearer ${workday.authSession}`};
+    const read=async path=>{
+      const response=await fetch(`${origin}${path}`,{headers:workHeaders});
+      assert.equal(response.status,200,path); assert.equal(response.headers.get('cache-control'),'no-store');
+      workdayReadChecks++; return response.json();
+    };
+    check=`workday_${index}_assets`;
+    const assets=await read(`/api/v1/contacts/${workday.contact}/assets`);
+    assert.equal(assets.organizationId,workday.organization); assert.equal(assets.items.length,2);
+    assert.ok(assets.items.some(row=>row.id===workday.retiredAsset && row.status==='retired'));
+    const catalog=await read('/api/v1/work-checklists');
+    assert.equal(catalog.organizationId,workday.organization); assert.equal(catalog.starters.length,2);
+    const template=await read(`/api/v1/work-checklists/${workday.template}`);
+    assert.equal(template.latestRevision.version,2); assert.equal(template.approvedRevision.id,workday.newRevision);
+    check=`workday_${index}_completed_history`;
+    const completed=await read(`/api/v1/appointments/${workday.completedVisit}/work`);
+    assert.equal(completed.organizationId,workday.organization); assert.equal(completed.completion.id,workday.completion);
+    assert.equal(completed.completion.outcome,'needs_followup'); assert.equal(completed.completion.followupTaskId,workday.followupTask);
+    assert.equal(completed.entries.length,2); assert.ok(completed.entries.every(row=>row.checklist.version===1 && row.state==='finalized'));
+    assert.equal(completed.entries.find(row=>row.id===workday.secondEntry).assetSnapshot.label,'FICTIONAL historical unit / area');
+    assert.equal(completed.corrections[0].originalCompletionId,workday.completion);
+    assert.equal(completed.completion.services[0].nextObligationId,workday.nextService);
+    assert.equal(completed.capabilities.canComplete,false);
+    assert.doesNotMatch(JSON.stringify(completed),/PRIVATE SYNTHETIC token|payloadSha256|reservedObjectId|tasksBefore|nativeBefore/);
+    const stale=await read(`/api/v1/appointments/${workday.staleVisit}/work`);
+    assert.equal(stale.entries[0].state,'draft'); assert.ok(stale.entries[0].holdReasons.includes('workday_asset_changed'));
+    assert.equal(stale.entries[0].answers.length,0); assert.equal(stale.entries[0].photos[0].available,false);
+    const ready=await read(`/api/v1/appointments/${workday.readyVisit}/work`);
+    assert.equal(ready.entries.length,0); assert.equal(ready.completion,null);
+    check=`workday_${index}_private_photo`;
+    const photo=await fetch(`${origin}/api/v1/appointments/${workday.completedVisit}/work/photos/${workday.photo}/content`,{headers:workHeaders});
+    assert.equal(photo.status,200); assert.equal(photo.headers.get('content-type'),'image/png');
+    assert.equal(photo.headers.get('x-content-type-options'),'nosniff');
+    assert.deepEqual(Buffer.from(await photo.arrayBuffer()),WORKDAY_FIXTURE_PNG); workdayReadChecks++;
+    for (const path of [`/api/v1/contacts/${foreign.contact}/assets`,`/api/v1/work-checklists/${foreign.template}`,`/api/v1/appointments/${foreign.completedVisit}/work`,`/api/v1/appointments/${workday.completedVisit}/work/photos/${foreign.photo}/content`]) {
+      const denied=await fetch(`${origin}${path}`,{headers:workHeaders}); assert.equal(denied.status,404); await denied.arrayBuffer();
+    }
+    const deniedWrite=await fetch(`${origin}/api/v1/appointments/${workday.readyVisit}/work/entries`,{method:'POST',headers:{...workHeaders,'content-type':'application/json'},body:'{}'});
+    assert.equal(deniedWrite.status,405); await deniedWrite.arrayBuffer();
+    assert.equal(databaseFailed,false);
+  }
+  process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, tenantBoundariesVerified: true, customerWorkspaceVerified: true, callieConversationReadVerified: true, workdayReadVerified: true, readChecks: good.length + receptionReadChecks + workdayReadChecks, writeBlocked: true })}\n`);
 } catch (error) {
   // No response body, URL with credentials, SQL parameters or record content.
   process.stderr.write(`CONTRACTOR_APP_PROBE_FAILED:${check}:${error.code === 'ERR_ASSERTION' ? 'assertion' : 'unavailable'}${Number.isInteger(error.actual) ? `:status_${error.actual}` : ''}\n`);

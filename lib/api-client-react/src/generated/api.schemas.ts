@@ -5,6 +5,3308 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+export type WorkdayAssetPageItemsItemCategory = typeof WorkdayAssetPageItemsItemCategory[keyof typeof WorkdayAssetPageItemsItemCategory];
+
+
+export const WorkdayAssetPageItemsItemCategory = {
+  hvac_equipment: 'hvac_equipment',
+  roof_system: 'roof_system',
+  other: 'other',
+} as const;
+
+export type WorkdayAssetPageItemsItemAttributesItem = {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  value: string;
+};
+
+export type WorkdayAssetPageItemsItemStatus = typeof WorkdayAssetPageItemsItemStatus[keyof typeof WorkdayAssetPageItemsItemStatus];
+
+
+export const WorkdayAssetPageItemsItemStatus = {
+  active: 'active',
+  retired: 'retired',
+} as const;
+
+export type WorkdayAssetPageItemsItem = {
+  category: WorkdayAssetPageItemsItemCategory;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  label: string;
+  /** @maxLength 160 */
+  manufacturer: string | null;
+  /** @maxLength 160 */
+  model: string | null;
+  /** @maxLength 160 */
+  serial: string | null;
+  /** @maxLength 300 */
+  location: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  installedOn: string | null;
+  /** @maxLength 2000 */
+  notes: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyEndsOn: string | null;
+  /** @maxLength 1000 */
+  warrantySource: string | null;
+  /** @maxItems 20 */
+  attributes: WorkdayAssetPageItemsItemAttributesItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  status: WorkdayAssetPageItemsItemStatus;
+  createdAt: string;
+  updatedAt: string;
+  currentParentCoherent: boolean;
+  canEdit: boolean;
+};
+
+export type WorkdayAssetPageLimit = typeof WorkdayAssetPageLimit[keyof typeof WorkdayAssetPageLimit];
+
+
+export const WorkdayAssetPageLimit = {
+  NUMBER_25: 25,
+} as const;
+
+export interface WorkdayAssetPage {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @maxItems 25 */
+  items: WorkdayAssetPageItemsItem[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  limit: WorkdayAssetPageLimit;
+  canCreate: boolean;
+}
+
+export type WorkdayAssetMutationAssetCategory = typeof WorkdayAssetMutationAssetCategory[keyof typeof WorkdayAssetMutationAssetCategory];
+
+
+export const WorkdayAssetMutationAssetCategory = {
+  hvac_equipment: 'hvac_equipment',
+  roof_system: 'roof_system',
+  other: 'other',
+} as const;
+
+export type WorkdayAssetMutationAssetAttributesItem = {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  value: string;
+};
+
+export type WorkdayAssetMutationAssetStatus = typeof WorkdayAssetMutationAssetStatus[keyof typeof WorkdayAssetMutationAssetStatus];
+
+
+export const WorkdayAssetMutationAssetStatus = {
+  active: 'active',
+  retired: 'retired',
+} as const;
+
+export type WorkdayAssetMutationAsset = {
+  category: WorkdayAssetMutationAssetCategory;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  label: string;
+  /** @maxLength 160 */
+  manufacturer: string | null;
+  /** @maxLength 160 */
+  model: string | null;
+  /** @maxLength 160 */
+  serial: string | null;
+  /** @maxLength 300 */
+  location: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  installedOn: string | null;
+  /** @maxLength 2000 */
+  notes: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyEndsOn: string | null;
+  /** @maxLength 1000 */
+  warrantySource: string | null;
+  /** @maxItems 20 */
+  attributes: WorkdayAssetMutationAssetAttributesItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  status: WorkdayAssetMutationAssetStatus;
+  createdAt: string;
+  updatedAt: string;
+  currentParentCoherent: boolean;
+  canEdit: boolean;
+};
+
+export type WorkdayAssetMutationReceipt = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  replayed: boolean;
+};
+
+export interface WorkdayAssetMutation {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  asset: WorkdayAssetMutationAsset;
+  receipt: WorkdayAssetMutationReceipt;
+}
+
+export type WorkdayAssetCategory = typeof WorkdayAssetCategory[keyof typeof WorkdayAssetCategory];
+
+
+export const WorkdayAssetCategory = {
+  hvac_equipment: 'hvac_equipment',
+  roof_system: 'roof_system',
+  other: 'other',
+} as const;
+
+export type WorkdayAssetAttributesItem = {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  value: string;
+};
+
+export type WorkdayAssetStatus = typeof WorkdayAssetStatus[keyof typeof WorkdayAssetStatus];
+
+
+export const WorkdayAssetStatus = {
+  active: 'active',
+  retired: 'retired',
+} as const;
+
+export interface WorkdayAsset {
+  category: WorkdayAssetCategory;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  label: string;
+  /** @maxLength 160 */
+  manufacturer: string | null;
+  /** @maxLength 160 */
+  model: string | null;
+  /** @maxLength 160 */
+  serial: string | null;
+  /** @maxLength 300 */
+  location: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  installedOn: string | null;
+  /** @maxLength 2000 */
+  notes: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyEndsOn: string | null;
+  /** @maxLength 1000 */
+  warrantySource: string | null;
+  /** @maxItems 20 */
+  attributes: WorkdayAssetAttributesItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  status: WorkdayAssetStatus;
+  createdAt: string;
+  updatedAt: string;
+  currentParentCoherent: boolean;
+  canEdit: boolean;
+}
+
+export type WorkdayTemplateCatalogTemplatesItemStatus = typeof WorkdayTemplateCatalogTemplatesItemStatus[keyof typeof WorkdayTemplateCatalogTemplatesItemStatus];
+
+
+export const WorkdayTemplateCatalogTemplatesItemStatus = {
+  draft: 'draft',
+  reviewed: 'reviewed',
+  retired: 'retired',
+} as const;
+
+export type WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinitionTrade = typeof WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinitionTrade[keyof typeof WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinitionTrade];
+
+
+export const WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinitionItemsItemKind = typeof WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinitionItemsItemKind[keyof typeof WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinitionItemsItemKind];
+
+
+export const WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinitionItemsItem[];
+};
+
+export type WorkdayTemplateCatalogTemplatesItemLatestRevision = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  templateId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  definition: WorkdayTemplateCatalogTemplatesItemLatestRevisionDefinition;
+  /** @pattern ^[a-f0-9]{64}$ */
+  definitionSha256: string;
+  baselineId: string | null;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  baselineVersion: number | null;
+  createdAt: string;
+  createdByUserId: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+};
+
+export type WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinitionTrade = typeof WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinitionTrade[keyof typeof WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinitionTrade];
+
+
+export const WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinitionItemsItemKind = typeof WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinitionItemsItemKind[keyof typeof WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinitionItemsItemKind];
+
+
+export const WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinitionItemsItem[];
+};
+
+export type WorkdayTemplateCatalogTemplatesItemApprovedRevision = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  templateId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  definition: WorkdayTemplateCatalogTemplatesItemApprovedRevisionDefinition;
+  /** @pattern ^[a-f0-9]{64}$ */
+  definitionSha256: string;
+  baselineId: string | null;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  baselineVersion: number | null;
+  createdAt: string;
+  createdByUserId: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+} | null;
+
+export type WorkdayTemplateCatalogTemplatesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  status: WorkdayTemplateCatalogTemplatesItemStatus;
+  latestRevision: WorkdayTemplateCatalogTemplatesItemLatestRevision;
+  approvedRevision: WorkdayTemplateCatalogTemplatesItemApprovedRevision;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WorkdayTemplateCatalogStartersItemVersion = typeof WorkdayTemplateCatalogStartersItemVersion[keyof typeof WorkdayTemplateCatalogStartersItemVersion];
+
+
+export const WorkdayTemplateCatalogStartersItemVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type WorkdayTemplateCatalogStartersItemDefinitionTrade = typeof WorkdayTemplateCatalogStartersItemDefinitionTrade[keyof typeof WorkdayTemplateCatalogStartersItemDefinitionTrade];
+
+
+export const WorkdayTemplateCatalogStartersItemDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayTemplateCatalogStartersItemDefinitionItemsItemKind = typeof WorkdayTemplateCatalogStartersItemDefinitionItemsItemKind[keyof typeof WorkdayTemplateCatalogStartersItemDefinitionItemsItemKind];
+
+
+export const WorkdayTemplateCatalogStartersItemDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayTemplateCatalogStartersItemDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayTemplateCatalogStartersItemDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayTemplateCatalogStartersItemDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayTemplateCatalogStartersItemDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayTemplateCatalogStartersItemDefinitionItemsItem[];
+};
+
+export type WorkdayTemplateCatalogStartersItem = {
+  id: string;
+  version: WorkdayTemplateCatalogStartersItemVersion;
+  title: string;
+  description: string;
+  sourceUrls: string[];
+  definition: WorkdayTemplateCatalogStartersItemDefinition;
+};
+
+export type WorkdayTemplateCatalogLimit = typeof WorkdayTemplateCatalogLimit[keyof typeof WorkdayTemplateCatalogLimit];
+
+
+export const WorkdayTemplateCatalogLimit = {
+  NUMBER_100: 100,
+} as const;
+
+export interface WorkdayTemplateCatalog {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @maxItems 100 */
+  templates: WorkdayTemplateCatalogTemplatesItem[];
+  starters: WorkdayTemplateCatalogStartersItem[];
+  canManage: boolean;
+  limit: WorkdayTemplateCatalogLimit;
+  limitReached: boolean;
+}
+
+export type WorkdayTemplateStatus = typeof WorkdayTemplateStatus[keyof typeof WorkdayTemplateStatus];
+
+
+export const WorkdayTemplateStatus = {
+  draft: 'draft',
+  reviewed: 'reviewed',
+  retired: 'retired',
+} as const;
+
+export type WorkdayTemplateLatestRevisionDefinitionTrade = typeof WorkdayTemplateLatestRevisionDefinitionTrade[keyof typeof WorkdayTemplateLatestRevisionDefinitionTrade];
+
+
+export const WorkdayTemplateLatestRevisionDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayTemplateLatestRevisionDefinitionItemsItemKind = typeof WorkdayTemplateLatestRevisionDefinitionItemsItemKind[keyof typeof WorkdayTemplateLatestRevisionDefinitionItemsItemKind];
+
+
+export const WorkdayTemplateLatestRevisionDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayTemplateLatestRevisionDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayTemplateLatestRevisionDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayTemplateLatestRevisionDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayTemplateLatestRevisionDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayTemplateLatestRevisionDefinitionItemsItem[];
+};
+
+export type WorkdayTemplateLatestRevision = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  templateId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  definition: WorkdayTemplateLatestRevisionDefinition;
+  /** @pattern ^[a-f0-9]{64}$ */
+  definitionSha256: string;
+  baselineId: string | null;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  baselineVersion: number | null;
+  createdAt: string;
+  createdByUserId: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+};
+
+export type WorkdayTemplateApprovedRevisionDefinitionTrade = typeof WorkdayTemplateApprovedRevisionDefinitionTrade[keyof typeof WorkdayTemplateApprovedRevisionDefinitionTrade];
+
+
+export const WorkdayTemplateApprovedRevisionDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayTemplateApprovedRevisionDefinitionItemsItemKind = typeof WorkdayTemplateApprovedRevisionDefinitionItemsItemKind[keyof typeof WorkdayTemplateApprovedRevisionDefinitionItemsItemKind];
+
+
+export const WorkdayTemplateApprovedRevisionDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayTemplateApprovedRevisionDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayTemplateApprovedRevisionDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayTemplateApprovedRevisionDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayTemplateApprovedRevisionDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayTemplateApprovedRevisionDefinitionItemsItem[];
+};
+
+export type WorkdayTemplateApprovedRevision = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  templateId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  definition: WorkdayTemplateApprovedRevisionDefinition;
+  /** @pattern ^[a-f0-9]{64}$ */
+  definitionSha256: string;
+  baselineId: string | null;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  baselineVersion: number | null;
+  createdAt: string;
+  createdByUserId: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+} | null;
+
+export interface WorkdayTemplate {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  status: WorkdayTemplateStatus;
+  latestRevision: WorkdayTemplateLatestRevision;
+  approvedRevision: WorkdayTemplateApprovedRevision;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type WorkdayTemplateMutationTemplateStatus = typeof WorkdayTemplateMutationTemplateStatus[keyof typeof WorkdayTemplateMutationTemplateStatus];
+
+
+export const WorkdayTemplateMutationTemplateStatus = {
+  draft: 'draft',
+  reviewed: 'reviewed',
+  retired: 'retired',
+} as const;
+
+export type WorkdayTemplateMutationTemplateLatestRevisionDefinitionTrade = typeof WorkdayTemplateMutationTemplateLatestRevisionDefinitionTrade[keyof typeof WorkdayTemplateMutationTemplateLatestRevisionDefinitionTrade];
+
+
+export const WorkdayTemplateMutationTemplateLatestRevisionDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayTemplateMutationTemplateLatestRevisionDefinitionItemsItemKind = typeof WorkdayTemplateMutationTemplateLatestRevisionDefinitionItemsItemKind[keyof typeof WorkdayTemplateMutationTemplateLatestRevisionDefinitionItemsItemKind];
+
+
+export const WorkdayTemplateMutationTemplateLatestRevisionDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayTemplateMutationTemplateLatestRevisionDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayTemplateMutationTemplateLatestRevisionDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayTemplateMutationTemplateLatestRevisionDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayTemplateMutationTemplateLatestRevisionDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayTemplateMutationTemplateLatestRevisionDefinitionItemsItem[];
+};
+
+export type WorkdayTemplateMutationTemplateLatestRevision = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  templateId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  definition: WorkdayTemplateMutationTemplateLatestRevisionDefinition;
+  /** @pattern ^[a-f0-9]{64}$ */
+  definitionSha256: string;
+  baselineId: string | null;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  baselineVersion: number | null;
+  createdAt: string;
+  createdByUserId: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+};
+
+export type WorkdayTemplateMutationTemplateApprovedRevisionDefinitionTrade = typeof WorkdayTemplateMutationTemplateApprovedRevisionDefinitionTrade[keyof typeof WorkdayTemplateMutationTemplateApprovedRevisionDefinitionTrade];
+
+
+export const WorkdayTemplateMutationTemplateApprovedRevisionDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayTemplateMutationTemplateApprovedRevisionDefinitionItemsItemKind = typeof WorkdayTemplateMutationTemplateApprovedRevisionDefinitionItemsItemKind[keyof typeof WorkdayTemplateMutationTemplateApprovedRevisionDefinitionItemsItemKind];
+
+
+export const WorkdayTemplateMutationTemplateApprovedRevisionDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayTemplateMutationTemplateApprovedRevisionDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayTemplateMutationTemplateApprovedRevisionDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayTemplateMutationTemplateApprovedRevisionDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayTemplateMutationTemplateApprovedRevisionDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayTemplateMutationTemplateApprovedRevisionDefinitionItemsItem[];
+};
+
+export type WorkdayTemplateMutationTemplateApprovedRevision = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  templateId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  definition: WorkdayTemplateMutationTemplateApprovedRevisionDefinition;
+  /** @pattern ^[a-f0-9]{64}$ */
+  definitionSha256: string;
+  baselineId: string | null;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  baselineVersion: number | null;
+  createdAt: string;
+  createdByUserId: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+} | null;
+
+export type WorkdayTemplateMutationTemplate = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  status: WorkdayTemplateMutationTemplateStatus;
+  latestRevision: WorkdayTemplateMutationTemplateLatestRevision;
+  approvedRevision: WorkdayTemplateMutationTemplateApprovedRevision;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WorkdayTemplateMutationReceipt = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  replayed: boolean;
+};
+
+export interface WorkdayTemplateMutation {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  template: WorkdayTemplateMutationTemplate;
+  receipt: WorkdayTemplateMutationReceipt;
+}
+
+export type WorkdayTemplatePreviewRevisionDefinitionTrade = typeof WorkdayTemplatePreviewRevisionDefinitionTrade[keyof typeof WorkdayTemplatePreviewRevisionDefinitionTrade];
+
+
+export const WorkdayTemplatePreviewRevisionDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayTemplatePreviewRevisionDefinitionItemsItemKind = typeof WorkdayTemplatePreviewRevisionDefinitionItemsItemKind[keyof typeof WorkdayTemplatePreviewRevisionDefinitionItemsItemKind];
+
+
+export const WorkdayTemplatePreviewRevisionDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayTemplatePreviewRevisionDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayTemplatePreviewRevisionDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayTemplatePreviewRevisionDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayTemplatePreviewRevisionDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayTemplatePreviewRevisionDefinitionItemsItem[];
+};
+
+export type WorkdayTemplatePreviewRevision = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  templateId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  definition: WorkdayTemplatePreviewRevisionDefinition;
+  /** @pattern ^[a-f0-9]{64}$ */
+  definitionSha256: string;
+  baselineId: string | null;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  baselineVersion: number | null;
+  createdAt: string;
+  createdByUserId: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+};
+
+export interface WorkdayTemplatePreview {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  templateId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  revision: WorkdayTemplatePreviewRevision;
+  expiresAt: string;
+  previewToken: string;
+}
+
+export type WorkdayAppointmentAppointmentStatus = typeof WorkdayAppointmentAppointmentStatus[keyof typeof WorkdayAppointmentAppointmentStatus];
+
+
+export const WorkdayAppointmentAppointmentStatus = {
+  scheduled: 'scheduled',
+  confirmed: 'confirmed',
+  completed: 'completed',
+  cancelled: 'cancelled',
+  no_show: 'no_show',
+} as const;
+
+export type WorkdayAppointmentAppointmentType = typeof WorkdayAppointmentAppointmentType[keyof typeof WorkdayAppointmentAppointmentType];
+
+
+export const WorkdayAppointmentAppointmentType = {
+  inspection: 'inspection',
+  estimate_review: 'estimate_review',
+  production: 'production',
+  final_walkthrough: 'final_walkthrough',
+  other: 'other',
+} as const;
+
+export type WorkdayAppointmentAppointment = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  assignedUserId: string | null;
+  status: WorkdayAppointmentAppointmentStatus;
+  type: WorkdayAppointmentAppointmentType;
+  scheduledStart: string;
+  scheduledEnd: string | null;
+  updatedAt: string;
+  notes: string | null;
+  customerLabel: string | null;
+  propertyLabel: string | null;
+};
+
+export type WorkdayAppointmentEntriesItemState = typeof WorkdayAppointmentEntriesItemState[keyof typeof WorkdayAppointmentEntriesItemState];
+
+
+export const WorkdayAppointmentEntriesItemState = {
+  draft: 'draft',
+  cancelled: 'cancelled',
+  finalized: 'finalized',
+} as const;
+
+export type WorkdayAppointmentEntriesItemChecklistDefinitionTrade = typeof WorkdayAppointmentEntriesItemChecklistDefinitionTrade[keyof typeof WorkdayAppointmentEntriesItemChecklistDefinitionTrade];
+
+
+export const WorkdayAppointmentEntriesItemChecklistDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayAppointmentEntriesItemChecklistDefinitionItemsItemKind = typeof WorkdayAppointmentEntriesItemChecklistDefinitionItemsItemKind[keyof typeof WorkdayAppointmentEntriesItemChecklistDefinitionItemsItemKind];
+
+
+export const WorkdayAppointmentEntriesItemChecklistDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayAppointmentEntriesItemChecklistDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayAppointmentEntriesItemChecklistDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayAppointmentEntriesItemChecklistDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayAppointmentEntriesItemChecklistDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayAppointmentEntriesItemChecklistDefinitionItemsItem[];
+};
+
+export type WorkdayAppointmentEntriesItemChecklist = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  templateId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  definition: WorkdayAppointmentEntriesItemChecklistDefinition;
+  /** @pattern ^[a-f0-9]{64}$ */
+  definitionSha256: string;
+  baselineId: string | null;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  baselineVersion: number | null;
+  createdAt: string;
+  createdByUserId: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+};
+
+export type WorkdayAppointmentEntriesItemAssetSnapshotCategory = typeof WorkdayAppointmentEntriesItemAssetSnapshotCategory[keyof typeof WorkdayAppointmentEntriesItemAssetSnapshotCategory];
+
+
+export const WorkdayAppointmentEntriesItemAssetSnapshotCategory = {
+  hvac_equipment: 'hvac_equipment',
+  roof_system: 'roof_system',
+  other: 'other',
+} as const;
+
+export type WorkdayAppointmentEntriesItemAssetSnapshotAttributesItem = {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  value: string;
+};
+
+export type WorkdayAppointmentEntriesItemAssetSnapshot = {
+  category: WorkdayAppointmentEntriesItemAssetSnapshotCategory;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  label: string;
+  /** @maxLength 160 */
+  manufacturer: string | null;
+  /** @maxLength 160 */
+  model: string | null;
+  /** @maxLength 160 */
+  serial: string | null;
+  /** @maxLength 300 */
+  location: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  installedOn: string | null;
+  /** @maxLength 2000 */
+  notes: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyEndsOn: string | null;
+  /** @maxLength 1000 */
+  warrantySource: string | null;
+  /** @maxItems 20 */
+  attributes: WorkdayAppointmentEntriesItemAssetSnapshotAttributesItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+} | null;
+
+export type WorkdayAppointmentEntriesItemAnswersItemResult = typeof WorkdayAppointmentEntriesItemAnswersItemResult[keyof typeof WorkdayAppointmentEntriesItemAnswersItemResult];
+
+
+export const WorkdayAppointmentEntriesItemAnswersItemResult = {
+  done: 'done',
+  needs_attention: 'needs_attention',
+  not_applicable: 'not_applicable',
+} as const;
+
+export type WorkdayAppointmentEntriesItemAnswersItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  itemKey: string;
+  result: WorkdayAppointmentEntriesItemAnswersItemResult;
+  value: string | number | null;
+  /** @maxLength 1000 */
+  reason: string | null;
+};
+
+export type WorkdayAppointmentEntriesItemPhotosItemState = typeof WorkdayAppointmentEntriesItemPhotosItemState[keyof typeof WorkdayAppointmentEntriesItemPhotosItemState];
+
+
+export const WorkdayAppointmentEntriesItemPhotosItemState = {
+  reserved: 'reserved',
+  attached: 'attached',
+  expired: 'expired',
+} as const;
+
+export type WorkdayAppointmentEntriesItemPhotosItemContentType = typeof WorkdayAppointmentEntriesItemPhotosItemContentType[keyof typeof WorkdayAppointmentEntriesItemPhotosItemContentType];
+
+
+export const WorkdayAppointmentEntriesItemPhotosItemContentType = {
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export type WorkdayAppointmentEntriesItemPhotosItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  entryId: string;
+  itemKey: string | null;
+  caption: string;
+  state: WorkdayAppointmentEntriesItemPhotosItemState;
+  contentType: WorkdayAppointmentEntriesItemPhotosItemContentType;
+  /**
+     * @minimum 1
+     * @maximum 10485760
+     */
+  sizeBytes: number;
+  expiresAt: string;
+  attachedAt: string | null;
+  contentPath: string | null;
+  available: boolean;
+};
+
+export type WorkdayAppointmentEntriesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  assetId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  serviceObligationId: string | null;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  state: WorkdayAppointmentEntriesItemState;
+  checklist: WorkdayAppointmentEntriesItemChecklist;
+  assetSnapshot: WorkdayAppointmentEntriesItemAssetSnapshot;
+  answers: WorkdayAppointmentEntriesItemAnswersItem[];
+  notes: string;
+  /** @maxItems 50 */
+  photos: WorkdayAppointmentEntriesItemPhotosItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  completionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  holdReasons: string[];
+};
+
+export type WorkdayAppointmentCompletionOutcome = typeof WorkdayAppointmentCompletionOutcome[keyof typeof WorkdayAppointmentCompletionOutcome];
+
+
+export const WorkdayAppointmentCompletionOutcome = {
+  completed: 'completed',
+  needs_followup: 'needs_followup',
+} as const;
+
+export type WorkdayAppointmentCompletionEntriesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  checklistRevisionId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  assetId: string | null;
+};
+
+export type WorkdayAppointmentCompletionServicesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  nextObligationId: string | null;
+};
+
+export type WorkdayAppointmentCompletionNativeAppointmentStatus = typeof WorkdayAppointmentCompletionNativeAppointmentStatus[keyof typeof WorkdayAppointmentCompletionNativeAppointmentStatus];
+
+
+export const WorkdayAppointmentCompletionNativeAppointmentStatus = {
+  completed: 'completed',
+} as const;
+
+export type WorkdayAppointmentCompletion = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  performedAt: string;
+  recordedAt: string;
+  recordedByUserId: string;
+  performerUserId: string;
+  actingNote: string | null;
+  summary: string;
+  outcome: WorkdayAppointmentCompletionOutcome;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  followupTaskId: string | null;
+  entries: WorkdayAppointmentCompletionEntriesItem[];
+  services: WorkdayAppointmentCompletionServicesItem[];
+  nativeAppointmentStatus: WorkdayAppointmentCompletionNativeAppointmentStatus;
+} | null;
+
+export type WorkdayAppointmentCorrectionsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  originalCompletionId: string;
+  note: string;
+  recordedAt: string;
+  recordedByUserId: string;
+};
+
+export type WorkdayAppointmentLinkedServicesItemStatus = typeof WorkdayAppointmentLinkedServicesItemStatus[keyof typeof WorkdayAppointmentLinkedServicesItemStatus];
+
+
+export const WorkdayAppointmentLinkedServicesItemStatus = {
+  active: 'active',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export type WorkdayAppointmentLinkedServicesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  equipmentLabel: string;
+  status: WorkdayAppointmentLinkedServicesItemStatus;
+  updatedAt: string;
+};
+
+export type WorkdayAppointmentCapabilities = {
+  canPrepare: boolean;
+  canEdit: boolean;
+  canCancel: boolean;
+  canComplete: boolean;
+  canCorrect: boolean;
+  requiresActingNote: boolean;
+  reasons: string[];
+};
+
+export interface WorkdayAppointment {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  appointment: WorkdayAppointmentAppointment;
+  /** @maxItems 20 */
+  entries: WorkdayAppointmentEntriesItem[];
+  completion: WorkdayAppointmentCompletion;
+  /** @maxItems 25 */
+  corrections: WorkdayAppointmentCorrectionsItem[];
+  correctionsHasMore: boolean;
+  linkedServices: WorkdayAppointmentLinkedServicesItem[];
+  capabilities: WorkdayAppointmentCapabilities;
+}
+
+export type WorkdayMutationWorkAppointmentStatus = typeof WorkdayMutationWorkAppointmentStatus[keyof typeof WorkdayMutationWorkAppointmentStatus];
+
+
+export const WorkdayMutationWorkAppointmentStatus = {
+  scheduled: 'scheduled',
+  confirmed: 'confirmed',
+  completed: 'completed',
+  cancelled: 'cancelled',
+  no_show: 'no_show',
+} as const;
+
+export type WorkdayMutationWorkAppointmentType = typeof WorkdayMutationWorkAppointmentType[keyof typeof WorkdayMutationWorkAppointmentType];
+
+
+export const WorkdayMutationWorkAppointmentType = {
+  inspection: 'inspection',
+  estimate_review: 'estimate_review',
+  production: 'production',
+  final_walkthrough: 'final_walkthrough',
+  other: 'other',
+} as const;
+
+export type WorkdayMutationWorkAppointment = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  assignedUserId: string | null;
+  status: WorkdayMutationWorkAppointmentStatus;
+  type: WorkdayMutationWorkAppointmentType;
+  scheduledStart: string;
+  scheduledEnd: string | null;
+  updatedAt: string;
+  notes: string | null;
+  customerLabel: string | null;
+  propertyLabel: string | null;
+};
+
+export type WorkdayMutationWorkEntriesItemState = typeof WorkdayMutationWorkEntriesItemState[keyof typeof WorkdayMutationWorkEntriesItemState];
+
+
+export const WorkdayMutationWorkEntriesItemState = {
+  draft: 'draft',
+  cancelled: 'cancelled',
+  finalized: 'finalized',
+} as const;
+
+export type WorkdayMutationWorkEntriesItemChecklistDefinitionTrade = typeof WorkdayMutationWorkEntriesItemChecklistDefinitionTrade[keyof typeof WorkdayMutationWorkEntriesItemChecklistDefinitionTrade];
+
+
+export const WorkdayMutationWorkEntriesItemChecklistDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayMutationWorkEntriesItemChecklistDefinitionItemsItemKind = typeof WorkdayMutationWorkEntriesItemChecklistDefinitionItemsItemKind[keyof typeof WorkdayMutationWorkEntriesItemChecklistDefinitionItemsItemKind];
+
+
+export const WorkdayMutationWorkEntriesItemChecklistDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayMutationWorkEntriesItemChecklistDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayMutationWorkEntriesItemChecklistDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayMutationWorkEntriesItemChecklistDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayMutationWorkEntriesItemChecklistDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayMutationWorkEntriesItemChecklistDefinitionItemsItem[];
+};
+
+export type WorkdayMutationWorkEntriesItemChecklist = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  templateId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  definition: WorkdayMutationWorkEntriesItemChecklistDefinition;
+  /** @pattern ^[a-f0-9]{64}$ */
+  definitionSha256: string;
+  baselineId: string | null;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  baselineVersion: number | null;
+  createdAt: string;
+  createdByUserId: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+};
+
+export type WorkdayMutationWorkEntriesItemAssetSnapshotCategory = typeof WorkdayMutationWorkEntriesItemAssetSnapshotCategory[keyof typeof WorkdayMutationWorkEntriesItemAssetSnapshotCategory];
+
+
+export const WorkdayMutationWorkEntriesItemAssetSnapshotCategory = {
+  hvac_equipment: 'hvac_equipment',
+  roof_system: 'roof_system',
+  other: 'other',
+} as const;
+
+export type WorkdayMutationWorkEntriesItemAssetSnapshotAttributesItem = {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  value: string;
+};
+
+export type WorkdayMutationWorkEntriesItemAssetSnapshot = {
+  category: WorkdayMutationWorkEntriesItemAssetSnapshotCategory;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  label: string;
+  /** @maxLength 160 */
+  manufacturer: string | null;
+  /** @maxLength 160 */
+  model: string | null;
+  /** @maxLength 160 */
+  serial: string | null;
+  /** @maxLength 300 */
+  location: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  installedOn: string | null;
+  /** @maxLength 2000 */
+  notes: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyEndsOn: string | null;
+  /** @maxLength 1000 */
+  warrantySource: string | null;
+  /** @maxItems 20 */
+  attributes: WorkdayMutationWorkEntriesItemAssetSnapshotAttributesItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+} | null;
+
+export type WorkdayMutationWorkEntriesItemAnswersItemResult = typeof WorkdayMutationWorkEntriesItemAnswersItemResult[keyof typeof WorkdayMutationWorkEntriesItemAnswersItemResult];
+
+
+export const WorkdayMutationWorkEntriesItemAnswersItemResult = {
+  done: 'done',
+  needs_attention: 'needs_attention',
+  not_applicable: 'not_applicable',
+} as const;
+
+export type WorkdayMutationWorkEntriesItemAnswersItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  itemKey: string;
+  result: WorkdayMutationWorkEntriesItemAnswersItemResult;
+  value: string | number | null;
+  /** @maxLength 1000 */
+  reason: string | null;
+};
+
+export type WorkdayMutationWorkEntriesItemPhotosItemState = typeof WorkdayMutationWorkEntriesItemPhotosItemState[keyof typeof WorkdayMutationWorkEntriesItemPhotosItemState];
+
+
+export const WorkdayMutationWorkEntriesItemPhotosItemState = {
+  reserved: 'reserved',
+  attached: 'attached',
+  expired: 'expired',
+} as const;
+
+export type WorkdayMutationWorkEntriesItemPhotosItemContentType = typeof WorkdayMutationWorkEntriesItemPhotosItemContentType[keyof typeof WorkdayMutationWorkEntriesItemPhotosItemContentType];
+
+
+export const WorkdayMutationWorkEntriesItemPhotosItemContentType = {
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export type WorkdayMutationWorkEntriesItemPhotosItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  entryId: string;
+  itemKey: string | null;
+  caption: string;
+  state: WorkdayMutationWorkEntriesItemPhotosItemState;
+  contentType: WorkdayMutationWorkEntriesItemPhotosItemContentType;
+  /**
+     * @minimum 1
+     * @maximum 10485760
+     */
+  sizeBytes: number;
+  expiresAt: string;
+  attachedAt: string | null;
+  contentPath: string | null;
+  available: boolean;
+};
+
+export type WorkdayMutationWorkEntriesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  assetId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  serviceObligationId: string | null;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  state: WorkdayMutationWorkEntriesItemState;
+  checklist: WorkdayMutationWorkEntriesItemChecklist;
+  assetSnapshot: WorkdayMutationWorkEntriesItemAssetSnapshot;
+  answers: WorkdayMutationWorkEntriesItemAnswersItem[];
+  notes: string;
+  /** @maxItems 50 */
+  photos: WorkdayMutationWorkEntriesItemPhotosItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  completionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  holdReasons: string[];
+};
+
+export type WorkdayMutationWorkCompletionOutcome = typeof WorkdayMutationWorkCompletionOutcome[keyof typeof WorkdayMutationWorkCompletionOutcome];
+
+
+export const WorkdayMutationWorkCompletionOutcome = {
+  completed: 'completed',
+  needs_followup: 'needs_followup',
+} as const;
+
+export type WorkdayMutationWorkCompletionEntriesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  checklistRevisionId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  assetId: string | null;
+};
+
+export type WorkdayMutationWorkCompletionServicesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  nextObligationId: string | null;
+};
+
+export type WorkdayMutationWorkCompletionNativeAppointmentStatus = typeof WorkdayMutationWorkCompletionNativeAppointmentStatus[keyof typeof WorkdayMutationWorkCompletionNativeAppointmentStatus];
+
+
+export const WorkdayMutationWorkCompletionNativeAppointmentStatus = {
+  completed: 'completed',
+} as const;
+
+export type WorkdayMutationWorkCompletion = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  performedAt: string;
+  recordedAt: string;
+  recordedByUserId: string;
+  performerUserId: string;
+  actingNote: string | null;
+  summary: string;
+  outcome: WorkdayMutationWorkCompletionOutcome;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  followupTaskId: string | null;
+  entries: WorkdayMutationWorkCompletionEntriesItem[];
+  services: WorkdayMutationWorkCompletionServicesItem[];
+  nativeAppointmentStatus: WorkdayMutationWorkCompletionNativeAppointmentStatus;
+} | null;
+
+export type WorkdayMutationWorkCorrectionsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  originalCompletionId: string;
+  note: string;
+  recordedAt: string;
+  recordedByUserId: string;
+};
+
+export type WorkdayMutationWorkLinkedServicesItemStatus = typeof WorkdayMutationWorkLinkedServicesItemStatus[keyof typeof WorkdayMutationWorkLinkedServicesItemStatus];
+
+
+export const WorkdayMutationWorkLinkedServicesItemStatus = {
+  active: 'active',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export type WorkdayMutationWorkLinkedServicesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  equipmentLabel: string;
+  status: WorkdayMutationWorkLinkedServicesItemStatus;
+  updatedAt: string;
+};
+
+export type WorkdayMutationWorkCapabilities = {
+  canPrepare: boolean;
+  canEdit: boolean;
+  canCancel: boolean;
+  canComplete: boolean;
+  canCorrect: boolean;
+  requiresActingNote: boolean;
+  reasons: string[];
+};
+
+export type WorkdayMutationWork = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  appointment: WorkdayMutationWorkAppointment;
+  /** @maxItems 20 */
+  entries: WorkdayMutationWorkEntriesItem[];
+  completion: WorkdayMutationWorkCompletion;
+  /** @maxItems 25 */
+  corrections: WorkdayMutationWorkCorrectionsItem[];
+  correctionsHasMore: boolean;
+  linkedServices: WorkdayMutationWorkLinkedServicesItem[];
+  capabilities: WorkdayMutationWorkCapabilities;
+};
+
+export type WorkdayMutationReceipt = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  replayed: boolean;
+};
+
+export interface WorkdayMutation {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  work: WorkdayMutationWork;
+  receipt: WorkdayMutationReceipt;
+}
+
+export type WorkdayCompletionPreviewEntriesItemState = typeof WorkdayCompletionPreviewEntriesItemState[keyof typeof WorkdayCompletionPreviewEntriesItemState];
+
+
+export const WorkdayCompletionPreviewEntriesItemState = {
+  draft: 'draft',
+  cancelled: 'cancelled',
+  finalized: 'finalized',
+} as const;
+
+export type WorkdayCompletionPreviewEntriesItemChecklistDefinitionTrade = typeof WorkdayCompletionPreviewEntriesItemChecklistDefinitionTrade[keyof typeof WorkdayCompletionPreviewEntriesItemChecklistDefinitionTrade];
+
+
+export const WorkdayCompletionPreviewEntriesItemChecklistDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayCompletionPreviewEntriesItemChecklistDefinitionItemsItemKind = typeof WorkdayCompletionPreviewEntriesItemChecklistDefinitionItemsItemKind[keyof typeof WorkdayCompletionPreviewEntriesItemChecklistDefinitionItemsItemKind];
+
+
+export const WorkdayCompletionPreviewEntriesItemChecklistDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayCompletionPreviewEntriesItemChecklistDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayCompletionPreviewEntriesItemChecklistDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayCompletionPreviewEntriesItemChecklistDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayCompletionPreviewEntriesItemChecklistDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayCompletionPreviewEntriesItemChecklistDefinitionItemsItem[];
+};
+
+export type WorkdayCompletionPreviewEntriesItemChecklist = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  templateId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  definition: WorkdayCompletionPreviewEntriesItemChecklistDefinition;
+  /** @pattern ^[a-f0-9]{64}$ */
+  definitionSha256: string;
+  baselineId: string | null;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  baselineVersion: number | null;
+  createdAt: string;
+  createdByUserId: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+};
+
+export type WorkdayCompletionPreviewEntriesItemAssetSnapshotCategory = typeof WorkdayCompletionPreviewEntriesItemAssetSnapshotCategory[keyof typeof WorkdayCompletionPreviewEntriesItemAssetSnapshotCategory];
+
+
+export const WorkdayCompletionPreviewEntriesItemAssetSnapshotCategory = {
+  hvac_equipment: 'hvac_equipment',
+  roof_system: 'roof_system',
+  other: 'other',
+} as const;
+
+export type WorkdayCompletionPreviewEntriesItemAssetSnapshotAttributesItem = {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  value: string;
+};
+
+export type WorkdayCompletionPreviewEntriesItemAssetSnapshot = {
+  category: WorkdayCompletionPreviewEntriesItemAssetSnapshotCategory;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  label: string;
+  /** @maxLength 160 */
+  manufacturer: string | null;
+  /** @maxLength 160 */
+  model: string | null;
+  /** @maxLength 160 */
+  serial: string | null;
+  /** @maxLength 300 */
+  location: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  installedOn: string | null;
+  /** @maxLength 2000 */
+  notes: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyEndsOn: string | null;
+  /** @maxLength 1000 */
+  warrantySource: string | null;
+  /** @maxItems 20 */
+  attributes: WorkdayCompletionPreviewEntriesItemAssetSnapshotAttributesItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+} | null;
+
+export type WorkdayCompletionPreviewEntriesItemAnswersItemResult = typeof WorkdayCompletionPreviewEntriesItemAnswersItemResult[keyof typeof WorkdayCompletionPreviewEntriesItemAnswersItemResult];
+
+
+export const WorkdayCompletionPreviewEntriesItemAnswersItemResult = {
+  done: 'done',
+  needs_attention: 'needs_attention',
+  not_applicable: 'not_applicable',
+} as const;
+
+export type WorkdayCompletionPreviewEntriesItemAnswersItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  itemKey: string;
+  result: WorkdayCompletionPreviewEntriesItemAnswersItemResult;
+  value: string | number | null;
+  /** @maxLength 1000 */
+  reason: string | null;
+};
+
+export type WorkdayCompletionPreviewEntriesItemPhotosItemState = typeof WorkdayCompletionPreviewEntriesItemPhotosItemState[keyof typeof WorkdayCompletionPreviewEntriesItemPhotosItemState];
+
+
+export const WorkdayCompletionPreviewEntriesItemPhotosItemState = {
+  reserved: 'reserved',
+  attached: 'attached',
+  expired: 'expired',
+} as const;
+
+export type WorkdayCompletionPreviewEntriesItemPhotosItemContentType = typeof WorkdayCompletionPreviewEntriesItemPhotosItemContentType[keyof typeof WorkdayCompletionPreviewEntriesItemPhotosItemContentType];
+
+
+export const WorkdayCompletionPreviewEntriesItemPhotosItemContentType = {
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export type WorkdayCompletionPreviewEntriesItemPhotosItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  entryId: string;
+  itemKey: string | null;
+  caption: string;
+  state: WorkdayCompletionPreviewEntriesItemPhotosItemState;
+  contentType: WorkdayCompletionPreviewEntriesItemPhotosItemContentType;
+  /**
+     * @minimum 1
+     * @maximum 10485760
+     */
+  sizeBytes: number;
+  expiresAt: string;
+  attachedAt: string | null;
+  contentPath: string | null;
+  available: boolean;
+};
+
+export type WorkdayCompletionPreviewEntriesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  assetId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  serviceObligationId: string | null;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  state: WorkdayCompletionPreviewEntriesItemState;
+  checklist: WorkdayCompletionPreviewEntriesItemChecklist;
+  assetSnapshot: WorkdayCompletionPreviewEntriesItemAssetSnapshot;
+  answers: WorkdayCompletionPreviewEntriesItemAnswersItem[];
+  notes: string;
+  /** @maxItems 50 */
+  photos: WorkdayCompletionPreviewEntriesItemPhotosItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  completionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  holdReasons: string[];
+};
+
+export type WorkdayCompletionPreviewIntentEntriesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+};
+
+export type WorkdayCompletionPreviewIntentOutcome = typeof WorkdayCompletionPreviewIntentOutcome[keyof typeof WorkdayCompletionPreviewIntentOutcome];
+
+
+export const WorkdayCompletionPreviewIntentOutcome = {
+  completed: 'completed',
+  needs_followup: 'needs_followup',
+} as const;
+
+export type WorkdayCompletionPreviewIntentFollowup = {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  assignedUserId: string;
+  dueAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  note: string;
+} | null;
+
+export type WorkdayCompletionPreviewIntent = {
+  expectedAppointmentUpdatedAt: string;
+  /**
+     * @minItems 1
+     * @maxItems 20
+     */
+  entries: WorkdayCompletionPreviewIntentEntriesItem[];
+  /**
+     * @maxItems 20
+     * @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  serviceObligationIds: string[];
+  performedAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  summary: string;
+  outcome: WorkdayCompletionPreviewIntentOutcome;
+  followup: WorkdayCompletionPreviewIntentFollowup;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  actingNote?: string;
+};
+
+export type WorkdayCompletionPreviewServiceVersionsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  updatedAt: string;
+};
+
+export type WorkdayCompletionPreviewWarning = typeof WorkdayCompletionPreviewWarning[keyof typeof WorkdayCompletionPreviewWarning];
+
+
+export const WorkdayCompletionPreviewWarning = {
+  'Staff-recorded_work;_not_warranty_coverage,_customer_acceptance,_invoice_delivery_or_payment': 'Staff-recorded work; not warranty coverage, customer acceptance, invoice delivery or payment.',
+} as const;
+
+export interface WorkdayCompletionPreview {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentId: string;
+  expiresAt: string;
+  previewToken: string;
+  entries: WorkdayCompletionPreviewEntriesItem[];
+  intent: WorkdayCompletionPreviewIntent;
+  serviceVersions: WorkdayCompletionPreviewServiceVersionsItem[];
+  warning: WorkdayCompletionPreviewWarning;
+}
+
+export type WorkdayPhotoReservationWorkAppointmentStatus = typeof WorkdayPhotoReservationWorkAppointmentStatus[keyof typeof WorkdayPhotoReservationWorkAppointmentStatus];
+
+
+export const WorkdayPhotoReservationWorkAppointmentStatus = {
+  scheduled: 'scheduled',
+  confirmed: 'confirmed',
+  completed: 'completed',
+  cancelled: 'cancelled',
+  no_show: 'no_show',
+} as const;
+
+export type WorkdayPhotoReservationWorkAppointmentType = typeof WorkdayPhotoReservationWorkAppointmentType[keyof typeof WorkdayPhotoReservationWorkAppointmentType];
+
+
+export const WorkdayPhotoReservationWorkAppointmentType = {
+  inspection: 'inspection',
+  estimate_review: 'estimate_review',
+  production: 'production',
+  final_walkthrough: 'final_walkthrough',
+  other: 'other',
+} as const;
+
+export type WorkdayPhotoReservationWorkAppointment = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  assignedUserId: string | null;
+  status: WorkdayPhotoReservationWorkAppointmentStatus;
+  type: WorkdayPhotoReservationWorkAppointmentType;
+  scheduledStart: string;
+  scheduledEnd: string | null;
+  updatedAt: string;
+  notes: string | null;
+  customerLabel: string | null;
+  propertyLabel: string | null;
+};
+
+export type WorkdayPhotoReservationWorkEntriesItemState = typeof WorkdayPhotoReservationWorkEntriesItemState[keyof typeof WorkdayPhotoReservationWorkEntriesItemState];
+
+
+export const WorkdayPhotoReservationWorkEntriesItemState = {
+  draft: 'draft',
+  cancelled: 'cancelled',
+  finalized: 'finalized',
+} as const;
+
+export type WorkdayPhotoReservationWorkEntriesItemChecklistDefinitionTrade = typeof WorkdayPhotoReservationWorkEntriesItemChecklistDefinitionTrade[keyof typeof WorkdayPhotoReservationWorkEntriesItemChecklistDefinitionTrade];
+
+
+export const WorkdayPhotoReservationWorkEntriesItemChecklistDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayPhotoReservationWorkEntriesItemChecklistDefinitionItemsItemKind = typeof WorkdayPhotoReservationWorkEntriesItemChecklistDefinitionItemsItemKind[keyof typeof WorkdayPhotoReservationWorkEntriesItemChecklistDefinitionItemsItemKind];
+
+
+export const WorkdayPhotoReservationWorkEntriesItemChecklistDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayPhotoReservationWorkEntriesItemChecklistDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayPhotoReservationWorkEntriesItemChecklistDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayPhotoReservationWorkEntriesItemChecklistDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayPhotoReservationWorkEntriesItemChecklistDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayPhotoReservationWorkEntriesItemChecklistDefinitionItemsItem[];
+};
+
+export type WorkdayPhotoReservationWorkEntriesItemChecklist = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  templateId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  definition: WorkdayPhotoReservationWorkEntriesItemChecklistDefinition;
+  /** @pattern ^[a-f0-9]{64}$ */
+  definitionSha256: string;
+  baselineId: string | null;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  baselineVersion: number | null;
+  createdAt: string;
+  createdByUserId: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+};
+
+export type WorkdayPhotoReservationWorkEntriesItemAssetSnapshotCategory = typeof WorkdayPhotoReservationWorkEntriesItemAssetSnapshotCategory[keyof typeof WorkdayPhotoReservationWorkEntriesItemAssetSnapshotCategory];
+
+
+export const WorkdayPhotoReservationWorkEntriesItemAssetSnapshotCategory = {
+  hvac_equipment: 'hvac_equipment',
+  roof_system: 'roof_system',
+  other: 'other',
+} as const;
+
+export type WorkdayPhotoReservationWorkEntriesItemAssetSnapshotAttributesItem = {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  value: string;
+};
+
+export type WorkdayPhotoReservationWorkEntriesItemAssetSnapshot = {
+  category: WorkdayPhotoReservationWorkEntriesItemAssetSnapshotCategory;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  label: string;
+  /** @maxLength 160 */
+  manufacturer: string | null;
+  /** @maxLength 160 */
+  model: string | null;
+  /** @maxLength 160 */
+  serial: string | null;
+  /** @maxLength 300 */
+  location: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  installedOn: string | null;
+  /** @maxLength 2000 */
+  notes: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyEndsOn: string | null;
+  /** @maxLength 1000 */
+  warrantySource: string | null;
+  /** @maxItems 20 */
+  attributes: WorkdayPhotoReservationWorkEntriesItemAssetSnapshotAttributesItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+} | null;
+
+export type WorkdayPhotoReservationWorkEntriesItemAnswersItemResult = typeof WorkdayPhotoReservationWorkEntriesItemAnswersItemResult[keyof typeof WorkdayPhotoReservationWorkEntriesItemAnswersItemResult];
+
+
+export const WorkdayPhotoReservationWorkEntriesItemAnswersItemResult = {
+  done: 'done',
+  needs_attention: 'needs_attention',
+  not_applicable: 'not_applicable',
+} as const;
+
+export type WorkdayPhotoReservationWorkEntriesItemAnswersItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  itemKey: string;
+  result: WorkdayPhotoReservationWorkEntriesItemAnswersItemResult;
+  value: string | number | null;
+  /** @maxLength 1000 */
+  reason: string | null;
+};
+
+export type WorkdayPhotoReservationWorkEntriesItemPhotosItemState = typeof WorkdayPhotoReservationWorkEntriesItemPhotosItemState[keyof typeof WorkdayPhotoReservationWorkEntriesItemPhotosItemState];
+
+
+export const WorkdayPhotoReservationWorkEntriesItemPhotosItemState = {
+  reserved: 'reserved',
+  attached: 'attached',
+  expired: 'expired',
+} as const;
+
+export type WorkdayPhotoReservationWorkEntriesItemPhotosItemContentType = typeof WorkdayPhotoReservationWorkEntriesItemPhotosItemContentType[keyof typeof WorkdayPhotoReservationWorkEntriesItemPhotosItemContentType];
+
+
+export const WorkdayPhotoReservationWorkEntriesItemPhotosItemContentType = {
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export type WorkdayPhotoReservationWorkEntriesItemPhotosItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  entryId: string;
+  itemKey: string | null;
+  caption: string;
+  state: WorkdayPhotoReservationWorkEntriesItemPhotosItemState;
+  contentType: WorkdayPhotoReservationWorkEntriesItemPhotosItemContentType;
+  /**
+     * @minimum 1
+     * @maximum 10485760
+     */
+  sizeBytes: number;
+  expiresAt: string;
+  attachedAt: string | null;
+  contentPath: string | null;
+  available: boolean;
+};
+
+export type WorkdayPhotoReservationWorkEntriesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  assetId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  serviceObligationId: string | null;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  state: WorkdayPhotoReservationWorkEntriesItemState;
+  checklist: WorkdayPhotoReservationWorkEntriesItemChecklist;
+  assetSnapshot: WorkdayPhotoReservationWorkEntriesItemAssetSnapshot;
+  answers: WorkdayPhotoReservationWorkEntriesItemAnswersItem[];
+  notes: string;
+  /** @maxItems 50 */
+  photos: WorkdayPhotoReservationWorkEntriesItemPhotosItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  completionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  holdReasons: string[];
+};
+
+export type WorkdayPhotoReservationWorkCompletionOutcome = typeof WorkdayPhotoReservationWorkCompletionOutcome[keyof typeof WorkdayPhotoReservationWorkCompletionOutcome];
+
+
+export const WorkdayPhotoReservationWorkCompletionOutcome = {
+  completed: 'completed',
+  needs_followup: 'needs_followup',
+} as const;
+
+export type WorkdayPhotoReservationWorkCompletionEntriesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  checklistRevisionId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  assetId: string | null;
+};
+
+export type WorkdayPhotoReservationWorkCompletionServicesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  nextObligationId: string | null;
+};
+
+export type WorkdayPhotoReservationWorkCompletionNativeAppointmentStatus = typeof WorkdayPhotoReservationWorkCompletionNativeAppointmentStatus[keyof typeof WorkdayPhotoReservationWorkCompletionNativeAppointmentStatus];
+
+
+export const WorkdayPhotoReservationWorkCompletionNativeAppointmentStatus = {
+  completed: 'completed',
+} as const;
+
+export type WorkdayPhotoReservationWorkCompletion = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  performedAt: string;
+  recordedAt: string;
+  recordedByUserId: string;
+  performerUserId: string;
+  actingNote: string | null;
+  summary: string;
+  outcome: WorkdayPhotoReservationWorkCompletionOutcome;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  followupTaskId: string | null;
+  entries: WorkdayPhotoReservationWorkCompletionEntriesItem[];
+  services: WorkdayPhotoReservationWorkCompletionServicesItem[];
+  nativeAppointmentStatus: WorkdayPhotoReservationWorkCompletionNativeAppointmentStatus;
+} | null;
+
+export type WorkdayPhotoReservationWorkCorrectionsItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  originalCompletionId: string;
+  note: string;
+  recordedAt: string;
+  recordedByUserId: string;
+};
+
+export type WorkdayPhotoReservationWorkLinkedServicesItemStatus = typeof WorkdayPhotoReservationWorkLinkedServicesItemStatus[keyof typeof WorkdayPhotoReservationWorkLinkedServicesItemStatus];
+
+
+export const WorkdayPhotoReservationWorkLinkedServicesItemStatus = {
+  active: 'active',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export type WorkdayPhotoReservationWorkLinkedServicesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  equipmentLabel: string;
+  status: WorkdayPhotoReservationWorkLinkedServicesItemStatus;
+  updatedAt: string;
+};
+
+export type WorkdayPhotoReservationWorkCapabilities = {
+  canPrepare: boolean;
+  canEdit: boolean;
+  canCancel: boolean;
+  canComplete: boolean;
+  canCorrect: boolean;
+  requiresActingNote: boolean;
+  reasons: string[];
+};
+
+export type WorkdayPhotoReservationWork = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  appointment: WorkdayPhotoReservationWorkAppointment;
+  /** @maxItems 20 */
+  entries: WorkdayPhotoReservationWorkEntriesItem[];
+  completion: WorkdayPhotoReservationWorkCompletion;
+  /** @maxItems 25 */
+  corrections: WorkdayPhotoReservationWorkCorrectionsItem[];
+  correctionsHasMore: boolean;
+  linkedServices: WorkdayPhotoReservationWorkLinkedServicesItem[];
+  capabilities: WorkdayPhotoReservationWorkCapabilities;
+};
+
+export type WorkdayPhotoReservationReceipt = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  replayed: boolean;
+};
+
+export interface WorkdayPhotoReservation {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  work: WorkdayPhotoReservationWork;
+  receipt: WorkdayPhotoReservationReceipt;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  photoId: string;
+  uploadUrl: string | null;
+  uploadExpiresAt: string;
+}
+
+export type WorkdayCompletionOutcome = typeof WorkdayCompletionOutcome[keyof typeof WorkdayCompletionOutcome];
+
+
+export const WorkdayCompletionOutcome = {
+  completed: 'completed',
+  needs_followup: 'needs_followup',
+} as const;
+
+export type WorkdayCompletionEntriesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  checklistRevisionId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  assetId: string | null;
+};
+
+export type WorkdayCompletionServicesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  nextObligationId: string | null;
+};
+
+export type WorkdayCompletionNativeAppointmentStatus = typeof WorkdayCompletionNativeAppointmentStatus[keyof typeof WorkdayCompletionNativeAppointmentStatus];
+
+
+export const WorkdayCompletionNativeAppointmentStatus = {
+  completed: 'completed',
+} as const;
+
+export interface WorkdayCompletion {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  performedAt: string;
+  recordedAt: string;
+  recordedByUserId: string;
+  performerUserId: string;
+  actingNote: string | null;
+  summary: string;
+  outcome: WorkdayCompletionOutcome;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  followupTaskId: string | null;
+  entries: WorkdayCompletionEntriesItem[];
+  services: WorkdayCompletionServicesItem[];
+  nativeAppointmentStatus: WorkdayCompletionNativeAppointmentStatus;
+}
+
+export type WorkdayEntryState = typeof WorkdayEntryState[keyof typeof WorkdayEntryState];
+
+
+export const WorkdayEntryState = {
+  draft: 'draft',
+  cancelled: 'cancelled',
+  finalized: 'finalized',
+} as const;
+
+export type WorkdayEntryChecklistDefinitionTrade = typeof WorkdayEntryChecklistDefinitionTrade[keyof typeof WorkdayEntryChecklistDefinitionTrade];
+
+
+export const WorkdayEntryChecklistDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayEntryChecklistDefinitionItemsItemKind = typeof WorkdayEntryChecklistDefinitionItemsItemKind[keyof typeof WorkdayEntryChecklistDefinitionItemsItemKind];
+
+
+export const WorkdayEntryChecklistDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayEntryChecklistDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayEntryChecklistDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayEntryChecklistDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayEntryChecklistDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayEntryChecklistDefinitionItemsItem[];
+};
+
+export type WorkdayEntryChecklist = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  templateId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  definition: WorkdayEntryChecklistDefinition;
+  /** @pattern ^[a-f0-9]{64}$ */
+  definitionSha256: string;
+  baselineId: string | null;
+  /**
+     * @minimum -9007199254740991
+     * @maximum 9007199254740991
+     */
+  baselineVersion: number | null;
+  createdAt: string;
+  createdByUserId: string;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+};
+
+export type WorkdayEntryAssetSnapshotCategory = typeof WorkdayEntryAssetSnapshotCategory[keyof typeof WorkdayEntryAssetSnapshotCategory];
+
+
+export const WorkdayEntryAssetSnapshotCategory = {
+  hvac_equipment: 'hvac_equipment',
+  roof_system: 'roof_system',
+  other: 'other',
+} as const;
+
+export type WorkdayEntryAssetSnapshotAttributesItem = {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  value: string;
+};
+
+export type WorkdayEntryAssetSnapshot = {
+  category: WorkdayEntryAssetSnapshotCategory;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  label: string;
+  /** @maxLength 160 */
+  manufacturer: string | null;
+  /** @maxLength 160 */
+  model: string | null;
+  /** @maxLength 160 */
+  serial: string | null;
+  /** @maxLength 300 */
+  location: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  installedOn: string | null;
+  /** @maxLength 2000 */
+  notes: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyEndsOn: string | null;
+  /** @maxLength 1000 */
+  warrantySource: string | null;
+  /** @maxItems 20 */
+  attributes: WorkdayEntryAssetSnapshotAttributesItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+} | null;
+
+export type WorkdayEntryAnswersItemResult = typeof WorkdayEntryAnswersItemResult[keyof typeof WorkdayEntryAnswersItemResult];
+
+
+export const WorkdayEntryAnswersItemResult = {
+  done: 'done',
+  needs_attention: 'needs_attention',
+  not_applicable: 'not_applicable',
+} as const;
+
+export type WorkdayEntryAnswersItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  itemKey: string;
+  result: WorkdayEntryAnswersItemResult;
+  value: string | number | null;
+  /** @maxLength 1000 */
+  reason: string | null;
+};
+
+export type WorkdayEntryPhotosItemState = typeof WorkdayEntryPhotosItemState[keyof typeof WorkdayEntryPhotosItemState];
+
+
+export const WorkdayEntryPhotosItemState = {
+  reserved: 'reserved',
+  attached: 'attached',
+  expired: 'expired',
+} as const;
+
+export type WorkdayEntryPhotosItemContentType = typeof WorkdayEntryPhotosItemContentType[keyof typeof WorkdayEntryPhotosItemContentType];
+
+
+export const WorkdayEntryPhotosItemContentType = {
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export type WorkdayEntryPhotosItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  entryId: string;
+  itemKey: string | null;
+  caption: string;
+  state: WorkdayEntryPhotosItemState;
+  contentType: WorkdayEntryPhotosItemContentType;
+  /**
+     * @minimum 1
+     * @maximum 10485760
+     */
+  sizeBytes: number;
+  expiresAt: string;
+  attachedAt: string | null;
+  contentPath: string | null;
+  available: boolean;
+};
+
+export interface WorkdayEntry {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  assetId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  serviceObligationId: string | null;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+  state: WorkdayEntryState;
+  checklist: WorkdayEntryChecklist;
+  assetSnapshot: WorkdayEntryAssetSnapshot;
+  answers: WorkdayEntryAnswersItem[];
+  notes: string;
+  /** @maxItems 50 */
+  photos: WorkdayEntryPhotosItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  completionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  holdReasons: string[];
+}
+
+export type WorkdayCreateAssetRequestCategory = typeof WorkdayCreateAssetRequestCategory[keyof typeof WorkdayCreateAssetRequestCategory];
+
+
+export const WorkdayCreateAssetRequestCategory = {
+  hvac_equipment: 'hvac_equipment',
+  roof_system: 'roof_system',
+  other: 'other',
+} as const;
+
+export type WorkdayCreateAssetRequestAttributesItem = {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  value: string;
+};
+
+export interface WorkdayCreateAssetRequest {
+  category: WorkdayCreateAssetRequestCategory;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  label: string;
+  /** @maxLength 160 */
+  manufacturer: string | null;
+  /** @maxLength 160 */
+  model: string | null;
+  /** @maxLength 160 */
+  serial: string | null;
+  /** @maxLength 300 */
+  location: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  installedOn: string | null;
+  /** @maxLength 2000 */
+  notes: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyEndsOn: string | null;
+  /** @maxLength 1000 */
+  warrantySource: string | null;
+  /** @maxItems 20 */
+  attributes: WorkdayCreateAssetRequestAttributesItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string;
+}
+
+export type WorkdayUpdateAssetRequestCategory = typeof WorkdayUpdateAssetRequestCategory[keyof typeof WorkdayUpdateAssetRequestCategory];
+
+
+export const WorkdayUpdateAssetRequestCategory = {
+  hvac_equipment: 'hvac_equipment',
+  roof_system: 'roof_system',
+  other: 'other',
+} as const;
+
+export type WorkdayUpdateAssetRequestAttributesItem = {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minLength 1
+     * @maxLength 300
+     */
+  value: string;
+};
+
+export type WorkdayUpdateAssetRequestStatus = typeof WorkdayUpdateAssetRequestStatus[keyof typeof WorkdayUpdateAssetRequestStatus];
+
+
+export const WorkdayUpdateAssetRequestStatus = {
+  active: 'active',
+  retired: 'retired',
+} as const;
+
+export interface WorkdayUpdateAssetRequest {
+  category: WorkdayUpdateAssetRequestCategory;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  label: string;
+  /** @maxLength 160 */
+  manufacturer: string | null;
+  /** @maxLength 160 */
+  model: string | null;
+  /** @maxLength 160 */
+  serial: string | null;
+  /** @maxLength 300 */
+  location: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  installedOn: string | null;
+  /** @maxLength 2000 */
+  notes: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyStartsOn: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  warrantyEndsOn: string | null;
+  /** @maxLength 1000 */
+  warrantySource: string | null;
+  /** @maxItems 20 */
+  attributes: WorkdayUpdateAssetRequestAttributesItem[];
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  status: WorkdayUpdateAssetRequestStatus;
+}
+
+export type WorkdayCreateTemplateRequestDefinitionTrade = typeof WorkdayCreateTemplateRequestDefinitionTrade[keyof typeof WorkdayCreateTemplateRequestDefinitionTrade];
+
+
+export const WorkdayCreateTemplateRequestDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayCreateTemplateRequestDefinitionItemsItemKind = typeof WorkdayCreateTemplateRequestDefinitionItemsItemKind[keyof typeof WorkdayCreateTemplateRequestDefinitionItemsItemKind];
+
+
+export const WorkdayCreateTemplateRequestDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayCreateTemplateRequestDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayCreateTemplateRequestDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayCreateTemplateRequestDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayCreateTemplateRequestDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayCreateTemplateRequestDefinitionItemsItem[];
+};
+
+export interface WorkdayCreateTemplateRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  definition: WorkdayCreateTemplateRequestDefinition;
+  /** @maxLength 100 */
+  baselineId?: string | null;
+}
+
+export type WorkdayReviseTemplateRequestDefinitionTrade = typeof WorkdayReviseTemplateRequestDefinitionTrade[keyof typeof WorkdayReviseTemplateRequestDefinitionTrade];
+
+
+export const WorkdayReviseTemplateRequestDefinitionTrade = {
+  hvac: 'hvac',
+  roofing: 'roofing',
+  general: 'general',
+} as const;
+
+export type WorkdayReviseTemplateRequestDefinitionItemsItemKind = typeof WorkdayReviseTemplateRequestDefinitionItemsItemKind[keyof typeof WorkdayReviseTemplateRequestDefinitionItemsItemKind];
+
+
+export const WorkdayReviseTemplateRequestDefinitionItemsItemKind = {
+  result: 'result',
+  text: 'text',
+  number: 'number',
+  photo: 'photo',
+} as const;
+
+export type WorkdayReviseTemplateRequestDefinitionItemsItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  key: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  label: string;
+  kind: WorkdayReviseTemplateRequestDefinitionItemsItemKind;
+  required: boolean;
+  allowNotApplicable: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  unit: string | null;
+};
+
+export type WorkdayReviseTemplateRequestDefinition = {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  trade: WorkdayReviseTemplateRequestDefinitionTrade;
+  /** @maxLength 1000 */
+  description: string;
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  items: WorkdayReviseTemplateRequestDefinitionItemsItem[];
+};
+
+export interface WorkdayReviseTemplateRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  definition: WorkdayReviseTemplateRequestDefinition;
+}
+
+export interface WorkdayPreviewTemplateRequest {
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  revisionId: string;
+}
+
+export interface WorkdayApproveTemplateRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minLength 1
+     * @maxLength 10000
+     */
+  previewToken: string;
+  confirmed: true;
+}
+
+export interface WorkdayRetireTemplateRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  reason: string;
+  confirmed: true;
+}
+
+export interface WorkdayCreateEntryRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  expectedAppointmentUpdatedAt: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  checklistRevisionId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  assetId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  serviceObligationId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  actingNote?: string;
+}
+
+export type WorkdaySaveEntryRequestAnswersItemResult = typeof WorkdaySaveEntryRequestAnswersItemResult[keyof typeof WorkdaySaveEntryRequestAnswersItemResult];
+
+
+export const WorkdaySaveEntryRequestAnswersItemResult = {
+  done: 'done',
+  needs_attention: 'needs_attention',
+  not_applicable: 'not_applicable',
+} as const;
+
+export type WorkdaySaveEntryRequestAnswersItem = {
+  /** @pattern ^[a-z][a-z0-9_]{0,39}$ */
+  itemKey: string;
+  result: WorkdaySaveEntryRequestAnswersItemResult;
+  value: string | number | null;
+  /** @maxLength 1000 */
+  reason: string | null;
+};
+
+export interface WorkdaySaveEntryRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  /** @maxItems 50 */
+  answers: WorkdaySaveEntryRequestAnswersItem[];
+  /** @maxLength 2000 */
+  notes: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  actingNote?: string;
+}
+
+export interface WorkdayCancelEntryRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  reason: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  actingNote?: string;
+}
+
+export type WorkdayPreviewCompletionRequestEntriesItem = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  version: number;
+};
+
+export type WorkdayPreviewCompletionRequestOutcome = typeof WorkdayPreviewCompletionRequestOutcome[keyof typeof WorkdayPreviewCompletionRequestOutcome];
+
+
+export const WorkdayPreviewCompletionRequestOutcome = {
+  completed: 'completed',
+  needs_followup: 'needs_followup',
+} as const;
+
+export type WorkdayPreviewCompletionRequestFollowup = {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  assignedUserId: string;
+  dueAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  note: string;
+} | null;
+
+export interface WorkdayPreviewCompletionRequest {
+  expectedAppointmentUpdatedAt: string;
+  /**
+     * @minItems 1
+     * @maxItems 20
+     */
+  entries: WorkdayPreviewCompletionRequestEntriesItem[];
+  /**
+     * @maxItems 20
+     * @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  serviceObligationIds: string[];
+  performedAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  summary: string;
+  outcome: WorkdayPreviewCompletionRequestOutcome;
+  followup: WorkdayPreviewCompletionRequestFollowup;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  actingNote?: string;
+}
+
+export interface WorkdayCompleteRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minLength 1
+     * @maxLength 30000
+     */
+  previewToken: string;
+  confirmed: true;
+}
+
+export interface WorkdayCorrectRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  note: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  actingNote?: string;
+}
+
+export type WorkdayRequestPhotoRequestContentType = typeof WorkdayRequestPhotoRequestContentType[keyof typeof WorkdayRequestPhotoRequestContentType];
+
+
+export const WorkdayRequestPhotoRequestContentType = {
+  'image/jpeg': 'image/jpeg',
+  'image/png': 'image/png',
+  'image/webp': 'image/webp',
+} as const;
+
+export interface WorkdayRequestPhotoRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  contentType: WorkdayRequestPhotoRequestContentType;
+  /**
+     * @minimum 1
+     * @maximum 10485760
+     */
+  sizeBytes: number;
+  /** @maxLength 40 */
+  itemKey: string | null;
+  /** @maxLength 500 */
+  caption: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  actingNote?: string;
+}
+
+export interface WorkdayAttachPhotoRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  photoId: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  actingNote?: string;
+}
+
 export type CallieReceptionViewCurrentMode = typeof CallieReceptionViewCurrentMode[keyof typeof CallieReceptionViewCurrentMode];
 
 
@@ -10211,6 +13513,14 @@ export type AuthorizationSessionHeaderParameter = string;
  * Opaque homeowner portal session token.
  */
 export type PortalTokenHeaderParameter = string;
+
+export type GetWorkdayAssetsParams = {
+propertyId?: string;
+/**
+ * @maxLength 1000
+ */
+cursor?: string;
+};
 
 export type GetCustomerWorkspaceSectionParams = {
 /**
