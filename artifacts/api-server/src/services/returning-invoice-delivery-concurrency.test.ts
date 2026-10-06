@@ -38,6 +38,25 @@ import { disconnectMicrosoft, getMicrosoftConnection } from "./microsoft-oauth";
 
 const gmailSend = vi.hoisted(() => vi.fn());
 const microsoftSend = vi.hoisted(() => vi.fn());
+const attemptHooks = vi.hoisted(() => ({
+  afterAdmission: null as (() => Promise<void>) | null,
+}));
+vi.mock("./invoice-delivery-attempts", async (original) => {
+  const actual = await original<typeof import("./invoice-delivery-attempts")>();
+  return {
+    ...actual,
+    runInvoiceDeliveryAttempt: (
+      review: Parameters<typeof actual.runInvoiceDeliveryAttempt>[0],
+      execute: Parameters<typeof actual.runInvoiceDeliveryAttempt>[1],
+    ) =>
+      actual.runInvoiceDeliveryAttempt(review, async (claim) => {
+        // The actual kernel has committed its real claim transaction here.
+        // Gate only the original executor, never admission or finalization.
+        if (attemptHooks.afterAdmission) await attemptHooks.afterAdmission();
+        return execute(claim);
+      }),
+  };
+});
 vi.mock("./gmail-oauth", async (original) => ({
   ...(await original<typeof import("./gmail-oauth")>()),
   sendGmailForUser: gmailSend,
@@ -109,6 +128,7 @@ beforeEach(() => {
     throw Error("Only the captured exact loopback staff request is permitted");
   });
   effects = 0;
+  attemptHooks.afterAdmission = null;
   atOAuth = null;
   beforeGuard = null;
   gmailSend
@@ -119,6 +139,7 @@ beforeEach(() => {
     .mockImplementation((input) => transport("microsoft", input));
 });
 afterEach(() => {
+  attemptHooks.afterAdmission = null;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -202,7 +223,10 @@ realPg(
   async () => {
     const f = await fixture(),
       p = await preview(f),
-      pending: Promise<unknown>[] = [];
+      pending: Promise<unknown>[] = [],
+      admitted = deferred(),
+      continueEffect = deferred();
+    let executorEntries = 0;
     const [controller] = await db
       .insert(usersTable)
       .values({
@@ -237,6 +261,11 @@ realPg(
       "BEFORE INSERT",
       `NEW.organization_id='${f.org}'::uuid`,
     );
+    attemptHooks.afterAdmission = async () => {
+      executorEntries++;
+      admitted.resolve();
+      await continueEffect.promise;
+    };
     try {
       const sending = observe(send(f, p), pending),
         admitting = await blockedBy(
@@ -285,11 +314,19 @@ realPg(
         blockedBy(admitting, '%insert into "email_sender_preferences"%'),
       ]);
       expect(new Set([b.pid, admitting, ...writers]).size).toBe(7);
-      beforeGuard = () =>
-        Promise.all([customer, property, member, settings, preference]);
       await b.release();
+      await Promise.race([
+        admitted.promise,
+        sending.then(() => {
+          throw Error(
+            "Actual kernel settled without invoking its original admission executor",
+          );
+        }),
+      ]);
       await Promise.all([customer, property, settings, preference]);
       expect((await member).status).toBe(200);
+      expect(executorEntries).toBe(1);
+      continueEffect.resolve();
       const result = await sending;
       expect(result).toMatchObject({
         state: "held",
@@ -306,6 +343,7 @@ realPg(
         )[0].provider,
       ).toBe("microsoft");
     } finally {
+      continueEffect.resolve();
       await b.cleanup(pending);
     }
   },

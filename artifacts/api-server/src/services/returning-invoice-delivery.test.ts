@@ -59,9 +59,25 @@ import {
   updateCustomerWorkProject,
 } from "./returning-customer";
 import { listInvoiceDeliveryWorklist } from "./invoice-delivery-worklist";
+import { updateOrgSettings } from "./settings";
 
 const gmailSend = vi.hoisted(() => vi.fn());
 const microsoftSend = vi.hoisted(() => vi.fn());
+const customerEmailHooks = vi.hoisted(() => ({
+  beforeSend: null as (() => Promise<void>) | null,
+}));
+vi.mock("./customer-email", async (original) => {
+  const actual = await original<typeof import("./customer-email")>();
+  return {
+    ...actual,
+    sendCustomerEmail: async (
+      input: Parameters<typeof actual.sendCustomerEmail>[0],
+    ) => {
+      if (customerEmailHooks.beforeSend) await customerEmailHooks.beforeSend();
+      return actual.sendCustomerEmail(input);
+    },
+  };
+});
 vi.mock("./gmail-oauth", async (original) => ({
   ...(await original<typeof import("./gmail-oauth")>()),
   sendGmailForUser: gmailSend,
@@ -160,6 +176,7 @@ beforeEach(() => {
     throw Error("No real provider is allowed in invoice delivery tests");
   });
   effects.length = 0;
+  customerEmailHooks.beforeSend = null;
   afterOAuth = null;
   afterPost = null;
   unknownAfterPost = false;
@@ -772,6 +789,77 @@ it.each(["timeout", "lost-final-write"] as const)(
     ).toHaveLength(0);
   },
 );
+
+it("retains unknown ownership after a real sender-entry lookup refusal, even after configuration is restored", async () => {
+  const f = await fixture(),
+    p = await preview(f);
+  let senderEntries = 0;
+  customerEmailHooks.beforeSend = async () => {
+    customerEmailHooks.beforeSend = null;
+    senderEntries++;
+    // The actual initial invoice checks have passed. Let the real helper read
+    // the now-missing company default and throw its untyped preparation error.
+    await updateOrgSettings(f.org, { customerEmailSenderUserId: null });
+  };
+  const result = await send(f, p);
+  expect(senderEntries).toBe(1);
+  expect(result).toMatchObject({
+    integrity: "valid",
+    state: "uncertain",
+    attemptCount: 1,
+    nextIntents: [],
+    attempts: [{ state: "indeterminate", proof: "none", proofId: null }],
+  });
+  expect(effects).toHaveLength(0);
+  expect(gmailSend).not.toHaveBeenCalled();
+  expect(microsoftSend).not.toHaveBeenCalled();
+  const receipts = () =>
+    db
+      .select()
+      .from(revenueExecutionsTable)
+      .where(eq(revenueExecutionsTable.organizationId, f.org));
+  const originalReceipts = await receipts();
+  expect(originalReceipts).toHaveLength(1);
+  expect(originalReceipts[0]).toMatchObject({
+    id: result.executionId,
+    kind: "invoice_email",
+    state: "indeterminate",
+    actionKey: invoiceDeliveryKey(f.invoice.id),
+  });
+  expect(result.attempts[0].actionKey).toBe(invoiceDeliveryKey(f.invoice.id));
+
+  await updateOrgSettings(f.org, { customerEmailSenderUserId: f.sender });
+  expect(await readCompanyEmailSender(db, f.org)).toMatchObject({
+    sender: p.sender,
+    identitySha256: p.senderIdentitySha256,
+  });
+  expect(await send(f, p)).toMatchObject({
+    executionId: result.executionId,
+    state: "uncertain",
+    attemptCount: 1,
+    nextIntents: [],
+    attempts: [{ state: "indeterminate", proof: "none", proofId: null }],
+  });
+  await expect(preview(f)).rejects.toMatchObject({
+    code: "invoice_delivery_reserved",
+  });
+  expect(await receipts()).toEqual(originalReceipts);
+  expect(senderEntries).toBe(1);
+  expect(effects).toHaveLength(0);
+  expect(gmailSend).not.toHaveBeenCalled();
+  expect(microsoftSend).not.toHaveBeenCalled();
+  expect(
+    await db
+      .select()
+      .from(auditEventsTable)
+      .where(
+        and(
+          eq(auditEventsTable.organizationId, f.org),
+          eq(auditEventsTable.action, "invoice_delivery.not_dispatched"),
+        ),
+      ),
+  ).toHaveLength(0);
+});
 
 it("late acceptance pins original participants after edits and preserves the held original execution", async () => {
   const f = await fixture(),
