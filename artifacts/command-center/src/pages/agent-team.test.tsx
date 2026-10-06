@@ -30,7 +30,8 @@ it('does not present subscription billing as contractor invoicing', () => {
 it('makes provider and customer-contact boundaries visible', () => {
   render(<AgentTeam />);
   fireEvent.click(screen.getByRole('button', { name: /View CALLIE/ }));
-  expect(screen.getByText(/Automatic missed-call texts and AI voice answering are not implemented/)).toBeTruthy();
+  expect(screen.getByText(/Provider setup and real audio\/phone acceptance remain; neither pilot is live/)).toBeTruthy();
+  expect(screen.getByText(/A phone answer may be voicemail. Neither confirms a visit or grants general messaging permission/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: /View MAINTAIN/ }));
   expect(screen.getByText(/They do not yet send customer reminders/)).toBeTruthy();
   expect(screen.getByRole('link', { name: /Open service desk/ }).getAttribute('href')).toBe('/service');

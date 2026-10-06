@@ -7,7 +7,7 @@ import {
   type CalliePolicySnapshot, type CallieStage, type CallieStepReceipt,
 } from "@workspace/db";
 import { decryptSecret, encryptSecret } from "../lib/token-encryption";
-import { assertCallieCurrentAuthority, CallieError, lockCallie } from "./callie-policy";
+import { assertCallieCurrentAuthority, CallieError, currentCallieRevision, lockCallie } from "./callie-policy";
 import { CALLIE_CHALLENGE_MS, CALLIE_GRANT_MS, CALLIE_VOICE_MS, callieChallengeCode, callieChallengeHash, callieTriggerHash } from "./callie-contract";
 import { isMissedInbound } from "./missed-call-care-policy";
 import { normalizePhone } from "./send-gate";
@@ -57,6 +57,10 @@ async function block(tx: Tx, row: Intake, reason: string) {
 /** Must run ONLY in the transaction that inserted a genuinely new signed inbound call. */
 export async function admitCallieIntake(tx: Tx, call: Call, signedBinding: TwilioClientBinding) {
   if (call.direction !== "inbound" || !call.providerSid || call.organizationId !== signedBinding.organizationId || call.accountSid !== signedBinding.accountSid) return null;
+  if ((await currentCallieRevision(call.organizationId, tx))?.snapshot.templateVersion === "callie-conversation.v2") {
+    const { admitCallieReception } = await import("./callie-reception-runtime");
+    return admitCallieReception(tx, call, signedBinding);
+  }
   await lockCallie(tx, call.organizationId);
   let authority: Awaited<ReturnType<typeof assertCallieCurrentAuthority>>;
   try {
@@ -114,7 +118,7 @@ export async function beginCallieMissedIntake(org: string, callId: string): Prom
   return db.transaction(async (tx) => {
     await lockCallie(tx, org);
     const [row] = await tx.select().from(intakes).where(and(eq(intakes.organizationId, org), eq(intakes.callId, callId))).for("update");
-    if (!row) return null;
+    if (!row || row.mode !== "keypad") return null;
     if (finishedStates.has(row.state)) return hangup();
     const [call] = await tx.select().from(twilioCallsTable).where(and(eq(twilioCallsTable.organizationId, org), eq(twilioCallsTable.id, callId)));
     if (!call || !isMissedInbound(call)) {
@@ -149,7 +153,7 @@ export async function handleCallieGather(org: string, callId: string, stage: Cal
   return db.transaction(async (tx) => {
     await lockCallie(tx, org);
     const [row] = await tx.select().from(intakes).where(and(eq(intakes.organizationId, org), eq(intakes.callId, callId))).for("update");
-    if (!row || finishedStates.has(row.state)) return hangup();
+    if (!row || row.mode !== "keypad" || finishedStates.has(row.state)) return hangup();
     let authority: Awaited<ReturnType<typeof current>>;
     try { authority = await current(tx, row); }
     catch (error) {
@@ -201,7 +205,7 @@ export async function consumeCallieSms(tx: Tx, input: CallieSmsInput) {
   const org = input.binding.organizationId;
   await lockCallie(tx, org);
   const [row] = await tx.select().from(intakes).where(and(eq(intakes.organizationId, org), eq(intakes.fromPhone, input.phone), eq(intakes.challengeHash, callieChallengeHash(code)))).for("update");
-  if (!row || row.state !== "awaiting_sms" || row.stage !== "complete" || row.triggerMessageSid || !row.challengeExpiresAt || row.challengeExpiresAt.getTime() <= Date.now()) return false;
+  if (!row || row.mode !== "keypad" || row.state !== "awaiting_sms" || row.stage !== "complete" || row.triggerMessageSid || !row.challengeExpiresAt || row.challengeExpiresAt.getTime() <= Date.now()) return false;
   if (input.fields.AccountSid !== row.accountSid || input.fields.From !== row.fromPhone || input.fields.To !== row.calledNumber || input.fields.MessageSid !== input.messageSid || input.binding.id !== row.bindingId) return false;
   try {
     const authority = await current(tx, row);

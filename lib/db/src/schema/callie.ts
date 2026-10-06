@@ -23,9 +23,20 @@ export interface CalliePolicySnapshot extends CalliePolicySettings {
   acknowledgmentBody: string;
   binding: { id: string; accountSid: string; sender: string; messagingServiceSid: string; disclosureVersion: string; origin: string; businessName: string } | null;
 }
+export interface CallieReceptionPolicySnapshot extends CalliePolicySettings {
+  mode: "conversation";
+  templateVersion: "callie-conversation.v2";
+  toolVersion: "callie-reception-tools.v1";
+  businessFacts: string; callerDisclosure: string;
+  maxConversationSeconds: number; maxToolCalls: number; retentionDays: number;
+  businessHoursTransferPhone: string | null; afterHoursTransferPhone: string | null;
+  voiceBinding: { id: string; accountSid: string; sender: string; staffPhone: string; origin: string; businessName: string } | null;
+  receptionBinding: { id: string; version: number; enabled: boolean; agentId: string; agentVersionId: string; branchId: string | null; environment: "production" | "staging"; credentialKey: string; configurationSha256: string } | null;
+  prompt: string;
+}
 export const CALLIE_STAGES = ["admitted", "service", "request", "window", "consent", "complete"] as const;
 export type CallieStage = typeof CALLIE_STAGES[number];
-export const CALLIE_STATES = ["admitted", "collecting", "awaiting_sms", "confirmed", "deferred", "dispatching", "accepted", "blocked", "indeterminate", "resolved", "cancelled", "booked"] as const;
+export const CALLIE_STATES = ["admitted", "collecting", "awaiting_sms", "confirmed", "deferred", "dispatching", "accepted", "blocked", "indeterminate", "office_pending", "resolved", "cancelled", "booked"] as const;
 export type CallieState = typeof CALLIE_STATES[number];
 export type CallieServiceIntent = "repair" | "replacement" | "maintenance" | "other";
 export type CallieRequestIntent = "callback" | "visit";
@@ -39,7 +50,7 @@ export const calliePolicyRevisionsTable = pgTable("callie_policy_revisions", {
   organizationId: uuid("organization_id").notNull().references(() => organizationsTable.id),
   version: integer("version").notNull(),
   enabled: boolean("enabled").notNull().default(false),
-  snapshot: jsonb("snapshot").$type<CalliePolicySnapshot>().notNull(),
+  snapshot: jsonb("snapshot").$type<CalliePolicySnapshot | CallieReceptionPolicySnapshot>().notNull(),
   reviewId: uuid("review_id").notNull(),
   reviewPayloadHash: text("review_payload_hash").notNull(),
   approvedByUserId: varchar("approved_by_user_id").notNull(),
@@ -63,6 +74,7 @@ export const callieIntakesTable = pgTable("callie_intakes", {
   callId: uuid("call_id").notNull(),
   policyRevisionId: uuid("policy_revision_id").notNull(),
   version: integer("version").notNull().default(1),
+  mode: text("mode").$type<"keypad" | "conversation">().notNull().default("keypad"),
   state: text("state").$type<CallieState>().notNull().default("admitted"),
   stage: text("stage").$type<CallieStage>().notNull().default("admitted"),
   bindingId: uuid("binding_id").notNull(),
@@ -96,6 +108,7 @@ export const callieIntakesTable = pgTable("callie_intakes", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   unique("callie_intake_org_id_uq").on(t.organizationId, t.id),
+  unique("callie_intake_reception_parent_uq").on(t.organizationId, t.id, t.callId, t.policyRevisionId, t.mode),
   unique("callie_intake_grant_uq").on(t.organizationId, t.id, t.callId, t.policyRevisionId, t.triggerMessageSid),
   uniqueIndex("callie_intake_call_uq").on(t.callId),
   uniqueIndex("callie_intake_trigger_uq").on(t.triggerMessageSid),
@@ -108,7 +121,8 @@ export const callieIntakesTable = pgTable("callie_intakes", {
   foreignKey({ columns: [t.organizationId, t.triggerMessageSid], foreignColumns: [twilioInboundEventsTable.organizationId, twilioInboundEventsTable.messageSid], name: "callie_intake_trigger_fk" }),
   foreignKey({ columns: [t.organizationId, t.appointmentId], foreignColumns: [appointmentsTable.organizationId, appointmentsTable.id], name: "callie_intake_appointment_fk" }),
   check("callie_intake_version_ck", sql`${t.version} > 0`),
-  check("callie_intake_state_ck", sql`${t.state} in ('admitted','collecting','awaiting_sms','confirmed','deferred','dispatching','accepted','blocked','indeterminate','resolved','cancelled','booked') and ${t.stage} in ('admitted','service','request','window','consent','complete')`),
+  check("callie_intake_state_ck", sql`${t.state} in ('admitted','collecting','awaiting_sms','confirmed','deferred','dispatching','accepted','blocked','indeterminate','office_pending','resolved','cancelled','booked') and ${t.stage} in ('admitted','service','request','window','consent','complete')`),
+  check("callie_intake_mode_ck", sql`${t.mode} in ('keypad','conversation') and (${t.mode} <> 'conversation' or (${t.state} in ('admitted','office_pending','blocked','resolved','cancelled','booked') and ${t.stage} in ('admitted','complete') and jsonb_array_length(${t.stepReceipts}) = 0 and ${t.challengeHash} is null and ${t.triggerMessageSid} is null)) and (${t.state} <> 'office_pending' or ${t.mode} = 'conversation')`),
   check("callie_intake_choice_ck", sql`(${t.serviceIntent} is null or ${t.serviceIntent} in ('repair','replacement','maintenance','other')) and (${t.requestIntent} is null or ${t.requestIntent} in ('callback','visit')) and (${t.callbackWindow} is null or ${t.callbackWindow} in ('morning','afternoon','any'))`),
   check("callie_intake_steps_ck", sql`jsonb_typeof(${t.stepReceipts}) = 'array' and jsonb_array_length(${t.stepReceipts}) <= 5`),
   check("callie_intake_trigger_ck", sql`(${t.triggerMessageSid} is null and ${t.triggerAccountSid} is null and ${t.triggerFrom} is null and ${t.triggerTo} is null and ${t.triggerPayloadHash} is null and ${t.confirmedAt} is null and ${t.grantExpiresAt} is null) or (${t.triggerMessageSid} is not null and ${t.triggerAccountSid} is not null and ${t.triggerFrom} is not null and ${t.triggerTo} is not null and ${t.triggerPayloadHash} is not null and ${t.confirmedAt} is not null and ${t.grantExpiresAt} is not null and ${t.triggerAccountSid} = ${t.accountSid} and ${t.triggerFrom} = ${t.fromPhone} and ${t.triggerTo} = ${t.calledNumber} and ${t.triggerPayloadHash} ~ '^[a-f0-9]{64}$' and ${t.grantExpiresAt} > ${t.confirmedAt})`),

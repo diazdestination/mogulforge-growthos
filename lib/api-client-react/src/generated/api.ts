@@ -59,6 +59,11 @@ import type {
   CalliePolicyApproveRequest,
   CalliePolicyPreview,
   CalliePolicyPreviewRequest,
+  CallieReceptionApproveRequest,
+  CallieReceptionBindingRequest,
+  CallieReceptionPreview,
+  CallieReceptionPreviewRequest,
+  CallieReceptionView,
   CaptureDelivery,
   CaptureEndpoint,
   CaptureEndpointInput,
@@ -346,6 +351,300 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetCallieReceptionUrl = () => {
+
+
+
+
+  return `/api/v1/communications/callie/reception`
+}
+
+/**
+ * Current accepted active verified staff session only; no API-key authority. Requires crm.read. Shared policy head selects exactly one future-call mode. Binding metadata and exact policy approval do not configure a provider or prove live audio/transfer. Caller statements are unverified; no identity, SMS permission, confirmed visit or emergency dispatch is inferred. Original uncertain effects remain non-retryable.
+ * @summary Read conversation setup and separate current source mode
+ */
+export const getCallieReception = async ( options?: Parameters<typeof customFetch>[1]): Promise<CallieReceptionView> => {
+
+  return customFetch<CallieReceptionView>(getGetCallieReceptionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCallieReceptionQueryKey = () => {
+    return [
+    `/api/v1/communications/callie/reception`
+    ] as const;
+    }
+
+
+export const getGetCallieReceptionQueryOptions = <TData = Awaited<ReturnType<typeof getCallieReception>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCallieReception>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCallieReceptionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCallieReception>>> = ({ signal }) => getCallieReception({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCallieReception>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCallieReceptionQueryResult = NonNullable<Awaited<ReturnType<typeof getCallieReception>>>
+export type GetCallieReceptionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Read conversation setup and separate current source mode
+ */
+
+export function useGetCallieReception<TData = Awaited<ReturnType<typeof getCallieReception>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCallieReception>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCallieReceptionQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSaveCallieReceptionBindingUrl = () => {
+
+
+
+
+  return `/api/v1/communications/callie/reception/binding`
+}
+
+/**
+ * Current accepted active verified staff session only; no API-key authority. Requires settings.manage. Shared policy head selects exactly one future-call mode. Binding metadata and exact policy approval do not configure a provider or prove live audio/transfer. Caller statements are unverified; no identity, SMS permission, confirmed visit or emergency dispatch is inferred. Original uncertain effects remain non-retryable.
+ * @summary Save exact non-secret company provider identity
+ */
+export const saveCallieReceptionBinding = async (callieReceptionBindingRequest: CallieReceptionBindingRequest, options?: Parameters<typeof customFetch>[1]): Promise<CallieReceptionView> => {
+
+  return customFetch<CallieReceptionView>(getSaveCallieReceptionBindingUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(callieReceptionBindingRequest)
+  }
+);}
+
+
+
+
+
+export const getSaveCallieReceptionBindingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveCallieReceptionBinding>>, TError,{data: BodyType<CallieReceptionBindingRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveCallieReceptionBinding>>, TError,{data: BodyType<CallieReceptionBindingRequest>}, TContext> => {
+
+const mutationKey = ['saveCallieReceptionBinding'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveCallieReceptionBinding>>, {data: BodyType<CallieReceptionBindingRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveCallieReceptionBinding(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveCallieReceptionBindingMutationResult = NonNullable<Awaited<ReturnType<typeof saveCallieReceptionBinding>>>
+    export type SaveCallieReceptionBindingMutationBody = BodyType<CallieReceptionBindingRequest>
+    export type SaveCallieReceptionBindingMutationError = ErrorType<void>
+
+    /**
+ * @summary Save exact non-secret company provider identity
+ */
+export const useSaveCallieReceptionBinding = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveCallieReceptionBinding>>, TError,{data: BodyType<CallieReceptionBindingRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveCallieReceptionBinding>>,
+        TError,
+        {data: BodyType<CallieReceptionBindingRequest>},
+        TContext
+      > => {
+      return useMutation(getSaveCallieReceptionBindingMutationOptions(options));
+    }
+
+export const getPreviewCallieReceptionPolicyUrl = () => {
+
+
+
+
+  return `/api/v1/communications/callie/reception/policy/preview`
+}
+
+/**
+ * Current accepted active verified staff session only; no API-key authority. Requires settings.manage. Shared policy head selects exactly one future-call mode. Binding metadata and exact policy approval do not configure a provider or prove live audio/transfer. Caller statements are unverified; no identity, SMS permission, confirmed visit or emergency dispatch is inferred. Original uncertain effects remain non-retryable.
+ * @summary Review an expiring actor-bound conversational policy
+ */
+export const previewCallieReceptionPolicy = async (callieReceptionPreviewRequest: CallieReceptionPreviewRequest, options?: Parameters<typeof customFetch>[1]): Promise<CallieReceptionPreview> => {
+
+  return customFetch<CallieReceptionPreview>(getPreviewCallieReceptionPolicyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(callieReceptionPreviewRequest)
+  }
+);}
+
+
+
+
+
+export const getPreviewCallieReceptionPolicyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewCallieReceptionPolicy>>, TError,{data: BodyType<CallieReceptionPreviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewCallieReceptionPolicy>>, TError,{data: BodyType<CallieReceptionPreviewRequest>}, TContext> => {
+
+const mutationKey = ['previewCallieReceptionPolicy'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewCallieReceptionPolicy>>, {data: BodyType<CallieReceptionPreviewRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewCallieReceptionPolicy(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewCallieReceptionPolicyMutationResult = NonNullable<Awaited<ReturnType<typeof previewCallieReceptionPolicy>>>
+    export type PreviewCallieReceptionPolicyMutationBody = BodyType<CallieReceptionPreviewRequest>
+    export type PreviewCallieReceptionPolicyMutationError = ErrorType<void>
+
+    /**
+ * @summary Review an expiring actor-bound conversational policy
+ */
+export const usePreviewCallieReceptionPolicy = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewCallieReceptionPolicy>>, TError,{data: BodyType<CallieReceptionPreviewRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewCallieReceptionPolicy>>,
+        TError,
+        {data: BodyType<CallieReceptionPreviewRequest>},
+        TContext
+      > => {
+      return useMutation(getPreviewCallieReceptionPolicyMutationOptions(options));
+    }
+
+export const getApproveCallieReceptionPolicyUrl = () => {
+
+
+
+
+  return `/api/v1/communications/callie/reception/policy/approve`
+}
+
+/**
+ * Current accepted active verified staff session only; no API-key authority. Requires settings.manage. Shared policy head selects exactly one future-call mode. Binding metadata and exact policy approval do not configure a provider or prove live audio/transfer. Caller statements are unverified; no identity, SMS permission, confirmed visit or emergency dispatch is inferred. Original uncertain effects remain non-retryable.
+ * @summary Approve the exact future-call conversational policy
+ */
+export const approveCallieReceptionPolicy = async (callieReceptionApproveRequest: CallieReceptionApproveRequest, options?: Parameters<typeof customFetch>[1]): Promise<CallieReceptionView> => {
+
+  return customFetch<CallieReceptionView>(getApproveCallieReceptionPolicyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(callieReceptionApproveRequest)
+  }
+);}
+
+
+
+
+
+export const getApproveCallieReceptionPolicyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveCallieReceptionPolicy>>, TError,{data: BodyType<CallieReceptionApproveRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveCallieReceptionPolicy>>, TError,{data: BodyType<CallieReceptionApproveRequest>}, TContext> => {
+
+const mutationKey = ['approveCallieReceptionPolicy'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveCallieReceptionPolicy>>, {data: BodyType<CallieReceptionApproveRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  approveCallieReceptionPolicy(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveCallieReceptionPolicyMutationResult = NonNullable<Awaited<ReturnType<typeof approveCallieReceptionPolicy>>>
+    export type ApproveCallieReceptionPolicyMutationBody = BodyType<CallieReceptionApproveRequest>
+    export type ApproveCallieReceptionPolicyMutationError = ErrorType<void>
+
+    /**
+ * @summary Approve the exact future-call conversational policy
+ */
+export const useApproveCallieReceptionPolicy = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveCallieReceptionPolicy>>, TError,{data: BodyType<CallieReceptionApproveRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof approveCallieReceptionPolicy>>,
+        TError,
+        {data: BodyType<CallieReceptionApproveRequest>},
+        TContext
+      > => {
+      return useMutation(getApproveCallieReceptionPolicyMutationOptions(options));
+    }
 
 export const getGetCustomerWorkspaceUrl = (id: string,) => {
 

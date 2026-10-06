@@ -1,6 +1,8 @@
 import { and, asc, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { appointmentsTable, auditEventsTable, contactsTable, crmTasksTable, db, leadsTable, missedCallHandoffsTable, propertiesTable, revenueExecutionsTable, twilioCallsTable, usersTable, type UserRole } from "@workspace/db";
 import { callieAckDispatchesTable, callieIntakesTable, calliePolicyRevisionsTable } from "../../../../lib/db/src/schema/callie";
+import { callieReceptionSessionsTable } from "../../../../lib/db/src/schema/callie-reception";
+import { readCallieReceptionEvidence } from "./callie-reception-runtime";
 import { hasPermission, type Permission } from "../lib/permissions";
 import { getCustomerLifecycleStatus } from "./customer-lifecycle";
 import { assertOperationalStaff, assertResourceWindow, assertScheduleInterval, appointmentCustomer, lockContractorSchedule, type ScheduleTransaction } from "./contractor-scheduling";
@@ -65,11 +67,15 @@ async function observe(reader: Reader, org: string, id: string) {
     lead: lead ? { id: lead.id, updatedAt: lead.updatedAt.toISOString(), contactId: lead.contactId } : null,
     appointment: appointment ? { id: appointment.id, updatedAt: appointment.updatedAt.toISOString(), status: appointment.status } : null,
     staff: staff.map(user => ({ id: user.id, role: user.role, updatedAt: user.updatedAt.toISOString(), accepted: eligible(user) })),
-    properties: properties.map(property => ({ id: property.id, contactId: property.contactId, updatedAt: property.updatedAt.toISOString() })),
+    // Pin the reviewed worksite itself; JS timestamps alone can collide after
+    // PostgreSQL sub-millisecond values are materialized as a Date.
+    properties: properties.map(property => ({ id: property.id, contactId: property.contactId, updatedAt: property.updatedAt.toISOString(),
+      addressLine1: property.addressLine1, addressLine2: property.addressLine2, city: property.city, state: property.state, postalCode: property.postalCode })),
     receipt: receipt ? { id: receipt.id, state: receipt.state } : null,
     delivery: delivery ? { id: delivery.id, status: delivery.status, updatedAt: delivery.updatedAt.toISOString() } : null,
     lifecycle: { state: lifecycle.state, version: lifecycle.version }, identityReviewed };
-  return { intake, call, handoff, task, owner, contact, lead, appointment, delivery, receipt, policy, properties, staff, lifecycle, identityReviewed, fingerprint: careFingerprint(source) };
+  const reception = intake.mode === "conversation" ? await readCallieReceptionEvidence(reader, org, intake.id) : null;
+  return { intake, call, handoff, task, owner, contact, lead, appointment, delivery, receipt, policy, properties, staff, lifecycle, identityReviewed, reception, fingerprint: careFingerprint({ ...source, reception }) };
 }
 type Observation = Awaited<ReturnType<typeof observe>>;
 function smsProof(intake: Intake, now: Date) {
@@ -81,7 +87,7 @@ function smsProof(intake: Intake, now: Date) {
 function rowSummary(row: { intake: Intake; call: typeof twilioCallsTable.$inferSelect; handoff: typeof missedCallHandoffsTable.$inferSelect; task: typeof crmTasksTable.$inferSelect; owner: typeof usersTable.$inferSelect | null | undefined }, now = new Date()) {
   const { intake, call, handoff, task, owner } = row;
   const ownerEligible = eligible(owner) && task.assignedUserId === intake.ownerUserId;
-  return { id: intake.id, callId: intake.callId, version: intake.version, state: intake.state, stage: intake.stage, reason: intake.reason,
+  return { id: intake.id, organizationId: intake.organizationId, mode: intake.mode, callId: intake.callId, version: intake.version, state: intake.state, stage: intake.stage, reason: intake.reason,
     phone: intake.fromPhone, createdAt: call.createdAt.toISOString(), dueAt: intake.dueAt.toISOString(), overdue: !terminalState(intake.state) && intake.dueAt <= now,
     owner: { id: intake.ownerUserId, label: owner ? label(owner) : "Owner unavailable", eligible: ownerEligible },
     task: { id: task.id, status: task.status }, leadId: handoff.leadId, callerReviewed: !!handoff.reviewedAt,
@@ -104,7 +110,7 @@ function assertCurrentOwner(value: Observation) {
 function detail(value: Observation) {
   const optionsComplete = value.properties.length <= 100 && value.staff.length <= 200;
   const writeBlock = mutableReason(value);
-  return { ...rowSummary(value), expectedFingerprint: value.fingerprint, companyHeld: !value.lifecycle.automationAllowed,
+  return { ...rowSummary(value), reception: value.reception, expectedFingerprint: value.fingerprint, companyHeld: !value.lifecycle.automationAllowed,
     timezone: value.policy?.snapshot.timezone ?? "UTC", identityReviewed: value.identityReviewed,
     contact: value.contact ? { id: value.contact.id, name: `${value.contact.firstName} ${value.contact.lastName ?? ""}`.trim(), phone: value.contact.phone } : null,
     reviewedAt: value.handoff.reviewedAt?.toISOString() ?? null,
@@ -125,7 +131,8 @@ export async function listCallieOffice(org: string, actor: string, raw: CallieLi
   const query = callieListQuery.parse(raw);
   await assertCallieStaff(org, actor);
   const lifecycle = await getCustomerLifecycleStatus(org);
-  const waiting = and(inArray(callieIntakesTable.state, ["admitted", "collecting", "awaiting_sms", "confirmed", "deferred", "accepted"]),
+  const waiting = and(inArray(callieIntakesTable.state, ["admitted", "collecting", "awaiting_sms", "confirmed", "deferred", "accepted", "office_pending"]),
+    sql`(${callieIntakesTable.mode} = 'keypad' or not exists (select 1 from ${callieReceptionSessionsTable} where ${callieReceptionSessionsTable.organizationId} = ${callieIntakesTable.organizationId} and ${callieReceptionSessionsTable.intakeId} = ${callieIntakesTable.id} and (${callieReceptionSessionsTable.state} in ('blocked','indeterminate','interrupted','expired') or ${callieReceptionSessionsTable.transferState} in ('failed','indeterminate','blocked','not_answered'))))`,
     sql`${callieIntakesTable.dueAt} > now()`, eq(usersTable.isActive, true), sql`${usersTable.emailVerifiedAt} is not null`,
     sql`${usersTable.id} not like 'invite:%'`, inArray(usersTable.role, writeRoles), eq(crmTasksTable.assignedUserId, callieIntakesTable.ownerUserId), inArray(crmTasksTable.status, ["open", "in_progress"]));
   const scope = query.scope === "history" ? inArray(callieIntakesTable.state, [...terminal])

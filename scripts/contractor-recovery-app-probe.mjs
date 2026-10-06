@@ -11,6 +11,7 @@ import { callieFixtureIds } from './callie-recovery-fixture.mjs';
 import { standingServiceIds } from './standing-service-recovery-fixture.mjs';
 import { sourceNurtureIds } from './source-nurture-recovery-fixture.mjs';
 import { customerWorkspaceIds } from './customer-workspace-fixture.mjs';
+import { CALLIE_CONVERSATION_RECOVERY_SLUGS, callieConversationFixtureIds } from './callie-conversation-recovery-fixture.mjs';
 
 const target = new URL(process.env.DATABASE_URL ?? '');
 if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.hostname !== '127.0.0.1' || target.pathname !== '/postgres' || process.env.CONTRACTOR_SYNTHETIC_RECOVERY !== 'true' || process.env.NODE_ENV !== 'test') throw new Error('contractor_probe_target_invalid');
@@ -186,7 +187,45 @@ try {
   assert.equal(mutation.status, 405); await mutation.arrayBuffer();
   const callieMutation = await fetch(`${origin}/api/v1/communications/callie/${callie.intake}/office-action`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: '{}' });
   assert.equal(callieMutation.status, 405); await callieMutation.arrayBuffer();
-  process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, tenantBoundariesVerified: true, customerWorkspaceVerified: true, readChecks: good.length, writeBlocked: true })}\n`);
+  let receptionReadChecks = 0;
+  for (const [index, slug] of CALLIE_CONVERSATION_RECOVERY_SLUGS.entries()) {
+    const reception = callieConversationFixtureIds(slug);
+    const otherReception = callieConversationFixtureIds(CALLIE_CONVERSATION_RECOVERY_SLUGS[1 - index]);
+    const receptionHeaders = { authorization: `Bearer ${reception.authSession}` };
+    const read = async path => {
+      const response = await fetch(`${origin}${path}`, { headers: receptionHeaders });
+      assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'no-store');
+      receptionReadChecks++; return response.json();
+    };
+    check = `reception_${index}_setup`;
+    const setup = await read('/api/v1/communications/callie/reception');
+    assert.equal(setup.organizationId, reception.organization); assert.equal(setup.currentMode, 'conversation');
+    assert.equal(setup.currentEnabled, false); assert.equal(setup.readiness.ready, false); assert.equal(setup.readiness.state, 'off');
+    assert.equal(setup.binding.credentialsConfigured, false); assert.equal(setup.binding.webhookConfigured, false);
+    const page = await read('/api/v1/communications/callie?scope=attention');
+    assert.ok(page.items.some(row => row.id === reception.intake && row.organizationId === reception.organization && row.mode === 'conversation'));
+    check = `reception_${index}_detail`;
+    const detail = await read(`/api/v1/communications/callie/${reception.intake}`);
+    assert.equal(detail.id, reception.intake); assert.equal(detail.state, 'office_pending'); assert.equal(detail.mode, 'conversation');
+    assert.equal(detail.reception.sessionId, reception.session); assert.equal(detail.reception.state, 'indeterminate');
+    assert.equal(detail.reception.registration.state, 'indeterminate'); assert.equal(detail.reception.transfer.state, 'indeterminate');
+    assert.equal(detail.reception.conversation.outcome, 'unknown'); assert.equal(detail.smsProof, 'not_confirmed'); assert.equal(detail.confirmedAt, null);
+    const expired = Date.parse(detail.reception.conversation.contentExpiresAt) <= Date.now() || slug.endsWith('-b');
+    assert.equal(detail.reception.conversation.contentExpired, expired);
+    if (expired) {
+      assert.equal(detail.reception.conversation.facts, null); assert.equal(detail.reception.conversation.summary, null);
+    } else {
+      assert.equal(detail.reception.conversation.facts.serviceIntent, 'repair');
+      assert.match(detail.reception.conversation.facts.problem, /^SYNTHETIC:/);
+      assert.match(detail.reception.conversation.summary, /^FICTIONAL/);
+    }
+    assert.doesNotMatch(JSON.stringify(detail), /capabilityHash|capability_hash|secret__|registration_twiml|SYNTHETIC_RECEPTION_NO_CREDENTIAL/);
+    assert.equal((await fetch(`${origin}/api/v1/communications/callie/${otherReception.intake}`, { headers: receptionHeaders })).status, 404);
+    const update = await fetch(`${origin}/api/v1/communications/callie/reception/binding`, { method: 'POST', headers: { ...receptionHeaders, 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(update.status, 405); await update.arrayBuffer();
+    assert.equal(databaseFailed, false);
+  }
+  process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, tenantBoundariesVerified: true, customerWorkspaceVerified: true, callieConversationReadVerified: true, readChecks: good.length + receptionReadChecks, writeBlocked: true })}\n`);
 } catch (error) {
   // No response body, URL with credentials, SQL parameters or record content.
   process.stderr.write(`CONTRACTOR_APP_PROBE_FAILED:${check}:${error.code === 'ERR_ASSERTION' ? 'assertion' : 'unavailable'}${Number.isInteger(error.actual) ? `:status_${error.actual}` : ''}\n`);

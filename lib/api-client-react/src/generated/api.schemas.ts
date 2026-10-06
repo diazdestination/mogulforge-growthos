@@ -5,6 +5,1671 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+export type CallieReceptionViewCurrentMode = typeof CallieReceptionViewCurrentMode[keyof typeof CallieReceptionViewCurrentMode];
+
+
+export const CallieReceptionViewCurrentMode = {
+  keypad: 'keypad',
+  conversation: 'conversation',
+} as const;
+
+export type CallieReceptionViewBindingEnvironment = typeof CallieReceptionViewBindingEnvironment[keyof typeof CallieReceptionViewBindingEnvironment];
+
+
+export const CallieReceptionViewBindingEnvironment = {
+  production: 'production',
+  staging: 'staging',
+} as const;
+
+export type CallieReceptionViewBinding = {
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  agentId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  agentVersionId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  branchId: string | null;
+  environment: CallieReceptionViewBindingEnvironment;
+  /**
+     * @minLength 1
+     * @maxLength 60
+     * @pattern ^[A-Z][A-Z0-9_]*$
+     */
+  credentialKey: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  configurationSha256: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  version: number;
+  updatedAt: string;
+  credentialsConfigured: boolean;
+  webhookConfigured: boolean;
+} | null;
+
+export type CallieReceptionViewPolicyMode = typeof CallieReceptionViewPolicyMode[keyof typeof CallieReceptionViewPolicyMode];
+
+
+export const CallieReceptionViewPolicyMode = {
+  conversation: 'conversation',
+} as const;
+
+export type CallieReceptionViewPolicy = {
+  mode: CallieReceptionViewPolicyMode;
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  timezone: string;
+  /**
+     * @minItems 1
+     * @maxItems 7
+     * @items.minimum 1
+     * @items.maximum 7
+     */
+  days: number[];
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  opensAt: string;
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  closesAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  businessHoursOwnerId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  afterHoursOwnerId: string | null;
+  /**
+     * @minimum 5
+     * @maximum 1440
+     */
+  responseMinutes: number;
+  /** @maxLength 1200 */
+  businessFacts: string;
+  /** @maxLength 500 */
+  callerDisclosure: string;
+  /**
+     * @minimum 60
+     * @maximum 600
+     */
+  maxConversationSeconds: number;
+  /**
+     * @minimum 3
+     * @maximum 12
+     */
+  maxToolCalls: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  retentionDays: number;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  businessHoursTransferPhone: string | null;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  afterHoursTransferPhone: string | null;
+};
+
+export type CallieReceptionViewApprovedSnapshotMode = typeof CallieReceptionViewApprovedSnapshotMode[keyof typeof CallieReceptionViewApprovedSnapshotMode];
+
+
+export const CallieReceptionViewApprovedSnapshotMode = {
+  conversation: 'conversation',
+} as const;
+
+export type CallieReceptionViewApprovedSnapshotTemplateVersion = typeof CallieReceptionViewApprovedSnapshotTemplateVersion[keyof typeof CallieReceptionViewApprovedSnapshotTemplateVersion];
+
+
+export const CallieReceptionViewApprovedSnapshotTemplateVersion = {
+  'callie-conversationv2': 'callie-conversation.v2',
+} as const;
+
+export type CallieReceptionViewApprovedSnapshotToolVersion = typeof CallieReceptionViewApprovedSnapshotToolVersion[keyof typeof CallieReceptionViewApprovedSnapshotToolVersion];
+
+
+export const CallieReceptionViewApprovedSnapshotToolVersion = {
+  'callie-reception-toolsv1': 'callie-reception-tools.v1',
+} as const;
+
+export type CallieReceptionViewApprovedSnapshotVoiceBinding = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^AC[a-f0-9]{32}$ */
+  accountSid: string;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  sender: string;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  staffPhone: string;
+  origin: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  businessName: string;
+} | null;
+
+export type CallieReceptionViewApprovedSnapshotReceptionBindingEnvironment = typeof CallieReceptionViewApprovedSnapshotReceptionBindingEnvironment[keyof typeof CallieReceptionViewApprovedSnapshotReceptionBindingEnvironment];
+
+
+export const CallieReceptionViewApprovedSnapshotReceptionBindingEnvironment = {
+  production: 'production',
+  staging: 'staging',
+} as const;
+
+export type CallieReceptionViewApprovedSnapshotReceptionBinding = {
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  agentId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  agentVersionId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  branchId: string | null;
+  environment: CallieReceptionViewApprovedSnapshotReceptionBindingEnvironment;
+  /**
+     * @minLength 1
+     * @maxLength 60
+     * @pattern ^[A-Z][A-Z0-9_]*$
+     */
+  credentialKey: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  configurationSha256: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  version: number;
+} | null;
+
+export type CallieReceptionViewApprovedSnapshot = {
+  mode: CallieReceptionViewApprovedSnapshotMode;
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  timezone: string;
+  /**
+     * @minItems 1
+     * @maxItems 7
+     * @items.minimum 1
+     * @items.maximum 7
+     */
+  days: number[];
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  opensAt: string;
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  closesAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  businessHoursOwnerId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  afterHoursOwnerId: string | null;
+  /**
+     * @minimum 5
+     * @maximum 1440
+     */
+  responseMinutes: number;
+  /** @maxLength 1200 */
+  businessFacts: string;
+  /** @maxLength 500 */
+  callerDisclosure: string;
+  /**
+     * @minimum 60
+     * @maximum 600
+     */
+  maxConversationSeconds: number;
+  /**
+     * @minimum 3
+     * @maximum 12
+     */
+  maxToolCalls: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  retentionDays: number;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  businessHoursTransferPhone: string | null;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  afterHoursTransferPhone: string | null;
+  templateVersion: CallieReceptionViewApprovedSnapshotTemplateVersion;
+  toolVersion: CallieReceptionViewApprovedSnapshotToolVersion;
+  voiceBinding: CallieReceptionViewApprovedSnapshotVoiceBinding;
+  receptionBinding: CallieReceptionViewApprovedSnapshotReceptionBinding;
+  /**
+     * @minLength 1
+     * @maxLength 8000
+     */
+  prompt: string;
+} | null;
+
+export type CallieReceptionViewReadinessState = typeof CallieReceptionViewReadinessState[keyof typeof CallieReceptionViewReadinessState];
+
+
+export const CallieReceptionViewReadinessState = {
+  off: 'off',
+  setup_incomplete: 'setup_incomplete',
+  approved_but_held: 'approved_but_held',
+  approved_for_future_eligible_calls: 'approved_for_future_eligible_calls',
+} as const;
+
+export type CallieReceptionViewReadiness = {
+  state: CallieReceptionViewReadinessState;
+  ready: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  reason: string | null;
+};
+
+export type CallieReceptionViewBoundary = typeof CallieReceptionViewBoundary[keyof typeof CallieReceptionViewBoundary];
+
+
+export const CallieReceptionViewBoundary = {
+  'Voice-only_missed-call_reception_Requests_are_unverified;_no_automatic_booking_or_messaging_permission': 'Voice-only missed-call reception. Requests are unverified; no automatic booking or messaging permission.',
+} as const;
+
+export interface CallieReceptionView {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  version: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  revisionId: string | null;
+  currentMode: CallieReceptionViewCurrentMode;
+  currentEnabled: boolean;
+  binding: CallieReceptionViewBinding;
+  policy: CallieReceptionViewPolicy;
+  approvedSnapshot: CallieReceptionViewApprovedSnapshot;
+  approvedAt: string | null;
+  readiness: CallieReceptionViewReadiness;
+  boundary: CallieReceptionViewBoundary;
+}
+
+export type CallieReceptionBindingRequestBindingEnvironment = typeof CallieReceptionBindingRequestBindingEnvironment[keyof typeof CallieReceptionBindingRequestBindingEnvironment];
+
+
+export const CallieReceptionBindingRequestBindingEnvironment = {
+  production: 'production',
+  staging: 'staging',
+} as const;
+
+export type CallieReceptionBindingRequestBinding = {
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  agentId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  agentVersionId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  branchId: string | null;
+  environment: CallieReceptionBindingRequestBindingEnvironment;
+  /**
+     * @minLength 1
+     * @maxLength 60
+     * @pattern ^[A-Z][A-Z0-9_]*$
+     */
+  credentialKey: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  configurationSha256: string;
+};
+
+export interface CallieReceptionBindingRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  binding: CallieReceptionBindingRequestBinding;
+  confirmed: true;
+}
+
+export type CallieReceptionSettingsMode = typeof CallieReceptionSettingsMode[keyof typeof CallieReceptionSettingsMode];
+
+
+export const CallieReceptionSettingsMode = {
+  conversation: 'conversation',
+} as const;
+
+export interface CallieReceptionSettings {
+  mode: CallieReceptionSettingsMode;
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  timezone: string;
+  /**
+     * @minItems 1
+     * @maxItems 7
+     * @items.minimum 1
+     * @items.maximum 7
+     */
+  days: number[];
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  opensAt: string;
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  closesAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  businessHoursOwnerId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  afterHoursOwnerId: string | null;
+  /**
+     * @minimum 5
+     * @maximum 1440
+     */
+  responseMinutes: number;
+  /** @maxLength 1200 */
+  businessFacts: string;
+  /** @maxLength 500 */
+  callerDisclosure: string;
+  /**
+     * @minimum 60
+     * @maximum 600
+     */
+  maxConversationSeconds: number;
+  /**
+     * @minimum 3
+     * @maximum 12
+     */
+  maxToolCalls: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  retentionDays: number;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  businessHoursTransferPhone: string | null;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  afterHoursTransferPhone: string | null;
+}
+
+export type CallieReceptionSnapshotMode = typeof CallieReceptionSnapshotMode[keyof typeof CallieReceptionSnapshotMode];
+
+
+export const CallieReceptionSnapshotMode = {
+  conversation: 'conversation',
+} as const;
+
+export type CallieReceptionSnapshotTemplateVersion = typeof CallieReceptionSnapshotTemplateVersion[keyof typeof CallieReceptionSnapshotTemplateVersion];
+
+
+export const CallieReceptionSnapshotTemplateVersion = {
+  'callie-conversationv2': 'callie-conversation.v2',
+} as const;
+
+export type CallieReceptionSnapshotToolVersion = typeof CallieReceptionSnapshotToolVersion[keyof typeof CallieReceptionSnapshotToolVersion];
+
+
+export const CallieReceptionSnapshotToolVersion = {
+  'callie-reception-toolsv1': 'callie-reception-tools.v1',
+} as const;
+
+export type CallieReceptionSnapshotVoiceBinding = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^AC[a-f0-9]{32}$ */
+  accountSid: string;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  sender: string;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  staffPhone: string;
+  origin: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  businessName: string;
+} | null;
+
+export type CallieReceptionSnapshotReceptionBindingEnvironment = typeof CallieReceptionSnapshotReceptionBindingEnvironment[keyof typeof CallieReceptionSnapshotReceptionBindingEnvironment];
+
+
+export const CallieReceptionSnapshotReceptionBindingEnvironment = {
+  production: 'production',
+  staging: 'staging',
+} as const;
+
+export type CallieReceptionSnapshotReceptionBinding = {
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  agentId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  agentVersionId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  branchId: string | null;
+  environment: CallieReceptionSnapshotReceptionBindingEnvironment;
+  /**
+     * @minLength 1
+     * @maxLength 60
+     * @pattern ^[A-Z][A-Z0-9_]*$
+     */
+  credentialKey: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  configurationSha256: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  version: number;
+} | null;
+
+export interface CallieReceptionSnapshot {
+  mode: CallieReceptionSnapshotMode;
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  timezone: string;
+  /**
+     * @minItems 1
+     * @maxItems 7
+     * @items.minimum 1
+     * @items.maximum 7
+     */
+  days: number[];
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  opensAt: string;
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  closesAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  businessHoursOwnerId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  afterHoursOwnerId: string | null;
+  /**
+     * @minimum 5
+     * @maximum 1440
+     */
+  responseMinutes: number;
+  /** @maxLength 1200 */
+  businessFacts: string;
+  /** @maxLength 500 */
+  callerDisclosure: string;
+  /**
+     * @minimum 60
+     * @maximum 600
+     */
+  maxConversationSeconds: number;
+  /**
+     * @minimum 3
+     * @maximum 12
+     */
+  maxToolCalls: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  retentionDays: number;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  businessHoursTransferPhone: string | null;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  afterHoursTransferPhone: string | null;
+  templateVersion: CallieReceptionSnapshotTemplateVersion;
+  toolVersion: CallieReceptionSnapshotToolVersion;
+  voiceBinding: CallieReceptionSnapshotVoiceBinding;
+  receptionBinding: CallieReceptionSnapshotReceptionBinding;
+  /**
+     * @minLength 1
+     * @maxLength 8000
+     */
+  prompt: string;
+}
+
+export type CallieReceptionPreviewRequestPolicyMode = typeof CallieReceptionPreviewRequestPolicyMode[keyof typeof CallieReceptionPreviewRequestPolicyMode];
+
+
+export const CallieReceptionPreviewRequestPolicyMode = {
+  conversation: 'conversation',
+} as const;
+
+export type CallieReceptionPreviewRequestPolicy = {
+  mode: CallieReceptionPreviewRequestPolicyMode;
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  timezone: string;
+  /**
+     * @minItems 1
+     * @maxItems 7
+     * @items.minimum 1
+     * @items.maximum 7
+     */
+  days: number[];
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  opensAt: string;
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  closesAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  businessHoursOwnerId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  afterHoursOwnerId: string | null;
+  /**
+     * @minimum 5
+     * @maximum 1440
+     */
+  responseMinutes: number;
+  /** @maxLength 1200 */
+  businessFacts: string;
+  /** @maxLength 500 */
+  callerDisclosure: string;
+  /**
+     * @minimum 60
+     * @maximum 600
+     */
+  maxConversationSeconds: number;
+  /**
+     * @minimum 3
+     * @maximum 12
+     */
+  maxToolCalls: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  retentionDays: number;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  businessHoursTransferPhone: string | null;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  afterHoursTransferPhone: string | null;
+};
+
+export interface CallieReceptionPreviewRequest {
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  policy: CallieReceptionPreviewRequestPolicy;
+}
+
+export type CallieReceptionPreviewExpectedSnapshotSchemaVersion = typeof CallieReceptionPreviewExpectedSnapshotSchemaVersion[keyof typeof CallieReceptionPreviewExpectedSnapshotSchemaVersion];
+
+
+export const CallieReceptionPreviewExpectedSnapshotSchemaVersion = {
+  'callie-reception-previewv1': 'callie-reception-preview.v1',
+} as const;
+
+export type CallieReceptionPreviewExpectedSnapshotPolicyMode = typeof CallieReceptionPreviewExpectedSnapshotPolicyMode[keyof typeof CallieReceptionPreviewExpectedSnapshotPolicyMode];
+
+
+export const CallieReceptionPreviewExpectedSnapshotPolicyMode = {
+  conversation: 'conversation',
+} as const;
+
+export type CallieReceptionPreviewExpectedSnapshotPolicyTemplateVersion = typeof CallieReceptionPreviewExpectedSnapshotPolicyTemplateVersion[keyof typeof CallieReceptionPreviewExpectedSnapshotPolicyTemplateVersion];
+
+
+export const CallieReceptionPreviewExpectedSnapshotPolicyTemplateVersion = {
+  'callie-conversationv2': 'callie-conversation.v2',
+} as const;
+
+export type CallieReceptionPreviewExpectedSnapshotPolicyToolVersion = typeof CallieReceptionPreviewExpectedSnapshotPolicyToolVersion[keyof typeof CallieReceptionPreviewExpectedSnapshotPolicyToolVersion];
+
+
+export const CallieReceptionPreviewExpectedSnapshotPolicyToolVersion = {
+  'callie-reception-toolsv1': 'callie-reception-tools.v1',
+} as const;
+
+export type CallieReceptionPreviewExpectedSnapshotPolicyVoiceBinding = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^AC[a-f0-9]{32}$ */
+  accountSid: string;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  sender: string;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  staffPhone: string;
+  origin: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  businessName: string;
+} | null;
+
+export type CallieReceptionPreviewExpectedSnapshotPolicyReceptionBindingEnvironment = typeof CallieReceptionPreviewExpectedSnapshotPolicyReceptionBindingEnvironment[keyof typeof CallieReceptionPreviewExpectedSnapshotPolicyReceptionBindingEnvironment];
+
+
+export const CallieReceptionPreviewExpectedSnapshotPolicyReceptionBindingEnvironment = {
+  production: 'production',
+  staging: 'staging',
+} as const;
+
+export type CallieReceptionPreviewExpectedSnapshotPolicyReceptionBinding = {
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  agentId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  agentVersionId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  branchId: string | null;
+  environment: CallieReceptionPreviewExpectedSnapshotPolicyReceptionBindingEnvironment;
+  /**
+     * @minLength 1
+     * @maxLength 60
+     * @pattern ^[A-Z][A-Z0-9_]*$
+     */
+  credentialKey: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  configurationSha256: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  version: number;
+} | null;
+
+export type CallieReceptionPreviewExpectedSnapshotPolicy = {
+  mode: CallieReceptionPreviewExpectedSnapshotPolicyMode;
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  timezone: string;
+  /**
+     * @minItems 1
+     * @maxItems 7
+     * @items.minimum 1
+     * @items.maximum 7
+     */
+  days: number[];
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  opensAt: string;
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  closesAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  businessHoursOwnerId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  afterHoursOwnerId: string | null;
+  /**
+     * @minimum 5
+     * @maximum 1440
+     */
+  responseMinutes: number;
+  /** @maxLength 1200 */
+  businessFacts: string;
+  /** @maxLength 500 */
+  callerDisclosure: string;
+  /**
+     * @minimum 60
+     * @maximum 600
+     */
+  maxConversationSeconds: number;
+  /**
+     * @minimum 3
+     * @maximum 12
+     */
+  maxToolCalls: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  retentionDays: number;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  businessHoursTransferPhone: string | null;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  afterHoursTransferPhone: string | null;
+  templateVersion: CallieReceptionPreviewExpectedSnapshotPolicyTemplateVersion;
+  toolVersion: CallieReceptionPreviewExpectedSnapshotPolicyToolVersion;
+  voiceBinding: CallieReceptionPreviewExpectedSnapshotPolicyVoiceBinding;
+  receptionBinding: CallieReceptionPreviewExpectedSnapshotPolicyReceptionBinding;
+  /**
+     * @minLength 1
+     * @maxLength 8000
+     */
+  prompt: string;
+};
+
+export type CallieReceptionPreviewExpectedSnapshot = {
+  schemaVersion: CallieReceptionPreviewExpectedSnapshotSchemaVersion;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  actorUserId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  reviewId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  issuedAt: string;
+  expiresAt: string;
+  policy: CallieReceptionPreviewExpectedSnapshotPolicy;
+};
+
+export interface CallieReceptionPreview {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  expectedSnapshot: CallieReceptionPreviewExpectedSnapshot;
+  /** @pattern ^[a-f0-9]{64}$ */
+  previewHash: string;
+  expiresAt: string;
+}
+
+export type CallieReceptionApproveRequestExpectedSnapshotSchemaVersion = typeof CallieReceptionApproveRequestExpectedSnapshotSchemaVersion[keyof typeof CallieReceptionApproveRequestExpectedSnapshotSchemaVersion];
+
+
+export const CallieReceptionApproveRequestExpectedSnapshotSchemaVersion = {
+  'callie-reception-previewv1': 'callie-reception-preview.v1',
+} as const;
+
+export type CallieReceptionApproveRequestExpectedSnapshotPolicyMode = typeof CallieReceptionApproveRequestExpectedSnapshotPolicyMode[keyof typeof CallieReceptionApproveRequestExpectedSnapshotPolicyMode];
+
+
+export const CallieReceptionApproveRequestExpectedSnapshotPolicyMode = {
+  conversation: 'conversation',
+} as const;
+
+export type CallieReceptionApproveRequestExpectedSnapshotPolicyTemplateVersion = typeof CallieReceptionApproveRequestExpectedSnapshotPolicyTemplateVersion[keyof typeof CallieReceptionApproveRequestExpectedSnapshotPolicyTemplateVersion];
+
+
+export const CallieReceptionApproveRequestExpectedSnapshotPolicyTemplateVersion = {
+  'callie-conversationv2': 'callie-conversation.v2',
+} as const;
+
+export type CallieReceptionApproveRequestExpectedSnapshotPolicyToolVersion = typeof CallieReceptionApproveRequestExpectedSnapshotPolicyToolVersion[keyof typeof CallieReceptionApproveRequestExpectedSnapshotPolicyToolVersion];
+
+
+export const CallieReceptionApproveRequestExpectedSnapshotPolicyToolVersion = {
+  'callie-reception-toolsv1': 'callie-reception-tools.v1',
+} as const;
+
+export type CallieReceptionApproveRequestExpectedSnapshotPolicyVoiceBinding = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^AC[a-f0-9]{32}$ */
+  accountSid: string;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  sender: string;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  staffPhone: string;
+  origin: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  businessName: string;
+} | null;
+
+export type CallieReceptionApproveRequestExpectedSnapshotPolicyReceptionBindingEnvironment = typeof CallieReceptionApproveRequestExpectedSnapshotPolicyReceptionBindingEnvironment[keyof typeof CallieReceptionApproveRequestExpectedSnapshotPolicyReceptionBindingEnvironment];
+
+
+export const CallieReceptionApproveRequestExpectedSnapshotPolicyReceptionBindingEnvironment = {
+  production: 'production',
+  staging: 'staging',
+} as const;
+
+export type CallieReceptionApproveRequestExpectedSnapshotPolicyReceptionBinding = {
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  agentId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  agentVersionId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  branchId: string | null;
+  environment: CallieReceptionApproveRequestExpectedSnapshotPolicyReceptionBindingEnvironment;
+  /**
+     * @minLength 1
+     * @maxLength 60
+     * @pattern ^[A-Z][A-Z0-9_]*$
+     */
+  credentialKey: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  configurationSha256: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  version: number;
+} | null;
+
+export type CallieReceptionApproveRequestExpectedSnapshotPolicy = {
+  mode: CallieReceptionApproveRequestExpectedSnapshotPolicyMode;
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  timezone: string;
+  /**
+     * @minItems 1
+     * @maxItems 7
+     * @items.minimum 1
+     * @items.maximum 7
+     */
+  days: number[];
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  opensAt: string;
+  /** @pattern ^([01]\d|2[0-3]):[0-5]\d$ */
+  closesAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  businessHoursOwnerId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  afterHoursOwnerId: string | null;
+  /**
+     * @minimum 5
+     * @maximum 1440
+     */
+  responseMinutes: number;
+  /** @maxLength 1200 */
+  businessFacts: string;
+  /** @maxLength 500 */
+  callerDisclosure: string;
+  /**
+     * @minimum 60
+     * @maximum 600
+     */
+  maxConversationSeconds: number;
+  /**
+     * @minimum 3
+     * @maximum 12
+     */
+  maxToolCalls: number;
+  /**
+     * @minimum 1
+     * @maximum 30
+     */
+  retentionDays: number;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  businessHoursTransferPhone: string | null;
+  /** @pattern ^\+1[2-9]\d{9}$ */
+  afterHoursTransferPhone: string | null;
+  templateVersion: CallieReceptionApproveRequestExpectedSnapshotPolicyTemplateVersion;
+  toolVersion: CallieReceptionApproveRequestExpectedSnapshotPolicyToolVersion;
+  voiceBinding: CallieReceptionApproveRequestExpectedSnapshotPolicyVoiceBinding;
+  receptionBinding: CallieReceptionApproveRequestExpectedSnapshotPolicyReceptionBinding;
+  /**
+     * @minLength 1
+     * @maxLength 8000
+     */
+  prompt: string;
+};
+
+export type CallieReceptionApproveRequestExpectedSnapshot = {
+  schemaVersion: CallieReceptionApproveRequestExpectedSnapshotSchemaVersion;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  actorUserId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  reviewId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  issuedAt: string;
+  expiresAt: string;
+  policy: CallieReceptionApproveRequestExpectedSnapshotPolicy;
+};
+
+export interface CallieReceptionApproveRequest {
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedVersion: number;
+  expectedSnapshot: CallieReceptionApproveRequestExpectedSnapshot;
+  /** @pattern ^[a-f0-9]{64}$ */
+  previewHash: string;
+  confirmed: true;
+}
+
+export type CallieReceptionEvidenceState = typeof CallieReceptionEvidenceState[keyof typeof CallieReceptionEvidenceState];
+
+
+export const CallieReceptionEvidenceState = {
+  admitted: 'admitted',
+  registering: 'registering',
+  registered: 'registered',
+  active: 'active',
+  completed: 'completed',
+  interrupted: 'interrupted',
+  blocked: 'blocked',
+  indeterminate: 'indeterminate',
+  expired: 'expired',
+} as const;
+
+export type CallieReceptionEvidenceRegistration = {
+  /** @maxLength 40 */
+  state: string | null;
+  acceptedAt: string | null;
+};
+
+export type CallieReceptionEvidenceConversationOutcome = typeof CallieReceptionEvidenceConversationOutcome[keyof typeof CallieReceptionEvidenceConversationOutcome];
+
+
+export const CallieReceptionEvidenceConversationOutcome = {
+  pending: 'pending',
+  completed: 'completed',
+  interrupted: 'interrupted',
+  empty: 'empty',
+  unknown: 'unknown',
+} as const;
+
+export type CallieReceptionEvidenceConversationFactsServiceIntent = typeof CallieReceptionEvidenceConversationFactsServiceIntent[keyof typeof CallieReceptionEvidenceConversationFactsServiceIntent] | null;
+
+
+export const CallieReceptionEvidenceConversationFactsServiceIntent = {
+  repair: 'repair',
+  replacement: 'replacement',
+  maintenance: 'maintenance',
+  other: 'other',
+} as const;
+
+export type CallieReceptionEvidenceConversationFactsRequestIntent = typeof CallieReceptionEvidenceConversationFactsRequestIntent[keyof typeof CallieReceptionEvidenceConversationFactsRequestIntent] | null;
+
+
+export const CallieReceptionEvidenceConversationFactsRequestIntent = {
+  callback: 'callback',
+  visit: 'visit',
+} as const;
+
+export type CallieReceptionEvidenceConversationFactsUrgency = typeof CallieReceptionEvidenceConversationFactsUrgency[keyof typeof CallieReceptionEvidenceConversationFactsUrgency];
+
+
+export const CallieReceptionEvidenceConversationFactsUrgency = {
+  routine: 'routine',
+  urgent: 'urgent',
+  unspecified: 'unspecified',
+} as const;
+
+export type CallieReceptionEvidenceConversationFacts = {
+  /** @maxLength 120 */
+  callerName: string | null;
+  /** @maxLength 300 */
+  describedLocation: string | null;
+  /** @maxLength 1200 */
+  problem: string | null;
+  serviceIntent: CallieReceptionEvidenceConversationFactsServiceIntent;
+  requestIntent: CallieReceptionEvidenceConversationFactsRequestIntent;
+  urgency: CallieReceptionEvidenceConversationFactsUrgency;
+  /** @maxLength 200 */
+  callbackPreference: string | null;
+} | null;
+
+export type CallieReceptionEvidenceConversation = {
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  id: string | null;
+  boundAt: string | null;
+  endedAt: string | null;
+  outcome: CallieReceptionEvidenceConversationOutcome;
+  facts: CallieReceptionEvidenceConversationFacts;
+  /** @maxLength 1600 */
+  summary: string | null;
+  contentExpiresAt: string;
+  contentExpired: boolean;
+};
+
+export type CallieReceptionEvidenceTransferState = typeof CallieReceptionEvidenceTransferState[keyof typeof CallieReceptionEvidenceTransferState];
+
+
+export const CallieReceptionEvidenceTransferState = {
+  not_requested: 'not_requested',
+  claiming: 'claiming',
+  redirect_accepted: 'redirect_accepted',
+  ringing: 'ringing',
+  phone_answered: 'phone_answered',
+  not_answered: 'not_answered',
+  failed: 'failed',
+  indeterminate: 'indeterminate',
+  blocked: 'blocked',
+} as const;
+
+export type CallieReceptionEvidenceTransfer = {
+  state: CallieReceptionEvidenceTransferState;
+  requestedAt: string | null;
+  acceptedAt: string | null;
+  /** @pattern ^CA[a-f0-9]{32}$ */
+  childCallSid: string | null;
+  completedAt: string | null;
+};
+
+export type CallieReceptionEvidenceBoundary = typeof CallieReceptionEvidenceBoundary[keyof typeof CallieReceptionEvidenceBoundary];
+
+
+export const CallieReceptionEvidenceBoundary = {
+  'Caller_statements_are_unverified_A_phone_answer_is_not_proof_of_human_acceptance;_only_office-saved_appointments_are_confirmed': 'Caller statements are unverified. A phone answer is not proof of human acceptance; only office-saved appointments are confirmed.',
+} as const;
+
+export interface CallieReceptionEvidence {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  sessionId: string;
+  state: CallieReceptionEvidenceState;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  reason: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  toolsUsed: number;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  maxToolCalls: number;
+  registration: CallieReceptionEvidenceRegistration;
+  conversation: CallieReceptionEvidenceConversation;
+  transfer: CallieReceptionEvidenceTransfer;
+  boundary: CallieReceptionEvidenceBoundary;
+}
+
+export type CallieReceptionCallerFactsServiceIntent = typeof CallieReceptionCallerFactsServiceIntent[keyof typeof CallieReceptionCallerFactsServiceIntent] | null;
+
+
+export const CallieReceptionCallerFactsServiceIntent = {
+  repair: 'repair',
+  replacement: 'replacement',
+  maintenance: 'maintenance',
+  other: 'other',
+} as const;
+
+export type CallieReceptionCallerFactsRequestIntent = typeof CallieReceptionCallerFactsRequestIntent[keyof typeof CallieReceptionCallerFactsRequestIntent] | null;
+
+
+export const CallieReceptionCallerFactsRequestIntent = {
+  callback: 'callback',
+  visit: 'visit',
+} as const;
+
+export type CallieReceptionCallerFactsUrgency = typeof CallieReceptionCallerFactsUrgency[keyof typeof CallieReceptionCallerFactsUrgency];
+
+
+export const CallieReceptionCallerFactsUrgency = {
+  routine: 'routine',
+  urgent: 'urgent',
+  unspecified: 'unspecified',
+} as const;
+
+export interface CallieReceptionCallerFacts {
+  /** @maxLength 120 */
+  callerName: string | null;
+  /** @maxLength 300 */
+  describedLocation: string | null;
+  /** @maxLength 1200 */
+  problem: string | null;
+  serviceIntent: CallieReceptionCallerFactsServiceIntent;
+  requestIntent: CallieReceptionCallerFactsRequestIntent;
+  urgency: CallieReceptionCallerFactsUrgency;
+  /** @maxLength 200 */
+  callbackPreference: string | null;
+}
+
+export type CalliePolicyReadiness = {
+  ready: boolean;
+  reason: string | null;
+};
+
+export interface MissedCallCarePolicy {
+  enabled: boolean;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  timezone: string;
+  /**
+     * @minItems 1
+     * @maxItems 7
+     * @items.minimum 1
+     * @items.maximum 7
+     */
+  days: number[];
+  /** @pattern ^(?:[01]\d|2[0-3]):[0-5]\d$ */
+  opensAt: string;
+  /** @pattern ^(?:[01]\d|2[0-3]):[0-5]\d$ */
+  closesAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @nullable
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  businessHoursOwnerId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 128
+     * @nullable
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  afterHoursOwnerId: string | null;
+  /**
+     * @minimum 5
+     * @maximum 1440
+     */
+  responseMinutes: number;
+}
+
+export type CalliePolicySnapshotTemplateVersion = typeof CalliePolicySnapshotTemplateVersion[keyof typeof CalliePolicySnapshotTemplateVersion];
+
+
+export const CalliePolicySnapshotTemplateVersion = {
+  'callie-intakev1': 'callie-intake.v1',
+} as const;
+
+export type CalliePolicySnapshotPrompts = {
+  service: string;
+  request: string;
+  window: string;
+  disclosure: string;
+  consent: string;
+  instructions: string;
+};
+
+export type CalliePolicySnapshotBinding = {
+  id: string;
+  accountSid: string;
+  sender: string;
+  messagingServiceSid: string;
+  disclosureVersion: string;
+  origin: string;
+  businessName: string;
+} | null;
+
+export interface CalliePolicySnapshot {
+  enabled: boolean;
+  timezone: string;
+  /**
+     * @maxItems 7
+     * @items.minimum 1
+     * @items.maximum 7
+     */
+  days: number[];
+  opensAt: string;
+  closesAt: string;
+  businessHoursOwnerId: string | null;
+  afterHoursOwnerId: string | null;
+  /**
+     * @minimum 5
+     * @maximum 1440
+     */
+  responseMinutes: number;
+  templateVersion: CalliePolicySnapshotTemplateVersion;
+  prompts: CalliePolicySnapshotPrompts;
+  acknowledgmentBody: string;
+  binding: CalliePolicySnapshotBinding;
+}
+
+export interface CalliePolicy {
+  /** @minimum 0 */
+  version: number;
+  revisionId: string | null;
+  policy: MissedCallCarePolicy | CallieReceptionSettings;
+  snapshot: CalliePolicySnapshot | CallieReceptionSnapshot;
+  approvedAt: string | null;
+  readiness: CalliePolicyReadiness;
+  automaticUnknownCallerEnrollment: false;
+  callerInitiatedOneCallAcknowledgmentOnly: true;
+}
+
+export type CallieIntakeSummaryState = typeof CallieIntakeSummaryState[keyof typeof CallieIntakeSummaryState];
+
+
+export const CallieIntakeSummaryState = {
+  admitted: 'admitted',
+  collecting: 'collecting',
+  awaiting_sms: 'awaiting_sms',
+  confirmed: 'confirmed',
+  deferred: 'deferred',
+  dispatching: 'dispatching',
+  accepted: 'accepted',
+  blocked: 'blocked',
+  indeterminate: 'indeterminate',
+  resolved: 'resolved',
+  cancelled: 'cancelled',
+  booked: 'booked',
+  office_pending: 'office_pending',
+} as const;
+
+export type CallieIntakeSummaryStage = typeof CallieIntakeSummaryStage[keyof typeof CallieIntakeSummaryStage];
+
+
+export const CallieIntakeSummaryStage = {
+  admitted: 'admitted',
+  service: 'service',
+  request: 'request',
+  window: 'window',
+  consent: 'consent',
+  complete: 'complete',
+} as const;
+
+export type CallieIntakeSummaryOwner = {
+  id: string;
+  label: string;
+  eligible: boolean;
+};
+
+export type CallieIntakeSummaryTask = {
+  id: string;
+  status: string;
+};
+
+export type CallieIntakeSummaryServiceIntent = typeof CallieIntakeSummaryServiceIntent[keyof typeof CallieIntakeSummaryServiceIntent] | null;
+
+
+export const CallieIntakeSummaryServiceIntent = {
+  repair: 'repair',
+  replacement: 'replacement',
+  maintenance: 'maintenance',
+  other: 'other',
+} as const;
+
+export type CallieIntakeSummaryRequestIntent = typeof CallieIntakeSummaryRequestIntent[keyof typeof CallieIntakeSummaryRequestIntent] | null;
+
+
+export const CallieIntakeSummaryRequestIntent = {
+  callback: 'callback',
+  visit: 'visit',
+} as const;
+
+export type CallieIntakeSummaryCallbackWindow = typeof CallieIntakeSummaryCallbackWindow[keyof typeof CallieIntakeSummaryCallbackWindow] | null;
+
+
+export const CallieIntakeSummaryCallbackWindow = {
+  morning: 'morning',
+  afternoon: 'afternoon',
+  any: 'any',
+} as const;
+
+export type CallieIntakeSummarySmsProof = typeof CallieIntakeSummarySmsProof[keyof typeof CallieIntakeSummarySmsProof];
+
+
+export const CallieIntakeSummarySmsProof = {
+  single_call_confirmed: 'single_call_confirmed',
+  confirmation_expired: 'confirmation_expired',
+  awaiting_caller_confirmation: 'awaiting_caller_confirmation',
+  not_confirmed: 'not_confirmed',
+} as const;
+
+export type CallieIntakeSummaryMode = typeof CallieIntakeSummaryMode[keyof typeof CallieIntakeSummaryMode];
+
+
+export const CallieIntakeSummaryMode = {
+  keypad: 'keypad',
+  conversation: 'conversation',
+} as const;
+
+export interface CallieIntakeSummary {
+  id: string;
+  callId: string;
+  /** @minimum 1 */
+  version: number;
+  state: CallieIntakeSummaryState;
+  stage: CallieIntakeSummaryStage;
+  reason: string;
+  phone: string;
+  createdAt: string;
+  dueAt: string;
+  overdue: boolean;
+  owner: CallieIntakeSummaryOwner;
+  task: CallieIntakeSummaryTask;
+  leadId: string | null;
+  callerReviewed: boolean;
+  serviceIntent: CallieIntakeSummaryServiceIntent;
+  requestIntent: CallieIntakeSummaryRequestIntent;
+  callbackWindow: CallieIntakeSummaryCallbackWindow;
+  smsProof: CallieIntakeSummarySmsProof;
+  confirmedAt: string | null;
+  appointmentId: string | null;
+  organizationId: string;
+  mode: CallieIntakeSummaryMode;
+}
+
+export type CallieIntakeDetailState = typeof CallieIntakeDetailState[keyof typeof CallieIntakeDetailState];
+
+
+export const CallieIntakeDetailState = {
+  admitted: 'admitted',
+  collecting: 'collecting',
+  awaiting_sms: 'awaiting_sms',
+  confirmed: 'confirmed',
+  deferred: 'deferred',
+  dispatching: 'dispatching',
+  accepted: 'accepted',
+  blocked: 'blocked',
+  indeterminate: 'indeterminate',
+  resolved: 'resolved',
+  cancelled: 'cancelled',
+  booked: 'booked',
+  office_pending: 'office_pending',
+} as const;
+
+export type CallieIntakeDetailStage = typeof CallieIntakeDetailStage[keyof typeof CallieIntakeDetailStage];
+
+
+export const CallieIntakeDetailStage = {
+  admitted: 'admitted',
+  service: 'service',
+  request: 'request',
+  window: 'window',
+  consent: 'consent',
+  complete: 'complete',
+} as const;
+
+export type CallieIntakeDetailOwner = {
+  id: string;
+  label: string;
+  eligible: boolean;
+};
+
+export type CallieIntakeDetailTask = {
+  id: string;
+  status: string;
+};
+
+export type CallieIntakeDetailServiceIntent = typeof CallieIntakeDetailServiceIntent[keyof typeof CallieIntakeDetailServiceIntent] | null;
+
+
+export const CallieIntakeDetailServiceIntent = {
+  repair: 'repair',
+  replacement: 'replacement',
+  maintenance: 'maintenance',
+  other: 'other',
+} as const;
+
+export type CallieIntakeDetailRequestIntent = typeof CallieIntakeDetailRequestIntent[keyof typeof CallieIntakeDetailRequestIntent] | null;
+
+
+export const CallieIntakeDetailRequestIntent = {
+  callback: 'callback',
+  visit: 'visit',
+} as const;
+
+export type CallieIntakeDetailCallbackWindow = typeof CallieIntakeDetailCallbackWindow[keyof typeof CallieIntakeDetailCallbackWindow] | null;
+
+
+export const CallieIntakeDetailCallbackWindow = {
+  morning: 'morning',
+  afternoon: 'afternoon',
+  any: 'any',
+} as const;
+
+export type CallieIntakeDetailSmsProof = typeof CallieIntakeDetailSmsProof[keyof typeof CallieIntakeDetailSmsProof];
+
+
+export const CallieIntakeDetailSmsProof = {
+  single_call_confirmed: 'single_call_confirmed',
+  confirmation_expired: 'confirmation_expired',
+  awaiting_caller_confirmation: 'awaiting_caller_confirmation',
+  not_confirmed: 'not_confirmed',
+} as const;
+
+export type CallieIntakeDetailContact = {
+  id: string;
+  name: string;
+  phone: string | null;
+} | null;
+
+export type CallieIntakeDetailBookingOptionsPropertiesItem = {
+  id: string;
+  label: string;
+};
+
+export type CallieIntakeDetailBookingOptionsStaffItem = {
+  id: string;
+  label: string;
+};
+
+export type CallieIntakeDetailBookingOptions = {
+  complete: boolean;
+  /** @maxItems 100 */
+  properties: CallieIntakeDetailBookingOptionsPropertiesItem[];
+  /** @maxItems 200 */
+  staff: CallieIntakeDetailBookingOptionsStaffItem[];
+};
+
+export type CallieIntakeDetailAppointment = {
+  id: string;
+  status: string;
+  scheduledStart: string;
+  scheduledEnd: string | null;
+  assignedUserId: string | null;
+} | null;
+
+export type CallieIntakeDetailDelivery = {
+  status: string;
+  providerSid: string | null;
+  updatedAt: string;
+} | null;
+
+export type CallieIntakeDetailExecution = {
+  id: string;
+  state: string;
+} | null;
+
+export type CallieIntakeDetailActions = {
+  canReviewCaller: boolean;
+  canAssign: boolean;
+  canClose: boolean;
+  canBook: boolean;
+  blockReason: string | null;
+};
+
+export type CallieIntakeDetailEvidence = typeof CallieIntakeDetailEvidence[keyof typeof CallieIntakeDetailEvidence];
+
+
+export const CallieIntakeDetailEvidence = {
+  caller_choices_are_requests_not_identity_or_confirmed_appointments: 'caller_choices_are_requests_not_identity_or_confirmed_appointments',
+} as const;
+
+export type CallieIntakeDetailMode = typeof CallieIntakeDetailMode[keyof typeof CallieIntakeDetailMode];
+
+
+export const CallieIntakeDetailMode = {
+  keypad: 'keypad',
+  conversation: 'conversation',
+} as const;
+
+export interface CallieIntakeDetail {
+  id: string;
+  callId: string;
+  /** @minimum 1 */
+  version: number;
+  state: CallieIntakeDetailState;
+  stage: CallieIntakeDetailStage;
+  reason: string;
+  phone: string;
+  createdAt: string;
+  dueAt: string;
+  overdue: boolean;
+  owner: CallieIntakeDetailOwner;
+  task: CallieIntakeDetailTask;
+  leadId: string | null;
+  callerReviewed: boolean;
+  serviceIntent: CallieIntakeDetailServiceIntent;
+  requestIntent: CallieIntakeDetailRequestIntent;
+  callbackWindow: CallieIntakeDetailCallbackWindow;
+  smsProof: CallieIntakeDetailSmsProof;
+  confirmedAt: string | null;
+  appointmentId: string | null;
+  /** @pattern ^[a-f0-9]{64}$ */
+  expectedFingerprint: string;
+  companyHeld: boolean;
+  timezone: string;
+  identityReviewed: boolean;
+  contact: CallieIntakeDetailContact;
+  reviewedAt: string | null;
+  bookingOptions: CallieIntakeDetailBookingOptions;
+  appointment: CallieIntakeDetailAppointment;
+  delivery: CallieIntakeDetailDelivery;
+  execution: CallieIntakeDetailExecution;
+  actions: CallieIntakeDetailActions;
+  evidence: CallieIntakeDetailEvidence;
+  reception: CallieReceptionEvidence | null;
+  organizationId: string;
+  mode: CallieIntakeDetailMode;
+}
+
 export type CustomerWorkspaceHeaderContact = {
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   id: string;
@@ -2675,112 +4340,6 @@ export interface ServiceSmsReplyReviewResult {
   replayed: boolean;
 }
 
-export type CalliePolicySnapshotTemplateVersion = typeof CalliePolicySnapshotTemplateVersion[keyof typeof CalliePolicySnapshotTemplateVersion];
-
-
-export const CalliePolicySnapshotTemplateVersion = {
-  'callie-intakev1': 'callie-intake.v1',
-} as const;
-
-export type CalliePolicySnapshotPrompts = {
-  service: string;
-  request: string;
-  window: string;
-  disclosure: string;
-  consent: string;
-  instructions: string;
-};
-
-export type CalliePolicySnapshotBinding = {
-  id: string;
-  accountSid: string;
-  sender: string;
-  messagingServiceSid: string;
-  disclosureVersion: string;
-  origin: string;
-  businessName: string;
-} | null;
-
-export interface CalliePolicySnapshot {
-  enabled: boolean;
-  timezone: string;
-  /**
-     * @maxItems 7
-     * @items.minimum 1
-     * @items.maximum 7
-     */
-  days: number[];
-  opensAt: string;
-  closesAt: string;
-  businessHoursOwnerId: string | null;
-  afterHoursOwnerId: string | null;
-  /**
-     * @minimum 5
-     * @maximum 1440
-     */
-  responseMinutes: number;
-  templateVersion: CalliePolicySnapshotTemplateVersion;
-  prompts: CalliePolicySnapshotPrompts;
-  acknowledgmentBody: string;
-  binding: CalliePolicySnapshotBinding;
-}
-
-export type CalliePolicyReadiness = {
-  ready: boolean;
-  reason: string | null;
-};
-
-export interface MissedCallCarePolicy {
-  enabled: boolean;
-  /**
-     * @minLength 1
-     * @maxLength 80
-     */
-  timezone: string;
-  /**
-     * @minItems 1
-     * @maxItems 7
-     * @items.minimum 1
-     * @items.maximum 7
-     */
-  days: number[];
-  /** @pattern ^(?:[01]\d|2[0-3]):[0-5]\d$ */
-  opensAt: string;
-  /** @pattern ^(?:[01]\d|2[0-3]):[0-5]\d$ */
-  closesAt: string;
-  /**
-     * @minLength 1
-     * @maxLength 128
-     * @nullable
-     * @pattern ^[A-Za-z0-9_-]+$
-     */
-  businessHoursOwnerId: string | null;
-  /**
-     * @minLength 1
-     * @maxLength 128
-     * @nullable
-     * @pattern ^[A-Za-z0-9_-]+$
-     */
-  afterHoursOwnerId: string | null;
-  /**
-     * @minimum 5
-     * @maximum 1440
-     */
-  responseMinutes: number;
-}
-
-export interface CalliePolicy {
-  /** @minimum 0 */
-  version: number;
-  revisionId: string | null;
-  policy: MissedCallCarePolicy;
-  snapshot: CalliePolicySnapshot;
-  approvedAt: string | null;
-  readiness: CalliePolicyReadiness;
-  automaticUnknownCallerEnrollment: false;
-  callerInitiatedOneCallAcknowledgmentOnly: true;
-}
-
 export interface CalliePolicyPreviewRequest {
   /** @minimum 0 */
   expectedVersion: number;
@@ -2824,108 +4383,6 @@ export interface CalliePolicyApproveRequest {
   confirmed: true;
 }
 
-export type CallieIntakeSummaryState = typeof CallieIntakeSummaryState[keyof typeof CallieIntakeSummaryState];
-
-
-export const CallieIntakeSummaryState = {
-  admitted: 'admitted',
-  collecting: 'collecting',
-  awaiting_sms: 'awaiting_sms',
-  confirmed: 'confirmed',
-  deferred: 'deferred',
-  dispatching: 'dispatching',
-  accepted: 'accepted',
-  blocked: 'blocked',
-  indeterminate: 'indeterminate',
-  resolved: 'resolved',
-  cancelled: 'cancelled',
-  booked: 'booked',
-} as const;
-
-export type CallieIntakeSummaryStage = typeof CallieIntakeSummaryStage[keyof typeof CallieIntakeSummaryStage];
-
-
-export const CallieIntakeSummaryStage = {
-  admitted: 'admitted',
-  service: 'service',
-  request: 'request',
-  window: 'window',
-  consent: 'consent',
-  complete: 'complete',
-} as const;
-
-export type CallieIntakeSummaryOwner = {
-  id: string;
-  label: string;
-  eligible: boolean;
-};
-
-export type CallieIntakeSummaryTask = {
-  id: string;
-  status: string;
-};
-
-export type CallieIntakeSummaryServiceIntent = typeof CallieIntakeSummaryServiceIntent[keyof typeof CallieIntakeSummaryServiceIntent] | null;
-
-
-export const CallieIntakeSummaryServiceIntent = {
-  repair: 'repair',
-  replacement: 'replacement',
-  maintenance: 'maintenance',
-  other: 'other',
-} as const;
-
-export type CallieIntakeSummaryRequestIntent = typeof CallieIntakeSummaryRequestIntent[keyof typeof CallieIntakeSummaryRequestIntent] | null;
-
-
-export const CallieIntakeSummaryRequestIntent = {
-  callback: 'callback',
-  visit: 'visit',
-} as const;
-
-export type CallieIntakeSummaryCallbackWindow = typeof CallieIntakeSummaryCallbackWindow[keyof typeof CallieIntakeSummaryCallbackWindow] | null;
-
-
-export const CallieIntakeSummaryCallbackWindow = {
-  morning: 'morning',
-  afternoon: 'afternoon',
-  any: 'any',
-} as const;
-
-export type CallieIntakeSummarySmsProof = typeof CallieIntakeSummarySmsProof[keyof typeof CallieIntakeSummarySmsProof];
-
-
-export const CallieIntakeSummarySmsProof = {
-  single_call_confirmed: 'single_call_confirmed',
-  confirmation_expired: 'confirmation_expired',
-  awaiting_caller_confirmation: 'awaiting_caller_confirmation',
-  not_confirmed: 'not_confirmed',
-} as const;
-
-export interface CallieIntakeSummary {
-  id: string;
-  callId: string;
-  /** @minimum 1 */
-  version: number;
-  state: CallieIntakeSummaryState;
-  stage: CallieIntakeSummaryStage;
-  reason: string;
-  phone: string;
-  createdAt: string;
-  dueAt: string;
-  overdue: boolean;
-  owner: CallieIntakeSummaryOwner;
-  task: CallieIntakeSummaryTask;
-  leadId: string | null;
-  callerReviewed: boolean;
-  serviceIntent: CallieIntakeSummaryServiceIntent;
-  requestIntent: CallieIntakeSummaryRequestIntent;
-  callbackWindow: CallieIntakeSummaryCallbackWindow;
-  smsProof: CallieIntakeSummarySmsProof;
-  confirmedAt: string | null;
-  appointmentId: string | null;
-}
-
 export type CallieIntakePageScope = typeof CallieIntakePageScope[keyof typeof CallieIntakePageScope];
 
 
@@ -2955,179 +4412,6 @@ export interface CallieIntakePage {
   items: CallieIntakeSummary[];
   companyHeld: boolean;
   boundary: string;
-}
-
-export type CallieIntakeDetailState = typeof CallieIntakeDetailState[keyof typeof CallieIntakeDetailState];
-
-
-export const CallieIntakeDetailState = {
-  admitted: 'admitted',
-  collecting: 'collecting',
-  awaiting_sms: 'awaiting_sms',
-  confirmed: 'confirmed',
-  deferred: 'deferred',
-  dispatching: 'dispatching',
-  accepted: 'accepted',
-  blocked: 'blocked',
-  indeterminate: 'indeterminate',
-  resolved: 'resolved',
-  cancelled: 'cancelled',
-  booked: 'booked',
-} as const;
-
-export type CallieIntakeDetailStage = typeof CallieIntakeDetailStage[keyof typeof CallieIntakeDetailStage];
-
-
-export const CallieIntakeDetailStage = {
-  admitted: 'admitted',
-  service: 'service',
-  request: 'request',
-  window: 'window',
-  consent: 'consent',
-  complete: 'complete',
-} as const;
-
-export type CallieIntakeDetailOwner = {
-  id: string;
-  label: string;
-  eligible: boolean;
-};
-
-export type CallieIntakeDetailTask = {
-  id: string;
-  status: string;
-};
-
-export type CallieIntakeDetailServiceIntent = typeof CallieIntakeDetailServiceIntent[keyof typeof CallieIntakeDetailServiceIntent] | null;
-
-
-export const CallieIntakeDetailServiceIntent = {
-  repair: 'repair',
-  replacement: 'replacement',
-  maintenance: 'maintenance',
-  other: 'other',
-} as const;
-
-export type CallieIntakeDetailRequestIntent = typeof CallieIntakeDetailRequestIntent[keyof typeof CallieIntakeDetailRequestIntent] | null;
-
-
-export const CallieIntakeDetailRequestIntent = {
-  callback: 'callback',
-  visit: 'visit',
-} as const;
-
-export type CallieIntakeDetailCallbackWindow = typeof CallieIntakeDetailCallbackWindow[keyof typeof CallieIntakeDetailCallbackWindow] | null;
-
-
-export const CallieIntakeDetailCallbackWindow = {
-  morning: 'morning',
-  afternoon: 'afternoon',
-  any: 'any',
-} as const;
-
-export type CallieIntakeDetailSmsProof = typeof CallieIntakeDetailSmsProof[keyof typeof CallieIntakeDetailSmsProof];
-
-
-export const CallieIntakeDetailSmsProof = {
-  single_call_confirmed: 'single_call_confirmed',
-  confirmation_expired: 'confirmation_expired',
-  awaiting_caller_confirmation: 'awaiting_caller_confirmation',
-  not_confirmed: 'not_confirmed',
-} as const;
-
-export type CallieIntakeDetailContact = {
-  id: string;
-  name: string;
-  phone: string | null;
-} | null;
-
-export type CallieIntakeDetailBookingOptionsPropertiesItem = {
-  id: string;
-  label: string;
-};
-
-export type CallieIntakeDetailBookingOptionsStaffItem = {
-  id: string;
-  label: string;
-};
-
-export type CallieIntakeDetailBookingOptions = {
-  complete: boolean;
-  /** @maxItems 100 */
-  properties: CallieIntakeDetailBookingOptionsPropertiesItem[];
-  /** @maxItems 200 */
-  staff: CallieIntakeDetailBookingOptionsStaffItem[];
-};
-
-export type CallieIntakeDetailAppointment = {
-  id: string;
-  status: string;
-  scheduledStart: string;
-  scheduledEnd: string | null;
-  assignedUserId: string | null;
-} | null;
-
-export type CallieIntakeDetailDelivery = {
-  status: string;
-  providerSid: string | null;
-  updatedAt: string;
-} | null;
-
-export type CallieIntakeDetailExecution = {
-  id: string;
-  state: string;
-} | null;
-
-export type CallieIntakeDetailActions = {
-  canReviewCaller: boolean;
-  canAssign: boolean;
-  canClose: boolean;
-  canBook: boolean;
-  blockReason: string | null;
-};
-
-export type CallieIntakeDetailEvidence = typeof CallieIntakeDetailEvidence[keyof typeof CallieIntakeDetailEvidence];
-
-
-export const CallieIntakeDetailEvidence = {
-  caller_choices_are_requests_not_identity_or_confirmed_appointments: 'caller_choices_are_requests_not_identity_or_confirmed_appointments',
-} as const;
-
-export interface CallieIntakeDetail {
-  id: string;
-  callId: string;
-  /** @minimum 1 */
-  version: number;
-  state: CallieIntakeDetailState;
-  stage: CallieIntakeDetailStage;
-  reason: string;
-  phone: string;
-  createdAt: string;
-  dueAt: string;
-  overdue: boolean;
-  owner: CallieIntakeDetailOwner;
-  task: CallieIntakeDetailTask;
-  leadId: string | null;
-  callerReviewed: boolean;
-  serviceIntent: CallieIntakeDetailServiceIntent;
-  requestIntent: CallieIntakeDetailRequestIntent;
-  callbackWindow: CallieIntakeDetailCallbackWindow;
-  smsProof: CallieIntakeDetailSmsProof;
-  confirmedAt: string | null;
-  appointmentId: string | null;
-  /** @pattern ^[a-f0-9]{64}$ */
-  expectedFingerprint: string;
-  companyHeld: boolean;
-  timezone: string;
-  identityReviewed: boolean;
-  contact: CallieIntakeDetailContact;
-  reviewedAt: string | null;
-  bookingOptions: CallieIntakeDetailBookingOptions;
-  appointment: CallieIntakeDetailAppointment;
-  delivery: CallieIntakeDetailDelivery;
-  execution: CallieIntakeDetailExecution;
-  actions: CallieIntakeDetailActions;
-  evidence: CallieIntakeDetailEvidence;
 }
 
 export type CallieOfficeActionRequest = {

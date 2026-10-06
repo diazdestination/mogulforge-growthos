@@ -4,22 +4,11 @@ import { getGetMeQueryKey } from "@workspace/api-client-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
-import { mockApi, sampleMe } from "@/test/mock-api";
+import { mockApi } from "@/test/mock-api";
+import { id, otherId, contactId, propertyId, taskId, receiptId, organizationId, base, settings, snapshot, savedPolicy, policyPreview, item, detail, receptionView, callieMe as sampleMe } from "@/test/callie-fixtures";
 import { CallieDesk } from "./callie-desk";
-import type { CallieDetail, CallieItem, CalliePolicy, CalliePolicyPreview, CallieSettings } from "./callie-contract";
+import type { CalliePolicyPreview, CallieSettings } from "./callie-contract";
 
-const id = "11111111-1111-4111-8111-111111111111", otherId = "22222222-2222-4222-8222-222222222222";
-const contactId = "33333333-3333-4333-8333-333333333333", propertyId = "44444444-4444-4444-8444-444444444444";
-const base = "/api/v1/communications/callie";
-const settings: CallieSettings = { enabled: false, timezone: "America/New_York", days: [1, 2, 3, 4, 5, 6], opensAt: "09:00", closesAt: "18:00", businessHoursOwnerId: "u1", afterHoursOwnerId: "u1", responseMinutes: 30 };
-const snapshot = { ...settings, templateVersion: "callie-intake.v1", prompts: { service: "Select service needed.", request: "Request a callback or a visit.", window: "Choose your preferred callback window.", disclosure: "Keypad choices do not confirm an appointment.", consent: "Only text the code if you want one acknowledgment.", instructions: "Caller-initiated confirmation only." }, acknowledgmentBody: "Fictional Contractor: We received your visit request. The office will call to agree a time. No visit is booked.", binding: { sender: "+12025550102", businessName: "Fictional Contractor", disclosureVersion: "test.v1" } };
-const savedPolicy = (): CalliePolicy => ({ version: 1, policy: { ...settings }, snapshot, approvedAt: null, readiness: { ready: false, reason: "policy_disabled_or_revised" } });
-function item(overrides: Partial<CallieItem> = {}): CallieItem {
-  return { id, callId: "call-id", version: 1, state: "blocked", stage: "complete", reason: "caller_declined", phone: "+12025550101", createdAt: "2026-10-02T14:00:00Z", dueAt: "2026-10-02T14:30:00Z", overdue: true, owner: { id: "u1", label: "Accepted Owner", eligible: true }, task: { id: "task-id", status: "open" }, leadId: null, callerReviewed: false, serviceIntent: "repair", requestIntent: "visit", callbackWindow: "morning", smsProof: "not_confirmed", confirmedAt: null, appointmentId: null, ...overrides };
-}
-function detail(reviewed = false, overrides: Partial<CallieDetail> = {}): CallieDetail {
-  return { ...item(), expectedFingerprint: "a".repeat(64), companyHeld: false, timezone: "America/New_York", identityReviewed: reviewed, contact: reviewed ? { id: contactId, name: "Fictional Customer", phone: "+12025550101" } : null, reviewedAt: reviewed ? "2026-10-02T15:00:00Z" : null, bookingOptions: { complete: true, properties: [{ id: propertyId, label: "1 Fictional Lane" }], staff: [{ id: "u1", label: "Accepted Owner" }, { id: "tech", label: "Accepted Technician" }] }, appointment: null, delivery: null, execution: null, actions: { canReviewCaller: !reviewed, canAssign: true, canClose: true, canBook: reviewed, blockReason: null }, ...overrides };
-}
 const json = (value: unknown, status = 200) => Response.json(value, { status });
 type Request = { path: string; query: URLSearchParams; method: string; body: Record<string, unknown> };
 type Handler = (req: Request) => Response | Promise<Response> | undefined;
@@ -30,15 +19,17 @@ function server(role = "owner", currentDetail = detail(), handler?: Handler) {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "http://localhost");
     const req: Request = { path: url.pathname, query: url.searchParams, method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : {} };
     requests.push(req); const custom = handler?.(req); if (custom) return custom;
+    if (req.path === "/api/v1/me") return json(sampleMe(role));
+    if (req.path === `${base}/reception`) return json(receptionView());
     if (req.path === "/api/v1/users") return json([{ ...sampleMe("owner"), firstName: "Accepted", lastName: "Owner", operationallyEligible: true }, { ...sampleMe("office"), id: "pending", firstName: "Pending", operationallyEligible: false }, { ...sampleMe("viewer"), id: "viewer", operationallyEligible: true }]);
     if (req.path === "/api/v1/contacts") return json([{ id: contactId, firstName: "Fictional", lastName: "Customer", phone: "+12025550101", email: null }]);
     if (req.path === `${base}/policy`) return json(state.policy);
-    if (req.path === `${base}/policy/preview`) return json({ expectedVersion: state.policy.version, expectedSnapshot: { schemaVersion: 1, organizationId: "o1", actorUserId: "u1", reviewId: otherId, policy: { ...snapshot, ...req.body.policy as object } }, previewHash: "b".repeat(64), expiresAt: new Date(Date.now() + 600_000).toISOString() });
-    if (req.path === `${base}/policy/approve`) { state.policy = { ...state.policy, policy: (req.body.expectedSnapshot as { policy: CallieSettings }).policy, readiness: { ready: false, reason: "provider_not_approved" } }; return json(state.policy); }
+    if (req.path === `${base}/policy/preview`) return json(policyPreview(req.body.policy as CallieSettings));
+    if (req.path === `${base}/policy/approve`) { const next = (req.body.expectedSnapshot as CalliePolicyPreview["expectedSnapshot"]).policy; state.policy = { ...state.policy, version: state.policy.version + 1, snapshot: next, policy: Object.fromEntries(Object.keys(settings).map(key => [key, next[key as keyof CallieSettings]])) as CallieSettings, readiness: { ready: false, reason: "provider_not_approved" } }; return json(state.policy); }
     if (req.path === base) return json({ scope: req.query.get("scope"), offset: Number(req.query.get("offset")), pageSize: 25, hasMore: false, items: [item()], companyHeld: false, boundary: "This page contains admitted requests only; it is not a global count." });
     if (req.path === `${base}/${id}`) return json(state.detail);
     if (req.path === `${base}/${id}/review-caller`) { state.detail = detail(true, { version: 2, callerReviewed: true }); return json({ detail: state.detail, replayed: false }); }
-    if (req.path === `${base}/${id}/book`) { state.detail = detail(true, { state: "booked", appointmentId: otherId, task: { id: "task-id", status: "done" }, appointment: { id: otherId, status: "confirmed", scheduledStart: String(req.body.scheduledStart), scheduledEnd: String(req.body.scheduledEnd), assignedUserId: String(req.body.assignedUserId) }, actions: { canReviewCaller: false, canAssign: false, canClose: false, canBook: false, blockReason: "office_work_closed" } }); return json({ detail: state.detail, replayed: false }); }
+    if (req.path === `${base}/${id}/book`) { state.detail = detail(true, { state: "booked", appointmentId: otherId, task: { id: taskId, status: "done" }, appointment: { id: otherId, status: "confirmed", scheduledStart: String(req.body.scheduledStart), scheduledEnd: String(req.body.scheduledEnd), assignedUserId: String(req.body.assignedUserId) }, actions: { canReviewCaller: false, canAssign: false, canClose: false, canBook: false, blockReason: "office_work_closed" } }); return json({ detail: state.detail, replayed: false }); }
     return fallback(input, init);
   });
   return { requests, state, writes: () => requests.filter(req => req.method !== "GET") };
@@ -67,7 +58,7 @@ describe("CALLIE contractor controls", () => {
     await screen.findByText("Standing recovery is off"); await screen.findByText(/Caller identity not currently reviewed/);
     expect(screen.getAllByText(/Visit requested — not booked/)).toHaveLength(2);
     expect(screen.queryByRole("button", { name: "Book CALLIE confirmed visit" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Open original callback task" }).getAttribute("href")).toBe("/tasks?taskId=task-id");
+    expect(screen.getByRole("link", { name: "Open original callback task" }).getAttribute("href")).toBe(`/tasks?taskId=${taskId}`);
     expect(api.requests.filter(req => req.path === "/api/v1/me")).toHaveLength(1);
     expect(api.writes()).toHaveLength(0);
     expect(screen.getByRole("region", { name: "CALLIE automatic intake" }).className).toContain("min-w-0");
@@ -85,7 +76,7 @@ describe("CALLIE contractor controls", () => {
     fireEvent.click(within(preview).getByRole("checkbox")); fireEvent.click(approve);
     await screen.findByText("Approved, but held");
     expect(api.writes()).toHaveLength(2);
-    expect(api.writes()[1].body).toMatchObject({ expectedVersion: 1, previewHash: "b".repeat(64), confirmed: true, expectedSnapshot: { organizationId: "o1", actorUserId: "u1", policy: { enabled: true } } });
+    expect(api.writes()[1].body).toMatchObject({ expectedVersion: 1, previewHash: "b".repeat(64), confirmed: true, expectedSnapshot: { organizationId, actorUserId: "u1", policy: { enabled: true } } });
     expect(screen.queryByRole("button", { name: "Approve standing policy" })).toBeNull();
   });
   it("invalidates both an approved preview and a delayed preview after settings change", async () => {
@@ -101,7 +92,7 @@ describe("CALLIE contractor controls", () => {
     expect(api.writes().filter(req => req.path.endsWith("/approve"))).toHaveLength(0);
   });
   it("expires a policy preview without saving or silently retrying", async () => {
-    const api = server("owner", detail(), req => req.path.endsWith("/policy/preview") ? json({ expectedVersion: 1, expectedSnapshot: { policy: snapshot }, previewHash: "b".repeat(64), expiresAt: new Date(Date.now() + 30).toISOString() }) : undefined); mount(); await preparePolicy();
+    const api = server("owner", detail(), req => req.path.endsWith("/policy/preview") ? json(policyPreview(req.body.policy as CallieSettings, new Date(Date.now() + 30).toISOString())) : undefined); mount(); await preparePolicy();
     await screen.findByText("This preview expired. Prepare a fresh review; nothing was approved.");
     expect(screen.getByRole("button", { name: "Approve standing policy" }).matches(":disabled")).toBe(true); expect(api.writes()).toHaveLength(1);
   });
@@ -164,7 +155,7 @@ describe("CALLIE contractor controls", () => {
     }
     fireEvent.click(book); await screen.findByText("Actual office appointment: confirmed");
     expect(api.writes()).toHaveLength(1); expect(api.writes()[0].body).toMatchObject({ contactId, leadId: null, propertyId: null, assignedUserId: "u1", type: "other", customerConfirmed: true, expectedFingerprint: "a".repeat(64) });
-    expect(screen.getByRole("link", { name: "Open Appointments to manage the saved visit" }).getAttribute("href")).toBe("/appointments");
+    expect(screen.getByRole("link", { name: "Open Appointments to manage the saved visit" }).getAttribute("href")).toBe(`/appointments?appointmentId=${otherId}&organizationId=${organizationId}`);
     expect(screen.queryByRole("button", { name: "Book CALLIE confirmed visit" })).toBeNull();
   });
   it("blocks every repeat after stale booking until an explicit refresh and fresh confirmation", async () => {
@@ -176,7 +167,7 @@ describe("CALLIE contractor controls", () => {
     expect((screen.getByLabelText(/The customer confirmed this exact time/) as HTMLInputElement).checked).toBe(false); expect(api.writes()).toHaveLength(1);
   });
   it("holds unknown send results without review, close, booking or resend and links the original reconciliation desk", async () => {
-    const api = server("owner", detail(false, { state: "indeterminate", execution: { id: "receipt-id", state: "indeterminate" }, actions: { canReviewCaller: false, canAssign: false, canClose: false, canBook: false, blockReason: "provider_reconciliation_required" } })); mount(`/calls?callieId=${id}`);
+    const api = server("owner", detail(false, { state: "indeterminate", execution: { id: receiptId, state: "indeterminate" }, actions: { canReviewCaller: false, canAssign: false, canClose: false, canBook: false, blockReason: "provider_reconciliation_required" } })); mount(`/calls?callieId=${id}`);
     await screen.findByRole("link", { name: "Review original execution in Revenue Desk" }); expect(screen.getAllByText("Unknown send result — do not resend").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Review original execution in Revenue Desk" }).getAttribute("href")).toBe("/bie");
     expect(screen.queryByText("Assign or close office work")).toBeNull(); expect(screen.queryByRole("button", { name: /Save CALLIE|Book CALLIE|Send|Resend/ })).toBeNull(); expect(api.writes()).toHaveLength(0);
@@ -187,8 +178,8 @@ describe("CALLIE contractor controls", () => {
     const nextProfile = { ...sampleMe(kind === "role" ? "viewer" : "owner"), ...(kind === "identity" ? { id: "different-member" } : {}), ...(kind === "company" ? { organization: { id: "o2", name: "Another Company", slug: "other", timezone: "UTC" } } : {}), ...(kind === "logout" ? { isActive: false, organization: null } : {}) };
     await act(async () => { client.setQueryData(getGetMeQueryKey(), nextProfile, { updatedAt: Date.now() + 1 }); });
     if (kind === "logout") await waitFor(() => expect(screen.queryByRole("region", { name: "CALLIE automatic intake" })).toBeNull());
-    else await waitFor(() => expect(api.requests.filter(req => req.path === `${base}/policy` && req.method === "GET")).toHaveLength(2));
-    await act(async () => { late.resolve(json({ expectedVersion: 1, expectedSnapshot: { policy: snapshot }, previewHash: "b".repeat(64), expiresAt: new Date(Date.now() + 600_000).toISOString() } satisfies CalliePolicyPreview)); await late.promise; });
+    else await waitFor(() => expect(api.requests.filter(req => req.path === `${base}/reception` && req.method === "GET")).toHaveLength(2));
+    await act(async () => { late.resolve(json(policyPreview())); await late.promise; });
     expect(screen.queryByRole("button", { name: "Approve standing policy" })).toBeNull();
     if (kind === "role" || kind === "logout") expect(screen.queryByRole("button", { name: "Save CALLIE caller review" })).toBeNull();
     expect(api.writes()).toHaveLength(1);

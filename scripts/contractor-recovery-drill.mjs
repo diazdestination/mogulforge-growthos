@@ -20,6 +20,7 @@ import { callieFixtureIds, seedCallieRecoveryFixture, assertCallieRecoveryFixtur
 import { standingServiceIds, seedStandingServiceRecovery, assertStandingServiceRecovery, assertStandingServiceKeys } from './standing-service-recovery-fixture.mjs';
 import { sourceNurtureIds, seedSourceNurtureRecovery, assertSourceNurtureRecovery, assertSourceNurtureKeys } from './source-nurture-recovery-fixture.mjs';
 import { seedCustomerWorkspaceFixture } from './customer-workspace-fixture.mjs';
+import { CALLIE_CONVERSATION_RECOVERY_SLUGS, seedCallieConversationRecovery, assertCallieConversationRecovery, assertCallieConversationKeys } from './callie-conversation-recovery-fixture.mjs';
 
 const requireApi = createRequire(new URL('../artifacts/api-server/package.json', import.meta.url));
 const requireDb = createRequire(new URL('../lib/db/package.json', import.meta.url));
@@ -30,7 +31,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const identifier = (name) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('contractor_identifier_invalid'); return `"${name}"`; };
 const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot', 'reasons', 'snapshot', 'settings', 'result', 'historical_source', 'policy', 'context_snapshot']);
-const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql', '0010_lead-replies.sql', '0011_invoice-recovery.sql', '0012_callie-intake.sql', '0013_standing-service.sql', '0014_source-nurture.sql'];
+const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql', '0010_lead-replies.sql', '0011_invoice-recovery.sql', '0012_callie-intake.sql', '0013_standing-service.sql', '0014_source-nurture.sql', '0015_callie-conversation.sql'];
 
 async function insert(database, table, row) {
   const fields = Object.keys(row);
@@ -60,6 +61,7 @@ async function probeApp(database) {
   Object.assign(env, {
     NODE_ENV: 'test', DATABASE_URL: `postgresql://contractor_recovery_reader:synthetic@${socket.getServerConn()}/postgres`,
     SESSION_SECRET: 'synthetic-contractor-recovery-not-for-deployment', APP_ORIGIN: 'https://growth.example',
+    OAUTH_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 63).toString('base64'),
     OBJECT_STORAGE_PROVIDER: 'postgres', LOG_LEVEL: 'silent', RESTORE_DRILL_ONLY: 'true',
     CONTRACTOR_SYNTHETIC_RECOVERY: 'true', GROWTHOS_OUTBOUND_HOLD: 'true', SCHEDULER_AUTOSTART: 'false',
     CONTRACTOR_RECOVERY_APP: join(output, 'contractor-recovery-entry.mjs'),
@@ -146,6 +148,10 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       await insert(source, 'email_response_reviews', { organization_id: id.organization, source_id: emailSource, external_message_id: `synthetic-reply-${index}`, payload_sha256: sha('synthetic-reply'), state: 'confirmed', reason: 'synthetic_confirmed_reply', lead_id: id.lead, contact_id: id.contact, reply_at: new Date(), hold_active: true, reviewed_by_user_id: id.user });
       await insert(source, 'sessions', { sid: (index ? 'b' : 'a').repeat(64), sess: JSON.stringify({ user: { id: id.user, email: `${slug}.operator@example.invalid`, firstName: 'Synthetic', lastName: 'Recovery', profileImageUrl: null }, access_token: 'synthetic-no-provider' }), expire: new Date(Date.now() + 86_400_000) });
     }
+    for (const slug of CALLIE_CONVERSATION_RECOVERY_SLUGS) {
+      await seedCallieConversationRecovery(source, slug, codec);
+      await assertCallieConversationRecovery(source, slug, codec);
+    }
     await source.exec('CREATE ROLE contractor_recovery_reader; GRANT USAGE ON SCHEMA public TO contractor_recovery_reader; GRANT SELECT ON ALL TABLES IN SCHEMA public TO contractor_recovery_reader;');
     const careBaseline = await fingerprints(source);
     await assertCareTenantKeys(source, slugs[0], slugs[1]);
@@ -156,6 +162,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     const callieConstraintChecks = await assertCallieRecoveryKeys(source, slugs[0], slugs[1]);
     const standingServiceConstraintChecks = await assertStandingServiceKeys(source, slugs[0], slugs[1]);
     const nurtureConstraintChecks = await assertSourceNurtureKeys(source, slugs[0], slugs[1]);
+    const conversationConstraints = await assertCallieConversationKeys(source);
     assert.deepEqual(await fingerprints(source), careBaseline);
     // Prove the reviewed active-service exception cannot mask an unpaused
     // company or another active obligation. These transactions always roll back.
@@ -219,6 +226,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     for (const slug of slugs) await assertCallieRecoveryFixture(restored,slug,codec);
     for (const slug of slugs) await assertStandingServiceRecovery(restored,slug);
     for (const slug of slugs) await assertSourceNurtureRecovery(restored,slug);
+    for (const slug of CALLIE_CONVERSATION_RECOVERY_SLUGS) await assertCallieConversationRecovery(restored, slug, codec);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM billing_checkouts WHERE state='reconcile'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM customer_lifecycle WHERE state='paused'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM staff_invitations WHERE state='pending' AND delivery_state='unconfirmed'")).rows[0].n, 2);
@@ -250,6 +258,10 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       callieConstraintChecks, callieUnknownGrantPreserved: true, callieDisabledHeadPreserved: true, callieUnverifiedCallerPreserved: true, callieChallengeEncryptionVerified: true,
       standingServiceConstraintChecks, standingDisabledHeadPreserved: true, standingUnknownSendPreserved: true, serviceSmsHoldAfterPurgePreserved: true, ambiguousServiceSmsPreserved: true,
       nurtureConstraintChecks, nurtureStoppedOwnershipPreserved: true, nurtureUnknownNeverAdvanced: true, nurtureFailedSyncPreserved: true, nurtureReplyHoldAfterPurgePreserved: true,
+      callieConversationConstraintChecks: conversationConstraints.count,
+      callieConversationUnknownEffectsPreserved: true, callieConversationStaffWorkPreserved: true,
+      callieConversationContentPurgePreserved: true, callieConversationDisabledHeadPreserved: true,
+      callieConversationEncryptionVerified: true, callieConversationLegacySeparated: true,
       ...app, restoreVerificationMs: Date.now() - restoreStartedAt, elapsedMs: Date.now() - startedAt,
       providerCalls: 0, managedBackupRestoreVerified: false, productionRpoRtoEstablished: false,
     };

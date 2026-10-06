@@ -13,6 +13,7 @@ import type { CallieIntakeDetailContact } from './callieIntakeDetailContact';
 import type { CallieIntakeDetailDelivery } from './callieIntakeDetailDelivery';
 import type { CallieIntakeDetailEvidence } from './callieIntakeDetailEvidence';
 import type { CallieIntakeDetailExecution } from './callieIntakeDetailExecution';
+import type { CallieIntakeDetailMode } from './callieIntakeDetailMode';
 import type { CallieIntakeDetailOwner } from './callieIntakeDetailOwner';
 import type { CallieIntakeDetailRequestIntent } from './callieIntakeDetailRequestIntent';
 import type { CallieIntakeDetailServiceIntent } from './callieIntakeDetailServiceIntent';
@@ -20,6 +21,7 @@ import type { CallieIntakeDetailSmsProof } from './callieIntakeDetailSmsProof';
 import type { CallieIntakeDetailStage } from './callieIntakeDetailStage';
 import type { CallieIntakeDetailState } from './callieIntakeDetailState';
 import type { CallieIntakeDetailTask } from './callieIntakeDetailTask';
+import type { CallieReceptionEvidence } from './callieReceptionEvidence';
 
 export interface CallieIntakeDetail {
   id: string;
@@ -56,4 +58,7 @@ export interface CallieIntakeDetail {
   execution: CallieIntakeDetailExecution;
   actions: CallieIntakeDetailActions;
   evidence: CallieIntakeDetailEvidence;
+  reception: CallieReceptionEvidence | null;
+  organizationId: string;
+  mode: CallieIntakeDetailMode;
 }

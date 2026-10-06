@@ -1,6 +1,32 @@
 # GrowthOS project state
 
-## October 5 manual appointment property selection (active bounded slice)
+## October 5 CALLIE conversation (active engineering wave)
+
+The owner authorized the next big wave after PR23 passed exact-main verification.
+PR23 is merged as afcb72a810a55ea32c42adb2f342477bb0e7299f; candidate CI37387983451
+and exact-main CI37390525754 both passed3700recursive tests/15existing skips,
+26adapter tests, realPG16.15 appointment/service-property barriers, types/builds
+and Docker parity/cleanup. Root and independent reviewer accepted the full logs;
+tree1e52585c923890adc52d5e03575f0f666461af67 matches the reviewed candidate.
+
+New frozen contract: `reports/callie-conversation-contract-2026-10-05.md`.
+Branch agent/growthos-callie-conversation-20261005 starts from that accepted main.
+Runtime, experience and independent review lanes are implementing natural missed-
+call intake, a controlled original-call human-handoff attempt and one canonical
+office workflow. Explicit voice-only v2 authority preserves all v1 keypad/SMS
+evidence. Expected offline schema adds three tables after0014 (133 total).
+Implementation/local integration and independent source review are complete;
+see `reports/callie-conversation-integration-2026-10-05.md`. Runtime103passes/9PG
+skips, full UI840/840, inventory49/49, workspace types/builds, compatible90->133
+synthetic recovery/53readonly app reads and built320/390/1280px QA pass. Fresh
+candidate/main PostgreSQL CI remains required. No live voice/provider/contractor
+acceptance is claimed. Root owns the source release and separate live gates.
+
+## October 5 manual appointment property selection (source release complete)
+
+PR23/mainafcb72a and its exact-main CI37390525754 are COMPLETE as recorded above.
+The precommit-only wording below is historical. All future work uses its own
+contract and release evidence; never repeat this release or infer hosted acceptance.
 
 PR22 customer workspace is merged at6cbf0ae93f4daf9d0a3f7e8b932d959b65f2870b;
 candidate CI37366497034 attempt3 and exact-main CI37383108807 both passed.

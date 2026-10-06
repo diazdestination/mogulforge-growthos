@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 
 /** CALLIE staff authority is a human session, never an API-key enrollment hook. */
 export function callieHuman(req: Request, res: Response, next: NextFunction) {
-  if (req.get("x-api-key")) { res.status(403).json({ error: "Sign in as accepted company staff.", code: "human_session_required" }); return; }
+  if (Object.prototype.hasOwnProperty.call(req.headers, "x-api-key")) { res.status(403).json({ error: "Sign in as accepted company staff.", code: "human_session_required" }); return; }
   if (["GET", "HEAD"].includes(req.method)) return next();
   let configuredOrigin: string | null = null;
   try { configuredOrigin = new URL(process.env.APP_ORIGIN ?? "").origin; } catch { /* Missing trusted origin fails closed. */ }

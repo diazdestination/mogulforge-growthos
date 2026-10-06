@@ -37,6 +37,7 @@ export async function ensureMissedCallHandoff(organizationId: string, callId: st
       .where(eq(missedCallHandoffsTable.callId, call.id));
     if (existing) return existing;
 
+    const [conversation] = await tx.select().from(callieIntakesTable).where(and(eq(callieIntakesTable.organizationId, organizationId), eq(callieIntakesTable.callId, call.id), eq(callieIntakesTable.mode, "conversation")));
     const [task] = await tx
       .insert(crmTasksTable)
       .values({
@@ -46,7 +47,8 @@ export async function ensureMissedCallHandoff(organizationId: string, callId: st
         description: `Inbound call from ${call.phone} was not connected. Review and call back.`,
         sourceEvent: "voice.missed_call",
         priority: "high",
-        dueAt: new Date(),
+        dueAt: conversation?.dueAt ?? new Date(),
+        ...(conversation ? { assignedUserId: conversation.ownerUserId } : {}),
       })
       .returning();
     const [handoff] = await tx

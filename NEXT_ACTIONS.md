@@ -1,5 +1,17 @@
 # Next acceptance work
 
+October5 CALLIE conversation is now the active owner-authorized engineering wave.
+PR23/mainafcb72a and exact-main CI37390525754 passed and were independently
+accepted. Follow `reports/callie-conversation-contract-2026-10-05.md`: preserve
+signed staff-first Twilio ingress, add bounded natural intake through ElevenLabs
+register-call, explicit voice-only v2 policy, one governed custom human handoff,
+and the original office task/review/native booking. Exactly three additive tables
+after0014 are reviewed offline; no hosted schema or provider change is authorized.
+Coordinated runtime/experience/review lanes own their assigned files; root owns
+integration/recovery/preview and new full candidate/main gates. Actual agent/line/
+audio/handoff/phone/contractor acceptance remains open. Historical entries below
+do not authorize replaying old source releases or substitute for this contract.
+
 October5 active slice: explicit property selection for NEW manual appointments,
 after completed PR22/main6cbf0ae and exact-main CI37383108807. Follow the frozen
 `reports/manual-appointment-property-contract-2026-10-05.md`. Integrate coherent

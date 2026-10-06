@@ -22,4 +22,5 @@ export const CallieIntakeSummaryState = {
   resolved: 'resolved',
   cancelled: 'cancelled',
   booked: 'booked',
+  office_pending: 'office_pending',
 } as const;

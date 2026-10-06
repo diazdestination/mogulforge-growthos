@@ -7,6 +7,7 @@ import { requireMember } from "../../middlewares/requireMember";
 import { rateLimit } from "../../lib/rateLimit";
 import { ensureMissedCallHandoff, reviewMissedCall } from "../../services/missed-call-handoff";
 import { admitCallieIntake, beginCallieMissedIntake, handleCallieGather } from "../../services/callie-intake";
+import { beginCallieReception, acceptReceptionTransferStatus } from "../../services/callie-reception-runtime";
 import { assertOutboundDeliveryAllowed, outboundDeliveryHeld } from "../../services/outbound-hold";
 import { customerWorkHeld } from "../../services/customer-lifecycle-runtime";
 import {
@@ -606,6 +607,8 @@ router.post("/public/voice/complete", async (req, res) => {
     await ensureMissedCallHandoff(op.organizationId, op.id);
   }
   if (op.direction === "inbound" && status.success) {
+    const receptionResponse = await beginCallieReception(op.organizationId, op.id);
+    if (receptionResponse !== null) { res.type("text/xml").send(receptionResponse); return; }
     const intakeResponse = await beginCallieMissedIntake(op.organizationId, op.id);
     if (intakeResponse !== null) {
       res.type("text/xml").send(intakeResponse);
@@ -631,6 +634,10 @@ router.post("/public/voice/care-gather", rateLimit({ windowMs: 60_000, max: 240,
   // Signature validation rejected non-string/array fields. Empty input is an explicit bounded result.
   const digit = typeof req.body.Digits === "string" ? req.body.Digits : "";
   res.type("text/xml").send(await handleCallieGather(bound.op.organizationId, bound.op.id, stage.data, version, digit));
+});
+router.post("/public/voice/reception-transfer", async (req, res) => {
+  if (!await acceptReceptionTransferStatus(req)) { res.status(403).end(); return; }
+  res.type("text/xml").send(hangup());
 });
 router.post("/public/voice/status", async (req, res) => {
   const bound = await boundOperation(req);

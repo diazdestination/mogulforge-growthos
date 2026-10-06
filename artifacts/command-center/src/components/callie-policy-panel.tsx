@@ -1,38 +1,39 @@
 import { useEffect, useRef, useState } from "react";
 import { getListUsersQueryKey, useListUsers } from "@workspace/api-client-react";
 import { canWrite } from "@/lib/permissions";
-import { callieButton as button, callieField as field, callieLabel, callieRequest, type CalliePolicy, type CalliePolicyPreview, type CallieSettings } from "./callie-contract";
+import { callieButton as button, callieField as field, callieLabel, callieRequest, calliePolicySchema, policyPreviewFor, samePolicyFields, type CalliePolicy, type CalliePolicyPreview, type CallieSettings } from "./callie-contract";
 
-export default function CalliePolicyPanel({ scopeKey, manage, refreshToken }: { scopeKey: string; manage: boolean; refreshToken: number }) {
+export default function CalliePolicyPanel({ scopeKey, organizationId, actorId, manage, refreshToken, onSaved, onSaving }: { scopeKey: string; organizationId: string; actorId: string; manage: boolean; refreshToken: number; onSaved: () => void | Promise<void>; onSaving: (saving: boolean) => void }) {
   const { data: users = [] } = useListUsers({ query: { queryKey: [...getListUsersQueryKey(), "callie", scopeKey], enabled: manage } });
   const [saved, setSaved] = useState<CalliePolicy | null>(null), [draft, setDraft] = useState<CallieSettings | null>(null), [preview, setPreview] = useState<CalliePolicyPreview | null>(null);
   const [approved, setApproved] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState(""), [expired, setExpired] = useState(false);
   const generation = useRef(0), mounted = useRef(true);
+  const [saving, setSaving] = useState(false);
   function invalidate() { generation.current++; setPreview(null); setApproved(false); setExpired(false); }
   async function refresh() {
     invalidate(); const run = generation.current; setBusy(true); setError(""); setSaved(null); setDraft(null);
-    try { const value = await callieRequest<CalliePolicy>("/policy"); if (mounted.current && run === generation.current) { setSaved(value); setDraft(value.policy); } }
+    try { const value = await callieRequest(calliePolicySchema, "/policy"); if (mounted.current && run === generation.current) { setSaved(value); setDraft(value.policy); } }
     catch (failure) { if (mounted.current && run === generation.current) setError(failure instanceof Error ? failure.message : "Standing policy could not be loaded."); }
     finally { if (mounted.current && run === generation.current) setBusy(false); }
   }
   useEffect(() => { mounted.current = true; void refresh(); return () => { mounted.current = false; generation.current++; }; }, [refreshToken]);
   useEffect(() => { if (!preview) return; const delay = Math.max(0, Date.parse(preview.expiresAt) - Date.now()); const timer = setTimeout(() => { setExpired(true); setApproved(false); }, delay); return () => clearTimeout(timer); }, [preview]);
-  function change(patch: Partial<CallieSettings>) { invalidate(); setDraft(value => value ? { ...value, ...patch } : value); setBusy(false); }
+  function change(patch: Partial<CallieSettings>) { if (saving) return; invalidate(); setDraft(value => value ? { ...value, ...patch } : value); setBusy(false); }
   async function prepare() {
     if (!saved || !draft || !manage || busy) return;
     invalidate(); const run = generation.current; setBusy(true); setError(""); setNotice("");
-    try { const value = await callieRequest<CalliePolicyPreview>("/policy/preview", { expectedVersion: saved.version, policy: draft }); if (mounted.current && generation.current === run) setPreview(value); }
+    try { const value = await callieRequest(policyPreviewFor(organizationId, actorId, saved.version, draft), "/policy/preview", { expectedVersion: saved.version, policy: draft }); if (mounted.current && generation.current === run) setPreview(value); }
     catch (failure) { if (mounted.current && run === generation.current) setError(failure instanceof Error ? failure.message : "Preview unavailable."); }
     finally { if (mounted.current && run === generation.current) setBusy(false); }
   }
   async function approve() {
     if (!preview || !approved || expired || busy || !manage || Date.parse(preview.expiresAt) <= Date.now()) return;
-    const current = preview, run = ++generation.current; setBusy(true); setApproved(false); setPreview(null); setError("");
+    const current = preview, run = ++generation.current; setBusy(true); setSaving(true); onSaving(true); setApproved(false); setPreview(null); setError("");
     try {
-      const value = await callieRequest<CalliePolicy>("/policy/approve", { expectedVersion: current.expectedVersion, expectedSnapshot: current.expectedSnapshot, previewHash: current.previewHash, confirmed: true });
-      if (mounted.current && run === generation.current) { setSaved(value); setDraft(value.policy); setNotice(value.policy.enabled ? "Standing policy approved for new eligible calls only. Existing calls were not enrolled. Provider and company holds still apply." : "Standing recovery disabled. Existing call evidence and callback tasks are retained."); }
+      const value = await callieRequest(calliePolicySchema.refine(saved => saved.version === current.expectedVersion + 1 && samePolicyFields(saved.snapshot, current.expectedSnapshot.policy) && samePolicyFields(saved.snapshot, saved.policy)), "/policy/approve", { expectedVersion: current.expectedVersion, expectedSnapshot: current.expectedSnapshot, previewHash: current.previewHash, confirmed: true });
+      if (mounted.current && run === generation.current) { setSaved(value); setDraft(value.policy); setNotice(value.policy.enabled ? "Standing policy approved for new eligible calls only. Existing calls were not enrolled. Provider and company holds still apply." : "Standing recovery disabled. Existing call evidence and callback tasks are retained."); await onSaved(); }
     } catch (failure) { if (mounted.current && run === generation.current) { setSaved(null); setDraft(null); setError(`${failure instanceof Error ? failure.message : "Save not confirmed."} Refresh the saved policy before another action. No automatic retry was made.`); } }
-    finally { if (mounted.current && run === generation.current) setBusy(false); }
+    finally { if (mounted.current && run === generation.current) { setBusy(false); setSaving(false); onSaving(false); } }
   }
   const eligible = users.filter(user => user.isActive && user.operationallyEligible === true && canWrite(user.role));
   return <section className="min-w-0 space-y-3 rounded-lg border p-4" aria-label="CALLIE standing policy">
