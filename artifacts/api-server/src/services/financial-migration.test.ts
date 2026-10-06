@@ -12,6 +12,7 @@ import {
   invoicesTable,
   leadsTable,
   organizationsTable,
+  propertiesTable,
   usersTable,
   valueEntriesTable,
 } from "@workspace/db";
@@ -35,6 +36,7 @@ import {
   reverseInvoiceAllocation,
 } from "./invoices";
 import { recordValueEntry, valueLedger } from "./revenue-workspace";
+import { updateLead, updateProperty } from "./crm";
 import { lockContractorSchedule } from "./contractor-scheduling";
 import { createCustomerLifecycleExporter } from "./customer-lifecycle-export";
 
@@ -103,6 +105,16 @@ afterAll(async () => {
   await deleteTestOrgs(...orgs);
 });
 describe("reviewed historical financial migration", () => {
+  it("keeps the original v1 review digest but refuses an actual property-owner change before import",async()=>{
+    const f=await fixture(),[property]=await db.insert(propertiesTable).values({organizationId:f.org,contactId:f.contact,addressLine1:"Original historical worksite",city:"Fixture",state:"GA",postalCode:"00000"}).returning(),[other]=await db.insert(contactsTable).values({organizationId:f.org,firstName:"Different historical customer"}).returning();
+    await updateLead(f.org,f.lead,{propertyId:property.id});
+    const p=await preview(f),[saved]=await db.select().from(reviews).where(eq(reviews.id,p.id));
+    expect(await updateProperty(f.org,property.id,{contactId:other.id})).toMatchObject({contactId:other.id});
+    await expect(commit(f,p)).rejects.toMatchObject({code:"financial_mapping_unavailable"});
+    expect((await db.select().from(reviews).where(eq(reviews.id,p.id)))[0]).toEqual(saved);
+    expect(await db.select().from(invoicesTable).where(eq(invoicesTable.organizationId,f.org))).toHaveLength(0);
+    expect(await db.select().from(valueEntriesTable).where(eq(valueEntriesTable.organizationId,f.org))).toHaveLength(0);
+  });
   it("previews without financial effects then atomically imports original document and evidenced partial receipt", async () => {
     const f = await fixture(),
       p = await preview(f);

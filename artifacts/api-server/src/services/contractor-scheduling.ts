@@ -1,6 +1,7 @@
 import { appointmentsTable, contactsTable, crmTasksTable, db, invoicesTable, leadsTable, projectsTable, propertiesTable, usersTable } from "@workspace/db";
 import { and, eq, gt, inArray, lt, ne, or, sql } from "drizzle-orm";
 import { hasPermission } from "../lib/permissions";
+import { customerWorkRootsTable } from "../../../../lib/db/src/schema/customer-work";
 
 export type ScheduleTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export class ScheduleError extends Error {
@@ -93,14 +94,21 @@ export async function assertResourceWindow(tx: ScheduleTransaction, org: string,
 }
 
 export async function ensureInvoicePreparationTask(tx: ScheduleTransaction, project: typeof projectsTable.$inferSelect) {
+  let contactId: string | null = null;
+  if (project.customerWorkId) {
+    const [root] = await tx.select().from(customerWorkRootsTable).where(and(eq(customerWorkRootsTable.organizationId,project.organizationId),eq(customerWorkRootsTable.id,project.customerWorkId))).for("share");
+    if (!root || project.leadId !== null) throw new ScheduleError("customer_reference_mismatch",400);
+    contactId = root.contactId;
+  }
   const sourceEvent = `project.invoice_preparation:${project.id}`;
   const [existing] = await tx.select().from(crmTasksTable).where(and(eq(crmTasksTable.organizationId, project.organizationId), eq(crmTasksTable.sourceEvent, sourceEvent))).limit(1);
   const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(eq(invoicesTable.organizationId, project.organizationId), eq(invoicesTable.projectId, project.id), ne(invoicesTable.status, "void"))).limit(1);
   if (existing) {
     const status = invoice ? "done" : project.status === "completed" ? (existing.status === "in_progress" ? "in_progress" : "open") : "cancelled";
-    if (existing.status !== status) await tx.update(crmTasksTable).set({ status, completedAt: status === "done" ? new Date() : null, ...(status === "open" ? { dueAt: new Date() } : {}) }).where(and(eq(crmTasksTable.organizationId, project.organizationId), eq(crmTasksTable.id, existing.id)));
+    if (project.customerWorkId && (existing.leadId !== null || existing.contactId !== contactId)) throw new ScheduleError("customer_reference_mismatch",400);
+    if (existing.status !== status) await tx.update(crmTasksTable).set({ status, completedAt: status === "done" ? new Date() : null, ...(status === "open" && !project.customerWorkId ? { dueAt: new Date() } : {}) }).where(and(eq(crmTasksTable.organizationId, project.organizationId), eq(crmTasksTable.id, existing.id)));
     return;
   }
   if (invoice || project.status !== "completed") return;
-  await tx.insert(crmTasksTable).values({ organizationId: project.organizationId, leadId: project.leadId, title: `Prepare invoice: ${project.name}`, description: "Review the completed work, agreed estimate, and billing details before preparing an invoice. No invoice has been issued or sent by this task.", sourceEvent, dueAt: new Date(), priority: "normal" });
+  await tx.insert(crmTasksTable).values({ organizationId: project.organizationId, leadId: project.leadId, contactId, title: `Prepare invoice: ${project.name}`, description: "Review the completed work, agreed estimate, and billing details before preparing an invoice. No invoice has been issued or sent by this task.", sourceEvent, dueAt: new Date(), priority: "normal" });
 }

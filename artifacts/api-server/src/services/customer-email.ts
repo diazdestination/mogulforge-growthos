@@ -1,4 +1,5 @@
-import { db, leadsTable, usersTable } from "@workspace/db";
+import { createHash } from "node:crypto";
+import { db, leadsTable, orgSettingsTable, usersTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { hasPermission } from "../lib/permissions";
 import { logger } from "../lib/logger";
@@ -7,6 +8,8 @@ import {
   getUserEmailStatus,
   sendEmailForUser,
   emailAcceptanceEvidence,
+  readUserEmailIdentity,
+  type EmailIdentityReader,
 } from "./user-email";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
 import { getOrgSettings } from "./settings";
@@ -24,9 +27,58 @@ export interface CustomerEmailSender {
   senderEmail: string;
 }
 
+/** Exact explicit company sender, without getOrgSettings' lazy writes. */
+export async function readCompanyEmailSender(
+  reader: EmailIdentityReader,
+  organizationId: string,
+  lockRows = false,
+): Promise<{
+  sender: CustomerEmailSender & { source: "company_default" };
+  identitySha256: string;
+}> {
+  if (lockRows && reader === db) throw new EmailDispatchBlockedError();
+  const query = reader
+    .select({
+      id: orgSettingsTable.id,
+      userId: orgSettingsTable.customerEmailSenderUserId,
+    })
+    .from(orgSettingsTable)
+    .where(eq(orgSettingsTable.organizationId, organizationId));
+  const [settings] = await (lockRows ? query.for("share") : query);
+  if (!settings?.userId) throw new EmailDispatchBlockedError();
+  const identity = await readUserEmailIdentity(
+    reader,
+    organizationId,
+    settings.userId,
+    lockRows,
+  );
+  return {
+    sender: {
+      userId: identity.userId,
+      source: "company_default",
+      provider: identity.provider,
+      senderEmail: identity.senderEmail,
+    },
+    identitySha256: createHash("sha256")
+      .update(
+        JSON.stringify({
+          organizationId,
+          settingsId: settings.id,
+          userId: settings.userId,
+          identitySha256: identity.identitySha256,
+        }),
+      )
+      .digest("hex"),
+  };
+}
+
 function sameSender(a: CustomerEmailSender, b: CustomerEmailSender) {
-  return a.userId === b.userId && a.source === b.source && a.provider === b.provider &&
-    a.senderEmail.trim().toLowerCase() === b.senderEmail.trim().toLowerCase();
+  return (
+    a.userId === b.userId &&
+    a.source === b.source &&
+    a.provider === b.provider &&
+    a.senderEmail.trim().toLowerCase() === b.senderEmail.trim().toLowerCase()
+  );
 }
 
 /** An admin may designate only an active, authorized member of this company. */
@@ -99,10 +151,22 @@ export async function resolveCustomerEmailSender(
   context: CustomerEmailContext,
 ): Promise<CustomerEmailSender> {
   const sender = await resolveSender(context);
-  const status = await getUserEmailStatus(context.organizationId, sender.userId);
-  if (!status.connected || !status.configured || !status.provider || !status.email)
+  const status = await getUserEmailStatus(
+    context.organizationId,
+    sender.userId,
+  );
+  if (
+    !status.connected ||
+    !status.configured ||
+    !status.provider ||
+    !status.email
+  )
     throw new EmailDispatchBlockedError();
-  return { ...sender, provider: status.provider, senderEmail: status.email.trim().toLowerCase() };
+  return {
+    ...sender,
+    provider: status.provider,
+    senderEmail: status.email.trim().toLowerCase(),
+  };
 }
 
 export async function getCustomerEmailStatus(organizationId: string) {
@@ -161,7 +225,10 @@ export async function sendCustomerEmail(
     subject: input.subject,
     body: input.body,
     outboundParentId: input.outboundParentId,
-    expectedSender: { provider: sender.provider, senderEmail: sender.senderEmail },
+    expectedSender: {
+      provider: sender.provider,
+      senderEmail: sender.senderEmail,
+    },
     beforeDispatch: async () => {
       await input.beforeDispatch?.();
       const current = await resolveCustomerEmailSender(input);
@@ -175,7 +242,16 @@ export async function sendCustomerEmail(
     entityType: input.leadId ? "lead" : "organization",
     entityId: input.leadId ?? input.organizationId,
     metadata: {
-      ...emailAcceptanceEvidence(result, input.leadId ? { organizationId: input.organizationId, leadId: input.leadId, recipientEmail: input.to } : undefined),
+      ...emailAcceptanceEvidence(
+        result,
+        input.leadId
+          ? {
+              organizationId: input.organizationId,
+              leadId: input.leadId,
+              recipientEmail: input.to,
+            }
+          : undefined,
+      ),
       senderUserId: sender.userId,
       senderSource: sender.source,
     },

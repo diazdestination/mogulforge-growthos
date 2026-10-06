@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -19,6 +20,7 @@ import { projectsTable } from "./projects";
 import { estimatesTable } from "./estimates";
 import { usersTable } from "./auth";
 import { valueEntriesTable } from "./revenue-workspace";
+import { customerWorkRootsTable } from "./customer-work";
 
 export interface InvoiceDocument {
   title: string;
@@ -56,8 +58,8 @@ export const invoicesTable = pgTable(
       .notNull()
       .references(() => organizationsTable.id),
     leadId: uuid("lead_id")
-      .notNull()
       .references(() => leadsTable.id),
+    customerWorkId: uuid("customer_work_id"),
     projectId: uuid("project_id").references(() => projectsTable.id),
     estimateId: uuid("estimate_id").references(() => estimatesTable.id),
     status: text("status").$type<InvoiceState>().notNull().default("draft"),
@@ -88,6 +90,11 @@ export const invoicesTable = pgTable(
       .defaultNow(),
   },
   (t) => [
+    foreignKey({ columns: [t.organizationId, t.customerWorkId], foreignColumns: [customerWorkRootsTable.organizationId, customerWorkRootsTable.id], name: "invoices_customer_work_fk" }),
+    foreignKey({ columns: [t.organizationId, t.projectId, t.customerWorkId], foreignColumns: [projectsTable.organizationId, projectsTable.id, projectsTable.customerWorkId], name: "invoices_work_project_fk" }),
+    foreignKey({ columns: [t.organizationId, t.estimateId, t.customerWorkId], foreignColumns: [estimatesTable.organizationId, estimatesTable.id, estimatesTable.customerWorkId], name: "invoices_work_estimate_fk" }),
+    check("invoices_work_scope_ck", sql`(${t.leadId} is not null and ${t.customerWorkId} is null) or (${t.leadId} is null and ${t.customerWorkId} is not null)`),
+    index("invoices_org_work_idx").on(t.organizationId, t.customerWorkId),
     unique("invoice_org_id").on(t.organizationId, t.id),
     uniqueIndex("invoice_org_number_unique").on(
       t.organizationId,

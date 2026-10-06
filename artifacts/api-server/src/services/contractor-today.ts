@@ -49,7 +49,9 @@ export interface DayProject {
   id: string;
   title: string;
   status: string;
-  leadId: string;
+  leadId: string | null;
+  customerWorkId: string | null;
+  contactId: string;
   customerLabel: string | null;
   crewNames: string[];
   scheduledStart: string | null;
@@ -198,7 +200,12 @@ export async function getContractorToday(
         nullif(concat_ws(' ',coalesce(c.first_name,lc.first_name),coalesce(c.last_name,lc.last_name)),'') AS "customerLabel",
         u.id AS "assignedUserId",nullif(concat_ws(' ',u.first_name,u.last_name),'') AS "assigneeName",
         CASE WHEN ${invoiceReader} AND handoff.id IS NOT NULL
-          THEN '/invoices?projectId='||handoff.id::text
+          AND ((handoff.lead_id IS NOT NULL AND handoff.customer_work_id IS NULL AND handoff_lead.id IS NOT NULL
+              AND handoff_contact.id IS NOT NULL AND (t.lead_id IS NULL OR handoff.lead_id=t.lead_id)
+              AND (t.contact_id IS NULL OR t.contact_id=handoff_lead.contact_id))
+            OR (handoff.lead_id IS NULL AND handoff.customer_work_id IS NOT NULL AND handoff_work.id IS NOT NULL
+              AND t.lead_id IS NULL AND t.contact_id=handoff_work.contact_id))
+          THEN '/invoices?projectId='||handoff.id::text||'&organizationId='||handoff.organization_id::text
           WHEN ${leadReader} AND reply.id IS NOT NULL THEN '/leads/'||l.id::text||'?tab=messages'
           ELSE '/tasks?taskId='||t.id::text END AS "actionPath"
       FROM crm_tasks t
@@ -207,6 +214,11 @@ export async function getContractorToday(
       LEFT JOIN contacts lc ON lc.id=l.contact_id AND lc.organization_id=${organizationId}
       LEFT JOIN users u ON u.id=t.assigned_user_id AND u.organization_id=${organizationId}
       LEFT JOIN projects handoff ON t.source_event='project.invoice_preparation:'||handoff.id::text AND handoff.organization_id=${organizationId}
+      LEFT JOIN leads handoff_lead ON handoff_lead.id=handoff.lead_id AND handoff_lead.organization_id=${organizationId}
+      LEFT JOIN contacts handoff_contact ON handoff_contact.id=handoff_lead.contact_id AND handoff_contact.organization_id=${organizationId}
+      LEFT JOIN customer_work_roots handoff_work ON handoff_work.id=handoff.customer_work_id AND handoff_work.organization_id=${organizationId}
+      LEFT JOIN properties handoff_property ON handoff_property.id=handoff_work.property_id
+        AND handoff_property.organization_id=${organizationId} AND handoff_property.contact_id=handoff_work.contact_id
       LEFT JOIN email_response_reviews reply ON reply.organization_id=${organizationId}
         AND reply.id::text=substring(t.source_event from '^mailbox[.]lead_reply:(.*)$')
         AND reply.task_id=t.id AND reply.lead_id=l.id AND reply.contact_id=l.contact_id
@@ -217,6 +229,8 @@ export async function getContractorToday(
         AND (t.lead_id IS NULL OR l.id IS NOT NULL)
         AND (t.contact_id IS NULL OR c.id IS NOT NULL)
         AND (l.id IS NULL OR lc.id IS NOT NULL)
+        AND (t.contact_id IS NULL OR l.id IS NULL OR t.contact_id=l.contact_id)
+        AND (handoff_work.property_id IS NULL OR handoff_property.id IS NOT NULL)
     `,
         sql`"dueAt" ASC NULLS LAST,id`,
       );
@@ -245,14 +259,28 @@ export async function getContractorToday(
       const projects = await queue<DayProject>(
         tx,
         sql`
-      SELECT p.id,p.name AS title,p.status,l.id AS "leadId",
+      SELECT p.id,p.name AS title,p.status,l.id AS "leadId",p.customer_work_id AS "customerWorkId",c.id AS "contactId",
         nullif(concat_ws(' ',c.first_name,c.last_name),'') AS "customerLabel",
         p.scheduled_start AS "scheduledStart",p.scheduled_end AS "scheduledEnd",
         coalesce((SELECT jsonb_agg(nullif(concat_ws(' ',u.first_name,u.last_name),'') ORDER BY u.id)
           FROM users u WHERE u.organization_id=${organizationId} AND p.crew_user_ids ? u.id),'[]'::jsonb) AS "crewNames"
-      FROM projects p JOIN leads l ON l.id=p.lead_id AND l.organization_id=${organizationId}
-      JOIN contacts c ON c.id=l.contact_id AND c.organization_id=${organizationId}
+      FROM projects p LEFT JOIN leads l ON l.id=p.lead_id AND l.organization_id=${organizationId}
+      LEFT JOIN customer_work_roots w ON w.id=p.customer_work_id AND w.organization_id=${organizationId}
+      JOIN contacts c ON c.id=coalesce(l.contact_id,w.contact_id) AND c.organization_id=${organizationId}
+      LEFT JOIN properties property ON property.id=coalesce(l.property_id,w.property_id)
+        AND property.organization_id=${organizationId} AND property.contact_id=c.id
+      LEFT JOIN estimates estimate ON estimate.id=p.estimate_id AND estimate.organization_id=${organizationId}
+        AND estimate.lead_id IS NOT DISTINCT FROM p.lead_id
+        AND estimate.customer_work_id IS NOT DISTINCT FROM p.customer_work_id
       WHERE p.organization_id=${organizationId} AND p.status IN ('scheduled','in_progress','on_hold')
+        AND ((p.lead_id IS NOT NULL AND l.id IS NOT NULL AND p.customer_work_id IS NULL AND p.work_version IS NULL)
+          OR (p.lead_id IS NULL AND p.customer_work_id IS NOT NULL AND w.id IS NOT NULL AND p.work_version>0))
+        AND (coalesce(l.property_id,w.property_id) IS NULL OR property.id IS NOT NULL)
+        AND (p.estimate_id IS NULL OR estimate.id IS NOT NULL)
+        AND jsonb_typeof(p.crew_user_ids)='array'
+        AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text(
+          CASE WHEN jsonb_typeof(p.crew_user_ids)='array' THEN p.crew_user_ids ELSE '[]'::jsonb END) crew(id)
+          WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id=crew.id AND u.organization_id=${organizationId}))
         AND (p.scheduled_start IS NULL OR (p.scheduled_start<${endAt}::timestamptz
           AND (p.scheduled_end>${startAt}::timestamptz OR (p.scheduled_end IS NULL
             AND (p.scheduled_start>=${startAt}::timestamptz OR p.status IN ('in_progress','on_hold'))))))

@@ -8,15 +8,18 @@ import {
   db,
   invoicesTable as invoices,
   leadsTable,
+  propertiesTable,
   revenueExecutionsTable as executions,
   revenueExecutionEventsTable as events,
   usersTable,
   type ExecutionState,
+  type UserRole,
 } from "@workspace/db";
 import {
   invoiceDeliveryAttemptsTable as attempts,
   type InvoiceDeliveryIntent,
 } from "../../../../lib/db/src/schema/invoice-delivery-attempts";
+import { customerWorkRootsTable as workRoots } from "../../../../lib/db/src/schema/customer-work";
 import { hasPermission } from "../lib/permissions";
 import {
   lockContractorSchedule,
@@ -30,6 +33,10 @@ import {
 } from "./invoice-delivery-contract";
 import { EmailDispatchBlockedError } from "./email-dispatch-guard";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
+import { readInvoiceDetail, readReturningInvoiceLineage } from "./invoices";
+import { readCompanyEmailSender } from "./customer-email";
+import { checkSendEligibility } from "./send-gate";
+import { hasContactReplyHold } from "./response-correlation";
 
 type Reader = typeof db | ScheduleTransaction;
 type Attempt = typeof attempts.$inferSelect;
@@ -57,7 +64,8 @@ const contextSchema = z
       .strict(),
   })
   .strict();
-export const invoiceAttemptReviewMetadataSchema = z
+// Preserve this exact v2 shape. Historical hashes/participants are not migrated.
+export const invoiceAttemptReviewV2MetadataSchema = z
   .object({
     reviewVersion: z.literal(2),
     payloadSha256: hash,
@@ -76,19 +84,63 @@ export const invoiceAttemptReviewMetadataSchema = z
       ? value.expectedLatestExecutionId === null && value.reason === null
       : value.expectedLatestExecutionId !== null && value.reason !== null,
   );
+export const invoiceAttemptReviewV3MetadataSchema = z
+  .object({
+    reviewVersion: z.literal(3),
+    payloadSha256: hash,
+    expiresAt: z.iso.datetime(),
+    invoiceVersion: z.number().int().positive(),
+    documentSha256: hash,
+    intent: z.enum(["initial", "retry_not_dispatched", "additional_copy"]),
+    expectedLatestExecutionId: z.uuid().nullable(),
+    reason: nullableReason,
+    duplicateCopyAcknowledged: z.literal(false),
+    context: z
+      .object({
+        leadId: z.null(),
+        customerWorkId: z.uuid(),
+        contactId: z.uuid(),
+        propertyId: z.uuid().nullable(),
+        sourceSha256: hash,
+        senderIdentitySha256: hash,
+        invoiceNumber: z.string().min(1).max(100),
+        recipient: z.email(),
+        sender: z
+          .object({
+            userId: z.string().min(1),
+            source: z.literal("company_default"),
+            provider: z.enum(["gmail", "microsoft"]),
+            senderEmail: z.email(),
+          })
+          .strict(),
+      })
+      .strict(),
+  })
+  .strict()
+  .refine((value) =>
+    value.intent === "initial"
+      ? value.expectedLatestExecutionId === null && value.reason === null
+      : value.expectedLatestExecutionId !== null && value.reason !== null,
+  );
+export const invoiceAttemptReviewMetadataSchema = z.union([
+  invoiceAttemptReviewV2MetadataSchema,
+  invoiceAttemptReviewV3MetadataSchema,
+]);
 export type InvoiceAttemptReviewMetadata = z.infer<
   typeof invoiceAttemptReviewMetadataSchema
 >;
-export type InvoiceAttemptReview = Omit<
-  InvoiceAttemptReviewMetadata,
-  "duplicateCopyAcknowledged"
-> & {
-  organizationId: string;
-  invoiceId: string;
-  actorUserId: string;
-  previewId: string;
-  duplicateCopyAcknowledged: boolean;
-};
+type WithoutAcknowledgment<T> = T extends unknown
+  ? Omit<T, "duplicateCopyAcknowledged">
+  : never;
+export type InvoiceAttemptReview =
+  WithoutAcknowledgment<InvoiceAttemptReviewMetadata> & {
+    organizationId: string;
+    invoiceId: string;
+    actorUserId: string;
+    previewId: string;
+    duplicateCopyAcknowledged: boolean;
+    effectiveRole?: UserRole;
+  };
 export type InvoiceAttemptClaim = {
   organizationId: string;
   invoiceId: string;
@@ -100,6 +152,7 @@ export type InvoiceAttemptClaim = {
   actorUserId: string;
   previewId: string;
   payloadSha256: string;
+  effectiveRole?: UserRole;
 };
 export type InvoiceAttemptOutcome =
   | {
@@ -108,8 +161,10 @@ export type InvoiceAttemptOutcome =
     }
   | {
       kind: "accepted";
-      leadId: string;
+      leadId: string | null;
       contactId: string;
+      customerWorkId?: string;
+      propertyId?: string | null;
       evidence: Record<string, unknown> & {
         provider: string;
         providerMessageId: string | null;
@@ -251,8 +306,40 @@ export async function getInvoiceDeliveryChains(
   // A transaction reader owns one PostgreSQL client. Keep these bounded reads
   // sequential rather than queueing concurrent queries on that same session.
   const invoiceRows = await reader
-    .select({ id: invoices.id, status: invoices.status })
+    .select({
+      id: invoices.id,
+      status: invoices.status,
+      leadId: invoices.leadId,
+      customerWorkId: invoices.customerWorkId,
+      rootId: workRoots.id,
+      rootContactId: workRoots.contactId,
+      rootPropertyId: workRoots.propertyId,
+      contactId: contactsTable.id,
+      propertyId: propertiesTable.id,
+      propertyContactId: propertiesTable.contactId,
+    })
     .from(invoices)
+    .leftJoin(
+      workRoots,
+      and(
+        eq(workRoots.id, invoices.customerWorkId),
+        eq(workRoots.organizationId, org),
+      ),
+    )
+    .leftJoin(
+      contactsTable,
+      and(
+        eq(contactsTable.id, workRoots.contactId),
+        eq(contactsTable.organizationId, org),
+      ),
+    )
+    .leftJoin(
+      propertiesTable,
+      and(
+        eq(propertiesTable.id, workRoots.propertyId),
+        eq(propertiesTable.organizationId, org),
+      ),
+    )
     .where(and(eq(invoices.organizationId, org), inArray(invoices.id, ids)));
   const attemptRows = await reader
     .select()
@@ -322,6 +409,17 @@ export async function getInvoiceDeliveryChains(
       ),
       proofs = proofRows.filter((row) => row.entityId === invoiceId);
     let invalid = !invoice || receipts.length > 5 || own.length > 5;
+    if (
+      invoice?.customerWorkId &&
+      (invoice.leadId !== null ||
+        invoice.rootId !== invoice.customerWorkId ||
+        !invoice.contactId ||
+        invoice.contactId !== invoice.rootContactId ||
+        (invoice.rootPropertyId !== null &&
+          (invoice.propertyId !== invoice.rootPropertyId ||
+            invoice.propertyContactId !== invoice.rootContactId)))
+    )
+      invalid = true;
     const entries: InvoiceDeliveryAttemptEvidence[] = [];
     const usedProofs = new Set<string>();
     for (let ordinal = 1; ordinal <= receipts.length && !invalid; ordinal++) {
@@ -389,6 +487,21 @@ export async function getInvoiceDeliveryChains(
         payloadSha256 = attempt.payloadSha256;
         documentSha256 = attempt.documentSha256;
         context = parsed.data.context;
+        // Immutable native lineage must agree with the retained participants.
+        // Do not compare old acceptance with today's mutable names, address,
+        // sender connection or source hash: those are reviewed afresh for a copy.
+        if (
+          parsed.data.reviewVersion === 3
+            ? invoice?.leadId !== null ||
+              invoice.customerWorkId !== parsed.data.context.customerWorkId ||
+              invoice.rootId !== parsed.data.context.customerWorkId ||
+              invoice.rootContactId !== parsed.data.context.contactId ||
+              invoice.rootPropertyId !== parsed.data.context.propertyId
+            : invoice?.customerWorkId !== null
+        ) {
+          invalid = true;
+          break;
+        }
         if (
           ordinal === 1
             ? attempt.intent !== "initial" ||
@@ -474,7 +587,13 @@ export async function getInvoiceDeliveryChains(
                 m.provider !== context.sender.provider ||
                 m.invoiceNumber !== context.invoiceNumber ||
                 m.leadId !== context.leadId ||
-                m.contactId !== context.contactId))
+                m.contactId !== context.contactId ||
+                ("customerWorkId" in context &&
+                  (m.customerWorkId !== context.customerWorkId ||
+                    m.propertyId !== context.propertyId ||
+                    m.recipient !== context.recipient ||
+                    m.sourceSha256 !== context.sourceSha256 ||
+                    m.senderIdentitySha256 !== context.senderIdentitySha256))))
           ) {
             invalid = true;
             break;
@@ -607,7 +726,12 @@ async function lock(tx: ScheduleTransaction, org: string) {
     sql`select pg_advisory_xact_lock(hashtextextended(${`invoices:${org}`},0))`,
   );
 }
-async function manager(reader: Reader, org: string, actor: string) {
+async function manager(
+  reader: Reader,
+  org: string,
+  actor: string,
+  effectiveRole?: UserRole,
+) {
   const query = reader
     .select()
     .from(usersTable)
@@ -617,7 +741,8 @@ async function manager(reader: Reader, org: string, actor: string) {
     !user?.isActive ||
     !user.emailVerifiedAt ||
     user.id.startsWith("invite:") ||
-    !hasPermission(user.role, "invoices.manage")
+    !hasPermission(user.role, "invoices.manage") ||
+    !hasPermission(effectiveRole ?? user.role, "invoices.manage")
   )
     throw new InvoiceError(
       403,
@@ -650,6 +775,72 @@ async function assertReview(
     fail("invoice_delivery_review_changed");
   if (Date.parse(expected.expiresAt) <= Date.now())
     fail("invoice_delivery_review_expired");
+  if (expected.reviewVersion === 3) {
+    // Caller retains lifecycle -> schedule -> invoice locks. These readers lock
+    // the actual native/identity rows, not just this effect's advisory namespace.
+    const current = await readReturningInvoiceLineage(
+      tx,
+      review.organizationId,
+      review.invoiceId,
+      {
+        actorUserId: review.actorUserId,
+        effectiveRole: review.effectiveRole,
+        lockRows: tx !== db,
+        requireIssued: true,
+      },
+    );
+    const selected = await readCompanyEmailSender(
+      tx,
+      review.organizationId,
+      tx !== db,
+    );
+    const c = expected.context;
+    if (
+      current.invoice.version !== expected.invoiceVersion ||
+      current.invoice.invoiceNumber !== c.invoiceNumber ||
+      deliveryFingerprint(current.invoice.document) !==
+        expected.documentSha256 ||
+      current.root.id !== c.customerWorkId ||
+      current.contact.id !== c.contactId ||
+      (current.property?.id ?? null) !== c.propertyId ||
+      current.sourceSha256 !== c.sourceSha256 ||
+      current.contact.email?.trim().toLowerCase() !== c.recipient ||
+      selected.identitySha256 !== c.senderIdentitySha256 ||
+      deliveryFingerprint(selected.sender) !== deliveryFingerprint(c.sender)
+    )
+      fail("invoice_delivery_review_changed");
+    await manager(
+      tx,
+      review.organizationId,
+      review.actorUserId,
+      review.effectiveRole,
+    );
+    assertOutboundDeliveryAllowed({ channel: "email", recipient: c.recipient });
+    const gate = await checkSendEligibility(
+      {
+        organizationId: review.organizationId,
+        leadId: null,
+        contact: current.contact,
+        channel: "email",
+        kind: "transactional",
+      },
+      tx,
+    );
+    if (
+      !gate.ok ||
+      (await hasContactReplyHold(review.organizationId, c.contactId, tx))
+    )
+      fail("invoice_delivery_held");
+    return;
+  }
+  // Reader-aware validation keeps final admission on the caller's one client.
+  await readInvoiceDetail(
+    tx,
+    review.organizationId,
+    review.actorUserId,
+    review.invoiceId,
+    { effectiveRole: review.effectiveRole, lockRows: tx !== db },
+  );
   const [invoice] = await tx
     .select()
     .from(invoices)
@@ -668,7 +859,7 @@ async function assertReview(
     deliveryFingerprint(invoice.issuedDocument) !== expected.documentSha256
   )
     fail("invoice_delivery_review_changed");
-  const [customer] = await tx
+  const customerQuery = tx
     .select({ id: contactsTable.id, email: contactsTable.email })
     .from(leadsTable)
     .innerJoin(
@@ -684,6 +875,9 @@ async function assertReview(
         eq(leadsTable.id, expected.context.leadId),
       ),
     );
+  const [customer] = await (tx === db
+    ? customerQuery
+    : customerQuery.for("share"));
   const [sender] = await tx
     .select({ id: usersTable.id })
     .from(usersTable)
@@ -700,7 +894,12 @@ async function assertReview(
     !sender
   )
     fail("invoice_delivery_review_changed");
-  await manager(tx, review.organizationId, review.actorUserId);
+  await manager(
+    tx,
+    review.organizationId,
+    review.actorUserId,
+    review.effectiveRole,
+  );
   if (
     !(await getCustomerLifecycleStatus(review.organizationId, tx))
       .automationAllowed
@@ -730,7 +929,12 @@ export async function runInvoiceDeliveryAttempt(
     );
   const claim = await db.transaction(async (tx) => {
     await lock(tx, review.organizationId);
-    await manager(tx, review.organizationId, review.actorUserId);
+    await manager(
+      tx,
+      review.organizationId,
+      review.actorUserId,
+      review.effectiveRole,
+    );
     const chain = await getInvoiceDeliveryChain(
       review.organizationId,
       review.invoiceId,
@@ -827,6 +1031,7 @@ export async function runInvoiceDeliveryAttempt(
       actorUserId: review.actorUserId,
       previewId: review.previewId,
       payloadSha256: review.payloadSha256,
+      effectiveRole: review.effectiveRole,
     } satisfies InvoiceAttemptClaim;
   });
   if (!claim)
@@ -936,6 +1141,7 @@ export async function assertInvoiceDeliveryAttemptDispatch(
           invoiceId: claim.invoiceId,
           actorUserId: claim.actorUserId,
           previewId: claim.previewId,
+          effectiveRole: claim.effectiveRole,
         },
         metadata,
       );
@@ -1021,6 +1227,17 @@ async function finalize(
         e.provider !== c.sender.provider
       )
         fail("invoice_delivery_invalid_acceptance");
+      if (
+        review.reviewVersion === 3 &&
+        (outcome.customerWorkId !== review.context.customerWorkId ||
+          outcome.propertyId !== review.context.propertyId ||
+          e.customerWorkId !== review.context.customerWorkId ||
+          e.propertyId !== review.context.propertyId ||
+          e.recipient !== review.context.recipient ||
+          e.sourceSha256 !== review.context.sourceSha256 ||
+          e.senderIdentitySha256 !== review.context.senderIdentitySha256)
+      )
+        fail("invoice_delivery_invalid_acceptance");
       state = "succeeded";
       detail =
         "The selected provider accepted this invoice attempt; inbox delivery and payment remain unconfirmed.";
@@ -1029,6 +1246,15 @@ async function finalize(
         ...common,
         leadId: c.leadId,
         contactId: c.contactId,
+        ...(review.reviewVersion === 3
+          ? {
+              customerWorkId: review.context.customerWorkId,
+              propertyId: review.context.propertyId,
+              recipient: review.context.recipient,
+              sourceSha256: review.context.sourceSha256,
+              senderIdentitySha256: review.context.senderIdentitySha256,
+            }
+          : {}),
       };
       await tx.insert(audits).values({
         organizationId: claim.organizationId,

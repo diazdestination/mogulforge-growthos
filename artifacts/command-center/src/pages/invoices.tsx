@@ -10,6 +10,11 @@ import { InvoiceDelivery } from "@/components/invoice-delivery";
 import { InvoiceDeliveryWorklist } from "@/components/invoice-delivery-worklist";
 import { canManageInvoices, canReadInvoices } from "@/lib/permissions";
 import { contractorRequest } from "@/lib/contractor-api";
+import { memberAuthorityScope } from '@/lib/member-authority-scope';
+import { customerWorkLocation, customerInvoicePath, customerWorkLoginPath, customerWorkPath } from '@/lib/customer-work-links';
+import { customerWorkspacePath } from '@/lib/customer-workspace-links';
+import { CustomerWorkSource, type CustomerWorkChoice } from '@/components/customer-work-source';
+import { returningProject } from '@/components/customer-work-form';
 import {
   invoiceRequestStorageKey,
   useInvoiceCommand,
@@ -42,6 +47,7 @@ type Actor = {
   organizationName: string;
   manage: boolean;
   migrate: boolean;
+  scopeKey: string;
 };
 type Command = ReturnType<typeof useInvoiceCommand>;
 
@@ -96,7 +102,8 @@ function Balance({ invoice }: { invoice: InvoiceSummary }) {
 }
 
 export default function Invoices() {
-  const { data: me, isLoading } = useGetMe();
+  const { data: me, isLoading, isError } = useGetMe();
+  const search = useSearch();
   const [, params] = useRoute("/invoices/:id");
   if (isLoading)
     return (
@@ -104,7 +111,7 @@ export default function Invoices() {
         Checking invoice access…
       </div>
     );
-  if (!me?.organization || !canReadInvoices(me.role))
+  if (isError || !me?.isActive || !me.organization || !canReadInvoices(me.role))
     return (
       <div role="alert" className="p-6">
         <h1 className="text-xl font-semibold">
@@ -125,15 +132,19 @@ export default function Invoices() {
     organizationName: me.organization.name,
     manage: canManageInvoices(me.role),
     migrate: me.role === "owner" || me.role === "admin",
+    scopeKey: memberAuthorityScope(me),
   };
+  const target = customerWorkLocation('invoices', search, actor.organizationId);
+  const pinnedDetail = params?.id && search ? customerWorkLoginPath(`/invoices/${params.id}?${search}`, window.location.origin) : null;
+  if (params?.id ? !!search && (!pinnedDetail || new URLSearchParams(search).get('organizationId') !== actor.organizationId) : ['invalid', 'different-company'].includes(target.kind)) return <p role="alert" className="p-5">This invoice link is invalid or belongs to a different company. Open it from the matching customer record.</p>;
   return params?.id ? (
     <InvoiceWorkspace
-      key={`${actor.id}:${actor.organizationId}:${params.id}`}
+      key={`${actor.scopeKey}:${params.id}:${search}`}
       id={params.id}
       actor={actor}
     />
   ) : (
-    <InvoiceIndex key={`${actor.id}:${actor.organizationId}`} actor={actor} />
+    <InvoiceIndex key={`${actor.scopeKey}:${search}`} actor={actor} />
   );
 }
 
@@ -141,6 +152,7 @@ function InvoiceIndex({ actor }: { actor: Actor }) {
   const search = new URLSearchParams(useSearch());
   const projectId = search.get("projectId") || "";
   const leadId = search.get("leadId") || "";
+  const target = customerWorkLocation('invoices', search.toString(), actor.organizationId);
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(0);
   const [deliveryView, setDeliveryView] = useState(
@@ -148,11 +160,11 @@ function InvoiceIndex({ actor }: { actor: Actor }) {
   );
   const [creating, setCreating] = useState(() => {
     try {
-      return !!sessionStorage.getItem(
+      return target.kind === 'new' || !!sessionStorage.getItem(
         invoiceRequestStorageKey(actor.id, actor.organizationId, "new"),
       );
     } catch {
-      return false;
+      return target.kind === 'new';
     }
   });
   const list = useQuery({
@@ -164,6 +176,7 @@ function InvoiceIndex({ actor }: { actor: Actor }) {
       page,
       projectId,
       leadId,
+      actor.scopeKey,
     ],
     queryFn: ({ signal }) => {
       const params = new URLSearchParams({ page: String(page) });
@@ -216,6 +229,7 @@ function InvoiceIndex({ actor }: { actor: Actor }) {
             actor={actor}
             projectId={projectId}
             initialLeadId={leadId}
+            initialContactId={target.kind === 'new' ? target.contactId : ''}
             onClose={() => setCreating(false)}
           />
         )}
@@ -304,7 +318,7 @@ function InvoiceIndex({ actor }: { actor: Actor }) {
                   <div className="rounded-xl border border-border bg-card p-6">
                     <h2 className="font-semibold">Start with a draft</h2>
                     <p className="mt-2 max-w-prose text-sm text-muted-foreground">
-                      Link approved work to its customer opportunity, review the
+                      Link approved work to its customer or opportunity, review the
                       details, then issue the saved version. No customer message
                       or charge is sent here.
                     </p>
@@ -317,7 +331,7 @@ function InvoiceIndex({ actor }: { actor: Actor }) {
                     {list.data.items.map((invoice) => (
                       <li key={invoice.id}>
                         <Link
-                          href={`/invoices/${invoice.id}`}
+                          href={customerInvoicePath(invoice.id, actor.organizationId) || `/invoices/${invoice.id}`}
                           className="grid gap-3 p-4 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
                         >
                           <div className="min-w-0">
@@ -393,11 +407,13 @@ function CreateInvoice({
   actor,
   projectId,
   initialLeadId,
+  initialContactId,
   onClose,
 }: {
   actor: Actor;
   projectId: string;
   initialLeadId: string;
+  initialContactId: string;
   onClose: () => void;
 }) {
   const [, navigate] = useLocation();
@@ -405,16 +421,26 @@ function CreateInvoice({
     actor.id,
     actor.organizationId,
     "new",
-    (result) => navigate(`/invoices/${result.invoice.id}`),
+    (result) => navigate(customerInvoicePath(result.invoice.id, actor.organizationId) || `/invoices/${result.invoice.id}`),
+    actor.scopeKey,
   );
   const saved = command.pending?.body;
+  const savedSource = saved?.source as { kind?: string; contactId?: string; propertyId?: string | null; customerWorkId?: string } | undefined;
+  const [customerMode, setCustomerMode] = useState(!!initialContactId || !!savedSource);
+  const [choice, setChoice] = useState<CustomerWorkChoice>({ contactId: savedSource?.contactId ?? initialContactId, propertyId: savedSource?.propertyId ?? null, confirmed: false });
   const linkedProject =
-    typeof saved?.projectId === "string" ? saved.projectId : projectId;
+    saved ? typeof saved.projectId === "string" ? saved.projectId : '' : projectId;
   const [leadId, setLeadId] = useState(
     typeof saved?.leadId === "string" ? saved.leadId : initialLeadId,
   );
+  const chooseSource = (nextCustomerMode: boolean) => {
+    if (command.locked || nextCustomerMode === customerMode) return;
+    setCustomerMode(nextCustomerMode);
+    setLeadId('');
+    setChoice({ contactId: '', propertyId: null, confirmed: false });
+  };
   const project = useQuery({
-    queryKey: ["invoice-project", actor.organizationId, linkedProject],
+    queryKey: ["invoice-project", actor.scopeKey, linkedProject],
     queryFn: async () => {
       const result = await getProject(encodeURIComponent(linkedProject));
       if (
@@ -427,9 +453,11 @@ function CreateInvoice({
     enabled: !!linkedProject,
     retry: false,
   });
-  const effectiveLead = leadId || project.data?.leadId || "";
+  const nativeWork = returningProject(project.data);
+  const returning = !!nativeWork || !!savedSource || (!linkedProject && customerMode);
+  const effectiveLead = returning ? '' : leadId || project.data?.leadId || "";
   const lead = useQuery({
-    queryKey: ["invoice-lead", actor.organizationId, effectiveLead],
+    queryKey: ["invoice-lead", actor.scopeKey, effectiveLead],
     queryFn: async () => {
       const result = await getLead(encodeURIComponent(effectiveLead));
       if (
@@ -450,7 +478,7 @@ function CreateInvoice({
     currency: "USD",
     issuerName: actor.organizationName,
     issuerAddress: null,
-    customerName: lead.data?.contactName || "",
+    customerName: nativeWork?.customerLabel || lead.data?.contactName || "",
     customerAddress: null,
     dueDate: null,
     notes: null,
@@ -461,7 +489,7 @@ function CreateInvoice({
     (!!linkedProject && project.isPending) ||
     (!!effectiveLead && lead.isPending);
   const contextError =
-    (!!linkedProject && project.isError) || (!!effectiveLead && lead.isError);
+    (!!linkedProject && (project.isError || (!!project.data?.customerWorkId && !nativeWork))) || (!!effectiveLead && lead.isError);
   return (
     <section
       aria-label="New invoice"
@@ -478,6 +506,7 @@ function CreateInvoice({
         </button>
       </div>
       <InvoiceCommandNotice command={command} />
+      {!linkedProject && !command.pending && <div className="flex flex-wrap gap-2" aria-label="Invoice source"><button type="button" className={invoiceButton} aria-pressed={!customerMode} disabled={command.locked} onClick={() => chooseSource(false)}>Customer opportunity</button><button type="button" className={invoiceButton} aria-pressed={customerMode} disabled={command.locked} onClick={() => chooseSource(true)}>Existing customer · No new lead</button></div>}
       {contextLoading ? (
         <p role="status">Loading the linked customer and job…</p>
       ) : contextError ? (
@@ -489,8 +518,8 @@ function CreateInvoice({
           <button
             className={`${invoiceButton} mt-2`}
             onClick={() => {
-              void project.refetch();
-              void lead.refetch();
+              if (linkedProject) void project.refetch();
+              if (effectiveLead) void lead.refetch();
             }}
           >
             Refresh linked records
@@ -498,17 +527,18 @@ function CreateInvoice({
         </div>
       ) : (
         <InvoiceEditor
-          key={effectiveLead || "unselected"}
+          key={returning ? `customer:${linkedProject || choice.contactId || 'unselected'}` : effectiveLead || "unselected"}
           initial={initial}
           disabled={command.locked}
+          saveDisabled={returning ? !nativeWork && !choice.confirmed : !effectiveLead}
           busy={command.busy}
           onSave={(document) => {
-            if (!effectiveLead) return;
+            if (returning ? !nativeWork && !choice.confirmed : !effectiveLead) return;
             void command.submit(
               "/invoices",
               "POST",
               {
-                leadId: effectiveLead,
+                ...(returning ? { source: nativeWork ? { kind: 'customer_work', customerWorkId: nativeWork.customerWorkId } : { kind: 'existing_customer', contactId: choice.contactId, propertyId: choice.propertyId } } : { leadId: effectiveLead }),
                 ...(linkedProject ? { projectId: linkedProject } : {}),
                 document,
               },
@@ -516,7 +546,8 @@ function CreateInvoice({
             );
           }}
         >
-          <div>
+          {returning ? nativeWork ? <div className="space-y-2 rounded border p-3 text-sm"><p>Job: {nativeWork.name}</p><p>{nativeWork.customerLabel} · {nativeWork.propertyLabel || 'No property linked'}</p><p>Receipts and corrections remain scoped to this exact work record, not all work for this customer.</p><Link className={invoiceButton} href={customerWorkPath('projects', nativeWork.id, actor.organizationId)!}>Open original job</Link></div>
+            : command.pending ? <div className="break-all rounded border p-3 text-sm">Original submitted source: {savedSource?.kind} · {savedSource?.contactId || savedSource?.customerWorkId} · Property {savedSource?.propertyId || 'deliberately unlinked'}. Reconcile only this saved request.</div> : <CustomerWorkSource organizationId={actor.organizationId} scopeKey={actor.scopeKey} purpose="invoice" value={choice} onChange={setChoice} disabled={command.locked} /> : <div>
             <p className="mb-1 text-sm font-medium">Customer opportunity</p>
             {linkedProject ? (
               <p className="rounded-lg bg-muted p-3 text-sm">
@@ -527,6 +558,7 @@ function CreateInvoice({
               </p>
             ) : (
               <LeadSelect
+                queryScope={actor.scopeKey}
                 value={effectiveLead}
                 onChange={setLeadId}
                 required
@@ -536,7 +568,8 @@ function CreateInvoice({
                 label="Customer opportunity"
               />
             )}
-          </div>
+          </div>}
+          {returning && <p className="text-sm text-muted-foreground">Review the invoice’s Bill to text. Saving does not create an acquisition lead, send a message, or move money.</p>}
         </InvoiceEditor>
       )}
     </section>
@@ -609,7 +642,7 @@ function InvoiceDraftEditor({
 
 function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
   const queryClient = useQueryClient();
-  const detailKey = ["invoices", actor.organizationId, "detail", id];
+  const detailKey = ["invoices", actor.organizationId, "detail", id, actor.scopeKey];
   const detail = useQuery({
     queryKey: detailKey,
     queryFn: async ({ signal }) => {
@@ -617,7 +650,7 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
         `/invoices/${encodeURIComponent(id)}`,
         { signal },
       );
-      if (result.id !== id) throw new Error("Invoice response mismatch");
+      if (result.id !== id || (result.organizationId !== undefined && result.organizationId !== actor.organizationId) || (result.customerWorkId && (result.organizationId !== actor.organizationId || result.leadId !== null || !result.contactId || result.sourceKind !== 'customer_work'))) throw new Error("Invoice response mismatch");
       return result;
     },
     retry: false,
@@ -637,6 +670,7 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
           : "Invoice record saved.",
       );
     },
+    actor.scopeKey,
   );
   const invoice = detail.data;
   async function refresh() {
@@ -706,6 +740,8 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
                 )}
               </div>
             </header>
+            {invoice.contactId && <Link className={invoiceButton} href={customerWorkspacePath(invoice.contactId, actor.organizationId, 'invoices')!}>Customer invoice history</Link>}
+            {invoice.customerWorkId && <p className="break-words text-sm text-muted-foreground">Existing-customer work · {invoice.customerWorkId}. Receipt accounting is isolated to this work, not this customer’s other jobs.</p>}
             {actor.manage &&
               invoice.status === "draft" &&
               !editing &&
@@ -806,7 +842,7 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
                 {invoice.reconciliationRequired && (
                   <p role="alert" className="text-sm">
                     {money(invoice.unallocatedRefundCents)} in recorded refunds
-                    for this customer opportunity need allocation review. The
+                    for this {invoice.customerWorkId ? 'work record' : 'customer opportunity'} need allocation review. The
                     balance is withheld until reconciliation.
                   </p>
                 )}
@@ -821,6 +857,7 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
                 invoice={invoice}
                 organizationId={actor.organizationId}
                 canManage={actor.manage}
+                authorityScope={actor.scopeKey}
               />
             )}
             <section aria-label="Payment allocations" className="space-y-3">
@@ -850,6 +887,7 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
                           ? `Allocation reversed: ${entry.reversalReason}`
                           : "Allocated to this invoice"}
                       </p>
+                      {entry.refundOfValueEntryId && <p className="break-all text-xs text-muted-foreground">External refund correction linked to original receipt {entry.refundOfValueEntryId}. No money was moved.</p>}
                     </li>
                   ))}
                 </ul>

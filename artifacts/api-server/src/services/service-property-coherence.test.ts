@@ -77,7 +77,7 @@ realPg("holds selected parent rows through actual creation while the real CRM pr
     let settled = false;
     changing = updateProperty(org, f.property, { contactId: f.b });
     void changing.then(() => { settled = true; }, () => { settled = true; });
-    const writerPid = await blockedBy(creatorPid, '%update "properties"%');
+    const writerPid = await blockedBy(creatorPid, '%from "properties"%for update%');
     expect(writerPid).not.toBe(creatorPid); expect(settled).toBe(false);
     expect(await counts(f.a)).toEqual({ services: 0, tasks: 0, leads: 0 });
     await keeper.query("COMMIT");

@@ -21,7 +21,12 @@ export interface InvoiceDocument extends Omit<InvoiceDraft, "lineItems"> {
 }
 export interface InvoiceSummary {
   id: string;
-  leadId: string;
+  leadId: string | null;
+  organizationId?: string;
+  customerWorkId?: string | null;
+  contactId?: string;
+  propertyId?: string | null;
+  sourceKind?: "lead" | "customer_work";
   projectId: string | null;
   estimateId: string | null;
   invoiceNumber: string | null;
@@ -59,6 +64,7 @@ export interface InvoiceSummary {
 export interface InvoiceAllocation {
   id: string;
   valueEntryId: string;
+  refundOfValueEntryId?: string | null;
   kind: "payment" | "refund";
   sourceReference: string;
   amountCents: number;
@@ -72,6 +78,7 @@ export interface InvoiceDetail extends InvoiceSummary {
   allocations: InvoiceAllocation[];
   availableValueEntries: {
     id: string;
+    refundOfValueEntryId?: string | null;
     kind: "payment" | "refund";
     sourceReference: string;
     amountCents: number;

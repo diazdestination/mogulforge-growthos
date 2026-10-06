@@ -18,4 +18,7 @@ limit?: number;
  * Number of rows to skip, for paging past earlier results (server treats negatives as 0).
  */
 offset?: number;
+contactId?: string;
+customerWorkId?: string;
+propertyId?: string;
 };

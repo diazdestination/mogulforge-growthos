@@ -172,7 +172,7 @@ realPg("retains selected lead/customer/property locks through native reminder in
     editingContact = updateContact(org, f.a, { firstName: "Office changed the name" }); void editingContact.catch(() => {});
     editingLead = updateLead(org, opportunity.id, { propertyId: f.second }); void editingLead.catch(() => {});
     const writers = await Promise.all([
-      blockedBy(creatorPid, '%update "properties"%'), blockedBy(creatorPid, '%update "contacts"%'), blockedBy(creatorPid, '%update "leads"%'),
+      blockedBy(creatorPid, '%from "properties"%for update%'), blockedBy(creatorPid, '%update "contacts"%'), blockedBy(creatorPid, '%update "leads"%'),
     ]);
     expect(new Set(writers).size).toBe(3);
     for (const writer of writers) expect(writer).not.toBe(creatorPid);

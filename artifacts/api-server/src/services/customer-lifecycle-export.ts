@@ -3,38 +3,451 @@ import pg from "pg";
 import { z } from "zod/v4";
 import { CustomerLifecycleError } from "./customer-lifecycle";
 
-type Dataset = { table: string; fields: readonly string[]; computedFields?: readonly string[]; references?: Record<string, string> };
+type Dataset = {
+  table: string;
+  fields: readonly string[];
+  computedFields?: readonly string[];
+  references?: Record<string, string>;
+};
 // Explicit columns only. Never export SELECT *, opaque metadata, credential
 // stores, identity/session tables, provider configuration or raw email payloads.
 export const CUSTOMER_EXPORT_DATASETS: readonly Dataset[] = [
-  { table: "contacts", fields: ["id", "first_name", "last_name", "email", "phone", "preferred_contact_method", "do_not_contact", "do_not_contact_email", "do_not_contact_sms", "created_at", "updated_at"] },
-  { table: "properties", fields: ["id", "contact_id", "address_line_1", "address_line_2", "city", "state", "postal_code", "property_type", "created_at", "updated_at"], references: { contact_id: "contacts" } },
-  { table: "leads", fields: ["id", "contact_id", "property_id", "status", "urgency", "service_type", "source", "summary", "estimated_value_cents", "lost_reason", "won_at", "won_revenue_cents", "won_attribution", "creation_method", "import_source_key", "external_opportunity_id", "created_at", "updated_at"], references: { contact_id: "contacts", property_id: "properties" } },
-  { table: "estimates", fields: ["id", "lead_id", "title", "status", "line_items", "subtotal_cents", "tax_cents", "total_cents", "notes", "sent_at", "accepted_at", "created_at", "updated_at"], references: { lead_id: "leads" } },
-  { table: "projects", fields: ["id", "lead_id", "estimate_id", "name", "status", "scheduled_start", "scheduled_end", "crew_notes", "completed_at", "created_at", "updated_at"], references: { lead_id: "leads", estimate_id: "estimates" } },
-  { table: "crm_tasks", fields: ["id", "lead_id", "contact_id", "title", "description", "source_event", "status", "priority", "due_at", "completed_at", "created_at", "updated_at"], references: { lead_id: "leads", contact_id: "contacts" } },
-  { table: "appointments", fields: ["id", "lead_id", "contact_id", "property_id", "type", "status", "scheduled_start", "scheduled_end", "notes", "created_at", "updated_at"], references: { lead_id: "leads", contact_id: "contacts", property_id: "properties" } },
-  { table: "service_obligations", fields: ["id", "contact_id", "property_id", "appointment_id", "task_id", "kind", "equipment_label", "due_at", "notice_days", "status", "source", "external_ref", "notes", "recurrence", "predecessor_obligation_id", "occurrence_index", "coverage_starts_on", "coverage_ends_on", "coverage_evidence", "completion_note", "completed_at", "created_at", "updated_at"], references: { contact_id: "contacts", property_id: "properties", appointment_id: "appointments", task_id: "crm_tasks", predecessor_obligation_id: "service_obligations" } },
-  { table: "activities", fields: ["id", "lead_id", "contact_id", "type", "title", "body", "occurred_at", "created_at"], references: { lead_id: "leads", contact_id: "contacts" } },
-  { table: "service_watch_cases", fields: ["id", "service_obligation_id", "version", "state", "reasons", "episode", "acknowledged_at", "next_action", "next_action_at", "resolved_at", "last_evaluated_at", "created_at", "updated_at"], references: { service_obligation_id: "service_obligations" } },
-  { table: "consent_records", fields: ["id", "contact_id", "channel", "granted", "disclosure_version", "recorded_at"], references: { contact_id: "contacts" } },
-  { table: "suppressions", fields: ["id", "channel", "value", "reason", "created_at"] },
-  { table: "value_entries", fields: ["id", "lead_id", "source_reference", "kind", "amount_cents", "occurred_at", "created_at"], references: { lead_id: "leads" } },
-  { table: "invoices", fields: ["id", "lead_id", "project_id", "estimate_id", "status", "version", "invoice_number", "draft_document", "issued_document", "issued_document_sha256", "issued_at", "balance_basis", "opening_receivable_cents", "opening_as_of", "historical_source", "voided_at", "void_reason", "created_at", "updated_at"], computedFields: ["exported_issued_document_sha256"], references: { lead_id: "leads", project_id: "projects", estimate_id: "estimates" } },
-  { table: "invoice_receipt_allocations", fields: ["id", "invoice_id", "value_entry_id", "kind", "amount_cents", "reverses_allocation_id", "reason", "created_at"], references: { invoice_id: "invoices", value_entry_id: "value_entries", reverses_allocation_id: "invoice_receipt_allocations" } },
-  { table: "invoice_operations", fields: ["id", "invoice_id", "action", "version", "reason", "created_at"], references: { invoice_id: "invoices" } },
-  { table: "financial_migration_items", fields: ["id", "source_system", "source_account", "entity_type", "external_id", "digest", "invoice_id", "value_entry_id", "created_at"], references: { invoice_id: "invoices", value_entry_id: "value_entries" } },
-  { table: "revenue_executions", fields: ["id", "kind", "state", "expires_at", "created_at", "completed_at"] },
-  { table: "revenue_execution_events", fields: ["id", "execution_id", "state", "created_at"], references: { execution_id: "revenue_executions" } },
-  { table: "stored_objects", fields: ["id", "content_type", "size_bytes", "created_at"] },
-  { table: "property_assets", fields: ["id", "contact_id", "property_id", "version", "status", "facts", "created_at", "updated_at"], references: { contact_id: "contacts", property_id: "properties" } },
-  { table: "work_checklist_templates", fields: ["id", "version", "status", "created_at", "updated_at"] },
-  { table: "work_checklist_revisions", fields: ["id", "template_id", "version", "definition", "definition_sha256", "baseline_id", "baseline_version", "reviewed_at", "created_at"], computedFields: ["exported_definition_sha256"], references: { template_id: "work_checklist_templates" } },
-  { table: "appointment_work_completions", fields: ["id", "appointment_id", "contact_id", "property_id", "original_completion_id", "snapshot", "created_at"], references: { appointment_id: "appointments", contact_id: "contacts", property_id: "properties", original_completion_id: "appointment_work_completions" } },
-  { table: "appointment_work_entries", fields: ["id", "appointment_id", "contact_id", "property_id", "asset_id", "service_obligation_id", "checklist_revision_id", "version", "state", "asset_snapshot", "answers", "notes", "completion_id", "created_at", "updated_at"], references: { appointment_id: "appointments", contact_id: "contacts", property_id: "properties", asset_id: "property_assets", service_obligation_id: "service_obligations", checklist_revision_id: "work_checklist_revisions", completion_id: "appointment_work_completions" } },
-  { table: "appointment_work_photos", fields: ["id", "appointment_id", "entry_id", "object_id", "state", "item_key", "caption", "content_type", "size_bytes", "object_sha256", "attached_at", "created_at"], references: { appointment_id: "appointments", entry_id: "appointment_work_entries", object_id: "stored_objects" } },
+  {
+    table: "contacts",
+    fields: [
+      "id",
+      "first_name",
+      "last_name",
+      "email",
+      "phone",
+      "preferred_contact_method",
+      "do_not_contact",
+      "do_not_contact_email",
+      "do_not_contact_sms",
+      "created_at",
+      "updated_at",
+    ],
+  },
+  {
+    table: "properties",
+    fields: [
+      "id",
+      "contact_id",
+      "address_line_1",
+      "address_line_2",
+      "city",
+      "state",
+      "postal_code",
+      "property_type",
+      "created_at",
+      "updated_at",
+    ],
+    references: { contact_id: "contacts" },
+  },
+  {
+    table: "customer_work_roots",
+    fields: ["id", "contact_id", "property_id", "created_at"],
+    references: { contact_id: "contacts", property_id: "properties" },
+  },
+  {
+    table: "leads",
+    fields: [
+      "id",
+      "contact_id",
+      "property_id",
+      "status",
+      "urgency",
+      "service_type",
+      "source",
+      "summary",
+      "estimated_value_cents",
+      "lost_reason",
+      "won_at",
+      "won_revenue_cents",
+      "won_attribution",
+      "creation_method",
+      "import_source_key",
+      "external_opportunity_id",
+      "created_at",
+      "updated_at",
+    ],
+    references: { contact_id: "contacts", property_id: "properties" },
+  },
+  {
+    table: "estimates",
+    fields: [
+      "id",
+      "lead_id",
+      "customer_work_id",
+      "work_version",
+      "title",
+      "status",
+      "line_items",
+      "subtotal_cents",
+      "tax_cents",
+      "total_cents",
+      "notes",
+      "sent_at",
+      "accepted_at",
+      "created_at",
+      "updated_at",
+    ],
+    references: { lead_id: "leads", customer_work_id: "customer_work_roots" },
+  },
+  {
+    table: "projects",
+    fields: [
+      "id",
+      "lead_id",
+      "customer_work_id",
+      "work_version",
+      "estimate_id",
+      "name",
+      "status",
+      "scheduled_start",
+      "scheduled_end",
+      "crew_notes",
+      "completed_at",
+      "created_at",
+      "updated_at",
+    ],
+    references: {
+      lead_id: "leads",
+      customer_work_id: "customer_work_roots",
+      estimate_id: "estimates",
+    },
+  },
+  {
+    table: "crm_tasks",
+    fields: [
+      "id",
+      "lead_id",
+      "contact_id",
+      "title",
+      "description",
+      "source_event",
+      "status",
+      "priority",
+      "due_at",
+      "completed_at",
+      "created_at",
+      "updated_at",
+    ],
+    references: { lead_id: "leads", contact_id: "contacts" },
+  },
+  {
+    table: "appointments",
+    fields: [
+      "id",
+      "lead_id",
+      "contact_id",
+      "property_id",
+      "type",
+      "status",
+      "scheduled_start",
+      "scheduled_end",
+      "notes",
+      "created_at",
+      "updated_at",
+    ],
+    references: {
+      lead_id: "leads",
+      contact_id: "contacts",
+      property_id: "properties",
+    },
+  },
+  {
+    table: "service_obligations",
+    fields: [
+      "id",
+      "contact_id",
+      "property_id",
+      "appointment_id",
+      "task_id",
+      "kind",
+      "equipment_label",
+      "due_at",
+      "notice_days",
+      "status",
+      "source",
+      "external_ref",
+      "notes",
+      "recurrence",
+      "predecessor_obligation_id",
+      "occurrence_index",
+      "coverage_starts_on",
+      "coverage_ends_on",
+      "coverage_evidence",
+      "completion_note",
+      "completed_at",
+      "created_at",
+      "updated_at",
+    ],
+    references: {
+      contact_id: "contacts",
+      property_id: "properties",
+      appointment_id: "appointments",
+      task_id: "crm_tasks",
+      predecessor_obligation_id: "service_obligations",
+    },
+  },
+  {
+    table: "activities",
+    fields: [
+      "id",
+      "lead_id",
+      "contact_id",
+      "type",
+      "title",
+      "body",
+      "occurred_at",
+      "created_at",
+    ],
+    references: { lead_id: "leads", contact_id: "contacts" },
+  },
+  {
+    table: "service_watch_cases",
+    fields: [
+      "id",
+      "service_obligation_id",
+      "version",
+      "state",
+      "reasons",
+      "episode",
+      "acknowledged_at",
+      "next_action",
+      "next_action_at",
+      "resolved_at",
+      "last_evaluated_at",
+      "created_at",
+      "updated_at",
+    ],
+    references: { service_obligation_id: "service_obligations" },
+  },
+  {
+    table: "consent_records",
+    fields: [
+      "id",
+      "contact_id",
+      "channel",
+      "granted",
+      "disclosure_version",
+      "recorded_at",
+    ],
+    references: { contact_id: "contacts" },
+  },
+  {
+    table: "suppressions",
+    fields: ["id", "channel", "value", "reason", "created_at"],
+  },
+  {
+    table: "value_entries",
+    fields: [
+      "id",
+      "lead_id",
+      "customer_work_id",
+      "refund_of_value_entry_id",
+      "source_reference",
+      "kind",
+      "amount_cents",
+      "occurred_at",
+      "created_at",
+    ],
+    references: {
+      lead_id: "leads",
+      customer_work_id: "customer_work_roots",
+      refund_of_value_entry_id: "value_entries",
+    },
+  },
+  {
+    table: "invoices",
+    fields: [
+      "id",
+      "lead_id",
+      "customer_work_id",
+      "project_id",
+      "estimate_id",
+      "status",
+      "version",
+      "invoice_number",
+      "draft_document",
+      "issued_document",
+      "issued_document_sha256",
+      "issued_at",
+      "balance_basis",
+      "opening_receivable_cents",
+      "opening_as_of",
+      "historical_source",
+      "voided_at",
+      "void_reason",
+      "created_at",
+      "updated_at",
+    ],
+    computedFields: ["exported_issued_document_sha256"],
+    references: {
+      lead_id: "leads",
+      customer_work_id: "customer_work_roots",
+      project_id: "projects",
+      estimate_id: "estimates",
+    },
+  },
+  {
+    table: "invoice_receipt_allocations",
+    fields: [
+      "id",
+      "invoice_id",
+      "value_entry_id",
+      "kind",
+      "amount_cents",
+      "reverses_allocation_id",
+      "reason",
+      "created_at",
+    ],
+    references: {
+      invoice_id: "invoices",
+      value_entry_id: "value_entries",
+      reverses_allocation_id: "invoice_receipt_allocations",
+    },
+  },
+  {
+    table: "invoice_operations",
+    fields: ["id", "invoice_id", "action", "version", "reason", "created_at"],
+    references: { invoice_id: "invoices" },
+  },
+  {
+    table: "financial_migration_items",
+    fields: [
+      "id",
+      "source_system",
+      "source_account",
+      "entity_type",
+      "external_id",
+      "digest",
+      "invoice_id",
+      "value_entry_id",
+      "created_at",
+    ],
+    references: { invoice_id: "invoices", value_entry_id: "value_entries" },
+  },
+  {
+    table: "revenue_executions",
+    fields: ["id", "kind", "state", "expires_at", "created_at", "completed_at"],
+  },
+  {
+    table: "revenue_execution_events",
+    fields: ["id", "execution_id", "state", "created_at"],
+    references: { execution_id: "revenue_executions" },
+  },
+  {
+    table: "stored_objects",
+    fields: ["id", "content_type", "size_bytes", "created_at"],
+  },
+  {
+    table: "property_assets",
+    fields: [
+      "id",
+      "contact_id",
+      "property_id",
+      "version",
+      "status",
+      "facts",
+      "created_at",
+      "updated_at",
+    ],
+    references: { contact_id: "contacts", property_id: "properties" },
+  },
+  {
+    table: "work_checklist_templates",
+    fields: ["id", "version", "status", "created_at", "updated_at"],
+  },
+  {
+    table: "work_checklist_revisions",
+    fields: [
+      "id",
+      "template_id",
+      "version",
+      "definition",
+      "definition_sha256",
+      "baseline_id",
+      "baseline_version",
+      "reviewed_at",
+      "created_at",
+    ],
+    computedFields: ["exported_definition_sha256"],
+    references: { template_id: "work_checklist_templates" },
+  },
+  {
+    table: "appointment_work_completions",
+    fields: [
+      "id",
+      "appointment_id",
+      "contact_id",
+      "property_id",
+      "original_completion_id",
+      "snapshot",
+      "created_at",
+    ],
+    references: {
+      appointment_id: "appointments",
+      contact_id: "contacts",
+      property_id: "properties",
+      original_completion_id: "appointment_work_completions",
+    },
+  },
+  {
+    table: "appointment_work_entries",
+    fields: [
+      "id",
+      "appointment_id",
+      "contact_id",
+      "property_id",
+      "asset_id",
+      "service_obligation_id",
+      "checklist_revision_id",
+      "version",
+      "state",
+      "asset_snapshot",
+      "answers",
+      "notes",
+      "completion_id",
+      "created_at",
+      "updated_at",
+    ],
+    references: {
+      appointment_id: "appointments",
+      contact_id: "contacts",
+      property_id: "properties",
+      asset_id: "property_assets",
+      service_obligation_id: "service_obligations",
+      checklist_revision_id: "work_checklist_revisions",
+      completion_id: "appointment_work_completions",
+    },
+  },
+  {
+    table: "appointment_work_photos",
+    fields: [
+      "id",
+      "appointment_id",
+      "entry_id",
+      "object_id",
+      "state",
+      "item_key",
+      "caption",
+      "content_type",
+      "size_bytes",
+      "object_sha256",
+      "attached_at",
+      "created_at",
+    ],
+    references: {
+      appointment_id: "appointments",
+      entry_id: "appointment_work_entries",
+      object_id: "stored_objects",
+    },
+  },
 ] as const;
 export const CUSTOMER_EXPORT_EXCLUSIONS = [
+  "Returning-customer immutable business lineage, native work versions and external receipt/refund references are included. Human command request IDs, payload hashes, actor identities and replay internals are excluded and retained in full inventory/backups. The archive is not a command replay, import mapping, payment processor or proof of acquisition revenue.",
   "Workday assets, reviewed checklist definitions, entry answers and projected completion/correction business records are included by closed allowlists. Staff identities, acting notes, raw parent/task/evidence snapshots, command/retry hashes, request IDs, preview tokens, upload reservations/capabilities and private object paths are excluded. Photo records are metadata only, not binary evidence or a re-import/activation grant. Recorded warranty dates and worker observations are not verified coverage or workmanship. The archive digest covers the projected export, not the original internal completion snapshot.",
   "Checklist definition_sha256 verifies the original canonical saved definition before export. exported_definition_sha256 covers its closed canonical export projection; these may differ when future/private fields are excluded. Neither digest is approval, compliance or permission to activate/import work.",
   "Credentials, passwords, sessions, identity tokens, API keys and provider/billing configuration are excluded.",
@@ -53,164 +466,601 @@ export const CUSTOMER_EXPORT_EXCLUSIONS = [
   "Backups, complete account erasure, retention decisions, billing cancellation and remote credential revocation require a separate operator review.",
   "Finite source-nurture plans/items/steps, immutable approved messages, permanent contact-touch reservations, separate nurture mailbox permissions and complete-sync evidence are excluded from this core export. They remain in inventory/backups and require a separately reviewed communications/security export. Canonical contacts, leads, appointments and office tasks are included through their existing allowlists. This export cannot be used to reset campaign ownership or replay unknown sends.",
 ] as const;
-const lineItems = z.array(z.object({ description: z.string(), quantity: z.number(), unitPriceCents: z.number(), totalCents: z.number() })).max(1000);
+const lineItems = z
+  .array(
+    z.object({
+      description: z.string(),
+      quantity: z.number(),
+      unitPriceCents: z.number(),
+      totalCents: z.number(),
+    }),
+  )
+  .max(1000);
 // Parse stored JSON through a closed field list. Staff approval IDs and future
 // private metadata must not bypass the export's documented exclusion policy.
 const invoiceDocument = z.object({
-  title: z.string(), currency: z.literal("USD"), issuerName: z.string(), issuerAddress: z.string().nullable(),
-  customerName: z.string(), customerAddress: z.string().nullable(), dueDate: z.iso.date().nullable(), notes: z.string().nullable(),
-  lineItems: z.array(z.object({ description: z.string(), quantity: z.string(), unitPriceCents: z.number().int(), totalCents: z.number().int() })).max(100),
-  subtotalCents: z.number().int(), taxCents: z.number().int(), totalCents: z.number().int(),
+  title: z.string(),
+  currency: z.literal("USD"),
+  issuerName: z.string(),
+  issuerAddress: z.string().nullable(),
+  customerName: z.string(),
+  customerAddress: z.string().nullable(),
+  dueDate: z.iso.date().nullable(),
+  notes: z.string().nullable(),
+  lineItems: z
+    .array(
+      z.object({
+        description: z.string(),
+        quantity: z.string(),
+        unitPriceCents: z.number().int(),
+        totalCents: z.number().int(),
+      }),
+    )
+    .max(100),
+  subtotalCents: z.number().int(),
+  taxCents: z.number().int(),
+  totalCents: z.number().int(),
 });
-const recurrence = z.object({ mode: z.literal("calendar_months"), intervalMonths: z.number().int().min(1).max(60), anchorDate: z.iso.date(), endDate: z.iso.date().nullable(), agreementNote: z.string(), approvedAt: z.string() });
-const historicalSource = z.object({ sourceSystem: z.string(), sourceAccount: z.string(), externalId: z.string(), cutoffAt: z.string(), recordSha256: z.string().regex(/^[a-f0-9]{64}$/) });
-const watchReasons = z.array(z.enum(["reminder_needs_review", "no_response_recorded", "reminder_blocked", "send_unknown", "visit_cancelled", "visit_no_show", "service_overdue", "response_needs_action", "next_action_overdue", "owner_required", "source_review_required", "reply_received_review"])).max(12);
+const recurrence = z.object({
+  mode: z.literal("calendar_months"),
+  intervalMonths: z.number().int().min(1).max(60),
+  anchorDate: z.iso.date(),
+  endDate: z.iso.date().nullable(),
+  agreementNote: z.string(),
+  approvedAt: z.string(),
+});
+const historicalSource = z.object({
+  sourceSystem: z.string(),
+  sourceAccount: z.string(),
+  externalId: z.string(),
+  cutoffAt: z.string(),
+  recordSha256: z.string().regex(/^[a-f0-9]{64}$/),
+});
+const watchReasons = z
+  .array(
+    z.enum([
+      "reminder_needs_review",
+      "no_response_recorded",
+      "reminder_blocked",
+      "send_unknown",
+      "visit_cancelled",
+      "visit_no_show",
+      "service_overdue",
+      "response_needs_action",
+      "next_action_overdue",
+      "owner_required",
+      "source_review_required",
+      "reply_received_review",
+    ]),
+  )
+  .max(12);
 const workdayFacts = z.object({
-  category: z.enum(["hvac_equipment", "roof_system", "other"]), label: z.string(),
-  manufacturer: z.string().nullable(), model: z.string().nullable(), serial: z.string().nullable(),
-  location: z.string().nullable(), installedOn: z.iso.date().nullable(), notes: z.string().nullable(),
-  warrantyStartsOn: z.iso.date().nullable(), warrantyEndsOn: z.iso.date().nullable(), warrantySource: z.string().nullable(),
-  attributes: z.array(z.object({ label: z.string(), value: z.string() })).max(20),
+  category: z.enum(["hvac_equipment", "roof_system", "other"]),
+  label: z.string(),
+  manufacturer: z.string().nullable(),
+  model: z.string().nullable(),
+  serial: z.string().nullable(),
+  location: z.string().nullable(),
+  installedOn: z.iso.date().nullable(),
+  notes: z.string().nullable(),
+  warrantyStartsOn: z.iso.date().nullable(),
+  warrantyEndsOn: z.iso.date().nullable(),
+  warrantySource: z.string().nullable(),
+  attributes: z
+    .array(z.object({ label: z.string(), value: z.string() }))
+    .max(20),
 });
-const workdayDefinition = z.object({ name: z.string(), trade: z.enum(["hvac", "roofing", "general"]), description: z.string(),
-  items: z.array(z.object({ key: z.string(), label: z.string(), kind: z.enum(["result", "text", "number", "photo"]), required: z.boolean(), allowNotApplicable: z.boolean(), unit: z.string().nullable() })).max(50),
+const workdayDefinition = z.object({
+  name: z.string(),
+  trade: z.enum(["hvac", "roofing", "general"]),
+  description: z.string(),
+  items: z
+    .array(
+      z.object({
+        key: z.string(),
+        label: z.string(),
+        kind: z.enum(["result", "text", "number", "photo"]),
+        required: z.boolean(),
+        allowNotApplicable: z.boolean(),
+        unit: z.string().nullable(),
+      }),
+    )
+    .max(50),
 });
-const workdayAnswers = z.array(z.object({ itemKey: z.string(), result: z.enum(["done", "needs_attention", "not_applicable"]), value: z.union([z.string(), z.number().finite()]).nullable(), reason: z.string().nullable() })).max(50);
+const workdayAnswers = z
+  .array(
+    z.object({
+      itemKey: z.string(),
+      result: z.enum(["done", "needs_attention", "not_applicable"]),
+      value: z.union([z.string(), z.number().finite()]).nullable(),
+      reason: z.string().nullable(),
+    }),
+  )
+  .max(50);
 const workdayCompletionResult = z.object({
-  id: z.uuid(), appointmentId: z.uuid(), contactId: z.uuid(), propertyId: z.uuid().nullable(),
-  performedAt: z.string(), recordedAt: z.string(), summary: z.string(), outcome: z.enum(["completed", "needs_followup"]), followupTaskId: z.uuid().nullable(),
-  entries: z.array(z.object({ id: z.uuid(), version: z.number().int(), checklistRevisionId: z.uuid(), assetId: z.uuid().nullable() })).max(20),
-  services: z.array(z.object({ id: z.uuid(), nextObligationId: z.uuid().nullable() })).max(20), nativeAppointmentStatus: z.literal("completed"),
+  id: z.uuid(),
+  appointmentId: z.uuid(),
+  contactId: z.uuid(),
+  propertyId: z.uuid().nullable(),
+  performedAt: z.string(),
+  recordedAt: z.string(),
+  summary: z.string(),
+  outcome: z.enum(["completed", "needs_followup"]),
+  followupTaskId: z.uuid().nullable(),
+  entries: z
+    .array(
+      z.object({
+        id: z.uuid(),
+        version: z.number().int(),
+        checklistRevisionId: z.uuid(),
+        assetId: z.uuid().nullable(),
+      }),
+    )
+    .max(20),
+  services: z
+    .array(z.object({ id: z.uuid(), nextObligationId: z.uuid().nullable() }))
+    .max(20),
+  nativeAppointmentStatus: z.literal("completed"),
 });
-const canonicalWorkday = (value: unknown): string => Array.isArray(value) ? `[${value.map(canonicalWorkday).join(",")}]`
-  : value && typeof value === "object" ? `{${Object.entries(value).sort(([a],[b]) => a.localeCompare(b)).map(([key,item]) => `${JSON.stringify(key)}:${canonicalWorkday(item)}`).join(",")}}` : JSON.stringify(value) ?? "null";
-const workdayDefinitionDigest = (value: unknown) => createHash("sha256").update(canonicalWorkday(value)).digest("hex");
-const unavailable = () => new CustomerLifecycleError(503, "customer_export_unavailable", "The export could not be prepared. No data was changed. Try again or ask your GrowthOS operator for help.");
+const canonicalWorkday = (value: unknown): string =>
+  Array.isArray(value)
+    ? `[${value.map(canonicalWorkday).join(",")}]`
+    : value && typeof value === "object"
+      ? `{${Object.entries(value)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(
+            ([key, item]) => `${JSON.stringify(key)}:${canonicalWorkday(item)}`,
+          )
+          .join(",")}}`
+      : (JSON.stringify(value) ?? "null");
+const workdayDefinitionDigest = (value: unknown) =>
+  createHash("sha256").update(canonicalWorkday(value)).digest("hex");
+const unavailable = () =>
+  new CustomerLifecycleError(
+    503,
+    "customer_export_unavailable",
+    "The export could not be prepared. No data was changed. Try again or ask your GrowthOS operator for help.",
+  );
 type ExportClient = Pick<pg.Client, "connect" | "query" | "end" | "on">;
+
+type BusinessRow = Record<string, unknown>;
+function businessScope(row: BusinessRow): string | null {
+  if (typeof row.lead_id === "string" && row.customer_work_id === null)
+    return `lead:${row.lead_id}`;
+  if (row.lead_id === null && typeof row.customer_work_id === "string")
+    return `work:${row.customer_work_id}`;
+  return null;
+}
+/** All parent IDs are already tenant-filtered. Require exact relationships too. */
+function businessLinks(
+  table: string,
+  rows: BusinessRow[],
+  data: Record<string, BusinessRow[]>,
+): BusinessRow[] {
+  const find = (name: string, id: unknown) =>
+    data[name]?.find((row) => row.id === id);
+  const same = (a: BusinessRow, b: BusinessRow | undefined) =>
+    !!b && businessScope(a) !== null && businessScope(a) === businessScope(b);
+  if (table === "customer_work_roots")
+    return rows.filter(
+      (row) =>
+        row.property_id === null ||
+        find("properties", row.property_id)?.contact_id === row.contact_id,
+    );
+  if (["estimates", "projects", "invoices", "value_entries"].includes(table))
+    rows = rows.filter((row) => businessScope(row) !== null);
+  if (table === "estimates" || table === "projects")
+    rows = rows.filter((row) =>
+      row.lead_id === null
+        ? Number.isInteger(row.work_version) && Number(row.work_version) > 0
+        : row.work_version === null,
+    );
+  if (table === "projects")
+    return rows.filter(
+      (row) =>
+        row.estimate_id === null ||
+        same(row, find("estimates", row.estimate_id)),
+    );
+  if (table === "invoices")
+    return rows.filter((row) => {
+      const project = find("projects", row.project_id),
+        estimate = find("estimates", row.estimate_id);
+      return (
+        (row.project_id === null || same(row, project)) &&
+        (row.estimate_id === null || same(row, estimate)) &&
+        (!project ||
+          project.estimate_id === null ||
+          row.estimate_id === null ||
+          project.estimate_id === row.estimate_id)
+      );
+    });
+  if (table === "value_entries") {
+    // First withhold incoherent refund parents. They cannot poison another
+    // work root's otherwise valid original receipt/correction history.
+    const originalRows = rows.filter(
+      (row) =>
+        row.customer_work_id === null ||
+        row.kind !== "refund" ||
+        rows.some(
+          (payment) =>
+            payment.id === row.refund_of_value_entry_id &&
+            payment.kind === "payment" &&
+            same(row, payment),
+        ),
+    );
+    return originalRows.filter((row) => {
+      if (
+        !Number.isSafeInteger(row.amount_cents) ||
+        Number(row.amount_cents) <= 0
+      )
+        return false;
+      if (row.lead_id !== null) return row.refund_of_value_entry_id === null;
+      if (row.kind !== "refund") return row.refund_of_value_entry_id === null;
+      const payment = originalRows.find(
+        (item) => item.id === row.refund_of_value_entry_id,
+      );
+      if (!payment || payment.kind !== "payment" || !same(row, payment))
+        return false;
+      const refunds = originalRows.filter(
+        (item) =>
+          item.kind === "refund" &&
+          item.refund_of_value_entry_id === payment.id,
+      );
+      const total = refunds.reduce(
+        (sum, item) => sum + Number(item.amount_cents),
+        0,
+      );
+      return (
+        refunds.every(
+          (item) =>
+            same(item, payment) &&
+            Number.isSafeInteger(item.amount_cents) &&
+            Number(item.amount_cents) > 0,
+        ) &&
+        Number.isSafeInteger(total) &&
+        total <= Number(payment.amount_cents)
+      );
+    });
+  }
+  if (table === "invoice_receipt_allocations")
+    return rows.filter((row) => {
+      const invoice = find("invoices", row.invoice_id),
+        value = find("value_entries", row.value_entry_id);
+      if (
+        !invoice ||
+        !value ||
+        !same(invoice, value) ||
+        !Number.isSafeInteger(row.amount_cents) ||
+        Number(row.amount_cents) <= 0
+      )
+        return false;
+      if (row.kind === "payment" || row.kind === "refund")
+        return row.reverses_allocation_id === null && row.kind === value.kind;
+      const original = rows.find(
+        (item) => item.id === row.reverses_allocation_id,
+      );
+      return (
+        row.kind === "reversal" &&
+        !!original &&
+        ["payment", "refund"].includes(String(original.kind)) &&
+        original.invoice_id === row.invoice_id &&
+        original.value_entry_id === row.value_entry_id &&
+        original.amount_cents === row.amount_cents
+      );
+    });
+  return rows;
+}
 
 /** A bounded consistent snapshot; caps fail the whole request, never truncate. */
 export function createCustomerLifecycleExporter({
-  createClient = () => new pg.Client({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 2000, query_timeout: 5500 }),
-  maxRows = 2000, maxBytes = 10 * 1024 * 1024,
-}: { createClient?: () => ExportClient; maxRows?: number; maxBytes?: number } = {}) {
+  createClient = () =>
+    new pg.Client({
+      connectionString: process.env.DATABASE_URL,
+      connectionTimeoutMillis: 2000,
+      query_timeout: 5500,
+    }),
+  maxRows = 2000,
+  maxBytes = 10 * 1024 * 1024,
+}: {
+  createClient?: () => ExportClient;
+  maxRows?: number;
+  maxBytes?: number;
+} = {}) {
   let occupied = 0;
   return async (organizationId: string, userId: string) => {
     if (occupied >= 2) throw unavailable();
     occupied++;
     let client: ExportClient;
-    try { client = createClient(); } catch { occupied--; throw unavailable(); }
-    let expired = false, failed = false;
-    client.on("error", () => { failed = true; });
+    try {
+      client = createClient();
+    } catch {
+      occupied--;
+      throw unavailable();
+    }
+    let expired = false,
+      failed = false;
+    client.on("error", () => {
+      failed = true;
+    });
     const query = async (text: string, values: unknown[] = []) => {
       if (expired || failed) throw unavailable();
-      const result = await client.query<Record<string, unknown>>({ text, values });
+      const result = await client.query<Record<string, unknown>>({
+        text,
+        values,
+      });
       if (expired || failed) throw unavailable();
       return result;
     };
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      return await Promise.race([(async () => {
-        await client.connect();
-        await query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
-        await query("SET LOCAL statement_timeout = '5000ms'");
-        await query("SET LOCAL lock_timeout = '500ms'");
-        await query("SET LOCAL idle_in_transaction_session_timeout = '10000ms'");
-        const actor = await query("SELECT id FROM public.users WHERE id = $2 AND organization_id = $1 AND is_active = true AND role IN ('owner', 'admin')", [organizationId, userId]);
-        if (actor.rows.length !== 1) throw new CustomerLifecycleError(403, "lifecycle_manager_required", "An active company owner or administrator is required.");
-        const org = await query("SELECT id, name, slug, created_at FROM public.organizations WHERE id = $1", [organizationId]);
-        if (org.rows.length !== 1) throw unavailable();
-        const data: Record<string, Record<string, unknown>[]> = {};
-        const included = new Map<string, Set<unknown>>();
-        const coverage: Array<{ table: string; fields: readonly string[]; count: number; withheldInvalidLinks: number }> = [];
-        let bytes = 0;
-        for (const definition of CUSTOMER_EXPORT_DATASETS) {
-          // All SQL identifiers are the fixed reviewed list above, never input.
-          const result = await query(`SELECT ${definition.fields.map((field) => `"${field}"`).join(", ")} FROM public."${definition.table}" WHERE organization_id = $1 ORDER BY id LIMIT $2`, [organizationId, maxRows + 1]);
-          if (result.rows.length > maxRows) throw new CustomerLifecycleError(413, "customer_export_limit", "This company exceeds the core export limit. Ask your GrowthOS operator for an expanded export. No partial file was produced.");
-          const links = Object.entries(definition.references ?? {});
-          let rows = result.rows.filter((row) => links.every(([column, parent]) => parent === definition.table || row[column] === null || included.get(parent)?.has(row[column])));
-          // Same-table chains can arrive in any UUID sort order. Repeatedly
-          // remove links to excluded ancestors rather than losing valid
-          // reversals/recurrences or retaining a foreign parent's identifier.
-          const selfLinks = links.filter(([, parent]) => parent === definition.table);
-          if (selfLinks.length) {
-            let changed: boolean;
-            do {
-              const ownIds = new Set(rows.map(row => row.id));
-              const valid = rows.filter(row => selfLinks.every(([column]) => row[column] === null || ownIds.has(row[column])));
-              changed = valid.length !== rows.length; rows = valid;
-            } while (changed);
+      return await Promise.race([
+        (async () => {
+          await client.connect();
+          await query(
+            "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+          );
+          await query("SET LOCAL statement_timeout = '5000ms'");
+          await query("SET LOCAL lock_timeout = '500ms'");
+          await query(
+            "SET LOCAL idle_in_transaction_session_timeout = '10000ms'",
+          );
+          const actor = await query(
+            "SELECT id FROM public.users WHERE id = $2 AND organization_id = $1 AND is_active = true AND role IN ('owner', 'admin')",
+            [organizationId, userId],
+          );
+          if (actor.rows.length !== 1)
+            throw new CustomerLifecycleError(
+              403,
+              "lifecycle_manager_required",
+              "An active company owner or administrator is required.",
+            );
+          const org = await query(
+            "SELECT id, name, slug, created_at FROM public.organizations WHERE id = $1",
+            [organizationId],
+          );
+          if (org.rows.length !== 1) throw unavailable();
+          const data: Record<string, Record<string, unknown>[]> = {};
+          const included = new Map<string, Set<unknown>>();
+          const coverage: Array<{
+            table: string;
+            fields: readonly string[];
+            count: number;
+            withheldInvalidLinks: number;
+          }> = [];
+          let bytes = 0;
+          for (const definition of CUSTOMER_EXPORT_DATASETS) {
+            // All SQL identifiers are the fixed reviewed list above, never input.
+            const result = await query(
+              `SELECT ${definition.fields.map((field) => `"${field}"`).join(", ")} FROM public."${definition.table}" WHERE organization_id = $1 ORDER BY id LIMIT $2`,
+              [organizationId, maxRows + 1],
+            );
+            if (result.rows.length > maxRows)
+              throw new CustomerLifecycleError(
+                413,
+                "customer_export_limit",
+                "This company exceeds the core export limit. Ask your GrowthOS operator for an expanded export. No partial file was produced.",
+              );
+            const links = Object.entries(definition.references ?? {});
+            let rows = result.rows.filter((row) =>
+              links.every(
+                ([column, parent]) =>
+                  parent === definition.table ||
+                  row[column] === null ||
+                  included.get(parent)?.has(row[column]),
+              ),
+            );
+            rows = businessLinks(definition.table, rows, data);
+            // Same-table chains can arrive in any UUID sort order. Repeatedly
+            // remove links to excluded ancestors rather than losing valid
+            // reversals/recurrences or retaining a foreign parent's identifier.
+            const selfLinks = links.filter(
+              ([, parent]) => parent === definition.table,
+            );
+            if (selfLinks.length) {
+              let changed: boolean;
+              do {
+                const ownIds = new Set(rows.map((row) => row.id));
+                const valid = rows.filter((row) =>
+                  selfLinks.every(
+                    ([column]) =>
+                      row[column] === null || ownIds.has(row[column]),
+                  ),
+                );
+                changed = valid.length !== rows.length;
+                rows = valid;
+              } while (changed);
+            }
+            if (definition.table === "estimates")
+              for (const row of rows)
+                row.line_items = lineItems.parse(row.line_items);
+            if (definition.table === "invoices")
+              for (const row of rows) {
+                row.historical_source =
+                  row.historical_source === null
+                    ? null
+                    : historicalSource.parse(row.historical_source);
+                if (row.issued_document !== null) {
+                  const storedHash = createHash("sha256")
+                    .update(JSON.stringify(row.issued_document))
+                    .digest("hex");
+                  if (row.issued_document_sha256 !== storedHash)
+                    throw unavailable();
+                } else if (
+                  row.issued_document_sha256 !== null ||
+                  row.issued_at !== null
+                )
+                  throw unavailable();
+                row.draft_document = invoiceDocument.parse(row.draft_document);
+                row.issued_document =
+                  row.issued_document === null
+                    ? null
+                    : invoiceDocument.parse(row.issued_document);
+                row.exported_issued_document_sha256 =
+                  row.issued_document === null
+                    ? null
+                    : createHash("sha256")
+                        .update(JSON.stringify(row.issued_document))
+                        .digest("hex");
+              }
+            if (definition.table === "service_obligations")
+              for (const row of rows)
+                row.recurrence =
+                  row.recurrence === null
+                    ? null
+                    : recurrence.parse(row.recurrence);
+            if (definition.table === "service_watch_cases")
+              for (const row of rows)
+                row.reasons = watchReasons.parse(row.reasons);
+            if (definition.table === "property_assets")
+              for (const row of rows) row.facts = workdayFacts.parse(row.facts);
+            if (definition.table === "work_checklist_revisions")
+              for (const row of rows) {
+                if (
+                  row.definition_sha256 !==
+                  workdayDefinitionDigest(row.definition)
+                )
+                  throw unavailable();
+                row.definition = workdayDefinition.parse(row.definition);
+                row.exported_definition_sha256 = workdayDefinitionDigest(
+                  row.definition,
+                );
+              }
+            if (definition.table === "appointment_work_entries")
+              for (const row of rows) {
+                row.asset_snapshot =
+                  row.asset_snapshot === null
+                    ? null
+                    : workdayFacts
+                        .extend({ id: z.uuid(), version: z.number().int() })
+                        .parse(row.asset_snapshot);
+                row.answers = workdayAnswers.parse(row.answers);
+              }
+            if (definition.table === "appointment_work_completions")
+              for (const row of rows) {
+                row.snapshot =
+                  row.original_completion_id === null
+                    ? z
+                        .object({ result: workdayCompletionResult })
+                        .parse(row.snapshot)
+                    : z.object({ note: z.string() }).parse(row.snapshot);
+              }
+            bytes += Buffer.byteLength(JSON.stringify(rows));
+            if (bytes > maxBytes)
+              throw new CustomerLifecycleError(
+                413,
+                "customer_export_limit",
+                "This company exceeds the core export size. Ask your GrowthOS operator for an expanded export. No partial file was produced.",
+              );
+            data[definition.table] = rows;
+            included.set(definition.table, new Set(rows.map((row) => row.id)));
+            coverage.push({
+              table: definition.table,
+              fields: [
+                ...definition.fields,
+                ...(definition.computedFields ?? []),
+              ],
+              count: rows.length,
+              withheldInvalidLinks: result.rows.length - rows.length,
+            });
           }
-          if (definition.table === "estimates") for (const row of rows) row.line_items = lineItems.parse(row.line_items);
-          if (definition.table === "invoices") for (const row of rows) {
-            row.historical_source = row.historical_source === null ? null : historicalSource.parse(row.historical_source);
-            if (row.issued_document !== null) {
-              const storedHash = createHash("sha256").update(JSON.stringify(row.issued_document)).digest("hex");
-              if (row.issued_document_sha256 !== storedHash) throw unavailable();
-            } else if (row.issued_document_sha256 !== null || row.issued_at !== null) throw unavailable();
-            row.draft_document = invoiceDocument.parse(row.draft_document);
-            row.issued_document = row.issued_document === null ? null : invoiceDocument.parse(row.issued_document);
-            row.exported_issued_document_sha256 = row.issued_document === null ? null : createHash("sha256").update(JSON.stringify(row.issued_document)).digest("hex");
-          }
-          if (definition.table === "service_obligations") for (const row of rows) row.recurrence = row.recurrence === null ? null : recurrence.parse(row.recurrence);
-          if (definition.table === "service_watch_cases") for (const row of rows) row.reasons = watchReasons.parse(row.reasons);
-          if (definition.table === "property_assets") for (const row of rows) row.facts = workdayFacts.parse(row.facts);
-          if (definition.table === "work_checklist_revisions") for (const row of rows) {
-            if (row.definition_sha256 !== workdayDefinitionDigest(row.definition)) throw unavailable();
-            row.definition = workdayDefinition.parse(row.definition);
-            row.exported_definition_sha256 = workdayDefinitionDigest(row.definition);
-          }
-          if (definition.table === "appointment_work_entries") for (const row of rows) {
-            row.asset_snapshot = row.asset_snapshot === null ? null : workdayFacts.extend({ id: z.uuid(), version: z.number().int() }).parse(row.asset_snapshot);
-            row.answers = workdayAnswers.parse(row.answers);
-          }
-          if (definition.table === "appointment_work_completions") for (const row of rows) {
-            row.snapshot = row.original_completion_id === null
-              ? z.object({ result: workdayCompletionResult }).parse(row.snapshot)
-              : z.object({ note: z.string() }).parse(row.snapshot);
-          }
-          bytes += Buffer.byteLength(JSON.stringify(rows));
-          if (bytes > maxBytes) throw new CustomerLifecycleError(413, "customer_export_limit", "This company exceeds the core export size. Ask your GrowthOS operator for an expanded export. No partial file was produced.");
-          data[definition.table] = rows;
-          included.set(definition.table, new Set(rows.map((row) => row.id)));
-          coverage.push({ table: definition.table, fields: [...definition.fields, ...(definition.computedFields ?? [])], count: rows.length, withheldInvalidLinks: result.rows.length - rows.length });
-        }
-        await query("ROLLBACK");
-        const snapshot = { organization: org.rows[0], data, coverage };
-        // Revalidate against current state on this same bounded connection, outside
-        // the earlier snapshot. Keep the actor stable through the audit commit.
-        await query("BEGIN");
-        await query("SET LOCAL statement_timeout = '5000ms'");
-        await query("SET LOCAL lock_timeout = '500ms'");
-        await query("SET LOCAL idle_in_transaction_session_timeout = '10000ms'");
-        const currentActor = await query("SELECT id FROM public.users WHERE id = $2 AND organization_id = $1 AND is_active = true AND role IN ('owner', 'admin') FOR SHARE", [organizationId, userId]);
-        if (currentActor.rows.length !== 1) throw new CustomerLifecycleError(403, "lifecycle_manager_required", "An active company owner or administrator is required.");
-        const exportId = randomUUID();
-        const result = {
-          format: "growthos-core-customer-export", version: 1, exportId, generatedAt: new Date().toISOString(),
-          organization: snapshot.organization,
-          manifest: { scope: "core_customer_records", completeAccountExport: false, deletionPerformed: false,
-            rowsPerTableLimit: maxRows, byteLimit: maxBytes, tables: snapshot.coverage,
-            exclusions: CUSTOMER_EXPORT_EXCLUSIONS, dataSha256: createHash("sha256").update(JSON.stringify(snapshot.data)).digest("hex"),
-            followUp: "Ask your GrowthOS operator to review excluded categories, withheld relationships and any expanded export requirements." },
-          data: snapshot.data,
-        };
-        if (Buffer.byteLength(JSON.stringify(result)) > maxBytes) throw new CustomerLifecycleError(413, "customer_export_limit", "The core export exceeds its size limit. Ask your GrowthOS operator for an expanded export.");
-        const metadata = { exportId, scope: result.manifest.scope, dataSha256: result.manifest.dataSha256, counts: snapshot.coverage.map(({ table, count, withheldInvalidLinks }) => ({ table, count, withheldInvalidLinks })), deliveryConfirmed: false };
-        await query("INSERT INTO public.audit_events (organization_id, actor_user_id, action, entity_type, entity_id, metadata) VALUES ($1, $2, 'customer_lifecycle.export_prepared', 'organization', $1, $3::jsonb)", [organizationId, userId, JSON.stringify(metadata)]);
-        await query("COMMIT");
-        return result;
-      })(), new Promise<never>((_, reject) => { timer = setTimeout(() => { expired = true; reject(unavailable()); }, 20_000); })]);
+          await query("ROLLBACK");
+          const snapshot = { organization: org.rows[0], data, coverage };
+          // Revalidate against current state on this same bounded connection, outside
+          // the earlier snapshot. Keep the actor stable through the audit commit.
+          await query("BEGIN");
+          await query("SET LOCAL statement_timeout = '5000ms'");
+          await query("SET LOCAL lock_timeout = '500ms'");
+          await query(
+            "SET LOCAL idle_in_transaction_session_timeout = '10000ms'",
+          );
+          const currentActor = await query(
+            "SELECT id FROM public.users WHERE id = $2 AND organization_id = $1 AND is_active = true AND role IN ('owner', 'admin') FOR SHARE",
+            [organizationId, userId],
+          );
+          if (currentActor.rows.length !== 1)
+            throw new CustomerLifecycleError(
+              403,
+              "lifecycle_manager_required",
+              "An active company owner or administrator is required.",
+            );
+          const exportId = randomUUID();
+          const result = {
+            format: "growthos-core-customer-export",
+            version: 1,
+            exportId,
+            generatedAt: new Date().toISOString(),
+            organization: snapshot.organization,
+            manifest: {
+              scope: "core_customer_records",
+              completeAccountExport: false,
+              deletionPerformed: false,
+              rowsPerTableLimit: maxRows,
+              byteLimit: maxBytes,
+              tables: snapshot.coverage,
+              exclusions: CUSTOMER_EXPORT_EXCLUSIONS,
+              dataSha256: createHash("sha256")
+                .update(JSON.stringify(snapshot.data))
+                .digest("hex"),
+              followUp:
+                "Ask your GrowthOS operator to review excluded categories, withheld relationships and any expanded export requirements.",
+            },
+            data: snapshot.data,
+          };
+          if (Buffer.byteLength(JSON.stringify(result)) > maxBytes)
+            throw new CustomerLifecycleError(
+              413,
+              "customer_export_limit",
+              "The core export exceeds its size limit. Ask your GrowthOS operator for an expanded export.",
+            );
+          const metadata = {
+            exportId,
+            scope: result.manifest.scope,
+            dataSha256: result.manifest.dataSha256,
+            counts: snapshot.coverage.map(
+              ({ table, count, withheldInvalidLinks }) => ({
+                table,
+                count,
+                withheldInvalidLinks,
+              }),
+            ),
+            deliveryConfirmed: false,
+          };
+          await query(
+            "INSERT INTO public.audit_events (organization_id, actor_user_id, action, entity_type, entity_id, metadata) VALUES ($1, $2, 'customer_lifecycle.export_prepared', 'organization', $1, $3::jsonb)",
+            [organizationId, userId, JSON.stringify(metadata)],
+          );
+          await query("COMMIT");
+          return result;
+        })(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            expired = true;
+            reject(unavailable());
+          }, 20_000);
+        }),
+      ]);
     } catch (error) {
       if (error instanceof CustomerLifecycleError) throw error;
       throw unavailable();
     } finally {
-      clearTimeout(timer); expired = true;
+      clearTimeout(timer);
+      expired = true;
       // Failed cleanup retains the slot until closing succeeds, bounding clients.
       let closeTimer: ReturnType<typeof setTimeout> | undefined;
-      try { await Promise.race([client.end().then(() => { occupied--; }), new Promise<void>((resolve) => { closeTimer = setTimeout(resolve, 500); })]); }
-      catch { /* Keep slot occupied; never create unlimited replacements. */ }
-      finally { clearTimeout(closeTimer); }
+      try {
+        await Promise.race([
+          client.end().then(() => {
+            occupied--;
+          }),
+          new Promise<void>((resolve) => {
+            closeTimer = setTimeout(resolve, 500);
+          }),
+        ]);
+      } catch {
+        /* Keep slot occupied; never create unlimited replacements. */
+      } finally {
+        clearTimeout(closeTimer);
+      }
     }
   };
 }

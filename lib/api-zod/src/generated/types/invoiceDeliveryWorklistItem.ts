@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { InvoiceDeliveryWorklistItemDelivery } from './invoiceDeliveryWorklistItemDelivery';
+import type { InvoiceDeliveryWorklistItemSourceKind } from './invoiceDeliveryWorklistItemSourceKind';
 import type { InvoiceDeliveryWorklistItemStatus } from './invoiceDeliveryWorklistItemStatus';
 
 export interface InvoiceDeliveryWorklistItem {
@@ -17,8 +18,13 @@ export interface InvoiceDeliveryWorklistItem {
   status: InvoiceDeliveryWorklistItemStatus;
   /** @minimum 1 */
   version: number;
-  leadId: string;
+  leadId: string | null;
   /** @nullable */
   projectId: string | null;
   delivery: InvoiceDeliveryWorklistItemDelivery;
+  customerWorkId?: string | null;
+  contactId?: string;
+  propertyId?: string | null;
+  sourceKind?: InvoiceDeliveryWorklistItemSourceKind;
+  organizationId?: string;
 }

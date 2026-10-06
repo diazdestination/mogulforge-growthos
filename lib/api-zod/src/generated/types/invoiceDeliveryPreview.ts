@@ -5,11 +5,8 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
-import type { InvoiceDeliveryPreviewIntent } from './invoiceDeliveryPreviewIntent';
-import type { InvoiceDeliveryPreviewMaxAttempts } from './invoiceDeliveryPreviewMaxAttempts';
-import type { InvoiceDeliveryPreviewSender } from './invoiceDeliveryPreviewSender';
 
-export interface InvoiceDeliveryPreview {
+export type InvoiceDeliveryPreview = {
   previewId: string;
   /** @pattern ^[a-f0-9]{64}$ */
   payloadSha256: string;
@@ -26,10 +23,15 @@ export interface InvoiceDeliveryPreview {
   /** @pattern ^[a-f0-9]{64}$ */
   sourceSha256: string;
   recipient: string;
-  sender: InvoiceDeliveryPreviewSender;
+  sender: {
+  userId: string;
+  source: 'lead_assignee' | 'company_default';
+  provider: 'gmail' | 'microsoft';
+  senderEmail: string;
+};
   subject: string;
   body: string;
-  intent: InvoiceDeliveryPreviewIntent;
+  intent: 'initial' | 'retry_not_dispatched' | 'additional_copy';
   /** @nullable */
   expectedLatestExecutionId: string | null;
   /** @nullable */
@@ -39,6 +41,48 @@ export interface InvoiceDeliveryPreview {
      * @maximum 5
      */
   prospectiveAttemptNumber: number;
-  maxAttempts: InvoiceDeliveryPreviewMaxAttempts;
+  maxAttempts: 5;
   deliveryDetail: string;
-}
+} | {
+  previewId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  expiresAt: Date;
+  invoiceId: string;
+  /** @minimum 1 */
+  invoiceVersion: number;
+  invoiceNumber: string;
+  issuedAt: Date;
+  /** @pattern ^[a-f0-9]{64}$ */
+  documentSha256: string;
+  leadId:  | null;
+  contactId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  sourceSha256: string;
+  recipient: string;
+  sender: {
+  userId: string;
+  source: 'company_default';
+  provider: 'gmail' | 'microsoft';
+  senderEmail: string;
+};
+  subject: string;
+  body: string;
+  intent: 'initial' | 'retry_not_dispatched' | 'additional_copy';
+  /** @nullable */
+  expectedLatestExecutionId: string | null;
+  /** @nullable */
+  reason: string | null;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  prospectiveAttemptNumber: number;
+  maxAttempts: 5;
+  deliveryDetail: string;
+  reviewVersion: 3;
+  customerWorkId: string;
+  propertyId: string | null;
+  /** @pattern ^[a-f0-9]{64}$ */
+  senderIdentitySha256: string;
+};

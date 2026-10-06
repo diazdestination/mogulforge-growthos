@@ -5,6 +5,7 @@ import { renderWithQuery } from "@/test/render";
 import { contractorRequest } from "@/lib/contractor-api";
 import { invoiceId, invoiceLeadId } from "@/test/invoice-fixtures";
 import { sampleAttempt } from "@/test/invoice-delivery-fixtures";
+import { workOrg, workRoot, workContact } from '@/test/customer-work-fixtures';
 
 vi.mock("@/lib/contractor-api", async (original) => ({
   ...(await original<typeof import("@/lib/contractor-api")>()),
@@ -58,6 +59,15 @@ const render = (canManage = true, leadId = "", projectId = "") =>
       projectId={projectId}
     />,
   );
+
+it('keeps returning work in the existing delivery page with a pinned invoice link and no fake opportunity', async () => {
+  vi.mocked(contractorRequest).mockResolvedValue({ items: [{ ...item(), organizationId: workOrg, leadId: null, customerWorkId: workRoot, contactId: workContact, propertyId: null, sourceKind: 'customer_work' }], total: 1, page: 0, pageSize: 25, boundary: 'Existing canonical page' });
+  renderWithQuery(<InvoiceDeliveryWorklist organizationId={workOrg} canManage leadId="" projectId="" />);
+  expect((await screen.findByRole('link', { name: 'Open invoice' })).getAttribute('href')).toBe(`/invoices/${invoiceId}?organizationId=${workOrg}#invoice-delivery`); expect(document.querySelector('a[href*="leads/null"]')).toBeNull();
+});
+it('rejects a null-lead row without its authoritative work/customer context', async () => {
+  vi.mocked(contractorRequest).mockResolvedValue({ items: [{ ...item(), leadId: null }], total: 1, page: 0, pageSize: 25, boundary: 'Unavailable context' }); render(); await screen.findByRole('alert'); expect(screen.queryByRole('link', { name: 'Open invoice' })).toBeNull();
+});
 
 it("shows authoritative unknown evidence and a canonical invoice link without offering a resend or pretending counts are exceptions", async () => {
   render();

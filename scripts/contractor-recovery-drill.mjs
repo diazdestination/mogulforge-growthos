@@ -22,6 +22,7 @@ import { sourceNurtureIds, seedSourceNurtureRecovery, assertSourceNurtureRecover
 import { seedCustomerWorkspaceFixture } from './customer-workspace-fixture.mjs';
 import { CALLIE_CONVERSATION_RECOVERY_SLUGS, seedCallieConversationRecovery, assertCallieConversationRecovery, assertCallieConversationKeys } from './callie-conversation-recovery-fixture.mjs';
 import { WORKDAY_RECOVERY_SLUGS, seedWorkdayRecovery, assertWorkdayRecovery, assertWorkdayKeys } from './contractor-workday-recovery-fixture.mjs';
+import { returningCustomerIds, seedReturningCustomerRecovery, assertReturningCustomerRecovery, assertReturningCustomerKeys } from './returning-customer-recovery-fixture.mjs';
 
 const requireApi = createRequire(new URL('../artifacts/api-server/package.json', import.meta.url));
 const requireDb = createRequire(new URL('../lib/db/package.json', import.meta.url));
@@ -32,7 +33,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const identifier = (name) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('contractor_identifier_invalid'); return `"${name}"`; };
 const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot', 'reasons', 'snapshot', 'settings', 'result', 'historical_source', 'policy', 'context_snapshot']);
-const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql', '0010_lead-replies.sql', '0011_invoice-recovery.sql', '0012_callie-intake.sql', '0013_standing-service.sql', '0014_source-nurture.sql', '0015_callie-conversation.sql', '0016_contractor-workday.sql'];
+const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql', '0010_lead-replies.sql', '0011_invoice-recovery.sql', '0012_callie-intake.sql', '0013_standing-service.sql', '0014_source-nurture.sql', '0015_callie-conversation.sql', '0016_contractor-workday.sql', '0017_returning-customer-work.sql'];
 
 async function insert(database, table, row) {
   const fields = Object.keys(row);
@@ -105,11 +106,25 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     }
     const beforeUpgrade = await fingerprints(source);
     const migrations = [];
+    let returningPreviousTableCount = 0, returningLegacyFingerprint;
+    const legacyFingerprint = async () => {
+      const rows = {};
+      for (const table of ['estimates','projects','invoices','value_entries']) rows[table]=(await source.query(`SELECT count(*)::int AS count,
+        md5(coalesce(string_agg(md5((to_jsonb(t)-'customer_work_id'-'work_version'-'refund_of_value_entry_id')::text),','
+          ORDER BY md5((to_jsonb(t)-'customer_work_id'-'work_version'-'refund_of_value_entry_id')::text)),'')) AS digest FROM ${identifier(table)} t`)).rows[0];
+      return rows;
+    };
     for (const file of deltas) {
+      if (file === '0017_returning-customer-work.sql') {
+        returningPreviousTableCount = Object.keys((await fingerprints(source)).tables).length;
+        assert.equal(returningPreviousTableCount,139);
+        returningLegacyFingerprint=await legacyFingerprint();
+      }
       const sql = (await readFile(new URL(`../reports/staging-schema-preview-2026-10-01/${file}`, import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
       await source.exec(sql);
       migrations.push({ file, sha256: sha(sql) });
     }
+    assert.deepEqual(await legacyFingerprint(),returningLegacyFingerprint);
     const currentSchema = await tsImport('../lib/db/src/schema/index.ts', import.meta.url);
     const expected = generateDrizzleJson(currentSchema).tables;
     const actual = (await source.query("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,column_name")).rows;
@@ -157,6 +172,10 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       await seedWorkdayRecovery(source, slug);
       await assertWorkdayRecovery(source, slug);
     }
+    for (const slug of slugs) {
+      await seedReturningCustomerRecovery(source,slug);
+      await assertReturningCustomerRecovery(source,slug);
+    }
     await source.exec('CREATE ROLE contractor_recovery_reader; GRANT USAGE ON SCHEMA public TO contractor_recovery_reader; GRANT SELECT ON ALL TABLES IN SCHEMA public TO contractor_recovery_reader;');
     const careBaseline = await fingerprints(source);
     await assertCareTenantKeys(source, slugs[0], slugs[1]);
@@ -169,13 +188,14 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     const nurtureConstraintChecks = await assertSourceNurtureKeys(source, slugs[0], slugs[1]);
     const conversationConstraints = await assertCallieConversationKeys(source);
     const workdayConstraints = await assertWorkdayKeys(source);
+    const returningConstraints = await assertReturningCustomerKeys(source,slugs[0],slugs[1]);
     assert.deepEqual(await fingerprints(source), careBaseline);
     // Prove the reviewed active-service exception cannot mask an unpaused
     // company or another active obligation. These transactions always roll back.
     const guardBaseline = await fingerprints(source);
     for (const slug of slugs) {
       const id=fixtureIds(slug), reviewedPausedServiceId=nativeFixtureIds(slug).nextService;
-      const careOptions={reviewedPausedServiceId,reviewedPausedCareExecutionId:careFixtureIds(slug).execution,reviewedPausedInvoiceExecutionId:invoiceRecoveryIds(slug).secondExecution,reviewedPausedCallieExecutionId:callieFixtureIds(slug).execution,reviewedPausedStandingExecutionId:standingServiceIds(slug).execution,reviewedPausedNurtureExecutionId:sourceNurtureIds(slug).execution};
+      const careOptions={reviewedPausedServiceId,reviewedPausedCareExecutionId:careFixtureIds(slug).execution,reviewedPausedInvoiceExecutionId:invoiceRecoveryIds(slug).secondExecution,reviewedPausedCallieExecutionId:callieFixtureIds(slug).execution,reviewedPausedStandingExecutionId:standingServiceIds(slug).execution,reviewedPausedNurtureExecutionId:sourceNurtureIds(slug).execution,reviewedPausedReturningInvoiceExecutionId:returningCustomerIds(slug).execution};
       const check=(options)=>assertFixtureRecords({query:(sql,values)=>source.query(sql,values)},{syntheticSlug:slug},codec,options);
       await assert.rejects(check(), /restore_fixture_outbound_or_identity_unsafe/);
       await source.exec('BEGIN');
@@ -190,10 +210,14 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       } finally { await source.exec('ROLLBACK'); }
       await assert.rejects(check({reviewedPausedServiceId}),/restore_fixture_outbound_or_identity_unsafe/);
       await assert.rejects(check({reviewedPausedServiceId,reviewedPausedCareExecutionId:careFixtureIds(slug).execution}),/restore_fixture_outbound_or_identity_unsafe/);
+      const {reviewedPausedReturningInvoiceExecutionId,...withoutReturning}=careOptions;
+      await assert.rejects(check(withoutReturning),/restore_fixture_outbound_or_identity_unsafe/);
+      await assert.rejects(check({...careOptions,reviewedPausedReturningInvoiceExecutionId:invoiceRecoveryIds(slug).secondExecution}),/restore_fixture_returning_exception_invalid/);
       for (const query of [
         "UPDATE missed_call_care_policies SET enabled=true WHERE organization_id=$1",
         "UPDATE revenue_executions SET state='processing' WHERE organization_id=$1 AND kind='missed_call_care'",
         "UPDATE revenue_executions SET state='processing' WHERE organization_id=$1 AND kind='invoice_email' AND state='indeterminate'",
+        "UPDATE audit_events SET metadata=jsonb_set(metadata,'{context,leadId}','\"unrelated-acquisition\"'::jsonb) WHERE organization_id=$1 AND action='invoice_delivery.previewed' AND metadata->>'reviewVersion'='3'",
         "UPDATE audit_events SET metadata=metadata || '{\"phase\":\"unknown\"}'::jsonb WHERE organization_id=$1 AND action='invoice_delivery.not_dispatched'",
         "UPDATE callie_policy_revisions SET enabled=true,snapshot=jsonb_set(snapshot,'{enabled}','true'::jsonb) WHERE organization_id=$1 AND version=2",
         "UPDATE revenue_executions SET state='processing' WHERE organization_id=$1 AND kind='callie_one_call_acknowledgment'",
@@ -222,7 +246,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     restored = await PGlite.create({ loadDataDir: snapshot });
     assert.deepEqual(await fingerprints(restored), baseline);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM organizations WHERE slug='restore-drill-after-snapshot'")).rows[0].n, 0);
-    for (const slug of slugs) await assertFixtureRecords({ query: (sql, values) => restored.query(sql, values) }, { syntheticSlug: slug }, codec, { reviewedPausedServiceId: nativeFixtureIds(slug).nextService, reviewedPausedCareExecutionId: careFixtureIds(slug).execution, reviewedPausedInvoiceExecutionId: invoiceRecoveryIds(slug).secondExecution, reviewedPausedCallieExecutionId: callieFixtureIds(slug).execution, reviewedPausedStandingExecutionId: standingServiceIds(slug).execution, reviewedPausedNurtureExecutionId: sourceNurtureIds(slug).execution });
+    for (const slug of slugs) await assertFixtureRecords({ query: (sql, values) => restored.query(sql, values) }, { syntheticSlug: slug }, codec, { reviewedPausedServiceId: nativeFixtureIds(slug).nextService, reviewedPausedCareExecutionId: careFixtureIds(slug).execution, reviewedPausedInvoiceExecutionId: invoiceRecoveryIds(slug).secondExecution, reviewedPausedCallieExecutionId: callieFixtureIds(slug).execution, reviewedPausedStandingExecutionId: standingServiceIds(slug).execution, reviewedPausedNurtureExecutionId: sourceNurtureIds(slug).execution, reviewedPausedReturningInvoiceExecutionId:returningCustomerIds(slug).execution });
     for (const slug of slugs) await assertNativeFixture(restored,slug);
     for (const slug of slugs) await assertCareFixture(restored,slug);
     for (const slug of slugs) await assertOperationsFixture(restored,slug);
@@ -234,6 +258,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     for (const slug of slugs) await assertSourceNurtureRecovery(restored,slug);
     for (const slug of CALLIE_CONVERSATION_RECOVERY_SLUGS) await assertCallieConversationRecovery(restored, slug, codec);
     for (const slug of WORKDAY_RECOVERY_SLUGS) await assertWorkdayRecovery(restored, slug);
+    for (const slug of slugs) await assertReturningCustomerRecovery(restored,slug);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM billing_checkouts WHERE state='reconcile'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM customer_lifecycle WHERE state='paused'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM staff_invitations WHERE state='pending' AND delivery_state='unconfirmed'")).rows[0].n, 2);
@@ -266,6 +291,9 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       standingServiceConstraintChecks, standingDisabledHeadPreserved: true, standingUnknownSendPreserved: true, serviceSmsHoldAfterPurgePreserved: true, ambiguousServiceSmsPreserved: true,
       nurtureConstraintChecks, nurtureStoppedOwnershipPreserved: true, nurtureUnknownNeverAdvanced: true, nurtureFailedSyncPreserved: true, nurtureReplyHoldAfterPurgePreserved: true,
       workdayConstraintChecks: workdayConstraints, workdayCapturedHistoryPreserved: true,
+      returningPreviousTableCount, returningLegacyRowsUnchanged: true, returningConstraintChecks: returningConstraints,
+      returningCustomerLineagePreserved: true, returningCommandResultsPreserved: true,
+      returningWorkScopedReceiptsPreserved: true, returningV3UnknownOwnershipPreserved: true,
       workdayImmutableRevisionPreserved: true, workdayPrivatePhotosPreserved: true,
       workdayNoAcquisitionLeadCreated: true, workdayReadVerified: app.workdayReadVerified,
       callieConversationConstraintChecks: conversationConstraints.count,

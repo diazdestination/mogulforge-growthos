@@ -19,6 +19,7 @@ import {
   savedFiltersTable,
   tagsTable,
   usersTable,
+  valueEntriesTable,
 } from "@workspace/db";
 import { and, count, desc, eq, gte, ilike, inArray, ne, or, sql } from "drizzle-orm";
 
@@ -34,6 +35,9 @@ import { appointmentCustomer, assertHistoricalStaff, assertOperationalStaff, ass
 import { reconcileServiceAppointment } from "./service-obligations";
 import { guardWorkdayAppointment, retainsWorkdayLeadHistory } from "./workday-guards";
 import { lockReplyLead } from "./response-correlation";
+import { customerWorkRootsTable } from "../../../../lib/db/src/schema/customer-work";
+import { customerWorkFail } from "./customer-work-lineage";
+import { readNativeEstimate, readNativeProject } from "./returning-customer";
 
 /**
  * Org-scoped CRM data access. Every query in this module REQUIRES an
@@ -264,10 +268,27 @@ export async function updateProperty(
   input: Partial<typeof propertiesTable.$inferInsert>,
 ) {
   const { organizationId: _ignored, id: _id, ...safe } = input as Record<string, unknown>;
-  if (!(await validateOrgRefs(organizationId, { contactId: input.contactId }))) {
+  return db.transaction(async tx => {
+  // Lock the actual ordinary writer row, including address-only edits. A fresh
+  // work create either commits first, or rereads this committed parent change.
+  const [current] = await tx.select().from(propertiesTable).where(and(eq(propertiesTable.id,id),eq(propertiesTable.organizationId,organizationId))).for("update");
+  if (!current) return null;
+  if (input.contactId !== undefined && input.contactId !== current.contactId) {
+    const [retained] = await tx.select({id:customerWorkRootsTable.id}).from(customerWorkRootsTable).where(and(eq(customerWorkRootsTable.organizationId,organizationId),eq(customerWorkRootsTable.propertyId,id))).limit(1);
+    if (retained) customerWorkFail("customer_work_parent_locked","This property has retained customer work. Its customer cannot be changed; create a separate property for different ownership.");
+    const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).innerJoin(leadsTable, and(
+      eq(leadsTable.id, invoicesTable.leadId), eq(leadsTable.organizationId, organizationId),
+    )).where(and(eq(invoicesTable.organizationId, organizationId), eq(leadsTable.propertyId, id))).limit(1);
+    if (invoice) customerWorkFail(INVOICE_HISTORY_RETAINED, "This property's customer is retained by invoice history. Create a separate property for different ownership.");
+    const [value] = await tx.select({ id: valueEntriesTable.id }).from(valueEntriesTable).innerJoin(leadsTable, and(
+      eq(leadsTable.id, valueEntriesTable.leadId), eq(leadsTable.organizationId, organizationId),
+    )).where(and(eq(valueEntriesTable.organizationId, organizationId), eq(leadsTable.propertyId, id))).limit(1);
+    if (value) customerWorkFail(VALUE_HISTORY_RETAINED, "This property's customer is retained by recorded value. Create a separate property for different ownership.");
+  }
+  if (!(await validateOrgRefs(organizationId, { contactId: input.contactId }, tx))) {
     return null;
   }
-  const [row] = await db
+  const [row] = await tx
     .update(propertiesTable)
     .set(safe)
     .where(
@@ -275,6 +296,7 @@ export async function updateProperty(
     )
     .returning();
   return row ?? null;
+  });
 }
 
 const MAX_LEAD_PAGE_SIZE = 200;
@@ -423,6 +445,26 @@ export async function updateLead(
   });
   if (!ok) return null;
   return db.transaction(async (tx) => {
+    if (input.propertyId !== undefined) {
+      // A legacy lead remains the original money scope. Serialize only parent
+      // edits with invoice/value creation; ordinary status/note edits retain
+      // their existing writer behavior and cannot move retained money.
+      await lockContractorSchedule(tx, organizationId);
+      const [existing] = await tx.select().from(leadsTable).where(and(
+        eq(leadsTable.id, id), eq(leadsTable.organizationId, organizationId),
+      )).for("update");
+      if (!existing) return null;
+      if (input.propertyId !== existing.propertyId) {
+        const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(
+          eq(invoicesTable.organizationId, organizationId), eq(invoicesTable.leadId, id),
+        )).limit(1);
+        if (invoice) customerWorkFail(INVOICE_HISTORY_RETAINED, "This opportunity has retained invoice history. Keep its original property; create separate work for a different property.");
+        const [value] = await tx.select({ id: valueEntriesTable.id }).from(valueEntriesTable).where(and(
+          eq(valueEntriesTable.organizationId, organizationId), eq(valueEntriesTable.leadId, id),
+        )).limit(1);
+        if (value) customerWorkFail(VALUE_HISTORY_RETAINED, "This opportunity has retained recorded value. Keep its original property; create separate work for a different property.");
+      }
+    }
     const [row] = await tx
       .update(leadsTable)
       .set(safe)
@@ -445,12 +487,14 @@ export async function updateLead(
 
 export async function listEstimates(
   organizationId: string,
-  filters: { leadId?: string; status?: string; limit?: number; offset?: number } = {},
+  filters: { leadId?: string; customerWorkId?: string; contactId?: string; status?: string; limit?: number; offset?: number } = {},
 ) {
   const conditions = [eq(estimatesTable.organizationId, organizationId)];
   if (filters.leadId) {
     conditions.push(eq(estimatesTable.leadId, filters.leadId));
   }
+  if (filters.customerWorkId) conditions.push(eq(estimatesTable.customerWorkId, filters.customerWorkId));
+  if (filters.contactId) conditions.push(sql`(exists(select 1 from leads l where l.id=${estimatesTable.leadId} and l.organization_id=${organizationId} and l.contact_id=${filters.contactId}) or exists(select 1 from customer_work_roots w where w.id=${estimatesTable.customerWorkId} and w.organization_id=${organizationId} and w.contact_id=${filters.contactId}))`);
   if (filters.status) {
     conditions.push(
       eq(
@@ -474,10 +518,9 @@ export async function listEstimates(
     .orderBy(desc(estimatesTable.createdAt), desc(estimatesTable.id))
     .limit(limit)
     .offset(offset);
-  return rows.map((row) => ({
-    ...row.estimate,
-    leadLabel: buildLeadLabel(row),
-  }));
+  const result = [];
+  for (const row of rows) { const value = await readNativeEstimate(db,organizationId,row.estimate.id); if(value) result.push({...value,leadLabel:row.estimate.leadId ? buildLeadLabel(row) : null}); }
+  return result;
 }
 
 /**
@@ -652,6 +695,7 @@ export async function findDuplicateLeadGroups(
 
 // ---------- lead merge ----------
 export const INVOICE_HISTORY_RETAINED = "invoice_history_retained" as const;
+export const VALUE_HISTORY_RETAINED = "value_history_retained" as const;
 export const OUTREACH_HISTORY_RETAINED = "outreach_history_retained" as const;
 
 /**
@@ -677,7 +721,7 @@ export async function mergeLeads(
       movedProjects: number;
       movedConversations: number;
     }
-  | { ok: false; error: "not_found" | "same_lead" | typeof INVOICE_HISTORY_RETAINED | typeof OUTREACH_HISTORY_RETAINED }
+  | { ok: false; error: "not_found" | "same_lead" | typeof INVOICE_HISTORY_RETAINED | typeof VALUE_HISTORY_RETAINED | typeof OUTREACH_HISTORY_RETAINED }
 > {
   if (survivorId === sourceId) return { ok: false, error: "same_lead" };
   return db.transaction(async (tx) => {
@@ -702,6 +746,10 @@ export async function mergeLeads(
       eq(invoicesTable.organizationId, organizationId), inArray(invoicesTable.leadId, [survivorId, sourceId]),
     )).limit(1);
     if (invoice) return { ok: false as const, error: INVOICE_HISTORY_RETAINED };
+    const [value] = await tx.select({ id: valueEntriesTable.id }).from(valueEntriesTable).where(and(
+      eq(valueEntriesTable.organizationId, organizationId), inArray(valueEntriesTable.leadId, [survivorId, sourceId]),
+    )).limit(1);
+    if (value) return { ok: false as const, error: VALUE_HISTORY_RETAINED };
     const [replyHold] = await tx.select({ id: emailResponseReviewsTable.id }).from(emailResponseReviewsTable).where(and(
       eq(emailResponseReviewsTable.organizationId, organizationId),
       inArray(emailResponseReviewsTable.leadId, [survivorId, sourceId]),
@@ -1529,6 +1577,8 @@ export async function getDashboardSummary(organizationId: string) {
 export async function deleteEstimate(organizationId: string, id: string) {
   return db.transaction(async tx => {
   await lockContractorSchedule(tx, organizationId);
+  const [native] = await tx.select({work:estimatesTable.customerWorkId}).from(estimatesTable).where(and(eq(estimatesTable.organizationId,organizationId),eq(estimatesTable.id,id)));
+  if (native?.work) customerWorkFail("customer_work_history_retained","Returning-customer estimates retain their original command and work history and cannot be deleted.");
   const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(
     eq(invoicesTable.organizationId, organizationId), eq(invoicesTable.estimateId, id),
   )).limit(1);
@@ -1600,6 +1650,15 @@ export async function updateProject(
   await lockContractorSchedule(tx, organizationId);
   const [existing] = await tx.select().from(projectsTable).where(and(eq(projectsTable.id, id), eq(projectsTable.organizationId, organizationId)));
   if (!existing) return null;
+  if (existing.customerWorkId) customerWorkFail("customer_work_versioned_command_required","Use the saved returning-job version and original request identity. Its estimate and customer cannot be changed.");
+  if (input.estimateId !== undefined && input.estimateId !== existing.estimateId) {
+    // Draft, issued and void documents all retain their original ancestry.
+    // Same-value edits and ordinary job changes remain compatible.
+    const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(
+      eq(invoicesTable.organizationId, organizationId), eq(invoicesTable.projectId, id),
+    )).limit(1);
+    if (invoice) customerWorkFail(INVOICE_HISTORY_RETAINED, "This job has retained invoice history. Its original estimate cannot be replaced or removed.");
+  }
   assertScheduleVersion(existing.updatedAt, input.expectedUpdatedAt);
   const ok = await validateProjectRefs(organizationId, {
     estimateId: input.estimateId,
@@ -1732,6 +1791,8 @@ export async function createProject(
 export async function deleteProject(organizationId: string, id: string) {
   return db.transaction(async tx => {
   await lockContractorSchedule(tx, organizationId);
+  const [native] = await tx.select({work:projectsTable.customerWorkId}).from(projectsTable).where(and(eq(projectsTable.organizationId,organizationId),eq(projectsTable.id,id)));
+  if (native?.work) customerWorkFail("customer_work_history_retained","Returning jobs retain their original command and billing history. Cancel the job through its versioned work command; it cannot be deleted.");
   const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(
     eq(invoicesTable.organizationId, organizationId), eq(invoicesTable.projectId, id),
   )).limit(1);
@@ -1759,13 +1820,7 @@ function computeEstimateTotals(lineItems: EstimateLineItemInput[], taxCents: num
 }
 
 export async function getEstimate(organizationId: string, id: string) {
-  const [row] = await db
-    .select()
-    .from(estimatesTable)
-    .where(
-      and(eq(estimatesTable.id, id), eq(estimatesTable.organizationId, organizationId)),
-    );
-  return row ?? null;
+  return readNativeEstimate(db,organizationId,id);
 }
 
 /**
@@ -1807,6 +1862,7 @@ export async function updateEstimate(
 ) {
   const existing = await getEstimate(organizationId, id);
   if (!existing) return null;
+  if (existing.customerWorkId) customerWorkFail("customer_work_versioned_command_required","Use the saved returning-estimate version and original request identity.");
 
   const patch: Record<string, unknown> = {};
   if (input.title !== undefined) patch.title = input.title;
@@ -1862,12 +1918,14 @@ async function validateProjectRefs(
 
 export async function listProjects(
   organizationId: string,
-  filters: { leadId?: string; status?: string } = {},
+  filters: { leadId?: string; customerWorkId?: string; contactId?: string; status?: string;limit?:number;offset?:number } = {},
 ) {
   const conditions = [eq(projectsTable.organizationId, organizationId)];
   if (filters.leadId) {
     conditions.push(eq(projectsTable.leadId, filters.leadId));
   }
+  if (filters.customerWorkId) conditions.push(eq(projectsTable.customerWorkId, filters.customerWorkId));
+  if (filters.contactId) conditions.push(sql`(exists(select 1 from leads l where l.id=${projectsTable.leadId} and l.organization_id=${organizationId} and l.contact_id=${filters.contactId}) or exists(select 1 from customer_work_roots w where w.id=${projectsTable.customerWorkId} and w.organization_id=${organizationId} and w.contact_id=${filters.contactId}))`);
   if (filters.status) {
     conditions.push(
       eq(
@@ -1887,12 +1945,11 @@ export async function listProjects(
     .leftJoin(leadsTable, eq(projectsTable.leadId, leadsTable.id))
     .leftJoin(contactsTable, eq(leadsTable.contactId, contactsTable.id))
     .where(and(...conditions))
-    .orderBy(desc(projectsTable.createdAt))
-    .limit(200);
-  return rows.map((row) => ({
-    ...row.project,
-    leadLabel: buildLeadLabel(row),
-  }));
+    .orderBy(desc(projectsTable.createdAt),desc(projectsTable.id))
+    .limit(clampPage({limit:filters.limit ?? 200}).limit).offset(clampPage(filters).offset);
+  const result=[];
+  for(const row of rows){const value=await readNativeProject(db,organizationId,row.project.id);if(value)result.push({...value,leadLabel:row.project.leadId ? buildLeadLabel(row) : null});}
+  return result;
 }
 
 export async function createEstimate(
@@ -1933,11 +1990,5 @@ export async function createEstimate(
 }
 
 export async function getProject(organizationId: string, id: string) {
-  const [row] = await db
-    .select()
-    .from(projectsTable)
-    .where(
-      and(eq(projectsTable.id, id), eq(projectsTable.organizationId, organizationId)),
-    );
-  return row ?? null;
+  return readNativeProject(db,organizationId,id);
 }

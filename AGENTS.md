@@ -1,5 +1,20 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## October6 returning-customer work and billing continuation
+
+PR25/mainbd9df2f and exact-mainCI37424251416 are fully complete and independently
+accepted. The owner directly requested beginning the next wave. The bounded
+source gap is existing-customer estimates/jobs/invoices and external-receipt
+accounting without fabricated acquisition leads. The root-reviewed contract is
+reports/returning-customer-work-contract-2026-10-06.md; all lanes accepted it
+before GO. Private growthos-returning-customer-2026-10-06 preserves actual source
+and release evidence. Preserve legacy lineage,
+issued documents, balance/receipt history, uncertain sends and acquisition
+metrics. Use coordinated runtime, experience and companion lanes; root owns
+schema/shared integration/recovery/Git/CI/release. No payment processor, live
+provider/account/customer/hosted activation, new cluster or invented migration.
+Earlier active-wave headings are chronological history, not current direction.
+
 ## October 6 UTC / October 5 Eastern researched contractor-workday continuation
 
 PR24/main3f1f1b5 and exact-mainCI37407237259 are complete and independently

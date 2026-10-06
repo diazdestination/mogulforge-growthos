@@ -57,6 +57,21 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe("Today work day", () => {
+  it('opens returning jobs and native office handoffs at exact company-pinned records without a fifth queue', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000001', contactId = '00000000-0000-4000-8000-000000000002', projectId = '00000000-0000-4000-8000-000000000003';
+    const actionPath = `/invoices?projectId=${projectId}&organizationId=${organizationId}`;
+    const base = { status: 'open', dueAt: null, leadId: null, contactId, customerLabel: 'Returning synthetic customer', assignedUserId: null, assigneeName: null };
+    mockApi('office', { me: { organization: { id: organizationId, name: 'Synthetic', slug: 'synthetic', timezone: 'UTC' } }, handler: (_method, path) => path.endsWith('/contractor/today') ? json(day({ organizationId,
+      tasks: { total: 2, truncated: false, items: [{ ...base, id: 'original', title: 'Prepare returning invoice', actionPath }, { ...base, id: 'wrong', title: 'Reject mismatched company action', actionPath: actionPath.replace(organizationId, contactId) }] },
+      projects: { total: 1, truncated: false, items: [{ id: projectId, title: 'Exact returning job', status: 'scheduled', leadId: null, contactId, customerWorkId: '00000000-0000-4000-8000-000000000004', customerLabel: base.customerLabel, crewNames: [], scheduledStart: null, scheduledEnd: null }] },
+    })) : undefined });
+    const { hook } = memoryLocation({ path: '/' }); renderWithQuery(<Router hook={hook}><Today /></Router>);
+    expect((await screen.findByRole('link', { name: /Prepare returning invoice/ })).getAttribute('href')).toBe(actionPath);
+    expect(screen.getByRole('link', { name: /Reject mismatched/ }).getAttribute('href')).toBe('/tasks?taskId=wrong');
+    expect(screen.getByRole('link', { name: /Exact returning job/ }).getAttribute('href')).toBe(`/projects?projectId=${projectId}&organizationId=${organizationId}`);
+    expect(screen.getAllByRole('region').map(item => item.getAttribute('aria-label'))).toEqual(['Appointments', 'Due and unplanned tasks', 'Jobs', 'Warranties & Service']);
+    expect(document.querySelector('a[href*="leads/null"]')).toBeNull();
+  });
   it("opens exact service and appointment records while keeping customer navigation as a separate link", async () => {
     const organizationId = "00000000-0000-4000-8000-000000000001", contactId = "00000000-0000-4000-8000-000000000002";
     const appointmentId = "00000000-0000-4000-8000-000000000003", serviceId = "00000000-0000-4000-8000-000000000004";

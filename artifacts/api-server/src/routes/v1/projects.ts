@@ -16,6 +16,10 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     res.json(
       await crm.listProjects(req.member!.organizationId, {
+        contactId: typeof req.query.contactId === "string" ? req.query.contactId : undefined,
+        customerWorkId: typeof req.query.customerWorkId === "string" ? req.query.customerWorkId : undefined,
+        limit: typeof req.query.limit === "string" && req.query.limit !== "" ? Number(req.query.limit) : undefined,
+        offset: typeof req.query.offset === "string" && req.query.offset !== "" ? Number(req.query.offset) : undefined,
         leadId:
           typeof req.query.leadId === "string" ? req.query.leadId : undefined,
         status:

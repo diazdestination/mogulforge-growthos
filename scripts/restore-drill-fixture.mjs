@@ -383,7 +383,7 @@ function normal(value, key) {
 }
 
 /** Checks stored app records using SELECT only, with secrets held only in memory. */
-export async function assertFixtureRecords(client, target, codec, { reviewedPausedServiceId = null, reviewedPausedCareExecutionId = null, reviewedPausedInvoiceExecutionId = null, reviewedPausedCallieExecutionId = null, reviewedPausedStandingExecutionId = null, reviewedPausedNurtureExecutionId = null } = {}) {
+export async function assertFixtureRecords(client, target, codec, { reviewedPausedServiceId = null, reviewedPausedCareExecutionId = null, reviewedPausedInvoiceExecutionId = null, reviewedPausedCallieExecutionId = null, reviewedPausedStandingExecutionId = null, reviewedPausedNurtureExecutionId = null, reviewedPausedReturningInvoiceExecutionId = null } = {}) {
   // The local contractor upgrade drill additionally restores one explicitly
   // reviewed successor. It may remain active only behind a restored company
   // pause. Ordinary restore acceptance keeps its original zero-active rule.
@@ -405,6 +405,14 @@ export async function assertFixtureRecords(client, target, codec, { reviewedPaus
   // Current-source synthetic drill only: one exact original unknown nurture
   // effect behind stopped plan/item, disabled reader and the company pause.
   if (reviewedPausedNurtureExecutionId !== null && (!reviewedPausedStandingExecutionId || !/^[a-f0-9-]{36}$/.test(reviewedPausedNurtureExecutionId))) fail("restore_fixture_nurture_exception_invalid");
+  // New CURRENT-SOURCE fictional drill only: one predetermined v3 invoice's
+  // exact original unknown receipt behind the same company pause. Never widen
+  // hosted/ordinary acceptance or permit other roots/processing/accepted sends.
+  if (reviewedPausedReturningInvoiceExecutionId !== null) {
+    const hash=createHash("sha256").update(`returning-work-fixture-v1:${target.syntheticSlug}:execution`).digest("hex");
+    const expected=`${hash.slice(0,8)}-${hash.slice(8,12)}-5${hash.slice(13,16)}-a${hash.slice(17,20)}-${hash.slice(20,32)}`;
+    if (!reviewedPausedNurtureExecutionId || !/^restore-drill-contractor-[ab]$/.test(target.syntheticSlug) || reviewedPausedReturningInvoiceExecutionId!==expected) fail("restore_fixture_returning_exception_invalid");
+  }
   const id = fixtureIds(target.syntheticSlug);
   let ciphertext;
   for (const [table, expected] of fixtureRows(target.syntheticSlug)) {
@@ -443,13 +451,30 @@ export async function assertFixtureRecords(client, target, codec, { reviewedPaus
   }
   if (!wrongContextRejected || !codec.wrongKeyRejects(ciphertext, context))
     fail("restore_fixture_credential_context_not_bound");
+  const returningException = reviewedPausedReturningInvoiceExecutionId ? `AND NOT (e.id=$8::uuid AND e.kind='invoice_email' AND e.state='indeterminate'
+    AND EXISTS (SELECT 1 FROM customer_lifecycle cl WHERE cl.organization_id=e.organization_id AND cl.state='paused')
+    AND EXISTS (SELECT 1 FROM invoice_delivery_attempts a JOIN invoices i ON i.id=a.invoice_id AND i.organization_id=a.organization_id
+      JOIN customer_work_roots w ON w.id=i.customer_work_id AND w.organization_id=i.organization_id
+      JOIN contacts c ON c.id=w.contact_id AND c.organization_id=w.organization_id
+      JOIN audit_events p ON p.id=a.preview_id AND p.organization_id=a.organization_id
+      WHERE a.organization_id=e.organization_id AND a.execution_id=e.id AND a.execution_fingerprint=e.fingerprint
+        AND a.action_key=e.action_key AND e.action_key='invoice-delivery:'||i.id::text AND a.ordinal=1 AND a.intent='initial'
+        AND a.predecessor_execution_id IS NULL AND a.predecessor_proof_id IS NULL AND a.duplicate_copy_acknowledged=false
+        AND i.lead_id IS NULL AND i.status='issued' AND c.do_not_contact=true AND c.do_not_contact_email=true AND c.do_not_contact_sms=true
+        AND p.action='invoice_delivery.previewed' AND p.entity_type='invoice' AND p.entity_id=i.id
+        AND p.actor_user_id=e.actor_user_id AND p.metadata->>'reviewVersion'='3'
+        AND p.metadata->'context'->'leadId'='null'::jsonb AND p.metadata->'context'->>'customerWorkId'=w.id::text
+        AND p.metadata->'context'->>'contactId'=w.contact_id::text
+        AND (p.metadata->'context'->>'propertyId') IS NOT DISTINCT FROM w.property_id::text
+        AND p.metadata->'context'->'sender'->>'source'='company_default'
+        AND p.metadata->>'payloadSha256'=a.payload_sha256 AND p.metadata->>'documentSha256'=a.document_sha256))` : "";
   const forbidden = await client.query(
     `SELECT
       (SELECT count(*) FROM scheduled_actions WHERE organization_id = $1 AND status = 'pending') +
       (SELECT count(*) FROM reactivation_campaigns WHERE organization_id = $1 AND status NOT IN ('draft', 'completed', 'cancelled')) +
       (SELECT count(*) FROM service_obligations s WHERE organization_id = $1 AND status = 'active' ${reviewedPausedServiceId ? "AND NOT (s.id=$2::uuid AND EXISTS (SELECT 1 FROM customer_lifecycle cl WHERE cl.organization_id=s.organization_id AND cl.state='paused'))" : ""}) +
       (SELECT count(*) FROM bie_action_proposals WHERE organization_id = $1 AND status IN ('approved', 'processing')) +
-      (SELECT count(*) FROM revenue_executions e WHERE organization_id = $1 AND state IN ('processing', 'indeterminate') ${reviewedPausedCareExecutionId ? "AND NOT (e.id=$3::uuid AND e.state='indeterminate' AND EXISTS (SELECT 1 FROM customer_lifecycle cl WHERE cl.organization_id=e.organization_id AND cl.state='paused') AND EXISTS (SELECT 1 FROM missed_call_care_policies p WHERE p.organization_id=e.organization_id AND p.enabled=false) AND EXISTS (SELECT 1 FROM missed_call_care_cases c WHERE c.organization_id=e.organization_id AND c.state='indeterminate' AND e.action_key='missed-call-care:' || c.call_id::text || ':sms:v1'))" : ""}
+      (SELECT count(*) FROM revenue_executions e WHERE organization_id = $1 AND state IN ('processing', 'indeterminate') ${reviewedPausedCareExecutionId ? "AND NOT (e.id=$3::uuid AND e.state='indeterminate' AND EXISTS (SELECT 1 FROM customer_lifecycle cl WHERE cl.organization_id=e.organization_id AND cl.state='paused') AND EXISTS (SELECT 1 FROM missed_call_care_policies p WHERE p.organization_id=e.organization_id AND p.enabled=false) AND EXISTS (SELECT 1 FROM missed_call_care_cases c WHERE c.organization_id=e.organization_id AND c.state='indeterminate' AND e.action_key='missed-call-care:' || c.call_id::text || ':sms:v1'))" : ""} ${returningException}
         ${reviewedPausedInvoiceExecutionId ? "AND NOT (e.id=$4::uuid AND e.state='indeterminate' AND e.kind='invoice_email' AND EXISTS (SELECT 1 FROM customer_lifecycle cl WHERE cl.organization_id=e.organization_id AND cl.state='paused') AND EXISTS (SELECT 1 FROM invoice_delivery_attempts a JOIN audit_events proof ON proof.id=a.predecessor_proof_id AND proof.organization_id=a.organization_id WHERE a.organization_id=e.organization_id AND a.execution_id=e.id AND a.execution_fingerprint=e.fingerprint AND a.action_key=e.action_key AND a.ordinal=2 AND a.intent='retry_not_dispatched' AND proof.action='invoice_delivery.not_dispatched' AND proof.metadata->>'phase'='pre_provider' AND proof.metadata->>'executionId'=a.predecessor_execution_id::text))" : ""}
         ${reviewedPausedCallieExecutionId ? "AND NOT (e.id=$5::uuid AND e.state='indeterminate' AND e.kind='callie_one_call_acknowledgment' AND EXISTS (SELECT 1 FROM customer_lifecycle cl WHERE cl.organization_id=e.organization_id AND cl.state='paused') AND EXISTS (SELECT 1 FROM callie_intakes i JOIN callie_ack_dispatches a ON a.organization_id=i.organization_id AND a.intake_id=i.id WHERE i.organization_id=e.organization_id AND i.state='indeterminate' AND a.status='uncertain' AND a.receipt_id=e.id AND a.operation_key=e.action_key AND e.action_key='missed-call-care:' || i.call_id::text || ':sms:v1') AND (SELECT p.enabled FROM callie_policy_revisions p WHERE p.organization_id=e.organization_id ORDER BY p.version DESC LIMIT 1)=false)" : ""}
         ${reviewedPausedStandingExecutionId ? "AND NOT (e.id=$6::uuid AND e.state='indeterminate' AND e.kind='service_care_reminder' AND EXISTS (SELECT 1 FROM customer_lifecycle cl WHERE cl.organization_id=e.organization_id AND cl.state='paused') AND EXISTS (SELECT 1 FROM service_sms_parents p JOIN twilio_dispatches d ON d.id=p.dispatch_id AND d.organization_id=p.organization_id JOIN service_standing_enrollments n ON n.organization_id=p.organization_id AND n.last_materialized_obligation_id=p.service_obligation_id WHERE p.organization_id=e.organization_id AND p.execution_id=e.id AND p.execution_fingerprint=e.fingerprint AND p.action_key=e.action_key AND p.action_key='scheduled:' || p.scheduled_action_id::text AND d.status='uncertain' AND p.context_snapshot->>'authorizationOrigin'='standing' AND (SELECT r.enabled FROM service_standing_policy_revisions r WHERE r.organization_id=n.organization_id AND r.enrollment_id=n.id ORDER BY r.version DESC LIMIT 1)=false))" : ""}
@@ -459,7 +484,7 @@ export async function assertFixtureRecords(client, target, codec, { reviewedPaus
       (SELECT count(*) FROM gmail_connections WHERE organization_id = $1 AND revoked_at IS NULL) +
       (SELECT count(*) FROM contacts WHERE organization_id = $1 AND (phone IS NOT NULL OR email NOT LIKE '%.invalid' OR do_not_contact = false OR do_not_contact_email = false OR do_not_contact_sms = false)) +
       (SELECT count(*) FROM users WHERE organization_id = $1 AND (email NOT LIKE '%.invalid' OR password_hash IS NOT NULL OR is_platform_admin = true)) AS unsafe_count`,
-    reviewedPausedNurtureExecutionId ? [id.organization, reviewedPausedServiceId, reviewedPausedCareExecutionId, reviewedPausedInvoiceExecutionId, reviewedPausedCallieExecutionId, reviewedPausedStandingExecutionId, reviewedPausedNurtureExecutionId] : reviewedPausedStandingExecutionId ? [id.organization, reviewedPausedServiceId, reviewedPausedCareExecutionId, reviewedPausedInvoiceExecutionId, reviewedPausedCallieExecutionId, reviewedPausedStandingExecutionId] : reviewedPausedCallieExecutionId ? [id.organization, reviewedPausedServiceId, reviewedPausedCareExecutionId, reviewedPausedInvoiceExecutionId, reviewedPausedCallieExecutionId] : reviewedPausedInvoiceExecutionId ? [id.organization, reviewedPausedServiceId, reviewedPausedCareExecutionId, reviewedPausedInvoiceExecutionId] : reviewedPausedCareExecutionId ? [id.organization, reviewedPausedServiceId, reviewedPausedCareExecutionId] : reviewedPausedServiceId ? [id.organization, reviewedPausedServiceId] : [id.organization],
+    reviewedPausedReturningInvoiceExecutionId ? [id.organization, reviewedPausedServiceId, reviewedPausedCareExecutionId, reviewedPausedInvoiceExecutionId, reviewedPausedCallieExecutionId, reviewedPausedStandingExecutionId, reviewedPausedNurtureExecutionId, reviewedPausedReturningInvoiceExecutionId] : reviewedPausedNurtureExecutionId ? [id.organization, reviewedPausedServiceId, reviewedPausedCareExecutionId, reviewedPausedInvoiceExecutionId, reviewedPausedCallieExecutionId, reviewedPausedStandingExecutionId, reviewedPausedNurtureExecutionId] : reviewedPausedStandingExecutionId ? [id.organization, reviewedPausedServiceId, reviewedPausedCareExecutionId, reviewedPausedInvoiceExecutionId, reviewedPausedCallieExecutionId, reviewedPausedStandingExecutionId] : reviewedPausedCallieExecutionId ? [id.organization, reviewedPausedServiceId, reviewedPausedCareExecutionId, reviewedPausedInvoiceExecutionId, reviewedPausedCallieExecutionId] : reviewedPausedInvoiceExecutionId ? [id.organization, reviewedPausedServiceId, reviewedPausedCareExecutionId, reviewedPausedInvoiceExecutionId] : reviewedPausedCareExecutionId ? [id.organization, reviewedPausedServiceId, reviewedPausedCareExecutionId] : reviewedPausedServiceId ? [id.organization, reviewedPausedServiceId] : [id.organization],
   );
   if (Number(forbidden.rows[0]?.unsafe_count) !== 0)
     fail("restore_fixture_outbound_or_identity_unsafe");

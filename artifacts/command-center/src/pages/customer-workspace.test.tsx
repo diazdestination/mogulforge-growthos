@@ -63,14 +63,14 @@ it('keeps equipment within the existing nine sections, lazy on open and preserve
   state.meStatus = 503; await act(async () => { await client.invalidateQueries({ queryKey: getGetMeQueryKey() }); }); await screen.findByText(/Current company access could not be verified/); expect(screen.queryByLabelText('Asset name')).toBeNull();
 });
 
-it('lazily navigates exact service, lead, task, invoice links while keeping jobs and estimates as related opportunities', async () => {
+it('lazily navigates native work and pinned invoice links while retaining related opportunities separately', async () => {
   const { calls } = setup(); await screen.findByRole('link', { name: 'Open visit' });
   for (const [section, linkName, href] of [
     ['Service & equipment', 'Open service', `/service?serviceObligationId=${workspaceId(5)}&organizationId=${org}`],
     ['Opportunities', 'Open opportunity', `/leads/${workspaceId(6)}?organizationId=${org}`],
     ['Jobs', 'Open related opportunity', `/leads/${workspaceId(6)}?organizationId=${org}`],
     ['Estimates', 'Open related opportunity', `/leads/${workspaceId(6)}?organizationId=${org}`],
-    ['Invoices', 'Open invoice', `/invoices/${workspaceId(10)}`],
+    ['Invoices', 'Open invoice', `/invoices/${workspaceId(10)}?organizationId=${org}`],
     ['Tasks', 'Open task', `/tasks?taskId=${workspaceId(9)}`],
   ]) {
     await select(section); expect((await screen.findByRole('link', { name: linkName })).getAttribute('href')).toBe(href);
@@ -82,6 +82,22 @@ it('lazily navigates exact service, lead, task, invoice links while keeping jobs
   expect(screen.getByRole('link', { name: 'Open property directory (all customers)' }).getAttribute('href')).toBe('/properties');
   await select('History'); await screen.findByText('Customer response recorded');
   expect(screen.getByText(/not proof of delivery/)).toBeTruthy();
+});
+
+it('adds returning estimates/jobs/invoices inside the original nine sections with explicit new links and no null opportunity', async () => {
+  setup({ search: `?organizationId=${org}&section=estimates`, respond: url => {
+    const section = url.pathname.split('/').at(-1);
+    if (!['estimates', 'projects', 'invoices'].includes(section!)) return undefined;
+    const page = workspacePage(section as 'estimates');
+    return json({ ...page, items: page.items.map(item => ({ ...item, leadId: null, customerWorkId: workspaceId(70), ...(section === 'invoices' ? {} : { workVersion: 1 }) })) });
+  } });
+  expect((await screen.findByRole('link', { name: 'New customer estimate' })).getAttribute('href')).toBe(`/estimates?new=customer&contactId=${contact}&organizationId=${org}`);
+  expect((await screen.findByRole('link', { name: 'Open estimate' })).getAttribute('href')).toBe(`/estimates?estimateId=${workspaceId(8)}&organizationId=${org}`);
+  expect(screen.queryByRole('link', { name: 'Open related opportunity' })).toBeNull();
+  await select('Jobs'); expect((await screen.findByRole('link', { name: 'Open job' })).getAttribute('href')).toBe(`/projects?projectId=${workspaceId(7)}&organizationId=${org}`); expect(screen.getByRole('link', { name: 'New customer job' }).getAttribute('href')).toBe(`/projects?new=customer&contactId=${contact}&organizationId=${org}`);
+  await select('Invoices'); await screen.findByRole('link', { name: 'Open invoice' }); expect(screen.getByRole('link', { name: 'New customer invoice' }).getAttribute('href')).toBe(`/invoices?new=customer&contactId=${contact}&organizationId=${org}`);
+  expect(within(screen.getByRole('navigation', { name: 'Customer record sections' })).getAllByRole('link')).toHaveLength(9);
+  expect(document.querySelector('a[href*="leads/null"]')).toBeNull();
 });
 
 it('keeps calendar coverage dates intact and renders customer content as inert text on a narrow-width-safe card', async () => {

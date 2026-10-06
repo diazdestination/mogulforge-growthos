@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ContractorApiError, contractorRequest } from "@/lib/contractor-api";
 import type { InvoiceMutation } from "@/lib/invoice-ui";
+import { currentMemberAuthorityMatches } from '@/lib/member-authority-scope';
 
 interface SavedCommand {
   path: string;
@@ -62,6 +63,7 @@ export function useInvoiceCommand(
   organizationId: string,
   target: string,
   onSuccess: (result: InvoiceMutation) => void,
+  scopeKey = `${userId}:${organizationId}`,
 ) {
   const key = invoiceRequestStorageKey(userId, organizationId, target);
   const [pending, setPending] = useState<SavedCommand | null>(() =>
@@ -69,6 +71,9 @@ export function useInvoiceCommand(
   );
   const [busy, setBusy] = useState(false);
   const running = useRef(false);
+  const authority = useRef({ identity: `${scopeKey}:${target}`, active: true });
+  if (authority.current.identity !== `${scopeKey}:${target}`) authority.current = { identity: `${scopeKey}:${target}`, active: true };
+  useEffect(() => { const token = authority.current; token.active = true; return () => { token.active = false; }; }, [scopeKey, target]);
   const [error, setError] = useState(
     pending
       ? "A previous request has no confirmed result. Retry the saved request to reconcile it before making another change."
@@ -79,7 +84,9 @@ export function useInvoiceCommand(
   const queryClient = useQueryClient();
 
   async function execute(command: SavedCommand, reconciling = false) {
-    if (running.current) return;
+    const token = authority.current;
+    const current = () => token.active && authority.current === token && currentMemberAuthorityMatches(queryClient, scopeKey);
+    if (running.current || !current()) return;
     try {
       sessionStorage.setItem(key, JSON.stringify(command));
     } catch {
@@ -98,12 +105,21 @@ export function useInvoiceCommand(
         body: command.body,
       });
       const requestedInvoice = command.path.split("/")[2];
+      const source = command.body.source as { kind?: string; customerWorkId?: string; contactId?: string; propertyId?: string | null } | undefined;
       if (
         !result.invoice?.id ||
         !Number.isInteger(result.invoice.version) ||
-        (requestedInvoice && result.invoice.id !== requestedInvoice)
+        (requestedInvoice && result.invoice.id !== requestedInvoice) ||
+        (result.invoice.organizationId !== undefined && result.invoice.organizationId !== organizationId) ||
+        (source && (result.invoice.organizationId !== organizationId || result.invoice.sourceKind !== 'customer_work' || result.invoice.leadId !== null || !result.invoice.customerWorkId || !result.invoice.contactId)) ||
+        (source?.kind === 'customer_work' && source.customerWorkId !== result.invoice.customerWorkId) ||
+        (source?.kind === 'existing_customer' && (source.contactId !== result.invoice.contactId || source.propertyId !== result.invoice.propertyId)) ||
+        (command.body.projectId && command.body.projectId !== result.invoice.projectId) ||
+        (command.body.estimateId && command.body.estimateId !== result.invoice.estimateId) ||
+        (command.body.leadId && command.body.leadId !== result.invoice.leadId)
       )
         throw new Error("Missing invoice acknowledgement");
+      if (!current()) return;
       sessionStorage.removeItem(key);
       setPending(null);
       setNeedsRefresh(false);
@@ -112,15 +128,19 @@ export function useInvoiceCommand(
         queryKey: ["invoices", organizationId],
       });
       await queryClient.invalidateQueries({
-        queryKey: ["contractor-day", organizationId],
+        queryKey: ["contractor-day"],
       });
-      onSuccess(result);
+      await queryClient.invalidateQueries({ queryKey: ['customer-workspace'] });
+      if (current()) onSuccess(result);
     } catch (failure) {
+      if (!current()) return;
       if (
         failure instanceof ContractorApiError &&
         failure.status >= 400 &&
         failure.status < 500 &&
+        (failure.code.startsWith('invoice_') || failure.code.startsWith('customer_work_')) &&
         failure.code !== "invoice_request_conflict" &&
+        failure.code !== "customer_work_request_conflict" &&
         // A later access denial cannot establish whether the earlier request
         // committed. Retain its identity until an authorized reconciliation.
         !(reconciling && [401, 403, 404, 408, 429].includes(failure.status))
@@ -142,7 +162,7 @@ export function useInvoiceCommand(
       }
     } finally {
       running.current = false;
-      setBusy(false);
+      if (current()) setBusy(false);
     }
   }
   return {

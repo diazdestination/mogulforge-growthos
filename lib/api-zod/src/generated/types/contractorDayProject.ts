@@ -10,7 +10,7 @@ export interface ContractorDayProject {
   id: string;
   title: string;
   status: string;
-  leadId: string;
+  leadId: string | null;
   /** @nullable */
   customerLabel: string | null;
   crewNames: string[];
@@ -18,4 +18,6 @@ export interface ContractorDayProject {
   scheduledStart: Date | null;
   /** @nullable */
   scheduledEnd: Date | null;
+  customerWorkId?: string | null;
+  contactId?: string;
 }

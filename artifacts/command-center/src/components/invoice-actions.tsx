@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { useInvoiceCommand } from "@/hooks/use-invoice-command";
+import { invoiceRefundSchema } from '../../../api-server/src/services/invoice-contract';
 import {
   dollarsToCents,
   invoiceButton,
@@ -9,15 +10,17 @@ import {
   type InvoiceDetail,
 } from "@/lib/invoice-ui";
 
-type Action = "issue" | "void" | "payment" | "allocate" | "reverse";
+type Action = "issue" | "void" | "payment" | "allocate" | "reverse" | "refund";
 const labels: Record<Action, string> = {
   issue: "Issue invoice",
   void: "Void invoice",
   payment: "Record payment",
   allocate: "Apply existing record",
   reverse: "Reverse allocation",
+  refund: "Record external refund correction",
 };
 const descriptions: Record<Action, string> = {
+  refund: "Record a refund that already happened outside GrowthOS. Link it to its original receipt for this same work record. This appends a correction and allocation; it never sends money or changes the original receipt.",
   issue:
     "Review the saved document. Issuing assigns an invoice number and retains this version. It does not send an email or collect payment.",
   void: "Retain this document as void with a reason. Resolve any net allocations first. This does not return money to the customer.",
@@ -38,6 +41,7 @@ function pendingAction(path?: string): Action | null {
   if (path.endsWith("/issue")) return "issue";
   if (path.endsWith("/void")) return "void";
   if (path.endsWith("/payments")) return "payment";
+  if (path.endsWith("/refunds")) return "refund";
   if (path.endsWith("/reverse")) return "reverse";
   if (path.endsWith("/allocations")) return "allocate";
   return null;
@@ -75,6 +79,8 @@ export function InvoiceActions({
   const [allocationId, setAllocationId] = useState(
     command.pending?.path.match(/\/allocations\/([^/]+)\/reverse$/)?.[1] ?? "",
   );
+  const [originalPayment, setOriginalPayment] = useState(typeof saved?.originalPaymentValueEntryId === 'string' ? saved.originalPaymentValueEntryId : '');
+  const originalPayments = invoice.allocations.filter((entry, index, all) => entry.kind === 'payment' && !entry.reversedAt && all.findIndex(other => other.kind === 'payment' && !other.reversedAt && other.valueEntryId === entry.valueEntryId) === index);
   const [reason, setReason] = useState(
     typeof saved?.reason === "string" ? saved.reason : "",
   );
@@ -93,6 +99,7 @@ export function InvoiceActions({
       setEntryId("");
       setAllocationId("");
       setReason("");
+      setOriginalPayment('');
     }
   }, [command.completed]);
   function choose(next: Action) {
@@ -106,6 +113,14 @@ export function InvoiceActions({
     const common = { expectedVersion: invoice.version, confirmed: true };
     let path = `/invoices/${invoice.id}/${action}`;
     let body: Record<string, unknown> = common;
+    if (action === 'refund') {
+      const amountCents = dollarsToCents(amount), timestamp = new Date(occurredAt);
+      if (!invoice.customerWorkId || !originalPayments.some(entry => entry.valueEntryId === originalPayment) || !Number.isFinite(timestamp.getTime())) { setError('Choose the original receipt on this work and the actual external refund time.'); return; }
+      const parsed = invoiceRefundSchema.safeParse({ ...common, requestId: crypto.randomUUID(), originalPaymentValueEntryId: originalPayment, amountCents, sourceReference: reference, occurredAt: timestamp.toISOString(), reason });
+      if (!parsed.success) { setError('Enter a positive amount, original refund reference, actual past refund time and a reviewable correction reason of at least ten characters.'); return; }
+      const { requestId: _requestId, ...input } = parsed.data;
+      body = input; path = `/invoices/${invoice.id}/refunds`;
+    }
     if (action === "payment" || action === "allocate") {
       const amountCents = dollarsToCents(amount);
       if (amountCents === null || amountCents <= 0) {
@@ -185,6 +200,7 @@ export function InvoiceActions({
         )}
         {invoice.status === "issued" && (
           <>
+            {invoice.customerWorkId && <button className={invoiceButton} disabled={command.locked || !originalPayments.length} onClick={() => choose('refund')}>Record external refund correction</button>}
             <button
               className={invoiceButton}
               disabled={command.locked}
@@ -249,6 +265,7 @@ export function InvoiceActions({
             disabled={command.locked}
             className="min-w-0 space-y-4 disabled:opacity-70"
           >
+            {action === 'refund' && <div><label htmlFor="invoice-original-payment" className="mb-1 block text-sm font-medium">Original receipt for this external refund</label><select id="invoice-original-payment" required className={invoiceControl} value={originalPayment} onChange={event => { setOriginalPayment(event.target.value); setConfirmed(false); }}><option value="">Choose the original payment</option>{originalPayments.map(entry => <option key={entry.valueEntryId} value={entry.valueEntryId}>{entry.sourceReference} · {money(entry.amountCents)} allocated</option>)}</select></div>}
             {action === "allocate" && (
               <div>
                 <label
@@ -263,6 +280,7 @@ export function InvoiceActions({
                   className={invoiceControl}
                   value={entryId}
                   onChange={(event) => {
+                    setConfirmed(false);
                     setEntryId(event.target.value);
                     const entry = invoice.availableValueEntries.find(
                       (item) => item.id === event.target.value,
@@ -282,7 +300,7 @@ export function InvoiceActions({
                 </select>
               </div>
             )}
-            {(action === "payment" || action === "allocate") && (
+            {(action === "payment" || action === "allocate" || action === "refund") && (
               <div className="max-w-sm">
                 <label
                   htmlFor="invoice-record-amount"
@@ -296,11 +314,11 @@ export function InvoiceActions({
                   inputMode="decimal"
                   className={invoiceControl}
                   value={amount}
-                  onChange={(event) => setAmount(event.target.value)}
+                  onChange={(event) => { setAmount(event.target.value); setConfirmed(false); }}
                 />
               </div>
             )}
-            {action === "payment" && (
+            {(action === "payment" || action === "refund") && (
               <>
                 <div>
                   <label
@@ -316,7 +334,7 @@ export function InvoiceActions({
                     maxLength={160}
                     className={invoiceControl}
                     value={reference}
-                    onChange={(event) => setReference(event.target.value)}
+                    onChange={(event) => { setReference(event.target.value); setConfirmed(false); }}
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
                     Use the receipt, check or processor transaction reference.
@@ -328,7 +346,7 @@ export function InvoiceActions({
                     htmlFor="invoice-received-time"
                     className="mb-1 block text-sm font-medium"
                   >
-                    Received at (
+                    {action === 'refund' ? 'Refund occurred at' : 'Received at'} (
                     {Intl.DateTimeFormat().resolvedOptions().timeZone})
                   </label>
                   <input
@@ -338,7 +356,7 @@ export function InvoiceActions({
                     max={localTime(new Date())}
                     className={invoiceControl}
                     value={occurredAt}
-                    onChange={(event) => setOccurredAt(event.target.value)}
+                    onChange={(event) => { setOccurredAt(event.target.value); setConfirmed(false); }}
                   />
                 </div>
               </>
@@ -356,7 +374,7 @@ export function InvoiceActions({
                   required
                   className={invoiceControl}
                   value={allocationId}
-                  onChange={(event) => setAllocationId(event.target.value)}
+                  onChange={(event) => { setAllocationId(event.target.value); setConfirmed(false); }}
                 >
                   <option value="">Choose an allocation</option>
                   {invoice.allocations
@@ -370,7 +388,7 @@ export function InvoiceActions({
                 </select>
               </div>
             )}
-            {(action === "void" || action === "reverse") && (
+            {(action === "void" || action === "reverse" || action === "refund") && (
               <div>
                 <label
                   htmlFor="invoice-action-reason"
@@ -386,7 +404,7 @@ export function InvoiceActions({
                   rows={3}
                   className={invoiceControl}
                   value={reason}
-                  onChange={(event) => setReason(event.target.value)}
+                  onChange={(event) => { setReason(event.target.value); setConfirmed(false); }}
                 />
               </div>
             )}

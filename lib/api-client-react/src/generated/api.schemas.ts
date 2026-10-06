@@ -5,6 +5,1152 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+export interface InvoiceRefund {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  expectedVersion: number;
+  confirmed: true;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  originalPaymentValueEntryId: string;
+  /**
+     * @minimum 1
+     * @maximum 1000000000
+     */
+  amountCents: number;
+  /**
+     * @minLength 5
+     * @maxLength 160
+     */
+  sourceReference: string;
+  occurredAt: string;
+  /**
+     * @minLength 10
+     * @maxLength 500
+     */
+  reason: string;
+}
+
+export type UpdateCustomerWorkProjectStatus = typeof UpdateCustomerWorkProjectStatus[keyof typeof UpdateCustomerWorkProjectStatus];
+
+
+export const UpdateCustomerWorkProjectStatus = {
+  scheduled: 'scheduled',
+  in_progress: 'in_progress',
+  on_hold: 'on_hold',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface UpdateCustomerWorkProject {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  confirmed: true;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  expectedWorkVersion: number;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  name: string;
+  status: UpdateCustomerWorkProjectStatus;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
+  /**
+     * @maxItems 50
+     * @items.minLength 1
+     * @items.maxLength 200
+     */
+  crewUserIds: string[];
+  /** @maxLength 4000 */
+  crewNotes: string | null;
+}
+
+export type CreateCustomerWorkProjectSource = {
+  kind: 'existing_customer';
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+} | {
+  kind: 'estimate';
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  expectedWorkVersion: number;
+};
+
+export type CreateCustomerWorkProjectStatus = typeof CreateCustomerWorkProjectStatus[keyof typeof CreateCustomerWorkProjectStatus];
+
+
+export const CreateCustomerWorkProjectStatus = {
+  scheduled: 'scheduled',
+  in_progress: 'in_progress',
+  on_hold: 'on_hold',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface CreateCustomerWorkProject {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  confirmed: true;
+  source: CreateCustomerWorkProjectSource;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  name: string;
+  status: CreateCustomerWorkProjectStatus;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
+  /**
+     * @maxItems 50
+     * @items.minLength 1
+     * @items.maxLength 200
+     */
+  crewUserIds: string[];
+  /** @maxLength 4000 */
+  crewNotes: string | null;
+}
+
+export type UpdateCustomerWorkEstimateLineItemsItem = {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  description: string;
+  /**
+     * @minimum 0
+     * @maximum 999999
+     * @exclusiveMinimum
+     */
+  quantity: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  unitPriceCents: number;
+};
+
+export type UpdateCustomerWorkEstimateStatus = typeof UpdateCustomerWorkEstimateStatus[keyof typeof UpdateCustomerWorkEstimateStatus];
+
+
+export const UpdateCustomerWorkEstimateStatus = {
+  draft: 'draft',
+  sent: 'sent',
+  accepted: 'accepted',
+  declined: 'declined',
+} as const;
+
+export interface UpdateCustomerWorkEstimate {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  confirmed: true;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  expectedWorkVersion: number;
+  /**
+     * @minLength 1
+     * @maxLength 150
+     */
+  title: string;
+  /** @maxItems 100 */
+  lineItems: UpdateCustomerWorkEstimateLineItemsItem[];
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  taxCents: number;
+  /** @maxLength 2000 */
+  notes: string | null;
+  status: UpdateCustomerWorkEstimateStatus;
+}
+
+export type CreateCustomerWorkEstimateSourceKind = typeof CreateCustomerWorkEstimateSourceKind[keyof typeof CreateCustomerWorkEstimateSourceKind];
+
+
+export const CreateCustomerWorkEstimateSourceKind = {
+  existing_customer: 'existing_customer',
+} as const;
+
+export type CreateCustomerWorkEstimateSource = {
+  kind: CreateCustomerWorkEstimateSourceKind;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+};
+
+export type CreateCustomerWorkEstimateLineItemsItem = {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  description: string;
+  /**
+     * @minimum 0
+     * @maximum 999999
+     * @exclusiveMinimum
+     */
+  quantity: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  unitPriceCents: number;
+};
+
+export interface CreateCustomerWorkEstimate {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  confirmed: true;
+  source: CreateCustomerWorkEstimateSource;
+  /**
+     * @minLength 1
+     * @maxLength 150
+     */
+  title: string;
+  /** @maxItems 100 */
+  lineItems: CreateCustomerWorkEstimateLineItemsItem[];
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  taxCents: number;
+  /** @maxLength 2000 */
+  notes: string | null;
+}
+
+export type CustomerWorkProjectMutationProjectSourceKind = typeof CustomerWorkProjectMutationProjectSourceKind[keyof typeof CustomerWorkProjectMutationProjectSourceKind];
+
+
+export const CustomerWorkProjectMutationProjectSourceKind = {
+  lead: 'lead',
+  customer_work: 'customer_work',
+} as const;
+
+export type CustomerWorkProjectMutationProjectStatus = typeof CustomerWorkProjectMutationProjectStatus[keyof typeof CustomerWorkProjectMutationProjectStatus];
+
+
+export const CustomerWorkProjectMutationProjectStatus = {
+  scheduled: 'scheduled',
+  in_progress: 'in_progress',
+  on_hold: 'on_hold',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export type CustomerWorkProjectMutationProject = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  sourceKind: CustomerWorkProjectMutationProjectSourceKind;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  customerLabel: string;
+  propertyLabel: string | null;
+  leadLabel: string | null;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  workVersion: number | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  name: string;
+  status: CustomerWorkProjectMutationProjectStatus;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
+  /**
+     * @maxItems 50
+     * @items.minLength 1
+     * @items.maxLength 200
+     */
+  crewUserIds: string[];
+  /** @maxLength 4000 */
+  crewNotes: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CustomerWorkProjectMutationCommandAction = typeof CustomerWorkProjectMutationCommandAction[keyof typeof CustomerWorkProjectMutationCommandAction];
+
+
+export const CustomerWorkProjectMutationCommandAction = {
+  estimate_created: 'estimate_created',
+  estimate_updated: 'estimate_updated',
+  project_created: 'project_created',
+  project_updated: 'project_updated',
+} as const;
+
+export type CustomerWorkProjectMutationCommand = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  action: CustomerWorkProjectMutationCommandAction;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  targetId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  version: number;
+  duplicate: boolean;
+};
+
+export interface CustomerWorkProjectMutation {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  project: CustomerWorkProjectMutationProject;
+  command: CustomerWorkProjectMutationCommand;
+}
+
+export type CustomerWorkEstimateMutationEstimateSourceKind = typeof CustomerWorkEstimateMutationEstimateSourceKind[keyof typeof CustomerWorkEstimateMutationEstimateSourceKind];
+
+
+export const CustomerWorkEstimateMutationEstimateSourceKind = {
+  lead: 'lead',
+  customer_work: 'customer_work',
+} as const;
+
+export type CustomerWorkEstimateMutationEstimateStatus = typeof CustomerWorkEstimateMutationEstimateStatus[keyof typeof CustomerWorkEstimateMutationEstimateStatus];
+
+
+export const CustomerWorkEstimateMutationEstimateStatus = {
+  draft: 'draft',
+  sent: 'sent',
+  accepted: 'accepted',
+  declined: 'declined',
+} as const;
+
+export type CustomerWorkEstimateMutationEstimateLineItemsItem = {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  description: string;
+  /**
+     * @minimum 0
+     * @maximum 999999
+     * @exclusiveMinimum
+     */
+  quantity: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  unitPriceCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  totalCents: number;
+};
+
+export type CustomerWorkEstimateMutationEstimate = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  sourceKind: CustomerWorkEstimateMutationEstimateSourceKind;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  customerLabel: string;
+  propertyLabel: string | null;
+  leadLabel: string | null;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  workVersion: number | null;
+  /**
+     * @minLength 1
+     * @maxLength 150
+     */
+  title: string;
+  status: CustomerWorkEstimateMutationEstimateStatus;
+  /** @maxItems 100 */
+  lineItems: CustomerWorkEstimateMutationEstimateLineItemsItem[];
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  subtotalCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  taxCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  totalCents: number;
+  notes: string | null;
+  sentAt: string | null;
+  acceptedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CustomerWorkEstimateMutationCommandAction = typeof CustomerWorkEstimateMutationCommandAction[keyof typeof CustomerWorkEstimateMutationCommandAction];
+
+
+export const CustomerWorkEstimateMutationCommandAction = {
+  estimate_created: 'estimate_created',
+  estimate_updated: 'estimate_updated',
+  project_created: 'project_created',
+  project_updated: 'project_updated',
+} as const;
+
+export type CustomerWorkEstimateMutationCommand = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  action: CustomerWorkEstimateMutationCommandAction;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  targetId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  version: number;
+  duplicate: boolean;
+};
+
+export interface CustomerWorkEstimateMutation {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  estimate: CustomerWorkEstimateMutationEstimate;
+  command: CustomerWorkEstimateMutationCommand;
+}
+
+export type CustomerWorkCommandAction = typeof CustomerWorkCommandAction[keyof typeof CustomerWorkCommandAction];
+
+
+export const CustomerWorkCommandAction = {
+  estimate_created: 'estimate_created',
+  estimate_updated: 'estimate_updated',
+  project_created: 'project_created',
+  project_updated: 'project_updated',
+} as const;
+
+export interface CustomerWorkCommand {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  action: CustomerWorkCommandAction;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  targetId: string;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  version: number;
+  duplicate: boolean;
+}
+
+export type CustomerWorkProjectSourceKind = typeof CustomerWorkProjectSourceKind[keyof typeof CustomerWorkProjectSourceKind];
+
+
+export const CustomerWorkProjectSourceKind = {
+  lead: 'lead',
+  customer_work: 'customer_work',
+} as const;
+
+export type CustomerWorkProjectStatus = typeof CustomerWorkProjectStatus[keyof typeof CustomerWorkProjectStatus];
+
+
+export const CustomerWorkProjectStatus = {
+  scheduled: 'scheduled',
+  in_progress: 'in_progress',
+  on_hold: 'on_hold',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface CustomerWorkProject {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  sourceKind: CustomerWorkProjectSourceKind;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  customerLabel: string;
+  propertyLabel: string | null;
+  leadLabel: string | null;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  workVersion: number | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  name: string;
+  status: CustomerWorkProjectStatus;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
+  /**
+     * @maxItems 50
+     * @items.minLength 1
+     * @items.maxLength 200
+     */
+  crewUserIds: string[];
+  /** @maxLength 4000 */
+  crewNotes: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CustomerWorkEstimateSourceKind = typeof CustomerWorkEstimateSourceKind[keyof typeof CustomerWorkEstimateSourceKind];
+
+
+export const CustomerWorkEstimateSourceKind = {
+  lead: 'lead',
+  customer_work: 'customer_work',
+} as const;
+
+export type CustomerWorkEstimateStatus = typeof CustomerWorkEstimateStatus[keyof typeof CustomerWorkEstimateStatus];
+
+
+export const CustomerWorkEstimateStatus = {
+  draft: 'draft',
+  sent: 'sent',
+  accepted: 'accepted',
+  declined: 'declined',
+} as const;
+
+export type CustomerWorkEstimateLineItemsItem = {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  description: string;
+  /**
+     * @minimum 0
+     * @maximum 999999
+     * @exclusiveMinimum
+     */
+  quantity: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  unitPriceCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  totalCents: number;
+};
+
+export interface CustomerWorkEstimate {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  sourceKind: CustomerWorkEstimateSourceKind;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  customerLabel: string;
+  propertyLabel: string | null;
+  leadLabel: string | null;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  workVersion: number | null;
+  /**
+     * @minLength 1
+     * @maxLength 150
+     */
+  title: string;
+  status: CustomerWorkEstimateStatus;
+  /** @maxItems 100 */
+  lineItems: CustomerWorkEstimateLineItemsItem[];
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  subtotalCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  taxCents: number;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  totalCents: number;
+  notes: string | null;
+  sentAt: string | null;
+  acceptedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CustomerWorkspaceHeaderContact = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  preferredContactMethod: string | null;
+  doNotContact: boolean;
+  doNotContactEmail: boolean;
+  doNotContactSms: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CustomerWorkspaceHeaderPermissions = {
+  canWrite: boolean;
+  canReadInvoices: boolean;
+};
+
+export type CustomerWorkspaceHeaderAvailableSectionsItem = typeof CustomerWorkspaceHeaderAvailableSectionsItem[keyof typeof CustomerWorkspaceHeaderAvailableSectionsItem];
+
+
+export const CustomerWorkspaceHeaderAvailableSectionsItem = {
+  properties: 'properties',
+  appointments: 'appointments',
+  services: 'services',
+  leads: 'leads',
+  projects: 'projects',
+  estimates: 'estimates',
+  invoices: 'invoices',
+  tasks: 'tasks',
+  activity: 'activity',
+} as const;
+
+export interface CustomerWorkspaceHeader {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  contact: CustomerWorkspaceHeaderContact;
+  permissions: CustomerWorkspaceHeaderPermissions;
+  /** @maxItems 9 */
+  availableSections: CustomerWorkspaceHeaderAvailableSectionsItem[];
+}
+
+export type CustomerWorkspacePage = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'properties';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+  kind: 'property';
+  createdAt: string;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'appointments';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'appointment';
+  type: 'inspection' | 'estimate_review' | 'production' | 'final_walkthrough' | 'other';
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
+  scheduledStart: string;
+  scheduledEnd: string | null;
+  updatedAt: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  property: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+  owner: {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  id: string;
+  name: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'services';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'service';
+  serviceKind: 'warranty_check' | 'maintenance' | 'service_plan';
+  equipmentLabel: string;
+  status: 'active' | 'completed' | 'cancelled';
+  dueAt: string;
+  completedAt: string | null;
+  coverageStartsOn: string | null;
+  coverageEndsOn: string | null;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  occurrenceIndex: number;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  predecessorObligationId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  taskId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  appointmentId: string | null;
+  property: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+  owner: {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  id: string;
+  name: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'leads';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'lead';
+  status: 'new' | 'ai_qualified' | 'contact_attempted' | 'inspection_scheduled' | 'inspection_completed' | 'estimate_preparing' | 'estimate_sent' | 'claim_pending' | 'follow_up' | 'won' | 'production_scheduled' | 'in_progress' | 'final_walkthrough' | 'completed' | 'review_requested' | 'nurture' | 'lost';
+  urgency: 'low' | 'normal' | 'high' | 'emergency';
+  serviceType: string | null;
+  property: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+  owner: {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  id: string;
+  name: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'projects';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'project';
+  name: string;
+  status: 'scheduled' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
+  completedAt: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  workVersion?: number | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId: string | null;
+  property: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'estimates';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'estimate';
+  title: string;
+  status: 'draft' | 'sent' | 'accepted' | 'declined';
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId?: string | null;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
+  workVersion?: number | null;
+  property: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'invoices';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'invoice';
+  invoiceNumber: string | null;
+  title: string;
+  status: 'draft' | 'issued' | 'void';
+  issuedAt: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId?: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  projectId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId: string | null;
+  property: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'tasks';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'task';
+  title: string;
+  status: 'open' | 'in_progress' | 'done' | 'cancelled';
+  priority: 'low' | 'normal' | 'high' | 'emergency';
+  dueAt: string | null;
+  completedAt: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  owner: {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  id: string;
+  name: string | null;
+} | null;
+})[];
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  order: 'created_desc';
+  limit: 25;
+  /**
+     * @minLength 1
+     * @maxLength 2048
+     */
+  nextCursor: string | null;
+  hasMore: boolean;
+  section: 'activity';
+  /** @maxItems 25 */
+  items: ({
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: 'activity';
+  category: 'note' | 'lead' | 'appointment' | 'service' | 'task' | 'communication' | 'invoice';
+  label: 'Note recorded' | 'Opportunity updated' | 'Visit updated' | 'Service updated' | 'Task updated' | 'Communication event recorded' | 'Customer response recorded' | 'Invoice updated';
+  occurredAt: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+})[];
+};
+
+export type CustomerWorkspaceAppointmentDetailAppointmentKind = typeof CustomerWorkspaceAppointmentDetailAppointmentKind[keyof typeof CustomerWorkspaceAppointmentDetailAppointmentKind];
+
+
+export const CustomerWorkspaceAppointmentDetailAppointmentKind = {
+  appointment: 'appointment',
+} as const;
+
+export type CustomerWorkspaceAppointmentDetailAppointmentType = typeof CustomerWorkspaceAppointmentDetailAppointmentType[keyof typeof CustomerWorkspaceAppointmentDetailAppointmentType];
+
+
+export const CustomerWorkspaceAppointmentDetailAppointmentType = {
+  inspection: 'inspection',
+  estimate_review: 'estimate_review',
+  production: 'production',
+  final_walkthrough: 'final_walkthrough',
+  other: 'other',
+} as const;
+
+export type CustomerWorkspaceAppointmentDetailAppointmentStatus = typeof CustomerWorkspaceAppointmentDetailAppointmentStatus[keyof typeof CustomerWorkspaceAppointmentDetailAppointmentStatus];
+
+
+export const CustomerWorkspaceAppointmentDetailAppointmentStatus = {
+  scheduled: 'scheduled',
+  confirmed: 'confirmed',
+  completed: 'completed',
+  cancelled: 'cancelled',
+  no_show: 'no_show',
+} as const;
+
+export type CustomerWorkspaceAppointmentDetailAppointmentProperty = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  propertyType: string | null;
+} | null;
+
+export type CustomerWorkspaceAppointmentDetailAppointmentOwner = {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  id: string;
+  name: string | null;
+} | null;
+
+export type CustomerWorkspaceAppointmentDetailAppointment = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  createdAt: string;
+  kind: CustomerWorkspaceAppointmentDetailAppointmentKind;
+  type: CustomerWorkspaceAppointmentDetailAppointmentType;
+  status: CustomerWorkspaceAppointmentDetailAppointmentStatus;
+  scheduledStart: string;
+  scheduledEnd: string | null;
+  updatedAt: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  property: CustomerWorkspaceAppointmentDetailAppointmentProperty;
+  owner: CustomerWorkspaceAppointmentDetailAppointmentOwner;
+};
+
+export type CustomerWorkspaceAppointmentDetailPermissions = {
+  canWrite: boolean;
+};
+
+export interface CustomerWorkspaceAppointmentDetail {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  appointment: CustomerWorkspaceAppointmentDetailAppointment;
+  permissions: CustomerWorkspaceAppointmentDetailPermissions;
+}
+
 export type WorkdayAssetPageItemsItemCategory = typeof WorkdayAssetPageItemsItemCategory[keyof typeof WorkdayAssetPageItemsItemCategory];
 
 
@@ -4972,482 +6118,6 @@ export interface CallieIntakeDetail {
   mode: CallieIntakeDetailMode;
 }
 
-export type CustomerWorkspaceHeaderContact = {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  firstName: string;
-  lastName: string | null;
-  email: string | null;
-  phone: string | null;
-  preferredContactMethod: string | null;
-  doNotContact: boolean;
-  doNotContactEmail: boolean;
-  doNotContactSms: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type CustomerWorkspaceHeaderPermissions = {
-  canWrite: boolean;
-  canReadInvoices: boolean;
-};
-
-export type CustomerWorkspaceHeaderAvailableSectionsItem = typeof CustomerWorkspaceHeaderAvailableSectionsItem[keyof typeof CustomerWorkspaceHeaderAvailableSectionsItem];
-
-
-export const CustomerWorkspaceHeaderAvailableSectionsItem = {
-  properties: 'properties',
-  appointments: 'appointments',
-  services: 'services',
-  leads: 'leads',
-  projects: 'projects',
-  estimates: 'estimates',
-  invoices: 'invoices',
-  tasks: 'tasks',
-  activity: 'activity',
-} as const;
-
-export interface CustomerWorkspaceHeader {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  contact: CustomerWorkspaceHeaderContact;
-  permissions: CustomerWorkspaceHeaderPermissions;
-  /** @maxItems 9 */
-  availableSections: CustomerWorkspaceHeaderAvailableSectionsItem[];
-}
-
-export type CustomerWorkspacePage = {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'properties';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-  kind: 'property';
-  createdAt: string;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'appointments';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'appointment';
-  type: 'inspection' | 'estimate_review' | 'production' | 'final_walkthrough' | 'other';
-  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
-  scheduledStart: string;
-  scheduledEnd: string | null;
-  updatedAt: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string | null;
-  property: {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-  owner: {
-  /**
-     * @minLength 1
-     * @maxLength 200
-     */
-  id: string;
-  name: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'services';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'service';
-  serviceKind: 'warranty_check' | 'maintenance' | 'service_plan';
-  equipmentLabel: string;
-  status: 'active' | 'completed' | 'cancelled';
-  dueAt: string;
-  completedAt: string | null;
-  coverageStartsOn: string | null;
-  coverageEndsOn: string | null;
-  /**
-     * @minimum 0
-     * @maximum 9007199254740991
-     */
-  occurrenceIndex: number;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  predecessorObligationId: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  taskId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  appointmentId: string | null;
-  property: {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-  owner: {
-  /**
-     * @minLength 1
-     * @maxLength 200
-     */
-  id: string;
-  name: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'leads';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'lead';
-  status: 'new' | 'ai_qualified' | 'contact_attempted' | 'inspection_scheduled' | 'inspection_completed' | 'estimate_preparing' | 'estimate_sent' | 'claim_pending' | 'follow_up' | 'won' | 'production_scheduled' | 'in_progress' | 'final_walkthrough' | 'completed' | 'review_requested' | 'nurture' | 'lost';
-  urgency: 'low' | 'normal' | 'high' | 'emergency';
-  serviceType: string | null;
-  property: {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-  owner: {
-  /**
-     * @minLength 1
-     * @maxLength 200
-     */
-  id: string;
-  name: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'projects';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'project';
-  name: string;
-  status: 'scheduled' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
-  scheduledStart: string | null;
-  scheduledEnd: string | null;
-  completedAt: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  estimateId: string | null;
-  property: {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'estimates';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'estimate';
-  title: string;
-  status: 'draft' | 'sent' | 'accepted' | 'declined';
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string;
-  property: {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'invoices';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'invoice';
-  invoiceNumber: string | null;
-  title: string;
-  status: 'draft' | 'issued' | 'void';
-  issuedAt: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  projectId: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  estimateId: string | null;
-  property: {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'tasks';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'task';
-  title: string;
-  status: 'open' | 'in_progress' | 'done' | 'cancelled';
-  priority: 'low' | 'normal' | 'high' | 'emergency';
-  dueAt: string | null;
-  completedAt: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string | null;
-  owner: {
-  /**
-     * @minLength 1
-     * @maxLength 200
-     */
-  id: string;
-  name: string | null;
-} | null;
-})[];
-} | {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string;
-  order: 'created_desc';
-  limit: 25;
-  /**
-     * @minLength 1
-     * @maxLength 2048
-     */
-  nextCursor: string | null;
-  hasMore: boolean;
-  section: 'activity';
-  /** @maxItems 25 */
-  items: ({
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: 'activity';
-  category: 'note' | 'lead' | 'appointment' | 'service' | 'task' | 'communication' | 'invoice';
-  label: 'Note recorded' | 'Opportunity updated' | 'Visit updated' | 'Service updated' | 'Task updated' | 'Communication event recorded' | 'Customer response recorded' | 'Invoice updated';
-  occurredAt: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string | null;
-})[];
-};
-
-export type CustomerWorkspaceAppointmentDetailAppointmentKind = typeof CustomerWorkspaceAppointmentDetailAppointmentKind[keyof typeof CustomerWorkspaceAppointmentDetailAppointmentKind];
-
-
-export const CustomerWorkspaceAppointmentDetailAppointmentKind = {
-  appointment: 'appointment',
-} as const;
-
-export type CustomerWorkspaceAppointmentDetailAppointmentType = typeof CustomerWorkspaceAppointmentDetailAppointmentType[keyof typeof CustomerWorkspaceAppointmentDetailAppointmentType];
-
-
-export const CustomerWorkspaceAppointmentDetailAppointmentType = {
-  inspection: 'inspection',
-  estimate_review: 'estimate_review',
-  production: 'production',
-  final_walkthrough: 'final_walkthrough',
-  other: 'other',
-} as const;
-
-export type CustomerWorkspaceAppointmentDetailAppointmentStatus = typeof CustomerWorkspaceAppointmentDetailAppointmentStatus[keyof typeof CustomerWorkspaceAppointmentDetailAppointmentStatus];
-
-
-export const CustomerWorkspaceAppointmentDetailAppointmentStatus = {
-  scheduled: 'scheduled',
-  confirmed: 'confirmed',
-  completed: 'completed',
-  cancelled: 'cancelled',
-  no_show: 'no_show',
-} as const;
-
-export type CustomerWorkspaceAppointmentDetailAppointmentProperty = {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  addressLine1: string;
-  addressLine2: string | null;
-  city: string;
-  state: string;
-  postalCode: string;
-  propertyType: string | null;
-} | null;
-
-export type CustomerWorkspaceAppointmentDetailAppointmentOwner = {
-  /**
-     * @minLength 1
-     * @maxLength 200
-     */
-  id: string;
-  name: string | null;
-} | null;
-
-export type CustomerWorkspaceAppointmentDetailAppointment = {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  id: string;
-  createdAt: string;
-  kind: CustomerWorkspaceAppointmentDetailAppointmentKind;
-  type: CustomerWorkspaceAppointmentDetailAppointmentType;
-  status: CustomerWorkspaceAppointmentDetailAppointmentStatus;
-  scheduledStart: string;
-  scheduledEnd: string | null;
-  updatedAt: string;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  contactId: string | null;
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  leadId: string | null;
-  property: CustomerWorkspaceAppointmentDetailAppointmentProperty;
-  owner: CustomerWorkspaceAppointmentDetailAppointmentOwner;
-};
-
-export type CustomerWorkspaceAppointmentDetailPermissions = {
-  canWrite: boolean;
-};
-
-export interface CustomerWorkspaceAppointmentDetail {
-  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
-  organizationId: string;
-  appointment: CustomerWorkspaceAppointmentDetailAppointment;
-  permissions: CustomerWorkspaceAppointmentDetailPermissions;
-}
-
 export type SourceNurtureDetailState = typeof SourceNurtureDetailState[keyof typeof SourceNurtureDetailState];
 
 
@@ -8871,10 +9541,18 @@ export interface EstimateLineItem {
   totalCents: number;
 }
 
+export type EstimateSourceKind = typeof EstimateSourceKind[keyof typeof EstimateSourceKind];
+
+
+export const EstimateSourceKind = {
+  lead: 'lead',
+  customer_work: 'customer_work',
+} as const;
+
 export interface Estimate {
   id: string;
   organizationId: string;
-  leadId: string;
+  leadId: string | null;
   title: string;
   status: EstimateStatus;
   lineItems: EstimateLineItem[];
@@ -8894,6 +9572,17 @@ export interface Estimate {
   acceptedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  customerWorkId?: string | null;
+  contactId?: string;
+  propertyId?: string | null;
+  sourceKind?: EstimateSourceKind;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  workVersion?: number | null;
+  customerLabel?: string;
+  propertyLabel?: string | null;
 }
 
 export interface EstimateInput {
@@ -8918,10 +9607,18 @@ export interface EstimateUpdate {
   notes?: string | null;
 }
 
+export type ProjectSourceKind = typeof ProjectSourceKind[keyof typeof ProjectSourceKind];
+
+
+export const ProjectSourceKind = {
+  lead: 'lead',
+  customer_work: 'customer_work',
+} as const;
+
 export interface Project {
   id: string;
   organizationId: string;
-  leadId: string;
+  leadId: string | null;
   /**
      * Convenience display name of the linked lead (contact name, falling back to lead summary; list endpoints only).
      * @nullable
@@ -8942,6 +9639,17 @@ export interface Project {
   completedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  customerWorkId?: string | null;
+  contactId?: string;
+  propertyId?: string | null;
+  sourceKind?: ProjectSourceKind;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  workVersion?: number | null;
+  customerLabel?: string;
+  propertyLabel?: string | null;
 }
 
 export interface ProjectInput {
@@ -11533,6 +12241,14 @@ export type InvoiceDeliveryWorklistItemDelivery = {
   latestAttempt: InvoiceDeliveryAttemptEvidence | null;
 };
 
+export type InvoiceDeliveryWorklistItemSourceKind = typeof InvoiceDeliveryWorklistItemSourceKind[keyof typeof InvoiceDeliveryWorklistItemSourceKind];
+
+
+export const InvoiceDeliveryWorklistItemSourceKind = {
+  lead: 'lead',
+  customer_work: 'customer_work',
+} as const;
+
 export interface InvoiceDeliveryWorklistItem {
   invoiceId: string;
   /** @nullable */
@@ -11542,10 +12258,15 @@ export interface InvoiceDeliveryWorklistItem {
   status: InvoiceDeliveryWorklistItemStatus;
   /** @minimum 1 */
   version: number;
-  leadId: string;
+  leadId: string | null;
   /** @nullable */
   projectId: string | null;
   delivery: InvoiceDeliveryWorklistItemDelivery;
+  customerWorkId?: string | null;
+  contactId?: string;
+  propertyId?: string | null;
+  sourceKind?: InvoiceDeliveryWorklistItemSourceKind;
+  organizationId?: string;
 }
 
 export type InvoiceDeliveryWorklistPageSize = typeof InvoiceDeliveryWorklistPageSize[keyof typeof InvoiceDeliveryWorklistPageSize];
@@ -11604,46 +12325,7 @@ export interface InvoiceDeliverySendRequest {
   duplicateCopyAcknowledged?: true;
 }
 
-export type InvoiceDeliveryPreviewSenderSource = typeof InvoiceDeliveryPreviewSenderSource[keyof typeof InvoiceDeliveryPreviewSenderSource];
-
-
-export const InvoiceDeliveryPreviewSenderSource = {
-  lead_assignee: 'lead_assignee',
-  company_default: 'company_default',
-} as const;
-
-export type InvoiceDeliveryPreviewSenderProvider = typeof InvoiceDeliveryPreviewSenderProvider[keyof typeof InvoiceDeliveryPreviewSenderProvider];
-
-
-export const InvoiceDeliveryPreviewSenderProvider = {
-  gmail: 'gmail',
-  microsoft: 'microsoft',
-} as const;
-
-export type InvoiceDeliveryPreviewSender = {
-  userId: string;
-  source: InvoiceDeliveryPreviewSenderSource;
-  provider: InvoiceDeliveryPreviewSenderProvider;
-  senderEmail: string;
-};
-
-export type InvoiceDeliveryPreviewIntent = typeof InvoiceDeliveryPreviewIntent[keyof typeof InvoiceDeliveryPreviewIntent];
-
-
-export const InvoiceDeliveryPreviewIntent = {
-  initial: 'initial',
-  retry_not_dispatched: 'retry_not_dispatched',
-  additional_copy: 'additional_copy',
-} as const;
-
-export type InvoiceDeliveryPreviewMaxAttempts = typeof InvoiceDeliveryPreviewMaxAttempts[keyof typeof InvoiceDeliveryPreviewMaxAttempts];
-
-
-export const InvoiceDeliveryPreviewMaxAttempts = {
-  NUMBER_5: 5,
-} as const;
-
-export interface InvoiceDeliveryPreview {
+export type InvoiceDeliveryPreview = {
   previewId: string;
   /** @pattern ^[a-f0-9]{64}$ */
   payloadSha256: string;
@@ -11660,10 +12342,15 @@ export interface InvoiceDeliveryPreview {
   /** @pattern ^[a-f0-9]{64}$ */
   sourceSha256: string;
   recipient: string;
-  sender: InvoiceDeliveryPreviewSender;
+  sender: {
+  userId: string;
+  source: 'lead_assignee' | 'company_default';
+  provider: 'gmail' | 'microsoft';
+  senderEmail: string;
+};
   subject: string;
   body: string;
-  intent: InvoiceDeliveryPreviewIntent;
+  intent: 'initial' | 'retry_not_dispatched' | 'additional_copy';
   /** @nullable */
   expectedLatestExecutionId: string | null;
   /** @nullable */
@@ -11673,9 +12360,51 @@ export interface InvoiceDeliveryPreview {
      * @maximum 5
      */
   prospectiveAttemptNumber: number;
-  maxAttempts: InvoiceDeliveryPreviewMaxAttempts;
+  maxAttempts: 5;
   deliveryDetail: string;
-}
+} | {
+  previewId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  expiresAt: string;
+  invoiceId: string;
+  /** @minimum 1 */
+  invoiceVersion: number;
+  invoiceNumber: string;
+  issuedAt: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  documentSha256: string;
+  leadId:  | null;
+  contactId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  sourceSha256: string;
+  recipient: string;
+  sender: {
+  userId: string;
+  source: 'company_default';
+  provider: 'gmail' | 'microsoft';
+  senderEmail: string;
+};
+  subject: string;
+  body: string;
+  intent: 'initial' | 'retry_not_dispatched' | 'additional_copy';
+  /** @nullable */
+  expectedLatestExecutionId: string | null;
+  /** @nullable */
+  reason: string | null;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  prospectiveAttemptNumber: number;
+  maxAttempts: 5;
+  deliveryDetail: string;
+  reviewVersion: 3;
+  customerWorkId: string;
+  propertyId: string | null;
+  /** @pattern ^[a-f0-9]{64}$ */
+  senderIdentitySha256: string;
+};
 
 export type ServiceCareReviewPreview = { [key: string]: unknown } | null;
 
@@ -12909,6 +13638,14 @@ export const InvoiceSummaryPaymentState = {
   reconciliation_required: 'reconciliation_required',
 } as const;
 
+export type InvoiceSummarySourceKind = typeof InvoiceSummarySourceKind[keyof typeof InvoiceSummarySourceKind];
+
+
+export const InvoiceSummarySourceKind = {
+  lead: 'lead',
+  customer_work: 'customer_work',
+} as const;
+
 export interface InvoiceSummary {
   /** Opening receivables are non-cash cutoff balances, not proof of money received. */
   balanceBasis: InvoiceSummaryBalanceBasis;
@@ -12922,7 +13659,7 @@ export interface InvoiceSummary {
   openingAsOf: string | null;
   historicalSource: HistoricalInvoiceSource | null;
   id: string;
-  leadId: string;
+  leadId: string | null;
   /** @nullable */
   projectId: string | null;
   /** @nullable */
@@ -12974,6 +13711,11 @@ export interface InvoiceSummary {
      * @maximum 1000000000
      */
   unallocatedRefundCents: number;
+  customerWorkId: string | null;
+  contactId: string;
+  propertyId: string | null;
+  sourceKind: InvoiceSummarySourceKind;
+  organizationId: string;
 }
 
 export type InvoiceAllocationKind = typeof InvoiceAllocationKind[keyof typeof InvoiceAllocationKind];
@@ -13000,6 +13742,7 @@ export interface InvoiceAllocation {
   reversedAt: string | null;
   /** @nullable */
   reversalReason: string | null;
+  refundOfValueEntryId?: string | null;
 }
 
 export type InvoiceAvailableValueEntryKind = typeof InvoiceAvailableValueEntryKind[keyof typeof InvoiceAvailableValueEntryKind];
@@ -13025,6 +13768,7 @@ export interface InvoiceAvailableValueEntry {
      */
   availableCents: number;
   occurredAt: string;
+  refundOfValueEntryId?: string | null;
 }
 
 export interface InvoiceEvent {
@@ -13077,6 +13821,14 @@ export const InvoiceDetailPaymentState = {
   reconciliation_required: 'reconciliation_required',
 } as const;
 
+export type InvoiceDetailSourceKind = typeof InvoiceDetailSourceKind[keyof typeof InvoiceDetailSourceKind];
+
+
+export const InvoiceDetailSourceKind = {
+  lead: 'lead',
+  customer_work: 'customer_work',
+} as const;
+
 export interface InvoiceDetail {
   /** Opening receivables are non-cash cutoff balances, not proof of money received. */
   balanceBasis: InvoiceDetailBalanceBasis;
@@ -13090,7 +13842,7 @@ export interface InvoiceDetail {
   openingAsOf: string | null;
   historicalSource: HistoricalInvoiceSource | null;
   id: string;
-  leadId: string;
+  leadId: string | null;
   /** @nullable */
   projectId: string | null;
   /** @nullable */
@@ -13147,6 +13899,11 @@ export interface InvoiceDetail {
   availableValueEntries: InvoiceAvailableValueEntry[];
   availableValueEntriesTruncated: boolean;
   events: InvoiceEvent[];
+  customerWorkId: string | null;
+  contactId: string;
+  propertyId: string | null;
+  sourceKind: InvoiceDetailSourceKind;
+  organizationId: string;
 }
 
 export type InvoiceListPageSize = typeof InvoiceListPageSize[keyof typeof InvoiceListPageSize];
@@ -13171,15 +13928,124 @@ export interface InvoiceMutation {
   duplicate: boolean;
 }
 
-export interface CreateInvoice {
+export type CreateInvoice = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   requestId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   leadId: string;
-  /** @nullable */
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   projectId?: string | null;
-  /** @nullable */
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   estimateId?: string | null;
-  document: InvoiceDocumentInput;
-}
+  document: {
+  /**
+     * @minLength 1
+     * @maxLength 150
+     */
+  title: string;
+  currency: 'USD';
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  issuerName: string;
+  /** @maxLength 500 */
+  issuerAddress?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  customerName: string;
+  /** @maxLength 500 */
+  customerAddress?: string | null;
+  dueDate?: string | null;
+  /** @maxLength 2000 */
+  notes?: string | null;
+  /** @maxItems 100 */
+  lineItems: {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  description: string;
+  /** @pattern ^\d{1,6}(?:\.\d{1,3})?$ */
+  quantity: string;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  unitPriceCents: number;
+}[];
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  taxCents: number;
+};
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  requestId: string;
+  source: {
+  kind: 'customer_work';
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  customerWorkId: string;
+} | {
+  kind: 'existing_customer';
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+};
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  projectId?: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId?: string | null;
+  document: {
+  /**
+     * @minLength 1
+     * @maxLength 150
+     */
+  title: string;
+  currency: 'USD';
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  issuerName: string;
+  /** @maxLength 500 */
+  issuerAddress?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  customerName: string;
+  /** @maxLength 500 */
+  customerAddress?: string | null;
+  dueDate?: string | null;
+  /** @maxLength 2000 */
+  notes?: string | null;
+  /** @maxItems 100 */
+  lineItems: {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  description: string;
+  /** @pattern ^\d{1,6}(?:\.\d{1,3})?$ */
+  quantity: string;
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  unitPriceCents: number;
+}[];
+  /**
+     * @minimum 0
+     * @maximum 1000000000
+     */
+  taxCents: number;
+};
+};
 
 export interface UpdateInvoice {
   requestId: string;
@@ -13312,7 +14178,7 @@ export interface ContractorDayProject {
   id: string;
   title: string;
   status: string;
-  leadId: string;
+  leadId: string | null;
   /** @nullable */
   customerLabel: string | null;
   crewNames: string[];
@@ -13320,6 +14186,8 @@ export interface ContractorDayProject {
   scheduledStart: string | null;
   /** @nullable */
   scheduledEnd: string | null;
+  customerWorkId?: string | null;
+  contactId?: string;
 }
 
 export interface ContractorDayService {
@@ -13514,19 +14382,19 @@ export type AuthorizationSessionHeaderParameter = string;
  */
 export type PortalTokenHeaderParameter = string;
 
-export type GetWorkdayAssetsParams = {
-propertyId?: string;
-/**
- * @maxLength 1000
- */
-cursor?: string;
-};
-
 export type GetCustomerWorkspaceSectionParams = {
 /**
  * @minLength 1
  * @maxLength 2048
  * @pattern ^[A-Za-z0-9_-]+$
+ */
+cursor?: string;
+};
+
+export type GetWorkdayAssetsParams = {
+propertyId?: string;
+/**
+ * @maxLength 1000
  */
 cursor?: string;
 };
@@ -13664,11 +14532,17 @@ limit?: number;
  * Number of rows to skip, for paging past earlier results (server treats negatives as 0).
  */
 offset?: number;
+contactId?: string;
+customerWorkId?: string;
+propertyId?: string;
 };
 
 export type ListProjectsParams = {
 leadId?: string;
 status?: ProjectStatus;
+contactId?: string;
+customerWorkId?: string;
+propertyId?: string;
 };
 
 export type ListTasksParams = {
@@ -13801,6 +14675,8 @@ projectId?: string;
  * @maximum 10000
  */
 page?: number;
+contactId?: string;
+customerWorkId?: string;
 };
 
 export type ListInvoicesStatus = typeof ListInvoicesStatus[keyof typeof ListInvoicesStatus];

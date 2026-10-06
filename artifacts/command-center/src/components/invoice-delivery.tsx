@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ContractorApiError, contractorRequest } from "@/lib/contractor-api";
+import { currentMemberAuthorityMatches } from '@/lib/member-authority-scope';
 import {
   invoiceButton,
   invoiceControl,
@@ -38,7 +39,7 @@ function failureMessage(error: unknown) {
           invoice_delivery_not_issued:
             "Only a currently issued, non-void invoice can be emailed.",
           invoice_delivery_sender_unavailable:
-            "Connect the assigned staff member’s selected Gmail/Microsoft mailbox, or configure the explicit company sender for an unassigned opportunity.",
+            "Check the explicitly selected Gmail/Microsoft sender. Existing-customer work requires the configured company-default sender and that sender’s stored mailbox preference; a staff assignment is not a substitute.",
           invoice_delivery_held:
             "Email is held. Check the customer’s do-not-contact/suppression status, company lifecycle and outbound/staging controls before reviewing again.",
           invoice_delivery_reserved:
@@ -57,15 +58,19 @@ export function InvoiceDelivery({
   invoice,
   organizationId,
   canManage,
+  authorityScope,
 }: {
   invoice: InvoiceDetail;
   organizationId: string;
   canManage: boolean;
+  authorityScope?: string;
 }) {
   const path = `/invoices/${encodeURIComponent(invoice.id)}/delivery`,
     cache = useQueryClient();
   const evidence = useQuery({
-    queryKey: ["invoice-delivery", organizationId, invoice.id],
+    // Billing acknowledgements change eligibility, not delivery ownership. Read
+    // fresh evidence for that saved revision without remounting unknown-send state.
+    queryKey: ["invoice-delivery", organizationId, invoice.id, invoice.version, invoice.status, authorityScope ?? null],
     retry: false,
     queryFn: async ({ signal }) => {
       const result = invoiceEmailEvidenceSchema.parse(
@@ -94,6 +99,14 @@ export function InvoiceDelivery({
     [checkRequired, setCheckRequired] = useState(false),
     [expired, setExpired] = useState(false);
   const inFlight = useRef(false);
+  const identity = `${authorityScope ?? organizationId}:${invoice.id}:${invoice.version}:${invoice.status}:${invoice.customerWorkId ?? invoice.leadId}:${canManage}`;
+  const memberCurrent = () => !authorityScope || currentMemberAuthorityMatches(cache, authorityScope);
+  const lifecycle = useRef({ identity, active: true });
+  if (lifecycle.current.identity !== identity) lifecycle.current = { identity, active: true };
+  useEffect(() => { const original = lifecycle.current; original.active = true; return () => { original.active = false; }; }, [identity]);
+  const matchesSource = (value: InvoiceEmailPreview) => invoice.customerWorkId
+    ? value.reviewVersion === 3 && value.customerWorkId === invoice.customerWorkId && value.contactId === invoice.contactId && value.propertyId === invoice.propertyId && value.sender.source === 'company_default'
+    : value.reviewVersion !== 3;
   useEffect(() => {
     setExpired(!!preview && Date.parse(preview.expiresAt) <= Date.now());
     if (!preview) return;
@@ -121,6 +134,7 @@ export function InvoiceDelivery({
       Date.parse(preview.expiresAt) <= Date.now() ||
       preview.invoiceId !== invoice.id ||
       preview.invoiceVersion !== invoice.version ||
+      !matchesSource(preview) ||
       invoice.status !== "issued" ||
       preview.expectedLatestExecutionId !== evidence.data?.latestExecutionId ||
       preview.prospectiveAttemptNumber !==
@@ -133,8 +147,10 @@ export function InvoiceDelivery({
     setCopyAcknowledged(false);
   }
   async function prepare(intent: InvoiceDeliveryIntent) {
+    const token = lifecycle.current, current = () => token.active && lifecycle.current === token && memberCurrent();
     if (
       inFlight.current ||
+      !current() ||
       !modes.includes(intent) ||
       (intent !== "initial" &&
         (reason.trim().length < 10 || reason.trim().length > 1000))
@@ -165,6 +181,7 @@ export function InvoiceDelivery({
       if (
         result.invoiceId !== invoice.id ||
         result.invoiceVersion !== invoice.version ||
+        !matchesSource(result) ||
         result.intent !== intent ||
         result.expectedLatestExecutionId !== head ||
         result.prospectiveAttemptNumber !== ordinal ||
@@ -172,33 +189,37 @@ export function InvoiceDelivery({
         Date.parse(result.expiresAt) <= Date.now()
       )
         throw new Error("The exact review changed or expired.");
+      if (!current()) return;
       setPreview(result);
     } catch (failure) {
-      setError(failureMessage(failure));
+      if (current()) setError(failureMessage(failure));
     } finally {
       inFlight.current = false;
-      setBusy(false);
+      if (current()) setBusy(false);
     }
   }
   async function refresh() {
-    if (inFlight.current) return;
+    const token = lifecycle.current, current = () => token.active && lifecycle.current === token && memberCurrent();
+    if (inFlight.current || !current()) return;
     inFlight.current = true;
     setBusy(true);
     discard();
     try {
       const result = await evidence.refetch();
-      if (!result.isError) {
+      if (current() && !result.isError) {
         setCheckRequired(false);
         setError("");
       }
     } finally {
       inFlight.current = false;
-      setBusy(false);
+      if (current()) setBusy(false);
     }
   }
   async function send() {
+    const token = lifecycle.current, current = () => token.active && lifecycle.current === token && memberCurrent();
     if (
       inFlight.current ||
+      !current() ||
       !preview ||
       !confirmed ||
       stale ||
@@ -223,13 +244,15 @@ export function InvoiceDelivery({
             : {}),
         },
       });
+      if (!current()) return;
       discard();
       await cache.invalidateQueries({
         queryKey: ["invoice-delivery-worklist", organizationId],
       });
       const result = await evidence.refetch();
-      if (!result.isError) setCheckRequired(false);
+      if (current() && !result.isError) setCheckRequired(false);
     } catch (failure) {
+      if (!current()) return;
       setConfirmed(false);
       setCopyAcknowledged(false);
       setError(
@@ -237,7 +260,7 @@ export function InvoiceDelivery({
       );
     } finally {
       inFlight.current = false;
-      setBusy(false);
+      if (current()) setBusy(false);
     }
   }
   return (
@@ -257,11 +280,12 @@ export function InvoiceDelivery({
         </button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Send the immutable issued document to this opportunity’s saved customer
-        email using the selected staff or company Gmail/Microsoft mailbox.
+        Send the immutable issued document to this {invoice.customerWorkId ? 'work record’s' : 'opportunity’s'} saved customer
+        email using the {invoice.customerWorkId ? 'explicit company-default' : 'selected staff or company'} Gmail/Microsoft mailbox.
         Emailing another copy never creates a new invoice, balance, payment link
         or charge.
       </p>
+      {invoice.customerWorkId && <p className="text-sm text-muted-foreground">This review uses the exact existing customer and property context. It does not enroll opportunity reply monitoring or prove an incoming reply.</p>}
       {evidence.isPending ? (
         <p role="status">Loading invoice email evidence…</p>
       ) : evidence.isError ? (

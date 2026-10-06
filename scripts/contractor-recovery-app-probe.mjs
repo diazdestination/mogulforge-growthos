@@ -13,6 +13,7 @@ import { sourceNurtureIds } from './source-nurture-recovery-fixture.mjs';
 import { customerWorkspaceIds } from './customer-workspace-fixture.mjs';
 import { CALLIE_CONVERSATION_RECOVERY_SLUGS, callieConversationFixtureIds } from './callie-conversation-recovery-fixture.mjs';
 import { WORKDAY_RECOVERY_SLUGS, workdayFixtureIds, WORKDAY_FIXTURE_PNG } from './contractor-workday-recovery-fixture.mjs';
+import { returningCustomerIds } from './returning-customer-recovery-fixture.mjs';
 
 const target = new URL(process.env.DATABASE_URL ?? '');
 if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.hostname !== '127.0.0.1' || target.pathname !== '/postgres' || process.env.CONTRACTOR_SYNTHETIC_RECOVERY !== 'true' || process.env.NODE_ENV !== 'test') throw new Error('contractor_probe_target_invalid');
@@ -120,7 +121,8 @@ try {
   assert.deepEqual(delivery.attempts.map(row => row.state), ['blocked', 'indeterminate']);
   check = 'invoice_delivery_worklist';
   const worklist = await (await fetch(`${origin}/api/v1/invoices/delivery-worklist`, { headers })).json();
-  assert.equal(worklist.pageSize, 25); assert.equal(worklist.total, 2);
+  assert.equal(worklist.pageSize, 25); assert.equal(worklist.total, 4);
+  assert.ok(worklist.items.some(row=>row.invoiceId===returningCustomerIds('restore-drill-contractor-a').invoice));
   assert.equal(worklist.items.some(row => row.invoiceId === otherNative.invoice), false);
   const listed = worklist.items.find(row => row.invoiceId === native.invoice);
   assert.equal(listed.delivery.integrity, 'valid'); assert.equal(listed.delivery.attemptCount, 2);
@@ -270,7 +272,43 @@ try {
     assert.equal(deniedWrite.status,405); await deniedWrite.arrayBuffer();
     assert.equal(databaseFailed,false);
   }
-  process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, tenantBoundariesVerified: true, customerWorkspaceVerified: true, callieConversationReadVerified: true, workdayReadVerified: true, readChecks: good.length + receptionReadChecks + workdayReadChecks, writeBlocked: true })}\n`);
+  let returningReadChecks=0;
+  for(const[index,slug]of ['restore-drill-contractor-a','restore-drill-contractor-b'].entries()){
+    const returning=returningCustomerIds(slug),foreign=returningCustomerIds(index?'restore-drill-contractor-a':'restore-drill-contractor-b');
+    const workHeaders={authorization:`Bearer ${(index?'b':'a').repeat(64)}`};
+    const read=async path=>{const response=await fetch(`${origin}${path}`,{headers:workHeaders});assert.equal(response.status,200,path);returningReadChecks++;return response.json();};
+    check=`returning_${index}_canonical_customer`;
+    const workspace=await read(`/api/v1/contacts/${returning.contact}/workspace`);
+    assert.equal(workspace.contact.id,returning.contact);assert.equal(workspace.availableSections.length,9);
+    const estimates=await read(`/api/v1/contacts/${returning.contact}/workspace/estimates`);
+    assert.equal(estimates.items.length,1);assert.equal(estimates.items[0].leadId,null);assert.equal(estimates.items[0].customerWorkId,returning.quoteRoot);
+    const projects=await read(`/api/v1/contacts/${returning.contact}/workspace/projects`);
+    assert.deepEqual(projects.items.map(row=>row.id).sort(),[returning.project,returning.directProject].sort());
+    const invoices=await read(`/api/v1/contacts/${returning.contact}/workspace/invoices`);
+    assert.deepEqual(invoices.items.map(row=>row.id).sort(),[returning.invoice,returning.standaloneInvoice].sort());
+    const estimate=await read(`/api/v1/estimates/${returning.estimate}`);
+    assert.equal(estimate.customerWorkId,returning.quoteRoot);assert.equal(estimate.contactId,returning.contact);assert.equal(estimate.workVersion,2);
+    for(const[projectId,root]of [[returning.project,returning.quoteRoot],[returning.directProject,returning.jobRoot]]){
+      const project=await read(`/api/v1/projects/${projectId}`);assert.equal(project.leadId,null);assert.equal(project.customerWorkId,root);assert.equal(project.contactId,returning.contact);
+    }
+    for(const[invoiceId,paid,balance]of [[returning.invoice,9000,11000],[returning.standaloneInvoice,7000,3000]]){
+      const invoice=await read(`/api/v1/invoices/${invoiceId}`);assert.equal(invoice.leadId,null);assert.equal(invoice.contactId,returning.contact);assert.equal(invoice.recordedPaidCents,paid);assert.equal(invoice.recordedBalanceCents,balance);assert.equal(invoice.reconciliationRequired,false);
+    }
+    check=`returning_${index}_held_v3_history`;
+    const delivery=await read(`/api/v1/invoices/${returning.invoice}/delivery`);
+    assert.equal(delivery.latestExecutionId,returning.execution);assert.equal(delivery.state,'uncertain');
+    assert.equal(delivery.integrity,'valid');assert.equal(delivery.attemptCount,1);
+    assert.equal(delivery.canPrepare,false);assert.deepEqual(delivery.nextIntents,[]);
+    const ledger=await read('/api/v1/revenue/value');
+    assert.equal(ledger.sourceBreakdown.find(row=>row.source==='customer_work').netReceiptsCents,16000);
+    assert.ok(ledger.entries.filter(row=>row.customerWorkId).every(row=>row.leadId===null&&row.contactId===returning.contact));
+    const today=await read('/api/v1/contractor/today?date=2026-10-06&scope=company');
+    const direct=today.projects.items.find(row=>row.id===returning.directProject);assert.equal(direct.contactId,returning.contact);assert.equal(direct.customerWorkId,returning.jobRoot);assert.equal(direct.leadId,null);
+    for(const path of [`/api/v1/contacts/${foreign.contact}/workspace`,`/api/v1/projects/${foreign.project}`,`/api/v1/invoices/${foreign.invoice}`]){const response=await fetch(`${origin}${path}`,{headers:workHeaders});assert.equal(response.status,404);await response.arrayBuffer();}
+    const write=await fetch(`${origin}/api/v1/customer-work/projects`,{method:'POST',headers:{...workHeaders,'content-type':'application/json'},body:'{}'});assert.equal(write.status,405);await write.arrayBuffer();
+    assert.equal(databaseFailed,false);
+  }
+  process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, tenantBoundariesVerified: true, customerWorkspaceVerified: true, callieConversationReadVerified: true, workdayReadVerified: true, returningCustomerReadVerified:true, returningV3UnknownReadVerified:true, readChecks: good.length + receptionReadChecks + workdayReadChecks + returningReadChecks, writeBlocked: true })}\n`);
 } catch (error) {
   // No response body, URL with credentials, SQL parameters or record content.
   process.stderr.write(`CONTRACTOR_APP_PROBE_FAILED:${check}:${error.code === 'ERR_ASSERTION' ? 'assertion' : 'unavailable'}${Number.isInteger(error.actual) ? `:status_${error.actual}` : ''}\n`);

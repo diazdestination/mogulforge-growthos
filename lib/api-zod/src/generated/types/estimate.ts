@@ -6,12 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { EstimateLineItem } from './estimateLineItem';
+import type { EstimateSourceKind } from './estimateSourceKind';
 import type { EstimateStatus } from './estimateStatus';
 
 export interface Estimate {
   id: string;
   organizationId: string;
-  leadId: string;
+  leadId: string | null;
   title: string;
   status: EstimateStatus;
   lineItems: EstimateLineItem[];
@@ -31,4 +32,15 @@ export interface Estimate {
   acceptedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  customerWorkId?: string | null;
+  contactId?: string;
+  propertyId?: string | null;
+  sourceKind?: EstimateSourceKind;
+  /**
+     * @minimum 1
+     * @maximum 2147483646
+     */
+  workVersion?: number | null;
+  customerLabel?: string;
+  propertyLabel?: string | null;
 }

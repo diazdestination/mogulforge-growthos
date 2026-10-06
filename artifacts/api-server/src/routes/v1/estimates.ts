@@ -4,6 +4,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { requireMember } from "../../middlewares/requireMember";
 import { recordAudit } from "../../services/audit";
 import * as crm from "../../services/crm";
+import { contractorScheduleError } from "../../middlewares/contractor-mutation";
 
 const router: IRouter = Router();
 
@@ -13,6 +14,8 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     res.json(
       await crm.listEstimates(req.member!.organizationId, {
+        contactId: typeof req.query.contactId === "string" ? req.query.contactId : undefined,
+        customerWorkId: typeof req.query.customerWorkId === "string" ? req.query.customerWorkId : undefined,
         leadId:
           typeof req.query.leadId === "string" ? req.query.leadId : undefined,
         status:
@@ -133,4 +136,5 @@ router.delete(
   },
 );
 
+router.use(contractorScheduleError);
 export default router;

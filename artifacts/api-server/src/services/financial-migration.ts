@@ -16,6 +16,8 @@ import {
   financialMigrationReviewsTable as reviews,
 } from "../../../../lib/db/src/schema/financial-migration";
 import { lockContractorSchedule } from "./contractor-scheduling";
+import { readNativeWorkLineage } from "./customer-work-lineage";
+import { CustomerWorkError } from "./returning-customer-contract";
 import { financialMigrationInvoiceTools as invoiceTools } from "./invoices";
 import {
   FinancialMigrationError,
@@ -421,6 +423,17 @@ export async function commitFinancialMigration(
     const checked = await inspect(tx, org, source);
     if (checked.issues.length)
       fail("financial_source_conflict", checked.issues[0]!.message);
+    // Retain real legacy parent rows through the import. This is a current
+    // coherence/locking check only: v1 review context, payload and hashes stay
+    // byte-compatible and no property/source is inferred or rewritten.
+    for (const leadId of [...new Set(source.invoices.map((record) => record.leadId))].sort()) {
+      try {
+        await readNativeWorkLineage(tx, org, { leadId, customerWorkId: null }, true);
+      } catch (error) {
+        if (error instanceof CustomerWorkError) fail("financial_mapping_unavailable", "A mapped opportunity, customer or property changed. Review the original financial source before importing.");
+        throw error;
+      }
+    }
     const target = new Map<string, typeof invoicesTable.$inferSelect>();
     let importedInvoices = 0,
       importedReceipts = 0;

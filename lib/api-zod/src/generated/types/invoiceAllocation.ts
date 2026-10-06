@@ -23,4 +23,5 @@ export interface InvoiceAllocation {
   reversedAt: Date | null;
   /** @nullable */
   reversalReason: string | null;
+  refundOfValueEntryId?: string | null;
 }

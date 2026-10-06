@@ -19,7 +19,17 @@ if (
 // this disposable visual runner only; real PostgreSQL/production pooling and
 // CI's independent-session concurrency checks remain unchanged.
 pool.options.max = 1;
-const server = app.listen(4192, "127.0.0.1", () => startAutomationScheduler());
+const previewPort = Number(process.env.PORT ?? "4192");
+if (![4192, 4193].includes(previewPort))
+  throw new Error(
+    "Only the two disposable loopback preview ports are permitted.",
+  );
+const server = app.listen(previewPort, "127.0.0.1", () =>
+  startAutomationScheduler(),
+);
+server.once("error", (error) => {
+  throw error;
+});
 for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.once(signal, () => {
     const deadline = setTimeout(() => process.exit(1), 10_000);

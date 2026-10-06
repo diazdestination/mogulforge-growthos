@@ -84,12 +84,12 @@ describe('Start Project flow', () => {
   it('creates the project and advances the lead to production_scheduled', async () => {
     const { fetchMock, onClose } = renderStartProject();
 
-    const advance = screen.getByRole('checkbox', {
+    const advance = await screen.findByRole('checkbox', {
       name: /advance lead status/i,
     }) as HTMLInputElement;
     expect(advance.checked).toBe(true);
 
-    fireEvent.click(screen.getByRole('button', { name: /start project/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /start project/i }));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
 
@@ -125,7 +125,7 @@ describe('Start Project flow', () => {
       return undefined;
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /start project/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /start project/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/project not created/i)).toBeTruthy();
@@ -145,7 +145,7 @@ describe('Start Project flow', () => {
       return undefined;
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /start project/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /start project/i }));
 
     // The failure must be surfaced to the user, not swallowed.
     await waitFor(() => {
@@ -176,7 +176,7 @@ describe('Start Project flow', () => {
       return undefined;
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /start project/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /start project/i }));
 
     // Wait for the submit flow (and its failed lead update) to finish so we
     // grab the Retry button from the freshly-raised toast, not a stale one.
@@ -212,7 +212,7 @@ describe('Start Project flow', () => {
       return undefined;
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /start project/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /start project/i }));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     const retry = await screen.findByRole('button', { name: /retry/i });

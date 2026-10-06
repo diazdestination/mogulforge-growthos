@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { contractorRequest } from "@/lib/contractor-api";
 import { invoiceButton, invoiceControl } from "@/lib/invoice-ui";
+import { customerInvoicePath } from '@/lib/customer-work-links';
 import {
   attemptLabel,
   invoiceDeliveryBlocker,
@@ -47,6 +48,8 @@ export function InvoiceDeliveryWorklist({
         result.page !== page ||
         result.items.some(
           (item) =>
+            (item.organizationId !== undefined && item.organizationId !== organizationId) ||
+            (item.leadId === null && (!item.customerWorkId || !item.contactId || item.organizationId !== organizationId || item.sourceKind !== 'customer_work')) ||
             (status && item.status !== status) ||
             (leadId && item.leadId !== leadId) ||
             (projectId && item.projectId !== projectId),
@@ -135,7 +138,7 @@ export function InvoiceDeliveryWorklist({
                     </div>
                     <Link
                       className={invoiceButton}
-                      href={`/invoices/${encodeURIComponent(item.invoiceId)}#invoice-delivery`}
+                      href={`${customerInvoicePath(item.invoiceId, organizationId) || `/invoices/${encodeURIComponent(item.invoiceId)}`}#invoice-delivery`}
                     >
                       Open invoice
                     </Link>

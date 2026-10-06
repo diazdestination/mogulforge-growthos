@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
 import { isDeepStrictEqual } from "node:util";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, inArray, sql } from "drizzle-orm";
 import {
   db,
   activitiesTable,
@@ -25,7 +25,17 @@ import { clientReadiness } from "./client-onboarding";
 import { getPortalConversation, getPortalOverview } from "./portal";
 import { smartSiteFollowup } from "./smart-site-followup";
 import type { PortalSession } from "@workspace/db";
-import { inReportingPeriod, parseReportingPeriod, type ReportingPeriod } from "./reporting-period";
+import {
+  inReportingPeriod,
+  parseReportingPeriod,
+  type ReportingPeriod,
+} from "./reporting-period";
+import { validWorkReadScope as validWorkScope } from "./customer-work-read-scope";
+import {
+  lockCustomerWork,
+  readNativeWorkLineage,
+} from "./customer-work-lineage";
+import { CustomerWorkError } from "./returning-customer-contract";
 
 export class RevenueError extends Error {
   constructor(
@@ -418,6 +428,9 @@ export async function recordValueEntry(
 ) {
   const input = valueEntrySchema.parse(raw);
   return db.transaction(async (tx) => {
+    // Retention and reference writers share one prefix. No source can move
+    // between the original lead read and an append-only cash fact.
+    await lockCustomerWork(tx, org, true);
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${`value-entry:${org}:${input.sourceReference}`}))`,
     );
@@ -429,8 +442,22 @@ export async function recordValueEntry(
           eq(leadsTable.id, input.leadId),
           eq(leadsTable.organizationId, org),
         ),
-      );
+      )
+      .for("share");
     if (!lead) throw new RevenueError("Lead not found in this workspace.", 404);
+    await readNativeWorkLineage(
+      tx,
+      org,
+      { leadId: input.leadId, customerWorkId: null },
+      true,
+    ).catch((error) => {
+      if (error instanceof CustomerWorkError)
+        throw new RevenueError(
+          "This opportunity's original customer/property source changed or is unavailable. Review it before recording cash.",
+          409,
+        );
+      throw error;
+    });
     const [prior] = await tx
       .select()
       .from(entries)
@@ -482,97 +509,177 @@ export async function recordValueEntry(
   });
 }
 
-export async function valueLedger(org: string, requestedPeriod?: ReportingPeriod) {
-  const period = requestedPeriod ? parseReportingPeriod({ startAt: requestedPeriod.startAt, endAt: requestedPeriod.endAt }) : undefined;
-  const entryScope = and(
-    eq(entries.organizationId, org),
-    sql`exists (select 1 from ${leadsTable} l where l.id = ${entries.leadId} and l.organization_id = ${org})`,
-    period ? inReportingPeriod(entries.occurredAt, period) : undefined,
+export async function valueLedger(
+  org: string,
+  requestedPeriod?: ReportingPeriod,
+) {
+  const period = requestedPeriod
+    ? parseReportingPeriod({
+        startAt: requestedPeriod.startAt,
+        endAt: requestedPeriod.endAt,
+      })
+    : undefined;
+  return db.transaction(
+    async (reader) => {
+      // Validate complete returning cash before filtering by reporting period: an
+      // out-of-period correction cannot make an invalid original receipt usable.
+      const invalid = await reader.execute(sql`SELECT 1 FROM value_entries e
+    WHERE e.organization_id=${org} AND e.customer_work_id IS NOT NULL AND
+      (NOT ${validWorkScope(org, sql`e.lead_id`, sql`e.customer_work_id`)} OR
+       (e.kind='refund' AND NOT EXISTS (SELECT 1 FROM value_entries payment
+         WHERE payment.id=e.refund_of_value_entry_id AND payment.organization_id=e.organization_id
+           AND payment.customer_work_id=e.customer_work_id AND payment.lead_id IS NULL AND payment.kind='payment'
+           AND payment.amount_cents>0 AND e.occurred_at>=payment.occurred_at AND (SELECT coalesce(sum(refund.amount_cents),0) FROM value_entries refund
+             WHERE refund.organization_id=e.organization_id AND refund.refund_of_value_entry_id=payment.id
+               AND refund.kind='refund')<=payment.amount_cents))) LIMIT 1`);
+      if (invalid.rows.length)
+        throw new RevenueError(
+          "Returning-customer receipt history requires reconciliation before totals can be reported.",
+          409,
+        );
+      const entryScope = and(
+        eq(entries.organizationId, org),
+        validWorkScope(org, entries.leadId, entries.customerWorkId),
+        period ? inReportingPeriod(entries.occurredAt, period) : undefined,
+      );
+      const acceptedInRange = period
+        ? inReportingPeriod(estimatesTable.acceptedAt, period)
+        : sql`true`;
+      const completedInRange = period
+        ? inReportingPeriod(projectsTable.completedAt, period)
+        : sql`true`;
+      const rows = await reader
+        .select({
+          ...getTableColumns(entries),
+          contactId: sql<string | null>`CASE WHEN ${entries.leadId} IS NOT NULL
+        THEN (SELECT l.contact_id FROM leads l WHERE l.id=${entries.leadId} AND l.organization_id=${org})
+        ELSE (SELECT w.contact_id FROM customer_work_roots w WHERE w.id=${entries.customerWorkId} AND w.organization_id=${org}) END`,
+        })
+        .from(entries)
+        .where(entryScope)
+        .orderBy(desc(entries.occurredAt))
+        .limit(200);
+      const totals = await reader
+        .select({
+          kind: entries.kind,
+          source: sql<string>`CASE WHEN ${entries.leadId} IS NOT NULL THEN 'lead' ELSE 'customer_work' END`,
+          amount: sql<string>`sum(${entries.amountCents})::text`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(entries)
+        .where(entryScope)
+        .groupBy(
+          entries.kind,
+          sql`CASE WHEN ${entries.leadId} IS NOT NULL THEN 'lead' ELSE 'customer_work' END`,
+        );
+      const accepted = await reader
+        .select({
+          count: sql<number>`count(*) filter (where ${acceptedInRange})::int`,
+          amount: sql<string>`coalesce(sum(${estimatesTable.totalCents}) filter (where ${acceptedInRange}),0)::text`,
+          undated: sql<number>`count(*) filter (where ${estimatesTable.acceptedAt} is null)::int`,
+        })
+        .from(estimatesTable)
+        .where(
+          and(
+            eq(estimatesTable.organizationId, org),
+            eq(estimatesTable.status, "accepted"),
+            validWorkScope(
+              org,
+              estimatesTable.leadId,
+              estimatesTable.customerWorkId,
+            ),
+            sql`((${estimatesTable.leadId} IS NOT NULL AND ${estimatesTable.workVersion} IS NULL)
+            OR (${estimatesTable.leadId} IS NULL AND ${estimatesTable.workVersion}>0))`,
+          ),
+        );
+      const completed = await reader
+        .select({
+          count: sql<number>`count(*) filter (where ${completedInRange})::int`,
+          undated: sql<number>`count(*) filter (where ${projectsTable.completedAt} is null)::int`,
+        })
+        .from(projectsTable)
+        .where(
+          and(
+            eq(projectsTable.organizationId, org),
+            eq(projectsTable.status, "completed"),
+            validWorkScope(
+              org,
+              projectsTable.leadId,
+              projectsTable.customerWorkId,
+            ),
+            sql`((${projectsTable.leadId} IS NOT NULL AND ${projectsTable.workVersion} IS NULL)
+            OR (${projectsTable.leadId} IS NULL AND ${projectsTable.workVersion}>0))`,
+            sql`(${projectsTable.estimateId} IS NULL OR EXISTS (SELECT 1 FROM estimates e
+            WHERE e.id=${projectsTable.estimateId} AND e.organization_id=${org}
+              AND e.lead_id IS NOT DISTINCT FROM ${projectsTable.leadId}
+              AND e.customer_work_id IS NOT DISTINCT FROM ${projectsTable.customerWorkId}))`,
+          ),
+        );
+      const amount = (kind: string, source?: string) =>
+        totals
+          .filter(
+            (t) =>
+              t.kind === kind && (source === undefined || t.source === source),
+          )
+          .reduce((n, t) => n + Number(t.amount), 0);
+      const netReceiptsCents = amount("payment") - amount("refund");
+      const netDirectCostsCents = amount("direct_cost") - amount("cost_refund");
+      const receiptEntryCount = totals
+        .filter((t) => t.kind === "payment" || t.kind === "refund")
+        .reduce((n, t) => n + t.count, 0);
+      const costEntryCount = totals
+        .filter((t) => t.kind === "direct_cost" || t.kind === "cost_refund")
+        .reduce((n, t) => n + t.count, 0);
+      if (
+        ![
+          netReceiptsCents,
+          netDirectCostsCents,
+          Number(accepted[0]?.amount),
+          ...totals.map((t) => Number(t.amount)),
+          ...["lead", "customer_work"].flatMap((source) => [
+            amount("payment", source) - amount("refund", source),
+            amount("direct_cost", source) - amount("cost_refund", source),
+          ]),
+        ].every(Number.isSafeInteger)
+      )
+        throw new RevenueError("Totals exceed supported precision.", 422);
+      return {
+        currency: "USD",
+        period: period ?? "all_time",
+        entries: rows,
+        entryCount: totals.reduce((n, t) => n + t.count, 0),
+        acceptedEstimateCount: accepted[0]?.count ?? 0,
+        acceptedEstimateCents: Number(accepted[0]?.amount ?? 0),
+        completedProjectCount: completed[0]?.count ?? 0,
+        undatedAcceptedEstimateCount: accepted[0]?.undated ?? 0,
+        undatedCompletedProjectCount: completed[0]?.undated ?? 0,
+        netReceiptsCents,
+        netDirectCostsCents,
+        sourceBreakdown: ["lead", "customer_work"].map((source) => ({
+          source,
+          entryCount: totals
+            .filter((t) => t.source === source)
+            .reduce((n, t) => n + t.count, 0),
+          netReceiptsCents:
+            amount("payment", source) - amount("refund", source),
+          netDirectCostsCents:
+            amount("direct_cost", source) - amount("cost_refund", source),
+        })),
+        receiptEntryCount,
+        costEntryCount,
+        recordedContributionCents:
+          receiptEntryCount && costEntryCount
+            ? netReceiptsCents - netDirectCostsCents
+            : null,
+        boundary:
+          (period
+            ? "UTC period uses financial event, estimate acceptance and project completion dates; undated records are excluded. "
+            : "All-time staff-recorded entries. ") +
+          "Includes validated opportunity and returning-customer work, with separate source totals; returning work is not newly acquired or recovered revenue. No bank/accounting synchronization or causal ROI. Contribution is recorded receipts less recorded direct costs; missing costs, tax and overhead prevent a profit claim. Use explicit new correction entries; allocation reversal is not a cash refund.",
+      };
+    },
+    { isolationLevel: "repeatable read", accessMode: "read only" },
   );
-  const acceptedInRange = period ? inReportingPeriod(estimatesTable.acceptedAt, period) : sql`true`;
-  const completedInRange = period ? inReportingPeriod(projectsTable.completedAt, period) : sql`true`;
-  const [rows, totals, accepted, completed] = await Promise.all([
-    db
-      .select()
-      .from(entries)
-      .where(entryScope)
-      .orderBy(desc(entries.occurredAt))
-      .limit(200),
-    db
-      .select({
-        kind: entries.kind,
-        amount: sql<string>`sum(${entries.amountCents})::text`,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(entries)
-      .where(entryScope)
-      .groupBy(entries.kind),
-    db
-      .select({
-        count: sql<number>`count(*) filter (where ${acceptedInRange})::int`,
-        amount: sql<string>`coalesce(sum(${estimatesTable.totalCents}) filter (where ${acceptedInRange}),0)::text`,
-        undated: sql<number>`count(*) filter (where ${estimatesTable.acceptedAt} is null)::int`,
-      })
-      .from(estimatesTable)
-      .where(
-        and(
-          eq(estimatesTable.organizationId, org),
-          eq(estimatesTable.status, "accepted"),
-          sql`exists (select 1 from ${leadsTable} l where l.id = ${estimatesTable.leadId} and l.organization_id = ${org})`,
-        ),
-      ),
-    db
-      .select({
-        count: sql<number>`count(*) filter (where ${completedInRange})::int`,
-        undated: sql<number>`count(*) filter (where ${projectsTable.completedAt} is null)::int`,
-      })
-      .from(projectsTable)
-      .where(
-        and(
-          eq(projectsTable.organizationId, org),
-          eq(projectsTable.status, "completed"),
-          sql`exists (select 1 from ${leadsTable} l where l.id = ${projectsTable.leadId} and l.organization_id = ${org})`,
-        ),
-      ),
-  ]);
-  const amount = (kind: string) =>
-    Number(totals.find((t) => t.kind === kind)?.amount ?? 0);
-  const netReceiptsCents = amount("payment") - amount("refund");
-  const netDirectCostsCents = amount("direct_cost") - amount("cost_refund");
-  const receiptEntryCount = totals
-    .filter((t) => t.kind === "payment" || t.kind === "refund")
-    .reduce((n, t) => n + t.count, 0);
-  const costEntryCount = totals
-    .filter((t) => t.kind === "direct_cost" || t.kind === "cost_refund")
-    .reduce((n, t) => n + t.count, 0);
-  if (
-    ![netReceiptsCents, netDirectCostsCents, Number(accepted[0]?.amount)].every(
-      Number.isSafeInteger,
-    )
-  )
-    throw new RevenueError("Totals exceed supported precision.", 422);
-  return {
-    currency: "USD",
-    period: period ?? "all_time",
-    entries: rows,
-    entryCount: totals.reduce((n, t) => n + t.count, 0),
-    acceptedEstimateCount: accepted[0]?.count ?? 0,
-    acceptedEstimateCents: Number(accepted[0]?.amount ?? 0),
-    completedProjectCount: completed[0]?.count ?? 0,
-    undatedAcceptedEstimateCount: accepted[0]?.undated ?? 0,
-    undatedCompletedProjectCount: completed[0]?.undated ?? 0,
-    netReceiptsCents,
-    netDirectCostsCents,
-    receiptEntryCount,
-    costEntryCount,
-    recordedContributionCents:
-      receiptEntryCount && costEntryCount
-        ? netReceiptsCents - netDirectCostsCents
-        : null,
-    boundary:
-      (period ? "UTC period uses financial event, estimate acceptance and project completion dates; undated records are excluded. " : "All-time staff-recorded entries. ") +
-      "No bank/accounting synchronization or causal ROI. Contribution is recorded receipts less recorded direct costs; missing costs, tax and overhead prevent a profit claim. Use new refund/cost-refund entries to correct history.",
-  };
 }
 
 export async function leadEvidence(org: string, leadId: string) {
@@ -779,6 +886,7 @@ export async function projectGrowth(org: string) {
       .select({
         id: projectsTable.id,
         leadId: projectsTable.leadId,
+        customerWorkId: projectsTable.customerWorkId,
         name: projectsTable.name,
         completedAt: projectsTable.completedAt,
         updatedAt: projectsTable.updatedAt,
@@ -788,6 +896,9 @@ export async function projectGrowth(org: string) {
         and(
           eq(projectsTable.organizationId, org),
           eq(projectsTable.status, "completed"),
+          // Project-story approval/public rooms remain opportunity-specific.
+          // A returning job is visible through its native customer work record.
+          sql`${projectsTable.leadId} IS NOT NULL AND ${projectsTable.customerWorkId} IS NULL`,
         ),
       )
       .orderBy(desc(projectsTable.completedAt))
