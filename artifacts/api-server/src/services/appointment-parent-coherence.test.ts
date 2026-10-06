@@ -155,6 +155,7 @@ realPg("retains selected lead/customer/property locks through native reminder in
   const keeper = await pool.connect();
   let creating: ReturnType<typeof create> | undefined, moving: ReturnType<typeof updateProperty> | undefined;
   let editingContact: ReturnType<typeof updateContact> | undefined, editingLead: ReturnType<typeof updateLead> | undefined;
+  let editingLeadNote: ReturnType<typeof updateLead> | undefined;
   try {
     // Freeze after the native appointment insert, while its original reminder
     // is about to be inserted in the same unmodified scheduling transaction.
@@ -171,10 +172,16 @@ realPg("retains selected lead/customer/property locks through native reminder in
     moving = updateProperty(org, f.property, { contactId: f.b }); void moving.catch(() => {});
     editingContact = updateContact(org, f.a, { firstName: "Office changed the name" }); void editingContact.catch(() => {});
     editingLead = updateLead(org, opportunity.id, { propertyId: f.second }); void editingLead.catch(() => {});
+    // A parent edit now waits on the shared scheduling prefix. Keep that actual
+    // writer, AND an ordinary note writer that still reaches the original lead
+    // row directly, so this case continues to prove the retained SHARE lock.
+    editingLeadNote = updateLead(org, opportunity.id, { summary: "Office changed the original lead note" }); void editingLeadNote.catch(() => {});
     const writers = await Promise.all([
-      blockedBy(creatorPid, '%from "properties"%for update%'), blockedBy(creatorPid, '%update "contacts"%'), blockedBy(creatorPid, '%update "leads"%'),
+      blockedBy(creatorPid, '%from "properties"%for update%'), blockedBy(creatorPid, '%update "contacts"%'),
+      blockedBy(creatorPid, '%pg_advisory_xact_lock%'), blockedBy(creatorPid, '%update "leads"%'),
     ]);
-    expect(new Set(writers).size).toBe(3);
+    expect(new Set(writers).size).toBe(4);
+    expect(new Set([...writers, creatorPid, keeperPid]).size).toBe(6);
     for (const writer of writers) expect(writer).not.toBe(creatorPid);
     expect(await counts()).toEqual(before);
     await keeper.query("COMMIT");
@@ -182,12 +189,13 @@ realPg("retains selected lead/customer/property locks through native reminder in
     expect(await moving).toMatchObject({ contactId: f.b });
     expect(await editingContact).toMatchObject({ firstName: "Office changed the name" });
     expect(await editingLead).toMatchObject({ propertyId: f.second });
+    expect(await editingLeadNote).toMatchObject({ summary: "Office changed the original lead note" });
     expect((await db.select().from(appointmentsTable).where(eq(appointmentsTable.id, appointment.id)))[0]).toMatchObject({ contactId: f.a, leadId: opportunity.id, propertyId: f.property, notes: "Exact original selected worksite." });
     expect(await reminder(appointment.id)).toHaveLength(1);
     expect(await counts()).toEqual({ appointments: before.appointments + 1, reminders: before.reminders + 1, leads: before.leads });
   } finally {
     await keeper.query("ROLLBACK"); keeper.release();
-    await Promise.allSettled([creating, moving, editingContact, editingLead].filter(Boolean));
+    await Promise.allSettled([creating, moving, editingContact, editingLead, editingLeadNote].filter(Boolean));
     await pool.query(`DROP TRIGGER IF EXISTS ${hook} ON scheduled_actions`);
     await pool.query(`DROP FUNCTION IF EXISTS ${hook}()`);
   }
