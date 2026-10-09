@@ -1,5 +1,29 @@
 # GrowthOS project state
 
+## October 8 production-gap assistance (current candidate)
+
+Fresh remote baseline: main `2162aa296281473dda170291ff95d64e0e6e9b79`,
+exact-main CI `37500458053` succeeded. PRs through #27 are merged. The October 6
+returning-customer runtime is present: native customer estimates/jobs/invoices,
+retained lineage and external receipt/refund accounting, on the 141-table source.
+Older headings about missing contact-only work or active earlier waves are history.
+
+Current branch `agent/growthos-production-gaps-20261008` closes the bounded L9
+source gap in `reports/smart-site-claim-contract-2026-10-08.md`: notification
+destinations show exact inquiry ownership and permit one initial claim; accepted
+responders are rechecked under locks; task/audit updates remain atomic. No schema.
+The candidate also retires unsafe automatic forced schema reconciliation and
+fixes build identity after Git failures. **The old Fly release command now stops.**
+Use `reports/release-safety-2026-10-08.md` before any proposed hosted rollout.
+
+Evidence and remaining gaps: `reports/production-gaps-2026-10-08.md`. GitHub's
+current PR checks are the authoritative candidate PostgreSQL/Docker result;
+this entry does not pre-claim a future CI, merge or deployment. The live readiness
+path returned 404 and staging timed out during read-only inspection; neither
+proved a deployed version. Hosted SQL/recovery, actual mail/voice/phone delivery,
+notification coverage, migration and both contractor acceptance cards remain open.
+
+
 ## October6 researched Contractor Workday integration
 
 The owner approved researched common HVAC/roofing baselines without waiting for

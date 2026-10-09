@@ -47,6 +47,7 @@ import { extractPhotoPaths, flattenPhotoPaths, photoUrl } from '@/lib/photos';
 import { LeadContactActions } from '@/components/lead-contact-actions';
 import { ManualLeadSms } from '@/components/manual-lead-sms';
 import { NextBestActionCard } from '@/components/next-best-action-card';
+import { SmartSiteLeadOwner } from '@/components/smart-site-lead-owner';
 import { LeadMailboxRepliesPanel } from '@/components/lead-mailbox-replies-panel';
 import { memberAuthorityScope } from '@/lib/member-authority-scope';
 import { customerWorkspacePath } from '@/lib/customer-workspace-links';
@@ -214,6 +215,9 @@ export default function LeadDetail() {
 
         {/* Contact & Property Info */}
         <div className="p-4 md:p-6 space-y-6">
+          {!memberError && me?.isActive && me.organization?.id === lead.organizationId && (
+            <SmartSiteLeadOwner organizationId={lead.organizationId} leadId={lead.id} userId={me.id} scopeKey={memberAuthorityScope(me)} canWrite={canWrite(me.role)} />
+          )}
           <NextBestActionCard leadId={lead.id} canWrite={canWrite(me?.role)} />
 
           <section>

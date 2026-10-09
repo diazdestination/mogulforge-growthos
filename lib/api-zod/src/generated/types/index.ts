@@ -746,6 +746,7 @@ export * from './smartFormPatchStepsItem';
 export * from './smartFormSettings';
 export * from './smartFormStatus';
 export * from './smartFormStepsItem';
+export * from './smartSiteInquiryOwnership';
 export * from './smsProviderStatus';
 export * from './smsProviderStatusProvider';
 export * from './sourceAdoptionApprovalInput';

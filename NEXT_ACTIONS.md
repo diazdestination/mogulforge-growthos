@@ -1,5 +1,31 @@
 # Next acceptance work
 
+## October 8 current order
+
+1. Complete review and full PostgreSQL 16/type/build/Docker CI for
+   `agent/growthos-production-gaps-20261008`, based on accepted main `2162aa2`.
+   The five new PostgreSQL-only rollback/membership tests must execute, not skip.
+   Current source contract and evidence are `reports/smart-site-claim-contract-2026-10-08.md`
+   and `reports/production-gaps-2026-10-08.md`. Use the private PR for integration;
+   do not overwrite GEEKOM's checkout or replay the completed earlier waves.
+2. Prepare the exact hosted SQL/source/image/target and recovery procedure.
+   `scripts/release-schema.mjs` is retired and always refuses; approval variables
+   cannot turn it into a safe migration. Current source has 141 tables, with no
+   additions in this candidate. Obtain fresh authorized hosted identity/readiness
+   evidence; October 8 public readiness returned 404 and staging timed out.
+3. Finish L9 delivery coverage: visibly account for configured recipients with
+   no eligible phone/session, then accept both real owners' installed devices,
+   background/locked/offline behavior and one-claim outcome. Source eligibility
+   and a push-provider receipt do not prove both owners saw an alert.
+4. Complete authorized mailbox/call/SMS proof, approved source migration and each
+   contractor's complete workday acceptance, plus GrowthOS subscription test and
+   agreed feature allowances. Initial contractor payment processing stays deferred.
+
+Returning-customer jobs/invoices and Contractor Workday engineering are already
+in the current main. Historical missing-feature/current-wave entries below are
+superseded by this snapshot. All actual provider/hosted/customer release gates remain.
+
+
 October6 current source slice is researched Contractor Workday Completion under
 reports/contractor-workday-contract-2026-10-06.md, after fully accepted PR24/main
 3f1f1b5/exact-mainCI37407237259. Earlier active-wave entries are history, never

@@ -9,6 +9,30 @@ import * as zod from 'zod';
 
 
 /**
+ * Company-scoped crm.read with no-store. Independent of the bounded Capture queue. canClaim requires an accepted verified active responder session, current crm.write authority, an open inquiry and no owner. API-key readers cannot claim. No contact details or message content are returned.
+ * @summary Read ownership of one exact website inquiry
+ */
+export const GetSmartSiteInquiryOwnershipParams = zod.object({
+  "id": zod.uuid()
+})
+
+export const GetSmartSiteInquiryOwnershipResponse = zod.object({
+  "organizationId": zod.uuid(),
+  "leadId": zod.uuid(),
+  "siteName": zod.string(),
+  "status": zod.string(),
+  "assignedUserId": zod.string().nullable(),
+  "ownerName": zod.string().nullable(),
+  "ownerEligible": zod.boolean(),
+  "receivedAt": zod.coerce.date(),
+  "dueAt": zod.coerce.date().nullable(),
+  "firstAttemptAt": zod.coerce.date().nullable(),
+  "canClaim": zod.boolean(),
+  "serverNow": zod.coerce.date()
+})
+
+
+/**
  * Current human invoice manager only. Append a staff-recorded external refund correction tied to the original same-work receipt and remaining invoice allocation. It does not issue a processor refund or move cash. Existing invoice operation/request ledger and cumulative receipt cap apply.
  * @summary recordInvoiceRefund
  */

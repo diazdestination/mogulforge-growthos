@@ -1,5 +1,15 @@
 # Housecall Pro replacement gate
 
+October 8 current source addendum: main `2162aa2` and exact-main CI `37500458053`
+include returning-customer estimates/jobs/invoices, external refund accounting,
+Contractor Workday and CALLIE conversation. Older missing-feature descriptions
+below do not override those merged implementations. Current bounded L9 candidate
+adds exact lead-page ownership/claim and accepted-responder transaction checks;
+see `reports/production-gaps-2026-10-08.md`. Both company cards remain **NOT ACCEPTED**.
+Green source checks do not accept hosted recovery, actual inbox/phone behavior,
+data migration or a full roofing/HVAC workday, and do not authorize cancellation.
+
+
 Current L5 source addendum: base PR19/mainf91e1c3 passed exact-main CI37134529680.
 `reports/standing-service-integration-2026-10-03.md` adds default-off exact
 forward-only series reminders and signed SMS office evidence/holds in the existing

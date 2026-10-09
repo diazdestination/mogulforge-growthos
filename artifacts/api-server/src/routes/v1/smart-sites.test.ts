@@ -426,6 +426,7 @@ beforeAll(async () => {
         organizationId,
         role,
         email: `smart-${randomUUID()}@example.com`,
+        emailVerifiedAt: new Date(),
       })
       .returning();
     return createSession({

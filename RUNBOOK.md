@@ -3,6 +3,32 @@
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 
+## October 8 current operator entry points
+
+Read `reports/production-gaps-2026-10-08.md` for the current candidate and launch
+gaps; older wave descriptions below are chronological records. Current accepted
+main is `2162aa2`, exact-main CI `37500458053`, including 141-table returning work.
+
+Staff notifications open the native lead page. The new **Inquiry owner** panel
+reads that exact website inquiry even beyond Capture's first 25 rows. Accepted
+responders can claim only an unassigned open inquiry. When another responder
+claims first, refresh to see the owner. When a save is uncertain, refresh before
+retrying; returning to the page also forces that read. An acknowledged save stays
+visible when its next read fails. Reassignment remains in the existing office
+workflow. Recording a contact attempt is staff evidence, not delivery proof.
+
+**Hosted release:** `scripts/release-schema.mjs` no longer executes forced schema
+push for any identity or approval flag. An ordinary Fly release using it will
+stop. Do not remove/bypass it to force a rollout. Prepare a separately reviewed
+exact SQL/source/image/target and backup/restore procedure; see
+`reports/release-safety-2026-10-08.md`. Isolated Compose/CI provisioning is separate.
+No hosted credentials, schema, customer contacts or notification policy changed.
+
+Local targeted API check (fresh disposable PGlite, no provider configuration):
+`node artifacts/api-server/scripts/test-scheduler-isolated.mjs src/routes/v1/route-inventory.test.ts src/routes/v1/smart-site-claim.test.ts src/services/smart-site-followup.test.ts`.
+Five new tests require real PostgreSQL and must pass in full PR CI.
+
+
 October6 Contractor Workday source follows the researched frozen contract and
 reports/contractor-workday-operator-2026-10-06.md. Existing Today→customer Service
 & equipment→exact appointment/Visit work and Service Desk/Company checklists
@@ -175,7 +201,8 @@ No migration, provider activation or hosted credential operation is authorized.
   against ae6b6e4: 103 to 105 tables, with parent composite unique constraints
   preceding the new tenant-bound foreign keys. Generate it offline with
   `node scripts/customer-care-schema-preview.mjs`; this is not hosted approval.
-  Preview only; do not bypass `scripts/release-schema.mjs` staging approval/hold.
+  Preview only; the generic `scripts/release-schema.mjs` command is now retired.
+  Follow the October 8 reviewed-rollout boundary above; flags cannot override it.
 - Source import limits: `reports/swarm-opportunity-history-2026-10-01.md`.
 - Scope assignment/billing limits: `reports/swarm-subscription-controls-2026-10-01.md`.
 - Tenant/photo matrix: `reports/normal-mode-tenant-acceptance-2026-10-01.md`.

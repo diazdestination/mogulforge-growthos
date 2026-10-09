@@ -283,6 +283,7 @@ import type {
   SmartForm,
   SmartFormInput,
   SmartFormPatch,
+  SmartSiteInquiryOwnership,
   SmsProviderStatus,
   SourceAdoptionApprovalInput,
   SourceAdoptionDetail,
@@ -381,6 +382,99 @@ const withQueryKey = <T extends object, K>(
   }
   return result;
 };
+
+export const getGetSmartSiteInquiryOwnershipUrl = (id: string) => {
+  return `/api/v1/smart-sites/leads/${id}/follow-up`;
+};
+
+/**
+ * Company-scoped crm.read with no-store. Independent of the bounded Capture queue. canClaim requires an accepted verified active responder session, current crm.write authority, an open inquiry and no owner. API-key readers cannot claim. No contact details or message content are returned.
+ * @summary Read ownership of one exact website inquiry
+ */
+export const getSmartSiteInquiryOwnership = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<SmartSiteInquiryOwnership> => {
+  return customFetch<SmartSiteInquiryOwnership>(
+    getGetSmartSiteInquiryOwnershipUrl(id),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetSmartSiteInquiryOwnershipQueryKey = (id: string) => {
+  return [`/api/v1/smart-sites/leads/${id}/follow-up`] as const;
+};
+
+export const getGetSmartSiteInquiryOwnershipQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSmartSiteInquiryOwnership>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSmartSiteInquiryOwnership>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetSmartSiteInquiryOwnershipQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSmartSiteInquiryOwnership>>
+  > = ({ signal }) =>
+    getSmartSiteInquiryOwnership(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSmartSiteInquiryOwnership>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSmartSiteInquiryOwnershipQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSmartSiteInquiryOwnership>>
+>;
+export type GetSmartSiteInquiryOwnershipQueryError = ErrorType<void>;
+
+/**
+ * @summary Read ownership of one exact website inquiry
+ */
+
+export function useGetSmartSiteInquiryOwnership<
+  TData = Awaited<ReturnType<typeof getSmartSiteInquiryOwnership>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSmartSiteInquiryOwnership>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSmartSiteInquiryOwnershipQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 export const getRecordInvoiceRefundUrl = (id: string) => {
   return `/api/v1/invoices/${id}/refunds`;

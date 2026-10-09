@@ -216,6 +216,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "PATCH /smart-sites/:id/measurement": "settings.manage",
   "POST /smart-sites/:id/rotate-key": "settings.manage",
   "GET /smart-sites/follow-up": "crm.read",
+  "GET /smart-sites/leads/:id/follow-up": "crm.read",
   "PATCH /smart-sites/:id/response-target": "settings.manage",
   "PATCH /smart-sites/leads/:id/owner": "crm.write",
   "POST /smart-sites/leads/:id/contact-attempts": "crm.write",

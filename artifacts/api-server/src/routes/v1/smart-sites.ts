@@ -31,6 +31,7 @@ import {
 } from "../../services/smart-sites";
 import {
   assignSmartSiteLead,
+  getSmartSiteInquiryFollowup,
   recordSmartSiteAttempt,
   setResponseTarget,
   smartSiteFollowup,
@@ -38,6 +39,26 @@ import {
 
 const router = Router();
 const idSchema = z.uuid();
+function staffInquiryMutation(req: Request, res: Response, next: NextFunction) {
+  res.setHeader("Cache-Control", "no-store");
+  if (Object.prototype.hasOwnProperty.call(req.headers, "x-api-key")) {
+    res.status(403).json({ error: "staff_session_required" });
+    return;
+  }
+  const origin = req.get("origin");
+  if (
+    (origin && origin !== process.env.APP_ORIGIN) ||
+    ["cross-site", "same-site"].includes(req.get("sec-fetch-site") ?? "")
+  ) {
+    res.status(403).json({ error: "same_origin_required" });
+    return;
+  }
+  if (!req.is("application/json")) {
+    res.status(415).json({ error: "json_required" });
+    return;
+  }
+  next();
+}
 const createSchema = z
   .object({
     name: z.string().trim().min(2).max(100),
@@ -320,8 +341,33 @@ router.patch(
     );
   }),
 );
+router.get(
+  "/smart-sites/leads/:id/follow-up",
+  (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  },
+  requireMember("crm.read"),
+  safe(async (req, res) => {
+    z.object({}).strict().parse(req.query);
+    res.json(
+      await getSmartSiteInquiryFollowup(
+        req.member!.organizationId,
+        req.member!.user.id,
+        idSchema.parse(req.params.id),
+        {
+          effectiveRole: req.member!.role,
+          staffSession:
+            !Object.prototype.hasOwnProperty.call(req.headers, "x-api-key") &&
+            req.isAuthenticated(),
+        },
+      ),
+    );
+  }),
+);
 router.patch(
   "/smart-sites/leads/:id/owner",
+  staffInquiryMutation,
   requireMember("crm.write"),
   safe(async (req, res) => {
     const input = z
@@ -344,10 +390,9 @@ router.patch(
 );
 router.post(
   "/smart-sites/leads/:id/contact-attempts",
+  staffInquiryMutation,
   requireMember("crm.write"),
   safe(async (req, res) => {
-    if (req.header("x-api-key"))
-      throw new SmartSiteError("staff_session_required", 403);
     const input = z
       .object({
         requestId: z.uuid(),
