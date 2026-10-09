@@ -1,0 +1,16 @@
+✔ consistent backup includes live WAL, preserves immutable replay identity and keeps secrets out of manifest (114.9339ms)
+✔ restored uncertain request reuses authoritative receipt after a lost acknowledgement (90.5687ms)
+✔ backup keeps an active claim and a second instance cannot steal it (82.1166ms)
+✔ snapshot requires an existing source and a private destination (43.4712ms)
+✔ health detects missing/stale/stopped worker, old queue and exhausted capacity without customer fields (70.9377ms)
+✔ health rejects wrong key and detects mismatched or future worker identity (52.2254ms)
+✔ read-only health does not expire or rewrite journal records (52.8888ms)
+✔ equivalent origin and site identity normalize before writing or checking heartbeat (53.2807ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 568.8314

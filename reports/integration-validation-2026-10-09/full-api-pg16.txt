@@ -1,0 +1,888 @@
+
+ RUN  v4.1.10 C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server
+
+ ✓ src/services/webhooks-delivery.test.ts (7 tests) 1812ms
+     ✓ re-signs retries with a fresh timestamp that still verifies  1206ms
+stdout | src/services/automation.test.ts > automation engine > records a run and sends SMS when consent is granted
+[MOCK SMS] to=+15550001111 body=Hi Auto
+
+stdout | src/services/automation.test.ts > automation engine > skips rules whose conditions do not match
+[MOCK SMS] to=+15550001111 body=Hi Auto
+
+stdout | src/services/automation.test.ts > automation engine > skips rules whose conditions do not match
+[MOCK SMS] to=+15550001111 body=Hello
+
+stdout | src/services/automation.test.ts > automation engine > does not run rules from another org
+[MOCK SMS] to=+15550001111 body=Hi Auto
+
+stdout | src/services/automation.test.ts > automation engine > does not run rules from another org
+[MOCK SMS] to=+15550001111 body=Hello
+
+stdout | src/services/automation.test.ts > default automation seeding > sends the edited template copy after an admin updates it
+[MOCK SMS] to=+15550002222 body=Custom copy for Tmpl from Template Edit Org
+
+ ✓ src/services/automation.test.ts (12 tests) 1667ms
+ ✓ src/services/customer-lifecycle-runtime.test.ts (9 tests) 1115ms
+ ✓ src/routes/v1/onboarding-org.test.ts (20 tests) 1768ms
+     ✓ fails closed, verifies allowlisted founders, preserves signed invites, and blocks revoked invites  302ms
+ ✓ src/routes/v1/staff-invitations.test.ts (15 tests) 2556ms
+ ✓ src/routes/v1/twilio.test.ts (15 tests) 2978ms
+   ✓ gates calls, starts only one staff leg, binds callbacks and prevents replaying the customer leg  300ms
+   ✓ separates two contractor accounts across inbound, outbound, callback and revocation  367ms
+ ✓ src/services/api-key-expiry-reminder.test.ts (15 tests) 892ms
+ ✓ src/routes/v1/customer-lifecycle-voice.test.ts (6 tests) 1191ms
+stdout | src/services/sms-delivery.test.ts > automation → send_sms → Twilio round-trip > uses the labeled mock provider (no HTTP) when Twilio is not configured
+[MOCK SMS] to=+15551112222 body=mock check
+
+ ✓ src/services/sms-delivery.test.ts (9 tests) 882ms
+ ✓ src/services/gmail-oauth.test.ts (11 tests) 634ms
+ ✓ src/services/outbound-hold.test.ts (14 tests) 69ms
+ ✓ src/services/providers.test.ts (5 tests) 6ms
+ ✓ src/routes/identity-auth.test.ts (1 test) 601ms
+     ✓ is enumeration-safe, rotates the password, consumes the token, and revokes sessions  597ms
+ ✓ src/services/callie-reception.test.ts (29 tests) 20984ms
+     ✓ supports separately approved voice-only reception while SMS is unavailable, without messaging consent or customer fabrication  907ms
+     ✓ one shared head supersedes modes without changing old v1 snapshots or enrolling historical calls  655ms
+     ✓ requires a persisted exact unexpired actor-bound preview and current binding revision  740ms
+     ✓ rejects original answered calls and caller/called-number transfer loops  610ms
+     ✓ retains one registration through concurrent missed callbacks and exact replay, and excludes legacy care  778ms
+     ✓ refuses drifted or unsafe agent config before registration and never rearms the original claim  665ms
+     ✓ rejects unsafe privacy even when a hash is explicitly reviewed  581ms
+     ✓ rejects unsafe procedures even when a hash is explicitly reviewed  582ms
+     ✓ rejects unsafe knowledge even when a hash is explicitly reviewed  573ms
+     ✓ rejects unsafe override even when a hash is explicitly reviewed  584ms
+     ✓ permanently owns an uncertain timeout registration without replay  693ms
+     ✓ permanently owns an uncertain malformed registration without replay  701ms
+     ✓ permanently owns an uncertain redirect registration without replay  770ms
+     ✓ does not start registration after slow preparation consumes the shared voice deadline  686ms
+     ✓ retains a provider-accepted original claim when both local final writes fail and never replays it  707ms
+     ✓ rejects expired/foreign capability and actual provider conversation mismatch before binding  724ms
+     ✓ returns a fixed safe refusal for malformed private conversation evidence without leaking the response snippet  706ms
+     ✓ enforces the exact finite tool allowance while keeping an already saved request replay inert  1010ms
+     ✓ collects bounded roofing requests once without turning instructions into authority  828ms
+     ✓ collects bounded hvac requests once without turning instructions into authority  871ms
+     ✓ rechecks both owners and blocks task edits committed during provider preparation  653ms
+     ✓ one cold redirect has its own original key and signed child outcome, never a human-accepted claim  952ms
+     ✓ leaves a lost redirect acknowledgment owned and never retries another target  950ms
+     ✓ signed post-call cannot adopt an unbound conversation or overwrite completed staff work  931ms
+     ✓ recovers a crash-shaped transfer with dispatchStarted=false even after the conversation finished  860ms
+     ✓ recovers a crash-shaped transfer with dispatchStarted=true even after the conversation finished  808ms
+     ✓ purges bounded encrypted content without releasing original effects or changing human notes  841ms
+     ✓ rejects partial key/capability SQL groups and a v1 parent for the conversational session  616ms
+ ✓ src/services/callie-runtime.test.ts (38 tests) 21924ms
+     ✓ defaults off and a preview alone grants no standing authority  388ms
+     ✓ requires the exact actor-bound saved unexpired review and rejects stale approval  489ms
+     ✓ keeps approved policy visibly held and allows disabling without provider credentials  455ms
+     ✓ requires accepted same-company owners and rechecks the non-selected owner  403ms
+     ✓ sends exactly one fixed response without creating contact, lead, consent or a booking  642ms
+     ✓ permanently excludes admitted calls from the older care approval and scheduler  513ms
+     ✓ escalates an overdue working callback once without undoing progress or changing its review timestamp again  630ms
+     ✓ rechecks policy after atomic ownership and before the physical POST  613ms
+     ✓ rechecks day_owner after atomic ownership and before the physical POST  583ms
+     ✓ rechecks after_owner after atomic ownership and before the physical POST  564ms
+     ✓ rechecks binding after atomic ownership and before the physical POST  542ms
+     ✓ rechecks program after atomic ownership and before the physical POST  578ms
+     ✓ rechecks hold after atomic ownership and before the physical POST  559ms
+     ✓ rechecks company after atomic ownership and before the physical POST  569ms
+     ✓ rechecks DNC after atomic ownership and before the physical POST  584ms
+     ✓ rechecks suppression after atomic ownership and before the physical POST  566ms
+     ✓ rechecks reply after atomic ownership and before the physical POST  630ms
+     ✓ rechecks late_call_failure after atomic ownership and before the physical POST  525ms
+     ✓ rechecks task_closed after atomic ownership and before the physical POST  564ms
+     ✓ rechecks task_reassigned after atomic ownership and before the physical POST  570ms
+     ✓ rechecks expired after atomic ownership and before the physical POST  573ms
+     ✓ rechecks grant after atomic ownership and before the physical POST  557ms
+     ✓ rechecks dispatch_tuple after atomic ownership and before the physical POST  571ms
+     ✓ rechecks allowance after atomic ownership and before the physical POST  549ms
+     ✓ rechecks lowered_allowance after atomic ownership and before the physical POST  605ms
+     ✓ blocks ambiguous phone identities and all prior response ownership  657ms
+     ✓ defers only within the grant and keeps the original callback deadline  601ms
+     ✓ does not rearm a timeout even with a reconciled receipt and changed policy  625ms
+     ✓ keeps an accepted network effect uncertain when the atomic final storage fails  652ms
+     ✓ expires a request whose next permitted window is outside its one-call grant  564ms
+     ✓ preserves actual late acceptance without overwriting a reconciled receipt  611ms
+     ✓ keeps HTTP failures non-retryable and creates permanent suppression only for typed recipient errors  603ms
+     ✓ validates signed original delivery context and retains late delivery without replay  606ms
+     ✓ counts the new ledger in the ordinary SMS allowance without borrowing one-call permission  698ms
+     ✓ counts an older ordinary dispatch in the CALLIE phone cap  583ms
+     ✓ claims one physical response under simultaneous workers  621ms
+     ✓ serializes shared daily allowance across two separately granted callers  647ms
+     ✓ shares the same allowance lock with the contact-required transport  632ms
+ ✓ src/services/source-nurture-mailbox.test.ts (9 tests) 20493ms
+   ✓ actual nurture accepted → original Sent/Inbox → stopped sibling and one canonical office task  2422ms
+   ✓ actual nurture acceptance_lost → original Sent/Inbox → stopped sibling and one canonical office task  2002ms
+   ✓ a delayed first-step reply ignores only same-plan newer evidence (unrelated=false)  3374ms
+   ✓ a delayed first-step reply ignores only same-plan newer evidence (unrelated=true)  3258ms
+   ✓ a late grant revocation during actual OAuth blocks the provider POST and cannot be replaced by BIE permission  1271ms
+   ✓ a different approving manager revoked through the real membership route during OAuth prevents POST  4015ms
+   ✓ PostgreSQL holds a real different-manager membership edit behind the actual final Microsoft parent claim  1773ms
+   ✓ a canonical reply on another lead stops only current contact work (historical=false)  696ms
+   ✓ a canonical reply on another lead stops only current contact work (historical=true)  726ms
+ ✓ src/services/source-nurture.test.ts (21 tests) 25605ms
+   ✓ keeps review and approval send-free, explicitly starts two permanent actions and replays exact commands only  1320ms
+   ✓ keeps stopped/default evidence readable while providers, lifecycle and entitlement are held  736ms
+   ✓ rejects cross-company, unaccepted actor, changed body, expiry and selected Gmail rather than Microsoft  723ms
+   ✓ does not admit without fresh full scan, and cannot adopt a second alias of the same address  1095ms
+   ✓ stops OAuth-time recipient changes with zero provider POST and no replacement action  1364ms
+   ✓ stops OAuth-time owner changes with zero provider POST and no replacement action  1329ms
+   ✓ stops OAuth-time permission changes with zero provider POST and no replacement action  1292ms
+   ✓ stops OAuth-time adoption changes with zero provider POST and no replacement action  1374ms
+   ✓ stops OAuth-time suppression changes with zero provider POST and no replacement action  1336ms
+   ✓ stops OAuth-time stage changes with zero provider POST and no replacement action  1301ms
+   ✓ stops OAuth-time lost changes with zero provider POST and no replacement action  1256ms
+   ✓ stops OAuth-time inspection_scheduled changes with zero provider POST and no replacement action  1237ms
+   ✓ stops OAuth-time completed changes with zero provider POST and no replacement action  1298ms
+   ✓ stops OAuth-time sending hours changes with zero provider POST and no replacement action  1396ms
+   ✓ stops OAuth-time appointment changes with zero provider POST and no replacement action  1359ms
+   ✓ preserves an unknown predecessor after reconciliation and never grants a follow-up or new sequence  1871ms
+   ✓ expires quiet-hour deferrals in the same finite window without claiming a late effect  756ms
+   ✓ counts aliases and pending/unknown receipts once; changed address/channel cannot use a saved allowance  309ms
+   ✓ leaves source/date/hash intact as accepted work changes only runtime fields  1690ms
+   ✓ PostgreSQL independent legacy send and nurture admission permanently converge on one source owner  865ms
+   ✓ PostgreSQL independent nurture and generic workers cannot both own the final alias contact allowance  904ms
+ ✓ src/services/contractor-workday.test.ts (22 tests) 9015ms
+   ✓ keeps equipment facts explicit, paginates 25 records, and refuses same-name wrong-parent or foreign assets  696ms
+   ✓ retired or replaced templates block new enrollment but not pinned reviewed work  347ms
+   ✓ returning-customer completion seals saved work atomically, creates one anchored successor, and preserves staff notes  329ms
+   ✓ enrollment blocks both generic completion writers while unenrolled legacy completion remains usable  324ms
+   ✓ sealed evidence cannot authorize generic reopening, relinking or rewriting original notes; corrections append only  354ms
+   ✓ missing answers, invalid observations and attention without accountable follow-up cannot finish  339ms
+   ✓ explicit N/A reasons work, and no service is completed unless selected in the final attestation  318ms
+   ✓ an explicitly unperformed service can be rebooked and finished later without replaying the first visit  582ms
+   ✓ the actual lead merge retains prepared and sealed visit history instead of bulk-reparenting evidence  334ms
+   ✓ changed staff assignment, source asset or saved task after preview invalidates completion  707ms
+   ✓ two-company and same-company wrong visit selectors cannot expose or enroll foreign work  319ms
+   ✓ multiple units keep independent answers and snapshots, and an exact draft replay does not overwrite newer saved work  483ms
+   ✓ canceled and no-show visits cannot enroll or finish, and cancellation is an explicit office re-preparation path  510ms
+   ✓ held drafts expose cancellation only to current effective office authority without changing saved answers or unknown effects  359ms
+   ✓ finite recurrence completion makes no successor beyond the explicitly approved end date  300ms
+ ✓ src/services/mailbox-connector.test.ts (27 tests) 11128ms
+     ✓ does not inherit a BIE context grant or mutate service identity on nurture opt-in  622ms
+     ✓ records only same-cycle complete Sent and Inbox boundaries with five-minute freshness  680ms
+     ✓ does not combine old Inbox complete=true with a new partial Sent round  722ms
+     ✓ resumes unfinished Inbox across ticks without restarting completed Sent Items  604ms
+     ✓ retains rejected/pending receipts as an incomplete observation, not silence  668ms
+     ✓ fences old work when nurture permission changes during provider work  515ms
+     ✓ requires another fresh round after recovery from a failed partial cursor  726ms
+     ✓ holds a current in-flight lease and cannot adopt old evidence after reconnect  662ms
+     ✓ holds new nurture when short-lived reply evidence cannot be encrypted  480ms
+     ✓ observes exact Sent Items before Inbox and deduplicates read-state redelivery  388ms
+     ✓ holds changed-payload redelivery and cursor gaps without advancing/resetting history  369ms
+     ✓ preserves the prior continuation when downstream intake fails, and never resets on 410  328ms
+     ✓ retains an unmatched reply for exact-ID bounded retry, not a new send  352ms
+     ✓ does not fetch unrelated bodies and reviews unsupported known IDs without gapping later messages  364ms
+     ✓ turns a missing pending immutable ID into visible review without killing the connector  307ms
+     ✓ defaults to service-only and preserves exact service identity/cursor when lead context changes  428ms
+     ✓ rejects missing confirmation, stale versions, foreign owner and inactive connector  418ms
+     ✓ allows local lead revoke while globally held and a new read opt-in starts service-only  461ms
+     ✓ rechecks a pending candidate before body fetch while valid service pending evidence continues  424ms
+ ✓ src/services/service-standing.test.ts (32 tests) 10649ms
+     ✓ queues only after a future notice and sends once with an honest standing origin  669ms
+     ✓ does not let an old future-notice checkpoint postpone a freshly reviewed policy  389ms
+     ✓ disable remains replay-safe under provider/lifecycle holds and never changes original receipt  484ms
+     ✓ rechecks disable between claim/preparation and provider POST  501ms
+     ✓ rechecks recipient between claim/preparation and provider POST  394ms
+     ✓ rechecks task_closed between claim/preparation and provider POST  410ms
+     ✓ rechecks reply between claim/preparation and provider POST  404ms
+     ✓ does not rearm an uncertain occurrence on a later revised policy or alternate channel  606ms
+     ✓ rotates held enrollments and preserves in-progress office tasks  429ms
+     ✓ counts unknown reservations and deduplicates the matching accepted activity  523ms
+     ✓ does not hide a different legacy unknown scheduled key merely because it repeats the same approval reference  496ms
+     ✓ does not use a conflicting explicit activity key to hide a pre-ledger unknown service receipt  507ms
+     ✓ serializes two independent service workers before either can consume the last contact slot  503ms
+ ✓ src/services/returning-invoice-delivery.test.ts (34 tests) 15220ms
+   ✓ sends an exact v3 gmail invoice with no invented lead or reply-monitor signature, using the original key  613ms
+   ✓ sends an exact v3 microsoft invoice with no invented lead or reply-monitor signature, using the original key  561ms
+   ✓ refuses a selected native job edit during OAuth without changing the issued document or sending  506ms
+   ✓ allows an explicit no-property invoice and rejects cross-company, actor and effective-role use before replay  517ms
+   ✓ records a typed no-dispatch proof for a post-OAuth customer change, allowing only separately reviewed recovery  451ms
+   ✓ records a typed no-dispatch proof for a post-OAuth address change, allowing only separately reviewed recovery  420ms
+   ✓ records a typed no-dispatch proof for a post-OAuth preference change, allowing only separately reviewed recovery  369ms
+   ✓ records a typed no-dispatch proof for a post-OAuth mailbox change, allowing only separately reviewed recovery  345ms
+   ✓ records a typed no-dispatch proof for a post-OAuth member change, allowing only separately reviewed recovery  343ms
+   ✓ records a typed no-dispatch proof for a post-OAuth sender change, allowing only separately reviewed recovery  390ms
+   ✓ records a typed no-dispatch proof for a post-OAuth hold change, allowing only separately reviewed recovery  389ms
+   ✓ records a typed no-dispatch proof for a post-OAuth reply change, allowing only separately reviewed recovery  385ms
+   ✓ refuses a mismatched immutable v3 root after coherent-history changes without trusting mutually matching proof  521ms
+   ✓ refuses a mismatched immutable v3 root after native-root changes without trusting mutually matching proof  501ms
+   ✓ preserves genuine v3 history after mutable address and mailbox changes, while a fresh copy requires a fresh review  573ms
+   ✓ retains the original five-attempt chain through proven retry and separately acknowledged copies  1969ms
+   ✓ keeps permanent unknown ownership after timeout, never retries the original or a new preview  487ms
+   ✓ keeps permanent unknown ownership after lost-final-write, never retries the original or a new preview  540ms
+   ✓ retains unknown ownership after a real sender-entry lookup refusal, even after configuration is restored  389ms
+   ✓ late acceptance pins original participants after edits and preserves the held original execution  468ms
+   ✓ withholds copy authority if retained v3 acceptance customerWorkId is mismatched  458ms
+   ✓ withholds copy authority if retained v3 acceptance propertyId is mismatched  467ms
+   ✓ withholds copy authority if retained v3 acceptance sourceSha256 is mismatched  425ms
+   ✓ withholds copy authority if retained v3 acceptance senderIdentitySha256 is mismatched  413ms
+   ✓ withholds copy authority if retained v3 acceptance recipient is mismatched  405ms
+ ✓ src/services/missed-call-care.test.ts (22 tests) 12935ms
+     ✓ holds an older individually reviewed response when a newer typed CALLIE request arrives  704ms
+     ✓ keeps default-disabled and unknown callers in review without creating leads, consent, or SMS  528ms
+     ✓ rejects answered calls, tenant crossing, and foreign or inactive owners  340ms
+     ✓ sends only the approved branded message once and exposes provider acceptance separately from replies  911ms
+     ✓ rejects a stale exact-message preview and stale policy version  547ms
+     ✓ rechecks purpose changes after approval and does not send  635ms
+     ✓ rechecks dnc changes after approval and does not send  607ms
+     ✓ rechecks policy changes after approval and does not send  541ms
+     ✓ rechecks phone changes after approval and does not send  522ms
+     ✓ rechecks owner changes after approval and does not send  539ms
+     ✓ rechecks reply changes after approval and does not send  558ms
+     ✓ requires purpose-specific consent even when a known caller has generic SMS consent  524ms
+     ✓ rechecks stale policy approval immediately before the actual provider handoff  604ms
+     ✓ does not send while the company hold is active  490ms
+     ✓ does not send while the environment hold is active  526ms
+     ✓ defers after-hours customer SMS without consuming an execution receipt and names the after-hours owner  520ms
+     ✓ caps another response to the same phone across different calls  727ms
+     ✓ escalates a missed deadline to the accountable callback task, not a second SMS  660ms
+     ✓ shows signed inbound reply/STOP evidence without asserting a booked appointment or precise campaign attribution  632ms
+     ✓ never retries an uncertain send, even with a fresh approval; closing requires recorded reconciliation  653ms
+     ✓ recognizes an abandoned receipt without acquiring a new send identity  594ms
+     ✓ creates one canonical lead push only inside the reviewed new-lead transaction  571ms
+ ✓ src/routes/v1/callie-intake.test.ts (45 tests) 14688ms
+     ✓ replays identical stage responses but cannot change a prior answer or backtrack  355ms
+     ✓ reads complete optional disclosure before Gather and stores encrypted replay without sending  378ms
+     ✓ does not invent consent when caller declines the optional acknowledgment  325ms
+     ✓ consumes exact caller-originated SMS after ordinary hangup, retaining deadline and no reusable consent  423ms
+     ✓ rejects wrong, malformed, other-phone, expired and foreign-tenant confirmations  608ms
+     ✓ makes both same-message and fresh-message used-code replays non-authorizing  416ms
+     ✓ STOP has priority over challenge text and neither CALLIE nor START restores general consent  466ms
+     ✓ does not treat provider HELP as CALLIE consent  329ms
+     ✓ does not treat provider START as CALLIE consent  353ms
+     ✓ fails closed when policy changes before confirmation  327ms
+     ✓ fails closed when owner changes before confirmation  348ms
+     ✓ fails closed when binding changes before confirmation  369ms
+     ✓ fails closed when company changes before confirmation  404ms
+     ✓ fails closed when environment changes before confirmation  349ms
+     ✓ checks all matching DNC contacts without auto-linking an ambiguous shared phone  401ms
+     ✓ signed incoming SMS preserves a reassigned callback and cannot create a grant  390ms
+     ✓ signed incoming SMS preserves a unassigned callback and cannot create a grant  382ms
+     ✓ signed incoming SMS preserves a done callback and cannot create a grant  351ms
+     ✓ signed incoming SMS preserves a cancelled callback and cannot create a grant  416ms
+     ✓ preserves in-progress status and original deadline through successful signed Gather and SMS  423ms
+     ✓ signed SMS waits for the real original-task row lock and honors committed staff reassignment  391ms
+     ✓ concurrent independent PostgreSQL confirmations consume one exact trigger  382ms
+ ✓ src/routes/v1/lead-import-large-body.test.ts (2 tests) 17362ms
+     ✓ accepts a CSV payload well above the 100kb default JSON limit  12481ms
+ ✓ src/services/staff-push-coverage.test.ts (43 tests) 13335ms
+     ✓ retains both selected recipients when only one has a device, with a closed safe projection  376ms
+     ✓ evaluates all twenty recipients with deterministic five-device caps and no global starvation  960ms
+     ✓ projects all exact original effect states and unavailable IDs independently of the last 100 list  413ms
+     ✓ rejects malformed inner evidence and unknown states with a fixed unavailable error  335ms
+     ✓ serializes concurrent admission before either can create an extra cohort  314ms
+     ✓ rechecks changed member after a lead lock wait  347ms
+     ✓ records missing member coverage after an admission lock wait  314ms
+     ✓ records missing session coverage after an admission lock wait  302ms
+     ✓ bounds an authority lock wait and releases its earlier lead lock after timeout  3206ms
+ ✓ src/services/invoice-delivery-adapter.test.ts (26 tests) 10974ms
+     ✓ keeps real preview, evidence, send and worklist output aligned with generated OpenAPI contracts  570ms
+     ✓ previews without external calls, sends exact text once, then sends only an acknowledged COPY with retained receipts  702ms
+     ✓ prevents the actual provider POST after source changes during OAuth preparation  333ms
+     ✓ prevents the actual provider POST after assignment changes during OAuth preparation  337ms
+     ✓ prevents the actual provider POST after sender changes during OAuth preparation  318ms
+     ✓ prevents the actual provider POST after optout changes during OAuth preparation  349ms
+     ✓ prevents the actual provider POST after suppression changes during OAuth preparation  402ms
+     ✓ prevents the actual provider POST after company changes during OAuth preparation  325ms
+     ✓ prevents the actual provider POST after global hold changes during OAuth preparation  369ms
+     ✓ prevents the actual provider POST after actor changes during OAuth preparation  328ms
+     ✓ prevents the actual provider POST after unverified actor changes during OAuth preparation  340ms
+     ✓ prevents the actual provider POST after expired preview changes during OAuth preparation  315ms
+     ✓ prevents the actual provider POST after altered review changes during OAuth preparation  385ms
+     ✓ prevents the actual provider POST after expired claim changes during OAuth preparation  330ms
+     ✓ prevents the actual provider POST after changed claim state changes during OAuth preparation  331ms
+     ✓ a safe retry after a real post-OAuth refusal needs a new exact preview  612ms
+     ✓ never creates no-dispatch proof after the POST reaches transport and returns timeout  473ms
+     ✓ never creates no-dispatch proof after the POST reaches transport and returns lookalike_guard  475ms
+     ✓ never creates no-dispatch proof after the POST reaches transport and returns http_error  438ms
+     ✓ retains accepted provider evidence when mutable company eligibility changes after the actual POST  376ms
+     ✓ records late provider acceptance without turning interrupted ownership into copy permission  417ms
+     ✓ refuses a copy when its approved predecessor proof no longer authorizes the chain after OAuth  634ms
+     ✓ keeps transactional invoice authority independent of imported provenance and ordinary lead replies  424ms
+ ✓ src/services/staff-push.test.ts (33 tests) 12175ms
+     ✓ encrypts endpoints/keys and limits status to the signed-in session  370ms
+     ✓ requires complete policy and active same-company recipients  310ms
+     ✓ does not silently transfer an existing browser endpoint to another account  310ms
+     ✓ caps devices at five and renews the same device without duplicating it  363ms
+     ✓ binds device expiry to browser and session expiry  334ms
+     ✓ commits one opaque receipt with the lead, dedupes repeat enqueue, never sends in request  357ms
+     ✓ rolls back the lead and queued effect together  350ms
+     ✓ does not notify a historical import or update  374ms
+     ✓ capture retries and contact merges do not add another new-lead notification  481ms
+     ✓ Smart Site intake and its idempotent retry share the same durable notification  483ms
+     ✓ bounds each worker cycle to ten effects and leaves further work pending  759ms
+     ✓ does not retry a provider response 302  426ms
+     ✓ does not retry a provider response 401  369ms
+     ✓ does not retry a provider response 429  344ms
+     ✓ does not retry a provider response 500  361ms
+     ✓ held/disabled work stays pending, then an enabled restarted worker can dispatch once  356ms
+     ✓ concurrent workers atomically own the effect once  361ms
+     ✓ interrupted/ambiguous effects never automatically replay  400ms
+     ✓ expires stale pending receipts instead of flooding after an outage  337ms
+     ✓ rechecks logout before network dispatch  329ms
+     ✓ rechecks deactivate before network dispatch  359ms
+     ✓ rechecks membership before network dispatch  365ms
+     ✓ rechecks role before network dispatch  329ms
+     ✓ rechecks policy before network dispatch  386ms
+     ✓ rechecks revoke before network dispatch  365ms
+     ✓ rechecks session expiry without background OAuth refresh  341ms
+     ✓ requires explicit staging user allowlist at dispatch  338ms
+     ✓ revokes only the recipient device on provider 404  417ms
+     ✓ revokes only the recipient device on provider 410  377ms
+     ✓ a late expiry response cannot revoke a newly renewed device lease  369ms
+     ✓ does not process another tenant queue or expose its receipts  334ms
+ ✓ src/services/service-watch.test.ts (17 tests) 10418ms
+   ✓ acknowledges the actual task owner/deadline once; no invented response, then reopens at deadline  332ms
+   ✓ rotates older held rows so later cases are evaluated and reports unmonitored work truthfully  2024ms
+   ✓ retains bad bootstrap sources so a full old batch cannot hide a later valid service  1202ms
+   ✓ does not let old resolved history consume the attention-page bound  4485ms
+ ✓ src/services/service-sms.test.ts (20 tests) 10950ms
+     ✓ does not retrofit references or encryption prerequisites into a previously approved legacy SMS  432ms
+     ✓ reserves exact parent before actual transport POST, pins sender and retains signed exact evidence  588ms
+     ✓ keeps no-reference replies ambiguous even with one candidate and holds later same-phone occurrences  517ms
+     ✓ retains invalid/unmatched reference without guessing exact association: SERVICE invalid book now  496ms
+     ✓ retains invalid/unmatched reference without guessing exact association: SERVICE ffffffffffffffff please call  491ms
+     ✓ does not correlate another company's token or a different handset/shop line  938ms
+     ✓ retains exact replay identity after purge and rejects changed body, phone and event type  570ms
+     ✓ STOP/START/HELP remain separate, never release an unresolved service reply hold  609ms
+     ✓ keeps an exact completed occurrence reply historical without choosing a new occurrence  477ms
+     ✓ unknown provider outcome remains permanently owned after signed reply and office review  500ms
+     ✓ handled releases one exact reply hold but not another reply, STOP or unknown execution ownership  646ms
+     ✓ accepts omitted optional service metadata only while the exact bound program is unchanged  525ms
+     ✓ retains multiple phone candidates without picking the last or first service  927ms
+     ✓ actual reminder → signed reply → explicit staff response/booking → completion creates only one agreed successor  603ms
+     ✓ explicit unrelated disposition releases only service hold, no consent or booking, and is idempotent  511ms
+     ✓ HTTP requires accepted tenant staff; rejects API keys, forged overrides and stale reviews  798ms
+ ✓ src/services/invoice-delivery.test.ts (35 tests) 9339ms
+     ✓ records truthful gmail acceptance once, with no collection or delivery claim  392ms
+     ✓ records truthful microsoft acceptance once, with no collection or delivery claim  351ms
+     ✓ never lets a second preview, changed sender or reconciled/new key bypass an uncertain logical send  413ms
+     ✓ requires a fresh explicit review after typed pre-dispatch refusal and retains the original blocked receipt  539ms
+     ✓ allows an additional COPY only after a fresh preview and a separate post-preview acknowledgement  530ms
+     ✓ blocks every additional attempt once the latest copy becomes uncertain  581ms
+     ✓ caps all server attempts at five, including explicitly acknowledged copies  1095ms
+     ✓ reserves one logical effect across different reviewed requests  328ms
+ ✓ src/services/source-adoption.test.ts (27 tests) 9365ms
+     ✓ runs preview -> adoption -> independent permission -> exact approval -> gmail receipt with no history rewrite  398ms
+     ✓ runs preview -> adoption -> independent permission -> exact approval -> microsoft receipt with no history rewrite  397ms
+     ✓ links the actual reviewed-send receipt to exactly one verified incoming parent and holds the contact  491ms
+     ✓ stops late adoption changes at the provider boundary after preparation  360ms
+     ✓ stops late campaign changes at the provider boundary after preparation  392ms
+     ✓ stops late permission changes at the provider boundary after preparation  390ms
+     ✓ stops late suppression changes at the provider boundary after preparation  367ms
+     ✓ stops late reply changes at the provider boundary after preparation  356ms
+     ✓ stops late sender changes at the provider boundary after preparation  329ms
+     ✓ stops late identity changes at the provider boundary after preparation  312ms
+     ✓ stops late company_hold changes at the provider boundary after preparation  317ms
+     ✓ stops late global_hold changes at the provider boundary after preparation  303ms
+     ✓ stops late expiry changes at the provider boundary after preparation  329ms
+     ✓ stops late staff changes at the provider boundary after preparation  312ms
+     ✓ never releases unknown, expired, reconciled or pre-provider reservations to another campaign  680ms
+     ✓ preserves a strict rolling company cap across separately approved campaigns  601ms
+     ✓ stops an expired or operator-reconciled durable owner before the provider boundary  356ms
+     ✓ serializes two independently racing campaign sends on PostgreSQL  377ms
+ ✓ src/services/mailbox-lead-communication.test.ts (25 tests) 6539ms
+   ✓ exact typed reply atomically holds native lead follow-up and creates one accepted-assignee office task without a new lead or booking  370ms
+   ✓ office handling is exact/versioned/idempotent after reader revocation and never resumes cancelled or unknown work  301ms
+   ✓ inactive assignee becomes visible unassigned office work and tenant/parent/task FKs cannot be transplanted  312ms
+   ✓ bounds retained lead reply pages without hiding older evidence  1590ms
+ ✓ src/services/mailbox-communication.test.ts (25 tests) 8364ms
+     ✓ approved send -> actual parent claim -> Sent Items observation -> reply creates office work, never a lead, booking or consent  460ms
+     ✓ office review is versioned and idempotent; only explicit separate staff conversation moves the response workflow  385ms
+     ✓ isolates company and same-company parent/service/contact keys at the database boundary  371ms
+     ✓ exposes older retained evidence through bounded pages and keeps an older unreviewed arrival in watch  1140ms
+ ✓ src/services/staff-service-push.test.ts (13 tests) 7740ms
+     ✓ atomically enqueues one device notice for an exception without manufacturing a lead, then accepts only once  713ms
+     ✓ keeps legacy policies off and never broadcasts unassigned services  551ms
+     ✓ cancels a queued alert after acknowledge  721ms
+     ✓ cancels a queued alert after completed  653ms
+     ✓ cancels a queued alert after reassigned  649ms
+     ✓ cancels a queued alert after policy  562ms
+     ✓ cancels a queued alert after logout  537ms
+     ✓ cancels a queued alert after unverified  618ms
+     ✓ holds the queue for company pause and never claims another company  516ms
+     ✓ rechecks a changed case at the actual transport boundary and labels definite non-dispatch  565ms
+     ✓ retains uncertain acceptance and never replays it on the next monitor tick  566ms
+     ✓ rejects cross-company service owners at the database boundary  565ms
+     ✓ rolls back service reconciliation and notification work together  523ms
+ ✓ src/services/service-care.test.ts (30 tests) 6208ms
+     ✓ uses the actual SMS adapter with purpose consent and a mocked network, once per obligation  432ms
+     ✓ frequency caps defer a second due obligation for the same customer without claiming it  426ms
+ ✓ src/services/service-standing-mailbox.test.ts (8 tests) 7842ms
+     ✓ tracks a typed original standing parent and a reply after policy disable, unknown=false  1421ms
+     ✓ tracks a typed original standing parent and a reply after policy disable, unknown=true  957ms
+     ✓ revocation during OAuth preparation blocks the original parent before the provider POST  666ms
+     ✓ a real task edit committed during OAuth preparation (closed) blocks the provider POST  668ms
+     ✓ a real task edit committed during OAuth preparation (reassigned) blocks the provider POST  650ms
+     ✓ serializes a real generic task edit behind the actual final Microsoft parent claim  863ms
+     ✓ retains an entire staff-owned in_progress task when an exact standing Microsoft reply arrives  960ms
+     ✓ retains an entire staff-owned done task when an exact standing Microsoft reply arrives  968ms
+ ✓ src/services/smart-site-followup.test.ts (15 tests) 6181ms
+     ✓ commits one initial claimant and the same canonical task owner  491ms
+     ✓ rolls ownership and audit back when the canonical task cannot be updated  367ms
+     ✓ excludes pending, unverified, inactive and read-only staff from owner choices and assignment  366ms
+     ✓ rechecks actor eligibility for assignments, releases and attempted-contact receipts  410ms
+     ✓ retains attempt idempotency while refusing replay by a now-unverified actor  407ms
+     ✓ finds the exact inquiry beyond the Capture queue without returning contact or receipt content  638ms
+     ✓ reports current owner and current actor authority without exposing another company's staff  479ms
+     ✓ does not offer or commit an initial claim after won  313ms
+     ✓ does not offer or commit an initial claim after lost  350ms
+     ✓ does not offer or commit an initial claim after completed  316ms
+     ✓ rejects ordinary or inaccessible lead IDs and rechecks the reader's current company  343ms
+     ✓ claim observes a membership change committed while it waits on the lead  345ms
+     ✓ attempt observes a membership change committed while it waits on the lead  358ms
+     ✓ rejects a target whose verification changed while ownership waits  354ms
+     ✓ retains actor and target authority until the canonical task change commits  642ms
+ ✓ src/routes/v1/email-response-correlation.test.ts (30 tests) 3561ms
+ ✓ src/services/bie-reviewed-email.test.ts (25 tests) 6118ms
+     ✓ prepares exact displayed identity without approval or network; approves the complete saved snapshot and sends through the real guarded Microsoft adapter once  763ms
+     ✓ keeps no tracking acknowledgement explicitly untracked and never silently reserves a parent  327ms
+     ✓ keeps historical approved email explicitly untracked and never silently reserves a parent  317ms
+     ✓ another company staff member cannot consume the prepared sender's fixed execution slot  455ms
+     ✓ unknown Microsoft effect permanently owns the same proposal and parent, without automatic send replay  420ms
+ ✓ src/services/invoice-delivery-attempts.test.ts (28 tests) 5638ms
+   ✓ typed no-dispatch proof unlocks exactly one reviewed successor, then caps all lifetime attempts at five  783ms
+   ✓ exact invoice, actor, review, receipt and predecessor/proof FKs prevent tenant or null escape  336ms
+ ✓ src/services/shared-contact-lanes.test.ts (18 tests) 6161ms
+     ✓ counts an accepted BIE claim, execution receipt and accepted activity exactly once, retaining the original key on retry  737ms
+     ✓ keeps an accepted touch inside the rolling window until actual acceptance ages out, not its earlier reservation  396ms
+     ✓ an unknown BIE provider effect retains its original key and blocks an alias playbook, including after negative operator reconciliation  485ms
+     ✓ BIE rechecks the shared cap after OAuth and cannot dispatch when an alias claim uses the changed allowance  346ms
+     ✓ does not share another company's allowance even when its fictional email and phone are identical  479ms
+     ✓ real PostgreSQL serializes competing BIE and playbook workers for the last alias allowance  484ms
+ ✓ src/services/assistant.test.ts (36 tests) 1919ms
+ ✓ src/services/platform-email-delivery.test.ts (24 tests) 5581ms
+     ✓ owns one email_verification send with a stable record and no raw content  429ms
+     ✓ concurrent duplicate callers can never own two provider requests  379ms
+     ✓ permits a currently authorized administrator to reissue after the original creator is deactivated  352ms
+     ✓ retains invitation receipt while callbacks cannot accept, reactivate or undo revocation  323ms
+ ✓ src/services/automated-email-final-guard.test.ts (26 tests) 4804ms
+     ✓ uses the real adapter and a fixed scheduled receipt for an unchanged permitted email  370ms
+ ✓ src/services/callie-reception-races.test.ts (4 tests) 3969ms
+   ✓ one final registration claim serializes duplicate callbacks and the actual CRM task writer through physical dispatch ownership  1000ms
+   ✓ an actual policy disable writer commits before a waiting original registration and prevents every provider POST  764ms
+   ✓ a final transfer claim serializes competing call tools and retains exactly one original redirect effect  1204ms
+   ✓ signed late provider evidence waits for the actual office resolve writer and cannot undo its original task or disposition  1000ms
+ ✓ src/routes/v1/staff-push-coverage.test.ts (25 tests) 5520ms
+     ✓ returns historical unknown from a normal owner session without creating evidence or effects  386ms
+     ✓ rejects anonymous, revoked and expired sessions  307ms
+ ✓ src/services/callie-office.test.ts (15 tests) 3866ms
+     ✓ reassigns only accepted staff, holds automation and distinguishes stop from handled  373ms
+     ✓ returns oldest unresolved work across bounded pages and separates waiting/history  553ms
+ ✓ src/routes/v1/data-lifecycle-inventory.test.ts (13 tests) 3511ms
+     ✓ matches all reviewed deployed synthetic tables and counts in a server-enforced read-only snapshot  1311ms
+     ✓ requires active owner/admin membership and does not elevate an unscoped platform session  305ms
+     ✓ returns only scoped counts with explicit shared and unresolved ownership exceptions  391ms
+ ✓ src/services/returning-customer.test.ts (15 tests) 3958ms
+   ✓ shares receipt allocations only inside one explicit work root, never across another job or a lead for the same customer  407ms
+   ✓ refuses refunds above one invoice's exact original-payment allocation even when that invoice has other paid cash  332ms
+ ✓ src/services/twilio-dispatch-guard.test.ts (8 tests) 2434ms
+     ✓ does not contact Twilio when contact_dnc changes after ownership  341ms
+     ✓ does not contact Twilio when hold changes after ownership  302ms
+     ✓ does not contact Twilio when workflow changes after ownership  309ms
+     ✓ checks the workflow only for the owner and does not repeat an accepted SMS  309ms
+     ✓ keeps a lost acknowledgement uncertain and prevents a retry  300ms
+ ✓ src/routes/v1/contractor-workday.test.ts (8 tests) 3651ms
+   ✓ actual save/reopen and signed private photo PUT/attachment retain exact entry versions  433ms
+   ✓ generated HTTP contracts expose explicit office cancellation and re-preparation for a held asset without granting edits  554ms
+   ✓ generated HTTP contracts expose explicit office cancellation and re-preparation for a held parent without granting edits  503ms
+ ✓ src/services/customer-workspace.test.ts (16 tests) 3750ms
+     ✓ bounds ancestry traversal and does not expose successors beyond the validated bound  412ms
+     ✓ uses microsecond keysets with UUID ties and stays stable after newer inserts and status edits  312ms
+     ✓ pages every section beyond the first 25 without duplicates or omitted historical records  463ms
+ ✓ src/services/invoices.test.ts (17 tests) 3243ms
+ ✓ src/services/invoice-retention.test.ts (14 tests) 3697ms
+     ✓ keeps exact legacy estimate, lead property and property owner for every retained draft invoice  377ms
+     ✓ keeps exact legacy estimate, lead property and property owner for every retained issued invoice  359ms
+     ✓ keeps exact legacy estimate, lead property and property owner for every retained void invoice  373ms
+ ✓ src/services/contractor-workday-concurrency.test.ts (5 tests) 3518ms
+   ✓ retains actual property, task and performing member locks through atomic work completion while generic writers wait  660ms
+   ✓ waits for actual property or assignment changes and rejects stale work after the writer commits  730ms
+   ✓ two actual finishers and a legacy completion writer produce one original completion and one successor  413ms
+   ✓ actual entry, asset and template edits serialize after completion without rewriting reviewed historical work  411ms
+   ✓ actual native orphan deletion waits for photo attachment and then preserves the confirmed private object  401ms
+ ✓ src/routes/v1/smart-site-claim.test.ts (7 tests) 3159ms
+     ✓ requires authentication and returns only the no-store ownership DTO  499ms
+     ✓ rejects query selectors, malformed IDs, foreign and ordinary leads  413ms
+     ✓ offers no claim to read-only or machine-context readers  338ms
+     ✓ allows one same-origin accepted claim and returns a stale-owner conflict without changing its task  544ms
+     ✓ blocks foreign Origin, Fetch Metadata, API keys including empty headers and non-JSON for both staff mutations  489ms
+     ✓ rejects a now-unverified actor on writes and updates read eligibility  371ms
+     ✓ preserves the exact staff-attempt receipt across a retry  495ms
+ ✓ src/routes/v1/smart-sites.test.ts (20 tests) 3035ms
+ ✓ src/services/scheduler-restart.test.ts (1 test) 2427ms
+   ✓ restarts after a real worker crash without repeating its committed effect and resumes other due work  2426ms
+ ✓ src/services/financial-migration.test.ts (16 tests) 3220ms
+ ✓ src/services/mailbox-lead-integration.test.ts (2 tests) 2772ms
+   ✓ runs actual reviewed BIE → Microsoft (accepted) → exact Sent Items/Inbox → one held lead task → explicit handling  1281ms
+   ✓ runs actual reviewed BIE → Microsoft (acceptance_lost) → exact Sent Items/Inbox → one held lead task → explicit handling  994ms
+ ✓ src/services/returning-invoice-delivery-concurrency.test.ts (4 tests) 3031ms
+   ✓ v3 admission retains actual customer, property, member, company sender and mailbox preference locks against ordinary writers  741ms
+   ✓ v3 final post-OAuth guard waits for an actual property writer and refuses changed same-timestamp evidence before POST  539ms
+   ✓ v3 final post-OAuth guard waits for the real Microsoft disconnect writer and never posts from revoked identity  487ms
+   ✓ two independently observed v3 initial approvers retain one original execution and one physical effect  745ms
+ ✓ src/services/appointment-work-photos.test.ts (6 tests) 3255ms
+   ✓ reserves one exact object, attaches actual bytes and serves only the current tenant/visit private content route  642ms
+   ✓ lost upload response replays inertly and never returns a new upload capability or reservation  313ms
+   ✓ expired unbound reservations are tombstoned and deletable; attached references survive actual cleanup  532ms
+   ✓ required photo answers need an exact attached item and completion freezes the reference  429ms
+ ✓ src/routes/v1/normal-mode-tenant-acceptance.test.ts (15 tests) 2618ms
+ ✓ src/routes/v1/invoices.test.ts (6 tests) 2478ms
+     ✓ requires a current active staff role and allows sales managers to read only  362ms
+     ✓ rejects tenant and server-field overrides, malformed values and unrelated tenant identifiers  304ms
+     ✓ records staff receipt evidence once, preserves cash through unallocation, and voids only after allocation resolution  427ms
+ ✓ src/services/returning-customer-concurrency.test.ts (7 tests) 3279ms
+   ✓ serializes actual estimate conversion with duplicate creation and accepted-price writers into one retained native job  386ms
+   ✓ serializes original returning cash allocation and refund corrections without exceeding the exact receipt or invoice allocation  516ms
+   ✓ retains original legacy cash and imported invoice lineage against actual property and merge writers  353ms
+ ✓ src/services/data-lifecycle-inventory.test.ts (49 tests) 2604ms
+     ✓ matches catalog metadata from the actual checked-in view SQL in an isolated database  1828ms
+ ✓ src/services/appointment-reminder.test.ts (15 tests) 2557ms
+     ✓ sends a due reminder and logs an activity on the lead  338ms
+     ✓ concierge email preference survives a CRM reschedule (reminder still emails)  480ms
+ ✓ src/routes/v1/invoice-delivery.test.ts (8 tests) 2076ms
+     ✓ derives company context from membership and rejects foreign invoices, query overrides and malformed contracts  319ms
+     ✓ serves the exact SELECT-only canonical worklist before invoice-ID routes, with fixed pagination and no foreign selectors  369ms
+ ✓ src/routes/v1/beta-company-rehearsal.test.ts (5 tests) 2212ms
+   ✓ rehearses 'Painless Roofing and Water Restoration' intake, ownership, office booking, estimate and accurately labeled value  378ms
+ ✓ src/routes/v1/customer-lifecycle.test.ts (10 tests) 1935ms
+ ✓ src/routes/v1/revenue-workspace.test.ts (12 tests) 1910ms
+ ✓ src/routes/v1/service-history-list.test.ts (3 tests) 1395ms
+ ✓ src/routes/v1/lead-mailbox-replies.test.ts (6 tests) 1577ms
+ ✓ src/routes/v1/callie-reception.test.ts (7 tests) 2287ms
+   ✓ fresh signed staff-first inbound and exact missed Dial admit one reception and reject unsigned/cross-call callbacks  328ms
+ ✓ src/services/tenant-isolation.test.ts (24 tests) 2248ms
+ ✓ src/routes/v1/financial-migration.test.ts (5 tests) 1537ms
+ ✓ src/services/playbooks.test.ts (14 tests) 1780ms
+ ✓ src/routes/v1/platform-email-delivery.test.ts (3 tests) 1332ms
+     ✓ exposes exact receipt status to platform staff but not ordinary company members or API keys  514ms
+     ✓ company invitation evidence never exposes another company or platform identity  463ms
+     ✓ requires a signed raw callback and reconciles callback-before-receipt without verifying the user  351ms
+ ✓ src/services/playbook-stage-behaviors.test.ts (15 tests) 2037ms
+ ✓ src/services/invoice-delivery-worklist.test.ts (8 tests) 2122ms
+     ✓ pages at 25 canonical invoices and applies only strict status/lead/project selectors  778ms
+ ✓ src/lib/restore-app-readonly.test.ts (2 tests) 1589ms
+   ✓ reads recovered CRM, Revenue Desk, project-room snapshots and private bytes through the actual app without modifying tenant records  704ms
+ ✓ src/routes/v1/callie.test.ts (6 tests) 1695ms
+ ✓ src/services/billing-checkout.test.ts (21 tests) 2004ms
+ ✓ src/services/contractor-scheduling.test.ts (22 tests) 2446ms
+ ✓ src/services/mailbox-service-integration.test.ts (1 test) 2018ms
+   ✓ runs actual approved scheduler send, observes the immutable original parent, queues exact reply review and retains it through read revocation  1569ms
+stderr | src/services/reactivation.test.ts > campaign lifecycle + throttle > a mid-batch enrollment failure leaves the lead pending and retryable
+[reactivation] drain failed for campaign f5af44ba-b51c-4bbd-8cb6-4b7eb491c38e: Error: boom: provider down
+    at C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server/src/services/reactivation.test.ts:458:49
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at file:///C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ ✓ src/services/reactivation.test.ts (11 tests) 1773ms
+ ✓ src/services/contractor-today.test.ts (9 tests) 1533ms
+ ✓ src/routes/v1/returning-customer.test.ts (4 tests) 1711ms
+   ✓ actual generated HTTP responses cover zero-lead estimate to accepted job, invoice, receipt and linked refund  511ms
+ ✓ src/services/next-best-action.test.ts (12 tests) 1538ms
+     ✓ aggregates copilot performance by action type and compares acted-on vs dismissed conversion, org-scoped  462ms
+ ✓ src/services/concierge-resume.test.ts (2 tests) 1423ms
+     ✓ abandon → resume reactivates, cancels pending follow-ups, and can complete  530ms
+     ✓ resume straight to completion from abandoned works too  335ms
+ ✓ src/services/returning-customer-projections.test.ts (8 tests) 1917ms
+ ✓ src/routes/v1/capture.test.ts (13 tests) 1673ms
+     ✓ queues webhook deliveries for lead.created and lead.won  606ms
+ ✓ src/services/post-sale.test.ts (20 tests) 1798ms
+ ✓ src/routes/v1/client-onboarding.test.ts (11 tests) 1531ms
+     ✓ requires confirmation, prevents cross-org rotation and rejects stale versions  311ms
+ ✓ src/services/smart-site-lifecycle-race.test.ts (4 tests) 1420ms
+   ✓ rechecks intake after a pause commits between the entry guard and capture transaction  495ms
+   ✓ rechecks acquisition after a pause commits between the entry guard and capture transaction  405ms
+ ✓ src/services/customer-email.test.ts (15 tests) 1639ms
+ ✓ src/routes/v1/leads-gmail-user-scope.test.ts (4 tests) 602ms
+ ✓ src/routes/v1/service-watch.test.ts (4 tests) 1306ms
+ ✓ src/routes/v1/bie-email-review.test.ts (6 tests) 1630ms
+     ✓ prepares exact identity, approves unchanged saved payload, and executes once  565ms
+stderr | src/routes/v1/api-key-brute-force.test.ts > invalid API key brute-force throttling > returns 429 after repeated invalid-key attempts from the same IP
+[security] IP 127.0.0.1 blocked after 10 invalid API key attempts within 15 minutes
+
+stdout | src/routes/v1/api-key-brute-force.test.ts > invalid API key brute-force throttling > successful key auth is never counted against the budget
+[MOCK EMAIL] to=brute-force-admin-1791534204655@example.com subject=Security alert: API key guessing attempts blocked body=We blocked the IP address 127.0.0.1 after 10 invalid API key attempts within 15 minutes.
+
+Someone may be trying to guess API keys. Your keys were not compromised by these blocked attempts, but as a precaution you may want to:
+- Review your API keys and rotate any that may be exposed.
+- Check the audit log for unusual activity.
+
+You can manage API keys in the Command Center under Settings → API keys.
+
+stderr | src/routes/v1/api-key-brute-force.test.ts > invalid API key brute-force throttling > successful key auth is never counted against the budget
+[identity-email] No transactional provider configured — using mock outside production.
+
+ ✓ src/routes/v1/service-care.test.ts (5 tests) 1318ms
+ ✓ src/routes/v1/api-key-brute-force.test.ts (6 tests) 1135ms
+     ✓ successful key auth is never counted against the budget  446ms
+ ✓ src/routes/v1/missed-call-care.test.ts (4 tests) 1190ms
+     ✓ rejects foreign/malformed origins, same-site browser writes, and bogus Authorization cookie bypasses  355ms
+ ✓ src/services/automation-dnc.test.ts (4 tests) 1161ms
+     ✓ sends nothing when both channels are do-not-contact  316ms
+ ✓ src/routes/v1/customer-workspace.test.ts (6 tests) 1125ms
+ ✓ src/routes/v1/mailbox-integrations.test.ts (6 tests) 1287ms
+   ✓ requires a separate strict accepted-session nurture acknowledgment and allows held-state revoke  337ms
+   ✓ requires an exact human-session lead acknowledgement, returns versioned status and locally revokes under global hold  309ms
+ ✓ src/routes/v1/service-standing-reminders.test.ts (4 tests) 1175ms
+ ✓ src/services/reporting-periods.test.ts (10 tests) 1363ms
+ ✓ src/services/playbook-learning.test.ts (5 tests) 1370ms
+ ✓ src/services/concierge-confirmation.test.ts (2 tests) 1250ms
+     ✓ sends an SMS confirmation for text preference, logs activity + audit  453ms
+     ✓ sends an email confirmation when the homeowner prefers email  349ms
+ ✓ src/services/manual-sms.test.ts (42 tests) 1276ms
+ ✓ src/services/delivery-events.test.ts (18 tests) 1529ms
+ ✓ src/services/playbook-source-hold.test.ts (8 tests) 1237ms
+ ✓ src/services/installation.test.ts (16 tests) 1162ms
+     ✓ concurrent issuance and rotation never leave two active keys  316ms
+ ✓ src/services/lead-merge.test.ts (6 tests) 964ms
+ ✓ src/routes/v1/api-key-access.test.ts (15 tests) 1057ms
+ ✓ src/services/appointment-parent-coherence.test.ts (10 tests) 1140ms
+ ✓ src/services/lead-needs-reply-filter.test.ts (4 tests) 1122ms
+     ✓ omits a lead once the team replies (team_message newer than portal_message)  310ms
+ ✓ src/services/microsoft-oauth.test.ts (24 tests) 1131ms
+ ✓ src/services/mailbox-microsoft-dispatch.test.ts (6 tests) 1047ms
+ ✓ src/services/concierge-abandon.test.ts (4 tests) 1168ms
+ ✓ src/routes/v1/portal-add-photos.test.ts (12 tests) 1223ms
+ ✓ src/services/portal.test.ts (22 tests) 1065ms
+ ✓ src/services/opportunity-import.test.ts (12 tests) 1166ms
+ ✓ src/routes/v1/appointment-property.test.ts (2 tests) 679ms
+ ✓ src/services/bie-capabilities.test.ts (5 tests) 1218ms
+ ✓ src/routes/v1/reporting-periods.test.ts (4 tests) 1051ms
+ ✓ src/routes/v1/billing-lifecycle.test.ts (6 tests) 1049ms
+ ✓ src/routes/v1/smart-site-acquisition.test.ts (3 tests) 1179ms
+     ✓ accepts only bounded consented events, detects edited retries and keeps tenants separate  312ms
+ ✓ src/services/lead-merge-outreach-retention.test.ts (6 tests) 1284ms
+ ✓ src/routes/v1/source-adoption.test.ts (3 tests) 1033ms
+ ✓ src/routes/v1/source-nurture.test.ts (6 tests) 868ms
+ ✓ src/routes/staff-oidc-acceptance.test.ts (3 tests) 753ms
+ ✓ src/services/portal-message-email.test.ts (14 tests) 837ms
+ ✓ src/services/native-customer-export.test.ts (3 tests) 922ms
+ ✓ src/routes/v1/service-mailbox-replies.test.ts (5 tests) 1042ms
+ ✓ src/services/playbook-send-window.test.ts (11 tests) 765ms
+ ✓ src/services/estimate-totals.test.ts (17 tests) 906ms
+ ✓ src/services/durable-execution.test.ts (6 tests) 784ms
+ ✓ src/routes/v1/won-revenue-correction.test.ts (7 tests) 784ms
+ ✓ src/routes/v1/microsoft-integrations.test.ts (5 tests) 815ms
+stdout | src/services/concierge-automation.test.ts > concierge booking automations > runs org appointment.booked automations for chat bookings
+[MOCK SMS] to=+15550001111 body=Concierge Automation Org: your inspection is confirmed for Mon, Oct 12, 9 AM–11 AM at 456 Test Ln, Springfield, TX, 75001. Need to reschedule? Reply to this message or contact our office and we'll find a time that works.
+
+ ✓ src/services/contact-touch-legacy.test.ts (8 tests) 947ms
+ ✓ src/services/concierge-automation.test.ts (1 test) 914ms
+     ✓ runs org appointment.booked automations for chat bookings  413ms
+ ✓ src/routes/v1/resend-invite.test.ts (6 tests) 600ms
+ ✓ src/services/email-intelligence.test.ts (7 tests) 869ms
+ ✓ src/routes/v1/contractor-scheduling.test.ts (4 tests) 783ms
+ ✓ src/services/bie-email-provider.test.ts (3 tests) 761ms
+ ✓ src/lib/rate-limit-fail-open.test.ts (12 tests) 697ms
+     ✓ rateLimit middleware resumes enforcing 429 once the database is back  329ms
+ ✓ src/routes/v1/tenant-list-scoping.test.ts (9 tests) 697ms
+ ✓ src/routes/v1/unsubscribe-flow.test.ts (8 tests) 935ms
+ ✓ src/services/service-property-coherence.test.ts (4 tests) 650ms
+ ✓ src/routes/v1/delivery-status.test.ts (32 tests) 674ms
+ ✓ src/services/concierge-slots.test.ts (22 tests) 777ms
+ ✓ src/services/knowledge.test.ts (7 tests) 637ms
+ ✓ src/routes/v1/leads-merge-photo-count.test.ts (6 tests) 663ms
+stderr | src/routes/v1/api-key-brute-force-alert.test.ts > admin alerting when an IP is blocked for API-key guessing > records an audit event for orgs with active API keys
+[security] IP 198.51.100.77-1791534248755 blocked after 10 invalid API key attempts within 15 minutes
+
+stdout | src/routes/v1/api-key-brute-force-alert.test.ts > admin alerting when an IP is blocked for API-key guessing > records an audit event for orgs with active API keys
+[MOCK EMAIL] to=brute-alert-admin-1791534248636@example.com subject=Security alert: API key guessing attempts blocked body=We blocked the IP address 198.51.100.77-1791534248755 after 10 invalid API key attempts within 15 minutes.
+
+Someone may be trying to guess API keys. Your keys were not compromised by these blocked attempts, but as a precaution you may want to:
+- Review your API keys and rotate any that may be exposed.
+- Check the audit log for unusual activity.
+
+You can manage API keys in the Command Center under Settings → API keys.
+
+stderr | src/routes/v1/api-key-brute-force-alert.test.ts > admin alerting when an IP is blocked for API-key guessing > records an audit event for orgs with active API keys
+[identity-email] No transactional provider configured — using mock outside production.
+
+stderr | src/routes/v1/api-key-brute-force-alert.test.ts > admin alerting when an IP is blocked for API-key guessing > crossing the threshold over HTTP records the audit event
+[security] IP 127.0.0.1 blocked after 10 invalid API key attempts within 15 minutes
+
+stdout | src/routes/v1/api-key-brute-force-alert.test.ts > admin alerting when an IP is blocked for API-key guessing > crossing the threshold over HTTP records the audit event
+[MOCK EMAIL] to=brute-alert-admin-1791534248636@example.com subject=Security alert: API key guessing attempts blocked body=We blocked the IP address 127.0.0.1 after 10 invalid API key attempts within 15 minutes.
+
+Someone may be trying to guess API keys. Your keys were not compromised by these blocked attempts, but as a precaution you may want to:
+- Review your API keys and rotate any that may be exposed.
+- Check the audit log for unusual activity.
+
+You can manage API keys in the Command Center under Settings → API keys.
+
+stderr | src/routes/v1/api-key-brute-force-alert.test.ts > admin alerting when an IP is blocked for API-key guessing > crossing the threshold over HTTP records the audit event
+[identity-email] No transactional provider configured — using mock outside production.
+
+ ✓ src/services/crm-appointment-conflict.test.ts (16 tests) 747ms
+ ✓ src/routes/v1/api-key-brute-force-alert.test.ts (3 tests) 578ms
+ ✓ src/services/send-source-history.test.ts (5 tests) 525ms
+stderr | src/routes/session-login-brute-force.test.ts > POST /mobile-auth/token-exchange — brute-force throttling > returns 500 on each failed exchange until the budget is spent, then 429
+[security] IP ::ffff:127.0.0.1 blocked after 10 invalid login attempts within 15 minutes
+
+ ✓ src/services/microsoft-lifecycle-dispatch.test.ts (6 tests) 786ms
+stderr | src/routes/session-login-brute-force.test.ts > POST /mobile-auth/token-exchange — brute-force throttling > continues to return 429 for subsequent requests once blocked
+[security] IP ::ffff:127.0.0.1 blocked after 10 invalid login attempts within 15 minutes
+
+stderr | src/routes/session-login-brute-force.test.ts > POST /mobile-auth/token-exchange — brute-force throttling > returns the correct JSON error shape when blocked
+[security] IP ::ffff:127.0.0.1 blocked after 10 invalid login attempts within 15 minutes
+
+ ✓ src/routes/session-login-brute-force.test.ts (5 tests) 632ms
+ ✓ src/services/loss-corroborations.test.ts (3 tests) 724ms
+ ✓ src/routes/v1/assignee-scoping.test.ts (8 tests) 608ms
+ ✓ src/routes/v1/appointment-booked-urgency.test.ts (1 test) 575ms
+ ✓ src/services/claim-execution.test.ts (2 tests) 645ms
+ ✓ src/routes/v1/webhook-secret-redaction.test.ts (10 tests) 658ms
+ ✓ src/services/bie.test.ts (2 tests) 837ms
+ ✓ src/routes/v1/assistant-chat.test.ts (5 tests) 698ms
+     ✓ returns 429 on the 21st request within the same minute  376ms
+ ✓ src/routes/v1/leads-merge-authz.test.ts (2 tests) 770ms
+ ✓ src/services/attribution.test.ts (10 tests) 900ms
+ ✓ src/routes/v1/widget.test.ts (12 tests) 772ms
+ ✓ src/routes/v1/installation-check.test.ts (16 tests) 803ms
+ ✓ src/routes/v1/leads-photo-delete.test.ts (4 tests) 702ms
+ ✓ src/routes/v1/estimate-line-total.test.ts (3 tests) 538ms
+ ✓ src/services/duplicate-detection.test.ts (2 tests) 773ms
+     ✓ finds duplicate pairs even when the org has more leads than one scan batch  364ms
+ ✓ src/routes/v1/assistant-history.test.ts (11 tests) 509ms
+ ✓ src/routes/v1/rep-photo-upload.test.ts (13 tests) 829ms
+ ✓ src/services/lead-pagination.test.ts (5 tests) 762ms
+ ✓ src/routes/v1/estimate-negative-amounts.test.ts (7 tests) 592ms
+ ✓ src/routes/v1/leads-merge-audit.test.ts (3 tests) 658ms
+ ✓ src/services/project-duplicate-estimate.test.ts (5 tests) 810ms
+ ✓ src/routes/v1/settings-api-key-roundtrip.test.ts (2 tests) 585ms
+ ✓ src/routes/v1/playbooks-enrollment-read.test.ts (1 test) 678ms
+ ✓ src/services/billing-entitlements.test.ts (11 tests) 695ms
+ ✓ src/services/assessment-photos.test.ts (7 tests) 590ms
+ ✓ src/routes/v1/settings-api-key-mask.test.ts (5 tests) 586ms
+ ✓ src/services/entitlements.test.ts (10 tests) 509ms
+ ✓ src/services/role-permissions.test.ts (214 tests) 538ms
+ ✓ src/routes/v1/portal-photos.test.ts (5 tests) 526ms
+ ✓ src/services/send-gate.test.ts (12 tests) 672ms
+ ✓ src/services/service-obligations.test.ts (3 tests) 562ms
+ ✓ src/services/gmail-oauth-no-replay.test.ts (5 tests) 429ms
+ ✓ src/services/org-bootstrap.test.ts (6 tests) 510ms
+ ✓ src/routes/v1/api-key-tenant-isolation.test.ts (1 test) 548ms
+ ✓ src/services/scheduled-action-recovery.test.ts (4 tests) 520ms
+ ✓ src/services/forms.test.ts (11 tests) 647ms
+ ✓ src/services/concierge-booking.test.ts (12 tests) 582ms
+ ✓ src/middlewares/publicOrg.test.ts (3 tests) 412ms
+ ✓ src/services/staff-readiness.test.ts (1 test) 524ms
+ ✓ src/routes/v1/tasks-lead-label.test.ts (3 tests) 552ms
+ ✓ src/routes/v1/leads-search-scope.test.ts (3 tests) 592ms
+ ✓ src/services/claim-graphs.test.ts (2 tests) 524ms
+ ✓ src/routes/v1/billing-entitlements.test.ts (3 tests) 600ms
+ ✓ src/routes/v1/storage-serving.test.ts (3 tests) 423ms
+ ✓ src/routes/v1/portal-conversation.test.ts (4 tests) 583ms
+stderr | src/services/security-alerts.test.ts > security alert email failures > redacts api_key raw failures without replaying recipients
+[security] IP 203.0.113.99 blocked after 10 invalid API key attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > security alert email failures > redacts login raw failures without replaying recipients
+[security] IP 203.0.113.99 blocked after 10 invalid login attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > security alert email failures > redacts api_key Resend failures without replaying recipients
+[security] IP 203.0.113.99 blocked after 10 invalid API key attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > security alert email failures > redacts login Resend failures without replaying recipients
+[security] IP 203.0.113.99 blocked after 10 invalid login attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > brute-force block emails org admins > emails active owners/admins once, skipping inactive and non-admin users
+[security] IP 203.0.113.77 blocked after 10 invalid API key attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > brute-force block emails org admins > skips orgs without an active API key
+[security] IP 203.0.113.78 blocked after 10 invalid API key attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > reportCallbackBruteForceBlock emails org admins about login attacks > emails active owners/admins, skipping inactive and non-admin users
+[security] IP 203.0.113.90 blocked after 10 invalid login attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > reportCallbackBruteForceBlock emails org admins about login attacks > records an auth.brute_force_blocked audit event for the org
+[security] IP 203.0.113.91 blocked after 10 invalid login attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > reportCallbackBruteForceBlock emails org admins about login attacks > skips orgs without an active API key
+[security] IP 203.0.113.92 blocked after 10 invalid login attempts within 15 minutes
+
+ ✓ src/routes/v1/settings-security-ack.test.ts (3 tests) 448ms
+ ✓ src/services/security-alerts.test.ts (9 tests) 437ms
+ ✓ src/routes/v1/settings-google-reviews-cache.test.ts (3 tests) 714ms
+ ✓ src/services/crm-appointment-past-start.test.ts (12 tests) 480ms
+ ✓ src/routes/v1/runtime-health.test.ts (2 tests) 455ms
+ ✓ src/services/dashboard-portal-messages.test.ts (3 tests) 457ms
+ ✓ src/services/invite-email.test.ts (9 tests) 359ms
+ ✓ src/routes/v1/contacts-search-scope.test.ts (2 tests) 447ms
+ ✓ src/services/portal-cleanup.test.ts (2 tests) 339ms
+ ✓ src/services/audit-events-filter.test.ts (3 tests) 342ms
+ ✓ src/routes/v1/contacts-pagination.test.ts (2 tests) 408ms
+ ✓ src/services/email-send-health.test.ts (3 tests) 382ms
+stderr | src/services/upload-cleanup.test.ts > cleanupOrphanedUploads > counts delete failures as errors without aborting the run
+[upload-cleanup] failed to process /objects/uploads/failing: Error: boom
+    at Object.failing.remove (C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server/src/services/upload-cleanup.test.ts:78:13)
+    at cleanupOrphanedUploads (C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server/src/services/upload-cleanup.ts:83:21)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server/src/services/upload-cleanup.test.ts:82:20
+    at file:///C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ ✓ src/routes/v1/assessment-photo-flow.test.ts (5 tests) 252ms
+ ✓ src/services/webhook-secret-cleanup.test.ts (2 tests) 403ms
+ ✓ src/services/upload-cleanup.test.ts (3 tests) 392ms
+ ✓ src/routes/oidc-callback-brute-force.test.ts (4 tests) 251ms
+ ✓ src/routes/v1/concierge-transcription.test.ts (6 tests) 249ms
+ ✓ src/routes/v1/og-area-card.test.ts (4 tests) 253ms
+ ✓ src/routes/v1/portal-login-throttle.test.ts (1 test) 239ms
+ ✓ src/services/scheduler-stage-isolation.test.ts (14 tests) 203ms
+ ✓ src/services/identity-token.test.ts (4 tests) 174ms
+ ✓ src/services/scheduler-runtime.test.ts (4 tests) 165ms
+ ✓ src/lib/beta-operations-schema-upgrade.test.ts (1 test) 155ms
+ ✓ src/routes/mobile-token-exchange-brute-force.test.ts (4 tests) 254ms
+ ✓ src/routes/health.test.ts (15 tests) 121ms
+ ✓ src/routes/v1/google-reviews-env-fallback-bypass.test.ts (3 tests) 102ms
+ ✓ src/lib/swarm-schema-upgrade.test.ts (1 test) 101ms
+ ✓ src/routes/v1/portal-photo-stream.test.ts (1 test) 119ms
+ ✓ src/services/webhooks.test.ts (13 tests) 24ms
+ ✓ src/routes/v1/public-site-config.test.ts (1 test) 125ms
+ ✓ src/services/staff-push-transport.test.ts (30 tests) 45ms
+ ✓ src/services/staff-push-policy.test.ts (40 tests) 31ms
+ ✓ src/services/missed-call-care-policy.test.ts (3 tests) 41ms
+ ✓ src/services/resend-delivery.test.ts (41 tests) 43ms
+ ✓ src/services/financial-migration-contract.test.ts (4 tests) 24ms
+ ✓ src/services/source-nurture-contract.test.ts (5 tests) 31ms
+ ✓ src/services/mailbox-graph.test.ts (21 tests) 28ms
+ ✓ src/services/contractor-workday-export.test.ts (2 tests) 23ms
+stdout | src/services/scheduler-autostart.test.ts > keeps staging scheduler work dormant when explicitly false
+[scheduler] autostart disabled by SCHEDULER_AUTOSTART=false
+
+ ✓ src/services/scheduler-autostart.test.ts (3 tests) 19ms
+ ✓ src/routes/v1/storage-auth.test.ts (2 tests) 90ms
+ ✓ src/services/claim-compilation.test.ts (4 tests) 16ms
+ ✓ src/routes/v1/google-reviews-cache-control.test.ts (2 tests) 104ms
+ ✓ src/services/loss-corroboration.test.ts (5 tests) 20ms
+ ✓ src/services/claim-kernel.test.ts (7 tests) 18ms
+ ✓ src/lib/readiness.test.ts (11 tests) 13ms
+ ✓ src/services/contractor-workday-contract.test.ts (4 tests) 11ms
+ ✓ src/services/customer-lifecycle-export-deadline.test.ts (6 tests) 17ms
+ ✓ src/services/data-lifecycle-inventory-session.test.ts (21 tests) 16ms
+ ✓ src/services/returning-customer-export.test.ts (3 tests) 13ms
+ ✓ src/services/source-history.test.ts (3 tests) 14ms
+ ✓ src/lib/auto-migrate.test.ts (21 tests) 11ms
+ ✓ src/services/invoice-delivery-contract.test.ts (11 tests) 10ms
+ ✓ src/services/contractor-workday-baselines.test.ts (2 tests) 10ms
+ ✓ src/lib/restore-mode.test.ts (6 tests) 10ms
+ ✓ src/services/scheduler-loop.test.ts (4 tests) 10ms
+ ✓ src/lib/token-encryption.test.ts (2 tests) 6ms
+ ✓ src/services/invite-token.test.ts (3 tests) 6ms
+ ✓ src/services/identity-email.test.ts (5 tests) 9ms
+ ✓ src/lib/database-pool-errors.test.ts (4 tests) 5ms
+ ✓ src/lib/email-content-encryption.test.ts (2 tests) 6ms
+ ✓ src/routes/v1/billing-origin.test.ts (9 tests) 8ms
+ ✓ src/lib/staging-database-identity.test.ts (3 tests) 6ms
+ ✓ src/lib/release-identity.test.ts (3 tests) 4ms
+ ✓ src/services/evidence-redaction.test.ts (2 tests) 4ms
+ ✓ src/routes/auth-origin.test.ts (11 tests) 7ms
+ ✓ src/services/webhook-rotation.test.ts (7 tests) 5ms
+ ↓ src/services/og-card-brand-parity.test.ts (9 tests | 9 skipped)
+ ✓ src/services/evidence-intelligence.test.ts (4 tests) 4ms
+ ↓ src/services/settings-service-slugs.test.ts (5 tests | 5 skipped)
+ ↓ src/services/upload-cleanup.integration.test.ts (1 test | 1 skipped)
+ ✓ src/routes/v1/route-inventory.test.ts (7 tests) 4ms
+
+ Test Files  271 passed | 3 skipped (274)
+      Tests  2945 passed | 15 skipped (2960)
+   Start at  04:20:19
+   Duration  293.51s (transform 25.11s, setup 0ms, import 537.41s, tests 576.28s, environment 26ms)
+

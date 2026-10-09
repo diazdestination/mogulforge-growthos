@@ -1,0 +1,2018 @@
+
+ RUN  v4.1.10 C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server
+
+ ✓ src/services/assistant.test.ts (36 tests) 3567ms
+     ✓ a lead with status 'completed' does NOT appear in activeLeads  495ms
+     ✓ a lead with status 'nurture' does NOT appear in activeLeads  511ms
+ ❯ src/routes/v1/twilio.test.ts (15 tests | 10 failed) 1574ms
+   ✓ requires authentication and rejects forged, wrong-account and wrong-service callbacks 152ms
+   ✓ keeps enrollment closed without client policies while STOP and HELP remain available 165ms
+   ✓ resolves only the selected contractor program and rejects wrong tokens and phones 138ms
+   × records no consent until the correct handset confirms the optional purposes 9ms
+   × sends one provider request for a stable operation and binds monotonic status to the recipient 2ms
+   ✓ authorizes own-org replies, hides other-org receipts and refuses cross-origin writes 82ms
+   × never blindly retries uncertain or rate-limited sends and blocks changed phone numbers 1ms
+   × applies STOP only to the routed organization and START does not restore old purposes 88ms
+   ✓ blocks staff-requested calls before provider dispatch while staging is held 23ms
+   × gates calls, starts only one staff leg, binds callbacks and prevents replaying the customer leg 26ms
+   × routes an inbound call only to the configured staff phone and records a missed call without SMS 23ms
+   × hands an unknown missed caller to staff exactly once and never texts or auto-enrolls 28ms
+   × requires an explicit valid voice business name and keeps the client template disabled 69ms
+   × allows approved voice without a Messaging Service while SMS and tenant/account boundaries remain closed 102ms
+   × separates two contractor accounts across inbound, outbound, callback and revocation 33ms
+ ✓ src/services/contractor-workday.test.ts (22 tests) 17432ms
+   ✓ keeps equipment facts explicit, paginates 25 records, and refuses same-name wrong-parent or foreign assets  1268ms
+   ✓ retired or replaced templates block new enrollment but not pinned reviewed work  789ms
+   ✓ returning-customer completion seals saved work atomically, creates one anchored successor, and preserves staff notes  695ms
+   ✓ enrollment blocks both generic completion writers while unenrolled legacy completion remains usable  520ms
+   ✓ sealed evidence cannot authorize generic reopening, relinking or rewriting original notes; corrections append only  700ms
+   ✓ missing answers, invalid observations and attention without accountable follow-up cannot finish  753ms
+   ✓ explicit N/A reasons work, and no service is completed unless selected in the final attestation  979ms
+   ✓ an explicitly unperformed service can be rebooked and finished later without replaying the first visit  1018ms
+   ✓ the actual lead merge retains prepared and sealed visit history instead of bulk-reparenting evidence  580ms
+   ✓ changed staff assignment, source asset or saved task after preview invalidates completion  1141ms
+   ✓ a real address edit with the original timestamp retained still invalidates prepared parent identity  458ms
+   ✓ office must explicitly attest for the accepted assigned performer; unassigned sales and capped owners cannot write  450ms
+   ✓ two-company and same-company wrong visit selectors cannot expose or enroll foreign work  642ms
+   ✓ multiple units keep independent answers and snapshots, and an exact draft replay does not overwrite newer saved work  871ms
+   ✓ canceled and no-show visits cannot enroll or finish, and cancellation is an explicit office re-preparation path  1087ms
+   ✓ held drafts expose cancellation only to current effective office authority without changing saved answers or unknown effects  795ms
+   ✓ actual native reparenting cannot move draft or cancelled work history to another customer, property or lead  449ms
+   ✓ late native service failure rolls back the original evidence, appointment, follow-up and successor together  417ms
+   ✓ work completion retains the exact uncertain original reminder claim and creates only its reconciliation task  542ms
+   ✓ finite recurrence completion makes no successor beyond the explicitly approved end date  513ms
+   ✓ work reads execute in a read-only transaction and expired exact completion previews cannot mutate records  417ms
+ ✓ src/routes/v1/email-response-correlation.test.ts (30 tests) 5285ms
+ ✓ src/services/mailbox-connector.test.ts (27 tests) 17840ms
+     ✓ does not inherit a BIE context grant or mutate service identity on nurture opt-in  1081ms
+     ✓ records only same-cycle complete Sent and Inbox boundaries with five-minute freshness  1141ms
+     ✓ does not combine old Inbox complete=true with a new partial Sent round  1268ms
+     ✓ resumes unfinished Inbox across ticks without restarting completed Sent Items  933ms
+     ✓ retains rejected/pending receipts as an incomplete observation, not silence  1028ms
+     ✓ fences old work when nurture permission changes during provider work  774ms
+     ✓ requires another fresh round after recovery from a failed partial cursor  1310ms
+     ✓ holds a current in-flight lease and cannot adopt old evidence after reconnect  1082ms
+     ✓ holds new nurture when short-lived reply evidence cannot be encrypted  792ms
+     ✓ keeps a distinct encrypted credential and revokes stale exact identity/foreign company  358ms
+     ✓ observes exact Sent Items before Inbox and deduplicates read-state redelivery  735ms
+     ✓ holds changed-payload redelivery and cursor gaps without advancing/resetting history  629ms
+     ✓ preserves the prior continuation when downstream intake fails, and never resets on 410  677ms
+     ✓ retains an unmatched reply for exact-ID bounded retry, not a new send  540ms
+     ✓ honors pause/disable/lease before reading and serializes independent ticks  406ms
+     ✓ does not fetch unrelated bodies and reviews unsupported known IDs without gapping later messages  533ms
+     ✓ turns a missing pending immutable ID into visible review without killing the connector  515ms
+     ✓ only one of overlapping workers can refresh/read a leased mailbox  408ms
+     ✓ defaults to service-only and preserves exact service identity/cursor when lead context changes  590ms
+     ✓ rejects missing confirmation, stale versions, foreign owner and inactive connector  551ms
+     ✓ allows local lead revoke while globally held and a new read opt-in starts service-only  652ms
+     ✓ rechecks a pending candidate before body fetch while valid service pending evidence continues  530ms
+ ✓ src/services/service-standing.test.ts (32 tests) 16304ms
+     ✓ queues only after a future notice and sends once with an honest standing origin  1073ms
+     ✓ does not let an old future-notice checkpoint postpone a freshly reviewed policy  626ms
+     ✓ requires an explicit transaction for the task lock and observes committed generic task edits  395ms
+     ✓ requires explicitly reconciled imported service source but never adopts imported opportunity outreach  490ms
+     ✓ holds exact sender changes after approval  329ms
+     ✓ disable remains replay-safe under provider/lifecycle holds and never changes original receipt  864ms
+     ✓ rechecks disable between claim/preparation and provider POST  740ms
+     ✓ rechecks recipient between claim/preparation and provider POST  625ms
+     ✓ rechecks task_closed between claim/preparation and provider POST  596ms
+     ✓ rechecks reply between claim/preparation and provider POST  664ms
+     ✓ does not rearm an uncertain occurrence on a later revised policy or alternate channel  792ms
+     ✓ preserves month-end/leap-day recurrence and rejects a foreign predecessor chain  439ms
+     ✓ permits a fresh exact successor cutoff after recurrence revision without reinterpreting an older queued authority  588ms
+     ✓ rotates held enrollments and preserves in-progress office tasks  823ms
+     ✓ serializes individual versus standing approval around one immutable occurrence  372ms
+     ✓ two independent admission workers converge on one original action  322ms
+     ✓ counts unknown reservations and deduplicates the matching accepted activity  559ms
+     ✓ does not hide a different legacy unknown scheduled key merely because it repeats the same approval reference  540ms
+     ✓ does not use a conflicting explicit activity key to hide a pre-ledger unknown service receipt  649ms
+     ✓ serializes two independent service workers before either can consume the last contact slot  749ms
+ ✓ src/services/returning-invoice-delivery.test.ts (34 tests) 15857ms
+   ✓ sends an exact v3 gmail invoice with no invented lead or reply-monitor signature, using the original key  701ms
+   ✓ sends an exact v3 microsoft invoice with no invented lead or reply-monitor signature, using the original key  656ms
+   ✓ reads exact returning worklist context without writes or converting it to a lead  316ms
+   ✓ refuses a selected native job edit during OAuth without changing the issued document or sending  852ms
+   ✓ allows an explicit no-property invoice and rejects cross-company, actor and effective-role use before replay  867ms
+   ✓ requires a stored explicit company/default provider selection and uses the existing selection flow to restore readiness  434ms
+   ✓ records a typed no-dispatch proof for a post-OAuth customer change, allowing only separately reviewed recovery  681ms
+   ✓ records a typed no-dispatch proof for a post-OAuth address change, allowing only separately reviewed recovery  608ms
+   ✓ records a typed no-dispatch proof for a post-OAuth preference change, allowing only separately reviewed recovery  580ms
+   ✓ records a typed no-dispatch proof for a post-OAuth mailbox change, allowing only separately reviewed recovery  534ms
+   ✓ records a typed no-dispatch proof for a post-OAuth member change, allowing only separately reviewed recovery  455ms
+   ✓ records a typed no-dispatch proof for a post-OAuth sender change, allowing only separately reviewed recovery  492ms
+   ✓ records a typed no-dispatch proof for a post-OAuth hold change, allowing only separately reviewed recovery  486ms
+   ✓ records a typed no-dispatch proof for a post-OAuth reply change, allowing only separately reviewed recovery  391ms
+   ✓ refuses a mismatched immutable v3 root after coherent-history changes without trusting mutually matching proof  396ms
+   ✓ refuses a mismatched immutable v3 root after native-root changes without trusting mutually matching proof  382ms
+   ✓ preserves genuine v3 history after mutable address and mailbox changes, while a fresh copy requires a fresh review  422ms
+   ✓ retains the original five-attempt chain through proven retry and separately acknowledged copies  1547ms
+   ✓ keeps permanent unknown ownership after timeout, never retries the original or a new preview  410ms
+   ✓ keeps permanent unknown ownership after lost-final-write, never retries the original or a new preview  414ms
+   ✓ retains unknown ownership after a real sender-entry lookup refusal, even after configuration is restored  346ms
+   ✓ late acceptance pins original participants after edits and preserves the held original execution  353ms
+   ✓ withholds copy authority if retained v3 acceptance customerWorkId is mismatched  365ms
+   ✓ withholds copy authority if retained v3 acceptance propertyId is mismatched  371ms
+   ✓ withholds copy authority if retained v3 acceptance sourceSha256 is mismatched  368ms
+   ✓ withholds copy authority if retained v3 acceptance senderIdentitySha256 is mismatched  352ms
+   ✓ withholds copy authority if retained v3 acceptance recipient is mismatched  362ms
+ ✓ src/services/staff-push-coverage.test.ts (43 tests) 12453ms
+     ✓ retains both selected recipients when only one has a device, with a closed safe projection  592ms
+     ✓ seals missing policy admission before later enablement or registration  303ms
+     ✓ evaluates all twenty recipients with deterministic five-device caps and no global starvation  810ms
+     ✓ bounds an authority lock wait and releases its earlier lead lock after timeout  3171ms
+ ✓ src/services/invoices.test.ts (17 tests) 2891ms
+ ✓ src/services/service-sms.test.ts (20 tests) 9363ms
+     ✓ does not retrofit references or encryption prerequisites into a previously approved legacy SMS  384ms
+     ✓ reserves exact parent before actual transport POST, pins sender and retains signed exact evidence  546ms
+     ✓ keeps no-reference replies ambiguous even with one candidate and holds later same-phone occurrences  453ms
+     ✓ retains invalid/unmatched reference without guessing exact association: SERVICE invalid book now  409ms
+     ✓ retains invalid/unmatched reference without guessing exact association: SERVICE ffffffffffffffff please call  387ms
+     ✓ does not correlate another company's token or a different handset/shop line  810ms
+     ✓ retains exact replay identity after purge and rejects changed body, phone and event type  482ms
+     ✓ STOP/START/HELP remain separate, never release an unresolved service reply hold  473ms
+     ✓ keeps an exact completed occurrence reply historical without choosing a new occurrence  405ms
+     ✓ unknown provider outcome remains permanently owned after signed reply and office review  419ms
+     ✓ handled releases one exact reply hold but not another reply, STOP or unknown execution ownership  497ms
+     ✓ accepts omitted optional service metadata only while the exact bound program is unchanged  459ms
+     ✓ retains multiple phone candidates without picking the last or first service  805ms
+     ✓ actual reminder → signed reply → explicit staff response/booking → completion creates only one agreed successor  573ms
+     ✓ explicit unrelated disposition releases only service hold, no consent or booking, and is idempotent  464ms
+     ✓ HTTP requires accepted tenant staff; rejects API keys, forged overrides and stale reviews  657ms
+ ✓ src/routes/v1/callie-intake.test.ts (45 tests) 14780ms
+     ✓ does not admit without encrypted replay storage or after a policy changes during the call  395ms
+     ✓ admits busy once with one original task and immutable caller identity  794ms
+     ✓ admits no-answer once with one original task and immutable caller identity  904ms
+     ✓ admits failed once with one original task and immutable caller identity  353ms
+     ✓ consumes exact caller-originated SMS after ordinary hangup, retaining deadline and no reusable consent  324ms
+     ✓ rejects wrong, malformed, other-phone, expired and foreign-tenant confirmations  510ms
+     ✓ makes both same-message and fresh-message used-code replays non-authorizing  338ms
+     ✓ STOP has priority over challenge text and neither CALLIE nor START restores general consent  330ms
+     ✓ does not treat provider HELP as CALLIE consent  327ms
+     ✓ fails closed when policy changes before confirmation  343ms
+     ✓ fails closed when owner changes before confirmation  316ms
+     ✓ fails closed when binding changes before confirmation  363ms
+     ✓ fails closed when company changes before confirmation  355ms
+     ✓ checks all matching DNC contacts without auto-linking an ambiguous shared phone  361ms
+     ✓ signed incoming SMS preserves a reassigned callback and cannot create a grant  343ms
+     ✓ signed incoming SMS preserves a unassigned callback and cannot create a grant  356ms
+     ✓ signed incoming SMS preserves a done callback and cannot create a grant  354ms
+     ✓ signed incoming SMS preserves a cancelled callback and cannot create a grant  366ms
+     ✓ preserves in-progress status and original deadline through successful signed Gather and SMS  345ms
+     ✓ signed SMS waits for the real original-task row lock and honors committed staff reassignment  373ms
+     ✓ concurrent independent PostgreSQL confirmations consume one exact trigger  377ms
+ ✓ src/routes/v1/smart-sites.test.ts (20 tests) 2620ms
+ ✓ src/services/invoice-delivery.test.ts (35 tests) 8605ms
+     ✓ records truthful gmail acceptance once, with no collection or delivery claim  360ms
+     ✓ records truthful microsoft acceptance once, with no collection or delivery claim  342ms
+     ✓ never lets a second preview, changed sender or reconciled/new key bypass an uncertain logical send  366ms
+     ✓ requires a fresh explicit review after typed pre-dispatch refusal and retains the original blocked receipt  460ms
+     ✓ allows an additional COPY only after a fresh preview and a separate post-preview acknowledgement  570ms
+     ✓ blocks every additional attempt once the latest copy becomes uncertain  488ms
+     ✓ caps all server attempts at five, including explicitly acknowledged copies  1209ms
+     ✓ reserves one logical effect across different reviewed requests  311ms
+ ✓ src/services/callie-reception.test.ts (29 tests) 19243ms
+     ✓ supports separately approved voice-only reception while SMS is unavailable, without messaging consent or customer fabrication  823ms
+     ✓ one shared head supersedes modes without changing old v1 snapshots or enrolling historical calls  582ms
+     ✓ requires a persisted exact unexpired actor-bound preview and current binding revision  633ms
+     ✓ rejects original answered calls and caller/called-number transfer loops  601ms
+     ✓ retains one registration through concurrent missed callbacks and exact replay, and excludes legacy care  743ms
+     ✓ refuses drifted or unsafe agent config before registration and never rearms the original claim  667ms
+     ✓ rejects unsafe privacy even when a hash is explicitly reviewed  638ms
+     ✓ rejects unsafe procedures even when a hash is explicitly reviewed  585ms
+     ✓ rejects unsafe knowledge even when a hash is explicitly reviewed  568ms
+     ✓ rejects unsafe override even when a hash is explicitly reviewed  565ms
+     ✓ permanently owns an uncertain timeout registration without replay  785ms
+     ✓ permanently owns an uncertain malformed registration without replay  664ms
+     ✓ permanently owns an uncertain redirect registration without replay  606ms
+     ✓ does not start registration after slow preparation consumes the shared voice deadline  609ms
+     ✓ retains a provider-accepted original claim when both local final writes fail and never replays it  663ms
+     ✓ rejects expired/foreign capability and actual provider conversation mismatch before binding  634ms
+     ✓ returns a fixed safe refusal for malformed private conversation evidence without leaking the response snippet  751ms
+     ✓ enforces the exact finite tool allowance while keeping an already saved request replay inert  900ms
+     ✓ collects bounded roofing requests once without turning instructions into authority  774ms
+     ✓ collects bounded hvac requests once without turning instructions into authority  758ms
+     ✓ rechecks both owners and blocks task edits committed during provider preparation  603ms
+     ✓ one cold redirect has its own original key and signed child outcome, never a human-accepted claim  802ms
+     ✓ leaves a lost redirect acknowledgment owned and never retries another target  798ms
+     ✓ signed post-call cannot adopt an unbound conversation or overwrite completed staff work  765ms
+     ✓ recovers a crash-shaped transfer with dispatchStarted=false even after the conversation finished  676ms
+     ✓ recovers a crash-shaped transfer with dispatchStarted=true even after the conversation finished  696ms
+     ✓ purges bounded encrypted content without releasing original effects or changing human notes  767ms
+     ✓ rejects partial key/capability SQL groups and a v1 parent for the conversational session  583ms
+ ✓ src/routes/v1/route-inventory.test.ts (7 tests) 5ms
+ ✓ src/services/callie-runtime.test.ts (38 tests) 20049ms
+     ✓ defaults off and a preview alone grants no standing authority  337ms
+     ✓ requires the exact actor-bound saved unexpired review and rejects stale approval  391ms
+     ✓ keeps approved policy visibly held and allows disabling without provider credentials  407ms
+     ✓ requires accepted same-company owners and rechecks the non-selected owner  400ms
+     ✓ sends exactly one fixed response without creating contact, lead, consent or a booking  670ms
+     ✓ permanently excludes admitted calls from the older care approval and scheduler  481ms
+     ✓ escalates an overdue working callback once without undoing progress or changing its review timestamp again  556ms
+     ✓ rechecks policy after atomic ownership and before the physical POST  521ms
+     ✓ rechecks day_owner after atomic ownership and before the physical POST  492ms
+     ✓ rechecks after_owner after atomic ownership and before the physical POST  579ms
+     ✓ rechecks binding after atomic ownership and before the physical POST  511ms
+     ✓ rechecks program after atomic ownership and before the physical POST  597ms
+     ✓ rechecks hold after atomic ownership and before the physical POST  521ms
+     ✓ rechecks company after atomic ownership and before the physical POST  502ms
+     ✓ rechecks DNC after atomic ownership and before the physical POST  541ms
+     ✓ rechecks suppression after atomic ownership and before the physical POST  516ms
+     ✓ rechecks reply after atomic ownership and before the physical POST  521ms
+     ✓ rechecks late_call_failure after atomic ownership and before the physical POST  511ms
+     ✓ rechecks task_closed after atomic ownership and before the physical POST  492ms
+     ✓ rechecks task_reassigned after atomic ownership and before the physical POST  509ms
+     ✓ rechecks expired after atomic ownership and before the physical POST  500ms
+     ✓ rechecks grant after atomic ownership and before the physical POST  497ms
+     ✓ rechecks dispatch_tuple after atomic ownership and before the physical POST  493ms
+     ✓ rechecks allowance after atomic ownership and before the physical POST  503ms
+     ✓ rechecks lowered_allowance after atomic ownership and before the physical POST  557ms
+     ✓ blocks ambiguous phone identities and all prior response ownership  591ms
+     ✓ defers only within the grant and keeps the original callback deadline  575ms
+     ✓ does not rearm a timeout even with a reconciled receipt and changed policy  617ms
+     ✓ keeps an accepted network effect uncertain when the atomic final storage fails  591ms
+     ✓ expires a request whose next permitted window is outside its one-call grant  512ms
+     ✓ preserves actual late acceptance without overwriting a reconciled receipt  625ms
+     ✓ keeps HTTP failures non-retryable and creates permanent suppression only for typed recipient errors  600ms
+     ✓ validates signed original delivery context and retains late delivery without replay  591ms
+     ✓ counts the new ledger in the ordinary SMS allowance without borrowing one-call permission  622ms
+     ✓ counts an older ordinary dispatch in the CALLIE phone cap  555ms
+     ✓ claims one physical response under simultaneous workers  512ms
+     ✓ serializes shared daily allowance across two separately granted callers  565ms
+     ✓ shares the same allowance lock with the contact-required transport  486ms
+ ✓ src/services/tenant-isolation.test.ts (24 tests) 1555ms
+ ✓ src/services/customer-workspace.test.ts (16 tests) 3037ms
+     ✓ bounds ancestry traversal and does not expose successors beyond the validated bound  465ms
+     ✓ pages every section beyond the first 25 without duplicates or omitted historical records  309ms
+ ✓ src/services/service-care.test.ts (30 tests) 5572ms
+     ✓ uses the actual SMS adapter with purpose consent and a mocked network, once per obligation  361ms
+     ✓ frequency caps defer a second due obligation for the same customer without claiming it  358ms
+ ❯ src/routes/v1/staff-invitations.test.ts (15 tests | 12 failed) 1502ms
+     × validates the delivered signed invitation using configured base http://localhost:3001 118ms
+     × validates the delivered signed invitation using configured base https://app.example.invalid/crm 65ms
+     ✓ does not start a provider send when preparation finishes after the durable delivery deadline 51ms
+     ✓ rechecks revocation immediately before dispatch after asynchronous preparation 43ms
+     × serializes one request ID with competing mailbox payloads without an orphan member 62ms
+     ✓ requires active platform authority, same origin, JSON and explicit confirmation 184ms
+     × creates first-owner access without impersonation; pending staff never make capture ready 57ms
+     × accepts the signed invitation into its exact organization and keeps other memberships unchanged 68ms
+     × keeps ordinary admin invitations tenant bound and prevents owner grants by admins 116ms
+     × denies foreign invitation IDs without state or delivery effects 56ms
+     × revoke blocks both password and trusted OIDC; explicit reissue rotates the link 54ms
+     × expired ledger blocks otherwise valid links and OIDC until deliberate reissue 48ms
+     × preserves uncertain delivery without leaking provider data or silently retrying 74ms
+     × never moves or promotes an existing account, and refuses changed invitation role 119ms
+     × accepts verified OIDC and legacy signed links without reactivating revoked legacy records 54ms
+ ❯ src/routes/v1/onboarding-org.test.ts (20 tests | 1 failed) 1383ms
+     ✓ does not auto-attach new users to the default org once it has members 73ms
+     ✓ GET /session works without an org and reports organization: null 36ms
+     ✓ GET /me still requires membership (403 when org-less) 32ms
+     ✓ creates an org, makes the creator the owner, and seeds neutral defaults 85ms
+     ✓ rejects a second org for a non-platform-admin member 55ms
+     ✓ rejects duplicate slugs and invalid names 25ms
+     ✓ rejects API-key callers 16ms
+     ✓ blocks non-admins and lists all orgs for platform admins 38ms
+     ✓ platform admin can rename an org 75ms
+     ✓ starts empty, accumulates progress, and persists across reads 52ms
+     ✓ rejects unknown steps 9ms
+     ✓ launch stamps completedAt 24ms
+     ✓ invite-team step is included in the canonical step list 10ms
+     ✓ invite-team step can be marked complete via PATCH and is persisted 53ms
+     ✓ inviting a teammate lands them in the new org, not the default org 51ms
+     ✓ guided test lead: creates marked sandbox records with no reachable channels, then cleans up fully 143ms
+     ✓ updates only the signed-in member inside their organization 31ms
+     ✓ rejects an empty profile patch 20ms
+     × fails closed, verifies allowlisted founders, preserves signed invites, and blocks revoked invites 147ms
+     ✓ the legacy org's seeded playbook copy stays roofing-flavored 14ms
+ ✓ src/services/mailbox-communication.test.ts (25 tests) 7493ms
+     ✓ approved send -> actual parent claim -> Sent Items observation -> reply creates office work, never a lead, booking or consent  369ms
+     ✓ office review is versioned and idempotent; only explicit separate staff conversation moves the response workflow  331ms
+     ✓ isolates company and same-company parent/service/contact keys at the database boundary  308ms
+     ✓ exposes older retained evidence through bounded pages and keeps an older unreviewed arrival in watch  1061ms
+ ✓ src/services/returning-customer.test.ts (15 tests) 3232ms
+   ✓ shares receipt allocations only inside one explicit work root, never across another job or a lead for the same customer  357ms
+ ✓ src/services/billing-checkout.test.ts (21 tests) 1490ms
+ ✓ src/services/source-adoption.test.ts (27 tests) 8172ms
+     ✓ runs preview -> adoption -> independent permission -> exact approval -> gmail receipt with no history rewrite  360ms
+     ✓ runs preview -> adoption -> independent permission -> exact approval -> microsoft receipt with no history rewrite  370ms
+     ✓ links the actual reviewed-send receipt to exactly one verified incoming parent and holds the contact  425ms
+     ✓ stops late adoption changes at the provider boundary after preparation  305ms
+     ✓ stops late permission changes at the provider boundary after preparation  301ms
+     ✓ stops late identity changes at the provider boundary after preparation  316ms
+     ✓ never releases unknown, expired, reconciled or pre-provider reservations to another campaign  639ms
+     ✓ preserves a strict rolling company cap across separately approved campaigns  509ms
+     ✓ serializes two independently racing campaign sends on PostgreSQL  330ms
+ ✓ src/services/customer-email.test.ts (15 tests) 1248ms
+ ✓ src/routes/v1/normal-mode-tenant-acceptance.test.ts (15 tests) 2238ms
+ ✓ src/services/portal.test.ts (22 tests) 940ms
+ ✓ src/services/source-nurture-mailbox.test.ts (9 tests) 18759ms
+   ✓ actual nurture accepted → original Sent/Inbox → stopped sibling and one canonical office task  2073ms
+   ✓ actual nurture acceptance_lost → original Sent/Inbox → stopped sibling and one canonical office task  1792ms
+   ✓ a delayed first-step reply ignores only same-plan newer evidence (unrelated=false)  3194ms
+   ✓ a delayed first-step reply ignores only same-plan newer evidence (unrelated=true)  3254ms
+   ✓ a late grant revocation during actual OAuth blocks the provider POST and cannot be replaced by BIE permission  1168ms
+   ✓ a different approving manager revoked through the real membership route during OAuth prevents POST  3482ms
+   ✓ PostgreSQL holds a real different-manager membership edit behind the actual final Microsoft parent claim  1692ms
+   ✓ a canonical reply on another lead stops only current contact work (historical=false)  659ms
+   ✓ a canonical reply on another lead stops only current contact work (historical=true)  626ms
+ ✓ src/services/delivery-events.test.ts (18 tests) 1098ms
+stderr | src/services/reactivation.test.ts > campaign lifecycle + throttle > a mid-batch enrollment failure leaves the lead pending and retryable
+[reactivation] drain failed for campaign 6c300886-9930-4cc5-b9d9-721d7e2ad6a8: Error: boom: provider down
+    at C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server/src/services/reactivation.test.ts:458:49
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at file:///C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ ✓ src/services/reactivation.test.ts (11 tests) 1390ms
+ ✓ src/services/financial-migration.test.ts (16 tests) 2472ms
+ ✓ src/services/smart-site-followup.test.ts (15 tests) 5564ms
+     ✓ commits one initial claimant and the same canonical task owner  435ms
+     ✓ rolls ownership and audit back when the canonical task cannot be updated  312ms
+     ✓ excludes pending, unverified, inactive and read-only staff from owner choices and assignment  330ms
+     ✓ rechecks actor eligibility for assignments, releases and attempted-contact receipts  389ms
+     ✓ retains attempt idempotency while refusing replay by a now-unverified actor  381ms
+     ✓ finds the exact inquiry beyond the Capture queue without returning contact or receipt content  643ms
+     ✓ reports current owner and current actor authority without exposing another company's staff  492ms
+     ✓ attempt observes a membership change committed while it waits on the lead  318ms
+     ✓ rejects a target whose verification changed while ownership waits  309ms
+     ✓ retains actor and target authority until the canonical task change commits  537ms
+ ✓ src/services/service-watch.test.ts (17 tests) 9279ms
+   ✓ rotates older held rows so later cases are evaluated and reports unmonitored work truthfully  1796ms
+   ✓ retains bad bootstrap sources so a full old batch cannot hide a later valid service  1235ms
+   ✓ does not let old resolved history consume the attention-page bound  3861ms
+ ✓ src/services/shared-contact-lanes.test.ts (18 tests) 4870ms
+     ✓ counts an accepted BIE claim, execution receipt and accepted activity exactly once, retaining the original key on retry  505ms
+     ✓ keeps an accepted touch inside the rolling window until actual acceptance ages out, not its earlier reservation  322ms
+     ✓ an unknown BIE provider effect retains its original key and blocks an alias playbook, including after negative operator reconciliation  428ms
+     ✓ does not share another company's allowance even when its fictional email and phone are identical  343ms
+     ✓ real PostgreSQL serializes competing BIE and playbook workers for the last alias allowance  380ms
+ ✓ src/routes/v1/staff-push-coverage.test.ts (25 tests) 4616ms
+     ✓ returns historical unknown from a normal owner session without creating evidence or effects  346ms
+ ✓ src/services/invoice-delivery-adapter.test.ts (26 tests) 9438ms
+     ✓ keeps real preview, evidence, send and worklist output aligned with generated OpenAPI contracts  530ms
+     ✓ previews without external calls, sends exact text once, then sends only an acknowledged COPY with retained receipts  794ms
+     ✓ prevents the actual provider POST after recipient changes during OAuth preparation  320ms
+     ✓ prevents the actual provider POST after suppression changes during OAuth preparation  314ms
+     ✓ a safe retry after a real post-OAuth refusal needs a new exact preview  572ms
+     ✓ never creates no-dispatch proof after the POST reaches transport and returns timeout  428ms
+     ✓ never creates no-dispatch proof after the POST reaches transport and returns lookalike_guard  389ms
+     ✓ never creates no-dispatch proof after the POST reaches transport and returns http_error  375ms
+     ✓ retains accepted provider evidence when mutable company eligibility changes after the actual POST  312ms
+     ✓ records late provider acceptance without turning interrupted ownership into copy permission  330ms
+     ✓ refuses a copy when its approved predecessor proof no longer authorizes the chain after OAuth  564ms
+     ✓ keeps transactional invoice authority independent of imported provenance and ordinary lead replies  338ms
+ ❯ src/services/api-key-expiry-reminder.test.ts (15 tests | 13 failed) 638ms
+     × emails all org admins once for a key expiring within the window 29ms
+     ✓ skips keys outside the window, already expired, revoked, or already reminded 31ms
+     × keeps an attempted key claimed when its audit fails and still processes the next claimed key 32ms
+     × releases only a pre-send lookup failure and continues processing other claimed keys 25ms
+     × retains the claim after Resend timeout and does not replay on the next tick 19ms
+     × retains the claim after unclassified transport error and does not replay on the next tick 17ms
+     × records partial acceptance plus a unknown recipient without replaying either 19ms
+     × records partial acceptance plus a rejected recipient without replaying either 22ms
+     × retains an explicit nonretryable provider rejection for operator review 21ms
+     × preserves an uncertain reminder claim when a rename supplies the unchanged expiry 22ms
+     ✓ preserves a newer matching claim even when the initial expiry snapshot is stale 18ms
+     × releases a claim when there are no recipients and may send after admins return 38ms
+     × releases a known pre-dispatch hold without invoking the provider 29ms
+     × releases a known pre-dispatch missing configuration without invoking the provider 27ms
+     × sends a fresh reminder after an admin changes the key's expiry 33ms
+ ✓ src/services/invoice-delivery-attempts.test.ts (28 tests) 4783ms
+   ✓ typed no-dispatch proof unlocks exactly one reviewed successor, then caps all lifetime attempts at five  499ms
+   ✓ exact invoice, actor, review, receipt and predecessor/proof FKs prevent tenant or null escape  311ms
+ ✓ src/services/contractor-scheduling.test.ts (22 tests) 1489ms
+ ✓ src/services/platform-email-delivery.test.ts (24 tests) 4737ms
+     ✓ owns one email_verification send with a stable record and no raw content  308ms
+     ✓ permits a currently authorized administrator to reissue after the original creator is deactivated  332ms
+     ✓ retains invitation receipt while callbacks cannot accept, reactivate or undo revocation  307ms
+ ✓ src/services/microsoft-oauth.test.ts (24 tests) 970ms
+ ✓ src/routes/v1/contractor-workday.test.ts (8 tests) 3181ms
+   ✓ actual save/reopen and signed private photo PUT/attachment retain exact entry versions  337ms
+   ✓ generated HTTP contracts expose explicit office cancellation and re-preparation for a held asset without granting edits  407ms
+   ✓ generated HTTP contracts expose explicit office cancellation and re-preparation for a held parent without granting edits  521ms
+ ✓ src/services/post-sale.test.ts (20 tests) 1318ms
+ ✓ src/services/appointment-reminder.test.ts (15 tests) 1962ms
+     ✓ concierge email preference survives a CRM reschedule (reminder still emails)  378ms
+ ✓ src/services/missed-call-care.test.ts (22 tests) 13387ms
+     ✓ holds an older individually reviewed response when a newer typed CALLIE request arrives  631ms
+     ✓ keeps default-disabled and unknown callers in review without creating leads, consent, or SMS  418ms
+     ✓ sends only the approved branded message once and exposes provider acceptance separately from replies  742ms
+     ✓ rejects a stale exact-message preview and stale policy version  516ms
+     ✓ rechecks purpose changes after approval and does not send  527ms
+     ✓ rechecks dnc changes after approval and does not send  513ms
+     ✓ rechecks policy changes after approval and does not send  490ms
+     ✓ rechecks phone changes after approval and does not send  482ms
+     ✓ rechecks owner changes after approval and does not send  573ms
+     ✓ rechecks reply changes after approval and does not send  576ms
+     ✓ requires purpose-specific consent even when a known caller has generic SMS consent  507ms
+     ✓ rechecks stale policy approval immediately before the actual provider handoff  618ms
+     ✓ does not send while the company hold is active  511ms
+     ✓ does not send while the environment hold is active  599ms
+     ✓ defers after-hours customer SMS without consuming an execution receipt and names the after-hours owner  522ms
+     ✓ caps another response to the same phone across different calls  746ms
+     ✓ escalates a missed deadline to the accountable callback task, not a second SMS  881ms
+     ✓ shows signed inbound reply/STOP evidence without asserting a booked appointment or precise campaign attribution  891ms
+     ✓ never retries an uncertain send, even with a fresh approval; closing requires recorded reconciliation  960ms
+     ✓ recognizes an abandoned receipt without acquiring a new send identity  722ms
+     ✓ creates one canonical lead push only inside the reviewed new-lead transaction  669ms
+ ✓ src/services/mailbox-lead-communication.test.ts (25 tests) 7449ms
+   ✓ exact typed reply atomically holds native lead follow-up and creates one accepted-assignee office task without a new lead or booking  347ms
+   ✓ duplicates after raw purge retain one hold/task and changed immutable observations conflict  301ms
+   ✓ office handling is exact/versioned/idempotent after reader revocation and never resumes cancelled or unknown work  310ms
+   ✓ bounds retained lead reply pages without hiding older evidence  2217ms
+     ✓ concurrent stale staff reviews have only one versioned effect  337ms
+ ✓ src/routes/v1/revenue-workspace.test.ts (12 tests) 1732ms
+ ✓ src/services/staff-push.test.ts (33 tests) 11800ms
+     ✓ encrypts endpoints/keys and limits status to the signed-in session  467ms
+     ✓ requires complete policy and active same-company recipients  322ms
+     ✓ does not silently transfer an existing browser endpoint to another account  319ms
+     ✓ caps devices at five and renews the same device without duplicating it  467ms
+     ✓ binds device expiry to browser and session expiry  350ms
+     ✓ commits one opaque receipt with the lead, dedupes repeat enqueue, never sends in request  395ms
+     ✓ rolls back the lead and queued effect together  337ms
+     ✓ does not notify a historical import or update  321ms
+     ✓ capture retries and contact merges do not add another new-lead notification  430ms
+     ✓ Smart Site intake and its idempotent retry share the same durable notification  446ms
+     ✓ bounds each worker cycle to ten effects and leaves further work pending  737ms
+     ✓ does not retry a provider response 302  358ms
+     ✓ does not retry a provider response 401  363ms
+     ✓ does not retry a provider response 429  362ms
+     ✓ does not retry a provider response 500  339ms
+     ✓ held/disabled work stays pending, then an enabled restarted worker can dispatch once  333ms
+     ✓ concurrent workers atomically own the effect once  327ms
+     ✓ interrupted/ambiguous effects never automatically replay  350ms
+     ✓ expires stale pending receipts instead of flooding after an outage  327ms
+     ✓ rechecks logout before network dispatch  322ms
+     ✓ rechecks deactivate before network dispatch  341ms
+     ✓ rechecks membership before network dispatch  322ms
+     ✓ rechecks role before network dispatch  321ms
+     ✓ rechecks policy before network dispatch  330ms
+     ✓ rechecks revoke before network dispatch  310ms
+     ✓ rechecks session expiry without background OAuth refresh  303ms
+     ✓ requires explicit staging user allowlist at dispatch  447ms
+     ✓ revokes only the recipient device on provider 404  349ms
+     ✓ revokes only the recipient device on provider 410  320ms
+     ✓ a late expiry response cannot revoke a newly renewed device lease  327ms
+ ✓ src/services/service-standing-mailbox.test.ts (8 tests) 6439ms
+     ✓ tracks a typed original standing parent and a reply after policy disable, unknown=false  1022ms
+     ✓ tracks a typed original standing parent and a reply after policy disable, unknown=true  809ms
+     ✓ revocation during OAuth preparation blocks the original parent before the provider POST  570ms
+     ✓ a real task edit committed during OAuth preparation (closed) blocks the provider POST  571ms
+     ✓ a real task edit committed during OAuth preparation (reassigned) blocks the provider POST  550ms
+     ✓ serializes a real generic task edit behind the actual final Microsoft parent claim  743ms
+     ✓ retains an entire staff-owned in_progress task when an exact standing Microsoft reply arrives  781ms
+     ✓ retains an entire staff-owned done task when an exact standing Microsoft reply arrives  841ms
+ ✓ src/services/returning-customer-concurrency.test.ts (7 tests) 2210ms
+   ✓ serializes original returning cash allocation and refund corrections without exceeding the exact receipt or invoice allocation  381ms
+ ✓ src/services/source-nurture.test.ts (21 tests) 22997ms
+   ✓ keeps review and approval send-free, explicitly starts two permanent actions and replays exact commands only  1066ms
+   ✓ keeps stopped/default evidence readable while providers, lifecycle and entitlement are held  697ms
+   ✓ rejects cross-company, unaccepted actor, changed body, expiry and selected Gmail rather than Microsoft  725ms
+   ✓ does not admit without fresh full scan, and cannot adopt a second alias of the same address  1047ms
+   ✓ stops OAuth-time recipient changes with zero provider POST and no replacement action  1277ms
+   ✓ stops OAuth-time owner changes with zero provider POST and no replacement action  1276ms
+   ✓ stops OAuth-time permission changes with zero provider POST and no replacement action  1286ms
+   ✓ stops OAuth-time adoption changes with zero provider POST and no replacement action  1249ms
+   ✓ stops OAuth-time suppression changes with zero provider POST and no replacement action  1205ms
+   ✓ stops OAuth-time stage changes with zero provider POST and no replacement action  1179ms
+   ✓ stops OAuth-time lost changes with zero provider POST and no replacement action  1113ms
+   ✓ stops OAuth-time inspection_scheduled changes with zero provider POST and no replacement action  1089ms
+   ✓ stops OAuth-time completed changes with zero provider POST and no replacement action  1089ms
+   ✓ stops OAuth-time sending hours changes with zero provider POST and no replacement action  1156ms
+   ✓ stops OAuth-time appointment changes with zero provider POST and no replacement action  1211ms
+   ✓ preserves an unknown predecessor after reconciliation and never grants a follow-up or new sequence  1758ms
+   ✓ expires quiet-hour deferrals in the same finite window without claiming a late effect  672ms
+   ✓ counts aliases and pending/unknown receipts once; changed address/channel cannot use a saved allowance  334ms
+   ✓ leaves source/date/hash intact as accepted work changes only runtime fields  1470ms
+   ✓ PostgreSQL independent legacy send and nurture admission permanently converge on one source owner  628ms
+   ✓ PostgreSQL independent nurture and generic workers cannot both own the final alias contact allowance  747ms
+ ✓ src/services/playbooks.test.ts (14 tests) 1547ms
+ ✓ src/routes/v1/portal-add-photos.test.ts (12 tests) 978ms
+ ✓ src/services/portal-message-email.test.ts (14 tests) 786ms
+ ✓ src/routes/v1/invoices.test.ts (6 tests) 2100ms
+     ✓ requires a current active staff role and allows sales managers to read only  391ms
+     ✓ rejects tenant and server-field overrides, malformed values and unrelated tenant identifiers  319ms
+     ✓ records staff receipt evidence once, preserves cash through unallocation, and voids only after allocation resolution  374ms
+ ✓ src/routes/v1/customer-lifecycle.test.ts (10 tests) 1742ms
+ ✓ src/services/appointment-parent-coherence.test.ts (10 tests) 1009ms
+ ✓ src/routes/v1/data-lifecycle-inventory.test.ts (13 tests) 3385ms
+     ✓ matches all reviewed deployed synthetic tables and counts in a server-enforced read-only snapshot  1172ms
+     ✓ returns only scoped counts with explicit shared and unresolved ownership exceptions  337ms
+ ✓ src/services/data-lifecycle-inventory.test.ts (49 tests) 2090ms
+     ✓ matches catalog metadata from the actual checked-in view SQL in an isolated database  1482ms
+ ✓ src/services/concierge-slots.test.ts (22 tests) 667ms
+ ✓ src/services/invoice-retention.test.ts (14 tests) 2872ms
+ ✓ src/services/automated-email-final-guard.test.ts (26 tests) 4397ms
+     ✓ uses the real adapter and a fixed scheduled receipt for an unchanged permitted email  313ms
+ ✓ src/services/opportunity-import.test.ts (12 tests) 931ms
+ ✓ src/services/callie-office.test.ts (15 tests) 3234ms
+     ✓ returns oldest unresolved work across bounded pages and separates waiting/history  471ms
+ ✓ src/services/scheduler-stage-isolation.test.ts (14 tests) 167ms
+ ✓ src/services/reporting-periods.test.ts (10 tests) 1102ms
+ ✓ src/routes/v1/beta-company-rehearsal.test.ts (5 tests) 1998ms
+   ✓ rehearses 'Painless Roofing and Water Restoration' intake, ownership, office booking, estimate and accurately labeled value  356ms
+ ✓ src/lib/rate-limit-fail-open.test.ts (12 tests) 708ms
+     ✓ rateLimit middleware resumes enforcing 429 once the database is back  339ms
+ ✓ src/services/returning-invoice-delivery-concurrency.test.ts (4 tests) 2504ms
+   ✓ v3 admission retains actual customer, property, member, company sender and mailbox preference locks against ordinary writers  556ms
+   ✓ v3 final post-OAuth guard waits for an actual property writer and refuses changed same-timestamp evidence before POST  512ms
+   ✓ v3 final post-OAuth guard waits for the real Microsoft disconnect writer and never posts from revoked identity  465ms
+   ✓ two independently observed v3 initial approvers retain one original execution and one physical effect  569ms
+ ✓ src/services/contractor-today.test.ts (9 tests) 1393ms
+ ❯ src/services/automation.test.ts (12 tests | 2 failed) 1357ms
+     × records a run and sends SMS when consent is granted 150ms
+     ✓ blocks SMS without consent (skipped, never sent) 123ms
+     ✓ skips rules whose conditions do not match 190ms
+     ✓ does not run rules from another org 179ms
+     ✓ seeds an active assessment.abandoned rule once and stays idempotent 14ms
+     ✓ seeds editable message templates and wires the rule's actions to them 5ms
+     × sends the edited template copy after an admin updates it 199ms
+     ✓ upgrades a legacy seeded rule with unedited hardcoded copy to templates 22ms
+     ✓ leaves a customized legacy rule's copy untouched 14ms
+     ✓ does not re-seed a rule an admin deleted (deactivated) 14ms
+     ✓ stays idempotent under concurrent seeding 47ms
+     ✓ does not re-seed after an admin renames the seeded rule 24ms
+ ✓ src/services/bie-reviewed-email.test.ts (25 tests) 5165ms
+     ✓ prepares exact displayed identity without approval or network; approves the complete saved snapshot and sends through the real guarded Microsoft adapter once  546ms
+     ✓ another company staff member cannot consume the prepared sender's fixed execution slot  447ms
+     ✓ unknown Microsoft effect permanently owns the same proposal and parent, without automatic send replay  325ms
+ ✓ src/services/contractor-workday-concurrency.test.ts (5 tests) 2836ms
+   ✓ retains actual property, task and performing member locks through atomic work completion while generic writers wait  499ms
+   ✓ waits for actual property or assignment changes and rejects stale work after the writer commits  611ms
+   ✓ two actual finishers and a legacy completion writer produce one original completion and one successor  314ms
+   ✓ actual entry, asset and template edits serialize after completion without rewriting reviewed historical work  333ms
+   ✓ actual native orphan deletion waits for photo attachment and then preserves the confirmed private object  371ms
+ ❯ src/services/gmail-oauth.test.ts (11 tests | 5 failed) 494ms
+     ✓ returns only a connection matching both organization and user 7ms
+     ✓ does not report another tenant's sender in connection status 12ms
+     ✓ reports optional modules without inventing granted access 2ms
+     ✓ classifies expired grants separately from transient provider failures 0ms
+     × blocks a deactivated sender before contacting Google 19ms
+     × runs workflow approval after token preparation and does not dispatch a withdrawn message 3ms
+     × refuses a mailbox changed during token preparation 5ms
+     × uses a bounded non-retrying send after a successful final check 2ms
+     × fails closed and requires reconnect when Google rejects a revoked grant 6ms
+     ✓ removes the local credential even when Google revocation is unavailable 19ms
+     ✓ reconnects a revoked row only after Google returns a fresh offline token 28ms
+ ✓ src/routes/v1/mailbox-integrations.test.ts (6 tests) 1153ms
+   ✓ requires a separate strict accepted-session nurture acknowledgment and allows held-state revoke  322ms
+ ✓ src/routes/v1/callie-reception.test.ts (7 tests) 1661ms
+ ✓ src/routes/v1/api-key-access.test.ts (15 tests) 1021ms
+ ✓ src/routes/v1/smart-site-acquisition.test.ts (3 tests) 908ms
+ ✓ src/services/attribution.test.ts (10 tests) 557ms
+ ✓ src/routes/v1/capture.test.ts (13 tests) 1321ms
+     ✓ queues webhook deliveries for lead.created and lead.won  569ms
+ ✓ src/services/manual-sms.test.ts (42 tests) 1065ms
+ ❯ src/services/webhooks-delivery.test.ts (7 tests | 6 failed) 15456ms
+     × delivers a POST whose body verifies against the endpoint's plaintext secret 5041ms
+     × re-signs retries with a fresh timestamp that still verifies 5079ms
+     × re-attempts a due pending delivery: receiver gets the request and the row succeeds 22ms
+     ✓ leaves a not-yet-due delivery untouched 17ms
+     × marks a delivery failed at MAX_ATTEMPTS and never picks it up again 14ms
+     × claims before sending so concurrent workers never deliver twice 5028ms
+     × holds an ambiguous network failure for review without automatic replay 21ms
+ ✓ src/routes/v1/invoice-delivery.test.ts (8 tests) 2017ms
+     ✓ allows invoice read roles to inspect evidence but restricts preview/send to session invoice managers  315ms
+     ✓ serves the exact SELECT-only canonical worklist before invoice-ID routes, with fixed pagination and no foreign selectors  363ms
+ ✓ src/services/next-best-action.test.ts (12 tests) 1362ms
+     ✓ aggregates copilot performance by action type and compares acted-on vs dismissed conversion, org-scoped  463ms
+ ✓ src/services/playbook-stage-behaviors.test.ts (15 tests) 1515ms
+ ✓ src/services/forms.test.ts (11 tests) 454ms
+ ✓ src/services/mailbox-lead-integration.test.ts (2 tests) 2342ms
+   ✓ runs actual reviewed BIE → Microsoft (accepted) → exact Sent Items/Inbox → one held lead task → explicit handling  1111ms
+   ✓ runs actual reviewed BIE → Microsoft (acceptance_lost) → exact Sent Items/Inbox → one held lead task → explicit handling  840ms
+ ✓ src/services/send-gate.test.ts (12 tests) 490ms
+ ✓ src/services/callie-reception-races.test.ts (4 tests) 3492ms
+   ✓ one final registration claim serializes duplicate callbacks and the actual CRM task writer through physical dispatch ownership  847ms
+   ✓ an actual policy disable writer commits before a waiting original registration and prevents every provider POST  745ms
+   ✓ a final transfer claim serializes competing call tools and retains exactly one original redirect effect  1018ms
+   ✓ signed late provider evidence waits for the actual office resolve writer and cannot undo its original task or disposition  881ms
+ ✓ src/routes/v1/client-onboarding.test.ts (11 tests) 1296ms
+ ✓ src/services/native-customer-export.test.ts (3 tests) 784ms
+ ❯ src/routes/v1/customer-lifecycle-voice.test.ts (6 tests | 4 failed) 783ms
+   × rejects fresh calls before any claim or provider attempt for the paused company while the other company still works 68ms
+   × cancels a claimed but unsent call if pause arrives during preparation and never replays that request identity 28ms
+   × blocks answer and customer bridge after pause while continuing to record signed completion and status callbacks 30ms
+   ✓ keeps signed inbound call evidence while refusing a new staff leg for a held company 92ms
+   ✓ preserves the missed-call review record for an inbound leg handed off before pause 168ms
+   × fails closed if the lifecycle check is unavailable, without a call claim or external effect 25ms
+ ✓ src/services/crm-appointment-conflict.test.ts (16 tests) 642ms
+ ✓ src/services/estimate-totals.test.ts (17 tests) 753ms
+ ✓ src/services/resend-delivery.test.ts (41 tests) 40ms
+ ✓ src/routes/v1/smart-site-claim.test.ts (7 tests) 2699ms
+     ✓ requires authentication and returns only the no-store ownership DTO  451ms
+     ✓ rejects query selectors, malformed IDs, foreign and ordinary leads  345ms
+     ✓ allows one same-origin accepted claim and returns a stale-owner conflict without changing its task  492ms
+     ✓ blocks foreign Origin, Fetch Metadata, API keys including empty headers and non-JSON for both staff mutations  446ms
+     ✓ preserves the exact staff-attempt receipt across a retry  367ms
+ ✓ src/services/mailbox-service-integration.test.ts (1 test) 1418ms
+   ✓ runs actual approved scheduler send, observes the immutable original parent, queues exact reply review and retains it through read revocation  1025ms
+ ❯ src/services/sms-delivery.test.ts (9 tests | 6 failed) 591ms
+     × POSTs the correct to/from/body to the Twilio API and returns the SID 9ms
+     ✓ throws when Twilio env is missing (never silently pretends to send) 2ms
+     × throws on a non-OK Twilio response 2ms
+     × throws when Twilio returns no message SID 1ms
+     × routes a configured client through the Twilio guard at send time 1ms
+     ✓ never falls back to mock for a bound client with a missing secret 0ms
+     × fails closed for legacy marketing automations without handing anything to Twilio 155ms
+     × uses the labeled mock provider (no HTTP) when Twilio is not configured 0ms
+     ✓ does not downgrade an unknown provider error that copies the local purpose-refusal message 95ms
+ ✓ src/services/returning-customer-projections.test.ts (8 tests) 1271ms
+ ✓ src/services/email-intelligence.test.ts (7 tests) 710ms
+ ✓ src/services/installation.test.ts (16 tests) 1058ms
+     ✓ concurrent issuance and rotation never leave two active keys  339ms
+ ✓ src/routes/v1/installation-check.test.ts (16 tests) 559ms
+ ✓ src/services/playbook-learning.test.ts (5 tests) 1098ms
+ ✓ src/services/billing-entitlements.test.ts (11 tests) 520ms
+ ✓ src/services/concierge-abandon.test.ts (4 tests) 957ms
+ ✓ src/routes/v1/returning-customer.test.ts (4 tests) 1440ms
+   ✓ actual generated HTTP responses cover zero-lead estimate to accepted job, invoice, receipt and linked refund  405ms
+ ❯ src/services/customer-lifecycle-runtime.test.ts (9 tests | 1 failed) 809ms
+   ✓ retains pending work without attempts or receipts, then executes once after explicit resume 114ms
+   ✓ filters paused companies before the batch limit, preserving capacity for active companies 66ms
+   ✓ honors explicit follow-up cancellation while paused and never resurrects it on resume 42ms
+   ✓ retains a final playbook step when a pause lands at entry 36ms
+   ✓ retains a final playbook step when a pause lands at send gate 41ms
+   ✓ still completes obsolete outreach when an appointment is booked during a company pause 46ms
+   × blocks new outreach, transactional customer messages, and final email/SMS provider paths 35ms
+   ✓ holds webhook deliveries without consuming attempts or creating a network effect 36ms
+   ✓ holds existing-website capture before reserving a delivery or mutating a lead 33ms
+ ✓ src/services/invoice-delivery-worklist.test.ts (8 tests) 1496ms
+     ✓ pages at 25 canonical invoices and applies only strict status/lead/project selectors  599ms
+ ✓ src/routes/v1/leads-photo-delete.test.ts (4 tests) 555ms
+ ✓ src/routes/v1/callie.test.ts (6 tests) 1499ms
+ ✓ src/routes/v1/billing-lifecycle.test.ts (6 tests) 898ms
+ ✓ src/services/appointment-work-photos.test.ts (6 tests) 2277ms
+   ✓ reserves one exact object, attaches actual bytes and serves only the current tenant/visit private content route  462ms
+   ✓ expired unbound reservations are tombstoned and deletable; attached references survive actual cleanup  356ms
+   ✓ required photo answers need an exact attached item and completion freezes the reference  333ms
+ ✓ src/services/mailbox-graph.test.ts (21 tests) 25ms
+stderr | src/services/security-alerts.test.ts > security alert email failures > redacts api_key raw failures without replaying recipients
+[security] IP 203.0.113.99 blocked after 10 invalid API key attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > security alert email failures > redacts login raw failures without replaying recipients
+[security] IP 203.0.113.99 blocked after 10 invalid login attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > security alert email failures > redacts api_key Resend failures without replaying recipients
+[security] IP 203.0.113.99 blocked after 10 invalid API key attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > security alert email failures > redacts login Resend failures without replaying recipients
+[security] IP 203.0.113.99 blocked after 10 invalid login attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > brute-force block emails org admins > emails active owners/admins once, skipping inactive and non-admin users
+[security] IP 203.0.113.77 blocked after 10 invalid API key attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > brute-force block emails org admins > skips orgs without an active API key
+[security] IP 203.0.113.78 blocked after 10 invalid API key attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > reportCallbackBruteForceBlock emails org admins about login attacks > emails active owners/admins, skipping inactive and non-admin users
+[security] IP 203.0.113.90 blocked after 10 invalid login attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > reportCallbackBruteForceBlock emails org admins about login attacks > records an auth.brute_force_blocked audit event for the org
+[security] IP 203.0.113.91 blocked after 10 invalid login attempts within 15 minutes
+
+stderr | src/services/security-alerts.test.ts > reportCallbackBruteForceBlock emails org admins about login attacks > skips orgs without an active API key
+[security] IP 203.0.113.92 blocked after 10 invalid login attempts within 15 minutes
+
+ ✓ src/services/security-alerts.test.ts (9 tests) 357ms
+ ✓ src/routes/v1/widget.test.ts (12 tests) 568ms
+ ✓ src/services/staff-service-push.test.ts (13 tests) 7227ms
+     ✓ atomically enqueues one device notice for an exception without manufacturing a lead, then accepts only once  714ms
+     ✓ keeps legacy policies off and never broadcasts unassigned services  551ms
+     ✓ cancels a queued alert after acknowledge  587ms
+     ✓ cancels a queued alert after completed  532ms
+     ✓ cancels a queued alert after reassigned  619ms
+     ✓ cancels a queued alert after policy  540ms
+     ✓ cancels a queued alert after logout  509ms
+     ✓ cancels a queued alert after unverified  580ms
+     ✓ holds the queue for company pause and never claims another company  498ms
+     ✓ rechecks a changed case at the actual transport boundary and labels definite non-dispatch  510ms
+     ✓ retains uncertain acceptance and never replays it on the next monitor tick  562ms
+     ✓ rejects cross-company service owners at the database boundary  528ms
+     ✓ rolls back service reconciliation and notification work together  496ms
+ ✓ src/routes/v1/delivery-status.test.ts (32 tests) 679ms
+ ✓ src/routes/v1/rep-photo-upload.test.ts (13 tests) 546ms
+ ✓ src/routes/v1/unsubscribe-flow.test.ts (8 tests) 709ms
+ ✓ src/routes/v1/service-mailbox-replies.test.ts (5 tests) 841ms
+ ✓ src/services/playbook-source-hold.test.ts (8 tests) 1018ms
+ ✓ src/services/returning-customer-export.test.ts (3 tests) 12ms
+ ✓ src/routes/v1/bie-email-review.test.ts (6 tests) 1222ms
+     ✓ prepares exact identity, approves unchanged saved payload, and executes once  356ms
+ ✓ src/services/concierge-booking.test.ts (12 tests) 437ms
+ ✓ src/services/role-permissions.test.ts (214 tests) 501ms
+ ✓ src/routes/v1/webhook-secret-redaction.test.ts (10 tests) 615ms
+ ✓ src/services/data-lifecycle-inventory-session.test.ts (21 tests) 13ms
+ ✓ src/routes/v1/settings-api-key-roundtrip.test.ts (2 tests) 536ms
+ ✓ src/routes/v1/source-nurture.test.ts (6 tests) 872ms
+ ✓ src/routes/v1/customer-workspace.test.ts (6 tests) 1172ms
+ ✓ src/routes/v1/resend-invite.test.ts (6 tests) 740ms
+ ✓ src/routes/v1/service-care.test.ts (5 tests) 1195ms
+ ✓ src/routes/v1/microsoft-integrations.test.ts (5 tests) 740ms
+ ✓ src/routes/v1/assistant-history.test.ts (11 tests) 549ms
+ ✓ src/routes/v1/platform-email-delivery.test.ts (3 tests) 1592ms
+     ✓ exposes exact receipt status to platform staff but not ordinary company members or API keys  686ms
+     ✓ company invitation evidence never exposes another company or platform identity  559ms
+     ✓ requires a signed raw callback and reconciles callback-before-receipt without verifying the user  340ms
+ ✓ src/routes/v1/leads-gmail-user-scope.test.ts (4 tests) 1248ms
+ ✓ src/routes/v1/assistant-chat.test.ts (5 tests) 605ms
+     ✓ returns 429 on the 21st request within the same minute  328ms
+ ✓ src/services/lead-merge.test.ts (6 tests) 1010ms
+ ✓ src/routes/v1/missed-call-care.test.ts (4 tests) 1174ms
+     ✓ rejects foreign/malformed origins, same-site browser writes, and bogus Authorization cookie bypasses  341ms
+ ✓ src/services/staff-push-transport.test.ts (30 tests) 41ms
+ ✓ src/services/playbook-send-window.test.ts (11 tests) 768ms
+ ✓ src/routes/v1/lead-mailbox-replies.test.ts (6 tests) 1669ms
+ ✓ src/services/entitlements.test.ts (10 tests) 502ms
+ ✓ src/services/service-property-coherence.test.ts (4 tests) 699ms
+ ✓ src/routes/v1/google-reviews-env-fallback-bypass.test.ts (3 tests) 124ms
+ ✓ src/services/scheduler-restart.test.ts (1 test) 2436ms
+   ✓ restarts after a real worker crash without repeating its committed effect and resumes other due work  2435ms
+ ✓ src/routes/v1/financial-migration.test.ts (5 tests) 1625ms
+ ✓ src/routes/v1/assignee-scoping.test.ts (8 tests) 640ms
+ ✓ src/routes/v1/leads-merge-photo-count.test.ts (6 tests) 680ms
+ ✓ src/services/durable-execution.test.ts (6 tests) 749ms
+ ✓ src/services/lead-pagination.test.ts (5 tests) 537ms
+ ✓ src/services/bie-capabilities.test.ts (5 tests) 905ms
+ ✓ src/services/invite-email.test.ts (9 tests) 296ms
+ ✓ src/routes/mobile-token-exchange-brute-force.test.ts (4 tests) 202ms
+ ✓ src/routes/v1/source-adoption.test.ts (3 tests) 880ms
+ ✓ src/services/contact-touch-legacy.test.ts (8 tests) 735ms
+ ✓ src/routes/oidc-callback-brute-force.test.ts (4 tests) 203ms
+stderr | src/routes/v1/api-key-brute-force.test.ts > invalid API key brute-force throttling > returns 429 after repeated invalid-key attempts from the same IP
+[security] IP 127.0.0.1 blocked after 10 invalid API key attempts within 15 minutes
+
+ ✓ src/services/knowledge.test.ts (7 tests) 661ms
+     ✓ uses custom greeting, assistant name, and intents  324ms
+ ✓ src/routes/v1/api-key-brute-force.test.ts (6 tests) 1188ms
+     ✓ successful key auth is never counted against the budget  475ms
+ ✓ src/services/lead-needs-reply-filter.test.ts (4 tests) 996ms
+ ✓ src/services/mailbox-microsoft-dispatch.test.ts (6 tests) 952ms
+ ✓ src/services/lead-merge-outreach-retention.test.ts (6 tests) 891ms
+ ✓ src/services/claim-kernel.test.ts (7 tests) 15ms
+ ✓ src/services/loss-corroborations.test.ts (3 tests) 613ms
+ ❯ src/services/outbound-hold.test.ts (14 tests | 1 failed) 55ms
+     × defaults to existing production behavior and rejects ambiguous settings 6ms
+     ✓ fails closed for staging even if the hold flag is absent or false 0ms
+     ✓ blocks email, SMS, Gmail, and webhook dispatch before any network call 44ms
+     ✓ requires an exact approved email address in addition to both staging release flags 1ms
+     ✓ rejects malformed or broad staging allowlist * 0ms
+     ✓ rejects malformed or broad staging allowlist *@example.test 0ms
+     ✓ rejects malformed or broad staging allowlist example.test 0ms
+     ✓ rejects malformed or broad staging allowlist @example.test 0ms
+     ✓ rejects malformed or broad staging allowlist QA <qa@example.test> 0ms
+     ✓ rejects malformed or broad staging allowlist qa@example.test;other@example.test 0ms
+     ✓ rejects malformed or broad staging allowlist qa@example.test, 0ms
+     ✓ rejects malformed or broad staging allowlist qa@example.test
+Bcc:other@example.test 0ms
+     ✓ does not turn staging's allowlist into a production send permission 0ms
+     ✓ blocks unapproved staging email at actual provider and Gmail dispatch points 1ms
+ ✓ src/routes/v1/won-revenue-correction.test.ts (7 tests) 781ms
+ ✓ src/services/concierge-resume.test.ts (2 tests) 1345ms
+     ✓ abandon → resume reactivates, cancels pending follow-ups, and can complete  544ms
+     ✓ resume straight to completion from abandoned works too  304ms
+ ✓ src/services/org-bootstrap.test.ts (6 tests) 476ms
+ ✓ src/routes/v1/tenant-list-scoping.test.ts (9 tests) 721ms
+ ✓ src/services/source-nurture-contract.test.ts (5 tests) 30ms
+stderr | src/routes/session-login-brute-force.test.ts > POST /mobile-auth/token-exchange — brute-force throttling > returns 500 on each failed exchange until the budget is spent, then 429
+[security] IP ::ffff:127.0.0.1 blocked after 10 invalid login attempts within 15 minutes
+
+stderr | src/routes/session-login-brute-force.test.ts > POST /mobile-auth/token-exchange — brute-force throttling > continues to return 429 for subsequent requests once blocked
+[security] IP ::ffff:127.0.0.1 blocked after 10 invalid login attempts within 15 minutes
+
+stderr | src/routes/session-login-brute-force.test.ts > POST /mobile-auth/token-exchange — brute-force throttling > returns the correct JSON error shape when blocked
+[security] IP ::ffff:127.0.0.1 blocked after 10 invalid login attempts within 15 minutes
+
+ ✓ src/routes/session-login-brute-force.test.ts (5 tests) 645ms
+ ✓ src/services/microsoft-lifecycle-dispatch.test.ts (6 tests) 634ms
+ ✓ src/routes/v1/service-watch.test.ts (4 tests) 1223ms
+ ✓ src/services/crm-appointment-past-start.test.ts (12 tests) 355ms
+ ✓ src/routes/v1/settings-api-key-mask.test.ts (5 tests) 526ms
+ ✓ src/services/contractor-workday-export.test.ts (2 tests) 22ms
+ ✓ src/services/automation-dnc.test.ts (4 tests) 1163ms
+     ✓ sends nothing when both channels are do-not-contact  402ms
+ ✓ src/routes/v1/service-standing-reminders.test.ts (4 tests) 1168ms
+ ✓ src/services/staff-push-policy.test.ts (40 tests) 34ms
+ ✓ src/services/bie-email-provider.test.ts (3 tests) 708ms
+ ✓ src/lib/restore-app-readonly.test.ts (2 tests) 1498ms
+   ✓ reads recovered CRM, Revenue Desk, project-room snapshots and private bytes through the actual app without modifying tenant records  641ms
+ ✓ src/routes/v1/leads-merge-audit.test.ts (3 tests) 540ms
+ ✓ src/routes/v1/reporting-periods.test.ts (4 tests) 915ms
+ ✓ src/services/service-obligations.test.ts (3 tests) 484ms
+ ✓ src/services/claim-execution.test.ts (2 tests) 604ms
+ ✓ src/services/webhooks.test.ts (13 tests) 44ms
+ ✓ src/routes/v1/storage-serving.test.ts (3 tests) 424ms
+ ✓ src/lib/readiness.test.ts (11 tests) 12ms
+ ✓ src/services/smart-site-lifecycle-race.test.ts (4 tests) 1269ms
+   ✓ rechecks intake after a pause commits between the entry guard and capture transaction  503ms
+   ✓ rechecks acquisition after a pause commits between the entry guard and capture transaction  353ms
+ ✓ src/routes/staff-oidc-acceptance.test.ts (3 tests) 842ms
+ ✓ src/services/gmail-oauth-no-replay.test.ts (5 tests) 459ms
+ ✓ src/routes/v1/contractor-scheduling.test.ts (4 tests) 732ms
+ ✓ src/services/twilio-dispatch-guard.test.ts (8 tests) 3146ms
+     ✓ does not contact Twilio when contact_dnc changes after ownership  340ms
+     ✓ does not contact Twilio when phone changes after ownership  403ms
+     ✓ does not contact Twilio when purpose changes after ownership  465ms
+     ✓ does not contact Twilio when program changes after ownership  355ms
+     ✓ does not contact Twilio when hold changes after ownership  358ms
+     ✓ does not contact Twilio when workflow changes after ownership  414ms
+     ✓ checks the workflow only for the owner and does not repeat an accepted SMS  396ms
+     ✓ keeps a lost acknowledgement uncertain and prevents a retry  414ms
+ ✓ src/routes/v1/portal-photos.test.ts (5 tests) 516ms
+ ✓ src/routes/v1/estimate-line-total.test.ts (3 tests) 550ms
+ ✓ src/services/scheduler-runtime.test.ts (4 tests) 135ms
+stderr | src/routes/v1/api-key-brute-force-alert.test.ts > admin alerting when an IP is blocked for API-key guessing > records an audit event for orgs with active API keys
+[security] IP 198.51.100.102-1791533915950 blocked after 10 invalid API key attempts within 15 minutes
+
+stderr | src/routes/v1/api-key-brute-force-alert.test.ts > admin alerting when an IP is blocked for API-key guessing > crossing the threshold over HTTP records the audit event
+[security] IP 127.0.0.1 blocked after 10 invalid API key attempts within 15 minutes
+
+ ✓ src/routes/v1/api-key-brute-force-alert.test.ts (3 tests) 669ms
+ ❯ src/routes/identity-auth.test.ts (1 test | 1 failed) 402ms
+     × is enumeration-safe, rotates the password, consumes the token, and revokes sessions 398ms
+ ✓ src/lib/restore-mode.test.ts (6 tests) 8ms
+ ✓ src/services/financial-migration-contract.test.ts (4 tests) 25ms
+ ✓ src/services/loss-corroboration.test.ts (5 tests) 16ms
+ ✓ src/routes/v1/estimate-negative-amounts.test.ts (7 tests) 540ms
+ ✓ src/routes/health.test.ts (15 tests) 109ms
+ ✓ src/services/send-source-history.test.ts (5 tests) 642ms
+ ✓ src/services/scheduled-action-recovery.test.ts (4 tests) 456ms
+ ✓ src/routes/v1/portal-conversation.test.ts (4 tests) 409ms
+ ✓ src/routes/v1/google-reviews-cache-control.test.ts (2 tests) 62ms
+ ✓ src/services/project-duplicate-estimate.test.ts (5 tests) 533ms
+ ✓ src/routes/v1/leads-search-scope.test.ts (3 tests) 439ms
+ ✓ src/routes/v1/tasks-lead-label.test.ts (3 tests) 441ms
+ ✓ src/services/concierge-confirmation.test.ts (2 tests) 1097ms
+     ✓ sends an SMS confirmation for text preference, logs activity + audit  388ms
+ ✓ src/routes/v1/assessment-photo-flow.test.ts (5 tests) 278ms
+ ✓ src/routes/v1/billing-entitlements.test.ts (3 tests) 406ms
+ ✓ src/routes/v1/leads-merge-authz.test.ts (2 tests) 582ms
+ ✓ src/services/assessment-photos.test.ts (7 tests) 520ms
+ ✓ src/routes/v1/portal-photo-stream.test.ts (1 test) 113ms
+ ✓ src/services/claim-graphs.test.ts (2 tests) 407ms
+ ✓ src/services/bie.test.ts (2 tests) 569ms
+ ✓ src/routes/v1/service-history-list.test.ts (3 tests) 1721ms
+ ↓ src/services/og-card-brand-parity.test.ts (9 tests | 9 skipped)
+ ✓ src/routes/v1/portal-login-throttle.test.ts (1 test) 211ms
+ ✓ src/routes/v1/settings-google-reviews-cache.test.ts (3 tests) 391ms
+ ✓ src/services/invoice-delivery-contract.test.ts (11 tests) 10ms
+ ✓ src/lib/auto-migrate.test.ts (21 tests) 9ms
+ ✓ src/services/dashboard-portal-messages.test.ts (3 tests) 346ms
+ ✓ src/routes/v1/appointment-property.test.ts (2 tests) 930ms
+ ✓ src/routes/v1/public-site-config.test.ts (1 test) 93ms
+ ✓ src/services/customer-lifecycle-export-deadline.test.ts (6 tests) 15ms
+ ✓ src/routes/v1/appointment-booked-urgency.test.ts (1 test) 636ms
+ ✓ src/routes/v1/concierge-transcription.test.ts (6 tests) 253ms
+ ✓ src/routes/v1/runtime-health.test.ts (2 tests) 386ms
+ ✓ src/routes/v1/contacts-search-scope.test.ts (2 tests) 355ms
+ ↓ src/services/settings-service-slugs.test.ts (5 tests | 5 skipped)
+ ✓ src/routes/v1/settings-security-ack.test.ts (3 tests) 403ms
+ ✓ src/services/identity-email.test.ts (5 tests) 8ms
+ ✓ src/services/portal-cleanup.test.ts (2 tests) 268ms
+ ✓ src/routes/v1/playbooks-enrollment-read.test.ts (1 test) 536ms
+ ✓ src/routes/v1/og-area-card.test.ts (4 tests) 223ms
+ ✓ src/routes/v1/api-key-tenant-isolation.test.ts (1 test) 498ms
+ ✓ src/services/email-send-health.test.ts (3 tests) 267ms
+ ↓ src/services/upload-cleanup.integration.test.ts (1 test | 1 skipped)
+stderr | src/services/upload-cleanup.test.ts > cleanupOrphanedUploads > counts delete failures as errors without aborting the run
+[upload-cleanup] failed to process /objects/uploads/failing: Error: boom
+    at Object.failing.remove (C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server/src/services/upload-cleanup.test.ts:78:13)
+    at cleanupOrphanedUploads (C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server/src/services/upload-cleanup.ts:83:21)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server/src/services/upload-cleanup.test.ts:82:20
+    at file:///C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ ✓ src/services/upload-cleanup.test.ts (3 tests) 264ms
+ ✓ src/services/contractor-workday-contract.test.ts (4 tests) 11ms
+stderr | src/services/concierge-automation.test.ts > concierge booking automations > runs org appointment.booked automations for chat bookings
+[concierge] booking confirmation failed: Error: Outbound delivery is disabled by the staging safety hold
+    at assertOutboundDeliveryAllowed (C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server/src/services/outbound-hold.ts:68:11)
+    at Object.send (C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server/src/services/providers.ts:421:5)
+    at sendBookingConfirmation (C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server/src/services/concierge.ts:1147:42)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at handleMessage (C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server/src/services/concierge.ts:956:23)
+    at C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/artifacts/api-server/src/services/concierge-automation.test.ts:69:19
+    at file:///C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/node_modules/.pnpm/@vitest+runner@4.1.10/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ ✓ src/services/concierge-automation.test.ts (1 test) 725ms
+     ✓ runs org appointment.booked automations for chat bookings  343ms
+ ✓ src/services/claim-compilation.test.ts (4 tests) 17ms
+ ✓ src/routes/v1/contacts-pagination.test.ts (2 tests) 323ms
+ ✓ src/lib/beta-operations-schema-upgrade.test.ts (1 test) 115ms
+ ✓ src/services/webhook-secret-cleanup.test.ts (2 tests) 258ms
+ ✓ src/services/duplicate-detection.test.ts (2 tests) 544ms
+ ✓ src/routes/v1/lead-import-large-body.test.ts (2 tests) 14055ms
+     ✓ accepts a CSV payload well above the 100kb default JSON limit  12076ms
+ ✓ src/services/audit-events-filter.test.ts (3 tests) 268ms
+ ✓ src/lib/swarm-schema-upgrade.test.ts (1 test) 77ms
+ ✓ src/services/staff-readiness.test.ts (1 test) 428ms
+ ✓ src/routes/auth-origin.test.ts (11 tests) 11ms
+ ✓ src/services/identity-token.test.ts (4 tests) 152ms
+ ✓ src/middlewares/publicOrg.test.ts (3 tests) 454ms
+stdout | src/services/scheduler-autostart.test.ts > keeps staging scheduler work dormant when explicitly false
+[scheduler] autostart disabled by SCHEDULER_AUTOSTART=false
+
+ ✓ src/services/scheduler-autostart.test.ts (3 tests) 18ms
+ ✓ src/lib/database-pool-errors.test.ts (4 tests) 5ms
+ ❯ src/services/providers.test.ts (5 tests | 3 failed) 10ms
+     ✓ accepts plain mailboxes 1ms
+     ✓ rejects header injection, multiple recipients, and display names 0ms
+     × rejects recipient injection before touching the provider 5ms
+     × fails closed without Resend even when a global Gmail connector exists 1ms
+     × uses the platform Resend channel without invoking customer routing 2ms
+ ✓ src/services/scheduler-loop.test.ts (4 tests) 7ms
+ ✓ src/services/webhook-rotation.test.ts (7 tests) 5ms
+ ✓ src/services/missed-call-care-policy.test.ts (3 tests) 33ms
+ ✓ src/lib/staging-database-identity.test.ts (3 tests) 5ms
+ ✓ src/services/evidence-intelligence.test.ts (4 tests) 3ms
+ ✓ src/routes/v1/billing-origin.test.ts (9 tests) 5ms
+ ✓ src/services/invite-token.test.ts (3 tests) 5ms
+ ✓ src/services/contractor-workday-baselines.test.ts (2 tests) 9ms
+ ✓ src/lib/release-identity.test.ts (3 tests) 4ms
+ ✓ src/services/source-history.test.ts (3 tests) 11ms
+ ✓ src/lib/email-content-encryption.test.ts (2 tests) 5ms
+ ✓ src/lib/token-encryption.test.ts (2 tests) 5ms
+ ✓ src/services/evidence-redaction.test.ts (2 tests) 4ms
+ ✓ src/routes/v1/storage-auth.test.ts (2 tests) 63ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 65 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/routes/identity-auth.test.ts > password recovery > is enumeration-safe, rotates the password, consumes the token, and revokes sessions
+AssertionError: expected "send" to be called once, but got 0 times
+ ❯ src/routes/identity-auth.test.ts:107:18
+    105|     expect(known.status).toBe(202);
+    106|     expect(knownBody).toEqual(unknownBody);
+    107|     expect(send).toHaveBeenCalledOnce();
+       |                  ^
+    108|
+    109|     const resetUrl = send.mock.calls[0][2]
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/65]⎯
+
+ FAIL  src/services/api-key-expiry-reminder.test.ts > processApiKeyExpiryReminders > emails all org admins once for a key expiring within the window
+AssertionError: expected [] to deeply equal [ …(2) ]
+
+- Expected
++ Received
+
+- [
+-   "kr-admin-1791533625299-2rsler@example.com",
+-   "kr-owner-1791533625299-2rsler@example.com",
+- ]
++ []
+
+ ❯ src/services/api-key-expiry-reminder.test.ts:169:41
+    167|     expect(claimed.map((k) => k.id)).toContain(key.id);
+    168|     const own = mine();
+    169|     expect(own.map((s) => s.to).sort()).toEqual([adminEmail, ownerEmai…
+       |                                         ^
+    170|     expect(own[0].subject).toContain("Expiring");
+    171|     expect(await reminderAudit(key.id)).toMatchObject({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/65]⎯
+
+ FAIL  src/services/api-key-expiry-reminder.test.ts > processApiKeyExpiryReminders > keeps an attempted key claimed when its audit fails and still processes the next claimed key
+AssertionError: expected [] to have a length of 4 but got +0
+
+- Expected
++ Received
+
+- 4
++ 0
+
+ ❯ src/services/api-key-expiry-reminder.test.ts:247:20
+    245|       expect.arrayContaining([first.id, second.id]),
+    246|     );
+    247|     expect(mine()).toHaveLength(4);
+       |                    ^
+    248|     for (const key of [first, second])
+    249|       expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/65]⎯
+
+ FAIL  src/services/api-key-expiry-reminder.test.ts > processApiKeyExpiryReminders > releases only a pre-send lookup failure and continues processing other claimed keys
+AssertionError: expected [] to have a length of 2 but got +0
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ src/services/api-key-expiry-reminder.test.ts:331:20
+    329|     lookup.mockRestore();
+    330|
+    331|     expect(mine()).toHaveLength(2);
+       |                    ^
+    332|     const records = await db
+    333|       .select()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/65]⎯
+
+ FAIL  src/services/api-key-expiry-reminder.test.ts > processApiKeyExpiryReminders > retains the claim after Resend timeout and does not replay on the next tick
+ FAIL  src/services/api-key-expiry-reminder.test.ts > processApiKeyExpiryReminders > retains the claim after unclassified transport error and does not replay on the next tick
+AssertionError: expected [] to deeply equal [ …(2) ]
+
+- Expected
++ Received
+
+- [
+-   "kr-admin-1791533625299-2rsler@example.com",
+-   "kr-owner-1791533625299-2rsler@example.com",
+- ]
++ []
+
+ ❯ src/services/api-key-expiry-reminder.test.ts:386:35
+    384|       expect(claimed.map((k) => k.id)).toContain(key.id);
+    385|       expect(mine()).toHaveLength(0);
+    386|       expect(myAttempts().sort()).toEqual([adminEmail, ownerEmail]);
+       |                                   ^
+    387|
+    388|       const [afterFail] = await db
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/65]⎯
+
+ FAIL  src/services/api-key-expiry-reminder.test.ts > processApiKeyExpiryReminders > records partial acceptance plus a unknown recipient without replaying either
+ FAIL  src/services/api-key-expiry-reminder.test.ts > processApiKeyExpiryReminders > records partial acceptance plus a rejected recipient without replaying either
+AssertionError: expected [] to deeply equal [ Array(1) ]
+
+- Expected
++ Received
+
+- [
+-   "kr-owner-1791533625299-2rsler@example.com",
+- ]
++ []
+
+ ❯ src/services/api-key-expiry-reminder.test.ts:440:47
+    438|       );
+    439|       await processApiKeyExpiryReminders(7, now);
+    440|       expect(mine().map((value) => value.to)).toEqual([ownerEmail]);
+       |                                               ^
+    441|       expect(myAttempts().sort()).toEqual([adminEmail, ownerEmail]);
+    442|       expect(await reminderAudit(key.id)).toMatchObject({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/65]⎯
+
+ FAIL  src/services/api-key-expiry-reminder.test.ts > processApiKeyExpiryReminders > retains an explicit nonretryable provider rejection for operator review
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ reminderAudit src/services/api-key-expiry-reminder.test.ts:100:18
+     98|       ),
+     99|     );
+    100|   expect(events).toHaveLength(1);
+       |                  ^
+    101|   return events[0].metadata;
+    102| }
+ ❯ src/services/api-key-expiry-reminder.test.ts:470:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/65]⎯
+
+ FAIL  src/services/api-key-expiry-reminder.test.ts > processApiKeyExpiryReminders > preserves an uncertain reminder claim when a rename supplies the unchanged expiry
+AssertionError: expected [] to have a length of 2 but got +0
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ src/services/api-key-expiry-reminder.test.ts:498:26
+    496|     sendFailure = new ResendSendError("unknown", 503);
+    497|     await processApiKeyExpiryReminders(7, now);
+    498|     expect(myAttempts()).toHaveLength(2);
+       |                          ^
+    499|     expect(await reminderAudit(key.id)).toMatchObject({
+    500|       outcome: "indeterminate",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/65]⎯
+
+ FAIL  src/services/api-key-expiry-reminder.test.ts > processApiKeyExpiryReminders > releases a claim when there are no recipients and may send after admins return
+AssertionError: expected [] to deeply equal [ …(2) ]
+
+- Expected
++ Received
+
+- [
+-   "kr-admin-1791533625299-2rsler@example.com",
+-   "kr-owner-1791533625299-2rsler@example.com",
+- ]
++ []
+
+ ❯ src/services/api-key-expiry-reminder.test.ts:566:33
+    564|       .where(inArray(usersTable.id, userIds));
+    565|     await processApiKeyExpiryReminders(7, new Date(now.getTime() + 60_…
+    566|     expect(myAttempts().sort()).toEqual([adminEmail, ownerEmail]);
+       |                                 ^
+    567|   });
+    568|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/65]⎯
+
+ FAIL  src/services/api-key-expiry-reminder.test.ts > processApiKeyExpiryReminders > releases a known pre-dispatch hold without invoking the provider
+ FAIL  src/services/api-key-expiry-reminder.test.ts > processApiKeyExpiryReminders > releases a known pre-dispatch missing configuration without invoking the provider
+AssertionError: expected [] to deeply equal [ …(2) ]
+
+- Expected
++ Received
+
+- [
+-   "kr-admin-1791533625299-2rsler@example.com",
+-   "kr-owner-1791533625299-2rsler@example.com",
+- ]
++ []
+
+ ❯ src/services/api-key-expiry-reminder.test.ts:588:35
+    586|       vi.unstubAllEnvs();
+    587|       await processApiKeyExpiryReminders(7, new Date(now.getTime() + 6…
+    588|       expect(myAttempts().sort()).toEqual([adminEmail, ownerEmail]);
+       |                                   ^
+    589|     },
+    590|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/65]⎯
+
+ FAIL  src/services/api-key-expiry-reminder.test.ts > processApiKeyExpiryReminders > sends a fresh reminder after an admin changes the key's expiry
+AssertionError: expected 0 to be greater than 0
+ ❯ src/services/api-key-expiry-reminder.test.ts:613:25
+    611|     const claimed = await processApiKeyExpiryReminders(7, later);
+    612|     expect(claimed.map((k) => k.id)).toContain(key.id);
+    613|     expect(sent.length).toBeGreaterThan(0);
+       |                         ^
+    614|
+    615|     sent.length = 0;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/65]⎯
+
+ FAIL  src/services/automation.test.ts > automation engine > records a run and sends SMS when consent is granted
+AssertionError: expected 'failed' to be 'success' // Object.is equality
+
+Expected: "success"
+Received: "failed"
+
+ ❯ src/services/automation.test.ts:88:28
+     86|       .where(eq(automationRunsTable.automationId, rule.id));
+     87|     expect(runs).toHaveLength(1);
+     88|     expect(runs[0].status).toBe("success");
+       |                            ^
+     89|     expect(runs[0].actionResults[0].status).toBe("success");
+     90|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/65]⎯
+
+ FAIL  src/services/automation.test.ts > default automation seeding > sends the edited template copy after an admin updates it
+AssertionError: expected 'failed' to be 'success' // Object.is equality
+
+Expected: "success"
+Received: "failed"
+
+ ❯ src/services/automation.test.ts:257:27
+    255|       expect(runs).toHaveLength(1);
+    256|       const sms = runs[0].actionResults.find((r) => r.type === "send_s…
+    257|       expect(sms?.status).toBe("success");
+       |                           ^
+    258|       const sentBody = smsSpy.mock.calls.at(-1)?.[1];
+    259|       expect(sentBody).toContain("Custom copy for Tmpl");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/65]⎯
+
+ FAIL  src/services/customer-lifecycle-runtime.test.ts > blocks new outreach, transactional customer messages, and final email/SMS provider paths
+AssertionError: expected Error: Outbound delivery is disabled by t… to match object { code: 'customer_lifecycle_paused' }
+
+- Expected
++ Received
+
+- {
+-   "code": "customer_lifecycle_paused",
++ Error {
++   "message": "Outbound delivery is disabled by the staging safety hold",
+  }
+
+ ❯ src/services/customer-lifecycle-runtime.test.ts:102:167
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/65]⎯
+
+ FAIL  src/services/gmail-oauth.test.ts > Gmail authorization lifecycle > blocks a deactivated sender before contacting Google
+AssertionError: expected [Function] to throw error including 'Gmail sender account is not active' but got 'Outbound delivery is disabled by the …'
+
+Expected: "Gmail sender account is not active"
+Received: "Outbound delivery is disabled by the staging safety hold"
+
+ ❯ src/services/gmail-oauth.test.ts:215:8
+    213|           body: "No provider request should be made.",
+    214|         }),
+    215|       ).rejects.toThrow("Gmail sender account is not active");
+       |        ^
+    216|       expect(googleMocks.setCredentials).not.toHaveBeenCalled();
+    217|       expect(googleMocks.request).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/65]⎯
+
+ FAIL  src/services/gmail-oauth.test.ts > Gmail authorization lifecycle > runs workflow approval after token preparation and does not dispatch a withdrawn message
+AssertionError: expected Error: Outbound delivery is disabled by t… to match object { Object (code, effectNotAttempted) }
+
+- Expected
++ Received
+
+- {
+-   "code": "email_dispatch_blocked",
+-   "effectNotAttempted": true,
++ Error {
++   "message": "Outbound delivery is disabled by the staging safety hold",
+  }
+
+ ❯ src/services/gmail-oauth.test.ts:234:8
+    232|       organizationId: orgIds[0]!, userId: userIds[0]!, to: "recipient@…
+    233|       subject: "Synthetic", body: "Synthetic only", beforeDispatch: gu…
+    234|     })).rejects.toMatchObject({ code: "email_dispatch_blocked", effect…
+       |        ^
+    235|     expect(guard).toHaveBeenCalledWith({ provider: "gmail", senderEmai…
+    236|     expect(googleMocks.request).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/65]⎯
+
+ FAIL  src/services/gmail-oauth.test.ts > Gmail authorization lifecycle > refuses a mailbox changed during token preparation
+AssertionError: expected Error: Outbound delivery is disabled by t… to match object { code: 'email_dispatch_blocked' }
+
+- Expected
++ Received
+
+- {
+-   "code": "email_dispatch_blocked",
++ Error {
++   "message": "Outbound delivery is disabled by the staging safety hold",
+  }
+
+ ❯ src/services/gmail-oauth.test.ts:250:10
+    248|         organizationId: orgIds[0]!, userId: userIds[0]!, to: "recipien…
+    249|         subject: "Synthetic", body: "Synthetic only",
+    250|       })).rejects.toMatchObject({ code: "email_dispatch_blocked" });
+       |          ^
+    251|       expect(googleMocks.request).not.toHaveBeenCalled();
+    252|       expect(googleMocks.transportRequest).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/65]⎯
+
+ FAIL  src/services/gmail-oauth.test.ts > Gmail authorization lifecycle > uses a bounded non-retrying send after a successful final check
+AssertionError: promise rejected "Error: Outbound delivery is disabled by t…" instead of resolving
+ ❯ src/services/gmail-oauth.test.ts:262:8
+    260|       organizationId: orgIds[0]!, userId: userIds[0]!, to: "recipient@…
+    261|       subject: "Synthetic", body: "Synthetic only", beforeDispatch: gu…
+    262|     })).resolves.toMatchObject({ id: "synthetic-message", provider: "g…
+       |        ^
+    263|     expect(guard).toHaveBeenCalledOnce();
+    264|     expect(googleMocks.request).not.toHaveBeenCalled();
+
+Caused by: Error: Outbound delivery is disabled by the staging safety hold
+ ❯ assertOutboundDeliveryAllowed src/services/outbound-hold.ts:68:11
+ ❯ Module.sendGmailForUser src/services/gmail-oauth.ts:344:3
+ ❯ src/services/gmail-oauth.test.ts:259:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/65]⎯
+
+ FAIL  src/services/gmail-oauth.test.ts > Gmail authorization lifecycle > fails closed and requires reconnect when Google rejects a revoked grant
+AssertionError: expected [Function] to throw error including 'Gmail authorization expired or was re…' but got 'Outbound delivery is disabled by the …'
+
+Expected: "Gmail authorization expired or was revoked"
+Received: "Outbound delivery is disabled by the staging safety hold"
+
+ ❯ src/services/gmail-oauth.test.ts:285:8
+    283|           body: "No provider message is sent by this mocked test.",
+    284|         }),
+    285|       ).rejects.toThrow("Gmail authorization expired or was revoked");
+       |        ^
+    286|       expect(await getGmailConnection(orgIds[0]!, userIds[0]!)).toBeNu…
+    287|       expect(await getGmailStatus(orgIds[0]!, userIds[0]!)).toMatchObj…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/65]⎯
+
+ FAIL  src/services/outbound-hold.test.ts > staging outbound delivery hold > defaults to existing production behavior and rejects ambiguous settings
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/services/outbound-hold.test.ts:25:49
+     23| describe("staging outbound delivery hold", () => {
+     24|   it("defaults to existing production behavior and rejects ambiguous s…
+     25|     expect(outboundDeliveryHeld(undefined, {})).toBe(false);
+       |                                                 ^
+     26|     expect(outboundDeliveryHeld("false", {})).toBe(false);
+     27|     expect(outboundDeliveryHeld("true", {})).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/65]⎯
+
+ FAIL  src/services/providers.test.ts > platform transactional email > rejects recipient injection before touching the provider
+AssertionError: expected [Function] to throw error matching /invalid recipient/i but got 'Outbound delivery is disabled by the …'
+
+- Expected:
+/invalid recipient/i
+
++ Received:
+"Outbound delivery is disabled by the staging safety hold"
+
+ ❯ src/services/providers.test.ts:40:6
+     38|         "Body",
+     39|       ),
+     40|     ).rejects.toThrow(/invalid recipient/i);
+       |      ^
+     41|   });
+     42|   it("fails closed without Resend even when a global Gmail connector e…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/65]⎯
+
+ FAIL  src/services/providers.test.ts > platform transactional email > fails closed without Resend even when a global Gmail connector exists
+AssertionError: expected [Function] to throw error matching /transactional email is not configured/i but got 'Outbound delivery is disabled by the …'
+
+- Expected:
+/transactional email is not configured/i
+
++ Received:
+"Outbound delivery is disabled by the staging safety hold"
+
+ ❯ src/services/providers.test.ts:50:6
+     48|     await expect(
+     49|       transactionalEmailProvider.send("user@example.com", "Subject", "…
+     50|     ).rejects.toThrow(/transactional email is not configured/i);
+       |      ^
+     51|   });
+     52|   it("uses the platform Resend channel without invoking customer routi…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/65]⎯
+
+ FAIL  src/services/providers.test.ts > platform transactional email > uses the platform Resend channel without invoking customer routing
+Error: Outbound delivery is disabled by the staging safety hold
+ ❯ assertOutboundDeliveryAllowed src/services/outbound-hold.ts:68:11
+     66| }): void {
+     67|   if (outboundDeliveryHeld())
+     68|     throw new Error("Outbound delivery is disabled by the staging safe…
+       |           ^
+     69|   if (input?.channel === "email")
+     70|     assertStagingEmailRecipientAllowed(input.recipient);
+ ❯ Object.send src/services/providers.ts:395:5
+ ❯ src/services/providers.test.ts:61:53
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/65]⎯
+
+ FAIL  src/services/sms-delivery.test.ts > twilioSmsProvider > POSTs the correct to/from/body to the Twilio API and returns the SID
+Error: Outbound delivery is disabled by the staging safety hold
+ ❯ assertOutboundDeliveryAllowed src/services/outbound-hold.ts:68:11
+     66| }): void {
+     67|   if (outboundDeliveryHeld())
+     68|     throw new Error("Outbound delivery is disabled by the staging safe…
+       |           ^
+     69|   if (input?.channel === "email")
+     70|     assertStagingEmailRecipientAllowed(input.recipient);
+ ❯ sendTwilioSms src/services/twilio-delivery.ts:25:3
+ ❯ Object.send src/services/providers.ts:159:12
+ ❯ src/services/sms-delivery.test.ts:144:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/65]⎯
+
+ FAIL  src/services/sms-delivery.test.ts > twilioSmsProvider > throws on a non-OK Twilio response
+AssertionError: expected [Function] to throw error matching /Twilio send failed: 401/ but got 'Outbound delivery is disabled by the …'
+
+- Expected:
+/Twilio send failed: 401/
+
++ Received:
+"Outbound delivery is disabled by the staging safety hold"
+
+ ❯ src/services/sms-delivery.test.ts:179:68
+    177|     stubTwilioEnv();
+    178|     stubTwilioFetch({ ok: false, status: 401, text: "auth error" });
+    179|     await expect(twilioSmsProvider.send(recipient, "x", context())).re…
+       |                                                                    ^
+    180|       /Twilio send failed: 401/,
+    181|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/65]⎯
+
+ FAIL  src/services/sms-delivery.test.ts > twilioSmsProvider > throws when Twilio returns no message SID
+AssertionError: expected [Function] to throw error matching /no valid message SID/i but got 'Outbound delivery is disabled by the …'
+
+- Expected:
+/no valid message SID/i
+
++ Received:
+"Outbound delivery is disabled by the staging safety hold"
+
+ ❯ src/services/sms-delivery.test.ts:187:68
+    185|     stubTwilioEnv();
+    186|     stubTwilioFetch({ ok: true, json: {} });
+    187|     await expect(twilioSmsProvider.send(recipient, "x", context())).re…
+       |                                                                    ^
+    188|       /no valid message SID/i,
+    189|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/65]⎯
+
+ FAIL  src/services/sms-delivery.test.ts > SMS provider selection (module load) > routes a configured client through the Twilio guard at send time
+Error: Outbound delivery is disabled by the staging safety hold
+ ❯ assertOutboundDeliveryAllowed src/services/outbound-hold.ts:68:11
+     66| }): void {
+     67|   if (outboundDeliveryHeld())
+     68|     throw new Error("Outbound delivery is disabled by the staging safe…
+       |           ^
+     69|   if (input?.channel === "email")
+     70|     assertStagingEmailRecipientAllowed(input.recipient);
+ ❯ Object.send src/services/providers.ts:421:5
+ ❯ src/services/sms-delivery.test.ts:198:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/65]⎯
+
+ FAIL  src/services/sms-delivery.test.ts > automation → send_sms → Twilio round-trip > fails closed for legacy marketing automations without handing anything to Twilio
+AssertionError: expected 'Original action receipt retained; no …' to match /purpose is not enabled/i
+
+- Expected:
+/purpose is not enabled/i
+
++ Received:
+"Original action receipt retained; no automatic replay."
+
+ ❯ src/services/sms-delivery.test.ts:256:47
+    254|       expect(runs[0].status).toBe("failed");
+    255|       expect(runs[0].actionResults[0].status).toBe("failed");
+    256|       expect(runs[0].actionResults[0].detail).toMatch(/purpose is not …
+       |                                               ^
+    257|     } finally {
+    258|       providers.sms = original;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/65]⎯
+
+ FAIL  src/services/sms-delivery.test.ts > automation → send_sms → Twilio round-trip > uses the labeled mock provider (no HTTP) when Twilio is not configured
+Error: Outbound delivery is disabled by the staging safety hold
+ ❯ assertOutboundDeliveryAllowed src/services/outbound-hold.ts:68:11
+     66| }): void {
+     67|   if (outboundDeliveryHeld())
+     68|     throw new Error("Outbound delivery is disabled by the staging safe…
+       |           ^
+     69|   if (input?.channel === "email")
+     70|     assertStagingEmailRecipientAllowed(input.recipient);
+ ❯ Object.send src/services/providers.ts:421:5
+ ❯ src/services/sms-delivery.test.ts:265:37
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/65]⎯
+
+ FAIL  src/services/webhooks-delivery.test.ts > end-to-end signed webhook delivery > delivers a POST whose body verifies against the endpoint's plaintext secret
+Error: timed out waiting
+ ❯ waitFor src/services/webhooks-delivery.test.ts:116:38
+    114|     const value = await fn();
+    115|     if (value) return value;
+    116|     if (Date.now() > deadline) throw new Error("timed out waiting");
+       |                                      ^
+    117|     await new Promise((r) => setTimeout(r, 50));
+    118|   }
+ ❯ src/services/webhooks-delivery.test.ts:167:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/65]⎯
+
+ FAIL  src/services/webhooks-delivery.test.ts > end-to-end signed webhook delivery > re-signs retries with a fresh timestamp that still verifies
+Error: timed out waiting
+ ❯ waitFor src/services/webhooks-delivery.test.ts:116:38
+    114|     const value = await fn();
+    115|     if (value) return value;
+    116|     if (Date.now() > deadline) throw new Error("timed out waiting");
+       |                                      ^
+    117|     await new Promise((r) => setTimeout(r, 50));
+    118|   }
+ ❯ src/services/webhooks-delivery.test.ts:209:24
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/65]⎯
+
+ FAIL  src/services/webhooks-delivery.test.ts > retry scheduler (processPendingDeliveries) > re-attempts a due pending delivery: receiver gets the request and the row succeeds
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/services/webhooks-delivery.test.ts:273:23
+    271|
+    272|     const processed = await processPendingDeliveries();
+    273|     expect(processed).toBe(1);
+       |                       ^
+    274|
+    275|     // The receiver actually got the retried request, freshly signed.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/65]⎯
+
+ FAIL  src/services/webhooks-delivery.test.ts > retry scheduler (processPendingDeliveries) > marks a delivery failed at MAX_ATTEMPTS and never picks it up again
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/services/webhooks-delivery.test.ts:312:23
+    310|
+    311|     const processed = await processPendingDeliveries();
+    312|     expect(processed).toBe(1);
+       |                       ^
+    313|     expect(received).toHaveLength(1);
+    314|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/65]⎯
+
+ FAIL  src/services/webhooks-delivery.test.ts > retry scheduler (processPendingDeliveries) > claims before sending so concurrent workers never deliver twice
+Error: timed out waiting
+ ❯ waitFor src/services/webhooks-delivery.test.ts:116:38
+    114|     const value = await fn();
+    115|     if (value) return value;
+    116|     if (Date.now() > deadline) throw new Error("timed out waiting");
+       |                                      ^
+    117|     await new Promise((r) => setTimeout(r, 50));
+    118|   }
+ ❯ src/services/webhooks-delivery.test.ts:340:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/65]⎯
+
+ FAIL  src/services/webhooks-delivery.test.ts > retry scheduler (processPendingDeliveries) > holds an ambiguous network failure for review without automatic replay
+AssertionError: expected 'pending' to be 'failed' // Object.is equality
+
+Expected: "failed"
+Received: "pending"
+
+ ❯ src/services/webhooks-delivery.test.ts:367:25
+    365|     await attemptDelivery(seeded.id);
+    366|     const held = await getDelivery(endpoint.id);
+    367|     expect(held.status).toBe("failed");
+       |                         ^
+    368|     expect(held.attempts).toBe(2);
+    369|     expect(held.nextAttemptAt).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/65]⎯
+
+ FAIL  src/routes/v1/customer-lifecycle-voice.test.ts > rejects fresh calls before any claim or provider attempt for the paused company while the other company still works
+AssertionError: expected 503 to be 423 // Object.is equality
+
+- Expected
++ Received
+
+- 423
++ 503
+
+ ❯ src/routes/v1/customer-lifecycle-voice.test.ts:81:27
+     79|   const [held, active] = companies; await pause(held);
+     80|   const rejected = await start(held);
+     81|   expect(rejected.status).toBe(423); expect(await rejected.json()).toM…
+       |                           ^
+     82|   expect(await calls(held)).toHaveLength(0); expect(network).not.toHav…
+     83|   expect((await start(active)).status).toBe(202);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/65]⎯
+
+ FAIL  src/routes/v1/customer-lifecycle-voice.test.ts > cancels a claimed but unsent call if pause arrives during preparation and never replays that request identity
+AssertionError: expected 503 to be 423 // Object.is equality
+
+- Expected
++ Received
+
+- 423
++ 503
+
+ ❯ src/routes/v1/customer-lifecycle-voice.test.ts:95:52
+     93|     return actual(org);
+     94|   });
+     95|   expect((await start(company, requestId)).status).toBe(423);
+       |                                                    ^
+     96|   expect((await calls(company))[0]).toMatchObject({ status: "cancelled…
+     97|   expect(network).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[37/65]⎯
+
+ FAIL  src/routes/v1/customer-lifecycle-voice.test.ts > blocks answer and customer bridge after pause while continuing to record signed completion and status callbacks
+AssertionError: expected 503 to be 202 // Object.is equality
+
+- Expected
++ Received
+
+- 202
++ 503
+
+ ❯ src/routes/v1/customer-lifecycle-voice.test.ts:104:71
+    102|
+    103| it("blocks answer and customer bridge after pause while continuing to …
+    104|   const company = companies[0]; expect((await start(company)).status).…
+       |                                                                       ^
+    105|   const [call] = await calls(company); await pause(company);
+    106|   const fields = { CallSid: call.providerSid!, From: company.number, T…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[38/65]⎯
+
+ FAIL  src/routes/v1/customer-lifecycle-voice.test.ts > fails closed if the lifecycle check is unavailable, without a call claim or external effect
+AssertionError: expected 503 to be 500 // Object.is equality
+
+- Expected
++ Received
+
+- 500
++ 503
+
+ ❯ src/routes/v1/customer-lifecycle-voice.test.ts:150:46
+    148| it("fails closed if the lifecycle check is unavailable, without a call…
+    149|   vi.spyOn(lifecycle, "customerWorkHeld").mockRejectedValue(new Error(…
+    150|   expect((await start(companies[0])).status).toBe(500);
+       |                                              ^
+    151|   expect(await calls(companies[0])).toHaveLength(0); expect(network).n…
+    152| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39/65]⎯
+
+ FAIL  src/routes/v1/onboarding-org.test.ts > founding beta registration gate > fails closed, verifies allowlisted founders, preserves signed invites, and blocks revoked invites
+AssertionError: expected undefined to be truthy
+
+- Expected:
+true
+
++ Received:
+undefined
+
+ ❯ src/routes/v1/onboarding-org.test.ts:556:31
+    554|         ?.split("\n")
+    555|         .find((line) => line.startsWith("https://"));
+    556|       expect(verificationUrl).toBeTruthy();
+       |                               ^
+    557|       const verificationToken = new URL(verificationUrl!).searchParams…
+    558|         "token",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[40/65]⎯
+
+ FAIL  src/routes/v1/staff-invitations.test.ts > staff invitations through normal authenticated HTTP > validates the delivered signed invitation using configured base http://localhost:3001
+ FAIL  src/routes/v1/staff-invitations.test.ts > staff invitations through normal authenticated HTTP > validates the delivered signed invitation using configured base https://app.example.invalid/crm
+AssertionError: expected 'unconfirmed' to be 'sent' // Object.is equality
+
+Expected: "sent"
+Received: "unconfirmed"
+
+ ❯ create src/routes/v1/staff-invitations.test.ts:125:43
+    123|     duplicate: boolean;
+    124|   };
+    125|   expect(result.invitation.deliveryState).toBe(expectedDelivery);
+       |                                           ^
+    126|   return result;
+    127| };
+ ❯ src/routes/v1/staff-invitations.test.ts:264:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[41/65]⎯
+
+ FAIL  src/routes/v1/staff-invitations.test.ts > staff invitations through normal authenticated HTTP > serializes one request ID with competing mailbox payloads without an orphan member
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/routes/v1/staff-invitations.test.ts:385:20
+    383|         );
+    384|       expect(rows).toHaveLength(1);
+    385|       expect(mail).toHaveLength(1);
+       |                    ^
+    386|       const members = await db
+    387|         .select()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[42/65]⎯
+
+ FAIL  src/routes/v1/staff-invitations.test.ts > staff invitations through normal authenticated HTTP > creates first-owner access without impersonation; pending staff never make capture ready
+AssertionError: expected 'unconfirmed' to be 'sent' // Object.is equality
+
+Expected: "sent"
+Received: "unconfirmed"
+
+ ❯ create src/routes/v1/staff-invitations.test.ts:125:43
+    123|     duplicate: boolean;
+    124|   };
+    125|   expect(result.invitation.deliveryState).toBe(expectedDelivery);
+       |                                           ^
+    126|   return result;
+    127| };
+ ❯ src/routes/v1/staff-invitations.test.ts:431:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[43/65]⎯
+
+ FAIL  src/routes/v1/staff-invitations.test.ts > staff invitations through normal authenticated HTTP > accepts the signed invitation into its exact organization and keeps other memberships unchanged
+AssertionError: expected 'unconfirmed' to be 'sent' // Object.is equality
+
+Expected: "sent"
+Received: "unconfirmed"
+
+ ❯ create src/routes/v1/staff-invitations.test.ts:125:43
+    123|     duplicate: boolean;
+    124|   };
+    125|   expect(result.invitation.deliveryState).toBe(expectedDelivery);
+       |                                           ^
+    126|   return result;
+    127| };
+ ❯ src/routes/v1/staff-invitations.test.ts:472:24
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[44/65]⎯
+
+ FAIL  src/routes/v1/staff-invitations.test.ts > staff invitations through normal authenticated HTTP > keeps ordinary admin invitations tenant bound and prevents owner grants by admins
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/routes/v1/staff-invitations.test.ts:551:18
+    549|       ).status,
+    550|     ).toBe(200);
+    551|     expect(mail).toHaveLength(1);
+       |                  ^
+    552|     expect(
+    553|       (
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[45/65]⎯
+
+ FAIL  src/routes/v1/staff-invitations.test.ts > staff invitations through normal authenticated HTTP > denies foreign invitation IDs without state or delivery effects
+AssertionError: expected 'unconfirmed' to be 'sent' // Object.is equality
+
+Expected: "sent"
+Received: "unconfirmed"
+
+ ❯ create src/routes/v1/staff-invitations.test.ts:125:43
+    123|     duplicate: boolean;
+    124|   };
+    125|   expect(result.invitation.deliveryState).toBe(expectedDelivery);
+       |                                           ^
+    126|   return result;
+    127| };
+ ❯ src/routes/v1/staff-invitations.test.ts:594:28
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[46/65]⎯
+
+ FAIL  src/routes/v1/staff-invitations.test.ts > staff invitations through normal authenticated HTTP > revoke blocks both password and trusted OIDC; explicit reissue rotates the link
+AssertionError: expected 'unconfirmed' to be 'sent' // Object.is equality
+
+Expected: "sent"
+Received: "unconfirmed"
+
+ ❯ create src/routes/v1/staff-invitations.test.ts:125:43
+    123|     duplicate: boolean;
+    124|   };
+    125|   expect(result.invitation.deliveryState).toBe(expectedDelivery);
+       |                                           ^
+    126|   return result;
+    127| };
+ ❯ src/routes/v1/staff-invitations.test.ts:623:24
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[47/65]⎯
+
+ FAIL  src/routes/v1/staff-invitations.test.ts > staff invitations through normal authenticated HTTP > expired ledger blocks otherwise valid links and OIDC until deliberate reissue
+AssertionError: expected 'unconfirmed' to be 'sent' // Object.is equality
+
+Expected: "sent"
+Received: "unconfirmed"
+
+ ❯ create src/routes/v1/staff-invitations.test.ts:125:43
+    123|     duplicate: boolean;
+    124|   };
+    125|   expect(result.invitation.deliveryState).toBe(expectedDelivery);
+       |                                           ^
+    126|   return result;
+    127| };
+ ❯ src/routes/v1/staff-invitations.test.ts:671:24
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[48/65]⎯
+
+ FAIL  src/routes/v1/staff-invitations.test.ts > staff invitations through normal authenticated HTTP > preserves uncertain delivery without leaking provider data or silently retrying
+AssertionError: expected "send" to be called 1 times, but got 0 times
+ ❯ src/routes/v1/staff-invitations.test.ts:709:45
+    707|     const repeated = await create(input, clientOrg, "unconfirmed");
+    708|     expect(repeated.duplicate).toBe(true);
+    709|     expect(transactionalEmailProvider.send).toHaveBeenCalledTimes(1);
+       |                                             ^
+    710|     const audit = await db
+    711|       .select()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[49/65]⎯
+
+ FAIL  src/routes/v1/staff-invitations.test.ts > staff invitations through normal authenticated HTTP > never moves or promotes an existing account, and refuses changed invitation role
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/routes/v1/staff-invitations.test.ts:761:18
+    759|       ).status,
+    760|     ).toBe(409);
+    761|     expect(mail).toHaveLength(1);
+       |                  ^
+    762|   });
+    763|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[50/65]⎯
+
+ FAIL  src/routes/v1/staff-invitations.test.ts > staff invitations through normal authenticated HTTP > accepts verified OIDC and legacy signed links without reactivating revoked legacy records
+AssertionError: expected 'unconfirmed' to be 'sent' // Object.is equality
+
+Expected: "sent"
+Received: "unconfirmed"
+
+ ❯ create src/routes/v1/staff-invitations.test.ts:125:43
+    123|     duplicate: boolean;
+    124|   };
+    125|   expect(result.invitation.deliveryState).toBe(expectedDelivery);
+       |                                           ^
+    126|   return result;
+    127| };
+ ❯ src/routes/v1/staff-invitations.test.ts:765:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[51/65]⎯
+
+ FAIL  src/routes/v1/twilio.test.ts > records no consent until the correct handset confirms the optional purposes
+AssertionError: expected [Function] to throw error matching /consent/ but got 'Outbound delivery is disabled by the …'
+
+- Expected:
+/consent/
+
++ Received:
+"Outbound delivery is disabled by the staging safety hold"
+
+ ❯ src/routes/v1/twilio.test.ts:339:4
+    337|   await expect(
+    338|     sendTwilioSms(phone, "Hello", context("before-consent")),
+    339|   ).rejects.toThrow(/consent/);
+       |    ^
+    340|   const response = await realFetch(base + `/api/v1/public/sms/enroll?p…
+    341|     method: "POST",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[52/65]⎯
+
+ FAIL  src/routes/v1/twilio.test.ts > sends one provider request for a stable operation and binds monotonic status to the recipient
+Error: Outbound delivery is disabled by the staging safety hold
+ ❯ assertOutboundDeliveryAllowed src/services/outbound-hold.ts:68:11
+     66| }): void {
+     67|   if (outboundDeliveryHeld())
+     68|     throw new Error("Outbound delivery is disabled by the staging safe…
+       |           ^
+     69|   if (input?.channel === "email")
+     70|     assertStagingEmailRecipientAllowed(input.recipient);
+ ❯ sendTwilioSms src/services/twilio-delivery.ts:25:3
+ ❯ src/routes/v1/twilio.test.ts:387:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[53/65]⎯
+
+ FAIL  src/routes/v1/twilio.test.ts > never blindly retries uncertain or rate-limited sends and blocks changed phone numbers
+AssertionError: expected [Function] to throw error matching /uncertain/ but got 'Outbound delivery is disabled by the …'
+
+- Expected:
+/uncertain/
+
++ Received:
+"Outbound delivery is disabled by the staging safety hold"
+
+ ❯ src/routes/v1/twilio.test.ts:476:4
+    474|   await expect(
+    475|     sendTwilioSms(phone, "Timeout", context("timeout")),
+    476|   ).rejects.toThrow(/uncertain/);
+       |    ^
+    477|   expect(sends).toBe(attempted);
+    478|   mode = "429";
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[54/65]⎯
+
+ FAIL  src/routes/v1/twilio.test.ts > applies STOP only to the routed organization and START does not restore old purposes
+AssertionError: expected [Function] to throw error matching /consent/ but got 'Outbound delivery is disabled by the …'
+
+- Expected:
+/consent/
+
++ Received:
+"Outbound delivery is disabled by the staging safety hold"
+
+ ❯ src/routes/v1/twilio.test.ts:516:4
+    514|   await expect(
+    515|     sendTwilioSms(phone, "Start alone", context("start")),
+    516|   ).rejects.toThrow(/consent/);
+       |    ^
+    517|   const [own] = await db
+    518|     .select()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[55/65]⎯
+
+ FAIL  src/routes/v1/twilio.test.ts > gates calls, starts only one staff leg, binds callbacks and prevents replaying the customer leg
+AssertionError: expected 503 to be 409 // Object.is equality
+
+- Expected
++ Received
+
+- 409
++ 503
+
+ ❯ src/routes/v1/twilio.test.ts:572:49
+    570|       body: JSON.stringify({ contactId, requestId, requestedByContact:…
+    571|     });
+    572|   expect((await makeCall(randomUUID())).status).toBe(409);
+       |                                                 ^
+    573|   expect(voiceSends).toBe(0);
+    574|   await db.update(twilioClientBindingsTable)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[56/65]⎯
+
+ FAIL  src/routes/v1/twilio.test.ts > routes an inbound call only to the configured staff phone and records a missed call without SMS
+AssertionError: expected '<?xml version="1.0" encoding="UTF-8"?…' to contain '+12025550109'
+
+Expected: "+12025550109"
+Received: "<?xml version="1.0" encoding="UTF-8"?><Response><Reject reason="busy"/></Response>"
+
+ ❯ src/routes/v1/twilio.test.ts:652:23
+    650|   expect(incoming.status).toBe(200);
+    651|   const incomingXml = await incoming.text();
+    652|   expect(incomingXml).toContain("+12025550109");
+       |                       ^
+    653|   expect(incomingXml).toContain("Synthetic &amp; Roofing");
+    654|   expect(incomingXml).not.toContain("MogulForge");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[57/65]⎯
+
+ FAIL  src/routes/v1/twilio.test.ts > hands an unknown missed caller to staff exactly once and never texts or auto-enrolls
+TypeError: Cannot read properties of undefined (reading 'contactId')
+ ❯ src/routes/v1/twilio.test.ts:707:15
+    705|     .from(twilioCallsTable)
+    706|     .where(eq(twilioCallsTable.providerSid, fields.CallSid));
+    707|   expect(call.contactId).toBeNull();
+       |               ^
+    708|   const completePath = `/api/v1/public/voice/complete?operation=${call…
+    709|   expect((await webhook(completePath, { ...fields, DialCallStatus: "no…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[58/65]⎯
+
+ FAIL  src/routes/v1/twilio.test.ts > requires an explicit valid voice business name and keeps the client template disabled
+AssertionError: expected 503 to be 409 // Object.is equality
+
+- Expected
++ Received
+
+- 409
++ 503
+
+ ❯ src/routes/v1/twilio.test.ts:780:28
+    778|       }),
+    779|     });
+    780|     expect(blocked.status).toBe(409);
+       |                            ^
+    781|     expect(voiceSends).toBe(beforeVoice);
+    782|     expect(sends).toBe(beforeSms);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[59/65]⎯
+
+ FAIL  src/routes/v1/twilio.test.ts > allows approved voice without a Messaging Service while SMS and tenant/account boundaries remain closed
+AssertionError: expected '<?xml version="1.0" encoding="UTF-8"?…' to contain '+12025550109'
+
+Expected: "+12025550109"
+Received: "<?xml version="1.0" encoding="UTF-8"?><Response><Reject reason="busy"/></Response>"
+
+ ❯ src/routes/v1/twilio.test.ts:826:34
+    824|     const inbound = await webhook("/api/v1/public/voice/inbound", fiel…
+    825|     expect(inbound.status).toBe(200);
+    826|     expect(await inbound.text()).toContain("+12025550109");
+       |                                  ^
+    827|     const [op] = await db
+    828|       .select()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[60/65]⎯
+
+ FAIL  src/routes/v1/twilio.test.ts > separates two contractor accounts across inbound, outbound, callback and revocation
+AssertionError: expected [Function] to throw error matching /outside this organization/ but got 'Outbound delivery is disabled by the …'
+
+- Expected:
+/outside this organization/
+
++ Received:
+"Outbound delivery is disabled by the staging safety hold"
+
+ ❯ src/routes/v1/twilio.test.ts:905:6
+    903|     organizationId: orgB, contactId: contactA,
+    904|     purpose: "customer_care", idempotencyKey: "tenant-b-cross-contact",
+    905|   })).rejects.toThrow(/outside this organization/);
+       |      ^
+    906|   const sentB = await sendTwilioSms(phone, "Service follow-up", {
+    907|     organizationId: orgB, contactId: contactB,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[61/65]⎯
+
+
+ Test Files  13 failed | 258 passed | 3 skipped (274)
+      Tests  65 failed | 2880 passed | 15 skipped (2960)
+   Start at  04:10:43
+   Duration  550.43s (transform 20.14s, setup 0ms, import 499.48s, tests 552.18s, environment 24ms)
+

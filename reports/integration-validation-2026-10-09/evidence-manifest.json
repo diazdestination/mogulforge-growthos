@@ -1,0 +1,111 @@
+{
+  "recordedAt": "2026-10-09T08:26:39.463Z",
+  "source": "bdcd5f2d56f5c0c08284dda8dd9d3d27cad60848",
+  "files": [
+    {
+      "file": "ui-results.json",
+      "bytes": 1264,
+      "sha256": "9bf840c8253bf7b053ad2d3faeb5887906c8dadbd9b4559d8adcfc09d0fc5e5c"
+    },
+    {
+      "file": "other-results.json",
+      "bytes": 4736,
+      "sha256": "0c0368039a9350a92e18263b2c4e48eb0a322fedf312decd0661cc66ba71d1ff"
+    },
+    {
+      "file": "email-results.json",
+      "bytes": 1298,
+      "sha256": "3a56f9a72a80780cc3e938c221bddbf32d21a40404d389a9aacbda4ab53ea81a"
+    },
+    {
+      "file": "full-ui.txt",
+      "bytes": 12860,
+      "sha256": "22ea51431f0132138859eeea4daf04a4db88187b3d65a98d98a8f8e360e97ccf"
+    },
+    {
+      "file": "tests-scripts.txt",
+      "bytes": 2322,
+      "sha256": "43733e769ce8c3e93ec06e2cd181b57cae5b3a451ed50746434f1e04986b7b15"
+    },
+    {
+      "file": "tests-lib-api-client-react.txt",
+      "bytes": 321,
+      "sha256": "5b68c1d9871098c07323cb8898df52ac7c1961606cef1b3172eb299ed5427781"
+    },
+    {
+      "file": "tests-cloudflare-email-intake.txt",
+      "bytes": 330,
+      "sha256": "9df8743f7cf7cd38d67e5736cc97dd3ca62a18eeb2a049ed42ff69950e1095e9"
+    },
+    {
+      "file": "website-adapter.txt",
+      "bytes": 1999,
+      "sha256": "c81ba7786646ee7a6ed5a2ca8552ec935153e800b5204ccab40a757e6e037b18"
+    },
+    {
+      "file": "website-operations.txt",
+      "bytes": 883,
+      "sha256": "f9510179a9194de2f6bf7a157e616b25074b2120bf0b0d866a6b8ba55cc9b8e6"
+    },
+    {
+      "file": "parity-results.json",
+      "bytes": 701,
+      "sha256": "67ec19aeee0dea9912ebb3aa237dc9f8af5a76276ecdfbe0b748391787ae62cd"
+    },
+    {
+      "file": "docker-parity.txt",
+      "bytes": 14554,
+      "sha256": "5901181ef72a7d71a80310e13a5259b59b622f206a2ffe43b573d6c1bd9bb815"
+    },
+    {
+      "file": "docker-parity-attempt1-cli-config.txt",
+      "bytes": 754,
+      "sha256": "839227677fcd466f994c0e5ab571600a464badf08f6ffad1c6a9df638632731c"
+    },
+    {
+      "file": "api-attempt1-global-hold-results.json",
+      "bytes": 2495,
+      "sha256": "6fa797ec6d46b77867f90513677dc039c2dc65951d55d3b2d3027cd1d56c2074"
+    },
+    {
+      "file": "full-api-pg16-attempt1-global-hold.txt",
+      "bytes": 125115,
+      "sha256": "6bd6891408f0b880fbc0cdb3707007bb44cdf220a1da326ffa8c82edfacb3508"
+    },
+    {
+      "file": "fixture-identity.json",
+      "bytes": 78,
+      "sha256": "0985bee76c17ac9cecf3a5b3c4090f9d7dc895dfb8012b8034fe6fa22712b696"
+    },
+    {
+      "file": "fixture-schema-count.json",
+      "bytes": 14,
+      "sha256": "c326825adb9578c8f864d8f13e4044d2aaa9548233cde1f8bf7c61c46410297e"
+    },
+    {
+      "file": "api-results.json",
+      "bytes": 2475,
+      "sha256": "9e46a3c28e56ddd32bd7801d11ed42f5f716d1b05992d78d689b47a688c93602"
+    },
+    {
+      "file": "full-api-pg16.txt",
+      "bytes": 75306,
+      "sha256": "07f985ef0b7697337800182ce621d7485081a0c4e11592e63fb3c49a57cd0456"
+    },
+    {
+      "file": "fixture-schema.txt",
+      "bytes": 5995,
+      "sha256": "f29aac02d3d02feab2adeed1ae533f8b6af5b1c1e67f68d2dbf6910fdfe28ccf"
+    },
+    {
+      "file": "fixture-cleanup.json",
+      "bytes": 591,
+      "sha256": "0ba112d3a6c4e9d7e20c6d97fc1f7a02e4731cde4f3c15c71cb28034d1ec13ee"
+    },
+    {
+      "file": "fixture-cleanup-attempt1-decoder.json",
+      "bytes": 350,
+      "sha256": "94d9309e7f4fb5134a80dc5270664b035c7fe251711acdd22e892179475c632d"
+    }
+  ]
+}

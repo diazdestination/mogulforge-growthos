@@ -1,0 +1,27 @@
+{
+  "source": "bdcd5f2d56f5c0c08284dda8dd9d3d27cad60848",
+  "startedAt": "2026-10-09T08:16:44.023Z",
+  "finishedAt": "2026-10-09T08:18:49.711Z",
+  "exitCode": 0,
+  "log": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\work\\validation\\docker-parity.log",
+  "environmentKeyNames": [
+    "ALLUSERSPROFILE",
+    "APPDATA",
+    "ComSpec",
+    "LOCALAPPDATA",
+    "Path",
+    "PATHEXT",
+    "ProgramData",
+    "ProgramFiles",
+    "ProgramFiles(x86)",
+    "ProgramW6432",
+    "SystemRoot",
+    "TEMP",
+    "TMP",
+    "USERPROFILE",
+    "windir",
+    "CI",
+    "NO_COLOR"
+  ],
+  "scope": "new disposable local Compose project only; outbound held; script cleanup in finally"
+}

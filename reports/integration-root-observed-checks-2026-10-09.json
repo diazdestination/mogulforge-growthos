@@ -1,0 +1,13 @@
+{
+  "kind": "ROOT_OBSERVED_ACTUAL_CHECKS",
+  "applicationSource": "bdcd5f2d56f5c0c08284dda8dd9d3d27cad60848",
+  "rawConsoleNotSeparatelyCaptured": true,
+  "checks": [
+    {"command": "pnpm run typecheck", "completionTool": "3b4867", "exitCode": 0},
+    {"command": "pnpm --filter @workspace/cloudflare-email-intake run typecheck", "completionTool": "f6c4be", "exitCode": 0},
+    {"command": "pnpm --filter @workspace/command-center run build", "completionTool": "3c3b2b", "exitCode": 0},
+    {"command": "pnpm --filter @workspace/api-server run build", "completionTool": "3c3b2b", "exitCode": 0},
+    {"command": "node scripts/lead-alert-coverage-schema-preview.mjs", "completionTool": "29a2b6", "exitCode": 0, "previousTables": 141, "expectedTables": 142, "statements": 3, "oldDefinitionsUnchanged": true, "historicalDml": false, "databaseOpened": false}
+  ],
+  "scope": "actual Root-observed local checks; no independent rerun or reconstructed raw console; Docker raw log additionally proves production builds"
+}

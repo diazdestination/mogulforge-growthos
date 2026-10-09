@@ -1,0 +1,42 @@
+
+ RUN  v4.1.10 C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/scripts
+
+ ✓ hosted-pilot-drill.test.mjs (17 tests) 48ms
+ ✓ pilot-crash-drill.test.mjs (20 tests) 4412ms
+ ✓ pilot-staging-connection.test.mjs (82 tests) 26ms
+ ✓ pilot-scheduler-probe.test.mjs (25 tests) 76ms
+ ✓ restore-drill-fixture.test.mjs (10 tests) 7205ms
+     ✓ verifies an independent recovered in-memory database copy and detects altered recovery data  1874ms
+ ✓ restore-drill-readonly.test.mjs (6 tests) 14ms
+ ✓ github-api-push.test.mjs (9 tests) 7ms
+
+  ...rver\.contractor-recovery-mkwNHI\contractor-recovery-entry.mjs   17.3mb
+  ...tifacts\api-server\.contractor-recovery-mkwNHI\pino-worker.mjs  154.9kb
+  ..\artifacts\api-server\.contractor-recovery-mkwNHI\pino-file.mjs  143.4kb
+  ...tifacts\api-server\.contractor-recovery-mkwNHI\pino-pretty.mjs  116.1kb
+  ...pi-server\.contractor-recovery-mkwNHI\thread-stream-worker.mjs    7.7kb
+  ...and 5 more output files...
+
+Done in 2019ms
+ ✓ contractor-recovery-drill.test.mjs (1 test) 22127ms
+   ✓ upgrades the full prior schema, restores both synthetic companies, boots a read-only real app and preserves uncertainty/holds  22125ms
+ ✓ test-support/pglite-socket-cleanup.test.mjs (9 tests) 9262ms
+     ✓ waits for a real disconnected client's gated ROLLBACK before database close  1966ms
+     ✓ drains repeated multi-client close events without an arbitrary delay  7284ms
+ ✓ pilot-scheduler-preflight.test.mjs (4 tests) 2587ms
+ ✓ release-identity-build.test.mjs (15 tests) 10ms
+ ✓ release-schema.test.mjs (15 tests) 382ms
+ ✓ pilot-staging-bootstrap.test.mjs (6 tests) 13ms
+ ✓ readiness-parity-contract.test.mjs (1 test) 729ms
+   ✓ validates the real parity JSON parsing path across PowerShell timestamp coercion  728ms
+ ✓ pilot-mobile-schema.test.mjs (2 tests) 2677ms
+ ✓ restore-drill-connection.test.mjs (3 tests) 73ms
+ ✓ staging-readonly-preflight.test.mjs (2 tests) 4ms
+ ✓ pilot-scheduler-idle.test.mjs (20 tests) 64513ms
+     ✓ runs the frozen historical scheduler twice at its real 60-second interval, then stops without changing tenant state  61430ms
+
+ Test Files  18 passed (18)
+      Tests  247 passed (247)
+   Start at  04:10:28
+   Duration  65.26s (transform 624ms, setup 0ms, import 3.22s, tests 114.17s, environment 2ms)
+

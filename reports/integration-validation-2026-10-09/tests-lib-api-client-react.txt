@@ -1,0 +1,10 @@
+
+ RUN  v4.1.10 C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/lib/api-client-react
+
+ ✓ src/custom-fetch.test.ts (13 tests) 39ms
+
+ Test Files  1 passed (1)
+      Tests  13 passed (13)
+   Start at  04:11:34
+   Duration  352ms (transform 46ms, setup 0ms, import 78ms, tests 39ms, environment 0ms)
+
