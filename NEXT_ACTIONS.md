@@ -11,7 +11,8 @@
 2. Prepare the exact hosted SQL/source/image/target and recovery procedure.
    `scripts/release-schema.mjs` is retired and always refuses; approval variables
    cannot turn it into a safe migration. Current source has 141 tables, with no
-   additions in this candidate. Obtain fresh authorized hosted identity/readiness
+   additions in this candidate. The `AUTO_MIGRATE` startup bypass is also retired;
+   keep it disabled. Obtain fresh authorized hosted identity/readiness
    evidence; October 8 public readiness returned 404 and staging timed out.
 3. Finish L9 delivery coverage: visibly account for configured recipients with
    no eligible phone/session, then accept both real owners' installed devices,

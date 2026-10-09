@@ -39,6 +39,13 @@ The fixed launch list and both companies' full replacement cards remain open.
   cannot borrow a supplied SHA. Docker installs require the committed lockfile.
   See [operator impact and 30 focused tests](release-safety-2026-10-08.md).
 
+Root's integration follow-up also found and retired the `AUTO_MIGRATE` startup
+alternative, which independently invoked forced schema push. Disabled startup
+remains a no-op; enabling the legacy flag refuses before database/child access.
+The example configuration no longer recommends it. This closes the same unsafe
+mutation through either hosted release or process startup, without adding a new
+migration executor. The follow-up requires its own full final-head CI result.
+
 An ordinary Fly deployment now stops at its legacy release command. This is a
 deliberate closure of an unsafe mutation path, not a replacement hosted migration
 executor. A reviewed exact-source/SQL/target/backup procedure is still required.
@@ -54,6 +61,9 @@ executor. A reviewed exact-source/SQL/target/backup procedure is still required.
   Full GitHub CI must run them on PostgreSQL 16. The existing Smart Sites suite's
   synthetic staff fixture now explicitly models verified accepted responders;
   its protective local `*_test` database guard is preserved.
+- Startup and restore-mode checks: **27 tests passed** in a sanitized unit runner
+  without the API database setup. Enabled legacy flags cannot access the pool,
+  spawn a child or log connection details; disabled and restore-only behavior is preserved.
 - All release/scripts suites: **247 tests passed in 18 files**, including current
   synthetic compatible recovery and 30 focused release-safety checks.
 - Both production builds passed. Existing bundle-size/toolchain deprecation

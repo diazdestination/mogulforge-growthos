@@ -8,9 +8,10 @@ Work branch: `agent/growthos-production-gaps-20261008`, from main
 the new repair; it does not attest the deployed application or a later CI run.
 
 Owned changes are the generic schema-release script and its tests, API build
-identity and its dedicated tests, one Docker dependency-install option, and
-this note. No schema, provider configuration, customer data or hosted system
-was changed.
+identity and its dedicated tests, one Docker dependency-install option, the
+startup migration guard and its tests, environment/startup comments, and this
+note. No schema, provider configuration, customer data or hosted system was
+changed by these release-safety repairs.
 
 ## 1. Retired generic forced schema mutation
 
@@ -74,6 +75,33 @@ An inconsistent committed lockfile must fail the image build instead of being
 rewritten during installation. No dependency installation was performed in
 this lane; full image build/parity remains an integration/CI check.
 
+## 3. Retired startup schema mutation
+
+The follow-up audit found a second path in
+`artifacts/api-server/src/lib/auto-migrate.ts`: `AUTO_MIGRATE=true`, `1` or
+`yes` acquired a database advisory lock and started `drizzle-kit push --force`
+from the serving process. `.env.example` recommended this as a beta fallback.
+Retiring the generic Fly release command alone did not close this path.
+
+`runAutoMigrate` now has no database, child-process or logger dependencies. An
+enabled flag, including case and surrounding-whitespace variants, rejects
+with one fixed operator message before this function performs any I/O. Its
+disabled/unset behavior remains a no-op. Approval flags, a connection URL,
+`MIGRATE_CWD` or a restore flag cannot authorize startup schema mutation.
+
+**Normal startup with an enabled legacy setting now fails before HTTP listen
+and startup seeding.** For an authorized rollout, leave `AUTO_MIGRATE` unset or
+`false` and apply only the separately reviewed exact-source/SQL/target/recovery
+procedure. A disabled flag does not verify that the database schema is current.
+No hosted environment values were inspected or changed by this repair.
+
+The invocation remains in `index.ts`. Its existing staging/restore identity
+preflights still run earlier; their order and behavior are unchanged. The
+validated restore-only path still bypasses normal startup work and still
+requires `AUTO_MIGRATE=false` through the existing restore validator. Only
+comments changed in `index.ts`. `.env.example` now explains the retired flag
+and no longer advertises `MIGRATE_CWD` as a startup provisioning option.
+
 ## Local verification
 
 Command:
@@ -98,7 +126,45 @@ Result: **30 tests passed in two files**, no skips (October 8 local run).
   after checking the owned temporary path.
 - The four JavaScript files were formatted with repository Prettier.
 
+### Startup follow-up
+
+The new `src/lib/auto-migrate.test.ts` has **21 passing tests**. Existing
+`src/lib/restore-mode.test.ts` adds **6 passing tests**; total **27 passed**,
+no skips. The test run disabled Vitest config discovery to avoid the API's
+database-provisioning global setup and retained only operating-system path
+variables plus synthetic test settings. It used no database.
+
+`pnpm --filter @workspace/api-server exec tsc -p tsconfig.json --noEmit` passed.
+Scoped Prettier and `git diff --check` also passed. An independent source and
+operator-note review reported no blocking finding.
+
+Reproduce from the repository root in PowerShell:
+
+```powershell
+@'
+import { fileURLToPath } from 'node:url';
+const allowed = Object.fromEntries(Object.entries(process.env).filter(([key]) => /^(PATH|SystemRoot|WINDIR|TEMP|TMP|PATHEXT|COMSPEC)$/i.test(key)));
+process.env = { ...allowed, NODE_ENV: 'test', NO_COLOR: '1' };
+const { startVitest } = await import('./artifacts/api-server/node_modules/vitest/dist/node.js');
+const ctx = await startVitest('test', ['src/lib/auto-migrate.test.ts', 'src/lib/restore-mode.test.ts'], {
+  root: fileURLToPath(new URL('./artifacts/api-server/', import.meta.url)),
+  config: false, watch: false, maxWorkers: 1, fileParallelism: false,
+});
+if (!ctx || ctx.state.getFiles().some(file => file.result?.state === 'fail') || ctx.state.getUnhandledErrors().length) process.exitCode = 1;
+await ctx?.close();
+'@ | node --input-type=module
+```
+
+The startup tests cover all three enabled forms and case/space variants,
+disabled/unset behavior, default invocation with an entirely synthetic process
+environment, refusal despite approval/restore flags, and access to only the
+single migration flag. Database imports, pool calls, child-process launches
+and migration logging are guarded and asserted unused. Error text is fixed
+and contains neither the connection nor directory canary. Existing restore
+checks still reject an enabled migration flag.
+
 There were no provider requests, database connections, installs, deployments,
-commits or pushes in this lane. The parent owns final integration, exact-head
-CI and current release records. Hosted readiness, migration, restore and
-customer/provider acceptance remain separate evidence.
+commits or pushes in the release-safety implementation and unit verification.
+The parent owns final integration, exact-head CI and current release records.
+Hosted readiness, migration, restore and customer/provider acceptance remain
+separate evidence.

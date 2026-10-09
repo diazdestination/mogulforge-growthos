@@ -88,3 +88,14 @@ The lane also owns `artifacts/api-server/build-identity.mjs` and its dedicated
 tests: a Git command failure inside a known checkout cannot fall back to a
 supplied SHA as though `.git` were absent. Keep legitimate explicit Docker
 build-context identity behavior. Test these failures and complete full CI.
+
+### Same-risk startup follow-up
+
+During integration, root found the optional `AUTO_MIGRATE` startup path still
+invoked forced schema push directly, and `.env.example` recommended it. Extend
+the release lane to `lib/auto-migrate.ts`, its focused tests, the startup comment
+and example-environment guidance. Disabled startup remains a no-op; enabled
+spellings must refuse with a fixed message before database/child access. Preserve
+restore-only startup and isolated explicit CI provisioning. No fallback flag or
+new migration executor. Finish the in-progress first CI before pushing this
+follow-up, then require a fresh full exact-head run for the complete candidate.

@@ -15,6 +15,8 @@ responders are rechecked under locks; task/audit updates remain atomic. No schem
 The candidate also retires unsafe automatic forced schema reconciliation and
 fixes build identity after Git failures. **The old Fly release command now stops.**
 Use `reports/release-safety-2026-10-08.md` before any proposed hosted rollout.
+The legacy `AUTO_MIGRATE` startup alternative is also retired; enabled flags
+refuse normal startup. Leave it disabled and use the reviewed migration procedure.
 
 Evidence and remaining gaps: `reports/production-gaps-2026-10-08.md`. GitHub's
 current PR checks are the authoritative candidate PostgreSQL/Docker result;

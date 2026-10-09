@@ -11,11 +11,15 @@ export interface SmartSiteInquiryOwnership {
   leadId: string;
   siteName: string;
   status: string;
+  /** @nullable */
   assignedUserId: string | null;
+  /** @nullable */
   ownerName: string | null;
   ownerEligible: boolean;
   receivedAt: Date;
+  /** @nullable */
   dueAt: Date | null;
+  /** @nullable */
   firstAttemptAt: Date | null;
   canClaim: boolean;
   serverNow: Date;

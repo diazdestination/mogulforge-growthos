@@ -22,6 +22,9 @@ push for any identity or approval flag. An ordinary Fly release using it will
 stop. Do not remove/bypass it to force a rollout. Prepare a separately reviewed
 exact SQL/source/image/target and backup/restore procedure; see
 `reports/release-safety-2026-10-08.md`. Isolated Compose/CI provisioning is separate.
+The old `AUTO_MIGRATE` startup alternative is also retired. Leave it disabled;
+enabled spellings now refuse startup before this module opens a database or
+starts a schema process. Startup does not perform schema reconciliation.
 No hosted credentials, schema, customer contacts or notification policy changed.
 
 Local targeted API check (fresh disposable PGlite, no provider configuration):

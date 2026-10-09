@@ -10,8 +10,9 @@ wording below is historical where it conflicts with this snapshot.
 The current private candidate adds exact notification-to-lead ownership and one
 initial claim, with accepted-staff locking and retry/conflict UX. It addresses
 part of L9; no full launch item is closed. It also removes the generic forced
-schema release path and fixes Git failure identity handling for L10. Any hosted
-rollout now requires a separately reviewed migration procedure. Evidence:
+schema release path and fixes Git failure identity handling for L10. Hosted
+rollout must leave the retired `AUTO_MIGRATE` startup flag disabled and follow a
+separately reviewed migration procedure. Evidence:
 `reports/production-gaps-2026-10-08.md` and `reports/release-safety-2026-10-08.md`.
 Actual hosted/provider/device/company acceptance remains open. In particular,
 dual-recipient coverage, actual alerts, after-hours response, source migration,
