@@ -151,11 +151,11 @@ const items: ContractorNavigationItem[] = [
     keywords: "revenue recovery agents autopilot intelligence",
   },
   {
-    title: "Agent team",
+    title: "Specialists",
     href: "/agent-team",
     icon: Users,
     group: "More tools",
-    keywords: "agents roles",
+    keywords: "agents roles specialists guides esti bill invo sched appt callie maintain scout",
   },
   {
     title: "Evidence Intelligence",

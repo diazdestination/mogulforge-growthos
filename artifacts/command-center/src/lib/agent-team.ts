@@ -1,119 +1,431 @@
 export type AgentTaskStage = 'workspace' | 'setup' | 'planned';
-
-export interface AgentTask {
-  title: string;
-  stage: AgentTaskStage;
-  reality: string;
-}
-
+export interface AgentTask { title: string; stage: AgentTaskStage; reality: string; }
 export interface AgentProfile {
-  id: string;
-  name: string;
-  role: string;
-  promise: string;
-  portrait: string;
-  workspace?: string;
-  workspaceLabel?: string;
+  id: string; name: string; role: string; promise: string; portrait: string;
+  category: 'finance' | 'operations'; workspace: string; workspaceLabel: string;
   tasks: readonly AgentTask[];
 }
-
-/**
- * The illustrated agent team is a product map, not a claim that eight autonomous
- * workers are deployed. Keep every task tied to an inspectable current state.
- */
+/** Illustrated specialists identify workspaces; they do not imply autonomous execution. */
 export const AGENT_TEAM: readonly AgentProfile[] = [
   {
-    id: 'esti', name: 'ESTI', role: 'The Estimate Architect',
-    promise: 'Turn a scoped opportunity into an estimate your team can review.',
-    portrait: '/agent-profiles/esti.webp', workspace: '/estimates', workspaceLabel: 'Open estimates',
-    tasks: [
-      { title: 'Job measurements & scope building', stage: 'workspace', reality: 'Staff can create estimate line items and connect them to a lead. Automated measurement and scope extraction are not live.' },
-      { title: 'Pricing intelligence & templates', stage: 'planned', reality: 'Trade-specific price books and margin guidance still need governed source data and approval rules.' },
-      { title: 'Proposal generation & delivery', stage: 'planned', reality: 'A customer-ready proposal workflow and tracked delivery are not yet released.' },
-      { title: 'Estimate follow-up & nurturing', stage: 'setup', reality: 'Revenue Desk can surface follow-up work. Customer outreach needs approved provider setup, consent, and release acceptance.' },
-    ],
+    "id": "esti",
+    "name": "ESTI",
+    "role": "Estimates & proposals",
+    "promise": "Build a clear estimate from the scope, then review the next step.",
+    "category": "finance",
+    "portrait": "/agent-profiles/esti.webp",
+    "workspace": "/estimates",
+    "workspaceLabel": "Open estimates",
+    "tasks": [
+      {
+        "title": "Scope & line items",
+        "stage": "workspace",
+        "reality": "Prepare quantities, prices and line items in the estimate workspace. Your team reviews the scope and totals."
+      },
+      {
+        "title": "Estimate status & follow-up",
+        "stage": "workspace",
+        "reality": "Track drafts, decisions and follow-up. Changing a status does not itself deliver a proposal or contact a customer."
+      },
+      {
+        "title": "Returning-customer estimates",
+        "stage": "workspace",
+        "reality": "Prepare new work for an existing customer and property without creating a new acquisition lead."
+      },
+      {
+        "title": "Price books & margin guidance",
+        "stage": "planned",
+        "reality": "Governed trade price books and automatic margin recommendations remain planned. Staff enter and review pricing today."
+      }
+    ]
   },
   {
-    id: 'bill', name: 'BILL', role: 'The Billing Guardian',
-    promise: 'Keep the financial handoff visible without guessing at money.',
-    portrait: '/agent-profiles/bill.webp',
-    tasks: [
-      { title: 'Invoices & progress billing', stage: 'planned', reality: 'Customer invoicing is not built. The existing Billing page manages GrowthOS subscriptions, not contractor invoices.' },
-      { title: 'Payment tracking & reminders', stage: 'planned', reality: 'Recorded payments are not a connected accounting ledger; payment-provider reconciliation and consented reminders are still needed.' },
-      { title: 'Late payment recovery', stage: 'planned', reality: 'Collections workflows require approved policies, provider integration, and human review.' },
-      { title: 'Lien & notice management', stage: 'planned', reality: 'Legal deadlines and notices require jurisdiction-specific professional review. GrowthOS will not auto-file or send them.' },
-    ],
+    "id": "bill",
+    "name": "BILL",
+    "role": "Balances & receipts",
+    "promise": "Understand what is owed and what has been recorded against it.",
+    "category": "finance",
+    "portrait": "/agent-profiles/bill.webp",
+    "workspace": "/invoices",
+    "workspaceLabel": "Review invoice balances",
+    "tasks": [
+      {
+        "title": "Invoice balances",
+        "stage": "workspace",
+        "reality": "Review issued totals, recorded receipts and the remaining balance in the customer invoice workspace."
+      },
+      {
+        "title": "External receipts & corrections",
+        "stage": "workspace",
+        "reality": "Authorized staff can record evidenced external receipts and refund corrections. These records do not move money or verify bank settlement."
+      },
+      {
+        "title": "Financial history",
+        "stage": "workspace",
+        "reality": "Keep issued documents, opening balances and later receipts distinguishable. The Billing page manages GrowthOS subscriptions separately."
+      },
+      {
+        "title": "Card & bank collection",
+        "stage": "planned",
+        "reality": "Taking customer card or bank payments is a future add-on. Use your established payment process today."
+      }
+    ]
   },
   {
-    id: 'invo', name: 'INVO', role: 'The Invoice Intelligence Agent',
-    promise: 'Catch invoice exceptions and make receivables easier to manage.',
-    portrait: '/agent-profiles/invo.webp',
-    tasks: [
-      { title: 'Invoice creation & automation', stage: 'planned', reality: 'No contractor invoice generator is live; the canonical invoice model and accounting connector come first.' },
-      { title: 'Exception detection & flagging', stage: 'planned', reality: 'Invoice accuracy checks need trusted line items, payment state, and an auditable exception queue.' },
-      { title: 'Client payment portal management', stage: 'planned', reality: 'No customer payment portal is live. Payment collection remains outside the beta scope.' },
-      { title: 'A/R aging & collections workflow', stage: 'planned', reality: 'A/R aging requires an authoritative invoice and payment source before it can be shown responsibly.' },
-    ],
+    "id": "invo",
+    "name": "INVO",
+    "role": "Invoice documents & delivery",
+    "promise": "Prepare the document, check the details and review delivery.",
+    "category": "finance",
+    "portrait": "/agent-profiles/invo.webp",
+    "workspace": "/invoices",
+    "workspaceLabel": "Open invoices",
+    "tasks": [
+      {
+        "title": "Draft & issue invoices",
+        "stage": "workspace",
+        "reality": "Authorized staff can prepare a draft, review its saved details and issue a customer invoice. Issued document history is retained."
+      },
+      {
+        "title": "Document & customer review",
+        "stage": "workspace",
+        "reality": "Review the customer, job, line items and issued document before choosing the next action."
+      },
+      {
+        "title": "Invoice email delivery",
+        "stage": "setup",
+        "reality": "The delivery worklist exposes pending and uncertain attempts. Sending requires an approved mailbox, recipient and company delivery setup; uncertain sends are not retried automatically."
+      },
+      {
+        "title": "Exceptions & audit history",
+        "stage": "workspace",
+        "reality": "Inspect saved document changes, recorded financial events and delivery exceptions before resolving them."
+      }
+    ]
   },
   {
-    id: 'sched', name: 'SCHED', role: 'The Schedule Optimizer',
-    promise: 'Give dispatch a clear picture of appointments and capacity.',
-    portrait: '/agent-profiles/sched.webp', workspace: '/appointments', workspaceLabel: 'Open appointments',
-    tasks: [
-      { title: 'Job scheduling & routing', stage: 'workspace', reality: 'Staff can create and update appointments. Job routing and route optimization are not built.' },
-      { title: 'Crew & resource allocation', stage: 'planned', reality: 'A crew/skills/capacity model is needed before assignments can be optimized.' },
-      { title: 'Schedule adjustments & alerts', stage: 'planned', reality: 'Automated change alerts require a verified calendar and notification connector.' },
-      { title: 'Conflict detection & resolution', stage: 'planned', reality: 'There is not yet a cross-crew conflict engine or safe automatic rescheduler.' },
-    ],
+    "id": "sched",
+    "name": "SCHED",
+    "role": "Schedule & dispatch",
+    "promise": "Keep visits, assignments and the day’s work in view.",
+    "category": "operations",
+    "portrait": "/agent-profiles/sched.webp",
+    "workspace": "/appointments",
+    "workspaceLabel": "Open schedule",
+    "tasks": [
+      {
+        "title": "Visit scheduling",
+        "stage": "workspace",
+        "reality": "Create and update staff-booked appointments linked to the relevant customer, property and work."
+      },
+      {
+        "title": "Workday coordination",
+        "stage": "workspace",
+        "reality": "Review scheduled visits and their saved status. Required structured work must be completed through its work record."
+      },
+      {
+        "title": "Change review",
+        "stage": "workspace",
+        "reality": "Review the current appointment when a change is uncertain; no reschedule is repeated automatically."
+      },
+      {
+        "title": "Automatic route optimization",
+        "stage": "planned",
+        "reality": "Cross-crew route optimization and an automatic conflict resolver remain planned. Your team controls assignments and scheduling."
+      }
+    ]
   },
   {
-    id: 'appt', name: 'APPT', role: 'The Appointment Ally',
-    promise: 'Make the next visit clear for both the customer and the office.',
-    portrait: '/agent-profiles/appt.webp', workspace: '/appointments', workspaceLabel: 'Open appointments',
-    tasks: [
-      { title: 'Appointment booking & confirmations', stage: 'workspace', reality: 'Staff can book and update appointments in GrowthOS; automated customer confirmations need provider launch approval.' },
-      { title: 'Calendar synchronization', stage: 'planned', reality: 'A full external calendar adapter is explicitly deferred until the paid-beta core is proven.' },
-      { title: 'Email, SMS & voice reminders', stage: 'setup', reality: 'Reminder controls exist, but customer-facing delivery is not enabled for Painless or HVAC and must pass consent/provider acceptance.' },
-      { title: 'No-show recovery & rescheduling', stage: 'planned', reality: 'A no-show trigger, recovery policy, and rescheduling workflow still need to be built.' },
-    ],
+    "id": "appt",
+    "name": "APPT",
+    "role": "Bookings & visit details",
+    "promise": "Keep the customer, property and next visit connected.",
+    "category": "operations",
+    "portrait": "/agent-profiles/appt.webp",
+    "workspace": "/appointments",
+    "workspaceLabel": "Open appointments",
+    "tasks": [
+      {
+        "title": "Staff-confirmed booking",
+        "stage": "workspace",
+        "reality": "Book and update appointments in GrowthOS after your team confirms the visit."
+      },
+      {
+        "title": "Customer & property details",
+        "stage": "workspace",
+        "reality": "Choose the property for new manual appointments and keep existing visit history connected to its saved work."
+      },
+      {
+        "title": "Customer confirmations",
+        "stage": "setup",
+        "reality": "Customer-facing confirmations and reminders require approved delivery setup and consent. A draft or staff booking alone does not send a message."
+      },
+      {
+        "title": "External calendar sync",
+        "stage": "planned",
+        "reality": "Full external calendar synchronization remains planned; the GrowthOS schedule is the available workspace."
+      }
+    ]
   },
   {
-    id: 'callie', name: 'CALLIE', role: 'The Missed Call Responder',
-    promise: 'Turn a missed call into an owned callback, then a real opportunity.',
-    portrait: '/agent-profiles/callie.webp', workspace: '/calls', workspaceLabel: 'Open calls',
-    tasks: [
-      { title: 'Missed call detection & reception', stage: 'setup', reality: 'The company-scoped staff-first call flow supports a reviewed choice of keypad intake or voice-only conversation, with one accountable callback task. Provider setup and real audio/phone acceptance remain; neither pilot is live.' },
-      { title: 'Follow-up & human handoff', stage: 'setup', reality: 'Keypad mode supports one caller-confirmed text; conversation mode can attempt one reviewed fixed handoff. A phone answer may be voicemail. Neither confirms a visit or grants general messaging permission.' },
-      { title: 'Lead qualification & routing', stage: 'workspace', reality: 'Staff can review a call and create an opportunity when confirmed. Autonomous qualification is not live.' },
-      { title: 'Call analytics & reporting', stage: 'workspace', reality: 'The Calls workspace records calls and callback outcomes; provider-connected analytics need live acceptance.' },
-    ],
+    "id": "callie",
+    "name": "CALLIE",
+    "role": "Calls & intake",
+    "promise": "Turn a missed call into a clear callback and reviewed next step.",
+    "category": "operations",
+    "portrait": "/agent-profiles/callie.webp",
+    "workspace": "/calls",
+    "workspaceLabel": "Open calls",
+    "tasks": [
+      {
+        "title": "Call & callback review",
+        "stage": "workspace",
+        "reality": "Review call records and callback outcomes, then assign the appropriate staff follow-up."
+      },
+      {
+        "title": "Reviewed opportunity intake",
+        "stage": "workspace",
+        "reality": "Staff can connect reviewed call details to an opportunity when the customer’s need is confirmed."
+      },
+      {
+        "title": "Keypad or voice intake",
+        "stage": "setup",
+        "reality": "Company-scoped keypad and voice-only intake need provider setup and real phone acceptance before activation. Neither pilot is live."
+      },
+      {
+        "title": "Approved human handoff",
+        "stage": "setup",
+        "reality": "A reviewed conversation may attempt one fixed handoff after setup. A phone answer may be voicemail; neither a call nor a handoff confirms a visit or grants general messaging permission."
+      }
+    ]
   },
   {
-    id: 'maintain', name: 'MAINTAIN', role: 'The Maintenance Watchdog',
-    promise: 'Keep warranty and service dates from disappearing into a spreadsheet.',
-    portrait: '/agent-profiles/maintain.webp', workspace: '/service', workspaceLabel: 'Open service desk',
-    tasks: [
-      { title: 'Maintenance reminders & scheduling', stage: 'workspace', reality: 'Service dates create staff follow-up tasks. They do not yet send customer reminders or book a technician automatically.' },
-      { title: 'Inspection checklists & tracking', stage: 'planned', reality: 'Equipment-specific service checklists and completion evidence are not built.' },
-      { title: 'Warranty & service alerts', stage: 'setup', reality: 'Warranty and plan obligations can be imported and tracked; customer alerts still require approved message automation.' },
-      { title: 'Preventative maintenance programs', stage: 'planned', reality: 'Recurring program rules, entitlements, and visit reconciliation still need a product workflow.' },
-    ],
+    "id": "maintain",
+    "name": "MAINTAIN",
+    "role": "Warranties & service",
+    "promise": "Keep equipment, service dates and required work from being missed.",
+    "category": "operations",
+    "portrait": "/agent-profiles/maintain.webp",
+    "workspace": "/service",
+    "workspaceLabel": "Open service desk",
+    "tasks": [
+      {
+        "title": "Service obligations",
+        "stage": "workspace",
+        "reality": "Track warranty and service dates and create staff follow-up work. These records do not automatically book a technician."
+      },
+      {
+        "title": "Equipment & checklists",
+        "stage": "workspace",
+        "reality": "Review company equipment and configurable checklists, and keep visit completion evidence with its work record."
+      },
+      {
+        "title": "Standing service work",
+        "stage": "workspace",
+        "reality": "Manage saved recurring service work and review obligations and visit outcomes without inferring a manufacturer warranty."
+      },
+      {
+        "title": "Customer service reminders",
+        "stage": "setup",
+        "reality": "Customer reminders require approved company delivery setup and contact consent. Staff follow-up tasks do not send customer reminders themselves."
+      }
+    ]
   },
   {
-    id: 'scout', name: 'SCOUT', role: 'The Opportunity Scout',
-    promise: 'Find the revenue already hiding in your existing pipeline.',
-    portrait: '/agent-profiles/scout.webp', workspace: '/reactivation', workspaceLabel: 'Open win-back',
-    tasks: [
-      { title: 'Dead-lead resurrection campaigns', stage: 'setup', reality: 'CSV import, segments, preview, and campaign controls exist in code. Live outreach requires consent, provider readiness, and release approval.' },
-      { title: 'Missed opportunity detection', stage: 'workspace', reality: 'Revenue Desk can surface unowned inquiries, stalled follow-up, and estimates awaiting a decision.' },
-      { title: 'Process & efficiency analysis', stage: 'workspace', reality: 'Current insights and reports expose recorded activity; they do not prove causal improvement by themselves.' },
-      { title: 'Revenue growth recommendations', stage: 'workspace', reality: 'Next-best actions are operator-reviewed suggestions with supporting records, not autonomous business decisions.' },
-    ],
-  },
+    "id": "scout",
+    "name": "SCOUT",
+    "role": "Pipeline & follow-up",
+    "promise": "Find the opportunities that need an owner or a next action.",
+    "category": "finance",
+    "portrait": "/agent-profiles/scout.webp",
+    "workspace": "/bie",
+    "workspaceLabel": "Open Revenue Desk",
+    "tasks": [
+      {
+        "title": "Revenue Desk priorities",
+        "stage": "workspace",
+        "reality": "Review unowned inquiries, overdue follow-up and estimates awaiting a decision, with supporting records."
+      },
+      {
+        "title": "Existing lead recovery",
+        "stage": "workspace",
+        "reality": "Use reviewed imports, segments and source records to organize opportunities already in the business."
+      },
+      {
+        "title": "Recorded activity & insights",
+        "stage": "workspace",
+        "reality": "Inspect pipeline and activity reports. Recommendations support a staff decision; they do not prove additional revenue by themselves."
+      },
+      {
+        "title": "Consented outreach",
+        "stage": "setup",
+        "reality": "Campaign and delivery controls require approved providers, consent and company setup before customer contact. Your team reviews the action."
+      }
+    ]
+  }
 ];
-
-export const AGENT_STAGE_LABEL: Record<AgentTaskStage, string> = {
-  workspace: 'In workspace',
-  setup: 'Setup required',
-  planned: 'Planned',
-};
+export const AGENT_STAGE_LABEL: Record<AgentTaskStage, string> = { workspace:'In workspace', setup:'Connection setup', planned:'Planned' };
+export interface SpecialistContextInfo { workspace: string; summary: string; ids: readonly string[]; }
+const contexts: readonly [string,SpecialistContextInfo][] = [
+  [
+    "/invoices",
+    {
+      "workspace": "Invoices",
+      "summary": "Documents, balances and recorded receipts, with clear review steps.",
+      "ids": [
+        "invo",
+        "bill"
+      ]
+    }
+  ],
+  [
+    "/estimates",
+    {
+      "workspace": "Estimates",
+      "summary": "Scope, line items and the next decision on the estimate.",
+      "ids": [
+        "esti"
+      ]
+    }
+  ],
+  [
+    "/appointments",
+    {
+      "workspace": "Schedule",
+      "summary": "The visit, the right property and the team’s confirmed plan.",
+      "ids": [
+        "sched",
+        "appt"
+      ]
+    }
+  ],
+  [
+    "/service",
+    {
+      "workspace": "Service",
+      "summary": "Equipment, checklists and the service work that needs attention.",
+      "ids": [
+        "maintain"
+      ]
+    }
+  ],
+  [
+    "/calls",
+    {
+      "workspace": "Calls",
+      "summary": "Review the call, assign the callback and confirm the next step.",
+      "ids": [
+        "callie"
+      ]
+    }
+  ],
+  [
+    "/projects",
+    {
+      "workspace": "Jobs",
+      "summary": "Keep the job and its upcoming work connected.",
+      "ids": [
+        "sched",
+        "esti"
+      ]
+    }
+  ],
+  [
+    "/contacts",
+    {
+      "workspace": "Customers",
+      "summary": "Keep customer history and new work connected to the right record.",
+      "ids": [
+        "appt",
+        "esti"
+      ]
+    }
+  ],
+  [
+    "/properties",
+    {
+      "workspace": "Properties",
+      "summary": "Connect the right property to the next estimate or visit.",
+      "ids": [
+        "appt"
+      ]
+    }
+  ],
+  [
+    "/pipeline",
+    {
+      "workspace": "Pipeline",
+      "summary": "Keep an owner and a clear next action on each opportunity.",
+      "ids": [
+        "scout"
+      ]
+    }
+  ],
+  [
+    "/leads",
+    {
+      "workspace": "Opportunities",
+      "summary": "Review the opportunity and choose the next staff action.",
+      "ids": [
+        "scout"
+      ]
+    }
+  ],
+  [
+    "/reactivation",
+    {
+      "workspace": "Win-back",
+      "summary": "Review existing opportunities and consent before outreach.",
+      "ids": [
+        "scout"
+      ]
+    }
+  ],
+  [
+    "/bie",
+    {
+      "workspace": "Revenue Desk",
+      "summary": "Start with the opportunities that need attention today.",
+      "ids": [
+        "scout"
+      ]
+    }
+  ],
+  [
+    "/tasks",
+    {
+      "workspace": "Tasks",
+      "summary": "Keep follow-up owned and tied to the relevant customer work.",
+      "ids": [
+        "scout"
+      ]
+    }
+  ],
+  [
+    "/today",
+    {
+      "workspace": "Today",
+      "summary": "Review the next visit, follow-up and customer decision.",
+      "ids": [
+        "scout",
+        "sched"
+      ]
+    }
+  ],
+  [
+    "/",
+    {
+      "workspace": "Today",
+      "summary": "Review the next visit, follow-up and customer decision.",
+      "ids": [
+        "scout",
+        "sched"
+      ]
+    }
+  ]
+];
+/** Exact segment matching; guides never interpret a query as a route or action. */
+export function specialistContextFor(location: string): SpecialistContextInfo | null {
+  const pathname=location.split(/[?#]/,1)[0];
+  return contexts.find(([p])=>pathname===p || (p!=='/' && pathname.startsWith(p+'/')))?.[1] ?? null;
+}

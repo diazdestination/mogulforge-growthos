@@ -12,6 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { CLIENT } from "@/lib/client.config";
+import { AGENT_TEAM } from "@/lib/agent-team";
 
 const FEATURES = [
   {
@@ -148,11 +149,17 @@ export default function LandingPage() {
         <section className="max-w-6xl mx-auto px-5 md:px-8 py-8" aria-labelledby="team-teaser-heading">
           <div className="rounded-2xl border border-[#baf000]/30 bg-[#0b1b2b] p-6 md:p-8 flex flex-col md:flex-row gap-5 md:items-center md:justify-between">
             <div>
-              <p className="text-[#baf000] text-xs font-bold tracking-widest">THE GROWTHOS TEAM</p>
+              <p className="text-[#baf000] text-xs font-bold tracking-widest">THE GROWTHOS SPECIALISTS</p>
               <h2 id="team-teaser-heading" className="text-2xl md:text-3xl font-bold mt-2">Eight familiar specialists. One honest view of what is ready.</h2>
               <p className="text-zinc-400 text-sm mt-3 max-w-2xl">Meet Esti, Callie, Maintain, Scout and the rest of the team. See the workspaces available now, the setup still required, and what we are building next.</p>
             </div>
-            <Link href="/agent-team" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[#baf000] px-5 py-3 font-semibold text-sm text-[#d6f877] hover:bg-[#baf000]/10">Meet the agent team <ArrowRight className="h-4 w-4" /></Link>
+            <Link href="/agent-team" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[#baf000] px-5 py-3 font-semibold text-sm text-[#d6f877] hover:bg-[#baf000]/10">Meet the specialists <ArrowRight className="h-4 w-4" /></Link>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {AGENT_TEAM.filter(agent => ['callie', 'esti', 'invo', 'scout'].includes(agent.id)).map(agent => <Link key={agent.id} href={`/agent-team?specialist=${agent.id}`} className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#0b1b2b] p-4 hover:border-[#baf000]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#baf000]">
+              <img src={agent.portrait} alt="" className="h-12 w-10 shrink-0 rounded-md object-cover object-top" />
+              <span className="min-w-0"><strong className="block text-xs text-[#d6f877]">{agent.name}</strong><span className="mt-1 block text-xs text-zinc-200">{agent.role}</span></span>
+            </Link>)}
           </div>
         </section>
 
