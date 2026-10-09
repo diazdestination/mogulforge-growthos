@@ -9,6 +9,75 @@ import * as zod from 'zod';
 
 
 /**
+ * Requires an active verified owner/admin staff session and settings.manage. API keys and query selectors are refused. Missing historical coverage is explicit; reading never creates or resends alerts. Provider acceptance is not evidence of phone display or human reading.
+ * @summary Read original lead alert admission and current receipt evidence
+ */
+export const GetStaffLeadAlertCoverageParams = zod.object({
+  "leadId": zod.uuid()
+})
+
+export const getStaffLeadAlertCoverageResponseRecipientsItemUserIdMax = 128;
+
+export const getStaffLeadAlertCoverageResponseRecipientsItemQueuedDeviceCountMin = 0;
+export const getStaffLeadAlertCoverageResponseRecipientsItemQueuedDeviceCountMax = 5;
+
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsPendingMin = 0;
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsPendingMax = 5;
+
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsDispatchingMin = 0;
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsDispatchingMax = 5;
+
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsAcceptedMin = 0;
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsAcceptedMax = 5;
+
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsRejectedMin = 0;
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsRejectedMax = 5;
+
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsExpiredMin = 0;
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsExpiredMax = 5;
+
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsCancelledMin = 0;
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsCancelledMax = 5;
+
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsIndeterminateMin = 0;
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsIndeterminateMax = 5;
+
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsUnavailableMin = 0;
+export const getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsUnavailableMax = 5;
+
+export const getStaffLeadAlertCoverageResponseRecipientsMax = 20;
+
+
+
+export const GetStaffLeadAlertCoverageResponse = zod.object({
+  "organizationId": zod.uuid(),
+  "leadId": zod.uuid(),
+  "status": zod.enum(['coverage_not_recorded', 'evaluated', 'policy_unavailable', 'policy_disabled', 'historical_unknown']),
+  "version": zod.union([zod.literal(1),zod.literal(null)]).nullable(),
+  "occurredAt": zod.coerce.date(),
+  "recordedAt": zod.coerce.date().nullable(),
+  "serverNow": zod.coerce.date(),
+  "receiptMeaning": zod.enum(['provider_accepted_not_received_or_read']),
+  "recipients": zod.array(zod.object({
+  "userId": zod.string().min(1).max(getStaffLeadAlertCoverageResponseRecipientsItemUserIdMax),
+  "displayName": zod.string().nullable(),
+  "outcome": zod.enum(['queued', 'recipient_unavailable', 'no_eligible_device', 'notification_expired']),
+  "queuedDeviceCount": zod.int().min(getStaffLeadAlertCoverageResponseRecipientsItemQueuedDeviceCountMin).max(getStaffLeadAlertCoverageResponseRecipientsItemQueuedDeviceCountMax),
+  "deliveryStateCounts": zod.object({
+  "pending": zod.int().min(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsPendingMin).max(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsPendingMax),
+  "dispatching": zod.int().min(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsDispatchingMin).max(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsDispatchingMax),
+  "accepted": zod.int().min(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsAcceptedMin).max(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsAcceptedMax),
+  "rejected": zod.int().min(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsRejectedMin).max(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsRejectedMax),
+  "expired": zod.int().min(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsExpiredMin).max(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsExpiredMax),
+  "cancelled": zod.int().min(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsCancelledMin).max(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsCancelledMax),
+  "indeterminate": zod.int().min(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsIndeterminateMin).max(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsIndeterminateMax),
+  "unavailable": zod.int().min(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsUnavailableMin).max(getStaffLeadAlertCoverageResponseRecipientsItemDeliveryStateCountsUnavailableMax)
+})
+})).max(getStaffLeadAlertCoverageResponseRecipientsMax)
+})
+
+
+/**
  * Company-scoped crm.read with no-store. Independent of the bounded Capture queue. canClaim requires an accepted verified active responder session, current crm.write authority, an open inquiry and no owner. API-key readers cannot claim. No contact details or message content are returned.
  * @summary Read ownership of one exact website inquiry
  */

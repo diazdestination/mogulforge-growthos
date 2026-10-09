@@ -4,7 +4,14 @@ import { runContractorRecoveryDrill } from './contractor-recovery-drill.mjs';
 it('upgrades the full prior schema, restores both synthetic companies, boots a read-only real app and preserves uncertainty/holds', async () => {
   const result = await runContractorRecoveryDrill({ emit: () => {} });
   expect(result.previousTableCount).toBe(90);
-  expect(result.tableCount).toBe(141);
+  expect(result.tableCount).toBe(142);
+  expect(result.alertCoveragePreviousTableCount).toBe(141);
+  expect(result.alertCoveragePriorRowsUnchanged).toBe(true);
+  expect(result.alertCoverageConstraintChecks).toBe(12);
+  expect(result.originalAlertCoveragePreserved).toBe(true);
+  expect(result.missingAlertEffectsRemainUnknown).toBe(true);
+  expect(result.legacyAlertCoverageRemainsUnknown).toBe(true);
+  expect(result.tableCounts.staff_lead_alert_coverage).toBe(2);
   expect(result.returningPreviousTableCount).toBe(139);
   expect(result.returningLegacyRowsUnchanged).toBe(true);
   expect(result.returningConstraintChecks).toBe(16);

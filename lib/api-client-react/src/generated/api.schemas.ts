@@ -5,6 +5,119 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+export type StaffLeadAlertCoverageStatus = typeof StaffLeadAlertCoverageStatus[keyof typeof StaffLeadAlertCoverageStatus];
+
+
+export const StaffLeadAlertCoverageStatus = {
+  coverage_not_recorded: 'coverage_not_recorded',
+  evaluated: 'evaluated',
+  policy_unavailable: 'policy_unavailable',
+  policy_disabled: 'policy_disabled',
+  historical_unknown: 'historical_unknown',
+} as const;
+
+/**
+ * @nullable
+ */
+export type StaffLeadAlertCoverageVersion = typeof StaffLeadAlertCoverageVersion[keyof typeof StaffLeadAlertCoverageVersion] | null;
+
+
+export const StaffLeadAlertCoverageVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type StaffLeadAlertCoverageReceiptMeaning = typeof StaffLeadAlertCoverageReceiptMeaning[keyof typeof StaffLeadAlertCoverageReceiptMeaning];
+
+
+export const StaffLeadAlertCoverageReceiptMeaning = {
+  provider_accepted_not_received_or_read: 'provider_accepted_not_received_or_read',
+} as const;
+
+export type StaffLeadAlertCoverageRecipientOutcome = typeof StaffLeadAlertCoverageRecipientOutcome[keyof typeof StaffLeadAlertCoverageRecipientOutcome];
+
+
+export const StaffLeadAlertCoverageRecipientOutcome = {
+  queued: 'queued',
+  recipient_unavailable: 'recipient_unavailable',
+  no_eligible_device: 'no_eligible_device',
+  notification_expired: 'notification_expired',
+} as const;
+
+export interface StaffLeadAlertDeliveryStateCounts {
+  /**
+     * @minimum 0
+     * @maximum 5
+     */
+  pending: number;
+  /**
+     * @minimum 0
+     * @maximum 5
+     */
+  dispatching: number;
+  /**
+     * @minimum 0
+     * @maximum 5
+     */
+  accepted: number;
+  /**
+     * @minimum 0
+     * @maximum 5
+     */
+  rejected: number;
+  /**
+     * @minimum 0
+     * @maximum 5
+     */
+  expired: number;
+  /**
+     * @minimum 0
+     * @maximum 5
+     */
+  cancelled: number;
+  /**
+     * @minimum 0
+     * @maximum 5
+     */
+  indeterminate: number;
+  /**
+     * @minimum 0
+     * @maximum 5
+     */
+  unavailable: number;
+}
+
+export interface StaffLeadAlertCoverageRecipient {
+  /**
+     * @minLength 1
+     * @maxLength 128
+     */
+  userId: string;
+  /** @nullable */
+  displayName: string | null;
+  outcome: StaffLeadAlertCoverageRecipientOutcome;
+  /**
+     * @minimum 0
+     * @maximum 5
+     */
+  queuedDeviceCount: number;
+  deliveryStateCounts: StaffLeadAlertDeliveryStateCounts;
+}
+
+export interface StaffLeadAlertCoverage {
+  organizationId: string;
+  leadId: string;
+  status: StaffLeadAlertCoverageStatus;
+  /** @nullable */
+  version: StaffLeadAlertCoverageVersion;
+  occurredAt: string;
+  /** @nullable */
+  recordedAt: string | null;
+  serverNow: string;
+  receiptMeaning: StaffLeadAlertCoverageReceiptMeaning;
+  /** @maxItems 20 */
+  recipients: StaffLeadAlertCoverageRecipient[];
+}
+
 export interface SmartSiteInquiryOwnership {
   organizationId: string;
   leadId: string;

@@ -46,6 +46,32 @@ tags:
   - name: assistant
     description: CRM AI assistant
 paths:
+  /v1/staff-push/leads/{leadId}/coverage:
+    get:
+      operationId: getStaffLeadAlertCoverage
+      summary: Read original lead alert admission and current receipt evidence
+      description: Requires an active verified owner/admin staff session and settings.manage. API keys and query selectors are refused. Missing historical coverage is explicit; reading never creates or resends alerts. Provider acceptance is not evidence of phone display or human reading.
+      tags: [StaffNotifications]
+      parameters:
+        - in: path
+          name: leadId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Exact company-scoped coverage, never cached
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffLeadAlertCoverage'
+        '400': { description: Invalid lead identifier or unsupported query }
+        '401': { description: Active staff session required }
+        '403': { description: Current accepted owner/admin authority required }
+        '404': { description: Lead unavailable in this company }
+        '503': { description: Coverage evidence temporarily unavailable }
   /v1/smart-sites/leads/{id}/follow-up:
     get:
       operationId: getSmartSiteInquiryOwnership
@@ -4455,6 +4481,54 @@ components:
       schema:
         type: string
   schemas:
+    StaffLeadAlertCoverage:
+      type: object
+      additionalProperties: false
+      required: [organizationId, leadId, status, version, occurredAt, recordedAt, serverNow, receiptMeaning, recipients]
+      properties:
+        organizationId: { type: string, format: uuid }
+        leadId: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [coverage_not_recorded, evaluated, policy_unavailable, policy_disabled, historical_unknown]
+        version: { type: [integer, 'null'], enum: [1, null] }
+        occurredAt: { type: string, format: date-time }
+        recordedAt: { type: [string, 'null'], format: date-time }
+        serverNow: { type: string, format: date-time }
+        receiptMeaning:
+          type: string
+          enum: [provider_accepted_not_received_or_read]
+        recipients:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/StaffLeadAlertCoverageRecipient'
+    StaffLeadAlertCoverageRecipient:
+      type: object
+      additionalProperties: false
+      required: [userId, displayName, outcome, queuedDeviceCount, deliveryStateCounts]
+      properties:
+        userId: { type: string, minLength: 1, maxLength: 128 }
+        displayName: { type: [string, 'null'] }
+        outcome:
+          type: string
+          enum: [queued, recipient_unavailable, no_eligible_device, notification_expired]
+        queuedDeviceCount: { type: integer, minimum: 0, maximum: 5 }
+        deliveryStateCounts:
+          $ref: '#/components/schemas/StaffLeadAlertDeliveryStateCounts'
+    StaffLeadAlertDeliveryStateCounts:
+      type: object
+      additionalProperties: false
+      required: [pending, dispatching, accepted, rejected, expired, cancelled, indeterminate, unavailable]
+      properties:
+        pending: { type: integer, minimum: 0, maximum: 5 }
+        dispatching: { type: integer, minimum: 0, maximum: 5 }
+        accepted: { type: integer, minimum: 0, maximum: 5 }
+        rejected: { type: integer, minimum: 0, maximum: 5 }
+        expired: { type: integer, minimum: 0, maximum: 5 }
+        cancelled: { type: integer, minimum: 0, maximum: 5 }
+        indeterminate: { type: integer, minimum: 0, maximum: 5 }
+        unavailable: { type: integer, minimum: 0, maximum: 5 }
     SmartSiteInquiryOwnership:
       type: object
       additionalProperties: false

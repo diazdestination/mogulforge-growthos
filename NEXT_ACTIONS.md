@@ -1,5 +1,25 @@
 # Next acceptance work
 
+## October 9 UTC / October 8 Pacific current order
+
+1. Review the backend alert-coverage candidate and its final PostgreSQL 16,
+   types/build/Docker CI. Integrate PR #28 first, then this dependent branch.
+   See `reports/lead-alert-coverage-integration-2026-10-09.md` for local evidence.
+2. GEEKOM can connect the exact coverage API into its design using
+   `reports/lead-alert-coverage-ui-handoff-2026-10-09.md`. Show all recipients,
+   explicit missing/unknown coverage, and provider acceptance without claiming
+   phone display or human reading. UI integration is still open.
+3. Prepare the reviewed hosted rollout/recovery for the exact selected source.
+   New additive review-only 0018 follows 0017 (142 tables). No backfill or forced
+   schema push; keep retired AUTO_MIGRATE disabled. Existing release procedure
+   refuses execution until a reviewed target/SQL/image/backup plan replaces it.
+4. Complete real owner phone/background/offline acceptance, actual mail/voice,
+   source migration, subscription allowances and both full contractor workdays.
+   Actual routing/recipient/device activation is not established by source tests.
+
+The October 8 source/CI wave is verified at a0eb25d; its older checklist below is
+historical context. Public/provider/hosted/customer release gates remain open.
+
 ## October 8 current order
 
 1. Complete review and full PostgreSQL 16/type/build/Docker CI for

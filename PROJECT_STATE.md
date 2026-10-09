@@ -1,5 +1,26 @@
 # GrowthOS project state
 
+## October 9 UTC / October 8 Pacific lead alert coverage
+
+Current branch `agent/growthos-alert-coverage-20261009` depends on unmerged PR #28
+at a0eb25d (full CI 37885607739 passed). Canonical main remains 2162aa2.
+Frozen scope: `reports/lead-alert-coverage-contract-2026-10-09.md`. New backend
+evidence records every selected recipient, including no eligible device/member,
+without retroactive sends; exact owner/admin reads distinguish original admission
+from current receipt counts and preserve historical unknowns.
+
+One additive table brings the source to 142; review-only 0018 follows 0017.
+All 141 previous definitions remain unchanged; no historical backfill. Existing
+worker/service behavior and retired unsafe release/startup paths are retained.
+No Command Center page, component, styling or navigation changed. Generated API
+types and `reports/lead-alert-coverage-ui-handoff-2026-10-09.md` support GEEKOM's
+separate design lane; this does not claim UI completion or actual phone delivery.
+
+Evidence: `reports/lead-alert-coverage-integration-2026-10-09.md`; use the private
+candidate PR for final exact-head CI. This source record does not pre-claim a
+merge, deployment, hosted schema/backup, real alert or contractor acceptance.
+Older candidate headings below describe their historical source scope.
+
 ## October 8 production-gap assistance (current candidate)
 
 Fresh remote baseline: main `2162aa296281473dda170291ff95d64e0e6e9b79`,

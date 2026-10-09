@@ -183,6 +183,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /staff-push/policy": "settings.manage",
   "PUT /staff-push/policy": "settings.manage",
   "GET /staff-push/deliveries": "settings.manage",
+  "GET /staff-push/leads/:leadId/coverage": "settings.manage",
   "GET /integrations/microsoft": "crm.read",
   "POST /integrations/microsoft/connect": "crm.write",
   "GET /integrations/microsoft/callback": "crm.write",

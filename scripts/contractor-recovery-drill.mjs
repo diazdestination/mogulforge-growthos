@@ -23,6 +23,7 @@ import { seedCustomerWorkspaceFixture } from './customer-workspace-fixture.mjs';
 import { CALLIE_CONVERSATION_RECOVERY_SLUGS, seedCallieConversationRecovery, assertCallieConversationRecovery, assertCallieConversationKeys } from './callie-conversation-recovery-fixture.mjs';
 import { WORKDAY_RECOVERY_SLUGS, seedWorkdayRecovery, assertWorkdayRecovery, assertWorkdayKeys } from './contractor-workday-recovery-fixture.mjs';
 import { returningCustomerIds, seedReturningCustomerRecovery, assertReturningCustomerRecovery, assertReturningCustomerKeys } from './returning-customer-recovery-fixture.mjs';
+import { seedLeadAlertCoverage, assertLeadAlertCoverage, assertLeadAlertCoverageConstraints } from './lead-alert-coverage-recovery-fixture.mjs';
 
 const requireApi = createRequire(new URL('../artifacts/api-server/package.json', import.meta.url));
 const requireDb = createRequire(new URL('../lib/db/package.json', import.meta.url));
@@ -32,8 +33,8 @@ const { generateDrizzleJson } = requireDb('drizzle-kit/api');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const identifier = (name) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('contractor_identifier_invalid'); return `"${name}"`; };
-const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot', 'reasons', 'snapshot', 'settings', 'result', 'historical_source', 'policy', 'context_snapshot']);
-const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql', '0010_lead-replies.sql', '0011_invoice-recovery.sql', '0012_callie-intake.sql', '0013_standing-service.sql', '0014_source-nurture.sql', '0015_callie-conversation.sql', '0016_contractor-workday.sql', '0017_returning-customer-work.sql'];
+const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot', 'reasons', 'snapshot', 'settings', 'result', 'historical_source', 'policy', 'context_snapshot', 'recipients']);
+const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql', '0010_lead-replies.sql', '0011_invoice-recovery.sql', '0012_callie-intake.sql', '0013_standing-service.sql', '0014_source-nurture.sql', '0015_callie-conversation.sql', '0016_contractor-workday.sql', '0017_returning-customer-work.sql', '0018_lead-alert-coverage.sql'];
 
 async function insert(database, table, row) {
   const fields = Object.keys(row);
@@ -107,6 +108,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     const beforeUpgrade = await fingerprints(source);
     const migrations = [];
     let returningPreviousTableCount = 0, returningLegacyFingerprint;
+    let alertCoveragePreviousTableCount = 0, alertCoverageBefore;
     const legacyFingerprint = async () => {
       const rows = {};
       for (const table of ['estimates','projects','invoices','value_entries']) rows[table]=(await source.query(`SELECT count(*)::int AS count,
@@ -115,6 +117,11 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       return rows;
     };
     for (const file of deltas) {
+      if (file === '0018_lead-alert-coverage.sql') {
+        alertCoverageBefore = await fingerprints(source);
+        alertCoveragePreviousTableCount = Object.keys(alertCoverageBefore.tables).length;
+        assert.equal(alertCoveragePreviousTableCount,141);
+      }
       if (file === '0017_returning-customer-work.sql') {
         returningPreviousTableCount = Object.keys((await fingerprints(source)).tables).length;
         assert.equal(returningPreviousTableCount,139);
@@ -122,6 +129,12 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       }
       const sql = (await readFile(new URL(`../reports/staging-schema-preview-2026-10-01/${file}`, import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
       await source.exec(sql);
+      if (file === '0018_lead-alert-coverage.sql') {
+        const upgraded = await fingerprints(source);
+        assert.equal(Object.keys(upgraded.tables).length,142);
+        for (const [table,value] of Object.entries(alertCoverageBefore.tables)) assert.deepEqual(upgraded.tables[table],value);
+        assert.equal(upgraded.tables.staff_lead_alert_coverage.count,0);
+      }
       migrations.push({ file, sha256: sha(sql) });
     }
     assert.deepEqual(await legacyFingerprint(),returningLegacyFingerprint);
@@ -176,6 +189,10 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       await seedReturningCustomerRecovery(source,slug);
       await assertReturningCustomerRecovery(source,slug);
     }
+    for (const slug of slugs) {
+      await seedLeadAlertCoverage(source,slug);
+      await assertLeadAlertCoverage(source,slug);
+    }
     await source.exec('CREATE ROLE contractor_recovery_reader; GRANT USAGE ON SCHEMA public TO contractor_recovery_reader; GRANT SELECT ON ALL TABLES IN SCHEMA public TO contractor_recovery_reader;');
     const careBaseline = await fingerprints(source);
     await assertCareTenantKeys(source, slugs[0], slugs[1]);
@@ -189,6 +206,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     const conversationConstraints = await assertCallieConversationKeys(source);
     const workdayConstraints = await assertWorkdayKeys(source);
     const returningConstraints = await assertReturningCustomerKeys(source,slugs[0],slugs[1]);
+    const alertCoverageConstraintChecks = await assertLeadAlertCoverageConstraints(source,slugs[0],slugs[1]);
     assert.deepEqual(await fingerprints(source), careBaseline);
     // Prove the reviewed active-service exception cannot mask an unpaused
     // company or another active obligation. These transactions always roll back.
@@ -259,6 +277,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     for (const slug of CALLIE_CONVERSATION_RECOVERY_SLUGS) await assertCallieConversationRecovery(restored, slug, codec);
     for (const slug of WORKDAY_RECOVERY_SLUGS) await assertWorkdayRecovery(restored, slug);
     for (const slug of slugs) await assertReturningCustomerRecovery(restored,slug);
+    for (const slug of slugs) await assertLeadAlertCoverage(restored,slug);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM billing_checkouts WHERE state='reconcile'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM customer_lifecycle WHERE state='paused'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM staff_invitations WHERE state='pending' AND delivery_state='unconfirmed'")).rows[0].n, 2);
@@ -292,6 +311,8 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       nurtureConstraintChecks, nurtureStoppedOwnershipPreserved: true, nurtureUnknownNeverAdvanced: true, nurtureFailedSyncPreserved: true, nurtureReplyHoldAfterPurgePreserved: true,
       workdayConstraintChecks: workdayConstraints, workdayCapturedHistoryPreserved: true,
       returningPreviousTableCount, returningLegacyRowsUnchanged: true, returningConstraintChecks: returningConstraints,
+      alertCoveragePreviousTableCount, alertCoveragePriorRowsUnchanged: true, alertCoverageConstraintChecks,
+      originalAlertCoveragePreserved: true, missingAlertEffectsRemainUnknown: true, legacyAlertCoverageRemainsUnknown: true,
       returningCustomerLineagePreserved: true, returningCommandResultsPreserved: true,
       returningWorkScopedReceiptsPreserved: true, returningV3UnknownOwnershipPreserved: true,
       workdayImmutableRevisionPreserved: true, workdayPrivatePhotosPreserved: true,

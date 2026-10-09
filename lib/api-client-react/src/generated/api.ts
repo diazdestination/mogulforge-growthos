@@ -302,6 +302,7 @@ import type {
   SourceOutreachApproval,
   SourceOutreachDetail,
   SourceOutreachDraft,
+  StaffLeadAlertCoverage,
   StormCheckRequest,
   StormCheckResult,
   SubmitFormBody,
@@ -382,6 +383,102 @@ const withQueryKey = <T extends object, K>(
   }
   return result;
 };
+
+export const getGetStaffLeadAlertCoverageUrl = (leadId: string) => {
+  return `/api/v1/staff-push/leads/${leadId}/coverage`;
+};
+
+/**
+ * Requires an active verified owner/admin staff session and settings.manage. API keys and query selectors are refused. Missing historical coverage is explicit; reading never creates or resends alerts. Provider acceptance is not evidence of phone display or human reading.
+ * @summary Read original lead alert admission and current receipt evidence
+ */
+export const getStaffLeadAlertCoverage = async (
+  leadId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<StaffLeadAlertCoverage> => {
+  return customFetch<StaffLeadAlertCoverage>(
+    getGetStaffLeadAlertCoverageUrl(leadId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetStaffLeadAlertCoverageQueryKey = (leadId: string) => {
+  return [`/api/v1/staff-push/leads/${leadId}/coverage`] as const;
+};
+
+export const getGetStaffLeadAlertCoverageQueryOptions = <
+  TData = Awaited<ReturnType<typeof getStaffLeadAlertCoverage>>,
+  TError = ErrorType<void>,
+>(
+  leadId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStaffLeadAlertCoverage>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetStaffLeadAlertCoverageQueryKey(leadId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getStaffLeadAlertCoverage>>
+  > = ({ signal }) =>
+    getStaffLeadAlertCoverage(leadId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: leadId !== null && leadId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getStaffLeadAlertCoverage>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetStaffLeadAlertCoverageQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getStaffLeadAlertCoverage>>
+>;
+export type GetStaffLeadAlertCoverageQueryError = ErrorType<void>;
+
+/**
+ * @summary Read original lead alert admission and current receipt evidence
+ */
+
+export function useGetStaffLeadAlertCoverage<
+  TData = Awaited<ReturnType<typeof getStaffLeadAlertCoverage>>,
+  TError = ErrorType<void>,
+>(
+  leadId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getStaffLeadAlertCoverage>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetStaffLeadAlertCoverageQueryOptions(
+    leadId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 export const getGetSmartSiteInquiryOwnershipUrl = (id: string) => {
   return `/api/v1/smart-sites/leads/${id}/follow-up`;

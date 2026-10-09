@@ -1,5 +1,20 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## October 9 UTC / October 8 Pacific alert-coverage continuation
+
+Adam requested further engineering while GEEKOM works on UI design. The current
+bounded backend wave is `reports/lead-alert-coverage-contract-2026-10-09.md`, based
+on unmerged PR #28 a0eb25d with successful exact-head CI 37885607739. New branch
+`agent/growthos-alert-coverage-20261009` adds original lead-alert recipient evidence
+and an exact owner/admin read; leave UI integration to GEEKOM's separate lane.
+Use coordinated runtime, route and independent review lanes; root owns schema,
+recovery, API contract, integration and release evidence. One additive review-only
+table (142 total), no retrospective enqueue, no replay of unknown effects and no
+new provider/hosted/customer activation. Read the integration and UI handoff
+reports before continuing. PR #28 must be integrated before this dependent wave;
+all hosted rollout, actual phone and contractor acceptance gates remain open.
+Older active-wave headings below are chronological history.
+
 ## October6 returning-customer work and billing continuation
 
 PR25/mainbd9df2f and exact-mainCI37424251416 are fully complete and independently
