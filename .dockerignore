@@ -5,3 +5,4 @@
 *.log
 pnpm-workspace.yaml.bak
 **/.env
+/work

@@ -1,0 +1,30 @@
+{
+  "kind": "ROOT_OBSERVED_ACTUAL_FOCUSED_TEST_RESULT",
+  "observedAt": "2026-10-09T07:59:32.440Z",
+  "actualToolOutput": "90ff37",
+  "command": "pnpm --filter @workspace/command-center exec vitest run src/components/lead-alert-coverage.test.tsx src/pages/lead-detail-smart-site-owner.test.tsx src/components/smart-site-lead-owner.test.tsx src/components/specialist-context.test.tsx src/pages/agent-team.test.tsx --config vitest.config.ts",
+  "exitCode": 0,
+  "testFilesPassed": 5,
+  "testsPassed": 50,
+  "testsFailed": 0,
+  "scope": "local synthetic UI",
+  "rawConsoleNotSeparatelyCaptured": true,
+  "source": [
+    {
+      "path": "artifacts/command-center/src/lib/lead-alert-coverage.ts",
+      "sha256": "a1eec35501b603e936be31f927c295fc6939b784e5df3fa92f3e680c80087028"
+    },
+    {
+      "path": "artifacts/command-center/src/components/lead-alert-coverage.tsx",
+      "sha256": "e5c613bb9d029f73d95d2be73f142a449630e8709aff97aa3d23ee042cf71209"
+    },
+    {
+      "path": "artifacts/command-center/src/components/lead-alert-coverage.test.tsx",
+      "sha256": "74f929aa789b603c949603c8158a0db8f14d49a78af4c3812cd945ad11fc5eae"
+    },
+    {
+      "path": "artifacts/command-center/src/pages/lead-detail.tsx",
+      "sha256": "e2e76326a8442198f5ff0202b566f1cb426ab6a5d605182e03548404e0af0de7"
+    }
+  ]
+}

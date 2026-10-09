@@ -46,6 +46,9 @@ Thumbs.db
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
+# Local integration fixtures and validation scratch files
+/work/
+
 # Replit
 .cache/
 .local/
