@@ -1,0 +1,12 @@
+// Read-only local image identity; selects public image metadata only.
+import {execFileSync} from 'node:child_process';
+import fs from 'node:fs';
+const endpoint='npipe:////./pipe/dockerDesktopLinuxEngine';
+const image='sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea';
+const exe='C:/Program Files/Docker/Docker/resources/bin/docker.exe';
+const inspect=extra=>JSON.parse(execFileSync(exe,['--host',endpoint,'image','inspect',image,...extra],{windowsHide:true,timeout:20000,encoding:'utf8'}))[0];
+const a=inspect([]),b=inspect(['--platform','linux/amd64']);
+const project=x=>({id:x.Id,os:x.Os??null,architecture:x.Architecture??null,descriptor:x.Descriptor??null});
+const result={kind:'READ_ONLY_LOCAL_DOCKER_IMAGE_PLATFORM',observedAt:new Date().toISOString(),endpoint,imageReference:image,generic:project(a),linuxAmd64:project(b),dockerMutations:0};
+fs.writeFileSync('C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/reports/release-preparation-2026-10-09/current-local-image-platform.json',JSON.stringify(result,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify(result));

@@ -1,0 +1,34 @@
+{
+  "kind": "ROOT_CLEAN_LOCAL142_ATTEMPT3_LAUNCH",
+  "startedAt": "2026-10-09T14:37:00.093Z",
+  "finishedAt": "2026-10-09T14:37:21.401Z",
+  "node": "C:/Program Files/nodejs/node.exe",
+  "entryArguments": [
+    "work/release-preparation-2026-10-09/local142-pg16-driver.mjs",
+    "run"
+  ],
+  "environmentKeys": [
+    "COMSPEC",
+    "PATH",
+    "PATHEXT",
+    "ProgramFiles",
+    "ProgramFiles(x86)",
+    "ProgramW6432",
+    "SystemRoot",
+    "TEMP",
+    "TMP",
+    "WINDIR"
+  ],
+  "providerAndDatabaseEnvironmentExcluded": true,
+  "noEnvFileLoaded": true,
+  "outerTimeoutMs": 750000,
+  "exitCode": 0,
+  "killed": false,
+  "stdoutBytes": 446,
+  "stdoutSha256": "b1791f1123e29631f8d7e88b71ad1e48c5c2d0f33f6733a1fd0107299276db3e",
+  "stderrBytes": 0,
+  "stderrSuppressed": true,
+  "resultFiles": [
+    "local142-attempt3-result-e8c1ace4-d76a-49b5-b87d-9565aef71da3.json"
+  ]
+}

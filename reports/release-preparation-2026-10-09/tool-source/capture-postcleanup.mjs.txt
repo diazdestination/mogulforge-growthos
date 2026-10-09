@@ -1,0 +1,17 @@
+// Root fresh read-only corroboration after completed local-only rehearsal cleanup.
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import net from 'node:net';
+const root='C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009',dir=root+'/reports/release-preparation-2026-10-09';
+const name='local142-attempt3-result-e8c1ace4-d76a-49b5-b87d-9565aef71da3.json',bytes=fs.readFileSync(dir+'/'+name),r=JSON.parse(bytes);
+assert.equal(r.status,'PASS');assert.equal(r.providerCalls,0);assert.equal(r.hostedConnections,0);assert.equal(r.cleanup.positiveContainerAbsence,true);assert.equal(r.cleanup.positiveVolumeAbsence,true);
+const env={};for(const k of ['PATH','SystemRoot','WINDIR','TEMP','TMP','PATHEXT','COMSPEC','ProgramFiles','ProgramFiles(x86)','ProgramW6432'])if(typeof process.env[k]==='string')env[k]=process.env[k];
+const query=args=>execFileSync('C:/Program Files/Docker/Docker/resources/bin/docker.exe',['--host','npipe:////./pipe/dockerDesktopLinuxEngine',...args],{cwd:root,env,windowsHide:true,encoding:'utf8',timeout:20000});
+assert.equal(query(['ps','-aq','--no-trunc','--filter','id='+r.containerId]).trim(),'');
+assert.equal(query(['ps','-aq','--no-trunc','--filter','label=codex.task=growthos-local142-20261009']).trim(),'');
+assert(!query(['volume','ls','-q']).trim().split(/\r?\n/).includes(r.volumeId));
+let refused=false;await new Promise(resolve=>{const s=net.connect({host:'127.0.0.1',port:r.loopbackPort});s.setTimeout(2000);s.on('connect',()=>{s.destroy();resolve();});s.on('error',e=>{refused=e.code==='ECONNREFUSED';s.destroy();resolve();});s.on('timeout',()=>{s.destroy();resolve();});});assert(refused);
+const result={kind:'ROOT_FRESH_LOCAL142_CLEANUP_CORROBORATION',observedAt:new Date().toISOString(),resultFile:name,resultSha256:createHash('sha256').update(bytes).digest('hex'),positiveContainerAbsence:true,positiveTaskInventoryEmpty:true,positiveVolumeAbsence:true,loopbackPortRefused:true,mutations:0,sqlQueries:0,hostedCalls:0};
+fs.writeFileSync(dir+'/root-local142-postcleanup.json',JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(result));

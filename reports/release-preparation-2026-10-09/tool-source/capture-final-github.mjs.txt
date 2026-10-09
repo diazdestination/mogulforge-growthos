@@ -1,0 +1,9 @@
+// Root read-only PR metadata refresh; writes only explicitly selected public fields.
+import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
+const root='C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009';
+const fields='number,title,url,state,isDraft,baseRefName,headRefName,headRefOid,mergeable';
+const observations=[28,29].map(n=>JSON.parse(execFileSync('gh',['pr','view',String(n),'--repo','diazdestination/mogulforge-growthos','--json',fields],{cwd:root,windowsHide:true,timeout:30000,encoding:'utf8'})));
+const result={kind:'READ_ONLY_GITHUB_PR_REFRESH',observedAt:new Date().toISOString(),repository:'https://github.com/diazdestination/mogulforge-growthos.git',observations,mutations:0};
+fs.writeFileSync(root+'/reports/release-preparation-2026-10-09/current-github-pr-metadata.json',JSON.stringify(result,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify(result));

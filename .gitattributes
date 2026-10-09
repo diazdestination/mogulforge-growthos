@@ -2,3 +2,6 @@
 reports/integration-validation-2026-10-09/** -text
 # Raw console output intentionally retains provider formatting and whitespace.
 reports/integration-validation-2026-10-09/*.txt -diff
+# Release source capsules and receipts have reviewed raw-byte hashes.
+reports/release-preparation-2026-10-09/** -text
+reports/release-preparation-2026-10-09/*.txt -diff

@@ -1,0 +1,148 @@
+{
+  "kind": "READ_ONLY_MPG_PUBLIC_RESPONSE_SHAPES",
+  "at": "2026-10-09T13:50:18.321Z",
+  "status": {
+    "ok": true,
+    "topKeys": [
+      "credentials",
+      "data"
+    ],
+    "publicData": {
+      "kind": "object",
+      "keys": [
+        "attached_apps",
+        "disk",
+        "engine",
+        "id",
+        "ip_assignments",
+        "mpgd_cluster_id",
+        "name",
+        "organization",
+        "plan",
+        "region",
+        "replicas",
+        "status",
+        "storage_provisioned_bytes",
+        "storage_used_bytes"
+      ]
+    },
+    "publicChildShapes": {
+      "attached_apps": {
+        "kind": "null",
+        "keys": []
+      },
+      "disk": {
+        "kind": "number",
+        "keys": []
+      },
+      "engine": {
+        "kind": "string",
+        "keys": []
+      },
+      "id": {
+        "kind": "string",
+        "keys": []
+      },
+      "ip_assignments": {
+        "kind": "object",
+        "keys": [
+          "direct"
+        ]
+      },
+      "mpgd_cluster_id": {
+        "kind": "string",
+        "keys": []
+      },
+      "name": {
+        "kind": "string",
+        "keys": []
+      },
+      "organization": {
+        "kind": "object",
+        "keys": [
+          "AllowAllCrossNetworkReplays",
+          "AllowedReplaySourceOrgSlugs",
+          "Billable",
+          "DelegatedWireGuardTokens",
+          "ID",
+          "InternalNumericID",
+          "LoggedCertificates",
+          "Name",
+          "PaidPlan",
+          "RawSlug",
+          "RemoteBuilderApp",
+          "RemoteBuilderImage",
+          "Settings",
+          "Slug",
+          "Type",
+          "WireGuardPeer",
+          "WireGuardPeers"
+        ]
+      },
+      "plan": {
+        "kind": "string",
+        "keys": []
+      },
+      "region": {
+        "kind": "string",
+        "keys": []
+      },
+      "replicas": {
+        "kind": "number",
+        "keys": []
+      },
+      "status": {
+        "kind": "string",
+        "keys": []
+      },
+      "storage_provisioned_bytes": {
+        "kind": "number",
+        "keys": []
+      },
+      "storage_used_bytes": {
+        "kind": "number",
+        "keys": []
+      }
+    },
+    "credentialsBranch": "NOT_INSPECTED_OR_PERSISTED"
+  },
+  "backups": {
+    "ok": true,
+    "shape": {
+      "kind": "array",
+      "count": 24,
+      "firstRecordKeys": [
+        "id",
+        "start",
+        "status",
+        "stop",
+        "type"
+      ]
+    },
+    "publicChildren": {}
+  },
+  "list": {
+    "ok": true,
+    "shape": {
+      "kind": "array",
+      "count": 2,
+      "firstRecordKeys": [
+        "attached_apps",
+        "disk",
+        "id",
+        "ip_assignments",
+        "mpgd_cluster_id",
+        "name",
+        "organization",
+        "plan",
+        "region",
+        "replicas",
+        "status",
+        "version"
+      ]
+    },
+    "publicChildren": {}
+  },
+  "hostedSql": false,
+  "mutations": false
+}

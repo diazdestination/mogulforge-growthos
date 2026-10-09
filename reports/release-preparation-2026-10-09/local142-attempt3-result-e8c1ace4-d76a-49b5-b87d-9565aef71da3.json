@@ -1,0 +1,417 @@
+{
+  "kind": "LOCAL_PG16_95_TO_142",
+  "localOnly": true,
+  "hostedConnections": 0,
+  "providerCalls": 0,
+  "commit": "d7e38305e4a51a125be2c6dbc378dc310e247aae",
+  "tree": "9b127a8a373e02d45287b3fed3c35ff3d0f64aae",
+  "manifestSha256": "1c1a761a1d4cada324eefc4f9b62f3af821e190310b5bac9fe68c2250e07600c",
+  "nonce": "e8c1ace4-d76a-49b5-b87d-9565aef71da3",
+  "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+  "checks": {
+    "baseline": {
+      "tables": 95,
+      "companies": 2,
+      "rows": 44,
+      "dataSha256": "ab0b69b44175c9b4995fd0d5b7a595f6871486b4ec8638aec9b8b2c00ac9e637",
+      "catalogSha256": "a717ae6d79fe57095a4354b55bf1098b17085c00bd82b17a6076765434113516",
+      "physicalSha256": "29615ab69e925fd6a8d7df684e1857f4212e4f1dd6c53f525652d3b643771b1f",
+      "aclSha256": "72e1c7f1446cc70539cf17209cf4f9e3c1663e6560ed2ba4b5e7860f1ed09a55"
+    },
+    "injectedLate0018Rollback": {
+      "sqlstate": "22012",
+      "fullCatalog": true,
+      "data": true,
+      "acl": true,
+      "physical": true
+    },
+    "upgrade": {
+      "stages": [
+        {
+          "step": "0003",
+          "sha256": "07a071578dfdb37953eccea493ecf7a61549ff0ba05fbe21cd5d9539315441d7",
+          "tables": 95
+        },
+        {
+          "step": "0004",
+          "sha256": "28147940685931cb62ba3f61eec332503961f469b6240ab8c1e6c4932d979882",
+          "tables": 97
+        },
+        {
+          "step": "0005",
+          "sha256": "c7b96ec940cd50b278c31638213ea08b93f749c54a8b7a4651776595effe376b",
+          "tables": 99
+        },
+        {
+          "step": "0006",
+          "sha256": "2ecb746a96679b8c4723f0e7497247e14436b8391a9ea35254ef79038e6c0d39",
+          "tables": 103
+        },
+        {
+          "step": "0007",
+          "sha256": "064480b2240fc0bf5526a43a35d5adaaa3e784353629d7d30ad97a5a02dab34f",
+          "tables": 105
+        },
+        {
+          "step": "0008",
+          "sha256": "8352dabe69c8c93721481a5b21df47c037b1ed368357151cd733715522859860",
+          "tables": 111
+        },
+        {
+          "step": "0009",
+          "sha256": "7609d74d14ee1629790c140b1a086488ad2c66b19dec1d7ca077f72ac58b6734",
+          "tables": 117
+        },
+        {
+          "step": "0010",
+          "sha256": "35cd388146e714a307c1913e689417a8631b447ea5951a54e7107410b1df8e48",
+          "tables": 117
+        },
+        {
+          "step": "0011",
+          "sha256": "bab9a5d58e077656cc57c7407dc995c7cfefcbbf6c6994928e2b80808c88fcb4",
+          "tables": 118
+        },
+        {
+          "step": "0012",
+          "sha256": "d7b3a1e97e739bde9c8ea858419622c2f44d832e88cba02cf99962c00d357206",
+          "tables": 121
+        },
+        {
+          "step": "0013",
+          "sha256": "e5381b286bf2976ba32f2c6fef7f4dc32ec73389223c737a366ef2c8b5a2f9ae",
+          "tables": 125
+        },
+        {
+          "step": "0014",
+          "sha256": "bf28df0c19e1bd0181a69886cfc7176148fda5d3f55b29214d3804a1d50d8fa6",
+          "tables": 130
+        },
+        {
+          "step": "0015",
+          "sha256": "92724e6c4978871f19e974a0b7f2380e3ce7ebfdbbee4f3120c20f3aa278990d",
+          "tables": 133
+        },
+        {
+          "step": "0016",
+          "sha256": "a9fdcafbcfc380f8092869314bc98fd81c9a3d11dccf5ab97e85fcb6566ffd13",
+          "tables": 139
+        },
+        {
+          "step": "0017",
+          "sha256": "68f1734fa340eb9b094e834625baa8e8f700fdb455741b2cd436c2a4b8ae5c84",
+          "tables": 141
+        },
+        {
+          "step": "0018",
+          "sha256": "b5c6425dc7942460e4d734e14f971e8fc062b1bdfe292d69d22a88e34be587a1",
+          "tables": 142
+        }
+      ],
+      "newTables": [
+        "appointment_work_completions",
+        "appointment_work_entries",
+        "appointment_work_photos",
+        "billing_checkouts",
+        "callie_ack_dispatches",
+        "callie_intakes",
+        "callie_policy_revisions",
+        "callie_reception_bindings",
+        "callie_reception_events",
+        "callie_reception_sessions",
+        "contact_touch_reservations",
+        "customer_lifecycle",
+        "customer_work_commands",
+        "customer_work_roots",
+        "email_response_reviews",
+        "financial_migration_items",
+        "financial_migration_reviews",
+        "invoice_delivery_attempts",
+        "invoice_operations",
+        "invoice_receipt_allocations",
+        "invoice_sequences",
+        "invoices",
+        "mailbox_communication_parents",
+        "mailbox_connectors",
+        "mailbox_receipts",
+        "mailbox_service_replies",
+        "mailbox_sync_cycles",
+        "missed_call_care_cases",
+        "missed_call_care_policies",
+        "platform_email_dispatches",
+        "platform_email_events",
+        "property_assets",
+        "service_sms_parents",
+        "service_sms_replies",
+        "service_standing_enrollments",
+        "service_standing_policy_revisions",
+        "service_watch_cases",
+        "source_adoptions",
+        "source_nurture_items",
+        "source_nurture_plans",
+        "source_nurture_steps",
+        "source_outreach_batches",
+        "source_outreach_items",
+        "staff_invitations",
+        "staff_lead_alert_coverage",
+        "work_checklist_revisions",
+        "work_checklist_templates"
+      ],
+      "defaults": 26,
+      "complete142": true,
+      "originalData": true,
+      "originalAcl": true,
+      "originalPhysical": true,
+      "independentCatalogSha256": "f0399b47ba79f843eab66b0fa554923fdd21e26d1e6b22cf62002ec6c353d9fd"
+    },
+    "fresh142": {
+      "catalog": true,
+      "data": true,
+      "defaults": true,
+      "tableAclRows": 284,
+      "syntheticRolesOnly": true
+    }
+  },
+  "limitations": [
+    "Synthetic fixture, not hosted roles/backup/recovery or production migration authority",
+    "Provider/tenant business behavior outside schema proof"
+  ],
+  "cleanup": {
+    "exactId": "fc5f9cdf168759741d63c3ed361db1f19732012bda31f576b0d3fce10d739f2d",
+    "nonceLabelVerified": true,
+    "deleteIssuedOnce": true,
+    "positiveLabelAbsence": true,
+    "positiveContainerAbsence": true,
+    "volumeId": "ba93e731bb9367ff0596a62c9184f82ee946f7b250e82832e16ab7e85c0064bf",
+    "positiveVolumeAbsence": true,
+    "loopbackPortRefused": true
+  },
+  "observedImageIdentity": {
+    "requestedReference": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+    "runtimeImageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+    "platform": "linux/amd64",
+    "platformDigest": "sha256:1a66d744c1b459e13b05a8fca341da84cb63383e99ce262210efee5a319d4551",
+    "identityReceiptSha256": "33d0f30f0b6208201062099302518682b4760bba6629becb842245bee7d788cc"
+  },
+  "volumeId": "ba93e731bb9367ff0596a62c9184f82ee946f7b250e82832e16ab7e85c0064bf",
+  "containerId": "fc5f9cdf168759741d63c3ed361db1f19732012bda31f576b0d3fce10d739f2d",
+  "loopbackPort": 50426,
+  "status": "PASS",
+  "acks": [
+    {
+      "phase": "BASELINE",
+      "command": "BEGIN"
+    },
+    {
+      "phase": "BASELINE",
+      "step": "0000",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "BASELINE",
+      "step": "0001",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "BASELINE",
+      "step": "0002",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "BASELINE",
+      "command": "COMMIT"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "command": "BEGIN"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0003",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0004",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0005",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0006",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0007",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0008",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0009",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0010",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0011",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0012",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0013",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0014",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0015",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0016",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0017",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "INJECTED_ROLLBACK",
+      "step": "0018",
+      "command": "ROLLBACK"
+    },
+    {
+      "phase": "UPGRADE",
+      "command": "BEGIN"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0003",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0004",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0005",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0006",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0007",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0008",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0009",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0010",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0011",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0012",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0013",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0014",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0015",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0016",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0017",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "UPGRADE",
+      "step": "0018",
+      "command": "MIGRATION"
+    },
+    {
+      "phase": "COMMIT_DISPATCHED",
+      "command": "COMMIT"
+    }
+  ],
+  "connectionIdentities": [
+    {
+      "database": "local142_base",
+      "principal": "postgres",
+      "serverVersionNum": 160015,
+      "pid": 86
+    },
+    {
+      "database": "local142_independent",
+      "principal": "postgres",
+      "serverVersionNum": 160015,
+      "pid": 87
+    },
+    {
+      "database": "local142_base",
+      "principal": "postgres",
+      "serverVersionNum": 160015,
+      "pid": 88
+    }
+  ]
+}

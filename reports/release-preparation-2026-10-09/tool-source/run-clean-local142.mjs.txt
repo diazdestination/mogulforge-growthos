@@ -1,0 +1,27 @@
+// Root-owned launch of separately admitted LOCAL fixture; no hosted credentials.
+import fs from 'node:fs';
+import path from 'node:path';
+import {execFile} from 'node:child_process';
+import {createHash} from 'node:crypto';
+const root='C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009';
+const dir=path.join(root,'reports/release-preparation-2026-10-09');
+const sha=b=>createHash('sha256').update(b).digest('hex');
+const admission=JSON.parse(fs.readFileSync(path.join(dir,'local142-execution-admission.json')));
+if(!admission.localOnly||admission.hostedAuthorized!==false)throw Error('Invalid local admission');
+const prior=fs.readdirSync(dir).filter(x=>/^local142-result-.*\.json$/.test(x));
+if(prior.length)throw Error('Prior run present; no replay');
+const destination=path.join(dir,'root-local142-launch.json');
+if(fs.existsSync(destination))throw Error('Launch already recorded; no replay');
+const intentPath=path.join(dir,'root-local142-launch-intent.json');
+if(fs.existsSync(intentPath))throw Error('Prior dispatch intent present; no replay');
+const environment={};
+for(const key of ['PATH','SystemRoot','WINDIR','TEMP','TMP','PATHEXT','COMSPEC','ProgramFiles','ProgramFiles(x86)','ProgramW6432'])
+  if(typeof process.env[key]==='string')environment[key]=process.env[key];
+const start=new Date().toISOString();
+fs.writeFileSync(intentPath,JSON.stringify({kind:'ROOT_LOCAL142_SINGLE_DISPATCH_INTENT',startedAt:start,admissionSha256:sha(fs.readFileSync(path.join(dir,'local142-execution-admission.json'))),localOnly:true,hostedAuthorized:false,entryArguments:['work/release-preparation-2026-10-09/local142-pg16-driver.mjs','run'],mayReplay:false},null,2)+'\n',{flag:'wx'});
+const child=await new Promise(resolve=>execFile('C:/Program Files/nodejs/node.exe',[path.join(root,'work/release-preparation-2026-10-09/local142-pg16-driver.mjs'),'run'],{cwd:root,env:environment,windowsHide:true,timeout:750000,maxBuffer:2**20,encoding:'utf8'},(error,stdout,stderr)=>resolve({error,stdout,stderr})));
+const receipt={kind:'ROOT_CLEAN_LOCAL142_LAUNCH',startedAt:start,finishedAt:new Date().toISOString(),node:'C:/Program Files/nodejs/node.exe',entryArguments:['work/release-preparation-2026-10-09/local142-pg16-driver.mjs','run'],environmentKeys:Object.keys(environment).sort(),providerAndDatabaseEnvironmentExcluded:true,noEnvFileLoaded:true,outerTimeoutMs:750000,exitCode:child.error?(Number.isInteger(child.error.code)?child.error.code:null):0,killed:child.error?.killed===true,stdoutBytes:Buffer.byteLength(child.stdout),stdoutSha256:sha(child.stdout),stderrBytes:Buffer.byteLength(child.stderr),stderrSuppressed:true,resultFiles:fs.readdirSync(dir).filter(x=>/^local142-result-.*\.json$/.test(x))};
+fs.writeFileSync(path.join(dir,'root-local142-stdout.txt'),child.stdout,{flag:'wx'});
+fs.writeFileSync(destination,JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify(receipt));
+if(child.error)process.exitCode=1;

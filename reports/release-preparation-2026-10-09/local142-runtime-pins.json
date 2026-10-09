@@ -1,0 +1,50 @@
+{
+  "kind": "LOCAL142_RUNTIME_SOURCE_PINS",
+  "executables": [
+    {
+      "path": "C:/Program Files/nodejs/node.exe",
+      "sha256": "9a4eb5f1c29c6a2e93852ead46b999e284a6a5ca8bab4d4e241d587d025a52de"
+    },
+    {
+      "path": "C:/Program Files/Docker/Docker/resources/bin/docker.exe",
+      "sha256": "834d45bd30c6d08f1045f39a48fda64cf563f89e6f217a0dac53742612634fe2"
+    }
+  ],
+  "entries": [
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\pg@8.22.0\\node_modules\\pg\\lib\\index.js",
+      "request": "pg",
+      "sha256": "3fad6e6d3d976edbabe0cbc9e1d39f4340bcb719bbbb186a0d3a24f3dbd4a94c"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\typescript@5.9.3\\node_modules\\typescript\\lib\\typescript.js",
+      "request": "typescript",
+      "sha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\drizzle-kit@0.31.10\\node_modules\\drizzle-kit\\api.js",
+      "request": "drizzle-kit/api",
+      "sha256": "5c39a62e2e5fc1554b8e423b1ffe453ccc975e0ccca0090f0cf3210aeb6c49fc"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\drizzle-orm@0.45.2_@cloudfl_0209fd16620a32b92923669db5769f13\\node_modules\\drizzle-orm\\index.cjs",
+      "request": "drizzle-orm",
+      "sha256": "d26f03ba7eee981e1d0789b1b19c223ef8d081e4301aa40b1aa26f5933e70a1b"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\drizzle-orm@0.45.2_@cloudfl_0209fd16620a32b92923669db5769f13\\node_modules\\drizzle-orm\\pg-core\\index.cjs",
+      "request": "drizzle-orm/pg-core",
+      "sha256": "90518a5d73bc28ad47ac490b855f1cb1f63a677b183ed423beea990c852084a8"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\drizzle-zod@0.8.3_drizzle-o_d31ffb0d69ee3013e005013e4a279038\\node_modules\\drizzle-zod\\index.cjs",
+      "request": "drizzle-zod",
+      "sha256": "c09a7de093dd3f3b76bafec207050d69d71ac6fc0906ffec3c170504eb57949b"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\zod@4.4.3\\node_modules\\zod\\v4\\index.cjs",
+      "request": "zod/v4",
+      "sha256": "35934fbd99d4ca1d46932dfcddb6071c203b5c980862cf58e254998c49e1e5b8"
+    }
+  ]
+}

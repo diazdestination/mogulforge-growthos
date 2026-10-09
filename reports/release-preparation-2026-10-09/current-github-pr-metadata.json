@@ -1,0 +1,30 @@
+{
+  "kind": "READ_ONLY_GITHUB_PR_REFRESH",
+  "observedAt": "2026-10-09T14:30:42.968Z",
+  "repository": "https://github.com/diazdestination/mogulforge-growthos.git",
+  "observations": [
+    {
+      "baseRefName": "main",
+      "headRefName": "agent/growthos-production-gaps-20261008",
+      "headRefOid": "a0eb25dcc69291130a46a5478acf44f62d303e9f",
+      "isDraft": true,
+      "mergeable": "MERGEABLE",
+      "number": 28,
+      "state": "OPEN",
+      "title": "Harden website inquiry claims and release safety",
+      "url": "https://github.com/diazdestination/mogulforge-growthos/pull/28"
+    },
+    {
+      "baseRefName": "agent/growthos-production-gaps-20261008",
+      "headRefName": "agent/growthos-alert-coverage-20261009",
+      "headRefOid": "a52db0893fca14fea2f95df8a6ea1fc3d788a7b6",
+      "isDraft": true,
+      "mergeable": "MERGEABLE",
+      "number": 29,
+      "state": "OPEN",
+      "title": "Preserve every selected recipient in lead alert coverage",
+      "url": "https://github.com/diazdestination/mogulforge-growthos/pull/29"
+    }
+  ],
+  "mutations": 0
+}

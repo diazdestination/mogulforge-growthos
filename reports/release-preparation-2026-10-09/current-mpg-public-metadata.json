@@ -1,0 +1,226 @@
+{
+  "kind": "READ_ONLY_PUBLIC_MPG_METADATA_NO_SQL",
+  "at": "2026-10-09T13:51:02.914Z",
+  "organization": "adam-diaz",
+  "clusters": {
+    "ok": true,
+    "startedAt": "2026-10-09T13:50:57.303Z",
+    "finishedAt": "2026-10-09T13:50:59.065Z",
+    "recognized": true,
+    "count": 2,
+    "clusters": [
+      {
+        "id": "zp2wjrejd2zodn4q",
+        "knownTarget": true,
+        "name": "mogulforge-growthos-staging-db",
+        "status": "ready",
+        "region": "iad",
+        "plan": "basic",
+        "diskGb": 0,
+        "replicas": 0,
+        "version": null,
+        "attachedApps": [],
+        "attachmentInterpretation": "explicit array",
+        "orgMatches": true
+      },
+      {
+        "id": "kzpwm0j18eg04nv3",
+        "knownTarget": true,
+        "name": "mogulforge-growthos-db",
+        "status": "ready",
+        "region": "iad",
+        "plan": "basic",
+        "diskGb": 0,
+        "replicas": 0,
+        "version": null,
+        "attachedApps": [
+          "mogulforge-growthos",
+          "mogulforge-growthos-staging"
+        ],
+        "attachmentInterpretation": "explicit array",
+        "orgMatches": true
+      }
+    ]
+  },
+  "stagingBackups": {
+    "ok": true,
+    "startedAt": "2026-10-09T13:50:57.312Z",
+    "finishedAt": "2026-10-09T13:51:02.914Z",
+    "recognized": true,
+    "count": 24,
+    "backups": [
+      {
+        "id": "20261009-000216F_20261009-130009I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-09T13:00:09Z",
+        "stop": "2026-10-09T13:00:11Z"
+      },
+      {
+        "id": "20261009-000216F_20261009-120427D",
+        "status": "completed",
+        "type": "diff",
+        "start": "2026-10-09T12:04:27Z",
+        "stop": "2026-10-09T12:04:29Z"
+      },
+      {
+        "id": "20261009-000216F_20261009-110311I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-09T11:03:11Z",
+        "stop": "2026-10-09T11:03:13Z"
+      },
+      {
+        "id": "20261009-000216F_20261009-100456I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-09T10:04:56Z",
+        "stop": "2026-10-09T10:05:06Z"
+      },
+      {
+        "id": "20261009-000216F_20261009-090305I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-09T09:03:05Z",
+        "stop": "2026-10-09T09:03:08Z"
+      },
+      {
+        "id": "20261009-000216F_20261009-080159I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-09T08:01:59Z",
+        "stop": "2026-10-09T08:02:04Z"
+      },
+      {
+        "id": "20261009-000216F_20261009-070410I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-09T07:04:10Z",
+        "stop": "2026-10-09T07:04:12Z"
+      },
+      {
+        "id": "20261009-000216F_20261009-060102D",
+        "status": "completed",
+        "type": "diff",
+        "start": "2026-10-09T06:01:02Z",
+        "stop": "2026-10-09T06:01:04Z"
+      },
+      {
+        "id": "20261009-000216F_20261009-050424I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-09T05:04:24Z",
+        "stop": "2026-10-09T05:04:27Z"
+      },
+      {
+        "id": "20261009-000216F_20261009-040501I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-09T04:05:01Z",
+        "stop": "2026-10-09T04:05:06Z"
+      },
+      {
+        "id": "20261009-000216F_20261009-030103I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-09T03:01:03Z",
+        "stop": "2026-10-09T03:01:06Z"
+      },
+      {
+        "id": "20261009-000216F_20261009-020449I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-09T02:04:49Z",
+        "stop": "2026-10-09T02:04:51Z"
+      },
+      {
+        "id": "20261009-000216F_20261009-010053I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-09T01:00:53Z",
+        "stop": "2026-10-09T01:00:55Z"
+      },
+      {
+        "id": "20261009-000216F",
+        "status": "completed",
+        "type": "full",
+        "start": "2026-10-09T00:02:16Z",
+        "stop": "2026-10-09T00:02:25Z"
+      },
+      {
+        "id": "20261008-000316F_20261008-230015I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-08T23:00:15Z",
+        "stop": "2026-10-08T23:02:07Z"
+      },
+      {
+        "id": "20261008-000316F_20261008-220108I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-08T22:01:08Z",
+        "stop": "2026-10-08T22:01:10Z"
+      },
+      {
+        "id": "20261008-000316F_20261008-210212I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-08T21:02:12Z",
+        "stop": "2026-10-08T21:02:26Z"
+      },
+      {
+        "id": "20261008-000316F_20261008-200222I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-08T20:02:22Z",
+        "stop": "2026-10-08T20:02:27Z"
+      },
+      {
+        "id": "20261008-000316F_20261008-190118I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-08T19:01:18Z",
+        "stop": "2026-10-08T19:01:20Z"
+      },
+      {
+        "id": "20261008-000316F_20261008-180226D",
+        "status": "completed",
+        "type": "diff",
+        "start": "2026-10-08T18:02:26Z",
+        "stop": "2026-10-08T18:02:28Z"
+      },
+      {
+        "id": "20261008-000316F_20261008-170343I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-08T17:03:43Z",
+        "stop": "2026-10-08T17:03:48Z"
+      },
+      {
+        "id": "20261008-000316F_20261008-160239I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-08T16:02:39Z",
+        "stop": "2026-10-08T16:02:41Z"
+      },
+      {
+        "id": "20261008-000316F_20261008-150338I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-08T15:03:38Z",
+        "stop": "2026-10-08T15:03:40Z"
+      },
+      {
+        "id": "20261008-000316F_20261008-140255I",
+        "status": "completed",
+        "type": "incr",
+        "start": "2026-10-08T14:02:55Z",
+        "stop": "2026-10-08T14:02:57Z"
+      }
+    ],
+    "interpretation": "Last24h provider metadata only; restore recoverability and backup content not tested"
+  },
+  "credentialsRequested": false,
+  "hostedSql": false,
+  "mutations": false
+}

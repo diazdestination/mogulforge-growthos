@@ -1,0 +1,8 @@
+// Reproduces only the two GET-only Docker preflights; no run/rm/SQL or driver import.
+import {execFileSync} from 'node:child_process';
+const env={};for(const k of ['PATH','SystemRoot','WINDIR','TEMP','TMP','PATHEXT','COMSPEC','ProgramFiles','ProgramFiles(x86)','ProgramW6432'])if(typeof process.env[k]==='string')env[k]=process.env[k];
+const exe='C:/Program Files/Docker/Docker/resources/bin/docker.exe';
+for(const args of [['image','inspect','postgres:16-alpine'],['volume','ls','-q']]){
+ try{const raw=execFileSync(exe,args,{env,windowsHide:true,encoding:'utf8',timeout:30000,maxBuffer:4194304,stdio:['ignore','pipe','pipe']});console.log(JSON.stringify({step:args[0],ok:true,bytes:Buffer.byteLength(raw),imageId:args[0]==='image'?JSON.parse(raw)[0]?.Id:null,volumeCount:args[0]==='volume'?raw.trim().split(/\r?\n/).filter(Boolean).length:null}));}
+ catch(e){console.log(JSON.stringify({step:args[0],ok:false,errorCode:typeof e.code==='string'&&/^[A-Z_]+$/.test(e.code)?e.code:null,rawErrorSuppressed:true}));}
+}

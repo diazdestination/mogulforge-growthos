@@ -1,0 +1,32 @@
+// Root fresh local-only dispatch. Both earlier attempts remain consumed.
+import fs from 'node:fs';
+import path from 'node:path';
+import {execFile} from 'node:child_process';
+import {createHash} from 'node:crypto';
+const root='C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009';
+const dir=path.join(root,'reports/release-preparation-2026-10-09');
+const sha=b=>createHash('sha256').update(b).digest('hex');
+const admissionPath=path.join(dir,'local142-attempt3-execution-admission.json');
+const admission=JSON.parse(fs.readFileSync(admissionPath));
+if(admission.localOnly!==true||admission.hostedAuthorized!==false||admission.dockerEndpoint!=='npipe:////./pipe/dockerDesktopLinuxEngine')throw Error('Invalid local-only admission');
+const expectedPrior=[{name:'local142-result-7f6e5b74-d3b5-4873-87e8-6fffc154829f.json',sha256:'d940078c0202d7d1a45712bd96f5944bc77be64168197389bf5e360667107630'},{name:'local142-attempt2-result-0b3858c2-c0ab-4ac8-a841-3f1945800e7f.json',sha256:'41f629b0aaea128ccaa0701f5777c223deec25276e8340bf7edc29520bb2f460'}];
+if(!Array.isArray(admission.priorAttemptResults)||admission.priorAttemptResults.length!==2||admission.priorAttemptResults.some((f,i)=>f.name!==expectedPrior[i].name||f.sha256!==expectedPrior[i].sha256))throw Error('Exact prior evidence pair required');
+for(const f of admission.priorAttemptResults){
+  const bytes=fs.readFileSync(path.join(dir,f.name));if(sha(bytes)!==f.sha256)throw Error('Prior evidence changed');
+  const x=JSON.parse(bytes);if(x.status!=='UNCONFIRMED'||!['ADMISSION','PRE_IMAGE'].includes(x.failure?.phase)||x.containerId!==undefined||x.volumeId!==undefined||x.acks.length||x.connectionIdentities.length||Object.keys(x.checks).length)throw Error('No-creation boundary not established');
+}
+if(sha(fs.readFileSync(import.meta.filename))!==admission.rootLauncherSha256)throw Error('Launcher drift');
+if(sha(fs.readFileSync(path.join(root,'work/release-preparation-2026-10-09/local142-pg16-driver.mjs')))!==admission.driverSha256)throw Error('Driver drift');
+const prior=fs.readdirSync(dir).filter(x=>/^local142-attempt3-result-.*\.json$/.test(x));
+if(prior.length)throw Error('Prior attempt3 result; no replay');
+const destination=path.join(dir,'root-local142-attempt3-launch.json');
+const intentPath=path.join(dir,'root-local142-attempt3-launch-intent.json');
+if(fs.existsSync(destination)||fs.existsSync(intentPath))throw Error('Prior attempt3 dispatch; no replay');
+const environment={};for(const key of ['PATH','SystemRoot','WINDIR','TEMP','TMP','PATHEXT','COMSPEC','ProgramFiles','ProgramFiles(x86)','ProgramW6432'])if(typeof process.env[key]==='string')environment[key]=process.env[key];
+const start=new Date().toISOString();
+fs.writeFileSync(intentPath,JSON.stringify({kind:'ROOT_LOCAL142_ATTEMPT3_SINGLE_DISPATCH_INTENT',startedAt:start,admissionSha256:sha(fs.readFileSync(admissionPath)),priorAttemptResults:admission.priorAttemptResults,localOnly:true,hostedAuthorized:false,entryArguments:['work/release-preparation-2026-10-09/local142-pg16-driver.mjs','run'],mayReplay:false},null,2)+'\n',{flag:'wx'});
+const child=await new Promise(resolve=>execFile('C:/Program Files/nodejs/node.exe',[path.join(root,'work/release-preparation-2026-10-09/local142-pg16-driver.mjs'),'run'],{cwd:root,env:environment,windowsHide:true,timeout:750000,maxBuffer:2**20,encoding:'utf8'},(error,stdout,stderr)=>resolve({error,stdout,stderr})));
+const receipt={kind:'ROOT_CLEAN_LOCAL142_ATTEMPT3_LAUNCH',startedAt:start,finishedAt:new Date().toISOString(),node:'C:/Program Files/nodejs/node.exe',entryArguments:['work/release-preparation-2026-10-09/local142-pg16-driver.mjs','run'],environmentKeys:Object.keys(environment).sort(),providerAndDatabaseEnvironmentExcluded:true,noEnvFileLoaded:true,outerTimeoutMs:750000,exitCode:child.error?(Number.isInteger(child.error.code)?child.error.code:null):0,killed:child.error?.killed===true,stdoutBytes:Buffer.byteLength(child.stdout),stdoutSha256:sha(child.stdout),stderrBytes:Buffer.byteLength(child.stderr),stderrSuppressed:true,resultFiles:fs.readdirSync(dir).filter(x=>/^local142-attempt3-result-.*\.json$/.test(x))};
+fs.writeFileSync(path.join(dir,'root-local142-attempt3-stdout.txt'),child.stdout,{flag:'wx'});
+fs.writeFileSync(destination,JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify(receipt));if(child.error)process.exitCode=1;

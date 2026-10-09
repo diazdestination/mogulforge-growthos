@@ -1,0 +1,13 @@
+{
+  "kind": "ROOT_LOCAL142_ATTEMPT2_SINGLE_DISPATCH_INTENT",
+  "startedAt": "2026-10-09T14:23:10.664Z",
+  "admissionSha256": "4a5ca3cecc1b6817189f7198651f11262509f07c7e46a020ea97f931d90b9533",
+  "firstAttemptResultSha256": "d940078c0202d7d1a45712bd96f5944bc77be64168197389bf5e360667107630",
+  "localOnly": true,
+  "hostedAuthorized": false,
+  "entryArguments": [
+    "work/release-preparation-2026-10-09/local142-pg16-driver.mjs",
+    "run"
+  ],
+  "mayReplay": false
+}

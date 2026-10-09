@@ -1,0 +1,775 @@
+{
+  "kind": "INTEGRATED142_RELEASE_PREPARATION_SOURCE_MANIFEST",
+  "at": "2026-10-09T13:53:03.326Z",
+  "repository": "https://github.com/diazdestination/mogulforge-growthos.git",
+  "branch": "codex/integrated-specialists-alerts-20261009",
+  "observedCandidateHead": "d7e38305e4a51a125be2c6dbc378dc310e247aae",
+  "applicationSourceCommit": "bdcd5f2d56f5c0c08284dda8dd9d3d27cad60848",
+  "applicationSourceTree": "b5993f27b0c231a87be48fc223138421ca5e98b8",
+  "sourceSelection": "Exact application commit used for completed suites and local Docker parity; later candidate changes are evidence only",
+  "localImageConfigDigest": "sha256:ad35da18b877d2b9cbcf2d272d74bc89c20f383f84a49717b2b752c017bd076b",
+  "registryManifestDigest": null,
+  "imagePublished": false,
+  "historicalBaseline95CatalogDigest": "a717ae6d79fe57095a4354b55bf1098b17085c00bd82b17a6076765434113516",
+  "baselineObservedThisTurn": false,
+  "sqlFiles": [
+    {
+      "path": "reports/staging-schema-preview-2026-09-30/0000_isolated-staging-initial.sql",
+      "gitObjectSha256": "b27d33a59a8a0f083fefe3271936d197309db5d683bd4254bbd28d7bc7315a10",
+      "gitObjectBytes": 116856,
+      "canonicalLfSha256": "b27d33a59a8a0f083fefe3271936d197309db5d683bd4254bbd28d7bc7315a10",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "b27d33a59a8a0f083fefe3271936d197309db5d683bd4254bbd28d7bc7315a10"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-09-30/0001_pilot-email-sender.sql",
+      "gitObjectSha256": "8d2d49f344e4900e5304d1f7b23ce23b929121f9af04362d50902a692605883f",
+      "gitObjectBytes": 318,
+      "canonicalLfSha256": "8d2d49f344e4900e5304d1f7b23ce23b929121f9af04362d50902a692605883f",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "8d2d49f344e4900e5304d1f7b23ce23b929121f9af04362d50902a692605883f"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0002_mobile-microsoft-pilot.sql",
+      "gitObjectSha256": "eec075e1009718e9307a0e88b905098749b337211abc87f0bfdb49c38c5138d0",
+      "gitObjectBytes": 5182,
+      "canonicalLfSha256": "eec075e1009718e9307a0e88b905098749b337211abc87f0bfdb49c38c5138d0",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "eec075e1009718e9307a0e88b905098749b337211abc87f0bfdb49c38c5138d0"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0003_swarm-foundation.sql",
+      "gitObjectSha256": "dac2d1782d71d89e7f14ae1dc73d06a9e094b25a77a1c3ea6e5abbd5b1ba44fc",
+      "gitObjectBytes": 1064,
+      "canonicalLfSha256": "dac2d1782d71d89e7f14ae1dc73d06a9e094b25a77a1c3ea6e5abbd5b1ba44fc",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "dac2d1782d71d89e7f14ae1dc73d06a9e094b25a77a1c3ea6e5abbd5b1ba44fc"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0004_beta-operations.sql",
+      "gitObjectSha256": "2f4a87900b0e2f6b7c85f4ac177d2d64c44ac49c40fbd4f429777ec71b2b6e95",
+      "gitObjectBytes": 3713,
+      "canonicalLfSha256": "2f4a87900b0e2f6b7c85f4ac177d2d64c44ac49c40fbd4f429777ec71b2b6e95",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "2f4a87900b0e2f6b7c85f4ac177d2d64c44ac49c40fbd4f429777ec71b2b6e95"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0005_contractor-operations.sql",
+      "gitObjectSha256": "8cd09ae5ce8f6fc19a4a89cd80fa728dc9dc68918f4e87c86a3d2bede3ea10d8",
+      "gitObjectBytes": 5224,
+      "canonicalLfSha256": "8cd09ae5ce8f6fc19a4a89cd80fa728dc9dc68918f4e87c86a3d2bede3ea10d8",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "8cd09ae5ce8f6fc19a4a89cd80fa728dc9dc68918f4e87c86a3d2bede3ea10d8"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0006_native-contractor-day.sql",
+      "gitObjectSha256": "4406ec9b61bedfdf2fd172272fbb7782f863b023eeb3d0ff28a867f1a6ca9c80",
+      "gitObjectBytes": 8008,
+      "canonicalLfSha256": "4406ec9b61bedfdf2fd172272fbb7782f863b023eeb3d0ff28a867f1a6ca9c80",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "4406ec9b61bedfdf2fd172272fbb7782f863b023eeb3d0ff28a867f1a6ca9c80"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0007_customer-care.sql",
+      "gitObjectSha256": "028297f0c78268dad1c42815513b633f9b1cb742f5a1bf5605dab1006e8dabcb",
+      "gitObjectBytes": 3748,
+      "canonicalLfSha256": "028297f0c78268dad1c42815513b633f9b1cb742f5a1bf5605dab1006e8dabcb",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "028297f0c78268dad1c42815513b633f9b1cb742f5a1bf5605dab1006e8dabcb"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0008_operations-wave.sql",
+      "gitObjectSha256": "33dcb364229ab9bf8a05270cae9b17e4052fdbd1ed2db0fb83d050cd1acb36f6",
+      "gitObjectBytes": 16278,
+      "canonicalLfSha256": "33dcb364229ab9bf8a05270cae9b17e4052fdbd1ed2db0fb83d050cd1acb36f6",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "33dcb364229ab9bf8a05270cae9b17e4052fdbd1ed2db0fb83d050cd1acb36f6"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0009_launch-communications.sql",
+      "gitObjectSha256": "813d3fca929f462644d7399f5314ff4e358f24ff05817f9f7851f290a8ff89ca",
+      "gitObjectBytes": 15004,
+      "canonicalLfSha256": "813d3fca929f462644d7399f5314ff4e358f24ff05817f9f7851f290a8ff89ca",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "813d3fca929f462644d7399f5314ff4e358f24ff05817f9f7851f290a8ff89ca"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0010_lead-replies.sql",
+      "gitObjectSha256": "f385f2a11f08f709788395a937ced3a3508af9aa1d570064106182f520085717",
+      "gitObjectBytes": 3976,
+      "canonicalLfSha256": "f385f2a11f08f709788395a937ced3a3508af9aa1d570064106182f520085717",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "f385f2a11f08f709788395a937ced3a3508af9aa1d570064106182f520085717"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0011_invoice-recovery.sql",
+      "gitObjectSha256": "c9491ff8eef505d8e784e004cf97af7192cefa9701f5fa2eeb3d599e6a0de063",
+      "gitObjectBytes": 5882,
+      "canonicalLfSha256": "c9491ff8eef505d8e784e004cf97af7192cefa9701f5fa2eeb3d599e6a0de063",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "c9491ff8eef505d8e784e004cf97af7192cefa9701f5fa2eeb3d599e6a0de063"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0012_callie-intake.sql",
+      "gitObjectSha256": "ef48cf4d68d3da7aeb97acf4c5a97c06152c2f7eae2d4319c4aa2153cb7ce480",
+      "gitObjectBytes": 11938,
+      "canonicalLfSha256": "ef48cf4d68d3da7aeb97acf4c5a97c06152c2f7eae2d4319c4aa2153cb7ce480",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "ef48cf4d68d3da7aeb97acf4c5a97c06152c2f7eae2d4319c4aa2153cb7ce480"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0013_standing-service.sql",
+      "gitObjectSha256": "010c13b648a442f34801b9c30f5dde6f824cce0f897d7a98866e8f8a4a1beb39",
+      "gitObjectBytes": 15206,
+      "canonicalLfSha256": "010c13b648a442f34801b9c30f5dde6f824cce0f897d7a98866e8f8a4a1beb39",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "010c13b648a442f34801b9c30f5dde6f824cce0f897d7a98866e8f8a4a1beb39"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0014_source-nurture.sql",
+      "gitObjectSha256": "958aebae4e5509acd28892b0b30a9413bfe8c9ddebed868a2f7a0defaec3b83e",
+      "gitObjectBytes": 17176,
+      "canonicalLfSha256": "958aebae4e5509acd28892b0b30a9413bfe8c9ddebed868a2f7a0defaec3b83e",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "958aebae4e5509acd28892b0b30a9413bfe8c9ddebed868a2f7a0defaec3b83e"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0015_callie-conversation.sql",
+      "gitObjectSha256": "8b75fecb5250a5e9920fac2e7bcd9b734a3ba8f20c8a78d21f66f4853639dc33",
+      "gitObjectBytes": 12455,
+      "canonicalLfSha256": "8b75fecb5250a5e9920fac2e7bcd9b734a3ba8f20c8a78d21f66f4853639dc33",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "8b75fecb5250a5e9920fac2e7bcd9b734a3ba8f20c8a78d21f66f4853639dc33"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0016_contractor-workday.sql",
+      "gitObjectSha256": "aa15f891c013ce6a5e71107d973f04ee3cc4c46ca6030e54ac4490cf52147b89",
+      "gitObjectBytes": 15706,
+      "canonicalLfSha256": "aa15f891c013ce6a5e71107d973f04ee3cc4c46ca6030e54ac4490cf52147b89",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "aa15f891c013ce6a5e71107d973f04ee3cc4c46ca6030e54ac4490cf52147b89"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0017_returning-customer-work.sql",
+      "gitObjectSha256": "d6d0319830a26ab9387a6ef5952dd5409adb4feeac76a8a2d71d78c7e0e07da8",
+      "gitObjectBytes": 9675,
+      "canonicalLfSha256": "d6d0319830a26ab9387a6ef5952dd5409adb4feeac76a8a2d71d78c7e0e07da8",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": "d6d0319830a26ab9387a6ef5952dd5409adb4feeac76a8a2d71d78c7e0e07da8"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0018_lead-alert-coverage.sql",
+      "gitObjectSha256": "b5c6425dc7942460e4d734e14f971e8fc062b1bdfe292d69d22a88e34be587a1",
+      "gitObjectBytes": 2335,
+      "canonicalLfSha256": "b5c6425dc7942460e4d734e14f971e8fc062b1bdfe292d69d22a88e34be587a1",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    }
+  ],
+  "schemaFiles": [
+    {
+      "path": "lib/db/src/schema/activities.ts",
+      "gitObjectSha256": "e8269281bb167f5e25e03d1b6e5c0e1c248c83b63ff117d5eead8bdf7bc138a2",
+      "gitObjectBytes": 1648,
+      "canonicalLfSha256": "e8269281bb167f5e25e03d1b6e5c0e1c248c83b63ff117d5eead8bdf7bc138a2",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/analytics.ts",
+      "gitObjectSha256": "8aaa51ad0e3af02c71bcd75697e32b45d7d54de9c13dead376db4fed47c7a6ab",
+      "gitObjectBytes": 2708,
+      "canonicalLfSha256": "8aaa51ad0e3af02c71bcd75697e32b45d7d54de9c13dead376db4fed47c7a6ab",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/api-keys.ts",
+      "gitObjectSha256": "884af974bb64a7421f56a34339eacc953ed5f9cfcbf4de243952202d68e5a70d",
+      "gitObjectBytes": 2003,
+      "canonicalLfSha256": "884af974bb64a7421f56a34339eacc953ed5f9cfcbf4de243952202d68e5a70d",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/appointments.ts",
+      "gitObjectSha256": "8b6dad7494460ca7babf8369d5b926c7b8dda2b0a6ea3d498d5e74e749f351fc",
+      "gitObjectBytes": 2155,
+      "canonicalLfSha256": "8b6dad7494460ca7babf8369d5b926c7b8dda2b0a6ea3d498d5e74e749f351fc",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/assistant-history.ts",
+      "gitObjectSha256": "897132a2046851f85fa7ad527b80eb89304c04b6f304f50d2b4204b0f23be655",
+      "gitObjectBytes": 1058,
+      "canonicalLfSha256": "897132a2046851f85fa7ad527b80eb89304c04b6f304f50d2b4204b0f23be655",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/audit.ts",
+      "gitObjectSha256": "6a487784982344a44923a35aa5541f3906da1f540dc6a04cde98449e6965acc7",
+      "gitObjectBytes": 1575,
+      "canonicalLfSha256": "6a487784982344a44923a35aa5541f3906da1f540dc6a04cde98449e6965acc7",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/auth.ts",
+      "gitObjectSha256": "d9dbf5751c67ef7e1597d235a302b8a46067c71d3cdbd1079a330c85270b73c1",
+      "gitObjectBytes": 2504,
+      "canonicalLfSha256": "d9dbf5751c67ef7e1597d235a302b8a46067c71d3cdbd1079a330c85270b73c1",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/automations.ts",
+      "gitObjectSha256": "a1050b7b9e83c9998df93cc8c623c63f1864383a017ee7a215e0eff5bd281a19",
+      "gitObjectBytes": 5178,
+      "canonicalLfSha256": "a1050b7b9e83c9998df93cc8c623c63f1864383a017ee7a215e0eff5bd281a19",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/bie.ts",
+      "gitObjectSha256": "b51c316a70b5b88d893e8f873cfde3651ed58387a606338b226ee999552a4101",
+      "gitObjectBytes": 6560,
+      "canonicalLfSha256": "b51c316a70b5b88d893e8f873cfde3651ed58387a606338b226ee999552a4101",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/billing-checkouts.ts",
+      "gitObjectSha256": "9af94c964aaa29825b2727fab514b98e7eadce5242f31fbe74a5d8934389b8b5",
+      "gitObjectBytes": 3139,
+      "canonicalLfSha256": "9af94c964aaa29825b2727fab514b98e7eadce5242f31fbe74a5d8934389b8b5",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/callie-reception.ts",
+      "gitObjectSha256": "d39e60656401f734e3efc231692779158d1c15f7691683d3268a75ecd5ceb55a",
+      "gitObjectBytes": 10578,
+      "canonicalLfSha256": "d39e60656401f734e3efc231692779158d1c15f7691683d3268a75ecd5ceb55a",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/callie.ts",
+      "gitObjectSha256": "0b06a423941ebce9219cd7a4446f00fd432d7dffec4f8dae7def1cba2ea7e80a",
+      "gitObjectBytes": 13908,
+      "canonicalLfSha256": "0b06a423941ebce9219cd7a4446f00fd432d7dffec4f8dae7def1cba2ea7e80a",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/capture.ts",
+      "gitObjectSha256": "6bf93d51056e55cd44edcdf3e1182955d0f24816edb17918cbd09a46f7d8b695",
+      "gitObjectBytes": 4484,
+      "canonicalLfSha256": "6bf93d51056e55cd44edcdf3e1182955d0f24816edb17918cbd09a46f7d8b695",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/consent.ts",
+      "gitObjectSha256": "983ead1742a0035cd9ca72ed2b000e90eda7b4729943e1d8ecb802d26b7bb8d6",
+      "gitObjectBytes": 1338,
+      "canonicalLfSha256": "983ead1742a0035cd9ca72ed2b000e90eda7b4729943e1d8ecb802d26b7bb8d6",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/contact-touch-reservations.ts",
+      "gitObjectSha256": "8fadd710eaea75ba3357c6a3f5ddcadde17dd4ef118a14a5840d94247a2e0258",
+      "gitObjectBytes": 1757,
+      "canonicalLfSha256": "8fadd710eaea75ba3357c6a3f5ddcadde17dd4ef118a14a5840d94247a2e0258",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/contacts.ts",
+      "gitObjectSha256": "559575514fef8391970cb639f512c070253a3499413ca1e577461a3a91b48ee4",
+      "gitObjectBytes": 1926,
+      "canonicalLfSha256": "559575514fef8391970cb639f512c070253a3499413ca1e577461a3a91b48ee4",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/contractor-workday.ts",
+      "gitObjectSha256": "34b5024ef5991344a49d396af08532e0149ee697ee38106d956ecacce23d7414",
+      "gitObjectBytes": 13313,
+      "canonicalLfSha256": "34b5024ef5991344a49d396af08532e0149ee697ee38106d956ecacce23d7414",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/conversations.ts",
+      "gitObjectSha256": "11c991a95e2bc2bac5b21a40627e5e7ba7fa677c35d51acf7dccd9cdc9e299b3",
+      "gitObjectBytes": 3094,
+      "canonicalLfSha256": "11c991a95e2bc2bac5b21a40627e5e7ba7fa677c35d51acf7dccd9cdc9e299b3",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/crm-tasks.ts",
+      "gitObjectSha256": "ad28329f1f7520006bd509168439e1ca93f04e3768cf6afed9f7d3ae472405b4",
+      "gitObjectBytes": 2198,
+      "canonicalLfSha256": "ad28329f1f7520006bd509168439e1ca93f04e3768cf6afed9f7d3ae472405b4",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/customer-lifecycle.ts",
+      "gitObjectSha256": "28f4e94584c3f4001d146244a9ea0a9eb194567868d660c157ebc9f76a88ffd2",
+      "gitObjectBytes": 1187,
+      "canonicalLfSha256": "28f4e94584c3f4001d146244a9ea0a9eb194567868d660c157ebc9f76a88ffd2",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/customer-work.ts",
+      "gitObjectSha256": "6f1aa9882779c8b75bf5670196b6942d1069f7538526f2ba58960a921ec75562",
+      "gitObjectBytes": 3759,
+      "canonicalLfSha256": "6f1aa9882779c8b75bf5670196b6942d1069f7538526f2ba58960a921ec75562",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/email-intelligence.ts",
+      "gitObjectSha256": "7d5d985f5c8f17ab5e77522ae83126bb3f83a5f7e2f3932f12d72135093dd424",
+      "gitObjectBytes": 10557,
+      "canonicalLfSha256": "7d5d985f5c8f17ab5e77522ae83126bb3f83a5f7e2f3932f12d72135093dd424",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/engagement-links.ts",
+      "gitObjectSha256": "5fdc181dc30353f856e713cf214b21f3e372a699ed1f1e8e1a4efc2da9ffd9ee",
+      "gitObjectBytes": 1895,
+      "canonicalLfSha256": "5fdc181dc30353f856e713cf214b21f3e372a699ed1f1e8e1a4efc2da9ffd9ee",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/enums.ts",
+      "gitObjectSha256": "135d609ed864a060daf2a181aa8fb698a4b0803db32af7896ffa4255b15c4367",
+      "gitObjectBytes": 2334,
+      "canonicalLfSha256": "135d609ed864a060daf2a181aa8fb698a4b0803db32af7896ffa4255b15c4367",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/estimates.ts",
+      "gitObjectSha256": "b2f0a04df4c0a4489d57208ffb413b26828a0765f794f1aa20a60772d7efb9cf",
+      "gitObjectBytes": 2879,
+      "canonicalLfSha256": "b2f0a04df4c0a4489d57208ffb413b26828a0765f794f1aa20a60772d7efb9cf",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/evidence-intelligence.ts",
+      "gitObjectSha256": "63dd9bc463db3510d7565415fbef3f1c7ab797039b33fd0c8b9d4f921b3781be",
+      "gitObjectBytes": 16534,
+      "canonicalLfSha256": "63dd9bc463db3510d7565415fbef3f1c7ab797039b33fd0c8b9d4f921b3781be",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/financial-migration.ts",
+      "gitObjectSha256": "a6221ec25f7051dd94b7d091f19d3f6d3998b5d97f9a5c066e2d78126cb51a09",
+      "gitObjectBytes": 4178,
+      "canonicalLfSha256": "a6221ec25f7051dd94b7d091f19d3f6d3998b5d97f9a5c066e2d78126cb51a09",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/forms.ts",
+      "gitObjectSha256": "d3843425e8a3fa667d4d2d230431e7474b6ac4c597c11de825683bec1424d83d",
+      "gitObjectBytes": 6303,
+      "canonicalLfSha256": "d3843425e8a3fa667d4d2d230431e7474b6ac4c597c11de825683bec1424d83d",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/gmail-connections.ts",
+      "gitObjectSha256": "a5d4ce11821e05376ea1bdf1fd3554fe401fe8fc601a17a870c72f8fe45e6589",
+      "gitObjectBytes": 4475,
+      "canonicalLfSha256": "a5d4ce11821e05376ea1bdf1fd3554fe401fe8fc601a17a870c72f8fe45e6589",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/identity-tokens.ts",
+      "gitObjectSha256": "5a97bade5ed975c5f7a2f67fe8b5cb685725302a1bfece26b0af0c5e6d73f2e0",
+      "gitObjectBytes": 1193,
+      "canonicalLfSha256": "5a97bade5ed975c5f7a2f67fe8b5cb685725302a1bfece26b0af0c5e6d73f2e0",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/index.ts",
+      "gitObjectSha256": "b6f46fd2a27a0eb82651f2ea27accbaecbe47d7f5e25a0e36a5d15bb984cb25e",
+      "gitObjectBytes": 2204,
+      "canonicalLfSha256": "b6f46fd2a27a0eb82651f2ea27accbaecbe47d7f5e25a0e36a5d15bb984cb25e",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/installation.ts",
+      "gitObjectSha256": "5521e545d595a2122f889efba99b6124d0a59833370d2cde298d21ac0fd34e64",
+      "gitObjectBytes": 4071,
+      "canonicalLfSha256": "5521e545d595a2122f889efba99b6124d0a59833370d2cde298d21ac0fd34e64",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/invoice-delivery-attempts.ts",
+      "gitObjectSha256": "b9ce0cb87960d05c5e6477cfbb3bf599b2869a8c7cd78e7ff4c1b2fb6c1f826e",
+      "gitObjectBytes": 5646,
+      "canonicalLfSha256": "b9ce0cb87960d05c5e6477cfbb3bf599b2869a8c7cd78e7ff4c1b2fb6c1f826e",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/invoices.ts",
+      "gitObjectSha256": "5e670a4b05210534fc5c942a7e7fca40405b30d35ead972182c6e15da2a5a491",
+      "gitObjectBytes": 8372,
+      "canonicalLfSha256": "5e670a4b05210534fc5c942a7e7fca40405b30d35ead972182c6e15da2a5a491",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/knowledge.ts",
+      "gitObjectSha256": "eecc7b0fe804d6b4280dd5303f21a9185c47dbe9414a9c5dc6bcb9d806339ec7",
+      "gitObjectBytes": 2002,
+      "canonicalLfSha256": "eecc7b0fe804d6b4280dd5303f21a9185c47dbe9414a9c5dc6bcb9d806339ec7",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/leads.ts",
+      "gitObjectSha256": "d7bd0168f238c6dfc068d2f71264f2dbc44d631dfa3c313567e4a4e2add6ebd6",
+      "gitObjectBytes": 5909,
+      "canonicalLfSha256": "d7bd0168f238c6dfc068d2f71264f2dbc44d631dfa3c313567e4a4e2add6ebd6",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/mailbox-communication.ts",
+      "gitObjectSha256": "edfa86803aaa2e1d5628aaef51f69622fff6e437618153dcd8c2f9e77121df0e",
+      "gitObjectBytes": 9846,
+      "canonicalLfSha256": "edfa86803aaa2e1d5628aaef51f69622fff6e437618153dcd8c2f9e77121df0e",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/mailbox-connectors.ts",
+      "gitObjectSha256": "dbb73e53f2175f070e66cc27d315e510ee60550fd97986466908111e1d03f107",
+      "gitObjectBytes": 9181,
+      "canonicalLfSha256": "dbb73e53f2175f070e66cc27d315e510ee60550fd97986466908111e1d03f107",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/microsoft-connections.ts",
+      "gitObjectSha256": "7c8a8bc8d8ddec4084cd9ea3ac9e57a0e864e990db2598689987eecc1128278e",
+      "gitObjectBytes": 2477,
+      "canonicalLfSha256": "7c8a8bc8d8ddec4084cd9ea3ac9e57a0e864e990db2598689987eecc1128278e",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/missed-call-care.ts",
+      "gitObjectSha256": "0d2971b535f86a7be8fe8c93be24102ffa40188e9c4d8e4e8cb25525849fa0e8",
+      "gitObjectBytes": 4341,
+      "canonicalLfSha256": "0d2971b535f86a7be8fe8c93be24102ffa40188e9c4d8e4e8cb25525849fa0e8",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/next-actions.ts",
+      "gitObjectSha256": "492c00670805966be0e88b55318a095fbbfb3a0e6f9ea30f1671356f932e4fd9",
+      "gitObjectBytes": 1667,
+      "canonicalLfSha256": "492c00670805966be0e88b55318a095fbbfb3a0e6f9ea30f1671356f932e4fd9",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/object-storage.ts",
+      "gitObjectSha256": "1796d04181f0146d68ce829626b5cc17d56bcce4d7939df6ea56dfa282ed4b3d",
+      "gitObjectBytes": 1477,
+      "canonicalLfSha256": "1796d04181f0146d68ce829626b5cc17d56bcce4d7939df6ea56dfa282ed4b3d",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/organizations.ts",
+      "gitObjectSha256": "9020b5abccd714f8f33b90ef5832cc3758d701f509acf03b4e09b3174bd69c89",
+      "gitObjectBytes": 2079,
+      "canonicalLfSha256": "9020b5abccd714f8f33b90ef5832cc3758d701f509acf03b4e09b3174bd69c89",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/platform-email-delivery.ts",
+      "gitObjectSha256": "1965db5aec47153df23a793386770e8e3d627a9c6daecd66888020f74a843679",
+      "gitObjectBytes": 4600,
+      "canonicalLfSha256": "1965db5aec47153df23a793386770e8e3d627a9c6daecd66888020f74a843679",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/playbook-learning.ts",
+      "gitObjectSha256": "23263d993032bab35dbce191cdb088bc7d68cd49f2d5f6fbbb8aa90639e23eaa",
+      "gitObjectBytes": 4304,
+      "canonicalLfSha256": "23263d993032bab35dbce191cdb088bc7d68cd49f2d5f6fbbb8aa90639e23eaa",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/playbooks.ts",
+      "gitObjectSha256": "88eaa3e07027e1a57ecf16df5a7e4a5481183fcaed6a4809cc48cfb187c59e94",
+      "gitObjectBytes": 7470,
+      "canonicalLfSha256": "88eaa3e07027e1a57ecf16df5a7e4a5481183fcaed6a4809cc48cfb187c59e94",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/portal.ts",
+      "gitObjectSha256": "1f04d7415b5754f35d8af3dea259e2a99f1d42f201fb7f9d26788932cbc2d603",
+      "gitObjectBytes": 2204,
+      "canonicalLfSha256": "1f04d7415b5754f35d8af3dea259e2a99f1d42f201fb7f9d26788932cbc2d603",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/projects.ts",
+      "gitObjectSha256": "39e14156e49835eeab68429bf720ac5513d16701f7f180733189d3c0acd10aeb",
+      "gitObjectBytes": 3267,
+      "canonicalLfSha256": "39e14156e49835eeab68429bf720ac5513d16701f7f180733189d3c0acd10aeb",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/properties.ts",
+      "gitObjectSha256": "1f74c607716e63f69bc62ab41ee711268b82fe067f663268ec82ac44542340d1",
+      "gitObjectBytes": 1594,
+      "canonicalLfSha256": "1f74c607716e63f69bc62ab41ee711268b82fe067f663268ec82ac44542340d1",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/rate-limits.ts",
+      "gitObjectSha256": "8e32b93f81e031e584579e936f83f3333e59122f49fad1343b44a571ac7eae69",
+      "gitObjectBytes": 549,
+      "canonicalLfSha256": "8e32b93f81e031e584579e936f83f3333e59122f49fad1343b44a571ac7eae69",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/reactivation.ts",
+      "gitObjectSha256": "4196510e571d460c7f1b4c3e42ab0b2a9ea078a23e0b27004d91402919f9b68e",
+      "gitObjectBytes": 5692,
+      "canonicalLfSha256": "4196510e571d460c7f1b4c3e42ab0b2a9ea078a23e0b27004d91402919f9b68e",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/revenue-workspace.ts",
+      "gitObjectSha256": "a92678918babcd1829b706d44ee6c505c612ff3bf6633287d77e6713cfb029f4",
+      "gitObjectBytes": 8169,
+      "canonicalLfSha256": "a92678918babcd1829b706d44ee6c505c612ff3bf6633287d77e6713cfb029f4",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/saved-filters.ts",
+      "gitObjectSha256": "332d636ba64c0c5166d726150057d1768a5b8a2e00bc1bc870fa3a560f017f12",
+      "gitObjectBytes": 1202,
+      "canonicalLfSha256": "332d636ba64c0c5166d726150057d1768a5b8a2e00bc1bc870fa3a560f017f12",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/scheduler.ts",
+      "gitObjectSha256": "7d92cf16ff0f99eac41074d9b749b160494913f2a15fe5b0714579b849bd5235",
+      "gitObjectBytes": 793,
+      "canonicalLfSha256": "7d92cf16ff0f99eac41074d9b749b160494913f2a15fe5b0714579b849bd5235",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/service-obligations.ts",
+      "gitObjectSha256": "b2e7fd133d0ade5947b35f2db1a9fb48ac9d65e5abc07ad449d47c6baa47cfef",
+      "gitObjectBytes": 3352,
+      "canonicalLfSha256": "b2e7fd133d0ade5947b35f2db1a9fb48ac9d65e5abc07ad449d47c6baa47cfef",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/service-sms.ts",
+      "gitObjectSha256": "e96132da74f6748d87d7a1b3c94240edca5b5788b3db4e2339a749860a3e6683",
+      "gitObjectBytes": 10001,
+      "canonicalLfSha256": "e96132da74f6748d87d7a1b3c94240edca5b5788b3db4e2339a749860a3e6683",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/service-standing.ts",
+      "gitObjectSha256": "a3eed5448a972e5b50133ff4636daa47b87e15696d7e26504d8b665924ab687d",
+      "gitObjectBytes": 6653,
+      "canonicalLfSha256": "a3eed5448a972e5b50133ff4636daa47b87e15696d7e26504d8b665924ab687d",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/service-watch.ts",
+      "gitObjectSha256": "8c7980cf4664fc2f32cf33fe38d15895310d233a516a1983408c3b438723ade3",
+      "gitObjectBytes": 2914,
+      "canonicalLfSha256": "8c7980cf4664fc2f32cf33fe38d15895310d233a516a1983408c3b438723ade3",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/settings.ts",
+      "gitObjectSha256": "29c9afe1ce45109c02373aefd417c4b38a333ca87d328a096fb119e877a9d013",
+      "gitObjectBytes": 21910,
+      "canonicalLfSha256": "29c9afe1ce45109c02373aefd417c4b38a333ca87d328a096fb119e877a9d013",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/smart-sites.ts",
+      "gitObjectSha256": "3b9b32fdd4a0122e24e81d6767b02d7bcc86e9fce131278417f65c3938fc8eb1",
+      "gitObjectBytes": 5085,
+      "canonicalLfSha256": "3b9b32fdd4a0122e24e81d6767b02d7bcc86e9fce131278417f65c3938fc8eb1",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/source-adoption.ts",
+      "gitObjectSha256": "b3e33f555d0222d3968c6992bb5a266231df905090a8983d588bd3b122b5d116",
+      "gitObjectBytes": 6306,
+      "canonicalLfSha256": "b3e33f555d0222d3968c6992bb5a266231df905090a8983d588bd3b122b5d116",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/source-nurture.ts",
+      "gitObjectSha256": "0c34aec9ccc52db9ee27ce03f0c26a3e441190b026141b0cf4ff11374068b387",
+      "gitObjectBytes": 9912,
+      "canonicalLfSha256": "0c34aec9ccc52db9ee27ce03f0c26a3e441190b026141b0cf4ff11374068b387",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/staff-invitations.ts",
+      "gitObjectSha256": "367e0a78aa5b01556216d2427284714c70c8614babd0fed5788a9e09a2b2690c",
+      "gitObjectBytes": 2870,
+      "canonicalLfSha256": "367e0a78aa5b01556216d2427284714c70c8614babd0fed5788a9e09a2b2690c",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/staff-push.ts",
+      "gitObjectSha256": "d938847f055264eb02acd35b498c5a17b32a1171b01d05268829fd3420b8249f",
+      "gitObjectBytes": 7798,
+      "canonicalLfSha256": "d938847f055264eb02acd35b498c5a17b32a1171b01d05268829fd3420b8249f",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/suppressions.ts",
+      "gitObjectSha256": "f0cc17da8bf3616a40afe55199e02348c6b8206656bcc5ea1aca4a19c116ad21",
+      "gitObjectBytes": 2118,
+      "canonicalLfSha256": "f0cc17da8bf3616a40afe55199e02348c6b8206656bcc5ea1aca4a19c116ad21",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/tags.ts",
+      "gitObjectSha256": "311548fd0de3d5b3537b37a5de1ab48cf4cd07bda675f744c5391bd95c69a744",
+      "gitObjectBytes": 1653,
+      "canonicalLfSha256": "311548fd0de3d5b3537b37a5de1ab48cf4cd07bda675f744c5391bd95c69a744",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/templates.ts",
+      "gitObjectSha256": "b2492ef398f7f29e797845e86f13f8fa202066b4fcc446c2ff6c73e2097c7dfe",
+      "gitObjectBytes": 1534,
+      "canonicalLfSha256": "b2492ef398f7f29e797845e86f13f8fa202066b4fcc446c2ff6c73e2097c7dfe",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/twilio.ts",
+      "gitObjectSha256": "7684f621b9b4a5468c546dd0bf1c9ae3914f428166c764669992f595a9349c78",
+      "gitObjectBytes": 8307,
+      "canonicalLfSha256": "7684f621b9b4a5468c546dd0bf1c9ae3914f428166c764669992f595a9349c78",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    },
+    {
+      "path": "lib/db/src/schema/webhooks.ts",
+      "gitObjectSha256": "9c3641f955bb27f1696c510c6178e5991635eee73acf909abfa1a93008b4d549",
+      "gitObjectBytes": 3584,
+      "canonicalLfSha256": "9c3641f955bb27f1696c510c6178e5991635eee73acf909abfa1a93008b4d549",
+      "workingCanonicalMatches": true,
+      "historicalAcceptedSha256": null
+    }
+  ],
+  "selectedIfExact95": [
+    "reports/staging-schema-preview-2026-10-01/0003_swarm-foundation.sql",
+    "reports/staging-schema-preview-2026-10-01/0004_beta-operations.sql",
+    "reports/staging-schema-preview-2026-10-01/0005_contractor-operations.sql",
+    "reports/staging-schema-preview-2026-10-01/0006_native-contractor-day.sql",
+    "reports/staging-schema-preview-2026-10-01/0007_customer-care.sql",
+    "reports/staging-schema-preview-2026-10-01/0008_operations-wave.sql",
+    "reports/staging-schema-preview-2026-10-01/0009_launch-communications.sql",
+    "reports/staging-schema-preview-2026-10-01/0010_lead-replies.sql",
+    "reports/staging-schema-preview-2026-10-01/0011_invoice-recovery.sql",
+    "reports/staging-schema-preview-2026-10-01/0012_callie-intake.sql",
+    "reports/staging-schema-preview-2026-10-01/0013_standing-service.sql",
+    "reports/staging-schema-preview-2026-10-01/0014_source-nurture.sql",
+    "reports/staging-schema-preview-2026-10-01/0015_callie-conversation.sql",
+    "reports/staging-schema-preview-2026-10-01/0016_contractor-workday.sql",
+    "reports/staging-schema-preview-2026-10-01/0017_returning-customer-work.sql",
+    "reports/staging-schema-preview-2026-10-01/0018_lead-alert-coverage.sql"
+  ],
+  "selectedIfExact141": [
+    "reports/staging-schema-preview-2026-10-01/0018_lead-alert-coverage.sql"
+  ],
+  "freshHostedCatalogRequired": true,
+  "workingInputsMatch": true,
+  "toolSources": [
+    {
+      "path": "tool-source/capture-hosted-metadata.mjs.txt",
+      "sha256": "22cfed143412c15f2cbc440d96a939ca72f7bf5d714ba3f1fffe1106551c7682",
+      "bytes": 6650,
+      "executable": false
+    },
+    {
+      "path": "tool-source/capture-mpg-shapes.mjs.txt",
+      "sha256": "8fac0d9da06c3e8e056586c3d45eaeadcb5d18ea5387dd7c7c3b7b6f9cb32183",
+      "bytes": 2158,
+      "executable": false
+    },
+    {
+      "path": "tool-source/capture-mpg-public.mjs.txt",
+      "sha256": "dcaebafa17c1aa6a0ad3c3859dd97e30967911871ef7a3dacf877604aecee955",
+      "bytes": 2758,
+      "executable": false
+    },
+    {
+      "path": "tool-source/capture-source-manifest.mjs.txt",
+      "sha256": "1bf565963a90accd61174ef96aaf62ee6f3afd78229b9b380c56e4c48c85884e",
+      "bytes": 4073,
+      "executable": false
+    }
+  ],
+  "hostedMigrationAuthorized": false,
+  "deployAuthorized": false,
+  "paidRestoreAuthorized": false
+}

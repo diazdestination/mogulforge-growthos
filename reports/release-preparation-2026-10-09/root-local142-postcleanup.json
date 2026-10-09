@@ -1,0 +1,13 @@
+{
+  "kind": "ROOT_FRESH_LOCAL142_CLEANUP_CORROBORATION",
+  "observedAt": "2026-10-09T14:37:51.191Z",
+  "resultFile": "local142-attempt3-result-e8c1ace4-d76a-49b5-b87d-9565aef71da3.json",
+  "resultSha256": "9d7b867eb45480bdf1765f7c4add0da074f738d897de1247afa004f779bf8a67",
+  "positiveContainerAbsence": true,
+  "positiveTaskInventoryEmpty": true,
+  "positiveVolumeAbsence": true,
+  "loopbackPortRefused": true,
+  "mutations": 0,
+  "sqlQueries": 0,
+  "hostedCalls": 0
+}
