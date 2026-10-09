@@ -36,7 +36,7 @@ export default function AgentTeam({ publicMode = false }: { publicMode?: boolean
           <Link href="/" className="agent-team__brand" aria-label="MogulForge GrowthOS home">
             <img src="/brand/mogulforge-mark.svg" alt="" width="52" height="52" />
             <span className="agent-team__brand-copy">
-              <strong>MOGULFORGE</strong>
+              <strong>Mogul<span>Forge</span></strong>
               <small>POWERING CONTRACTOR GROWTH</small>
             </span>
           </Link>
