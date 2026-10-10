@@ -217,18 +217,27 @@ describe("authenticated Resend delivery callbacks", () => {
   it.each(["stale", "future", "fraction", "exponent"])(
     "rejects a correctly signed %s timestamp",
     async (kind) => {
-      const body = JSON.stringify(event());
-      const now = Math.floor(Date.now() / 1000);
-      const timestamp =
-        kind === "stale"
-          ? String(now - 301)
-          : kind === "future"
-            ? String(now + 301)
-            : kind === "fraction"
-              ? `${now}.0`
-              : `${now / 10}e1`;
-      expect((await send(body, headers(body, timestamp))).status).toBe(403);
-      expect(handleBounce).not.toHaveBeenCalled();
+      // Keep the 301-second boundary fixed across asynchronous HTTP handling.
+      // Under load a future timestamp could enter the valid window before the
+      // handler checked it, without any replay-protection defect.
+      const fixedNow = Date.now();
+      const clock = vi.spyOn(Date, "now").mockReturnValue(fixedNow);
+      try {
+        const body = JSON.stringify(event());
+        const now = Math.floor(fixedNow / 1000);
+        const timestamp =
+          kind === "stale"
+            ? String(now - 301)
+            : kind === "future"
+              ? String(now + 301)
+              : kind === "fraction"
+                ? `${now}.0`
+                : `${now / 10}e1`;
+        expect((await send(body, headers(body, timestamp))).status).toBe(403);
+        expect(handleBounce).not.toHaveBeenCalled();
+      } finally {
+        clock.mockRestore();
+      }
     },
   );
 

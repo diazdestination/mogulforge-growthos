@@ -1,5 +1,18 @@
 # GrowthOS project state
 
+## Local development tooling candidate — October 10 UTC
+
+Isolated branch `agent/growthos-local-dev-20261010` adds Codex setup/actions and
+a credential-free local launcher. Frozen installs, workspace type checks, the
+980-test UI suite and eight launcher isolation/ownership/session checks passed on Windows.
+The synthetic returning-customer preview responds on loopback4193. The shared
+browser audit runs and reports existing contrast/meta-viewport findings on the
+public entry page. After the approved restart, Ubuntu24.04 and Docker Engine29.9.0
+are installed on WILLOWFORGE. The launcher now holds a WSL session during database
+testing and parity so idle shutdown cannot remove the database mid-run. Full
+owned-container PostgreSQL/parity evidence is recorded with the candidate. No application
+feature, hosted data, provider, deployment or other candidate was changed.
+
 ## October6 researched Contractor Workday integration
 
 The owner approved researched common HVAC/roofing baselines without waiting for
