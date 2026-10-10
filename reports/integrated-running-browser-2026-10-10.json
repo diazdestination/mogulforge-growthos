@@ -1,0 +1,251 @@
+{
+  "startedAt": "2026-10-10T11:46:37.248Z",
+  "origin": "http://127.0.0.1:4193",
+  "synthetic": true,
+  "browser": "154.0.8037.99",
+  "recording": false,
+  "tracing": false,
+  "video": false,
+  "checks": [
+    {
+      "name": "Signed-in native Today",
+      "result": "passed",
+      "evidence": "Fictional Owner session; fully loaded appointments, due task and returning-customer job."
+    },
+    {
+      "name": "Customer and exact property correction",
+      "result": "passed",
+      "evidence": {
+        "loadedProperties": 30,
+        "propertyId": "00f5e378-54f7-5fa1-ab5d-493c7129f2b3",
+        "saved": {
+          "requestId": "7ad5052d-b5e4-4781-94b8-14506f620a91",
+          "status": "saved"
+        },
+        "persistedAfterReload": true,
+        "restrictionsPreserved": true,
+        "originalValuesRestored": {
+          "requestId": "9fdc6509-2f00-4fc4-a495-e4eb83402cff",
+          "status": "saved"
+        }
+      }
+    },
+    {
+      "name": "Returning-customer work navigation",
+      "result": "passed",
+      "evidence": "Customer Jobs, Estimates and Invoices sections load; exact invoice opens its recorded balance."
+    },
+    {
+      "name": "Native Schedule and Invoices",
+      "result": "passed",
+      "evidence": "Seeded HVAC/roofing appointments and three issued invoices load, with recorded balance $110.00 on the returning invoice."
+    },
+    {
+      "name": "Service to exact original visit",
+      "result": "passed",
+      "evidence": {
+        "path": "/appointments?appointmentId=64f6b014-c12d-5d3e-acbe-f7be4451d9b1&organizationId=8ed58f14-70bf-42e6-b156-1b7b60c7a631",
+        "linkedPropertyVisible": true
+      }
+    },
+    {
+      "name": "Native owner lead coverage",
+      "result": "passed",
+      "evidence": {
+        "result": "Original recipient cohort unknown; historical gap is explicit.",
+        "refresh": [
+          {
+            "method": "GET",
+            "path": "/api/v1/staff-push/leads/a40e0ed1-5b57-4044-8bd0-4c8243e45303/coverage"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Specialist to native workspace",
+      "result": "passed",
+      "evidence": "Signed-in SCHED guide opens Schedule; route optimization is explicitly Planned."
+    },
+    {
+      "name": "Responsive native navigation",
+      "result": "passed",
+      "evidence": "16 rendered page/viewport combinations at 390x844 and 320x844 have no document/body horizontal overflow. Mobile Menu opens Service and closes after navigation; quick Today returns to the workday."
+    }
+  ],
+  "layouts": [
+    {
+      "label": "Today",
+      "path": "/",
+      "viewport": 1440,
+      "documentWidth": 1440,
+      "bodyWidth": 1440
+    },
+    {
+      "label": "Today",
+      "path": "/",
+      "viewport": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390
+    },
+    {
+      "label": "Customers",
+      "path": "/contacts",
+      "viewport": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390
+    },
+    {
+      "label": "Customer work record",
+      "path": "/contacts/ca538d9c-7a51-51f9-a89e-af93014b79c0",
+      "viewport": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390
+    },
+    {
+      "label": "Schedule",
+      "path": "/appointments",
+      "viewport": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390
+    },
+    {
+      "label": "Invoices",
+      "path": "/invoices",
+      "viewport": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390
+    },
+    {
+      "label": "Service",
+      "path": "/service",
+      "viewport": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390
+    },
+    {
+      "label": "Specialists",
+      "path": "/agent-team",
+      "viewport": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390
+    },
+    {
+      "label": "Lead coverage",
+      "path": "/leads/a40e0ed1-5b57-4044-8bd0-4c8243e45303",
+      "viewport": 390,
+      "documentWidth": 390,
+      "bodyWidth": 390
+    },
+    {
+      "label": "Today",
+      "path": "/",
+      "viewport": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320
+    },
+    {
+      "label": "Customers",
+      "path": "/contacts",
+      "viewport": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320
+    },
+    {
+      "label": "Customer work record",
+      "path": "/contacts/ca538d9c-7a51-51f9-a89e-af93014b79c0",
+      "viewport": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320
+    },
+    {
+      "label": "Schedule",
+      "path": "/appointments",
+      "viewport": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320
+    },
+    {
+      "label": "Invoices",
+      "path": "/invoices",
+      "viewport": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320
+    },
+    {
+      "label": "Service",
+      "path": "/service",
+      "viewport": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320
+    },
+    {
+      "label": "Specialists",
+      "path": "/agent-team",
+      "viewport": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320
+    },
+    {
+      "label": "Lead coverage",
+      "path": "/leads/a40e0ed1-5b57-4044-8bd0-4c8243e45303",
+      "viewport": 320,
+      "documentWidth": 320,
+      "bodyWidth": 320
+    }
+  ],
+  "pageErrors": [],
+  "failedResponses": [
+    {
+      "path": "/api/v1/smart-sites/leads/a40e0ed1-5b57-4044-8bd0-4c8243e45303/follow-up",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/leads/a40e0ed1-5b57-4044-8bd0-4c8243e45303/enrollment",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/smart-sites/leads/a40e0ed1-5b57-4044-8bd0-4c8243e45303/follow-up",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/leads/a40e0ed1-5b57-4044-8bd0-4c8243e45303/enrollment",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/leads/a40e0ed1-5b57-4044-8bd0-4c8243e45303/enrollment",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/smart-sites/leads/a40e0ed1-5b57-4044-8bd0-4c8243e45303/follow-up",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/leads/a40e0ed1-5b57-4044-8bd0-4c8243e45303/enrollment",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/leads/a40e0ed1-5b57-4044-8bd0-4c8243e45303/enrollment",
+      "status": 404
+    }
+  ],
+  "mutations": [
+    {
+      "method": "POST",
+      "path": "/api/auth/login"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/contacts/ca538d9c-7a51-51f9-a89e-af93014b79c0/detail-corrections"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/contacts/ca538d9c-7a51-51f9-a89e-af93014b79c0/detail-corrections"
+    }
+  ],
+  "limitations": [
+    "The seeded lead is not a Smart Site inquiry. Native Smart Site ownership read returns 404 and correctly hides that panel; claiming an inquiry and evaluated push-recipient coverage are not proven by this browser fixture.",
+    "Local fictional browser acceptance only; no production, provider delivery, actual device receipt, customer workday or financial settlement is established. Preview runner has outbound holds and excludes provider credentials."
+  ],
+  "result": "passed",
+  "completedAt": "2026-10-10T11:46:45.870Z"
+}

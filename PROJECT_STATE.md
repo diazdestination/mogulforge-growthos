@@ -8,8 +8,10 @@ corrections. This isolated candidate merges canonical main d6be1e1, including
 PR31's verified local development actions. See
 reports/integrated-running-contract-2026-10-10.md for scope and the corresponding
 acceptance report for current verification. Original branches remain preserved.
-The combined PostgreSQL, browser, build and Docker checks are pending at this
-snapshot; old green source checks are not combined-source acceptance.
+Combined types/builds, Docker parity and signed-in native browser checks passed
+on merge fe43ba1. The complete PostgreSQL result and published candidate's final
+CI are recorded in the live PR and the coordinator's dated acceptance receipt;
+old green source checks are not combined-source acceptance.
 
 October 9 CSS discovery supersedes the older contractor-payment deferral:
 prepare customer payment collection for cutover. Provider choice and financial
