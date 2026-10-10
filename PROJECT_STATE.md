@@ -4,11 +4,13 @@
 
 Isolated branch `agent/growthos-local-dev-20261010` adds Codex setup/actions and
 a credential-free local launcher. Frozen installs, workspace type checks, the
-980-test UI suite and three launcher isolation/ownership checks passed on Windows.
+980-test UI suite and six launcher isolation/ownership/session checks passed on Windows.
 The synthetic returning-customer preview responds on loopback4193. The shared
 browser audit runs and reports existing contrast/meta-viewport findings on the
-public entry page. WSL3.0.1 is installed on WILLOWFORGE; Ubuntu/Docker and the new
-owned-container PostgreSQL/parity actions await a Windows restart. No application
+public entry page. After the approved restart, Ubuntu24.04 and Docker Engine29.9.0
+are installed on WILLOWFORGE. The launcher now holds a WSL session during database
+testing and parity so idle shutdown cannot remove the database mid-run. Full
+owned-container PostgreSQL/parity evidence is recorded with the candidate. No application
 feature, hosted data, provider, deployment or other candidate was changed.
 
 ## October6 researched Contractor Workday integration

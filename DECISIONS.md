@@ -69,5 +69,7 @@ Keep the fictional in-memory visual preview separate from real PostgreSQL
 concurrency checks. PostgreSQL tests own a fresh loopback-only Docker container;
 schema changes and cleanup require its exact run label. Exclude inherited
 provider, database and Docker-target variables from all local actions. WILLOWFORGE
-uses Docker Engine in WSL; existing production, release and main-branch gates
+uses Docker Engine in WSL, with an owned stdin session held for the duration of
+each database/parity action and its cleanup. It closes afterward; no permanent
+Windows helper or startup task is added. Existing production, release and main-branch gates
 remain separate.

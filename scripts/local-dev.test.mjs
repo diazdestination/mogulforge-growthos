@@ -1,6 +1,8 @@
 import { it as test } from 'vitest';
 import assert from 'node:assert/strict';
-import { assertOwnedContainer, localEnvironment, parseLoopbackPort } from './local-dev.mjs';
+import { EventEmitter } from 'node:events';
+import { PassThrough, Writable } from 'node:stream';
+import { assertOwnedContainer, localEnvironment, parseLoopbackPort, withWslDockerSession } from './local-dev.mjs';
 
 test('local actions discard inherited provider credentials and database targets', () => {
   const env = localEnvironment({ PATH: 'tools', DATABASE_URL: 'postgresql://live.example/production', OPENAI_API_KEY: 'private', GH_TOKEN: 'private', DOCKER_HOST: 'tcp://remote.example', NODE_OPTIONS: '--require untrusted.js', SCHEDULER_AUTOSTART: 'true' });
@@ -20,4 +22,49 @@ test('database targets reject LAN, IPv6 wildcard, multiple mappings and invalid 
   for (const mapping of ['0.0.0.0:54321', '[::]:54321', '127.0.0.1:0', '127.0.0.1:99999', '127.0.0.1:54321\n0.0.0.0:54321']) {
     assert.throws(() => parseLoopbackPort(mapping), /only to 127.0.0.1/);
   }
+});
+function sessionFixture({ acknowledge = true } = {}) {
+  const session = new EventEmitter();
+  session.stdout = new PassThrough();
+  session.stderr = new PassThrough();
+  session.ended = false;
+  session.stdin = new Writable({
+    write(chunk, encoding, done) {
+      if (acknowledge) session.stdout.write(chunk);
+      done();
+    },
+    final(done) {
+      session.ended = true;
+      done();
+      queueMicrotask(() => session.emit('close', 0));
+    },
+  });
+  session.kill = () => { session.emit('close', 1); };
+  return session;
+}
+test('WSL stays open through a long operation and closes after successful cleanup', async () => {
+  const session = sessionFixture();
+  const result = await withWslDockerSession(async () => {
+    await new Promise(done => setTimeout(done, 25));
+    assert.equal(session.ended, false);
+    return 'verified';
+  }, { enabled: true, spawnSession: (program, args) => {
+    assert.equal(program, 'wsl.exe');
+    assert.deepEqual(args, ['--distribution', 'Ubuntu-24.04', '--user', 'root', '--exec', 'cat']);
+    return session;
+  } });
+  assert.equal(result, 'verified');
+  assert.equal(session.ended, true);
+});
+test('failed database operations still close the owned WSL session', async () => {
+  const session = sessionFixture();
+  await assert.rejects(withWslDockerSession(async () => { throw new Error('database test failed'); }, { enabled: true, spawnSession: () => session }), /database test failed/);
+  assert.equal(session.ended, true);
+});
+test('unacknowledged WSL startup cannot begin database work and closes the session', async () => {
+  const session = sessionFixture({ acknowledge: false });
+  let began = false;
+  await assert.rejects(withWslDockerSession(async () => { began = true; }, { enabled: true, spawnSession: () => session, readyTimeoutMs: 10 }), /did not acknowledge/);
+  assert.equal(began, false);
+  assert.equal(session.ended, true);
 });

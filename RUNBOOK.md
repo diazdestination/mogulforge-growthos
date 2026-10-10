@@ -23,9 +23,13 @@ container; inspect its `com.forge.local-test` label before removing only that
 container. Never prune unrelated containers or volumes.
 
 On WILLOWFORGE, the Docker CLI bridge runs Docker Engine inside Ubuntu-24.04
-through WSL, without a TCP Docker daemon. Complete the Windows restart and the
-recorded WSL installation before using PostgreSQL tests or parity. On Linux use
-the installed Docker CLI directly. Browser QA uses the pinned shared Windows
+through WSL, without a TCP Docker daemon. Test and parity actions hold an owned
+WSL stdin session through the entire operation and container cleanup, then close
+it normally. This prevents WSL idle shutdown from removing the test database;
+systemd services alone do not keep WSL alive. For manual detached-container
+commands, keep an Ubuntu terminal open while using that container. The Windows
+restart and initial WSL/Docker installation are one-time prerequisites. On Linux
+use the installed Docker CLI directly. Browser QA uses the pinned shared Windows
 Forge shipping kit, without recordings or traces; start the preview first.
 It audits the public entry page and returns nonzero for accessibility findings.
 Authenticated journey acceptance remains a separate scoped browser task.

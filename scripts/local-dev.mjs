@@ -21,6 +21,45 @@ export function parseLoopbackPort(output) {
   if (!match || port < 1 || port > 65535) throw new Error('Expected one PostgreSQL port bound only to 127.0.0.1.');
   return port;
 }
+export async function withWslDockerSession(operation, {
+  enabled = process.platform === 'win32' && existsSync('C:/Forge/tools/local-dev/docker-wsl.mjs'),
+  spawnSession = spawn,
+  readyTimeoutMs = 30000,
+} = {}) {
+  if (!enabled) return operation();
+  // systemd services do not keep a WSL distribution alive. An owned stdin
+  // session keeps Docker available until the operation AND cleanup finish.
+  // EOF closes cat normally, leaving no permanent background/startup helper.
+  const marker = `FORGE_DOCKER_SESSION_${randomUUID()}`;
+  const session = spawnSession('wsl.exe', ['--distribution', 'Ubuntu-24.04', '--user', 'root', '--exec', 'cat'], {
+    env: localEnvironment(), windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  let closed = false;
+  const exited = new Promise(done => session.once('close', () => { closed = true; done(); }));
+  session.stdin.on('error', () => {});
+  try {
+    await new Promise((done, fail) => {
+      let output = '';
+      const timer = setTimeout(() => fail(new Error('WSL did not acknowledge the Docker session within 30 seconds.')), readyTimeoutMs);
+      const cleanup = () => clearTimeout(timer);
+      session.once('error', error => { cleanup(); fail(error); });
+      session.once('close', () => { cleanup(); fail(new Error('WSL closed before the Docker session was ready.')); });
+      session.stdout.on('data', chunk => {
+        output += chunk;
+        if (output.includes(marker)) { cleanup(); done(); }
+      });
+      session.stdin.write(marker + '\n');
+    });
+    return await operation();
+  } finally {
+    session.stdin.end();
+    if (!closed) {
+      const deadline = setTimeout(() => session.kill('SIGTERM'), 5000);
+      await exited;
+      clearTimeout(deadline);
+    }
+  }
+}
 async function command(program, args, { env = localEnvironment(), capture = false, cwd = root } = {}) {
   if (process.platform === 'win32' && program === 'pnpm') {
     const paths = execFileSync('where.exe', ['pnpm'], { env, encoding: 'utf8', windowsHide: true }).trim().split(/\r?\n/);
@@ -94,10 +133,10 @@ export async function main(action = process.argv[2]) {
       await command('pnpm', ['--filter', '@workspace/command-center', 'run', 'build']);
       await command(process.execPath, ['artifacts/api-server/scripts/preview-runtime-isolated.mjs', '--returning-customer'], { env: localEnvironment() });
       break;
-    case 'test': await databaseTests(); break;
+    case 'test': await withWslDockerSession(databaseTests); break;
     case 'ui': await command('pnpm', ['--filter', '@workspace/command-center', 'run', 'test']); break;
     case 'typecheck': await command('pnpm', ['run', 'typecheck']); break;
-    case 'parity': await command('pwsh', ['-NoProfile', '-File', 'scripts/verify-docker-staging-parity.ps1'], { env: { ...localEnvironment(), CI: 'false' } }); break;
+    case 'parity': await withWslDockerSession(() => command('pwsh', ['-NoProfile', '-File', 'scripts/verify-docker-staging-parity.ps1'], { env: { ...localEnvironment(), CI: 'false' } })); break;
     case 'browser':
       if (process.platform !== 'win32') throw new Error('Browser QA requires the installed Windows Forge shipping kit.');
       await command(process.execPath, ['C:/Forge/tools/shipping-kit/scripts/audit.mjs', 'http://127.0.0.1:4193']);

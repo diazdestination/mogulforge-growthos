@@ -229,8 +229,9 @@ prove remote task coordination. Applicable production, financial and customer
 contact approvals remain required; local engineering can continue autonomously.
 # Local tooling continuation — October 10 UTC
 
-After the owner-approved Windows restart, complete Ubuntu-24.04/Docker Engine
-installation and run the disposable PostgreSQL suite and Docker parity action.
+Ubuntu-24.04/Docker Engine installation is complete after the owner-approved
+Windows restart. Verify the disposable PostgreSQL suite and Docker parity action
+using the launcher that holds WSL open until all testing and cleanup finish.
 Review `C:\Forge\bootstrap\local-dev-2026-10-10` and its completion receipt.
 Integrate this tooling candidate through its own reviewed PR; keep the existing
 alert-coverage candidate and other worktrees intact. Browser QA currently reports
