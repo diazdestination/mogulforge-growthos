@@ -1,0 +1,14 @@
+{
+  "kind": "ROOT_OBSERVED_READ_ONLY_DIAGNOSTICS",
+  "notRawCommandReceipts": true,
+  "driverRuns": 0,
+  "dockerMutations": 0,
+  "sqlQueries": 0,
+  "providerMutations": 0,
+  "observations": [
+    {"toolChunk":"ccdd4f","scope":"nested clean environment local image inspection","defaultEngine":"No such image: postgres:16-alpine","explicitLinuxEngine":"No such image: postgres:16-alpine"},
+    {"toolChunk":"dd2ce1","scope":"PowerShell read-only tag and immutable ID inspection","tagInspection":"PASS","idInspection":"PASS","imageId":"sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea","desktopLinuxEndpoint":"npipe:////./pipe/dockerDesktopLinuxEngine"},
+    {"toolChunk":"9a462a","scope":"nested clean environment read-only image inspection and engine version","tagInspection":"PASS","explicitLinuxIdInspection":"PASS","imageId":"sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea","engine":"Linux amd64 Docker29.6.1","explicitPlatformInspectionId":"sha256:1a66d744c1b459e13b05a8fca341da84cb63383e99ce262210efee5a319d4551"}
+  ],
+  "interpretation":"The read-only tag lookup produced inconsistent outcomes. These diagnostics do not establish the exact cause of either earlier driver failure. The fresh revision must pin the local Linux engine and immutable image ID and preserve both consumed attempt results."
+}

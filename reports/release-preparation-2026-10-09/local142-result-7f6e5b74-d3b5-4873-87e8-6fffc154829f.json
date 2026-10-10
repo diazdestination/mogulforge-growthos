@@ -1,0 +1,28 @@
+{
+  "kind": "LOCAL_PG16_95_TO_142",
+  "localOnly": true,
+  "hostedConnections": 0,
+  "providerCalls": 0,
+  "commit": "d7e38305e4a51a125be2c6dbc378dc310e247aae",
+  "tree": "9b127a8a373e02d45287b3fed3c35ff3d0f64aae",
+  "manifestSha256": "d080120cc1583cc5121e1cd4fffb16d5f52b8a38d33322bec8b8cb4c022f7e23",
+  "nonce": "7f6e5b74-d3b5-4873-87e8-6fffc154829f",
+  "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+  "checks": {},
+  "limitations": [
+    "Synthetic fixture, not hosted roles/backup/recovery or production migration authority",
+    "Provider/tenant business behavior outside schema proof"
+  ],
+  "cleanup": null,
+  "status": "UNCONFIRMED",
+  "code": "LOCAL142_CHECK_FAILED",
+  "failure": {
+    "phase": "ADMISSION",
+    "step": null,
+    "code": "LOCAL142_CHECK_FAILED",
+    "rawErrorSuppressed": true
+  },
+  "mayReplay": false,
+  "acks": [],
+  "connectionIdentities": []
+}

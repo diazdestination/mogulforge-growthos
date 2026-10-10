@@ -1,0 +1,8 @@
+// Read-only diagnostic after admission failure; never replays a fixture dispatch.
+import {execFile} from 'node:child_process';
+const env={};for(const k of ['PATH','SystemRoot','WINDIR','TEMP','TMP','PATHEXT','COMSPEC','ProgramFiles','ProgramFiles(x86)','ProgramW6432'])if(typeof process.env[k]==='string')env[k]=process.env[k];
+const exe='C:/Program Files/Docker/Docker/resources/bin/docker.exe';
+for(const prefix of [[],['--host','npipe:////./pipe/dockerDesktopLinuxEngine']]){
+const r=await new Promise(resolve=>execFile(exe,[...prefix,'image','inspect','postgres:16-alpine','--format','{{.Id}}'],{env,windowsHide:true,timeout:20000,encoding:'utf8'},(e,out,err)=>resolve({e,out,err})));
+console.log(JSON.stringify({explicitLocalEngine:prefix.length>0,ok:!r.e,exitCode:Number.isInteger(r.e?.code)?r.e.code:r.e?null:0,imageId:/^sha256:[a-f0-9]{64}\s*$/.test(r.out)?r.out.trim():null,errorClass:r.e?/error during connect|cannot connect|unable to connect/i.test(r.err)?'ENGINE_CONNECTION_UNAVAILABLE':'READ_ONLY_IMAGE_INSPECTION_FAILED':null,rawErrorSuppressed:true}));
+}

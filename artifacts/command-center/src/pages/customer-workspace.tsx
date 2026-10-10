@@ -8,6 +8,7 @@ import { memberAuthorityScope } from '@/lib/member-authority-scope';
 import { canReadInvoices, canManageInvoices, canWrite } from '@/lib/permissions';
 import { customerWorkPath, customerInvoicePath, newCustomerWorkPath } from '@/lib/customer-work-links';
 import CustomerAssetsPanel from '@/components/customer-assets-panel';
+import CustomerDetailCorrectionPanel from '@/components/customer-detail-correction-panel';
 import { WorkdayDisclosure } from '@/components/workday-ui';
 import { customerWorkspaceLocation, customerWorkspacePath } from '@/lib/customer-workspace-links';
 import {
@@ -49,7 +50,7 @@ export default function CustomerWorkspace() {
   if (profile.isError || (profile.data && (!profile.data.isActive || !profile.data.organization))) {
     return <div className="p-4"><Unavailable retry={() => { void profile.refetch(); }}>Current company access could not be verified. Reload or sign in again; no customer details are shown.</Unavailable></div>;
   }
-  if (profile.isLoading || !profile.data?.organization) return <p role="status" className="p-5">Checking current company access…</p>;
+  if (!profile.isSuccess || !profile.data?.organization) return <p role="status" className="p-5">Checking current company access…</p>;
   const me = profile.data;
   const context = customerWorkspaceLocation(id, search, me.organization!.id);
   if (context.status !== 'allowed') return <div className="p-4"><Unavailable>{context.status === 'different-company'
@@ -58,12 +59,12 @@ export default function CustomerWorkspace() {
   const authority = memberAuthorityScope(me);
   return <Workspace key={`${authority}:${context.contactId}`} authority={authority} contactId={context.contactId}
     organizationId={me.organization!.id} organizationName={me.organization!.name} timezone={me.organization!.timezone}
-    invoiceAccess={canReadInvoices(me.role)} invoiceManage={canManageInvoices(me.role)} workManage={canWrite(me.role)} section={context.section} />;
+    invoiceAccess={canReadInvoices(me.role)} invoiceManage={canManageInvoices(me.role)} workManage={canWrite(me.role)} detailReview={['owner', 'admin', 'office'].includes(me.role)} section={context.section} />;
 }
 
-function Workspace({ authority, contactId, organizationId, organizationName, timezone, invoiceAccess, invoiceManage, workManage, section }: {
+function Workspace({ authority, contactId, organizationId, organizationName, timezone, invoiceAccess, invoiceManage, workManage, detailReview, section }: {
   authority: string; contactId: string; organizationId: string; organizationName: string; timezone: string;
-  invoiceAccess: boolean; invoiceManage: boolean; workManage: boolean; section: CustomerWorkspaceSection;
+  invoiceAccess: boolean; invoiceManage: boolean; workManage: boolean; detailReview: boolean; section: CustomerWorkspaceSection;
 }) {
   const [refresh, setRefresh] = useState(0);
   const header = useQuery({
@@ -86,6 +87,7 @@ function Workspace({ authority, contactId, organizationId, organizationName, tim
         <button type="button" className={button} onClick={reload} disabled={header.isFetching}><RefreshCw className="size-4" />Refresh record</button>
       </div>
       <CustomerHeader data={data} organizationName={organizationName} timezone={timezone} />
+      {detailReview && <CustomerDetailCorrectionPanel organizationId={organizationId} contactId={contactId} scopeKey={authority} onSaved={reload} />}
       <nav aria-label="Customer record sections" className="flex flex-wrap gap-2">
         {available.map(value => <Link key={value} href={customerWorkspacePath(contactId, organizationId, value)!}
           aria-current={section === value ? 'page' : undefined}

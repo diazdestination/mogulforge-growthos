@@ -1,0 +1,10 @@
+
+ RUN  v4.1.10 C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/lib/integrations/cloudflare-email-intake
+
+ ✓ src/index.test.ts (3 tests) 7ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  04:23:06
+   Duration  549ms (transform 82ms, setup 0ms, import 306ms, tests 7ms, environment 0ms)
+

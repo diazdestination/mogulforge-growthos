@@ -1,5 +1,71 @@
 # GrowthOS project state
 
+## October 10 consolidated local workday
+
+PR30 baf2c335 already contains PR28/29, GEEKOM's approved contractor/specialist
+screens and branding, lead-alert visibility, and audited staff customer-detail
+corrections. This isolated candidate merges canonical main d6be1e1, including
+PR31's verified local development actions. See
+reports/integrated-running-contract-2026-10-10.md for scope and the corresponding
+acceptance report for current verification. Original branches remain preserved.
+Combined types/builds, Docker parity and signed-in native browser checks passed
+on merge fe43ba1. The complete PostgreSQL result and published candidate's final
+CI are recorded in the live PR and the coordinator's dated acceptance receipt;
+old green source checks are not combined-source acceptance.
+
+October 9 CSS discovery supersedes the older contractor-payment deferral:
+prepare customer payment collection for cutover. Provider choice and financial
+activation remain separate. Structured invoice warranty dates, service/travel
+capacity and full approved source migration remain concrete functional gaps.
+This local preview does not establish hosted or contractor replacement readiness.
+All older dated headings below are historical evidence.
+
+## October 9 UTC / October 8 Pacific lead alert coverage
+
+Current branch `agent/growthos-alert-coverage-20261009` depends on unmerged PR #28
+at a0eb25d (full CI 37885607739 passed). Canonical main remains 2162aa2.
+Frozen scope: `reports/lead-alert-coverage-contract-2026-10-09.md`. New backend
+evidence records every selected recipient, including no eligible device/member,
+without retroactive sends; exact owner/admin reads distinguish original admission
+from current receipt counts and preserve historical unknowns.
+
+One additive table brings the source to 142; review-only 0018 follows 0017.
+All 141 previous definitions remain unchanged; no historical backfill. Existing
+worker/service behavior and retired unsafe release/startup paths are retained.
+No Command Center page, component, styling or navigation changed. Generated API
+types and `reports/lead-alert-coverage-ui-handoff-2026-10-09.md` support GEEKOM's
+separate design lane; this does not claim UI completion or actual phone delivery.
+
+Evidence: `reports/lead-alert-coverage-integration-2026-10-09.md`; use the private
+candidate PR for final exact-head CI. This source record does not pre-claim a
+merge, deployment, hosted schema/backup, real alert or contractor acceptance.
+Older candidate headings below describe their historical source scope.
+
+## October 8 production-gap assistance (current candidate)
+
+Fresh remote baseline: main `2162aa296281473dda170291ff95d64e0e6e9b79`,
+exact-main CI `37500458053` succeeded. PRs through #27 are merged. The October 6
+returning-customer runtime is present: native customer estimates/jobs/invoices,
+retained lineage and external receipt/refund accounting, on the 141-table source.
+Older headings about missing contact-only work or active earlier waves are history.
+
+Current branch `agent/growthos-production-gaps-20261008` closes the bounded L9
+source gap in `reports/smart-site-claim-contract-2026-10-08.md`: notification
+destinations show exact inquiry ownership and permit one initial claim; accepted
+responders are rechecked under locks; task/audit updates remain atomic. No schema.
+The candidate also retires unsafe automatic forced schema reconciliation and
+fixes build identity after Git failures. **The old Fly release command now stops.**
+Use `reports/release-safety-2026-10-08.md` before any proposed hosted rollout.
+The legacy `AUTO_MIGRATE` startup alternative is also retired; enabled flags
+refuse normal startup. Leave it disabled and use the reviewed migration procedure.
+
+Evidence and remaining gaps: `reports/production-gaps-2026-10-08.md`. GitHub's
+current PR checks are the authoritative candidate PostgreSQL/Docker result;
+this entry does not pre-claim a future CI, merge or deployment. The live readiness
+path returned 404 and staging timed out during read-only inspection; neither
+proved a deployed version. Hosted SQL/recovery, actual mail/voice/phone delivery,
+notification coverage, migration and both contractor acceptance cards remain open.
+
 ## Local development tooling candidate — October 10 UTC
 
 Isolated branch `agent/growthos-local-dev-20261010` adds Codex setup/actions and

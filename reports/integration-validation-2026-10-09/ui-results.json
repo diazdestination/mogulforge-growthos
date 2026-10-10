@@ -1,0 +1,44 @@
+[
+  {
+    "name": "full-ui",
+    "startedAt": "2026-10-09T08:10:28.474Z",
+    "finishedAt": "2026-10-09T08:11:40.191Z",
+    "exitCode": 0,
+    "command": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\artifacts\\command-center\\node_modules\\vitest\\vitest.mjs",
+      "run",
+      "--config",
+      "vitest.config.ts",
+      "--maxWorkers",
+      "4"
+    ],
+    "cwd": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\artifacts\\command-center",
+    "log": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\work\\validation\\full-ui.log",
+    "environmentKeyNames": [
+      "APPDATA",
+      "ComSpec",
+      "LOCALAPPDATA",
+      "Path",
+      "PATHEXT",
+      "SystemRoot",
+      "TEMP",
+      "TMP",
+      "USERPROFILE",
+      "windir",
+      "NODE_ENV",
+      "APP_ORIGIN",
+      "OBJECT_STORAGE_PROVIDER",
+      "SESSION_SECRET",
+      "EMAIL_INGESTION_WEBHOOK_SECRET",
+      "EMAIL_INTELLIGENCE_ENCRYPTION_KEY",
+      "OAUTH_TOKEN_ENCRYPTION_KEY",
+      "GROWTHOS_OUTBOUND_HOLD",
+      "SCHEDULER_AUTOSTART",
+      "AUTO_MIGRATE",
+      "NO_COLOR",
+      "LOG_LEVEL"
+    ],
+    "network": "loopback-only guard"
+  }
+]

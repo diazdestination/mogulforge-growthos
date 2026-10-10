@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-10-09T08:25:57.485Z",
+  "containerId": "fc495927d5ab9c8cde5bed287b74cba7e501d0720a098e4623a62479958e2f07",
+  "volume": "02e7384d1ab69ea0f35cfc97ab021058837e81cbe8d9c61dc521cbe43b83c867",
+  "scope": "only Root-created disposable integration fixture",
+  "containerAbsent": false,
+  "volumeAbsent": true,
+  "portRefused": true
+}

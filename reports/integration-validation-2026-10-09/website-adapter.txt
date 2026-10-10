@@ -1,0 +1,26 @@
+✔ configuration rejects unsupported origins, exposed paths and missing keys (4.9889ms)
+✔ disabled capture and lifecycle pause are visible holds that require operator review (121.3169ms)
+✔ retention erases old payloads across destination partitions without allowing cross-site dispatch or lookup (67.5117ms)
+✔ an observer cannot steal the live twentieth-attempt claim before its saved acknowledgement (192.3411ms)
+✔ ciphertext expiry preserves a live claim long enough to record its valid saved acknowledgement (94.2672ms)
+✔ a failed in-flight response after ciphertext expiry settles as expired, never queued without its payload (87.7455ms)
+✔ a crashed live claim expires after payload erasure and cannot later replace the terminal state (76.1231ms)
+✔ expired tombstones cannot hide actionable review items and truncated health is explicit (289.5148ms)
+✔ only explicit contact permission is normalized; no tracking or tenant fields accepted (0.521ms)
+✔ validates the credential-only handshake and rejects mismatched site evidence (36.1261ms)
+✔ actual saved receipts deduplicate retries; changed payload conflicts and ciphertext is removed (51.2199ms)
+✔ a real local lost acknowledgement survives restart and reconciles the original request once (118.6046ms)
+✔ unconfirmed success responses never claim a saved CRM lead (43.6238ms)
+✔ missing responders require review and never create an office-saved result (56.6356ms)
+✔ concurrent calls share a claim and fenced late workers cannot replace the newer receipt (55.108ms)
+✔ a changed site/destination cannot drain an old journal partition; wrong encryption key fails closed (48.6372ms)
+✔ retry exhaustion and payload expiry are visible; capacity never pretends to accept a request (66.0839ms)
+✔ native fetch refuses redirects without forwarding the credential to the redirected endpoint (54.0659ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1472.9483

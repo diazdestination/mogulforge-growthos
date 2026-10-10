@@ -1,0 +1,14 @@
+// GET-only supplement: schema keys of public MPG data, never credential values.
+// The status CLI can fetch credential values into memory. We neither project nor
+// persist that branch. No connection string, token, stderr or raw JSON is printed.
+import fs from 'node:fs';
+import {execFile} from 'node:child_process';
+const output='C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/reports/release-preparation-2026-10-09/mpg-public-shapes.json';
+if(fs.existsSync(output))throw Error('Receipt already exists');
+const fly='C:/Users/diazd/.fly/bin/fly.exe';
+const keys=v=>v&&typeof v==='object'&&!Array.isArray(v)?Object.keys(v).filter(k=>/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(k)).sort():[];
+const shape=v=>Array.isArray(v)?{kind:'array',count:v.length,firstRecordKeys:keys(v[0])}:{kind:v===null?'null':typeof v,keys:keys(v)};
+function run(args){return new Promise(resolve=>execFile(fly,args,{windowsHide:true,encoding:'utf8',timeout:25000,maxBuffer:2**21},(e,out)=>{if(e)return resolve({ok:false,error:'Read-only CLI unavailable; raw error withheld'});try{resolve({ok:true,value:JSON.parse(out)});}catch{resolve({ok:false,error:'Not JSON'});}}));}
+const [s,b,l]=await Promise.all([run(['mpg','status','zp2wjrejd2zodn4q','--json']),run(['mpg','backup','list','zp2wjrejd2zodn4q','--json']),run(['mpg','list','--org','adam-diaz','--json'])]);
+const result={kind:'READ_ONLY_MPG_PUBLIC_RESPONSE_SHAPES',at:new Date().toISOString(),status:s.ok?{ok:true,topKeys:keys(s.value),publicData:shape(s.value?.data),publicChildShapes:Object.fromEntries(keys(s.value?.data).map(k=>[k,shape(s.value.data[k])])),credentialsBranch:'NOT_INSPECTED_OR_PERSISTED'}:s,backups:b.ok?{ok:true,shape:shape(b.value),publicChildren:Object.fromEntries(keys(b.value).filter(k=>['data','backups','Backups'].includes(k)).map(k=>[k,shape(b.value[k])]))}:b,list:l.ok?{ok:true,shape:shape(l.value),publicChildren:Object.fromEntries(keys(l.value).filter(k=>['data','clusters','Clusters'].includes(k)).map(k=>[k,shape(l.value[k])]))}:l,hostedSql:false,mutations:false};
+fs.writeFileSync(output,JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(result));

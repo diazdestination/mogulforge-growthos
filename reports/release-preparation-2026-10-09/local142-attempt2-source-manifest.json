@@ -1,0 +1,914 @@
+{
+  "kind": "LOCAL142_SOURCE_PREPARATION",
+  "commit": "d7e38305e4a51a125be2c6dbc378dc310e247aae",
+  "tree": "9b127a8a373e02d45287b3fed3c35ff3d0f64aae",
+  "executionAuthorized": false,
+  "sqlFiles": [
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-09-30\\0000_isolated-staging-initial.sql",
+      "sha256": "52b900fad500e0d9c214fb97f5abb05508224ae2176c248b463ddc5a3a3bf201"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-09-30\\0001_pilot-email-sender.sql",
+      "sha256": "cb9f087d681d68925f2d984cb6a0d4c410b20c67e97682362926dc2a2fbeb841"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0002_mobile-microsoft-pilot.sql",
+      "sha256": "b5b6b76151fc246671130974386df9d5e3bdeb5e643f314f65507f0d43d50df5"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0003_swarm-foundation.sql",
+      "sha256": "07a071578dfdb37953eccea493ecf7a61549ff0ba05fbe21cd5d9539315441d7"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0004_beta-operations.sql",
+      "sha256": "28147940685931cb62ba3f61eec332503961f469b6240ab8c1e6c4932d979882"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0005_contractor-operations.sql",
+      "sha256": "c7b96ec940cd50b278c31638213ea08b93f749c54a8b7a4651776595effe376b"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0006_native-contractor-day.sql",
+      "sha256": "2ecb746a96679b8c4723f0e7497247e14436b8391a9ea35254ef79038e6c0d39"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0007_customer-care.sql",
+      "sha256": "064480b2240fc0bf5526a43a35d5adaaa3e784353629d7d30ad97a5a02dab34f"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0008_operations-wave.sql",
+      "sha256": "8352dabe69c8c93721481a5b21df47c037b1ed368357151cd733715522859860"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0009_launch-communications.sql",
+      "sha256": "7609d74d14ee1629790c140b1a086488ad2c66b19dec1d7ca077f72ac58b6734"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0010_lead-replies.sql",
+      "sha256": "35cd388146e714a307c1913e689417a8631b447ea5951a54e7107410b1df8e48"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0011_invoice-recovery.sql",
+      "sha256": "bab9a5d58e077656cc57c7407dc995c7cfefcbbf6c6994928e2b80808c88fcb4"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0012_callie-intake.sql",
+      "sha256": "d7b3a1e97e739bde9c8ea858419622c2f44d832e88cba02cf99962c00d357206"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0013_standing-service.sql",
+      "sha256": "e5381b286bf2976ba32f2c6fef7f4dc32ec73389223c737a366ef2c8b5a2f9ae"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0014_source-nurture.sql",
+      "sha256": "bf28df0c19e1bd0181a69886cfc7176148fda5d3f55b29214d3804a1d50d8fa6"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0015_callie-conversation.sql",
+      "sha256": "92724e6c4978871f19e974a0b7f2380e3ce7ebfdbbee4f3120c20f3aa278990d"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0016_contractor-workday.sql",
+      "sha256": "a9fdcafbcfc380f8092869314bc98fd81c9a3d11dccf5ab97e85fcb6566ffd13"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0017_returning-customer-work.sql",
+      "sha256": "68f1734fa340eb9b094e834625baa8e8f700fdb455741b2cd436c2a4b8ae5c84"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0018_lead-alert-coverage.sql",
+      "sha256": "b5c6425dc7942460e4d734e14f971e8fc062b1bdfe292d69d22a88e34be587a1"
+    }
+  ],
+  "schemaFiles": [
+    {
+      "relativePath": "lib/db/src/schema/activities.ts",
+      "sha256": "73bdfe8ff60c02d67501f1ea9e7c0b0312483c7783cfa74f33d9c841c16895e0",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\activities.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/analytics.ts",
+      "sha256": "54d2b85a44a00e7375878e91eb7b834eaa5955288c9763630ea7b9de4cf4c34e",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\analytics.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/api-keys.ts",
+      "sha256": "8f31be26a84cdeed886414bfe57b688e675c6277c2ca513420c43185c825cbcf",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\api-keys.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/appointments.ts",
+      "sha256": "53d0d855c8d2e30aa847d0dd29d0c5a0327fbc86f5fd2166fbb9148d1991a653",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\appointments.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/assistant-history.ts",
+      "sha256": "8e93a6faaaea8b0f37c7227ec8fac1a2ed8c4635f5d957120c73897444f52e12",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\assistant-history.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/audit.ts",
+      "sha256": "1039412bf38910f460d718f5f592c1aef8a8346415181b9bd623716a283000c2",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\audit.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/auth.ts",
+      "sha256": "f957e5c8e5d79d4d98d774c5a9fca8ecbe75bfec6ed3ca9c071295362c038857",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\auth.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/automations.ts",
+      "sha256": "655eefdd5da974dcbd8e79b6f425afd12fe2ee4fc38bc74e64973d77c05c361a",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\automations.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/bie.ts",
+      "sha256": "4d5119c2182cc88bd91b79fe3276a3ce225ed85a7378a42f815fcdb23786eeb4",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\bie.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/billing-checkouts.ts",
+      "sha256": "5633a003d5e77b6d62924d78ee8bbf7dea9dba1f1492fd33cf85fc81afae0ec4",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\billing-checkouts.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/callie-reception.ts",
+      "sha256": "bedeacdf60c7b863cdb1383ae4be4a0edb7d724cdbfcbb03128684be55870f92",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\callie-reception.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/callie.ts",
+      "sha256": "64b1ef7911b6477fe938aaf0858af3f20d7603a276eb91a68d7203893e8d29e2",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\callie.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/capture.ts",
+      "sha256": "ce5dce220d0dfb71de5695e73b3afe003fbce05ecc7abede2891730aa14648d6",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\capture.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/consent.ts",
+      "sha256": "a369fe1c487d8ba1b2ffb184aa158c5795d5f9a50f677c9acf72d9064b18cb84",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\consent.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/contact-touch-reservations.ts",
+      "sha256": "2d3b6d55384946ec87794ae8a9c0e09d8f03f4e004629515148b508ef51a0eff",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\contact-touch-reservations.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/contacts.ts",
+      "sha256": "916a0eec1adb17e3123ef661e9491f09c1fa3fba24188f948d67314bb37b5ec8",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\contacts.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/contractor-workday.ts",
+      "sha256": "3933fb6e4106d739c2040306f79d139afcf5bc52f85328e1f7bd7b587a924619",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\contractor-workday.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/conversations.ts",
+      "sha256": "7b91b9ac19b2129e03b4e7a8b7fe90245fea6b3a6d41dbd605e46270528776fc",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\conversations.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/crm-tasks.ts",
+      "sha256": "19491f00515bb535f204b2b246939d396ed47a0f39b867dd9018899ecc1ef459",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\crm-tasks.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/customer-lifecycle.ts",
+      "sha256": "ba99dc74046d5b2468f75a41ca53a47761e6c50228d03837d35e326c7148ab2a",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\customer-lifecycle.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/customer-work.ts",
+      "sha256": "7b8d7393bd39f68aa248289f39ab74b2a6291f7be15ea7fa4e47e4ba94844baa",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\customer-work.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/email-intelligence.ts",
+      "sha256": "2c677750e0627f12ba94e5920916823b6089488a676069d3bc9692eab9537992",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\email-intelligence.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/engagement-links.ts",
+      "sha256": "1b313d3c545573690eb495dddefd752376af634b4f6cda8ed6a7316371646b2b",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\engagement-links.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/enums.ts",
+      "sha256": "8b48e750ca12a275a9488a07a6b93d4439aadd1b0103fcd0605894354e99c51d",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\enums.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/estimates.ts",
+      "sha256": "dcef3e42b402d9d101a118ef22ee23d41d03fc202918d0f84bc71a01a4c08b3f",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\estimates.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/evidence-intelligence.ts",
+      "sha256": "2ffa0feac5326846f591ea5c1dc57c5625864f45183319bb3a1444917e0c543e",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\evidence-intelligence.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/financial-migration.ts",
+      "sha256": "c621474b9e5ab12ec364fb85d317501a7a33423059d0991d9a053b9dc8ef4c88",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\financial-migration.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/forms.ts",
+      "sha256": "f94bf9ec331d01b4193c44721a55030e3f062e6297480340727d74fdc6678ffc",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\forms.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/gmail-connections.ts",
+      "sha256": "a6162d9eeaf93b962a8441190043afe7084913d9bb32d0e307b05ed4edf2ce79",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\gmail-connections.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/identity-tokens.ts",
+      "sha256": "8e587dd934ed669e69490cddb4346f88ec5d90a6e628254b95befc615f03ca43",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\identity-tokens.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/index.ts",
+      "sha256": "f1b64214d43d72e530011e82a5ec33d8797cc273a6a56f72e7f41ad22f765b31",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\index.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/installation.ts",
+      "sha256": "16d934805298118aad09839dd639435d9600c6fd0d24c0fb7954dd674c378b55",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\installation.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/invoice-delivery-attempts.ts",
+      "sha256": "7363e3454319ff9c5640f36d5f3de88501a406e964375adea345b1e356fd8bdf",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\invoice-delivery-attempts.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/invoices.ts",
+      "sha256": "c6f04b0580608e80ef4cf7602314bebdd17b9491f37502e31c784b6ef8679829",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\invoices.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/knowledge.ts",
+      "sha256": "9f2f649c5b1265d6c3f78d9a346e8d33737fe52f789b6a9e7fd1a6665676ae0b",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\knowledge.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/leads.ts",
+      "sha256": "65d71fa13c4c6c9fe558b8a9878a8c52617b39eaa9ff5818803db610a9d90cf8",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\leads.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/mailbox-communication.ts",
+      "sha256": "5f439ee8ad8a28448535e0b0fa77e707937ced95db3ce157e6fcbfcc752d06c7",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\mailbox-communication.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/mailbox-connectors.ts",
+      "sha256": "51d119981a7263631aa228e7ae5bf8d4567e1cd4cc6755abe986a9e3c95db045",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\mailbox-connectors.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/microsoft-connections.ts",
+      "sha256": "51a940b29bb30e93c761df1bb9e02d76ffb8827b263d02df6225f9aa44ad4b77",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\microsoft-connections.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/missed-call-care.ts",
+      "sha256": "d66702506d70ce097a86d54f2218a97a32d9b2599546a991646cd984d3dfc3b3",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\missed-call-care.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/next-actions.ts",
+      "sha256": "6ddc77a5355b0e9b73198a5c5e134e6a702aaf247f3951d11105f7a5b93d1216",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\next-actions.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/object-storage.ts",
+      "sha256": "e20a57e315abb59fac39b3a95131bb23b4451392f015661edbf86060c278c2a2",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\object-storage.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/organizations.ts",
+      "sha256": "80412d8b45cc62948f5c891b919345ae36a261e09108e627cd1cdc7cace9d59a",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\organizations.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/platform-email-delivery.ts",
+      "sha256": "ca291a3514eafc7ee70aa9af943b8ca139fda37687c13e77a8bbed4808270b2c",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\platform-email-delivery.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/playbook-learning.ts",
+      "sha256": "73b366a47d9b01167c07bb75179c6f757f3012d2272c711a829d391d3434900f",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\playbook-learning.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/playbooks.ts",
+      "sha256": "2f377067fd3dc4fec847a6fbf250f892c9be8e40dc8c372fbda1deeeb40532c7",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\playbooks.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/portal.ts",
+      "sha256": "7c0e8ed53141ce7f90cfc50b89268a1827e5e7de8c1c6427b2a6d455cc237a28",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\portal.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/projects.ts",
+      "sha256": "3e9faf8d93e0a52a2a2dd48dfc71ff943de081b67a3c6e8f6870a6cfeada11e3",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\projects.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/properties.ts",
+      "sha256": "ac8cf629a29152f1561019ccd959678cf112b1c48bfb0b7d370a2d5edddc4524",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\properties.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/rate-limits.ts",
+      "sha256": "15488f5a303baf61db4f9e48203b2ef5f0f5614d26197e59e27095ade895f1f6",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\rate-limits.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/reactivation.ts",
+      "sha256": "9d113361d6d0131d9153fff495563fff40e20d72b55f00d2293ffab71410b2c2",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\reactivation.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/revenue-workspace.ts",
+      "sha256": "f0e9907d6bfe03ee7a851f959a6acc746c82ef0653ddb5702e8415992a0ec703",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\revenue-workspace.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/saved-filters.ts",
+      "sha256": "49d1cc010283e2c722fd02781ac1f173a99c065a843f01b6dd2739c29e0b82bb",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\saved-filters.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/scheduler.ts",
+      "sha256": "6ec2663e3788bb8a230c06b9e7c7520dd9f98fc51f5a3a17d515d891c15d43b9",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\scheduler.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/service-obligations.ts",
+      "sha256": "37bdcfd56d25ec6cbacf135b2d9ae23281305cca33e8cc2e27f4b9a910dd4e1d",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\service-obligations.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/service-sms.ts",
+      "sha256": "cf8121772dad8db786bf5c7fab380801f237790a39ad3bca0813122185c9e8bd",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\service-sms.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/service-standing.ts",
+      "sha256": "1285e5f7e292004d8d5115264091bbbe407eabcadaad43d80d81cdcb29044f43",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\service-standing.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/service-watch.ts",
+      "sha256": "20b245782df45182a5b36d7948ef549daab0d85ca616e206118a499e501f1f63",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\service-watch.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/settings.ts",
+      "sha256": "9c7d6ebd5cd6f3f2b829b491d33e4ca1a673a2f035d452830d5fd222818f79ce",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\settings.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/smart-sites.ts",
+      "sha256": "f555c966fc03881713f276f0ce034490567cb157fef739ae02ad38722ad8f676",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\smart-sites.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/source-adoption.ts",
+      "sha256": "6e0e7a6eaf56f366ad117218c8688296e36de3a5638716869c558345e2400515",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\source-adoption.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/source-nurture.ts",
+      "sha256": "b2e93e9e40c273ef6f6fdb2186a0cf8a7d22145bb83c5395c1fbff3d717a28fc",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\source-nurture.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/staff-invitations.ts",
+      "sha256": "c63950524ed187a93361708cb77c4eb15583f0574964ddb30d92029d07d51b14",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\staff-invitations.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/staff-push.ts",
+      "sha256": "bd91d928b78b97ee30c49fa5f16d8f8aa22d1ca0f631742e7cb80359dc254e27",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\staff-push.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/suppressions.ts",
+      "sha256": "8e8079d47c7dfdcaf07a13511a803c86fb93c31b698fdbb8cc49c9be77226f15",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\suppressions.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/tags.ts",
+      "sha256": "8c263722b72278c3aee33b3fced209deee077147adbe528f648ff8157ed1e19b",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\tags.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/templates.ts",
+      "sha256": "d873e19be4c3da5c22edd6c77d4fa6f6d7c99190c5af69638776e289fae1c197",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\templates.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/twilio.ts",
+      "sha256": "7f0e62de00ec10408dd2ddd5bdb0746c840f70a88cf2882bb374dad1eb3c71c7",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\twilio.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/webhooks.ts",
+      "sha256": "effa2b192d8b434d30cc8b9d03209fd4291df1e8767f7e53024194d4f54c5f6e",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\webhooks.ts"
+    }
+  ],
+  "files": [
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-09-30\\0000_isolated-staging-initial.sql",
+      "sha256": "52b900fad500e0d9c214fb97f5abb05508224ae2176c248b463ddc5a3a3bf201"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-09-30\\0001_pilot-email-sender.sql",
+      "sha256": "cb9f087d681d68925f2d984cb6a0d4c410b20c67e97682362926dc2a2fbeb841"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0002_mobile-microsoft-pilot.sql",
+      "sha256": "b5b6b76151fc246671130974386df9d5e3bdeb5e643f314f65507f0d43d50df5"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0003_swarm-foundation.sql",
+      "sha256": "07a071578dfdb37953eccea493ecf7a61549ff0ba05fbe21cd5d9539315441d7"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0004_beta-operations.sql",
+      "sha256": "28147940685931cb62ba3f61eec332503961f469b6240ab8c1e6c4932d979882"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0005_contractor-operations.sql",
+      "sha256": "c7b96ec940cd50b278c31638213ea08b93f749c54a8b7a4651776595effe376b"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0006_native-contractor-day.sql",
+      "sha256": "2ecb746a96679b8c4723f0e7497247e14436b8391a9ea35254ef79038e6c0d39"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0007_customer-care.sql",
+      "sha256": "064480b2240fc0bf5526a43a35d5adaaa3e784353629d7d30ad97a5a02dab34f"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0008_operations-wave.sql",
+      "sha256": "8352dabe69c8c93721481a5b21df47c037b1ed368357151cd733715522859860"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0009_launch-communications.sql",
+      "sha256": "7609d74d14ee1629790c140b1a086488ad2c66b19dec1d7ca077f72ac58b6734"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0010_lead-replies.sql",
+      "sha256": "35cd388146e714a307c1913e689417a8631b447ea5951a54e7107410b1df8e48"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0011_invoice-recovery.sql",
+      "sha256": "bab9a5d58e077656cc57c7407dc995c7cfefcbbf6c6994928e2b80808c88fcb4"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0012_callie-intake.sql",
+      "sha256": "d7b3a1e97e739bde9c8ea858419622c2f44d832e88cba02cf99962c00d357206"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0013_standing-service.sql",
+      "sha256": "e5381b286bf2976ba32f2c6fef7f4dc32ec73389223c737a366ef2c8b5a2f9ae"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0014_source-nurture.sql",
+      "sha256": "bf28df0c19e1bd0181a69886cfc7176148fda5d3f55b29214d3804a1d50d8fa6"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0015_callie-conversation.sql",
+      "sha256": "92724e6c4978871f19e974a0b7f2380e3ce7ebfdbbee4f3120c20f3aa278990d"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0016_contractor-workday.sql",
+      "sha256": "a9fdcafbcfc380f8092869314bc98fd81c9a3d11dccf5ab97e85fcb6566ffd13"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0017_returning-customer-work.sql",
+      "sha256": "68f1734fa340eb9b094e834625baa8e8f700fdb455741b2cd436c2a4b8ae5c84"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\staging-schema-preview-2026-10-01\\0018_lead-alert-coverage.sql",
+      "sha256": "b5c6425dc7942460e4d734e14f971e8fc062b1bdfe292d69d22a88e34be587a1"
+    },
+    {
+      "relativePath": "lib/db/src/schema/activities.ts",
+      "sha256": "73bdfe8ff60c02d67501f1ea9e7c0b0312483c7783cfa74f33d9c841c16895e0",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\activities.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/analytics.ts",
+      "sha256": "54d2b85a44a00e7375878e91eb7b834eaa5955288c9763630ea7b9de4cf4c34e",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\analytics.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/api-keys.ts",
+      "sha256": "8f31be26a84cdeed886414bfe57b688e675c6277c2ca513420c43185c825cbcf",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\api-keys.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/appointments.ts",
+      "sha256": "53d0d855c8d2e30aa847d0dd29d0c5a0327fbc86f5fd2166fbb9148d1991a653",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\appointments.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/assistant-history.ts",
+      "sha256": "8e93a6faaaea8b0f37c7227ec8fac1a2ed8c4635f5d957120c73897444f52e12",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\assistant-history.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/audit.ts",
+      "sha256": "1039412bf38910f460d718f5f592c1aef8a8346415181b9bd623716a283000c2",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\audit.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/auth.ts",
+      "sha256": "f957e5c8e5d79d4d98d774c5a9fca8ecbe75bfec6ed3ca9c071295362c038857",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\auth.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/automations.ts",
+      "sha256": "655eefdd5da974dcbd8e79b6f425afd12fe2ee4fc38bc74e64973d77c05c361a",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\automations.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/bie.ts",
+      "sha256": "4d5119c2182cc88bd91b79fe3276a3ce225ed85a7378a42f815fcdb23786eeb4",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\bie.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/billing-checkouts.ts",
+      "sha256": "5633a003d5e77b6d62924d78ee8bbf7dea9dba1f1492fd33cf85fc81afae0ec4",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\billing-checkouts.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/callie-reception.ts",
+      "sha256": "bedeacdf60c7b863cdb1383ae4be4a0edb7d724cdbfcbb03128684be55870f92",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\callie-reception.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/callie.ts",
+      "sha256": "64b1ef7911b6477fe938aaf0858af3f20d7603a276eb91a68d7203893e8d29e2",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\callie.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/capture.ts",
+      "sha256": "ce5dce220d0dfb71de5695e73b3afe003fbce05ecc7abede2891730aa14648d6",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\capture.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/consent.ts",
+      "sha256": "a369fe1c487d8ba1b2ffb184aa158c5795d5f9a50f677c9acf72d9064b18cb84",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\consent.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/contact-touch-reservations.ts",
+      "sha256": "2d3b6d55384946ec87794ae8a9c0e09d8f03f4e004629515148b508ef51a0eff",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\contact-touch-reservations.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/contacts.ts",
+      "sha256": "916a0eec1adb17e3123ef661e9491f09c1fa3fba24188f948d67314bb37b5ec8",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\contacts.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/contractor-workday.ts",
+      "sha256": "3933fb6e4106d739c2040306f79d139afcf5bc52f85328e1f7bd7b587a924619",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\contractor-workday.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/conversations.ts",
+      "sha256": "7b91b9ac19b2129e03b4e7a8b7fe90245fea6b3a6d41dbd605e46270528776fc",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\conversations.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/crm-tasks.ts",
+      "sha256": "19491f00515bb535f204b2b246939d396ed47a0f39b867dd9018899ecc1ef459",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\crm-tasks.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/customer-lifecycle.ts",
+      "sha256": "ba99dc74046d5b2468f75a41ca53a47761e6c50228d03837d35e326c7148ab2a",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\customer-lifecycle.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/customer-work.ts",
+      "sha256": "7b8d7393bd39f68aa248289f39ab74b2a6291f7be15ea7fa4e47e4ba94844baa",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\customer-work.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/email-intelligence.ts",
+      "sha256": "2c677750e0627f12ba94e5920916823b6089488a676069d3bc9692eab9537992",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\email-intelligence.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/engagement-links.ts",
+      "sha256": "1b313d3c545573690eb495dddefd752376af634b4f6cda8ed6a7316371646b2b",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\engagement-links.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/enums.ts",
+      "sha256": "8b48e750ca12a275a9488a07a6b93d4439aadd1b0103fcd0605894354e99c51d",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\enums.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/estimates.ts",
+      "sha256": "dcef3e42b402d9d101a118ef22ee23d41d03fc202918d0f84bc71a01a4c08b3f",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\estimates.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/evidence-intelligence.ts",
+      "sha256": "2ffa0feac5326846f591ea5c1dc57c5625864f45183319bb3a1444917e0c543e",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\evidence-intelligence.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/financial-migration.ts",
+      "sha256": "c621474b9e5ab12ec364fb85d317501a7a33423059d0991d9a053b9dc8ef4c88",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\financial-migration.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/forms.ts",
+      "sha256": "f94bf9ec331d01b4193c44721a55030e3f062e6297480340727d74fdc6678ffc",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\forms.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/gmail-connections.ts",
+      "sha256": "a6162d9eeaf93b962a8441190043afe7084913d9bb32d0e307b05ed4edf2ce79",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\gmail-connections.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/identity-tokens.ts",
+      "sha256": "8e587dd934ed669e69490cddb4346f88ec5d90a6e628254b95befc615f03ca43",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\identity-tokens.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/index.ts",
+      "sha256": "f1b64214d43d72e530011e82a5ec33d8797cc273a6a56f72e7f41ad22f765b31",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\index.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/installation.ts",
+      "sha256": "16d934805298118aad09839dd639435d9600c6fd0d24c0fb7954dd674c378b55",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\installation.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/invoice-delivery-attempts.ts",
+      "sha256": "7363e3454319ff9c5640f36d5f3de88501a406e964375adea345b1e356fd8bdf",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\invoice-delivery-attempts.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/invoices.ts",
+      "sha256": "c6f04b0580608e80ef4cf7602314bebdd17b9491f37502e31c784b6ef8679829",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\invoices.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/knowledge.ts",
+      "sha256": "9f2f649c5b1265d6c3f78d9a346e8d33737fe52f789b6a9e7fd1a6665676ae0b",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\knowledge.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/leads.ts",
+      "sha256": "65d71fa13c4c6c9fe558b8a9878a8c52617b39eaa9ff5818803db610a9d90cf8",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\leads.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/mailbox-communication.ts",
+      "sha256": "5f439ee8ad8a28448535e0b0fa77e707937ced95db3ce157e6fcbfcc752d06c7",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\mailbox-communication.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/mailbox-connectors.ts",
+      "sha256": "51d119981a7263631aa228e7ae5bf8d4567e1cd4cc6755abe986a9e3c95db045",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\mailbox-connectors.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/microsoft-connections.ts",
+      "sha256": "51a940b29bb30e93c761df1bb9e02d76ffb8827b263d02df6225f9aa44ad4b77",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\microsoft-connections.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/missed-call-care.ts",
+      "sha256": "d66702506d70ce097a86d54f2218a97a32d9b2599546a991646cd984d3dfc3b3",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\missed-call-care.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/next-actions.ts",
+      "sha256": "6ddc77a5355b0e9b73198a5c5e134e6a702aaf247f3951d11105f7a5b93d1216",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\next-actions.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/object-storage.ts",
+      "sha256": "e20a57e315abb59fac39b3a95131bb23b4451392f015661edbf86060c278c2a2",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\object-storage.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/organizations.ts",
+      "sha256": "80412d8b45cc62948f5c891b919345ae36a261e09108e627cd1cdc7cace9d59a",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\organizations.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/platform-email-delivery.ts",
+      "sha256": "ca291a3514eafc7ee70aa9af943b8ca139fda37687c13e77a8bbed4808270b2c",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\platform-email-delivery.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/playbook-learning.ts",
+      "sha256": "73b366a47d9b01167c07bb75179c6f757f3012d2272c711a829d391d3434900f",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\playbook-learning.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/playbooks.ts",
+      "sha256": "2f377067fd3dc4fec847a6fbf250f892c9be8e40dc8c372fbda1deeeb40532c7",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\playbooks.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/portal.ts",
+      "sha256": "7c0e8ed53141ce7f90cfc50b89268a1827e5e7de8c1c6427b2a6d455cc237a28",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\portal.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/projects.ts",
+      "sha256": "3e9faf8d93e0a52a2a2dd48dfc71ff943de081b67a3c6e8f6870a6cfeada11e3",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\projects.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/properties.ts",
+      "sha256": "ac8cf629a29152f1561019ccd959678cf112b1c48bfb0b7d370a2d5edddc4524",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\properties.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/rate-limits.ts",
+      "sha256": "15488f5a303baf61db4f9e48203b2ef5f0f5614d26197e59e27095ade895f1f6",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\rate-limits.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/reactivation.ts",
+      "sha256": "9d113361d6d0131d9153fff495563fff40e20d72b55f00d2293ffab71410b2c2",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\reactivation.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/revenue-workspace.ts",
+      "sha256": "f0e9907d6bfe03ee7a851f959a6acc746c82ef0653ddb5702e8415992a0ec703",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\revenue-workspace.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/saved-filters.ts",
+      "sha256": "49d1cc010283e2c722fd02781ac1f173a99c065a843f01b6dd2739c29e0b82bb",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\saved-filters.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/scheduler.ts",
+      "sha256": "6ec2663e3788bb8a230c06b9e7c7520dd9f98fc51f5a3a17d515d891c15d43b9",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\scheduler.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/service-obligations.ts",
+      "sha256": "37bdcfd56d25ec6cbacf135b2d9ae23281305cca33e8cc2e27f4b9a910dd4e1d",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\service-obligations.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/service-sms.ts",
+      "sha256": "cf8121772dad8db786bf5c7fab380801f237790a39ad3bca0813122185c9e8bd",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\service-sms.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/service-standing.ts",
+      "sha256": "1285e5f7e292004d8d5115264091bbbe407eabcadaad43d80d81cdcb29044f43",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\service-standing.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/service-watch.ts",
+      "sha256": "20b245782df45182a5b36d7948ef549daab0d85ca616e206118a499e501f1f63",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\service-watch.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/settings.ts",
+      "sha256": "9c7d6ebd5cd6f3f2b829b491d33e4ca1a673a2f035d452830d5fd222818f79ce",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\settings.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/smart-sites.ts",
+      "sha256": "f555c966fc03881713f276f0ce034490567cb157fef739ae02ad38722ad8f676",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\smart-sites.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/source-adoption.ts",
+      "sha256": "6e0e7a6eaf56f366ad117218c8688296e36de3a5638716869c558345e2400515",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\source-adoption.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/source-nurture.ts",
+      "sha256": "b2e93e9e40c273ef6f6fdb2186a0cf8a7d22145bb83c5395c1fbff3d717a28fc",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\source-nurture.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/staff-invitations.ts",
+      "sha256": "c63950524ed187a93361708cb77c4eb15583f0574964ddb30d92029d07d51b14",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\staff-invitations.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/staff-push.ts",
+      "sha256": "bd91d928b78b97ee30c49fa5f16d8f8aa22d1ca0f631742e7cb80359dc254e27",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\staff-push.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/suppressions.ts",
+      "sha256": "8e8079d47c7dfdcaf07a13511a803c86fb93c31b698fdbb8cc49c9be77226f15",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\suppressions.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/tags.ts",
+      "sha256": "8c263722b72278c3aee33b3fced209deee077147adbe528f648ff8157ed1e19b",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\tags.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/templates.ts",
+      "sha256": "d873e19be4c3da5c22edd6c77d4fa6f6d7c99190c5af69638776e289fae1c197",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\templates.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/twilio.ts",
+      "sha256": "7f0e62de00ec10408dd2ddd5bdb0746c840f70a88cf2882bb374dad1eb3c71c7",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\twilio.ts"
+    },
+    {
+      "relativePath": "lib/db/src/schema/webhooks.ts",
+      "sha256": "effa2b192d8b434d30cc8b9d03209fd4291df1e8767f7e53024194d4f54c5f6e",
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\src\\schema\\webhooks.ts"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\work\\release-preparation-2026-10-09\\local142-pg16-driver.mjs",
+      "sha256": "18f16dce14cb64b3cc8c3caf31d6ae0d46f47ad9503b3e7b2a1306605a396fc4"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\work\\release-preparation-2026-10-09\\local-fixture-pure.mjs",
+      "sha256": "c1baa6ea0a32baea38f49dc3a13c3dba090f0269ebd43f5d9bf8363e909cabfd"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\work\\release-preparation-2026-10-09\\schema-catalog.mjs",
+      "sha256": "1c05f960796b8db64a4bd45eda43825767695f43d265d70a21f2473c0407a517"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\package.json",
+      "sha256": "4cbcceba3c23955814a4a30f0ff2c22700dfa40d3435a8d02161fe6357d91596"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\pnpm-lock.yaml",
+      "sha256": "94d250fdd0c8bb59692e9cd7889562b40dab7147dd9453a61805379ca33ff938"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\db\\package.json",
+      "sha256": "2e2aed3736ca534980248bb48bfa7bd2fe084b30d8819553c6206baa382ec897"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\artifacts\\api-server\\package.json",
+      "sha256": "cc02daaa20b771199b730b9e1b52acddd1e101575f8aa86867a6ebe29bbffe70"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\reports\\release-preparation-2026-10-09\\local142-runtime-pins.json",
+      "sha256": "0b08e93486ddc5e5946152aa2a564131615ed0bb6f606f707f530f38c7d9f1f4"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\pg@8.22.0\\node_modules\\pg\\lib\\index.js",
+      "sha256": "3fad6e6d3d976edbabe0cbc9e1d39f4340bcb719bbbb186a0d3a24f3dbd4a94c"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\typescript@5.9.3\\node_modules\\typescript\\lib\\typescript.js",
+      "sha256": "3ae902c92cc44dace175c0e69e13a4b0899f6983c6121d76b9ab8dd5795e7675"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\drizzle-kit@0.31.10\\node_modules\\drizzle-kit\\api.js",
+      "sha256": "5c39a62e2e5fc1554b8e423b1ffe453ccc975e0ccca0090f0cf3210aeb6c49fc"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\drizzle-orm@0.45.2_@cloudfl_0209fd16620a32b92923669db5769f13\\node_modules\\drizzle-orm\\index.cjs",
+      "sha256": "d26f03ba7eee981e1d0789b1b19c223ef8d081e4301aa40b1aa26f5933e70a1b"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\drizzle-orm@0.45.2_@cloudfl_0209fd16620a32b92923669db5769f13\\node_modules\\drizzle-orm\\pg-core\\index.cjs",
+      "sha256": "90518a5d73bc28ad47ac490b855f1cb1f63a677b183ed423beea990c852084a8"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\drizzle-zod@0.8.3_drizzle-o_d31ffb0d69ee3013e005013e4a279038\\node_modules\\drizzle-zod\\index.cjs",
+      "sha256": "c09a7de093dd3f3b76bafec207050d69d71ac6fc0906ffec3c170504eb57949b"
+    },
+    {
+      "path": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\node_modules\\.pnpm\\zod@4.4.3\\node_modules\\zod\\v4\\index.cjs",
+      "sha256": "35934fbd99d4ca1d46932dfcddb6071c203b5c980862cf58e254998c49e1e5b8"
+    }
+  ]
+}

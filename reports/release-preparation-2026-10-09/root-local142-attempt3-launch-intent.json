@@ -1,0 +1,22 @@
+{
+  "kind": "ROOT_LOCAL142_ATTEMPT3_SINGLE_DISPATCH_INTENT",
+  "startedAt": "2026-10-09T14:37:00.093Z",
+  "admissionSha256": "760f3bf2290424bb11dcb43c69b230212e364dcd423cd83f63c50538d6a77d0a",
+  "priorAttemptResults": [
+    {
+      "name": "local142-result-7f6e5b74-d3b5-4873-87e8-6fffc154829f.json",
+      "sha256": "d940078c0202d7d1a45712bd96f5944bc77be64168197389bf5e360667107630"
+    },
+    {
+      "name": "local142-attempt2-result-0b3858c2-c0ab-4ac8-a841-3f1945800e7f.json",
+      "sha256": "41f629b0aaea128ccaa0701f5777c223deec25276e8340bf7edc29520bb2f460"
+    }
+  ],
+  "localOnly": true,
+  "hostedAuthorized": false,
+  "entryArguments": [
+    "work/release-preparation-2026-10-09/local142-pg16-driver.mjs",
+    "run"
+  ],
+  "mayReplay": false
+}

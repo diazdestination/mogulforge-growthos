@@ -1,0 +1,24 @@
+// Root admission preparation only; never imports or dispatches the rehearsal.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const root='C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009';
+const dir=path.join(root,'reports/release-preparation-2026-10-09');
+const sha=b=>createHash('sha256').update(b).digest('hex');
+const read=name=>fs.readFileSync(path.join(dir,name));
+const review=read('local142-attempt3-independent-source-review.md');
+assert.equal(sha(review),'30222323f92f2dbb72b8e59435f3bd27295453b193b1ad00dd42c697cc8ea5af');
+assert.equal(sha(read('local142-attempt3-source-manifest.json')),'1c1a761a1d4cada324eefc4f9b62f3af821e190310b5bac9fe68c2250e07600c');
+const manifest=JSON.parse(read('local142-attempt3-source-manifest.json'));
+for(const f of manifest.files)assert.equal(sha(fs.readFileSync(f.path)),f.sha256);
+assert.equal(sha(read('local142-attempt3-pg16-driver.mjs')),'edc2300228eae10ea5b7157ae11d3720368b0b60eaa52a5d9f7c9e07b16eee8a');
+assert.equal(sha(fs.readFileSync(root+'/work/release-preparation-2026-10-09/local142-pg16-driver.mjs')),'edc2300228eae10ea5b7157ae11d3720368b0b60eaa52a5d9f7c9e07b16eee8a');
+assert.equal(sha(fs.readFileSync(root+'/work/release-preparation-2026-10-09/run-clean-local142-attempt3.mjs')),'3beffb681d57414606c53a6bbf31babb624d5e7ad53475806d94307c19efd90e');
+assert.equal(execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim(),manifest.commit);
+const priorAttemptResults=[{name:'local142-result-7f6e5b74-d3b5-4873-87e8-6fffc154829f.json',sha256:'d940078c0202d7d1a45712bd96f5944bc77be64168197389bf5e360667107630'},{name:'local142-attempt2-result-0b3858c2-c0ab-4ac8-a841-3f1945800e7f.json',sha256:'41f629b0aaea128ccaa0701f5777c223deec25276e8340bf7edc29520bb2f460'}];
+for(const f of priorAttemptResults)assert.equal(sha(read(f.name)),f.sha256);
+const value={kind:'ROOT_INDEPENDENT_LOCAL142_ADMISSION',admittedAt:new Date().toISOString(),manifestSha256:sha(read('local142-attempt3-source-manifest.json')),sourceReviewSha256:sha(review),runtimePinsSha256:'0b08e93486ddc5e5946152aa2a564131615ed0bb6f606f707f530f38c7d9f1f4',driverSha256:'edc2300228eae10ea5b7157ae11d3720368b0b60eaa52a5d9f7c9e07b16eee8a',rootLauncherSha256:'3beffb681d57414606c53a6bbf31babb624d5e7ad53475806d94307c19efd90e',priorAttemptResults,imageReference:'postgres:16-alpine',imageId:'sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea',dockerEndpoint:'npipe:////./pipe/dockerDesktopLinuxEngine',imagePlatform:'linux/amd64',imagePlatformId:'sha256:1a66d744c1b459e13b05a8fca341da84cb63383e99ce262210efee5a319d4551',imageIdentityReceiptSha256:'33d0f30f0b6208201062099302518682b4760bba6629becb842245bee7d788cc',localOnly:true,hostedAuthorized:false,rootSourceReviewed:true,ownerScope:'Authorized release preparation; necessary fresh local-only revision after two preserved no-creation failures',earlierFailureCauses:'UNRESOLVED; consumed receipts remain intact',sourceCommitAtExecution:manifest.commit,applicationCommit:'bdcd5f2d56f5c0c08284dda8dd9d3d27cad60848',approvedEntry:'work/release-preparation-2026-10-09/run-clean-local142-attempt3.mjs',runs:1,mayReplay:false,workDeadlineMs:600000,cleanupBudgetMs:120000,outerWatchdogMs:750000,target:'NEW nonce-labelled loopback PG16 synthetic fixture only',prohibited:['hosted SQL','provider calls','paid resource creation','old intent replay','old operator imports','application startup','dotenv','inherited credentials','image pull','foreign resource adoption','remote publication','deployment']};
+fs.writeFileSync(path.join(dir,'local142-attempt3-execution-admission.json'),JSON.stringify(value,null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({kind:value.kind,manifestFiles:manifest.files.length,sourceReviewSha256:value.sourceReviewSha256,localOnly:true,hostedAuthorized:false}));

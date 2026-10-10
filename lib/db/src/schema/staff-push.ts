@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { check, foreignKey, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 import { organizationsTable } from "./organizations";
 import { usersTable, sessionsTable } from "./auth";
 import { leadsTable } from "./leads";
@@ -44,6 +44,33 @@ export const staffPushSubscriptionsTable = pgTable("staff_push_subscriptions", {
 ]);
 
 export type StaffPushDeliveryState = "pending" | "dispatching" | "accepted" | "rejected" | "expired" | "cancelled" | "indeterminate";
+
+export type StaffLeadAlertCoverageStatus = "evaluated" | "policy_unavailable" | "policy_disabled" | "historical_unknown";
+export type StaffLeadAlertRecipientOutcome = "queued" | "recipient_unavailable" | "no_eligible_device" | "notification_expired";
+export interface StaffLeadAlertRecipient {
+  userId: string;
+  outcome: StaffLeadAlertRecipientOutcome;
+  deliveryIds: string[];
+}
+
+/** Original admission evidence, never a send authority or proof of a phone display. */
+export const staffLeadAlertCoverageTable = pgTable("staff_lead_alert_coverage", {
+  organizationId: uuid("organization_id").notNull().references(() => organizationsTable.id, { onDelete: "cascade" }),
+  leadId: uuid("lead_id").notNull(),
+  version: integer("version").notNull().default(1),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+  status: text("status").$type<StaffLeadAlertCoverageStatus>().notNull(),
+  policyFingerprint: text("policy_fingerprint"),
+  recipients: jsonb("recipients").$type<StaffLeadAlertRecipient[]>().notNull(),
+}, (t) => [
+  primaryKey({ name: "staff_lead_alert_coverage_pk", columns: [t.organizationId, t.leadId] }),
+  foreignKey({ name: "staff_lead_alert_coverage_tenant_fk", columns: [t.organizationId, t.leadId], foreignColumns: [leadsTable.organizationId, leadsTable.id] }).onDelete("cascade"),
+  check("staff_lead_alert_coverage_version", sql`${t.version} = 1`),
+  check("staff_lead_alert_coverage_status", sql`${t.status} in ('evaluated', 'policy_unavailable', 'policy_disabled', 'historical_unknown')`),
+  check("staff_lead_alert_coverage_policy_hash", sql`(${t.status} in ('evaluated', 'policy_disabled') and ${t.policyFingerprint} is not null and ${t.policyFingerprint} ~ '^[a-f0-9]{64}$') or (${t.status} in ('policy_unavailable', 'historical_unknown') and ${t.policyFingerprint} is null)`),
+  check("staff_lead_alert_coverage_recipients", sql`case when jsonb_typeof(${t.recipients}) = 'array' then octet_length(${t.recipients}::text) <= 16384 and ((${t.status} = 'evaluated' and jsonb_array_length(${t.recipients}) between 1 and 20) or (${t.status} <> 'evaluated' and jsonb_array_length(${t.recipients}) = 0)) else false end`),
+]);
 
 /** Durable per-device receipt: acceptance is never called delivery/read. */
 export const staffPushDeliveriesTable = pgTable("staff_push_deliveries", {

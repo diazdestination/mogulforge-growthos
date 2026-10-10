@@ -1,0 +1,42 @@
+[
+  {
+    "name": "tests-cloudflare-email-intake",
+    "startedAt": "2026-10-09T08:23:05.605Z",
+    "finishedAt": "2026-10-09T08:23:06.665Z",
+    "exitCode": 0,
+    "command": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\integrations\\cloudflare-email-intake\\node_modules\\vitest\\vitest.mjs",
+      "run",
+      "--maxWorkers",
+      "2"
+    ],
+    "cwd": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\lib\\integrations\\cloudflare-email-intake",
+    "log": "C:\\Users\\diazd\\dev\\projects\\mogulforge-integrated-specialists-20261009\\work\\validation\\tests-cloudflare-email-intake.log",
+    "environmentKeyNames": [
+      "APPDATA",
+      "ComSpec",
+      "LOCALAPPDATA",
+      "Path",
+      "PATHEXT",
+      "SystemRoot",
+      "TEMP",
+      "TMP",
+      "USERPROFILE",
+      "windir",
+      "NODE_ENV",
+      "APP_ORIGIN",
+      "OBJECT_STORAGE_PROVIDER",
+      "SESSION_SECRET",
+      "EMAIL_INGESTION_WEBHOOK_SECRET",
+      "EMAIL_INTELLIGENCE_ENCRYPTION_KEY",
+      "OAUTH_TOKEN_ENCRYPTION_KEY",
+      "GROWTHOS_OUTBOUND_HOLD",
+      "SCHEDULER_AUTOSTART",
+      "AUTO_MIGRATE",
+      "NO_COLOR",
+      "LOG_LEVEL"
+    ],
+    "network": "loopback-only guard"
+  }
+]

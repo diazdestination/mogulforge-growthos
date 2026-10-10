@@ -1,0 +1,48 @@
+{
+  "kind": "INERT_REVIEW_PROPOSAL_NOT_EXECUTABLE",
+  "authorized": false,
+  "app": "mogulforge-growthos-staging",
+  "machineId": "8d96936a03d058",
+  "immutableRegistryImage": null,
+  "preferredTransport": "NEW_REVIEWED_TARGET_BOUND_MACHINES_API_OPERATOR",
+  "proposedApi": {
+    "method": "POST",
+    "path": "/v1/apps/mogulforge-growthos-staging/machines/8d96936a03d058",
+    "currentVersion": null,
+    "leaseRequired": true,
+    "skipLaunch": true,
+    "config": null,
+    "configRule": "Fresh entire config copied in memory; reviewed image/hold fields only; compare delta before POST; no arbitrary env persisted",
+    "unknownUpdateRule": "Read-only reconciliation; no replay"
+  },
+  "minimumPrerequisites": [
+    "fresh exact database/connection/role identity",
+    "accepted current backup/recovery and new operator",
+    "accepted exact-source migration COMMIT and independent142 capture",
+    "authorized remote push/combined exact-head CI/image publication",
+    "actual Fly registry digest/source identity",
+    "fresh Machine config and reviewed restricted delta",
+    "explicit held staging update authority"
+  ],
+  "argumentTemplate": [
+    "machine", "update", "8d96936a03d058",
+    "--app", "mogulforge-growthos-staging",
+    "--image", "UNRESOLVED_IMMUTABLE_FLY_REGISTRY_IMAGE",
+    "--skip-start", "--autostart=false", "--autostop=stop",
+    "--env", "AUTO_MIGRATE=false",
+    "--env", "SCHEDULER_AUTOSTART=false",
+    "--env", "GROWTHOS_OUTBOUND_HOLD=true",
+    "--env", "STAGING_OUTBOUND_APPROVED=false",
+    "--env", "STAGING_SCHEMA_PUSH_APPROVED=false",
+    "--env", "WEB_PUSH_ENABLED=false",
+    "--env", "STAGING_EMAIL_RECIPIENT_ALLOWLIST="
+  ],
+  "doNotApplyCheckedInFlyToml": true,
+  "startSeparatelyAuthorized": false,
+  "productionExcluded": true,
+  "newResourcesAllowed": false,
+  "requiresIndependentCommandAndBeforeAfterConfigReview": true,
+  "cliAlternativeReady": false,
+  "cliAlternativeWorkingDirectoryRule": "Neutral empty directory; no Fly TOML or automatic config discovery",
+  "note": "No dispatcher is included. This unresolved proposal is documentation, never execution admission. CLI defaults/config behavior must be independently checked. Starting the normal application also performs startup DML."
+}

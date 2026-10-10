@@ -213,6 +213,19 @@ function fixture() {
   return { records, queries, client };
 }
 describe("returning-work core export", () => {
+  it("does not read or include staff alert admission and original effect identities", async () => {
+    const { client, records, queries } = fixture();
+    records.staff_lead_alert_coverage = [{
+      lead_id: id(28),
+      policy_fingerprint: privateMarker,
+      recipients: [{ userId: privateMarker, outcome: "queued", deliveryIds: [id(29)] }],
+    }];
+    const result = await createCustomerLifecycleExporter({ createClient: () => client as never })(id(1), "fictional-owner");
+    expect(result.data).not.toHaveProperty("staff_lead_alert_coverage");
+    expect(result.manifest.tables.some(row => row.table === "staff_lead_alert_coverage")).toBe(false);
+    expect(queries.some(text => text.includes("staff_lead_alert_coverage"))).toBe(false);
+    expect(JSON.stringify(result)).not.toContain(privateMarker);
+  });
   it("preserves original issued and usable native lineage while withholding cross-work links and replay authority", async () => {
     const { client, queries } = fixture();
     const result = await createCustomerLifecycleExporter({

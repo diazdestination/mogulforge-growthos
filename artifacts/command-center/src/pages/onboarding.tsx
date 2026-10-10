@@ -60,7 +60,7 @@ const STEP_DEFS: StepDef[] = [
   { key: 'verify', title: 'Verify installation', description: 'Run the installation check to confirm your website is talking to the CRM.', icon: BadgeCheck, href: '/settings', linkLabel: 'Open settings' },
   { key: 'test-lead', title: 'Run a test lead', description: 'Create a sandboxed sample lead and watch the full journey — captured, scored, and enrolled in follow-up — without contacting anyone real.', icon: FlaskConical },
   { key: 'invite-team', title: 'Invite your team', description: 'Add the reps, managers, and admins who will work leads in this workspace. They\'ll get an email with a sign-in link.', icon: Users },
-  { key: 'launch', title: 'Launch', description: 'Everything checks out — mark your workspace live.', icon: Rocket },
+  { key: 'launch', title: 'Complete setup', description: 'Record your setup completion. Launch review is still required before serving real clients.', icon: Rocket },
 ];
 
 export default function Onboarding() {
@@ -179,7 +179,7 @@ export default function Onboarding() {
         </div>
         {launched && (
           <div className="mt-4 rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-sm" data-testid="onboarding-launched">
-            🎉 Your workspace is live. You can revisit any step from Settings.
+            Setup completion recorded. Launch review is still required before serving real clients. You can revisit any step from Settings.
           </div>
         )}
       </div>
@@ -340,7 +340,7 @@ export default function Onboarding() {
                         className="inline-flex items-center gap-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-md px-3 h-8 hover:bg-primary/90 disabled:opacity-50"
                         title={doneCount < STEP_DEFS.length - 1 ? 'Finish the steps above first' : undefined}
                       >
-                        <Rocket className="w-3 h-3" /> Launch workspace
+                        <Rocket className="w-3 h-3" /> Record setup completion
                       </button>
                     )
                   ) : (

@@ -30,12 +30,12 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function main(): Promise<void> {
   observeDatabasePoolErrors(pool, logger);
-  // The release command guards schema push separately. Check the actual
+  // The generic release command refuses schema mutation. Check the actual
   // session here before startup seeding or a stale secret can touch prod data.
   await assertStagingDatabaseIdentity(pool);
   const restoreOnly = await assertRestoreDatabaseIdentity(pool);
-  // No-op unless AUTO_MIGRATE is set. Awaited before listen so we never serve
-  // traffic against a database whose schema hasn't been applied yet.
+  // Refuse retired AUTO_MIGRATE settings before listen. Disabled is a no-op;
+  // the validated restore-only path still bypasses normal startup work.
   if (!restoreOnly) await runAutoMigrate();
 
   const server = app.listen(port, process.env.HOST || "0.0.0.0", (err) => {
@@ -117,8 +117,8 @@ async function main(): Promise<void> {
   });
 }
 
-// Fail fast: a failed schema push means the app would 500 on every request, so
-// exit loudly (and let the platform restart us) rather than serve broken.
+// Abort startup on a failed identity check or retired AUTO_MIGRATE setting.
+// Startup never applies schema changes; provisioning is separately reviewed.
 void main().catch((err: unknown) => {
   logger.error({ err }, "Fatal startup error");
   process.exit(1);

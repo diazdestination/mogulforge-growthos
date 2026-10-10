@@ -1,0 +1,31 @@
+// Local Git/source observations only; no application imports or runtime effects.
+import fs from 'node:fs';
+import path from 'node:path';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+const root='C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009';
+const folder=path.join(root,'reports/release-preparation-2026-10-09');
+const source='bdcd5f2d56f5c0c08284dda8dd9d3d27cad60848';
+const git=args=>execFileSync('git',args,{cwd:root,windowsHide:true,encoding:null});
+const text=args=>git(args).toString('utf8').trim();
+const hash=b=>createHash('sha256').update(b).digest('hex');
+const lf=b=>Buffer.from(b.toString('utf8').replace(/\r\n/g,'\n'));
+const current=text(['rev-parse','HEAD']);
+const sql=[
+  'reports/staging-schema-preview-2026-09-30/0000_isolated-staging-initial.sql',
+  'reports/staging-schema-preview-2026-09-30/0001_pilot-email-sender.sql',
+  ...text(['ls-tree','-r','--name-only',source,'--','reports/staging-schema-preview-2026-10-01']).split('\n').filter(p=>/^reports\/staging-schema-preview-2026-10-01\/\d{4}_.*\.sql$/.test(p)).sort()
+];
+if(sql.length!==19||!sql.every((p,i)=>path.basename(p).startsWith(String(i).padStart(4,'0')+'_')))throw Error('SQL set changed');
+const schema=text(['ls-tree','-r','--name-only',source,'--','lib/db/src/schema']).split('\n').filter(p=>p.endsWith('.ts')).sort();
+const old=JSON.parse(fs.readFileSync('C:/Users/diazd/dev/jarvis/handoffs/growthos-staging-acceptance-2026-10-06/application-source-pins.json','utf8'));
+const rows=files=>files.map(p=>{const bytes=git(['show',source+':'+p]);const working=fs.readFileSync(path.join(root,p));return {path:p,gitObjectSha256:hash(bytes),gitObjectBytes:bytes.length,canonicalLfSha256:hash(lf(bytes)),workingCanonicalMatches:hash(lf(working))===hash(lf(bytes)),historicalAcceptedSha256:old.sqlFiles?.find(x=>x.path===p)?.sha256??null};});
+const sqlFiles=rows(sql),schemaFiles=rows(schema);
+if([...sqlFiles,...schemaFiles].some(x=>!x.workingCanonicalMatches))throw Error('Reviewed source differs from working tree');
+const delta=sqlFiles.slice(3);
+if(delta.slice(0,-1).some(x=>x.canonicalLfSha256!==x.historicalAcceptedSha256))throw Error('Accepted prior lineage differs');
+const scripts=['capture-hosted-metadata.mjs','capture-mpg-shapes.mjs','capture-mpg-public.mjs','capture-source-manifest.mjs'];
+fs.mkdirSync(path.join(folder,'tool-source'),{recursive:true});
+const toolSources=scripts.map(name=>{const bytes=fs.readFileSync(path.join(root,'work/release-preparation-2026-10-09',name));const relative='tool-source/'+name+'.txt';fs.writeFileSync(path.join(folder,relative),bytes,{flag:'wx'});return {path:relative,sha256:hash(bytes),bytes:bytes.length,executable:false};});
+const manifest={kind:'INTEGRATED142_RELEASE_PREPARATION_SOURCE_MANIFEST',at:new Date().toISOString(),repository:'https://github.com/diazdestination/mogulforge-growthos.git',branch:text(['branch','--show-current']),observedCandidateHead:current,applicationSourceCommit:source,applicationSourceTree:text(['rev-parse',source+'^{tree}']),sourceSelection:'Exact application commit used for completed suites and local Docker parity; later candidate changes are evidence only',localImageConfigDigest:'sha256:ad35da18b877d2b9cbcf2d272d74bc89c20f383f84a49717b2b752c017bd076b',registryManifestDigest:null,imagePublished:false,historicalBaseline95CatalogDigest:'a717ae6d79fe57095a4354b55bf1098b17085c00bd82b17a6076765434113516',baselineObservedThisTurn:false,sqlFiles,schemaFiles,selectedIfExact95:delta.map(x=>x.path),selectedIfExact141:[delta.at(-1).path],freshHostedCatalogRequired:true,workingInputsMatch:true,toolSources,hostedMigrationAuthorized:false,deployAuthorized:false,paidRestoreAuthorized:false};
+fs.writeFileSync(path.join(folder,'source-manifest.json'),JSON.stringify(manifest,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({source,tree:manifest.applicationSourceTree,current,sqlFiles:sqlFiles.length,schemaFiles:schemaFiles.length,deltaFor95:delta.length,priorFifteenMatch:true,sql0018:delta.at(-1),toolSources:toolSources.length}));

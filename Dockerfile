@@ -15,7 +15,7 @@ COPY . .
 # --ignore-scripts: platform binaries (esbuild/rollup/tailwind-oxide/lightningcss)
 # come from optional deps, not build scripts, so skipping scripts avoids the
 # ERR_PNPM_IGNORED_BUILDS hard error while still producing working binaries.
-RUN pnpm install --no-frozen-lockfile --ignore-scripts
+RUN pnpm install --frozen-lockfile --ignore-scripts
 # Explicit production defaults; the Vite config also has portable local
 # defaults so ordinary builds no longer depend on platform-injected variables.
 ENV NODE_ENV=production PORT=3001 BASE_PATH=/

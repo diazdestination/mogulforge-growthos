@@ -1,0 +1,41 @@
+{
+  "kind": "READ_ONLY_LOCAL_DOCKER_IMAGE_PLATFORM",
+  "observedAt": "2026-10-09T14:32:54.825Z",
+  "endpoint": "npipe:////./pipe/dockerDesktopLinuxEngine",
+  "imageReference": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+  "generic": {
+    "id": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+    "os": "linux",
+    "architecture": "amd64",
+    "descriptor": {
+      "mediaType": "application/vnd.oci.image.index.v1+json",
+      "digest": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+      "size": 10301
+    }
+  },
+  "linuxAmd64": {
+    "id": "sha256:1a66d744c1b459e13b05a8fca341da84cb63383e99ce262210efee5a319d4551",
+    "os": "linux",
+    "architecture": "amd64",
+    "descriptor": {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:1a66d744c1b459e13b05a8fca341da84cb63383e99ce262210efee5a319d4551",
+      "size": 3054,
+      "annotations": {
+        "com.docker.official-images.bashbrew.arch": "amd64",
+        "org.opencontainers.image.base.digest": "sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395",
+        "org.opencontainers.image.base.name": "alpine:3.24",
+        "org.opencontainers.image.created": "2026-09-17T21:29:19Z",
+        "org.opencontainers.image.revision": "9d15534160ade17f2b6c455a39ee967c49b1937d",
+        "org.opencontainers.image.source": "https://github.com/docker-library/postgres.git#9d15534160ade17f2b6c455a39ee967c49b1937d:16/alpine3.24",
+        "org.opencontainers.image.url": "https://hub.docker.com/_/postgres",
+        "org.opencontainers.image.version": "16.15-alpine3.24"
+      },
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    }
+  },
+  "dockerMutations": 0
+}

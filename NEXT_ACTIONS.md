@@ -1,5 +1,70 @@
 # Next acceptance work
 
+## October 10 current order
+
+1. Accept PR30 plus canonical main d6be1e1 as one isolated candidate under
+   reports/integrated-running-contract-2026-10-10.md. Existing PR30 includes
+   PR28/29 and their UI integration; do not rebuild or replay those features.
+2. Complete fresh PostgreSQL/full tests, types, builds, Docker parity and signed-in
+   native browser acceptance; show the fictional loopback preview to Adam.
+3. Prepare reviewed source integration and an exact-source held-staging/recovery
+   plan. Existing provider/rehearsal records certify only their recorded source.
+4. Close explicit invoice equipment/warranty snapshots, configurable service and
+   travel capacity, and remaining company-specific workday requirements. October 9
+   CSS discovery restores contractor payment collection to engineering scope;
+   it does not select or activate a provider or approve financial actions.
+5. Obtain actual source exports and complete migration reconciliation, actual
+   staff/device/mail/voice acceptance and both contractor workday sign-offs.
+
+Older dated current-order sections below retain historical evidence only.
+
+## October 9 UTC / October 8 Pacific current order
+
+1. Review the backend alert-coverage candidate and its final PostgreSQL 16,
+   types/build/Docker CI. Integrate PR #28 first, then this dependent branch.
+   See `reports/lead-alert-coverage-integration-2026-10-09.md` for local evidence.
+2. GEEKOM can connect the exact coverage API into its design using
+   `reports/lead-alert-coverage-ui-handoff-2026-10-09.md`. Show all recipients,
+   explicit missing/unknown coverage, and provider acceptance without claiming
+   phone display or human reading. UI integration is still open.
+3. Prepare the reviewed hosted rollout/recovery for the exact selected source.
+   New additive review-only 0018 follows 0017 (142 tables). No backfill or forced
+   schema push; keep retired AUTO_MIGRATE disabled. Existing release procedure
+   refuses execution until a reviewed target/SQL/image/backup plan replaces it.
+4. Complete real owner phone/background/offline acceptance, actual mail/voice,
+   source migration, subscription allowances and both full contractor workdays.
+   Actual routing/recipient/device activation is not established by source tests.
+
+The October 8 source/CI wave is verified at a0eb25d; its older checklist below is
+historical context. Public/provider/hosted/customer release gates remain open.
+
+## October 8 current order
+
+1. Complete review and full PostgreSQL 16/type/build/Docker CI for
+   `agent/growthos-production-gaps-20261008`, based on accepted main `2162aa2`.
+   The five new PostgreSQL-only rollback/membership tests must execute, not skip.
+   Current source contract and evidence are `reports/smart-site-claim-contract-2026-10-08.md`
+   and `reports/production-gaps-2026-10-08.md`. Use the private PR for integration;
+   do not overwrite GEEKOM's checkout or replay the completed earlier waves.
+2. Prepare the exact hosted SQL/source/image/target and recovery procedure.
+   `scripts/release-schema.mjs` is retired and always refuses; approval variables
+   cannot turn it into a safe migration. Current source has 141 tables, with no
+   additions in this candidate. The `AUTO_MIGRATE` startup bypass is also retired;
+   keep it disabled. Obtain fresh authorized hosted identity/readiness
+   evidence; October 8 public readiness returned 404 and staging timed out.
+3. Finish L9 delivery coverage: visibly account for configured recipients with
+   no eligible phone/session, then accept both real owners' installed devices,
+   background/locked/offline behavior and one-claim outcome. Source eligibility
+   and a push-provider receipt do not prove both owners saw an alert.
+4. Complete authorized mailbox/call/SMS proof, approved source migration and each
+   contractor's complete workday acceptance, plus GrowthOS subscription test and
+   agreed feature allowances. Initial contractor payment processing stays deferred.
+
+Returning-customer jobs/invoices and Contractor Workday engineering are already
+in the current main. Historical missing-feature/current-wave entries below are
+superseded by this snapshot. All actual provider/hosted/customer release gates remain.
+
+
 October6 current source slice is researched Contractor Workday Completion under
 reports/contractor-workday-contract-2026-10-06.md, after fully accepted PR24/main
 3f1f1b5/exact-mainCI37407237259. Earlier active-wave entries are history, never

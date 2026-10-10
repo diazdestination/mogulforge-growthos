@@ -46,6 +46,57 @@ tags:
   - name: assistant
     description: CRM AI assistant
 paths:
+  /v1/staff-push/leads/{leadId}/coverage:
+    get:
+      operationId: getStaffLeadAlertCoverage
+      summary: Read original lead alert admission and current receipt evidence
+      description: Requires an active verified owner/admin staff session and settings.manage. API keys and query selectors are refused. Missing historical coverage is explicit; reading never creates or resends alerts. Provider acceptance is not evidence of phone display or human reading.
+      tags: [StaffNotifications]
+      parameters:
+        - in: path
+          name: leadId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Exact company-scoped coverage, never cached
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffLeadAlertCoverage'
+        '400': { description: Invalid lead identifier or unsupported query }
+        '401': { description: Active staff session required }
+        '403': { description: Current accepted owner/admin authority required }
+        '404': { description: Lead unavailable in this company }
+        '503': { description: Coverage evidence temporarily unavailable }
+  /v1/smart-sites/leads/{id}/follow-up:
+    get:
+      operationId: getSmartSiteInquiryOwnership
+      tags: [leads]
+      summary: Read ownership of one exact website inquiry
+      description: Company-scoped crm.read with no-store. Independent of the bounded Capture queue. canClaim requires an accepted verified active responder session, current crm.write authority, an open inquiry and no owner. API-key readers cannot claim. No contact details or message content are returned.
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+      responses:
+        '200':
+          description: Current inquiry ownership; re-read after an uncertain or conflicting claim.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmartSiteInquiryOwnership'
+        '400':
+          description: Invalid ID or unexpected query fields.
+        '401':
+          description: Authentication required.
+        '403':
+          description: Current company read access denied.
+        '404':
+          description: Ordinary lead or inquiry unavailable in this company.
+        '503':
+          description: Unavailable; do not infer current ownership.
   "/v1/invoices/{id}/refunds": {"post":{"operationId":"recordInvoiceRefund","tags":["customer-work"],"summary":"recordInvoiceRefund","description":"Current human invoice manager only. Append a staff-recorded external refund correction tied to the original same-work receipt and remaining invoice allocation. It does not issue a processor refund or move cash. Existing invoice operation/request ledger and cumulative receipt cap apply.","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/InvoiceRefund"}}}},"responses":{"200":{"description":"Actual committed native record and original request result.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/InvoiceMutation"}}}},"400":{"description":"Malformed strict request, source or selector."},"401":{"description":"Human staff sign-in required."},"403":{"description":"Current accepted verified active membership/effective permission required; API keys rejected."},"404":{"description":"Native record unavailable in this company."},"409":{"description":"Saved version, immutable parent or original request conflict. Reconcile the exact submitted request."},"415":{"description":"JSON required."},"503":{"description":"Unavailable or unknown acknowledgement; no fresh request/effect may be inferred."}}}}
   "/v1/customer-work/projects/{id}": {"patch":{"operationId":"updateCustomerWorkProject","tags":["customer-work"],"summary":"updateCustomerWorkProject","description":"Explicit canonical returning-customer work. No acquisition lead, signature, provider delivery or payment is inferred. Exact original request/result is retained transactionally. The root/property is immutable and native estimate/job history is versioned.","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/UpdateCustomerWorkProject"}}}},"responses":{"200":{"description":"Actual committed native record and original request result.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CustomerWorkProjectMutation"}}}},"400":{"description":"Malformed strict request, source or selector."},"401":{"description":"Human staff sign-in required."},"403":{"description":"Current accepted verified active membership/effective permission required; API keys rejected."},"404":{"description":"Native record unavailable in this company."},"409":{"description":"Saved version, immutable parent or original request conflict. Reconcile the exact submitted request."},"415":{"description":"JSON required."},"503":{"description":"Unavailable or unknown acknowledgement; no fresh request/effect may be inferred."}}}}
   "/v1/customer-work/projects": {"post":{"operationId":"createCustomerWorkProject","tags":["customer-work"],"summary":"createCustomerWorkProject","description":"Explicit canonical returning-customer work. No acquisition lead, signature, provider delivery or payment is inferred. Exact original request/result is retained transactionally. The root/property is immutable and native estimate/job history is versioned.","parameters":[],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CreateCustomerWorkProject"}}}},"responses":{"200":{"description":"Actual committed native record and original request result.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CustomerWorkProjectMutation"}}}},"400":{"description":"Malformed strict request, source or selector."},"401":{"description":"Human staff sign-in required."},"403":{"description":"Current accepted verified active membership/effective permission required; API keys rejected."},"404":{"description":"Native record unavailable in this company."},"409":{"description":"Saved version, immutable parent or original request conflict. Reconcile the exact submitted request."},"415":{"description":"JSON required."},"503":{"description":"Unavailable or unknown acknowledgement; no fresh request/effect may be inferred."}}}}
@@ -4430,6 +4481,71 @@ components:
       schema:
         type: string
   schemas:
+    StaffLeadAlertCoverage:
+      type: object
+      additionalProperties: false
+      required: [organizationId, leadId, status, version, occurredAt, recordedAt, serverNow, receiptMeaning, recipients]
+      properties:
+        organizationId: { type: string, format: uuid }
+        leadId: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [coverage_not_recorded, evaluated, policy_unavailable, policy_disabled, historical_unknown]
+        version: { type: [integer, 'null'], enum: [1, null] }
+        occurredAt: { type: string, format: date-time }
+        recordedAt: { type: [string, 'null'], format: date-time }
+        serverNow: { type: string, format: date-time }
+        receiptMeaning:
+          type: string
+          enum: [provider_accepted_not_received_or_read]
+        recipients:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/StaffLeadAlertCoverageRecipient'
+    StaffLeadAlertCoverageRecipient:
+      type: object
+      additionalProperties: false
+      required: [userId, displayName, outcome, queuedDeviceCount, deliveryStateCounts]
+      properties:
+        userId: { type: string, minLength: 1, maxLength: 128 }
+        displayName: { type: [string, 'null'] }
+        outcome:
+          type: string
+          enum: [queued, recipient_unavailable, no_eligible_device, notification_expired]
+        queuedDeviceCount: { type: integer, minimum: 0, maximum: 5 }
+        deliveryStateCounts:
+          $ref: '#/components/schemas/StaffLeadAlertDeliveryStateCounts'
+    StaffLeadAlertDeliveryStateCounts:
+      type: object
+      additionalProperties: false
+      required: [pending, dispatching, accepted, rejected, expired, cancelled, indeterminate, unavailable]
+      properties:
+        pending: { type: integer, minimum: 0, maximum: 5 }
+        dispatching: { type: integer, minimum: 0, maximum: 5 }
+        accepted: { type: integer, minimum: 0, maximum: 5 }
+        rejected: { type: integer, minimum: 0, maximum: 5 }
+        expired: { type: integer, minimum: 0, maximum: 5 }
+        cancelled: { type: integer, minimum: 0, maximum: 5 }
+        indeterminate: { type: integer, minimum: 0, maximum: 5 }
+        unavailable: { type: integer, minimum: 0, maximum: 5 }
+    SmartSiteInquiryOwnership:
+      type: object
+      additionalProperties: false
+      required: [organizationId, leadId, siteName, status, assignedUserId, ownerName, ownerEligible, receivedAt, dueAt, firstAttemptAt, canClaim, serverNow]
+      properties:
+        organizationId: {type: string, format: uuid}
+        leadId: {type: string, format: uuid}
+        siteName: {type: string}
+        status: {type: string}
+        assignedUserId: {type: [string, 'null']}
+        ownerName: {type: [string, 'null']}
+        ownerEligible: {type: boolean}
+        receivedAt: {type: string, format: date-time}
+        dueAt: {type: [string, 'null'], format: date-time}
+        firstAttemptAt: {type: [string, 'null'], format: date-time}
+        canClaim: {type: boolean}
+        serverNow: {type: string, format: date-time}
     InvoiceRefund: {"type":"object","properties":{"requestId":{"type":"string","format":"uuid","pattern":"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"},"expectedVersion":{"type":"integer","minimum":1,"maximum":2147483646},"confirmed":{"type":"boolean","enum":[true]},"originalPaymentValueEntryId":{"type":"string","format":"uuid","pattern":"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"},"amountCents":{"type":"integer","minimum":1,"maximum":1000000000},"sourceReference":{"type":"string","minLength":5,"maxLength":160},"occurredAt":{"type":"string","format":"date-time"},"reason":{"type":"string","minLength":10,"maxLength":500}},"required":["requestId","expectedVersion","confirmed","originalPaymentValueEntryId","amountCents","sourceReference","occurredAt","reason"],"additionalProperties":false}
     UpdateCustomerWorkProject: {"type":"object","properties":{"requestId":{"type":"string","format":"uuid","pattern":"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"},"confirmed":{"type":"boolean","enum":[true]},"expectedWorkVersion":{"type":"integer","minimum":1,"maximum":2147483646},"name":{"type":"string","minLength":1,"maxLength":200},"status":{"type":"string","enum":["scheduled","in_progress","on_hold","completed","cancelled"]},"scheduledStart":{"nullable":true,"type":"string","format":"date-time"},"scheduledEnd":{"nullable":true,"type":"string","format":"date-time"},"crewUserIds":{"maxItems":50,"type":"array","items":{"type":"string","minLength":1,"maxLength":200}},"crewNotes":{"nullable":true,"type":"string","maxLength":4000}},"required":["requestId","confirmed","expectedWorkVersion","name","status","scheduledStart","scheduledEnd","crewUserIds","crewNotes"],"additionalProperties":false}
     CreateCustomerWorkProject: {"type":"object","properties":{"requestId":{"type":"string","format":"uuid","pattern":"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"},"confirmed":{"type":"boolean","enum":[true]},"source":{"oneOf":[{"type":"object","properties":{"kind":{"type":"string","enum":["existing_customer"]},"contactId":{"type":"string","format":"uuid","pattern":"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"},"propertyId":{"nullable":true,"type":"string","format":"uuid","pattern":"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"}},"required":["kind","contactId","propertyId"],"additionalProperties":false},{"type":"object","properties":{"kind":{"type":"string","enum":["estimate"]},"estimateId":{"type":"string","format":"uuid","pattern":"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"},"expectedWorkVersion":{"type":"integer","minimum":1,"maximum":2147483646}},"required":["kind","estimateId","expectedWorkVersion"],"additionalProperties":false}]},"name":{"type":"string","minLength":1,"maxLength":200},"status":{"type":"string","enum":["scheduled","in_progress","on_hold","completed","cancelled"]},"scheduledStart":{"nullable":true,"type":"string","format":"date-time"},"scheduledEnd":{"nullable":true,"type":"string","format":"date-time"},"crewUserIds":{"maxItems":50,"type":"array","items":{"type":"string","minLength":1,"maxLength":200}},"crewNotes":{"nullable":true,"type":"string","maxLength":4000}},"required":["requestId","confirmed","source","name","status","scheduledStart","scheduledEnd","crewUserIds","crewNotes"],"additionalProperties":false}

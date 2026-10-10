@@ -1,8 +1,10 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { z } from "zod/v4";
 import {
   auditEventsTable, db, leadsTable, sessionsTable, staffPushDeliveriesTable as deliveries,
   staffPushPoliciesTable as policies, staffPushSubscriptionsTable as subscriptions, usersTable, serviceWatchCasesTable,
-  type StaffPushDeliveryState,
+  staffLeadAlertCoverageTable as coverage,
+  type StaffPushDeliveryState, type StaffLeadAlertRecipient, type StaffLeadAlertCoverageStatus,
 } from "@workspace/db";
 import { and, asc, desc, eq, gt, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { decryptSecret, encryptSecret, sha256Base64Url } from "../lib/token-encryption";
@@ -20,6 +22,110 @@ const QUEUE_TTL_MS = 15 * 60_000;
 const IN_FLIGHT_LIMIT_MS = 2 * 60_000;
 const BATCH_SIZE = 10;
 const context = (org: string, user: string) => `staff-push:${org}:${user}`;
+
+const coverageStatuses = ["evaluated", "policy_unavailable", "policy_disabled", "historical_unknown"] as const;
+const coverageOutcomes = ["queued", "recipient_unavailable", "no_eligible_device", "notification_expired"] as const;
+const deliveryStates = ["pending", "dispatching", "accepted", "rejected", "expired", "cancelled", "indeterminate"] as const;
+const coverageSnapshotSchema = z.object({
+  version: z.literal(1),
+  occurredAt: z.date(),
+  recordedAt: z.date(),
+  status: z.enum(coverageStatuses),
+  policyFingerprint: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+  recipients: z.array(z.object({
+    userId: z.string().min(1).max(128),
+    outcome: z.enum(coverageOutcomes),
+    deliveryIds: z.array(z.uuid()).max(5),
+  }).strict()).max(20),
+}).strict().superRefine((value, ctx) => {
+  const fail = () => ctx.addIssue({ code: "custom", message: "Invalid coverage evidence" });
+  if ((value.status === "evaluated") !== (value.recipients.length > 0)) fail();
+  if (["evaluated", "policy_disabled"].includes(value.status) !== (value.policyFingerprint !== null)) fail();
+  if (new Set(value.recipients.map(r => r.userId)).size !== value.recipients.length) fail();
+  const allIds = value.recipients.flatMap(r => r.deliveryIds);
+  if (new Set(allIds).size !== allIds.length) fail();
+  for (const recipient of value.recipients) {
+    if ((recipient.outcome === "queued") !== (recipient.deliveryIds.length > 0)) fail();
+  }
+});
+const coverageUnavailable = () => new StaffPushError("staff_notifications_temporarily_unavailable", 503);
+type Member = typeof usersTable.$inferSelect;
+const acceptedMember = (member: Member | undefined) => Boolean(member?.isActive && member.emailVerifiedAt && !member.id.startsWith("invite:"));
+const acceptedResponder = (member: Member | undefined) => acceptedMember(member) && hasPermission(member!.role, "crm.write");
+const validDate = (value: unknown): value is Date => value instanceof Date && Number.isFinite(value.getTime());
+function matchingSession(session: typeof sessionsTable.$inferSelect | undefined, userId: string, now: Date): boolean {
+  if (!session || !validDate(session.expire) || session.expire <= now || !session.sess || typeof session.sess !== "object") return false;
+  const data = session.sess as { user?: { id?: unknown }; expires_at?: unknown };
+  return data.user?.id === userId && (data.expires_at === undefined ||
+    (typeof data.expires_at === "number" && Number.isFinite(data.expires_at) && data.expires_at * 1000 > now.getTime()));
+}
+function parseCoverage(row: typeof coverage.$inferSelect) {
+  const result = coverageSnapshotSchema.safeParse({ version: row.version, occurredAt: row.occurredAt, recordedAt: row.recordedAt,
+    status: row.status, policyFingerprint: row.policyFingerprint, recipients: row.recipients });
+  if (!result.success) throw coverageUnavailable();
+  return result.data;
+}
+
+export type StaffLeadAlertDeliveryStateCounts = Record<StaffPushDeliveryState | "unavailable", number>;
+export interface StaffLeadAlertCoverage {
+  organizationId: string;
+  leadId: string;
+  status: StaffLeadAlertCoverageStatus | "coverage_not_recorded";
+  version: 1 | null;
+  occurredAt: Date;
+  recordedAt: Date | null;
+  serverNow: Date;
+  receiptMeaning: "provider_accepted_not_received_or_read";
+  recipients: Array<{ userId: string; displayName: string | null; outcome: StaffLeadAlertRecipient["outcome"];
+    queuedDeviceCount: number; deliveryStateCounts: StaffLeadAlertDeliveryStateCounts }>;
+}
+
+/** Exact evidence read; it cannot admit, repair or replay an alert. */
+export async function getStaffLeadAlertCoverage(organizationId: string, actorId: string, leadId: string,
+  access: { sessionId: string; effectiveRole: Member["role"] }): Promise<StaffLeadAlertCoverage> {
+  return db.transaction(async tx => {
+    await tx.execute(sql`select set_config('lock_timeout', '3000ms', true), set_config('statement_timeout', '5000ms', true), set_config('idle_in_transaction_session_timeout', '10000ms', true)`);
+    // Lead -> member -> session matches admission/claim ordering. Authority is
+    // held through this short read, including waits for other transactions.
+    const [lead] = await tx.select({ id: leadsTable.id, createdAt: leadsTable.createdAt }).from(leadsTable)
+      .where(and(eq(leadsTable.organizationId, organizationId), eq(leadsTable.id, leadId))).for("share");
+    const [actor] = await tx.select().from(usersTable).where(and(eq(usersTable.organizationId, organizationId), eq(usersTable.id, actorId))).for("share");
+    const [session] = await tx.select().from(sessionsTable).where(eq(sessionsTable.sid, access.sessionId)).for("share");
+    if (!acceptedMember(actor) || !hasPermission(actor!.role, "settings.manage") || !hasPermission(access.effectiveRole, "settings.manage") ||
+      !matchingSession(session, actorId, new Date())) throw new StaffPushError("active_member_session_required", 403);
+    if (!lead) throw new StaffPushError("lead_not_found", 404);
+    if (!validDate(lead.createdAt)) throw coverageUnavailable();
+    const [stored] = await tx.select().from(coverage).where(and(eq(coverage.organizationId, organizationId), eq(coverage.leadId, leadId)));
+    const result: StaffLeadAlertCoverage = { organizationId, leadId, status: "coverage_not_recorded", version: null,
+      occurredAt: lead.createdAt, recordedAt: null, serverNow: new Date(), receiptMeaning: "provider_accepted_not_received_or_read", recipients: [] };
+    const finish = () => {
+      // Even an unknown historical result may have waited past session expiry.
+      if (!matchingSession(session, actorId, new Date())) throw new StaffPushError("active_member_session_required", 403);
+      result.serverNow = new Date();
+      return result;
+    };
+    if (!stored) return finish();
+    const snapshot = parseCoverage(stored);
+    const ids = snapshot.recipients.flatMap(r => r.deliveryIds);
+    const effects = ids.length ? await tx.select({ id: deliveries.id, state: deliveries.state }).from(deliveries)
+      .where(and(eq(deliveries.organizationId, organizationId), eq(deliveries.leadId, leadId), inArray(deliveries.id, ids))) : [];
+    if (effects.some(effect => !deliveryStates.includes(effect.state))) throw coverageUnavailable();
+    const members = snapshot.recipients.length ? await tx.select().from(usersTable).where(and(eq(usersTable.organizationId, organizationId),
+      inArray(usersTable.id, snapshot.recipients.map(r => r.userId)))) : [];
+    result.status = snapshot.status; result.version = snapshot.version; result.occurredAt = snapshot.occurredAt; result.recordedAt = snapshot.recordedAt;
+    result.recipients = snapshot.recipients.map(recipient => {
+      const member = members.find(m => m.id === recipient.userId);
+      const counts: StaffLeadAlertDeliveryStateCounts = { pending: 0, dispatching: 0, accepted: 0, rejected: 0, expired: 0, cancelled: 0, indeterminate: 0, unavailable: 0 };
+      for (const id of recipient.deliveryIds) counts[effects.find(effect => effect.id === id)?.state ?? "unavailable"]++;
+      return { userId: recipient.userId, displayName: acceptedMember(member) ? [member!.firstName, member!.lastName].filter(Boolean).join(" ") || "Team member" : null,
+        outcome: recipient.outcome, queuedDeviceCount: recipient.deliveryIds.length, deliveryStateCounts: counts };
+    });
+    return finish();
+  }).catch((error: unknown) => {
+    if (error instanceof StaffPushError) throw error;
+    throw coverageUnavailable();
+  });
+}
 
 async function sessionMember(store: Store, organizationId: string, userId: string, sid: string, now: Date) {
   const [user] = await store.select().from(usersTable).where(and(
@@ -133,19 +239,57 @@ export async function revokeStaffPush(organizationId: string, userId: string, si
 
 /** Called INSIDE the canonical new-lead transaction, never on imports/merges/retries. */
 export async function enqueueStaffLeadPush(tx: Transaction, organizationId: string, lead: { id: string; createdAt: Date }) {
+  const [canonical] = await tx.select({ id: leadsTable.id, createdAt: leadsTable.createdAt }).from(leadsTable)
+    .where(and(eq(leadsTable.organizationId, organizationId), eq(leadsTable.id, lead.id))).for("update");
+  if (!canonical) throw new StaffPushError("lead_not_found", 404);
+  const [existing] = await tx.select().from(coverage).where(and(eq(coverage.organizationId, organizationId), eq(coverage.leadId, canonical.id)));
+  if (existing) return;
+  if (!validDate(canonical.createdAt)) throw coverageUnavailable();
+  const [legacy] = await tx.select({ id: deliveries.id }).from(deliveries)
+    .where(and(eq(deliveries.organizationId, organizationId), eq(deliveries.leadId, canonical.id))).limit(1);
+  const save = async (status: StaffLeadAlertCoverageStatus, policyFingerprint: string | null, recipients: StaffLeadAlertRecipient[], recordedAt = new Date()) => {
+    const snapshot = coverageSnapshotSchema.safeParse({ version: 1, occurredAt: canonical.createdAt, recordedAt, status, policyFingerprint, recipients });
+    if (!snapshot.success) throw coverageUnavailable();
+    await tx.insert(coverage).values({ organizationId, leadId: canonical.id, ...snapshot.data });
+  };
+  if (legacy) { await save("historical_unknown", null, []); return; }
   const [row] = await tx.select().from(policies).where(eq(policies.organizationId, organizationId));
-  const recipients = staffPushRecipients(row?.policy, lead.createdAt);
-  if (!recipients.length) return;
-  const now = new Date();
-  const devices = await tx.select().from(subscriptions).where(and(eq(subscriptions.organizationId, organizationId),
-    inArray(subscriptions.userId, recipients), isNull(subscriptions.revokedAt), gt(subscriptions.expiresAt, now)));
-  for (const device of devices.slice(0, 100)) {
-    if (!device.sessionId || !device.encryptedSubscription || !(await sessionMember(tx, organizationId, device.userId, device.sessionId, now))) continue;
-    await tx.insert(deliveries).values({ organizationId, leadId: lead.id, subscriptionId: device.id,
-      createdAt: lead.createdAt, expiresAt: new Date(lead.createdAt.getTime() + QUEUE_TTL_MS) }).onConflictDoNothing({
-      target: [deliveries.organizationId, deliveries.leadId, deliveries.subscriptionId],
-    });
+  const policy = staffPushPolicySchema.safeParse(row?.policy);
+  if (!policy.success) { await save("policy_unavailable", null, []); return; }
+  const fingerprint = createHash("sha256").update(JSON.stringify({ ...policy.data, days: [...policy.data.days].sort(),
+    businessHoursUserIds: [...policy.data.businessHoursUserIds].sort(), afterHoursUserIds: [...policy.data.afterHoursUserIds].sort() })).digest("hex");
+  if (!policy.data.enabled) { await save("policy_disabled", fingerprint, []); return; }
+  const recipientIds = staffPushRecipients(policy.data, canonical.createdAt);
+  const members = await tx.select().from(usersTable).where(and(eq(usersTable.organizationId, organizationId), inArray(usersTable.id, recipientIds)))
+    .orderBy(asc(usersTable.id)).for("share");
+  // Sessions precede device locks, matching logout's session -> subscription FK
+  // updates. A renewed device with a different unobserved session is not admitted.
+  const candidates = await tx.select({ id: subscriptions.id, sessionId: subscriptions.sessionId }).from(subscriptions)
+    .where(and(eq(subscriptions.organizationId, organizationId), inArray(subscriptions.userId, recipientIds), isNull(subscriptions.revokedAt), gt(subscriptions.expiresAt, new Date())));
+  const sessionIds = [...new Set(candidates.flatMap(d => d.sessionId ? [d.sessionId] : []))].sort();
+  const sessions = sessionIds.length ? await tx.select().from(sessionsTable).where(inArray(sessionsTable.sid, sessionIds)).orderBy(asc(sessionsTable.sid)).for("share") : [];
+  const devices = candidates.length ? await tx.select().from(subscriptions).where(and(eq(subscriptions.organizationId, organizationId),
+    inArray(subscriptions.id, candidates.map(d => d.id)), inArray(subscriptions.userId, recipientIds), isNull(subscriptions.revokedAt)))
+    .orderBy(asc(subscriptions.userId), asc(subscriptions.createdAt), asc(subscriptions.id)).for("share") : [];
+  const now = new Date(), expiresAt = new Date(canonical.createdAt.getTime() + QUEUE_TTL_MS);
+  const recipients: StaffLeadAlertRecipient[] = [];
+  for (const userId of recipientIds) {
+    const recipient: StaffLeadAlertRecipient = { userId, outcome: "no_eligible_device", deliveryIds: [] };
+    if (expiresAt <= now) recipient.outcome = "notification_expired";
+    else if (!acceptedResponder(members.find(member => member.id === userId))) recipient.outcome = "recipient_unavailable";
+    else {
+      const eligible = devices.filter(device => device.userId === userId && device.expiresAt > now && device.encryptedSubscription && device.sessionId &&
+        matchingSession(sessions.find(session => session.sid === device.sessionId), userId, now)).slice(0, 5);
+      for (const device of eligible) {
+        const [effect] = await tx.insert(deliveries).values({ organizationId, leadId: canonical.id, subscriptionId: device.id,
+          createdAt: canonical.createdAt, expiresAt }).returning({ id: deliveries.id });
+        recipient.deliveryIds.push(effect.id);
+      }
+      if (recipient.deliveryIds.length) recipient.outcome = "queued";
+    }
+    recipients.push(recipient);
   }
+  await save("evaluated", fingerprint, recipients, now);
 }
 
 /** Called within the service-watch reconciliation transaction. No outbound work here. */

@@ -14,8 +14,163 @@ import {
 } from "@workspace/db";
 import { SmartSiteError } from "./smart-sites";
 import { hasPermission } from "../lib/permissions";
+import { acceptedStaffCondition } from "./accepted-staff";
 
 const active = sql`${leadsTable.status} not in ('won', 'lost', 'completed')`;
+const terminal = new Set(["won", "lost", "completed"]);
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type Staff = typeof usersTable.$inferSelect;
+const acceptedResponder = (user: Staff | undefined) =>
+  Boolean(
+    user &&
+    user.isActive &&
+    user.emailVerifiedAt &&
+    !user.id.startsWith("invite:") &&
+    hasPermission(user.role, "crm.write"),
+  );
+
+/** Call after the lead lock: waiting staff commands must use current authority. */
+async function lockResponders(
+  tx: Transaction,
+  org: string,
+  actor: string,
+  owner: string | null = null,
+) {
+  const ids = [...new Set([actor, ...(owner ? [owner] : [])])].sort();
+  const members = await tx
+    .select()
+    .from(usersTable)
+    .where(
+      and(
+        eq(usersTable.organizationId, org),
+        inArray(usersTable.id, ids),
+        acceptedStaffCondition(),
+      ),
+    )
+    .orderBy(asc(usersTable.id))
+    .for("share");
+  if (!acceptedResponder(members.find((user) => user.id === actor)))
+    throw new SmartSiteError("active_responder_required", 403);
+  if (owner && !acceptedResponder(members.find((user) => user.id === owner)))
+    throw new SmartSiteError("owner_must_be_active_team_member", 400);
+}
+
+export interface SmartSiteInquiryFollowup {
+  organizationId: string;
+  leadId: string;
+  siteName: string;
+  status: typeof leadsTable.$inferSelect.status;
+  assignedUserId: string | null;
+  ownerName: string | null;
+  ownerEligible: boolean;
+  receivedAt: Date;
+  dueAt: Date | null;
+  firstAttemptAt: Date | null;
+  canClaim: boolean;
+  serverNow: Date;
+}
+
+/** Exact inquiry lookup is independent of the bounded Capture queue. */
+export async function getSmartSiteInquiryFollowup(
+  org: string,
+  actor: string,
+  leadId: string,
+  context: { effectiveRole?: Staff["role"]; staffSession?: boolean } = {},
+): Promise<SmartSiteInquiryFollowup> {
+  return db.transaction(
+    async (tx) => {
+      const [reader] = await tx
+        .select()
+        .from(usersTable)
+        .where(
+          and(
+            eq(usersTable.organizationId, org),
+            eq(usersTable.id, actor),
+            eq(usersTable.isActive, true),
+          ),
+        );
+      if (
+        !reader ||
+        !hasPermission(reader.role, "crm.read") ||
+        (context.effectiveRole !== undefined &&
+          !hasPermission(context.effectiveRole, "crm.read"))
+      )
+        throw new SmartSiteError("active_member_required", 403);
+      const [inquiry] = await tx
+        .select({
+          leadId: leadsTable.id,
+          status: leadsTable.status,
+          assignedUserId: leadsTable.assignedUserId,
+          siteName: smartSitesTable.name,
+          siteReceivedAt: receipts.siteReceivedAt,
+          createdAt: receipts.createdAt,
+          dueAt: receipts.responseDueAt,
+          firstAttemptAt: receipts.firstAttemptAt,
+        })
+        .from(receipts)
+        .innerJoin(
+          leadsTable,
+          and(
+            eq(leadsTable.id, receipts.leadId),
+            eq(leadsTable.organizationId, org),
+          ),
+        )
+        .innerJoin(
+          contactsTable,
+          and(
+            eq(contactsTable.id, leadsTable.contactId),
+            eq(contactsTable.organizationId, org),
+          ),
+        )
+        .innerJoin(
+          smartSitesTable,
+          and(
+            eq(smartSitesTable.id, receipts.siteId),
+            eq(smartSitesTable.organizationId, org),
+          ),
+        )
+        .where(
+          and(eq(receipts.organizationId, org), eq(receipts.leadId, leadId)),
+        )
+        .limit(1);
+      if (!inquiry) throw new SmartSiteError("inquiry_not_found", 404);
+      const [owner] = inquiry.assignedUserId
+        ? await tx
+            .select()
+            .from(usersTable)
+            .where(
+              and(
+                eq(usersTable.organizationId, org),
+                eq(usersTable.id, inquiry.assignedUserId),
+              ),
+            )
+        : [];
+      return {
+        organizationId: org,
+        leadId: inquiry.leadId,
+        siteName: inquiry.siteName,
+        status: inquiry.status,
+        assignedUserId: inquiry.assignedUserId,
+        ownerName: owner
+          ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") ||
+            "Team member"
+          : null,
+        ownerEligible: acceptedResponder(owner),
+        receivedAt: inquiry.siteReceivedAt ?? inquiry.createdAt,
+        dueAt: inquiry.dueAt,
+        firstAttemptAt: inquiry.firstAttemptAt,
+        canClaim:
+          context.staffSession !== false &&
+          acceptedResponder(reader) &&
+          hasPermission(context.effectiveRole ?? reader.role, "crm.write") &&
+          !terminal.has(inquiry.status) &&
+          inquiry.assignedUserId === null,
+        serverNow: new Date(),
+      };
+    },
+    { isolationLevel: "repeatable read", accessMode: "read only" },
+  );
+}
 
 export async function setResponseTarget(
   org: string,
@@ -38,20 +193,18 @@ export async function setResponseTarget(
         responseTargetMinutes: smartSitesTable.responseTargetMinutes,
       });
     if (!site) throw new SmartSiteError("site_not_found", 404);
-    await tx
-      .insert(auditEventsTable)
-      .values({
-        organizationId: org,
-        actorUserId: actor,
-        action: "smart_site.response_target_changed",
-        entityType: "smart_site",
-        entityId: siteId,
-        metadata: {
-          minutes,
-          appliesTo: "future-inquiries",
-          clock: "elapsed-24x7",
-        },
-      });
+    await tx.insert(auditEventsTable).values({
+      organizationId: org,
+      actorUserId: actor,
+      action: "smart_site.response_target_changed",
+      entityType: "smart_site",
+      entityId: siteId,
+      metadata: {
+        minutes,
+        appliesTo: "future-inquiries",
+        clock: "elapsed-24x7",
+      },
+    });
     return site;
   });
 }
@@ -76,23 +229,11 @@ export async function assignSmartSiteLead(
         and(eq(receipts.organizationId, org), eq(receipts.leadId, leadId)),
       );
     if (!lead || !receipt) throw new SmartSiteError("inquiry_not_found", 404);
+    await lockResponders(tx, org, actor, owner);
     if (lead.assignedUserId !== expected)
       throw new SmartSiteError("owner_changed_refresh_first", 409);
-    if (owner) {
-      const [user] = await tx
-        .select()
-        .from(usersTable)
-        .where(
-          and(
-            eq(usersTable.id, owner),
-            eq(usersTable.organizationId, org),
-            eq(usersTable.isActive, true),
-          ),
-        )
-        .for("share");
-      if (!user || !hasPermission(user.role, "crm.write"))
-        throw new SmartSiteError("owner_must_be_active_team_member", 400);
-    }
+    if (owner && expected === null && terminal.has(lead.status))
+      throw new SmartSiteError("inquiry_no_longer_open", 409);
     await tx
       .update(leadsTable)
       .set({ assignedUserId: owner })
@@ -108,16 +249,14 @@ export async function assignSmartSiteLead(
           inArray(crmTasksTable.status, ["open", "in_progress"]),
         ),
       );
-    await tx
-      .insert(auditEventsTable)
-      .values({
-        organizationId: org,
-        actorUserId: actor,
-        action: "smart_site.owner_changed",
-        entityType: "lead",
-        entityId: leadId,
-        metadata: { previousOwnerId: expected, assignedUserId: owner },
-      });
+    await tx.insert(auditEventsTable).values({
+      organizationId: org,
+      actorUserId: actor,
+      action: "smart_site.owner_changed",
+      entityType: "lead",
+      entityId: leadId,
+      metadata: { previousOwnerId: expected, assignedUserId: owner },
+    });
     return { leadId, assignedUserId: owner };
   });
 }
@@ -158,6 +297,7 @@ export async function recordSmartSiteAttempt(
       .where(and(eq(receipts.organizationId, org), eq(receipts.leadId, leadId)))
       .for("update");
     if (!lead || !receipt) throw new SmartSiteError("inquiry_not_found", 404);
+    await lockResponders(tx, org, actor);
     const [existing] = await tx
       .select()
       .from(attempts)
@@ -195,23 +335,21 @@ export async function recordSmartSiteAttempt(
       .update(receipts)
       .set({ firstAttemptAt: now })
       .where(and(eq(receipts.id, receipt.id), isNull(receipts.firstAttemptAt)));
-    await tx
-      .insert(activitiesTable)
-      .values({
-        organizationId: org,
-        actorUserId: actor,
-        leadId,
-        contactId: lead.contactId,
-        type: "smart_site_contact_attempt",
-        title: `Staff logged ${input.channel} attempt: ${input.outcome.replaceAll("_", " ")}`,
-        body: "Staff-declared action, recorded now. Not independently verified provider delivery or a customer reply.",
-        metadata: {
-          eventId: event.id,
-          channel: input.channel,
-          outcome: input.outcome,
-          evidence: "staff-recorded",
-        },
-      });
+    await tx.insert(activitiesTable).values({
+      organizationId: org,
+      actorUserId: actor,
+      leadId,
+      contactId: lead.contactId,
+      type: "smart_site_contact_attempt",
+      title: `Staff logged ${input.channel} attempt: ${input.outcome.replaceAll("_", " ")}`,
+      body: "Staff-declared action, recorded now. Not independently verified provider delivery or a customer reply.",
+      metadata: {
+        eventId: event.id,
+        channel: input.channel,
+        outcome: input.outcome,
+        evidence: "staff-recorded",
+      },
+    });
     await tx
       .update(crmTasksTable)
       .set({ status: "done", completedAt: now })
@@ -223,21 +361,19 @@ export async function recordSmartSiteAttempt(
           inArray(crmTasksTable.status, ["open", "in_progress"]),
         ),
       );
-    await tx
-      .insert(auditEventsTable)
-      .values({
-        organizationId: org,
-        actorUserId: actor,
-        action: "smart_site.contact_attempt_recorded",
-        entityType: "lead",
-        entityId: leadId,
-        metadata: {
-          eventId: event.id,
-          channel: input.channel,
-          outcome: input.outcome,
-          evidence: "staff-recorded",
-        },
-      });
+    await tx.insert(auditEventsTable).values({
+      organizationId: org,
+      actorUserId: actor,
+      action: "smart_site.contact_attempt_recorded",
+      entityType: "lead",
+      entityId: leadId,
+      metadata: {
+        eventId: event.id,
+        channel: input.channel,
+        outcome: input.outcome,
+        evidence: "staff-recorded",
+      },
+    });
     return {
       id: event.id,
       recordedAt: now,
@@ -321,9 +457,7 @@ export async function smartSiteFollowup(org: string) {
       role: usersTable.role,
     })
     .from(usersTable)
-    .where(
-      and(eq(usersTable.organizationId, org), eq(usersTable.isActive, true)),
-    );
+    .where(and(eq(usersTable.organizationId, org), acceptedStaffCondition()));
   return {
     serverNow: now,
     summary,

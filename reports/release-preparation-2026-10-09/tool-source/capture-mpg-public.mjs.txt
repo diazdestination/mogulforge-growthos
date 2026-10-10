@@ -1,0 +1,15 @@
+// Fixed GET-only public inventory. No status command (which can fetch credentials).
+import fs from 'node:fs';
+import {execFile} from 'node:child_process';
+const output='C:/Users/diazd/dev/projects/mogulforge-integrated-specialists-20261009/reports/release-preparation-2026-10-09/current-mpg-public-metadata.json';
+if(fs.existsSync(output))throw Error('Receipt already exists');
+const fly='C:/Users/diazd/.fly/bin/fly.exe';
+const text=v=>typeof v==='string'&&v.length<=200&&!/[\r\n\x00]/.test(v)?v:null;
+const number=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0?v:null;
+const time=v=>typeof v==='string'&&/^\d{4}-\d\d-\d\dT[\d:.+-]+Z?$/.test(v)?v:typeof v==='number'&&Number.isFinite(v)?v:null;
+const ids=new Set(['zp2wjrejd2zodn4q','kzpwm0j18eg04nv3']);
+function run(args){const startedAt=new Date().toISOString();return new Promise(resolve=>execFile(fly,args,{windowsHide:true,encoding:'utf8',timeout:25000,maxBuffer:2**21},(e,out)=>{if(e)return resolve({ok:false,startedAt,finishedAt:new Date().toISOString(),error:'Read-only CLI unavailable; raw error withheld'});try{resolve({ok:true,startedAt,finishedAt:new Date().toISOString(),value:JSON.parse(out)});}catch{resolve({ok:false,startedAt,finishedAt:new Date().toISOString(),error:'Not JSON'});}}));}
+function project(r,fn){return r.ok?{ok:true,startedAt:r.startedAt,finishedAt:r.finishedAt,...fn(r.value)}:r;}
+const [l,b]=await Promise.all([run(['mpg','list','--org','adam-diaz','--json']),run(['mpg','backup','list','zp2wjrejd2zodn4q','--json'])]);
+const result={kind:'READ_ONLY_PUBLIC_MPG_METADATA_NO_SQL',at:new Date().toISOString(),organization:'adam-diaz',clusters:project(l,v=>Array.isArray(v)?{recognized:true,count:v.length,clusters:v.map(c=>({id:text(c.id),knownTarget:ids.has(c.id),name:text(c.name),status:text(c.status),region:text(c.region),plan:text(c.plan),diskGb:number(c.disk),replicas:number(c.replicas),version:text(c.version),attachedApps:c.attached_apps===null?null:Array.isArray(c.attached_apps)?c.attached_apps.map(a=>text(typeof a==='string'?a:a?.name)).filter(Boolean):null,attachmentInterpretation:c.attached_apps===null?'provider-null; no absence claim':Array.isArray(c.attached_apps)?'explicit array':'unrecognized',orgMatches:c.organization?.Slug==='adam-diaz'}))}:{recognized:false}),stagingBackups:project(b,v=>Array.isArray(v)?{recognized:true,count:v.length,backups:v.map(x=>({id:text(x.id),status:text(x.status),type:text(x.type),start:time(x.start),stop:time(x.stop)})),interpretation:'Last24h provider metadata only; restore recoverability and backup content not tested'}:{recognized:false}),credentialsRequested:false,hostedSql:false,mutations:false};
+fs.writeFileSync(output,JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(result));

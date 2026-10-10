@@ -72,6 +72,9 @@ const SESSION_ONLY_ROUTES = new Set([
  * - settings.manage — org configuration surfaces (owner/admin)
  */
 const EXPECTED_PERMISSIONS: Record<string, Permission> = {
+  "GET /contacts/:id/detail-correction": "crm.read",
+  "POST /contacts/:id/detail-corrections": "crm.write",
+  "GET /contacts/:id/detail-corrections/:requestId": "crm.read",
   "POST /customer-work/estimates": "crm.write",
   "PATCH /customer-work/estimates/:id": "crm.write",
   "POST /customer-work/projects": "crm.write",
@@ -183,6 +186,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /staff-push/policy": "settings.manage",
   "PUT /staff-push/policy": "settings.manage",
   "GET /staff-push/deliveries": "settings.manage",
+  "GET /staff-push/leads/:leadId/coverage": "settings.manage",
   "GET /integrations/microsoft": "crm.read",
   "POST /integrations/microsoft/connect": "crm.write",
   "GET /integrations/microsoft/callback": "crm.write",
@@ -216,6 +220,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "PATCH /smart-sites/:id/measurement": "settings.manage",
   "POST /smart-sites/:id/rotate-key": "settings.manage",
   "GET /smart-sites/follow-up": "crm.read",
+  "GET /smart-sites/leads/:id/follow-up": "crm.read",
   "PATCH /smart-sites/:id/response-target": "settings.manage",
   "PATCH /smart-sites/leads/:id/owner": "crm.write",
   "POST /smart-sites/leads/:id/contact-attempts": "crm.write",

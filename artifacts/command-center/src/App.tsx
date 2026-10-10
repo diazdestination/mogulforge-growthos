@@ -178,7 +178,9 @@ function LoginScreen({
           ← Back to home
         </Link>
         <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center text-primary-foreground text-3xl font-bold mb-8 shadow-xl shadow-primary/20">
-          {brandInitial}
+          {CLIENT.businessShortName === 'MogulForge' ? (
+            <img src="/brand/mogulforge-mark.svg" alt="MogulForge" className="h-full w-full object-contain" />
+          ) : brandInitial}
         </div>
         <h1 className="text-3xl font-bold tracking-tight mb-2 text-center">
           {CLIENT.appName}

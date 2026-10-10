@@ -1,0 +1,23 @@
+
+== Verify Docker engine ==
+29.6.1
+
+== Start isolated parity database ==
+unknown flag: --project-name
+
+Usage:  docker [OPTIONS] COMMAND [ARG...]
+
+Run 'docker --help' for more information
+
+== Remove isolated parity stack ==
+unknown flag: --project-name
+
+Usage:  docker [OPTIONS] COMMAND [ARG...]
+
+Run 'docker --help' for more information
+WARNING: Parity cleanup returned exit code 125 for project growthos-parity-34092.
+Exception: C:\Users\diazd\dev\projects\mogulforge-integrated-specialists-20261009\scripts\verify-docker-staging-parity.ps1:31
+Line |
+  31 |      throw "$Label failed with exit code $LASTEXITCODE."
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Start isolated parity database failed with exit code 125.
