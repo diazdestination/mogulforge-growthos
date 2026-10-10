@@ -19,6 +19,11 @@ cleanup, applies the schema only there, and runs the recursive suites and websit
 adapter checks. API files use at most two test workers, matching the two-CPU
 database; explicit independent-client race tests still run inside those files.
 Tests use CI's fixture configuration, with provider credentials excluded;
+test processes use UTC, matching CI and PostgreSQL, without changing Windows
+time settings. To run selected API files against a fresh owned database, use
+`node scripts/local-dev.mjs test src/services/mailbox-lead-integration.test.ts`.
+Only literal relative `src/... .test.ts` paths are accepted; the default action
+still runs all suites and website adapter checks.
 preview/parity safety holds are kept separate from mocked dispatch tests.
 No existing `DATABASE_URL` or Docker host/context is inherited.
 Each test database is disposable; it is removed on normal completion or failure.

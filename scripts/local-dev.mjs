@@ -15,7 +15,14 @@ export function databaseTestEnvironment(source = process.env) {
   // Match CI's isolated test fixtures. Preview/parity holds must not suppress
   // the mocked dispatches that the regression tests intentionally exercise.
   for (const key of ['GROWTHOS_ENVIRONMENT', 'GROWTHOS_OUTBOUND_HOLD', 'SCHEDULER_AUTOSTART', 'AUTO_MIGRATE']) delete env[key];
+  env.TZ = 'UTC';
   return env;
+}
+export function apiTestFiles(args) {
+  if (args.some(file => !/^src\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.test\.(?:ts|tsx|js|mjs)$/.test(file))) {
+    throw new Error('API test files must be literal relative src/... .test.ts/.test.js paths.');
+  }
+  return args;
 }
 export function assertOwnedContainer(inspection, runId) {
   if (inspection?.Config?.Labels?.['com.forge.local-test'] !== runId) {
@@ -90,7 +97,7 @@ async function command(program, args, { env = localEnvironment(), capture = fals
     child.once('exit', () => { process.off('SIGINT', stop); process.off('SIGTERM', stop); });
   });
 }
-async function databaseTests() {
+async function databaseTests(files = []) {
   await command('docker', ['version', '--format', '{{.Server.Version}}'], { capture: true });
   const runId = randomUUID();
   const name = `forge-growthos-test-${process.pid}-${runId.slice(0, 8)}`;
@@ -118,12 +125,12 @@ async function databaseTests() {
     });
     // The schema target is constructed only from this run's owned container.
     await command('pnpm', ['--filter', '@workspace/db', 'run', 'push-force'], { env });
-    await command('pnpm', ['-r', '--filter', '!@workspace/api-server', '--if-present', 'run', 'test'], { env });
+    if (!files.length) await command('pnpm', ['-r', '--filter', '!@workspace/api-server', '--if-present', 'run', 'test'], { env });
     // Match the disposable database's two CPUs and avoid unrelated fixture
     // files competing for its resources. Race tests still open their own
     // independent PostgreSQL clients inside each file.
-    await command('pnpm', ['--filter', '@workspace/api-server', 'run', 'test', '--maxWorkers=2'], { env });
-    await command(process.execPath, ['--test', 'examples/website-connection/adapter.test.mjs', 'examples/website-connection/operations.test.mjs'], { env });
+    await command('pnpm', ['--filter', '@workspace/api-server', 'run', 'test', '--maxWorkers=2', ...files], { env });
+    if (!files.length) await command(process.execPath, ['--test', 'examples/website-connection/adapter.test.mjs', 'examples/website-connection/operations.test.mjs'], { env });
   } finally {
     if (created) {
       const inspection = JSON.parse(await command('docker', ['inspect', name], { capture: true }))[0];
@@ -144,7 +151,11 @@ export async function main(action = process.argv[2]) {
       await command('pnpm', ['--filter', '@workspace/command-center', 'run', 'build']);
       await command(process.execPath, ['artifacts/api-server/scripts/preview-runtime-isolated.mjs', '--returning-customer'], { env: localEnvironment() });
       break;
-    case 'test': await withWslDockerSession(databaseTests); break;
+    case 'test': {
+      const files = apiTestFiles(process.argv.slice(3));
+      await withWslDockerSession(() => databaseTests(files));
+      break;
+    }
     case 'ui': await command('pnpm', ['--filter', '@workspace/command-center', 'run', 'test']); break;
     case 'typecheck': await command('pnpm', ['run', 'typecheck']); break;
     case 'parity': await withWslDockerSession(() => command('pwsh', ['-NoProfile', '-File', 'scripts/verify-docker-staging-parity.ps1'], { env: { ...localEnvironment(), CI: 'false' } })); break;

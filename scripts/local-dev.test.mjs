@@ -2,7 +2,7 @@ import { it as test } from 'vitest';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough, Writable } from 'node:stream';
-import { assertOwnedContainer, databaseTestEnvironment, localEnvironment, parseLoopbackPort, withWslDockerSession } from './local-dev.mjs';
+import { apiTestFiles, assertOwnedContainer, databaseTestEnvironment, localEnvironment, parseLoopbackPort, withWslDockerSession } from './local-dev.mjs';
 
 test('local actions discard inherited provider credentials and database targets', () => {
   const env = localEnvironment({ PATH: 'tools', DATABASE_URL: 'postgresql://live.example/production', OPENAI_API_KEY: 'private', GH_TOKEN: 'private', DOCKER_HOST: 'tcp://remote.example', NODE_OPTIONS: '--require untrusted.js', SCHEDULER_AUTOSTART: 'true' });
@@ -15,7 +15,12 @@ test('database fixtures match CI without importing credentials or preview-only h
   const env = databaseTestEnvironment({ PATH: 'tools', NODE_ENV: 'production', GROWTHOS_OUTBOUND_HOLD: 'true', OPENAI_API_KEY: 'private', DATABASE_URL: 'postgresql://live.example/production', DOCKER_HOST: 'tcp://remote.example' });
   assert.equal(env.NODE_ENV, 'test');
   assert.equal(env.CI, 'true');
+  assert.equal(env.TZ, 'UTC');
   for (const key of ['GROWTHOS_ENVIRONMENT', 'GROWTHOS_OUTBOUND_HOLD', 'SCHEDULER_AUTOSTART', 'AUTO_MIGRATE', 'OPENAI_API_KEY', 'DATABASE_URL', 'DOCKER_HOST']) assert.equal(env[key], undefined);
+});
+test('focused database tests cannot introduce options, absolute paths or traversal', () => {
+  assert.deepEqual(apiTestFiles(['src/services/mailbox-lead-integration.test.ts']), ['src/services/mailbox-lead-integration.test.ts']);
+  for (const file of ['--config=outside.js', '../outside.test.ts', 'src/../../outside.test.ts', 'C:/outside.test.ts', 'src/services/*.test.ts']) assert.throws(() => apiTestFiles([file]));
 });
 test('cleanup rejects missing or different run ownership', () => {
   for (const inspection of [{}, { Config: { Labels: { 'com.forge.local-test': 'another-run' } } }]) {
