@@ -1,7 +1,7 @@
 import { it as test } from 'vitest';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { validateApproval, assertOwnedCopy, deletionComplete, providerRequest, deleteOwnedCopy, closeOwnedTransport,
+import { validateApproval, assertOwnedCopy, deletionComplete, providerRequest, refreshingProviderRequest, deleteOwnedCopy, closeOwnedTransport,
   productionInventoryIdentity, machineIdentity } from './staging-copy-rehearsal.mjs';
 
 const SOURCE = 'zp2wjrejd2zodn4q';
@@ -159,6 +159,48 @@ test('provider deadline blocks dispatch and malformed or oversized responses can
     fetchImpl: async () => new Response('x'.repeat(4000001)) }), /copy_response_bound/);
 });
 
+test('each provider request receives freshly refreshed authorization and the current deadline', async () => {
+  const calls = []; let refreshes = 0; let deadline = Date.now() + 60000;
+  const request = refreshingProviderRequest({
+    refreshAuthorization: async () => `synthetic-authorization-${++refreshes}`,
+    getDeadline: () => deadline,
+    request: async (path, method, body, options) => { calls.push({ path, method, body, ...options }); return { status: 200 }; },
+  });
+  const firstDeadline = deadline;
+  await request(`postgres/${COPY}`);
+  deadline += 30000;
+  const body = { backup_id: packet().backupId, name: packet().name };
+  await request(`postgres/${SOURCE}/restore`, 'POST', body);
+  assert.equal(refreshes, 2);
+  assert.deepEqual(calls, [
+    { path: `postgres/${COPY}`, method: 'GET', body: undefined, authorization: 'synthetic-authorization-1', deadline: firstDeadline },
+    { path: `postgres/${SOURCE}/restore`, method: 'POST', body, authorization: 'synthetic-authorization-2', deadline },
+  ]);
+});
+
+test('authorization refresh failure prevents every provider dispatch without retrying refresh', async () => {
+  let refreshes = 0; let dispatches = 0;
+  const failure = new Error('synthetic account verification failure');
+  const request = refreshingProviderRequest({
+    refreshAuthorization: async () => { refreshes++; throw failure; },
+    request: async () => { dispatches++; return { status: 202 }; },
+  });
+  await assert.rejects(request(`postgres/${COPY}`, 'DELETE'), error => error === failure);
+  assert.equal(refreshes, 1); assert.equal(dispatches, 0);
+});
+
+test('a provider mutation error is returned unchanged with no automatic authorization or mutation retry', async () => {
+  let refreshes = 0; const calls = [];
+  const failure = new Error('synthetic unknown mutation outcome');
+  const request = refreshingProviderRequest({
+    refreshAuthorization: async () => `synthetic-authorization-${++refreshes}`,
+    request: async (path, method, body, options) => { calls.push({ path, method, body, ...options }); throw failure; },
+  });
+  await assert.rejects(request(`postgres/${COPY}`, 'DELETE'), error => error === failure);
+  assert.equal(refreshes, 1); assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, 'DELETE'); assert.equal(calls[0].authorization, 'synthetic-authorization-1');
+});
+
 function lifecycle({ loseDeleteAck = false, protectedChanged = false, persistFailure, initialStatus = 200,
   initialCopyPatch = {}, terminalStatus = 200, activeCopy = false } = {}) {
   const f = ownedFixture(); const calls = []; const events = []; let dispatched = false; let time = NOW;
@@ -198,6 +240,34 @@ test('protected-source drift remains a failure finding while exact owned detache
   assert.equal(result.deleted, true); assert.equal(result.protectedStateChanged, true);
   assert.equal(f.calls.filter(call => call.method === 'DELETE').length, 1);
   assert.ok(f.calls.every(call => call.path === `postgres/${COPY}`));
+});
+
+test('lost DELETE acknowledgment uses refreshed GET and active inventory reconciliation without another mutation', async () => {
+  const f = lifecycle({ loseDeleteAck: true });
+  const originalRequest = f.options.request; const originalList = f.options.listActive;
+  const sequence = []; let refreshes = 0; const deadline = Date.now() + 60000;
+  f.options.request = refreshingProviderRequest({
+    refreshAuthorization: async () => `synthetic-authorization-${++refreshes}`,
+    getDeadline: () => deadline,
+    request: async (path, method, body, options) => {
+      sequence.push({ method, authorization: options.authorization });
+      assert.equal(options.deadline, deadline);
+      return originalRequest(path, method, body);
+    },
+  });
+  f.options.listActive = async () => { sequence.push({ method: 'LIST' }); return originalList(); };
+  const result = await deleteOwnedCopy(f.options);
+  assert.equal(result.deleted, true); assert.equal(result.protectedStateChanged, false);
+  assert.equal(result.terminalStatus, 'deleted'); assert.equal(result.activeOriginalsPresent, true);
+  assert.equal(refreshes, 3);
+  assert.deepEqual(sequence, [
+    { method: 'GET', authorization: 'synthetic-authorization-1' },
+    { method: 'DELETE', authorization: 'synthetic-authorization-2' },
+    { method: 'GET', authorization: 'synthetic-authorization-3' },
+    { method: 'LIST' },
+  ]);
+  assert.equal(f.events.find(event => event.phase === 'delete-response').value.status, null);
+  assert.equal(f.calls.filter(call => call.method === 'DELETE').length, 1);
 });
 
 test('missing or changed initial ownership metadata refuses DELETE, including protected IDs and attachments', async () => {

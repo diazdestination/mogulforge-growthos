@@ -86,6 +86,15 @@ or HTTP404 together with absence from the active list; HTTP410 alone is not
 accepted. The two originals must remain listed. Uncertain ownership or cleanup
 is an explicit failure requiring reconciliation, never a new create/delete loop.
 
+Every provider request refreshes authorization through the normal Fly CLI after
+verifying the expected account and organization inventory. Fly's CLI renews
+short-lived discharges; a header captured once is not assumed valid throughout
+the operation. Refresh failures never replay a provider request. Cleanup uses
+the same refresh path even after its independent time window begins. Missing
+original resources remain a reported protected-state failure without preventing
+cleanup of a positively identified owned copy. See the official
+[CLI token refresh implementation](https://github.com/superfly/flyctl/blob/v0.4.115/internal/config/tokens.go).
+
 No receipt includes row values, provider credentials or recovered keys. Live
 receipts remain outside Git. Only synthetic local evidence is checked in.
 After this rehearsal passes, migration of the actual staging database and the

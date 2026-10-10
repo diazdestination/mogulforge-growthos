@@ -24,7 +24,7 @@ const SOURCE_FILES=['scripts/staging-copy-rehearsal.mjs','scripts/staging-migrat
   'scripts/staging-observation-runner.mjs','scripts/staging-observation-core.mjs','scripts/staging-observation-fixtures.mjs','scripts/local-dev.mjs',
   'reports/release-preparation-2026-10-09/schema-catalog.mjs',...['95','142'].map(n=>`reports/staging-observation-2026-10-10/fixtures/catalog-${n}.json`)];
 const environment=()=>({...Object.fromEntries(Object.entries(process.env).filter(([k])=>/^(SystemRoot|WINDIR|PATH|PATHEXT|TEMP|TMP|USERPROFILE|HOME|LOCALAPPDATA|APPDATA|COMSPEC|PROGRAMDATA)$/i.test(k))),NO_COLOR:'1',FLY_NO_UPDATE_CHECK:'1'});
-const cli=args=>execFileSync(FLY,args,{env:environment(),windowsHide:true,encoding:'utf8',timeout:30000,maxBuffer:4000000,stdio:['ignore','pipe','pipe']});
+const cli=(args,timeout=30000)=>execFileSync(FLY,args,{env:environment(),windowsHide:true,encoding:'utf8',timeout,maxBuffer:4000000,stdio:['ignore','pipe','pipe']});
 function durable(path,value) {
   const fd=fs.openSync(path,'wx');
   try{fs.writeFileSync(fd,JSON.stringify(value,null,2)+'\n');fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
@@ -81,6 +81,17 @@ export async function providerRequest(path,method,body,{authorization,deadline=I
   return {status:response.status,body:parsed};
 }
 
+// Fly CLI renews short-lived discharges in its normal credential file. Read the
+// freshly verified authorization for EVERY request, including long cleanup polls.
+// Authentication errors never replay a provider request or mutation.
+export function refreshingProviderRequest({refreshAuthorization,request=providerRequest,getDeadline=()=>Infinity}) {
+  return async(path,method='GET',body)=>{
+    check(Date.now()<getDeadline(),'copy_phase_deadline');
+    const authorization=await refreshAuthorization();
+    return request(path,method,body,{authorization,deadline:getDeadline()});
+  };
+}
+
 /** Exactly one DELETE. Unknown acknowledgments lead only to bounded reads.
  * Protected-source drift is reported but cannot strand a positively owned copy. */
 export async function deleteOwnedCopy({owned,plan,request,listActive,persist,verifyProtected,now=Date.now,pause=wait,deadline=Date.now()+1200000}) {
@@ -117,13 +128,20 @@ export async function closeOwnedTransport(client,proxy,receipt,close=closeClient
 }
 
 async function context({deadline=Infinity}={}) {
-  check(cli(['auth','whoami']).trim()===TARGET.account,'copy_account');
-  const inventory=JSON.parse(cli(['mpg','list','--org','personal','--json']));
-  check(Array.isArray(inventory)&&[TARGET.cluster,PRODUCTION].every(id=>inventory.some(c=>c.id===id)),'copy_original_inventory');
-  const auth=flyAuthorization(fs.readFileSync('C:/Users/diazd/.fly/config.yml','utf8'));
-  const request=(path,method='GET',body)=>providerRequest(path,method,body,{authorization:auth,deadline});
+  let inventory;
+  const remaining=limit=>{check(Date.now()<deadline,'copy_phase_deadline');return Math.max(1,Math.min(limit,deadline-Date.now()));};
+  const refreshAuthorization=()=>{
+    check(cli(['auth','whoami'],remaining(10000)).trim()===TARGET.account,'copy_account');
+    inventory=JSON.parse(cli(['mpg','list','--org','personal','--json'],remaining(20000)));
+    check(Array.isArray(inventory)&&inventory.every(c=>typeof c.id==='string'&&c.organization?.Slug===TARGET.org),'copy_inventory_identity');
+    check(Date.now()<deadline,'copy_phase_deadline');
+    return flyAuthorization(fs.readFileSync('C:/Users/diazd/.fly/config.yml','utf8'));
+  };
+  refreshAuthorization();
+  check([TARGET.cluster,PRODUCTION].every(id=>inventory.some(c=>c.id===id)),'copy_original_inventory');
+  const request=refreshingProviderRequest({refreshAuthorization,getDeadline:()=>deadline});
   const get=async path=>{const r=await request(path);check(r.status===200,'copy_provider_read');return r.body;};
-  return {inventory,request,get,setDeadline:value=>{deadline=value;}};
+  return {get inventory(){return inventory;},request,get,setDeadline:value=>{deadline=value;}};
 }
 const hashes=()=>Object.fromEntries(SOURCE_FILES.map(p=>[p,sha(fs.readFileSync(resolve(root,p)))]));
 function readPolicy() {
