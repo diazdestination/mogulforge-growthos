@@ -227,3 +227,12 @@ activate duplicate workflow writers before the native acceptance and migration g
 GEEKOM retains Microsoft/Azure provider work. Local ForgeLink leases do not
 prove remote task coordination. Applicable production, financial and customer
 contact approvals remain required; local engineering can continue autonomously.
+# Local tooling continuation — October 10 UTC
+
+After the owner-approved Windows restart, complete Ubuntu-24.04/Docker Engine
+installation and run the disposable PostgreSQL suite and Docker parity action.
+Review `C:\Forge\bootstrap\local-dev-2026-10-10` and its completion receipt.
+Integrate this tooling candidate through its own reviewed PR; keep the existing
+alert-coverage candidate and other worktrees intact. Browser QA currently reports
+existing contrast and viewport issues on the public preview entry page; those
+findings remain visible and are not suppressed by the launcher.

@@ -1,5 +1,39 @@
 # GrowthOS operating entry points
 
+## Local development actions — October 10 UTC
+
+The repository's `.codex/environments/environment.toml` installs dependencies
+automatically when Codex creates a worktree. It exposes Run synthetic preview,
+Test with PostgreSQL, Test UI, Typecheck, Browser QA and Docker parity actions.
+Manual equivalents are `node scripts/local-dev.mjs setup|run|test|ui|typecheck|browser|parity`.
+Use Node 22 or 24 and pnpm 11.3.0; setup uses the frozen lockfile and disables
+dependency lifecycle scripts. It neither copies credentials nor opens a database.
+
+Run builds the Command Center and starts the existing fictional returning-customer
+preview on `http://127.0.0.1:4193`. This uses an in-memory database, excludes provider
+credentials and holds outbound effects. Stop the action's terminal to close it.
+
+Test requires a running local Docker Engine. It creates its own PostgreSQL 16
+container with a random loopback port, checks ownership before schema setup and
+cleanup, applies the schema only there, and runs the recursive suites and website
+adapter checks. No existing `DATABASE_URL` or Docker host/context is inherited.
+Each test database is disposable; it is removed on normal completion or failure.
+A forcibly terminated process may leave its uniquely named `forge-growthos-test-*`
+container; inspect its `com.forge.local-test` label before removing only that
+container. Never prune unrelated containers or volumes.
+
+On WILLOWFORGE, the Docker CLI bridge runs Docker Engine inside Ubuntu-24.04
+through WSL, without a TCP Docker daemon. Complete the Windows restart and the
+recorded WSL installation before using PostgreSQL tests or parity. On Linux use
+the installed Docker CLI directly. Browser QA uses the pinned shared Windows
+Forge shipping kit, without recordings or traces; start the preview first.
+It audits the public entry page and returns nonzero for accessibility findings.
+Authenticated journey acceptance remains a separate scoped browser task.
+
+Local actions do not deploy, apply hosted migrations, activate providers or
+establish contractor/production acceptance. Current machine evidence is in
+`C:\Forge\bootstrap\local-dev-2026-10-10`.
+
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
 

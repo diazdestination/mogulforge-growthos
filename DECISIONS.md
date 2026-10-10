@@ -62,3 +62,12 @@ These decisions do not approve charging, contacting customers or deployment.
 - Rehearse the two named beta companies privately with synthetic data. A rehearsal
   suffix, invented test identity or recorded synthetic value is never activation,
   real customer revenue, proven conversion improvement or market validation.
+# Local development tooling — October 10 UTC
+
+Use repository-scoped Codex environment actions and frozen pnpm 11.3.0 installs.
+Keep the fictional in-memory visual preview separate from real PostgreSQL
+concurrency checks. PostgreSQL tests own a fresh loopback-only Docker container;
+schema changes and cleanup require its exact run label. Exclude inherited
+provider, database and Docker-target variables from all local actions. WILLOWFORGE
+uses Docker Engine in WSL; existing production, release and main-branch gates
+remain separate.
