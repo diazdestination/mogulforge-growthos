@@ -57,27 +57,37 @@ restoring the value and original digest. It also verified actual READ ONLY write
 rejection (`25006`), rollback, socket closure, and owned-container removal.
 Local results and remote CI status remain separate evidence.
 
+## Subsequent October 10 acceptance
+
+The separately approved secret-recovery Machine completed and was deleted.
+All three application keys and DATABASE_URL now have a private encrypted Google
+Drive copy whose provider download passed offline decryption without DPAPI.
+The recovered application login matched the expected staging PostgreSQL16
+identity; both existing Gmail ciphertexts decrypted and rejected wrong context.
+Other encrypted columns were empty. This does not establish Google token
+usability or external-object recovery. The owner holds the correct workstation
+key in a verified phone photo; the earlier password-manager claim was corrected.
+
+The [permission policy](PERMISSION-POLICY-REVIEW.md) is now independently accepted,
+including SET-role paths, administrative ownership, raw default ACLs and stock
+pgaudit metadata. The [new executor's actual local PostgreSQL test](upgrade-fixtures/README.md)
+passed rollback, preservation, exact commit and fresh Reader verification.
+The [managed-copy rehearsal](MANAGED-UPGRADE-REHEARSAL.md) is prepared for a new
+explicit paid-copy approval. None of these results migrates source staging.
+
 ## Remaining gates
 
 - The provider view `public.pg_stat_monitor`, extension 2.3, was identified and
   never queried. It is outside application-table fingerprints; full cluster-data
   coverage remains false.
-- Reader inherits `pg_read_all_data` and `reader`. No effective application-table
-  DML privileges were found, but reachable SET-role paths and the broader
-  permission policy remain unresolved. Both Reader and Writer have 95 table
-  entries; this alone does not establish application least privilege.
-- Two executable C security-definer event-trigger functions belong to
-  `pgaudit` 16.1: `pgaudit_ddl_command_end` and `pgaudit_sql_drop`. Neither was
-  invoked. Their unresolved finding remains present in source and restored copy.
+- The accepted baseline permission policy must match the new copy before DDL;
+  all 142 tables' effective privileges require fresh verification after migration.
 - Protected status/domain semantics and actual tenant/application journeys need
   separate acceptance. Complete-row fingerprints include unknown values.
-- The application's effective `DATABASE_URL` endpoint has not been read or
-  inferred from attachment labels. Fly lists `DATABASE_URL`,
-  `OAUTH_TOKEN_ENCRYPTION_KEY`, `EMAIL_INTELLIGENCE_ENCRYPTION_KEY`, and
-  `SESSION_SECRET`; recoverable key bytes, decryption, and legacy external
-  objects remain unverified.
-- The restored backup chain is verified; PITR, a migration rehearsal, and
-  recovery of the current 142-table candidate are not. Source staging still has
+- Legacy external objects and production-secret recovery remain unverified.
+- The restored backup chain and local migration executor are verified; PITR,
+  a managed-copy upgrade and recovery of the hosted 142-table candidate are not.
+  Source staging still has
   95 tables and requires a separately reviewed `0003`–`0018` migration sequence.
   No DDL, deployment, startup, provider delivery, or public launch is authorized
   by these results.
