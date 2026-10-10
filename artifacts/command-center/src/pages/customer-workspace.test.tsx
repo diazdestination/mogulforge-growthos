@@ -169,6 +169,20 @@ it('does not follow a pinned link into a changed company', async () => {
   expect(calls.slice(before).filter(path => path.includes('/workspace'))).toEqual([]);
 });
 
+it('removes customer details and the review form while Me is pending and idle with retained owner data', async () => {
+  const { client, calls } = setup();
+  await screen.findByRole('link', { name: 'Open visit' });
+  expect(screen.getByRole('button', { name: 'Review customer details' })).toBeTruthy();
+  const before = calls.length;
+  const me = client.getQueryCache().find({ queryKey: getGetMeQueryKey() })!;
+  expect(me.state.data).toBeTruthy();
+  await act(async () => { me.setState({ status: 'pending', fetchStatus: 'idle' }); });
+  await screen.findByText('Checking current company access…');
+  expect(screen.queryByText('Morgan Synthetic Customer')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Review customer details' })).toBeNull();
+  expect(calls.slice(before).filter(path => path.includes('/workspace'))).toEqual([]);
+});
+
 it.each([`?organizationId=${workspaceId(99)}`, '?organizationId=bad', `?organizationId=${org}&section=bad`, `?organizationId=${org}&section=tasks&section=tasks`, `?organizationId=${org}&cursor=bad`])('rejects foreign or invalid URL context before customer reads: %s', async search => {
   const { calls } = setup({ search }); await screen.findByRole('alert'); expect(calls.filter(path => path.includes('/workspace'))).toEqual([]);
 });

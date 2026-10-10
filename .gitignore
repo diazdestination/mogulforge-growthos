@@ -48,6 +48,7 @@ Thumbs.db
 
 # Local integration fixtures and validation scratch files
 /work/
+/reports/customer-detail-corrections-local-*
 
 # Replit
 .cache/
