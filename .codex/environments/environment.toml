@@ -1,0 +1,36 @@
+version = 1
+name = "GrowthOS local development"
+
+[setup]
+script = "node scripts/local-dev.mjs setup"
+
+[[actions]]
+name = "Run synthetic preview"
+icon = "run"
+command = "node scripts/local-dev.mjs run"
+
+[[actions]]
+name = "Test with PostgreSQL"
+icon = "test"
+command = "node scripts/local-dev.mjs test"
+
+[[actions]]
+name = "Test UI"
+icon = "test"
+command = "node scripts/local-dev.mjs ui"
+
+[[actions]]
+name = "Typecheck"
+icon = "debug"
+command = "node scripts/local-dev.mjs typecheck"
+
+[[actions]]
+name = "Browser QA"
+icon = "test"
+command = "node scripts/local-dev.mjs browser"
+platform = "win32"
+
+[[actions]]
+name = "Docker parity"
+icon = "test"
+command = "node scripts/local-dev.mjs parity"

@@ -1,5 +1,23 @@
 # GrowthOS project state
 
+## October 10 consolidated local workday
+
+PR30 baf2c335 already contains PR28/29, GEEKOM's approved contractor/specialist
+screens and branding, lead-alert visibility, and audited staff customer-detail
+corrections. This isolated candidate merges canonical main d6be1e1, including
+PR31's verified local development actions. See
+reports/integrated-running-contract-2026-10-10.md for scope and the corresponding
+acceptance report for current verification. Original branches remain preserved.
+The combined PostgreSQL, browser, build and Docker checks are pending at this
+snapshot; old green source checks are not combined-source acceptance.
+
+October 9 CSS discovery supersedes the older contractor-payment deferral:
+prepare customer payment collection for cutover. Provider choice and financial
+activation remain separate. Structured invoice warranty dates, service/travel
+capacity and full approved source migration remain concrete functional gaps.
+This local preview does not establish hosted or contractor replacement readiness.
+All older dated headings below are historical evidence.
+
 ## October 9 UTC / October 8 Pacific lead alert coverage
 
 Current branch `agent/growthos-alert-coverage-20261009` depends on unmerged PR #28
@@ -46,6 +64,18 @@ path returned 404 and staging timed out during read-only inspection; neither
 proved a deployed version. Hosted SQL/recovery, actual mail/voice/phone delivery,
 notification coverage, migration and both contractor acceptance cards remain open.
 
+## Local development tooling candidate — October 10 UTC
+
+Isolated branch `agent/growthos-local-dev-20261010` adds Codex setup/actions and
+a credential-free local launcher. Frozen installs, workspace type checks, the
+980-test UI suite and eight launcher isolation/ownership/session checks passed on Windows.
+The synthetic returning-customer preview responds on loopback4193. The shared
+browser audit runs and reports existing contrast/meta-viewport findings on the
+public entry page. After the approved restart, Ubuntu24.04 and Docker Engine29.9.0
+are installed on WILLOWFORGE. The launcher now holds a WSL session during database
+testing and parity so idle shutdown cannot remove the database mid-run. Full
+owned-container PostgreSQL/parity evidence is recorded with the candidate. No application
+feature, hosted data, provider, deployment or other candidate was changed.
 
 ## October6 researched Contractor Workday integration
 

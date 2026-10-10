@@ -1,5 +1,23 @@
 # Next acceptance work
 
+## October 10 current order
+
+1. Accept PR30 plus canonical main d6be1e1 as one isolated candidate under
+   reports/integrated-running-contract-2026-10-10.md. Existing PR30 includes
+   PR28/29 and their UI integration; do not rebuild or replay those features.
+2. Complete fresh PostgreSQL/full tests, types, builds, Docker parity and signed-in
+   native browser acceptance; show the fictional loopback preview to Adam.
+3. Prepare reviewed source integration and an exact-source held-staging/recovery
+   plan. Existing provider/rehearsal records certify only their recorded source.
+4. Close explicit invoice equipment/warranty snapshots, configurable service and
+   travel capacity, and remaining company-specific workday requirements. October 9
+   CSS discovery restores contractor payment collection to engineering scope;
+   it does not select or activate a provider or approve financial actions.
+5. Obtain actual source exports and complete migration reconciliation, actual
+   staff/device/mail/voice acceptance and both contractor workday sign-offs.
+
+Older dated current-order sections below retain historical evidence only.
+
 ## October 9 UTC / October 8 Pacific current order
 
 1. Review the backend alert-coverage candidate and its final PostgreSQL 16,
@@ -274,3 +292,13 @@ activate duplicate workflow writers before the native acceptance and migration g
 GEEKOM retains Microsoft/Azure provider work. Local ForgeLink leases do not
 prove remote task coordination. Applicable production, financial and customer
 contact approvals remain required; local engineering can continue autonomously.
+# Local tooling continuation — October 10 UTC
+
+Ubuntu-24.04/Docker Engine installation is complete after the owner-approved
+Windows restart. Verify the disposable PostgreSQL suite and Docker parity action
+using the launcher that holds WSL open until all testing and cleanup finish.
+Review `C:\Forge\bootstrap\local-dev-2026-10-10` and its completion receipt.
+Integrate this tooling candidate through its own reviewed PR; keep the existing
+alert-coverage candidate and other worktrees intact. Browser QA currently reports
+existing contrast and viewport issues on the public preview entry page; those
+findings remain visible and are not suppressed by the launcher.
