@@ -5,3 +5,5 @@ reports/integration-validation-2026-10-09/*.txt -diff
 # Release source capsules and receipts have reviewed raw-byte hashes.
 reports/release-preparation-2026-10-09/** -text
 reports/release-preparation-2026-10-09/*.txt -diff
+# Generated schema fixtures and verification receipts carry raw-byte hashes.
+reports/staging-observation-2026-10-10/fixtures/** -text linguist-generated=true
