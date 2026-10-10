@@ -168,7 +168,17 @@ export async function executeMigration(client, { plan, expectedBefore, persist, 
   };
   try {
     const initial = (await query(IDENTITY_SQL)).rows[0];
-    check(identityMatches(initial, 'fly-user', 'fly-user'), 'migration_identity');
+    // Fly can select schema_admin as the login's initial effective role.
+    // Keep the login fixed and admit only these two reviewed starting roles.
+    // Booleans explain a refusal without persisting unexpected identity values.
+    result.initialIdentityChecks = {
+      database: initial?.database === 'growthos_staging',
+      login: initial?.login === 'fly-user',
+      role: ['fly-user', 'schema_admin'].includes(initial?.role),
+      version: Number.isInteger(initial?.version) && initial.version >= 160000 && initial.version < 170000,
+      pid: Number.isInteger(initial?.pid) && initial.pid > 0,
+    };
+    check(Object.values(result.initialIdentityChecks).every(value => value === true), 'migration_identity');
     await journal({ phase: 'begin-intent' });
     // Mark dispatched before awaiting: a lost BEGIN response still gets cleanup.
     began = true;

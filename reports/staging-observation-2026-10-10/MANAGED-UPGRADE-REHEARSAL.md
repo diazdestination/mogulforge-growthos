@@ -1,5 +1,12 @@
 # One temporary managed-copy upgrade rehearsal
 
+The first approved execution failed safely at the initial connection-identity
+guard before BEGIN/DDL and its owned copy was deleted. Restore preservation
+passed; hosted upgrade acceptance did not. See the
+[initial-role correction](INITIAL-ROLE-CORRECTION.md). That one-copy grant is
+consumed. Any corrected rehearsal requires a freshly prepared, reviewed and
+separately approved packet; the completed attempt must never be replayed.
+
 The next test restores one recent completed staging backup into an unattached
 Basic Fly database, rehearses and rolls back the exact 95-to-142 upgrade, then
 commits the same sequence on that copy and checks it through a fresh Reader.

@@ -105,6 +105,7 @@ async function runLocal() {
     evidence.postgres = actual;
     await admin.query(`CREATE ROLE schema_admin NOLOGIN;
       CREATE ROLE "fly-user" LOGIN PASSWORD 'local-owner-only'; GRANT schema_admin TO "fly-user";
+      ALTER ROLE "fly-user" SET role TO 'schema_admin';
       CREATE ROLE reader NOLOGIN; CREATE ROLE writer NOLOGIN;
       GRANT pg_read_all_data TO reader; GRANT pg_read_all_data,pg_write_all_data TO writer;
       CREATE ROLE "growthos-restore-reader" LOGIN PASSWORD 'local-reader-only';
@@ -122,13 +123,16 @@ async function runLocal() {
     };
     const runCase = async (label, expectedBefore, options = {}) => {
       const client = await connect('fly-user'); const journal = [];
+      const initialIdentity = (await client.query('SELECT session_user::text AS login,current_user::text AS role,pg_backend_pid() AS pid')).rows[0];
+      check(initialIdentity.login === 'fly-user' && initialIdentity.role === 'schema_admin' && Number.isInteger(initialIdentity.pid) && initialIdentity.pid > 0,
+        'migration_local_default_role_not_modeled');
       const wrapped = options.lateFailure ? { connection: client.connection, query: (...args) => args[0] === plan.steps.at(-1).sql ? client.query('SELECT 1 / 0') : client.query(...args) } : client;
       const journalFile = resolve(journalDirectory, `${label}.jsonl`);
       const descriptor = openSync(journalFile, 'wx');
       try {
         const result = await executeMigration(wrapped, { plan, expectedBefore, outcome: options.outcome ?? 'rollback',
           persist: async event => { writeSync(descriptor, `${JSON.stringify(event)}\n`); fsyncSync(descriptor); journal.push(event); } });
-        evidence.cases[label] = { result: safeResult(result), journal, durableJournal: `journals/${runId}/${label}.jsonl` };
+        evidence.cases[label] = { initialIdentity, result: safeResult(result), journal, durableJournal: `journals/${runId}/${label}.jsonl` };
         return result;
       } finally { closeSync(descriptor); }
     };
@@ -176,6 +180,9 @@ async function runLocal() {
     const verified = verifyCommittedMigration(committed, fresh, plan); evidence.verified = verified;
     evidence.checks.freshReaderVerified = verified.status === 'verified' && verified.freshReaderVerified === true;
     evidence.checks.proofCoverage = verified.originalTables === 95 && verified.newTablesEmpty === 47 && verified.defaultsVerified === 26 && verified.privilegeTableEntries === 284;
+    evidence.checks.ownerDefaultRoleModeled = Object.values(evidence.cases).every(entry => entry.initialIdentity.login === 'fly-user' &&
+      entry.initialIdentity.role === 'schema_admin' && Object.values(entry.result.initialIdentityChecks ?? {}).length === 5 &&
+      Object.values(entry.result.initialIdentityChecks).every(value => value === true));
     check(Object.values(evidence.checks).every(value => value === true), 'migration_local_assertion_failed');
   } catch (caught) { error = caught; }
   finally {

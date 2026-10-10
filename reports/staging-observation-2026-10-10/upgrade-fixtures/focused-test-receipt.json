@@ -1,13 +1,13 @@
 {
   "kind": "MIGRATION_FOCUSED_VITEST_RESULT",
-  "recordedAt": "2026-10-10T17:29:18.084Z",
+  "recordedAt": "2026-10-10T18:57:41.038Z",
   "command": "pnpm --filter @workspace/scripts exec vitest run staging-migration-core.test.mjs",
   "status": "PASS",
   "testFiles": 1,
-  "tests": 12,
-  "reportedDurationSeconds": 3.46,
-  "reportedTestDurationSeconds": 3.2,
-  "coreSha256": "1d46ecb1e38127e458387a13548b6bcd8eafa20577ff903307243237c5972ba0",
-  "testSha256": "21c724083671e7ebb90870df1a757e7cdb94dfe0c92da2c24bd38b546ef372fe",
+  "tests": 14,
+  "reportedDurationSeconds": 3.87,
+  "reportedTestDurationSeconds": 3.57,
+  "coreSha256": "336ef191fe11b3cceb109f16fdfce0368f0de961e780966d37ea4bdfc3d391cc",
+  "testSha256": "980c4a54fd2827892db89bf3e475d27a7f1caa0bdc762a60f4edcb0d93791eec",
   "providerCalls": false
 }

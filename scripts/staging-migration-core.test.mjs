@@ -29,8 +29,8 @@ function privilegeRows(catalog) {
     sequences: [], functions: [], publicGrants: [], defaultGrants: [],
   };
 }
-function fake(plan, { identityPatch, loseBegin = false, loseCommit = false, thirdRoleNewAcl = false } = {}) {
-  const state = { count: 95, role: 'fly-user', began: false, committed: false, destroyed: false }; const calls = [];
+function fake(plan, { identityPatch, initialRole = 'fly-user', loseBegin = false, loseCommit = false, thirdRoleNewAcl = false } = {}) {
+  const state = { count: 95, role: initialRole, began: false, committed: false, destroyed: false }; const calls = [];
   const client = { connection: { stream: { destroy() { state.destroyed = true; } } }, async query(text) {
     calls.push(text);
     if (text.startsWith('SELECT current_database()')) return { rows: [{ database: 'growthos_staging', login: 'fly-user',
@@ -38,8 +38,8 @@ function fake(plan, { identityPatch, loseBegin = false, loseCommit = false, thir
     if (text.startsWith('BEGIN')) { state.began = true; if (loseBegin) throw new Error('credential-containing raw error'); return { command: 'BEGIN' }; }
     if (text.startsWith('SET LOCAL')) { state.role = 'schema_admin'; return { command: 'SET' }; }
     if (text.startsWith('LOCK TABLE')) return { command: 'LOCK' };
-    if (text === 'ROLLBACK') { state.began = false; state.role = 'fly-user'; state.count = 95; return { command: 'ROLLBACK' }; }
-    if (text === 'COMMIT') { state.began = false; state.role = 'fly-user'; state.committed = true;
+    if (text === 'ROLLBACK') { state.began = false; state.role = initialRole; state.count = 95; return { command: 'ROLLBACK' }; }
+    if (text === 'COMMIT') { state.began = false; state.role = initialRole; state.committed = true;
       if (loseCommit) throw new Error('credential-containing raw error'); return { command: 'COMMIT' }; }
     const step = plan.steps.findIndex(value => value.sql === text);
     if (step >= 0) { if (step === 15) state.count = 142; return { command: 'ALTER' }; }
@@ -83,6 +83,38 @@ test('wrong current database cannot dispatch BEGIN or DDL', async () => {
   const result = await executeMigration(f.client, { plan: f.plan, expectedBefore: f.expectedBefore, persist: async () => {} });
   assert.equal(result.status, 'failed'); assert.equal(result.errorCode, 'migration_identity');
   assert.equal(f.calls.some(sql => sql.startsWith('BEGIN')), false); assert.equal(result.stepsAcknowledged, 0);
+  assert.deepEqual(result.initialIdentityChecks, { database: false, login: true, role: true, version: true, pid: true });
+  assert.equal(JSON.stringify(result).includes('wrong_database'), false);
+});
+
+test('fly-user login accepts only the two approved initial role configurations and keeps explicit transaction role selection', async () => {
+  for (const initialRole of ['fly-user', 'schema_admin']) {
+    const f = await fixture({ initialRole });
+    const result = await executeMigration(f.client, { plan: f.plan, expectedBefore: f.expectedBefore, persist: async () => {} });
+    assert.equal(result.status, 'rehearsed-rolled-back'); assert.equal(result.rollbackAcknowledged, true);
+    assert.deepEqual(result.initialIdentityChecks, { database: true, login: true, role: true, version: true, pid: true });
+    assert.ok(f.calls.some(sql => sql.startsWith('SET LOCAL') && sql.includes('SET LOCAL ROLE schema_admin')));
+    assert.equal(result.before.identity.login, 'fly-user'); assert.equal(result.before.identity.role, 'schema_admin');
+    assert.equal(result.before.identity.pid, 1234); assert.equal(f.state.role, initialRole);
+  }
+});
+
+test('wrong initial login, role, version or PID is refused before BEGIN and exposes only bounded check booleans', async () => {
+  const invalid = [
+    ['login', 'unexpected-secret-login'], ['role', 'unexpected-secret-role'],
+    ['version', '160015'], ['version', 150015], ['version', 170000], ['version', null],
+    ['pid', 0], ['pid', -1], ['pid', 12.5], ['pid', '1234'], ['pid', null],
+  ];
+  for (const [field, value] of invalid) {
+    const f = await fixture({ identityPatch: { [field]: value } }); let journals = 0;
+    const result = await executeMigration(f.client, { plan: f.plan, expectedBefore: f.expectedBefore, persist: async () => { journals++; } });
+    assert.equal(result.status, 'failed'); assert.equal(result.errorCode, 'migration_identity');
+    assert.equal(result.stepsAcknowledged, 0); assert.equal(result.commitDispatched, false); assert.equal(journals, 0);
+    assert.equal(f.calls.length, 1); assert.equal(f.calls.some(sql => sql.startsWith('BEGIN')), false);
+    const expected = { database: true, login: true, role: true, version: true, pid: true }; expected[field] = false;
+    assert.deepEqual(result.initialIdentityChecks, expected);
+    assert.equal(JSON.stringify(result).includes('unexpected-secret'), false);
+  }
 });
 
 test('begin intent journal rejection prevents BEGIN; lost BEGIN response requests rollback', async () => {

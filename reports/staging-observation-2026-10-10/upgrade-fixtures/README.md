@@ -8,18 +8,19 @@ physical 95/142 catalogs are verified before use. Only steps `0003`–`0018` are
 passed to the new migration executor.
 
 Final tested core SHA256:
-`1d46ecb1e38127e458387a13548b6bcd8eafa20577ff903307243237c5972ba0`.
+`336ef191fe11b3cceb109f16fdfce0368f0de961e780966d37ea4bdfc3d391cc`.
 The harness verifies that this hash is unchanged between import and completion.
 
 ## Results
 
-- Twelve focused Vitest tests passed. They cover source/catalog drift, an
-  unregistered plan, wrong database identity, journal failures before dispatch,
+- Fourteen focused Vitest tests passed. They cover source/catalog drift, an
+  unregistered plan, both approved initial roles, wrong database/login/role/version/PID,
+  bounded identity-check booleans, journal failures before dispatch,
   a lost BEGIN response, a lost COMMIT acknowledgment, a failed or hanging
   commit-ack journal, bounded hanging-journal cleanup, third-role ACL refusal,
   rollback proof, and mandatory independent Reader recapture.
-- The final real-PostgreSQL run passed from `2026-10-10T17:28:37.497Z` to
-  `2026-10-10T17:28:54.183Z`. An entirely empty 95-table database was accepted in
+- The final real-PostgreSQL run passed from `2026-10-10T18:57:18.098Z` to
+  `2026-10-10T18:57:35.222Z`. An entirely empty 95-table database was accepted in
   a rollback rehearsal. Two synthetic tenants then populated all eight tables
   receiving legacy defaults, plus required parents: 24 retained rows in 12
   tables, with 83 other original tables empty.
@@ -30,8 +31,10 @@ The harness verifies that this hash is unchanged between import and completion.
 - Exact commit and a different Reader backend proved 95 original-table
   fingerprints preserved, 47 new tables empty, all 26 legacy defaults correct,
   284 table-privilege entries, and 3,734 column-privilege entries. Original table
-  ownership is `schema_admin`; the executor logs in as `fly-user` and changes
-  its effective role within the transaction. Reader/Writer privileges are modeled
+  ownership is `schema_admin`; the local login role `fly-user` is configured with
+  default role `schema_admin`, matching the observed Fly configuration. Every
+  migration case verifies that initial identity, and the executor still selects
+  `schema_admin` explicitly within the transaction. Reader/Writer privileges are modeled
   through `pg_read_all_data` and `pg_write_all_data` inheritance.
 - Every case uses a separate journal file with `fsync` before the injected
   persistence callback acknowledges each event. All 11 clients and sockets

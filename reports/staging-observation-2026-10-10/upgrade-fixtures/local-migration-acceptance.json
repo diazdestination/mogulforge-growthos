@@ -1,9 +1,9 @@
 {
   "kind": "LOCAL_POSTGRES16_NEW_MIGRATION_EXECUTOR_ACCEPTANCE",
-  "startedAt": "2026-10-10T17:28:37.497Z",
+  "startedAt": "2026-10-10T18:57:18.098Z",
   "status": "PASS",
   "sourceCommit": "7091af816715cfd437925eb0af82fb47d3411e34",
-  "coreSha256": "1d46ecb1e38127e458387a13548b6bcd8eafa20577ff903307243237c5972ba0",
+  "coreSha256": "336ef191fe11b3cceb109f16fdfce0368f0de961e780966d37ea4bdfc3d391cc",
   "manifestSha256": "bae0480809fbec16bc66e623c47c0a1fcc07b13d2821af2c689ee1d46559c066",
   "sqlFiles": [
     {
@@ -102,12 +102,17 @@
       "gitObjectBytes": 2335
     }
   ],
-  "runId": "ad8b9b05-a31c-4086-98c1-19678abd9381",
-  "containerName": "growthos-upgrade-local-18356-ad8b9b05",
+  "runId": "f8df3698-4942-4b6c-8fd1-88a2e01663e0",
+  "containerName": "growthos-upgrade-local-23016-f8df3698",
   "hostedAccess": false,
   "rawRowsRecorded": false,
   "cases": {
     "empty-original-tables": {
+      "initialIdentity": {
+        "login": "fly-user",
+        "role": "schema_admin",
+        "pid": 76
+      },
       "result": {
         "status": "rehearsed-rolled-back",
         "commitDispatched": false,
@@ -115,6 +120,13 @@
         "rollbackAcknowledged": true,
         "stepsAcknowledged": 16,
         "requiresFreshReader": false,
+        "initialIdentityChecks": {
+          "database": true,
+          "login": true,
+          "role": true,
+          "version": true,
+          "pid": true
+        },
         "proof": {
           "originalTables": 95,
           "newTablesEmpty": 47,
@@ -1476,9 +1488,14 @@
           "phase": "rollback-ack"
         }
       ],
-      "durableJournal": "journals/ad8b9b05-a31c-4086-98c1-19678abd9381/empty-original-tables.jsonl"
+      "durableJournal": "journals/f8df3698-4942-4b6c-8fd1-88a2e01663e0/empty-original-tables.jsonl"
     },
     "same-count-non-key-drift": {
+      "initialIdentity": {
+        "login": "fly-user",
+        "role": "schema_admin",
+        "pid": 79
+      },
       "result": {
         "status": "failed",
         "commitDispatched": false,
@@ -1486,6 +1503,13 @@
         "rollbackAcknowledged": true,
         "stepsAcknowledged": 0,
         "requiresFreshReader": false,
+        "initialIdentityChecks": {
+          "database": true,
+          "login": true,
+          "role": true,
+          "version": true,
+          "pid": true
+        },
         "errorCode": "migration_baseline_drift"
       },
       "journal": [
@@ -1501,9 +1525,14 @@
           "afterFailure": true
         }
       ],
-      "durableJournal": "journals/ad8b9b05-a31c-4086-98c1-19678abd9381/same-count-non-key-drift.jsonl"
+      "durableJournal": "journals/f8df3698-4942-4b6c-8fd1-88a2e01663e0/same-count-non-key-drift.jsonl"
     },
     "late-sql-error": {
+      "initialIdentity": {
+        "login": "fly-user",
+        "role": "schema_admin",
+        "pid": 81
+      },
       "result": {
         "status": "failed",
         "commitDispatched": false,
@@ -1511,6 +1540,13 @@
         "rollbackAcknowledged": true,
         "stepsAcknowledged": 15,
         "requiresFreshReader": false,
+        "initialIdentityChecks": {
+          "database": true,
+          "login": true,
+          "role": true,
+          "version": true,
+          "pid": true
+        },
         "errorCode": "migration_database_or_journal_failure"
       },
       "journal": [
@@ -1666,9 +1702,14 @@
           "afterFailure": true
         }
       ],
-      "durableJournal": "journals/ad8b9b05-a31c-4086-98c1-19678abd9381/late-sql-error.jsonl"
+      "durableJournal": "journals/f8df3698-4942-4b6c-8fd1-88a2e01663e0/late-sql-error.jsonl"
     },
     "exact-commit": {
+      "initialIdentity": {
+        "login": "fly-user",
+        "role": "schema_admin",
+        "pid": 83
+      },
       "result": {
         "status": "committed-awaiting-reader",
         "commitDispatched": true,
@@ -1676,6 +1717,13 @@
         "rollbackAcknowledged": false,
         "stepsAcknowledged": 16,
         "requiresFreshReader": true,
+        "initialIdentityChecks": {
+          "database": true,
+          "login": true,
+          "role": true,
+          "version": true,
+          "pid": true
+        },
         "proof": {
           "originalTables": 95,
           "newTablesEmpty": 47,
@@ -1846,7 +1894,7 @@
               "table": "contacts",
               "rows": 2,
               "bytes": 774,
-              "digest": "802d135fff7f598907b0ef0bd37a6d0f"
+              "digest": "9420a652fd4a1e67e92e682212687bc3"
             },
             {
               "table": "conversation_messages",
@@ -1864,7 +1912,7 @@
               "table": "crm_tasks",
               "rows": 2,
               "bytes": 780,
-              "digest": "db238e9258c702842be51692c8722eda"
+              "digest": "a2645c638c21c53e98cfddb6eb71d446"
             },
             {
               "table": "decision_rooms",
@@ -1906,7 +1954,7 @@
               "table": "estimates",
               "rows": 2,
               "bytes": 812,
-              "digest": "b2ea2440f0a5315f81791dfee831f42b"
+              "digest": "c0d8e4db98f0c0b6febb299ada0ec9fd"
             },
             {
               "table": "form_submissions",
@@ -1960,7 +2008,7 @@
               "table": "lead_imports",
               "rows": 2,
               "bytes": 550,
-              "digest": "2c92b1d3cc28d4dddcf457310936eb1c"
+              "digest": "eeb1fc12c6fe3d24eaeccfea992e32b6"
             },
             {
               "table": "lead_tags",
@@ -1971,8 +2019,8 @@
             {
               "table": "leads",
               "rows": 2,
-              "bytes": 1374,
-              "digest": "b8bac17ca1e6bd81cc0e54357a0bf11f"
+              "bytes": 1378,
+              "digest": "1466a73a9c3c0f5e220ac4ed4a3e8a8b"
             },
             {
               "table": "message_templates",
@@ -2019,8 +2067,8 @@
             {
               "table": "organizations",
               "rows": 2,
-              "bytes": 712,
-              "digest": "7ac72ca49afa2ab9c59b2f56caa3ffc4"
+              "bytes": 714,
+              "digest": "7724d645731d65fc58b51e8d0c6505db"
             },
             {
               "table": "playbook_decisions",
@@ -2068,7 +2116,7 @@
               "table": "projects",
               "rows": 2,
               "bytes": 832,
-              "digest": "7acc1802d53c2c9b918e2c0b3cc192dc"
+              "digest": "3e00869da432c6b6215a6b8744f0a8ee"
             },
             {
               "table": "properties",
@@ -2128,7 +2176,7 @@
               "table": "service_obligations",
               "rows": 2,
               "bytes": 1114,
-              "digest": "e7f09bc24dea060997c53f1c249527af"
+              "digest": "af514a75826b5f4d7a45fa0d6c094ecc"
             },
             {
               "table": "sessions",
@@ -2164,7 +2212,7 @@
               "table": "staff_push_deliveries",
               "rows": 2,
               "bytes": 780,
-              "digest": "286d3f131b9fb8d397e711714cdc4f9a"
+              "digest": "d1347e6c12e05f7e98ad62b9b497d8b8"
             },
             {
               "table": "staff_push_policies",
@@ -2175,8 +2223,8 @@
             {
               "table": "staff_push_subscriptions",
               "rows": 2,
-              "bytes": 666,
-              "digest": "36f0ed423e431de099abc0bd1d060119"
+              "bytes": 665,
+              "digest": "4245ee5790186bef9f2f49753cee266d"
             },
             {
               "table": "stored_objects",
@@ -2236,13 +2284,13 @@
               "table": "users",
               "rows": 2,
               "bytes": 788,
-              "digest": "5afc40afcecd2dfd3c4a2c3d7de11ddb"
+              "digest": "bdff5c243236cbe71c840892e440a361"
             },
             {
               "table": "value_entries",
               "rows": 2,
               "bytes": 766,
-              "digest": "195f36c7374fc03639cf74af9c1258c0"
+              "digest": "fce21b69bf3647dbb413c32abec55fab"
             },
             {
               "table": "webhook_deliveries",
@@ -2439,7 +2487,7 @@
               "table": "contacts",
               "rows": 2,
               "bytes": 774,
-              "digest": "802d135fff7f598907b0ef0bd37a6d0f"
+              "digest": "9420a652fd4a1e67e92e682212687bc3"
             },
             {
               "table": "conversation_messages",
@@ -2457,7 +2505,7 @@
               "table": "crm_tasks",
               "rows": 2,
               "bytes": 780,
-              "digest": "db238e9258c702842be51692c8722eda"
+              "digest": "a2645c638c21c53e98cfddb6eb71d446"
             },
             {
               "table": "decision_rooms",
@@ -2499,7 +2547,7 @@
               "table": "estimates",
               "rows": 2,
               "bytes": 812,
-              "digest": "b2ea2440f0a5315f81791dfee831f42b"
+              "digest": "c0d8e4db98f0c0b6febb299ada0ec9fd"
             },
             {
               "table": "form_submissions",
@@ -2553,7 +2601,7 @@
               "table": "lead_imports",
               "rows": 2,
               "bytes": 550,
-              "digest": "2c92b1d3cc28d4dddcf457310936eb1c"
+              "digest": "eeb1fc12c6fe3d24eaeccfea992e32b6"
             },
             {
               "table": "lead_tags",
@@ -2564,8 +2612,8 @@
             {
               "table": "leads",
               "rows": 2,
-              "bytes": 1374,
-              "digest": "b8bac17ca1e6bd81cc0e54357a0bf11f"
+              "bytes": 1378,
+              "digest": "1466a73a9c3c0f5e220ac4ed4a3e8a8b"
             },
             {
               "table": "message_templates",
@@ -2612,8 +2660,8 @@
             {
               "table": "organizations",
               "rows": 2,
-              "bytes": 712,
-              "digest": "7ac72ca49afa2ab9c59b2f56caa3ffc4"
+              "bytes": 714,
+              "digest": "7724d645731d65fc58b51e8d0c6505db"
             },
             {
               "table": "playbook_decisions",
@@ -2661,7 +2709,7 @@
               "table": "projects",
               "rows": 2,
               "bytes": 832,
-              "digest": "7acc1802d53c2c9b918e2c0b3cc192dc"
+              "digest": "3e00869da432c6b6215a6b8744f0a8ee"
             },
             {
               "table": "properties",
@@ -2721,7 +2769,7 @@
               "table": "service_obligations",
               "rows": 2,
               "bytes": 1114,
-              "digest": "e7f09bc24dea060997c53f1c249527af"
+              "digest": "af514a75826b5f4d7a45fa0d6c094ecc"
             },
             {
               "table": "sessions",
@@ -2757,7 +2805,7 @@
               "table": "staff_push_deliveries",
               "rows": 2,
               "bytes": 780,
-              "digest": "286d3f131b9fb8d397e711714cdc4f9a"
+              "digest": "d1347e6c12e05f7e98ad62b9b497d8b8"
             },
             {
               "table": "staff_push_policies",
@@ -2768,8 +2816,8 @@
             {
               "table": "staff_push_subscriptions",
               "rows": 2,
-              "bytes": 666,
-              "digest": "36f0ed423e431de099abc0bd1d060119"
+              "bytes": 665,
+              "digest": "4245ee5790186bef9f2f49753cee266d"
             },
             {
               "table": "stored_objects",
@@ -2829,13 +2877,13 @@
               "table": "users",
               "rows": 2,
               "bytes": 788,
-              "digest": "5afc40afcecd2dfd3c4a2c3d7de11ddb"
+              "digest": "bdff5c243236cbe71c840892e440a361"
             },
             {
               "table": "value_entries",
               "rows": 2,
               "bytes": 766,
-              "digest": "195f36c7374fc03639cf74af9c1258c0"
+              "digest": "fce21b69bf3647dbb413c32abec55fab"
             },
             {
               "table": "webhook_deliveries",
@@ -3037,7 +3085,7 @@
           "phase": "commit-ack"
         }
       ],
-      "durableJournal": "journals/ad8b9b05-a31c-4086-98c1-19678abd9381/exact-commit.jsonl"
+      "durableJournal": "journals/f8df3698-4942-4b6c-8fd1-88a2e01663e0/exact-commit.jsonl"
     }
   },
   "checks": {
@@ -3052,6 +3100,7 @@
     "exactCommitAcknowledged": true,
     "freshReaderVerified": true,
     "proofCoverage": true,
+    "ownerDefaultRoleModeled": true,
     "coreUnchanged": true
   },
   "cleanup": {
@@ -3061,7 +3110,7 @@
     "containerRemoved": true
   },
   "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
-  "containerId": "d2b5a1aa332e760047e84f70396b1b20066e6877eb771299fa9fd9b99c5ee280",
+  "containerId": "ff7a5676ccb05c4811a533becd1592837782bf5d24c1f7a0d1fa12b9532c8644",
   "loopbackBinding": {
     "host": "127.0.0.1",
     "port": 32768
@@ -3234,7 +3283,7 @@
         "table": "contacts",
         "rows": 2,
         "bytes": 774,
-        "digest": "802d135fff7f598907b0ef0bd37a6d0f"
+        "digest": "9420a652fd4a1e67e92e682212687bc3"
       },
       {
         "table": "conversation_messages",
@@ -3252,7 +3301,7 @@
         "table": "crm_tasks",
         "rows": 2,
         "bytes": 780,
-        "digest": "db238e9258c702842be51692c8722eda"
+        "digest": "a2645c638c21c53e98cfddb6eb71d446"
       },
       {
         "table": "decision_rooms",
@@ -3294,7 +3343,7 @@
         "table": "estimates",
         "rows": 2,
         "bytes": 812,
-        "digest": "b2ea2440f0a5315f81791dfee831f42b"
+        "digest": "c0d8e4db98f0c0b6febb299ada0ec9fd"
       },
       {
         "table": "form_submissions",
@@ -3348,7 +3397,7 @@
         "table": "lead_imports",
         "rows": 2,
         "bytes": 550,
-        "digest": "2c92b1d3cc28d4dddcf457310936eb1c"
+        "digest": "eeb1fc12c6fe3d24eaeccfea992e32b6"
       },
       {
         "table": "lead_tags",
@@ -3359,8 +3408,8 @@
       {
         "table": "leads",
         "rows": 2,
-        "bytes": 1374,
-        "digest": "b8bac17ca1e6bd81cc0e54357a0bf11f"
+        "bytes": 1378,
+        "digest": "1466a73a9c3c0f5e220ac4ed4a3e8a8b"
       },
       {
         "table": "message_templates",
@@ -3407,8 +3456,8 @@
       {
         "table": "organizations",
         "rows": 2,
-        "bytes": 712,
-        "digest": "7ac72ca49afa2ab9c59b2f56caa3ffc4"
+        "bytes": 714,
+        "digest": "7724d645731d65fc58b51e8d0c6505db"
       },
       {
         "table": "playbook_decisions",
@@ -3456,7 +3505,7 @@
         "table": "projects",
         "rows": 2,
         "bytes": 832,
-        "digest": "7acc1802d53c2c9b918e2c0b3cc192dc"
+        "digest": "3e00869da432c6b6215a6b8744f0a8ee"
       },
       {
         "table": "properties",
@@ -3516,7 +3565,7 @@
         "table": "service_obligations",
         "rows": 2,
         "bytes": 1114,
-        "digest": "e7f09bc24dea060997c53f1c249527af"
+        "digest": "af514a75826b5f4d7a45fa0d6c094ecc"
       },
       {
         "table": "sessions",
@@ -3552,7 +3601,7 @@
         "table": "staff_push_deliveries",
         "rows": 2,
         "bytes": 780,
-        "digest": "286d3f131b9fb8d397e711714cdc4f9a"
+        "digest": "d1347e6c12e05f7e98ad62b9b497d8b8"
       },
       {
         "table": "staff_push_policies",
@@ -3563,8 +3612,8 @@
       {
         "table": "staff_push_subscriptions",
         "rows": 2,
-        "bytes": 666,
-        "digest": "36f0ed423e431de099abc0bd1d060119"
+        "bytes": 665,
+        "digest": "4245ee5790186bef9f2f49753cee266d"
       },
       {
         "table": "stored_objects",
@@ -3624,13 +3673,13 @@
         "table": "users",
         "rows": 2,
         "bytes": 788,
-        "digest": "5afc40afcecd2dfd3c4a2c3d7de11ddb"
+        "digest": "bdff5c243236cbe71c840892e440a361"
       },
       {
         "table": "value_entries",
         "rows": 2,
         "bytes": 766,
-        "digest": "195f36c7374fc03639cf74af9c1258c0"
+        "digest": "fce21b69bf3647dbb413c32abec55fab"
       },
       {
         "table": "webhook_deliveries",
@@ -3827,7 +3876,7 @@
         "table": "contacts",
         "rows": 2,
         "bytes": 774,
-        "digest": "802d135fff7f598907b0ef0bd37a6d0f"
+        "digest": "9420a652fd4a1e67e92e682212687bc3"
       },
       {
         "table": "conversation_messages",
@@ -3845,7 +3894,7 @@
         "table": "crm_tasks",
         "rows": 2,
         "bytes": 780,
-        "digest": "db238e9258c702842be51692c8722eda"
+        "digest": "a2645c638c21c53e98cfddb6eb71d446"
       },
       {
         "table": "decision_rooms",
@@ -3887,7 +3936,7 @@
         "table": "estimates",
         "rows": 2,
         "bytes": 812,
-        "digest": "b2ea2440f0a5315f81791dfee831f42b"
+        "digest": "c0d8e4db98f0c0b6febb299ada0ec9fd"
       },
       {
         "table": "form_submissions",
@@ -3941,7 +3990,7 @@
         "table": "lead_imports",
         "rows": 2,
         "bytes": 550,
-        "digest": "2c92b1d3cc28d4dddcf457310936eb1c"
+        "digest": "eeb1fc12c6fe3d24eaeccfea992e32b6"
       },
       {
         "table": "lead_tags",
@@ -3952,8 +4001,8 @@
       {
         "table": "leads",
         "rows": 2,
-        "bytes": 1374,
-        "digest": "b8bac17ca1e6bd81cc0e54357a0bf11f"
+        "bytes": 1378,
+        "digest": "1466a73a9c3c0f5e220ac4ed4a3e8a8b"
       },
       {
         "table": "message_templates",
@@ -4000,8 +4049,8 @@
       {
         "table": "organizations",
         "rows": 2,
-        "bytes": 712,
-        "digest": "7ac72ca49afa2ab9c59b2f56caa3ffc4"
+        "bytes": 714,
+        "digest": "7724d645731d65fc58b51e8d0c6505db"
       },
       {
         "table": "playbook_decisions",
@@ -4049,7 +4098,7 @@
         "table": "projects",
         "rows": 2,
         "bytes": 832,
-        "digest": "7acc1802d53c2c9b918e2c0b3cc192dc"
+        "digest": "3e00869da432c6b6215a6b8744f0a8ee"
       },
       {
         "table": "properties",
@@ -4109,7 +4158,7 @@
         "table": "service_obligations",
         "rows": 2,
         "bytes": 1114,
-        "digest": "e7f09bc24dea060997c53f1c249527af"
+        "digest": "af514a75826b5f4d7a45fa0d6c094ecc"
       },
       {
         "table": "sessions",
@@ -4145,7 +4194,7 @@
         "table": "staff_push_deliveries",
         "rows": 2,
         "bytes": 780,
-        "digest": "286d3f131b9fb8d397e711714cdc4f9a"
+        "digest": "d1347e6c12e05f7e98ad62b9b497d8b8"
       },
       {
         "table": "staff_push_policies",
@@ -4156,8 +4205,8 @@
       {
         "table": "staff_push_subscriptions",
         "rows": 2,
-        "bytes": 666,
-        "digest": "36f0ed423e431de099abc0bd1d060119"
+        "bytes": 665,
+        "digest": "4245ee5790186bef9f2f49753cee266d"
       },
       {
         "table": "stored_objects",
@@ -4217,13 +4266,13 @@
         "table": "users",
         "rows": 2,
         "bytes": 788,
-        "digest": "5afc40afcecd2dfd3c4a2c3d7de11ddb"
+        "digest": "bdff5c243236cbe71c840892e440a361"
       },
       {
         "table": "value_entries",
         "rows": 2,
         "bytes": 766,
-        "digest": "195f36c7374fc03639cf74af9c1258c0"
+        "digest": "fce21b69bf3647dbb413c32abec55fab"
       },
       {
         "table": "webhook_deliveries",
@@ -4264,6 +4313,6 @@
     "privilegeTableEntries": 284,
     "freshReaderVerified": true
   },
-  "coreFinishedSha256": "1d46ecb1e38127e458387a13548b6bcd8eafa20577ff903307243237c5972ba0",
-  "finishedAt": "2026-10-10T17:28:54.183Z"
+  "coreFinishedSha256": "336ef191fe11b3cceb109f16fdfce0368f0de961e780966d37ea4bdfc3d391cc",
+  "finishedAt": "2026-10-10T18:57:35.222Z"
 }
