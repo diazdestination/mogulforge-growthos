@@ -16,7 +16,11 @@ credentials and holds outbound effects. Stop the action's terminal to close it.
 Test requires a running local Docker Engine. It creates its own PostgreSQL 16
 container with a random loopback port, checks ownership before schema setup and
 cleanup, applies the schema only there, and runs the recursive suites and website
-adapter checks. No existing `DATABASE_URL` or Docker host/context is inherited.
+adapter checks. API files use at most two test workers, matching the two-CPU
+database; explicit independent-client race tests still run inside those files.
+Tests use CI's fixture configuration, with provider credentials excluded;
+preview/parity safety holds are kept separate from mocked dispatch tests.
+No existing `DATABASE_URL` or Docker host/context is inherited.
 Each test database is disposable; it is removed on normal completion or failure.
 A forcibly terminated process may leave its uniquely named `forge-growthos-test-*`
 container; inspect its `com.forge.local-test` label before removing only that

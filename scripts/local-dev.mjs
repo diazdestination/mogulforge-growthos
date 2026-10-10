@@ -10,6 +10,13 @@ export function localEnvironment(source = process.env) {
     /^(PATH|SystemRoot|WINDIR|TEMP|TMP|PATHEXT|COMSPEC|USERPROFILE|APPDATA|LOCALAPPDATA|HOME|LANG|TERM)$/i.test(key)));
   return Object.assign(env, { CI: 'true', NODE_ENV: 'test', GROWTHOS_ENVIRONMENT: 'test', GROWTHOS_OUTBOUND_HOLD: 'true', SCHEDULER_AUTOSTART: 'false', AUTO_MIGRATE: 'false', DO_NOT_TRACK: '1' });
 }
+export function databaseTestEnvironment(source = process.env) {
+  const env = localEnvironment(source);
+  // Match CI's isolated test fixtures. Preview/parity holds must not suppress
+  // the mocked dispatches that the regression tests intentionally exercise.
+  for (const key of ['GROWTHOS_ENVIRONMENT', 'GROWTHOS_OUTBOUND_HOLD', 'SCHEDULER_AUTOSTART', 'AUTO_MIGRATE']) delete env[key];
+  return env;
+}
 export function assertOwnedContainer(inspection, runId) {
   if (inspection?.Config?.Labels?.['com.forge.local-test'] !== runId) {
     throw new Error('Refusing to modify a container not owned by this test run.');
@@ -102,7 +109,7 @@ async function databaseTests() {
     }
     if (!ready) throw new Error('Disposable PostgreSQL did not become ready. No schema command ran.');
     const port = parseLoopbackPort(await command('docker', ['port', name, '5432/tcp'], { capture: true }));
-    const env = Object.assign(localEnvironment(), {
+    const env = Object.assign(databaseTestEnvironment(), {
       DATABASE_URL: `postgresql://postgres:forge-local-test-only@127.0.0.1:${port}/mogulforge_test`,
       SESSION_SECRET: 'ci-only-session-secret-that-is-long-enough-for-validation',
       EMAIL_INGESTION_WEBHOOK_SECRET: 'ci-only-email-intake-signing-secret',
@@ -111,7 +118,11 @@ async function databaseTests() {
     });
     // The schema target is constructed only from this run's owned container.
     await command('pnpm', ['--filter', '@workspace/db', 'run', 'push-force'], { env });
-    await command('pnpm', ['-r', '--if-present', 'run', 'test'], { env });
+    await command('pnpm', ['-r', '--filter', '!@workspace/api-server', '--if-present', 'run', 'test'], { env });
+    // Match the disposable database's two CPUs and avoid unrelated fixture
+    // files competing for its resources. Race tests still open their own
+    // independent PostgreSQL clients inside each file.
+    await command('pnpm', ['--filter', '@workspace/api-server', 'run', 'test', '--maxWorkers=2'], { env });
     await command(process.execPath, ['--test', 'examples/website-connection/adapter.test.mjs', 'examples/website-connection/operations.test.mjs'], { env });
   } finally {
     if (created) {
