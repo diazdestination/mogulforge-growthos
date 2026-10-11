@@ -120,6 +120,24 @@ omissions remain provisional. They are not achieved claims until qualified
 contractors label a representative, deidentified beta set and the Proof Lab
 measures it.
 
+The contractor eval harness that will measure them is in
+`artifacts/api-server/evals/contractor/` and `artifacts/api-server/src/lib/evals/`.
+It covers roofing and HVAC evidence cases, two cases from owner-supplied
+invoices that were redacted on 2026-10-11, CRM-assistant cases, an LLM judge
+and an offline lexical judge, judge calibration (agreement and Cohen's kappa),
+contractor label export/import, and an opt-in live runner with offline replay.
+
+**Current truth (2026-10-11): 0 contractor-verified cases, so contractor
+agreement is not measured.** The gate reports `not-measurable` until all of
+these hold:
+
+- at least 20 cases are contractor-verified;
+- the judge agrees with contractor-verified calibration verdicts at least 90%
+  of the time.
+
+Research-draft results are reported separately and are not a contractor
+benchmark.
+
 ## Local operation
 
 Keep the OpenAI key only in an ignored `.env.local` or an environment secret.
