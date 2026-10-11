@@ -24,11 +24,12 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useGetMe, UserRole } from '@workspace/api-client-react';
-import { canManageSettings, canWrite } from '@/lib/permissions';
+import { canManageSettings, canReadInvoices, canWrite } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import { RevenueWorkspace } from '@/components/revenue-workspace';
 import { CustomerReplies } from '@/components/customer-replies';
 import { BieEmailReviewSummary, preparedBieEmail } from '@/components/bie-email-review';
+import { SpecialistBadge, type SpecialistKey } from '@/components/specialist-badge';
 
 type SourceStatus = 'not_connected' | 'pending' | 'connected' | 'error';
 type ActionType = 'create_task' | 'change_stage' | 'send_email';
@@ -92,7 +93,18 @@ interface Proposal {
   estimatedValueCents: number | null;
   executionDetail: string | null;
   createdAt: string;
+  /** Server-derived from the proposing run; specialists can only propose. */
+  specialist?: SpecialistKey | null;
 }
+
+
+interface SpecialistRun {
+  specialist: string;
+  runId: string;
+  proposals: Proposal[];
+  skippedCount: number;
+}
+
 
 type EmailSourceStatus = 'pending' | 'active' | 'paused' | 'error';
 type EmailFactStatus = 'needs_review' | 'verified' | 'rejected';
@@ -340,6 +352,14 @@ export default function Bie() {
     },
     onError: (err) => setError(err instanceof Error ? err.message : 'BIE could not build the action queue.'),
   });
+  const specialistMutation = useMutation({
+    mutationFn: (key: 'scout' | 'invo') => request<SpecialistRun>(`/bie/specialists/${key}/run`, { method: 'POST', body: JSON.stringify({}) }),
+    onSuccess: async (run) => {
+      await refresh();
+      setNotice(`${run.specialist} proposed ${run.proposals.length} action${run.proposals.length === 1 ? '' : 's'} for review. Nothing was sent or changed.`);
+    },
+    onError: (err) => setError(err instanceof Error ? err.message : 'The specialist could not check your records.'),
+  });
   const actionMutation = useMutation({
     mutationFn: ({ id, path, expectedPayload }: { id: string; path: 'approve' | 'reject' | 'execute' | 'prepare-email'; expectedPayload?: Record<string, unknown> }) => request<Proposal>(`/bie/actions/${id}/${path}`, { method: 'POST', body: JSON.stringify(['approve', 'prepare-email'].includes(path) ? { expectedPayload } : {}) }),
     onSuccess: async () => {
@@ -422,7 +442,7 @@ export default function Bie() {
 
   const briefing = briefingQuery.data;
   const proposed = useMemo(() => (actionsQuery.data ?? []).filter((action) => action.status === 'proposed'), [actionsQuery.data]);
-  const busy = briefingMutation.isPending || proposalsMutation.isPending || actionMutation.isPending || policyMutation.isPending || emailSetupMutation.isPending || emailTestMutation.isPending || emailFactMutation.isPending || emailPurgeMutation.isPending || emailDeleteMutation.isPending || emailSourceMutation.isPending;
+  const busy = briefingMutation.isPending || proposalsMutation.isPending || specialistMutation.isPending || actionMutation.isPending || policyMutation.isPending || emailSetupMutation.isPending || emailTestMutation.isPending || emailFactMutation.isPending || emailPurgeMutation.isPending || emailDeleteMutation.isPending || emailSourceMutation.isPending;
   const emailStatus = emailStatusQuery.data;
   const emailSource = emailStatus?.source;
 
@@ -458,6 +478,12 @@ export default function Bie() {
             <button onClick={() => { setError(null); setNotice(null); proposalsMutation.mutate(); }} disabled={busy || briefing.opportunityCount === 0} className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60">
               <Bot className="h-4 w-4" /> Build action queue
             </button>
+            {canAct && <button onClick={() => { setError(null); setNotice(null); specialistMutation.mutate('scout'); }} disabled={busy} title="SCOUT proposes follow-ups for review. Nothing is sent." className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-muted disabled:opacity-60">
+              <Bot className="h-4 w-4" /> Find follow-ups (SCOUT)
+            </button>}
+            {canAct && canReadInvoices(profile?.role as UserRole | undefined) && <button onClick={() => { setError(null); setNotice(null); specialistMutation.mutate('invo'); }} disabled={busy} title="INVO proposes invoice review tasks. It never edits or sends an invoice." className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-semibold hover:bg-muted disabled:opacity-60">
+              <Bot className="h-4 w-4" /> Check invoices (INVO)
+            </button>}
           </div>
         </div>
       </section>
@@ -623,7 +649,7 @@ export default function Bie() {
           {!actionsQuery.isLoading && !(actionsQuery.data?.length) && <div className="p-5 text-sm text-muted-foreground">No queued actions yet. Run a recovery briefing, then build a review queue.</div>}
           {(actionsQuery.data ?? []).map((proposal) => (
             <div key={proposal.id} className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="max-w-3xl"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{proposal.title}</p><StatusPill status={proposal.status} /><span className="text-xs text-muted-foreground">{actionNames[proposal.actionType]}</span></div><p className="mt-1 text-sm text-muted-foreground">{proposal.rationale}</p>{proposal.estimatedValueCents != null && <p className="mt-1 text-xs font-medium text-muted-foreground">Known lead value: {dollars(proposal.estimatedValueCents)}</p>}</div>
+              <div className="max-w-3xl"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{proposal.title}</p><SpecialistBadge specialist={proposal.specialist} /><StatusPill status={proposal.status} /><span className="text-xs text-muted-foreground">{actionNames[proposal.actionType]}</span></div><p className="mt-1 text-sm text-muted-foreground">{proposal.rationale}</p>{proposal.estimatedValueCents != null && <p className="mt-1 text-xs font-medium text-muted-foreground">Known lead value: {dollars(proposal.estimatedValueCents)}</p>}</div>
               {proposal.actionType === 'send_email' && <BieEmailReviewSummary payload={proposal.payload} status={proposal.status} showContent />}
               {staleActions.includes(proposal.id) && <div className="space-y-2 text-sm"><p role="alert">The saved action changed. Refresh and review the current sender, recipient and message before another decision.</p><button disabled={busy || actionsQuery.isFetching} className="min-h-10 rounded-md border border-border px-3" onClick={async () => { const result = await actionsQuery.refetch(); if (!result.isError) setStaleActions(ids => ids.filter(id => id !== proposal.id)); }}>Refresh saved action for review</button></div>}
               <ActionButtons proposal={proposal} busy={busy || !canAct || staleActions.includes(proposal.id)} onPrepare={(id) => { setError(null); setNotice(null); actionMutation.mutate({ id, path: 'prepare-email', expectedPayload: proposal.payload }); }} onReview={(id, decision) => { setError(null); setNotice(null); actionMutation.mutate({ id, path: decision, expectedPayload: proposal.payload }); }} onExecute={(id) => { setError(null); setNotice(null); actionMutation.mutate({ id, path: 'execute' }); }} />

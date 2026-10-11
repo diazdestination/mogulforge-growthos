@@ -5,7 +5,11 @@ export interface AgentProfile {
   category: 'finance' | 'operations'; workspace: string; workspaceLabel: string;
   tasks: readonly AgentTask[];
 }
-/** Illustrated specialists identify workspaces; they do not imply autonomous execution. */
+/**
+ * Illustrated specialists identify workspaces; they do not imply autonomous execution.
+ * SCOUT and INVO are additionally backed by proposal-only server runs: they can
+ * add reviewable proposals to Revenue Desk, never approve or execute them.
+ */
 export const AGENT_TEAM: readonly AgentProfile[] = [
   {
     "id": "esti",
@@ -97,9 +101,9 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
         "reality": "The delivery worklist exposes pending and uncertain attempts. Sending requires an approved mailbox, recipient and company delivery setup; uncertain sends are not retried automatically."
       },
       {
-        "title": "Exceptions & audit history",
+        "title": "Invoice exception proposals",
         "stage": "workspace",
-        "reality": "Inspect saved document changes, recorded financial events and delivery exceptions before resolving them."
+        "reality": "From Revenue Desk, INVO checks for multi-repair invoices awaiting office review, missing warranty dates, overdue due-on-receipt balances and estimate wording, then proposes staff tasks. Each proposal waits for approval; INVO never edits or sends an invoice."
       }
     ]
   },
@@ -252,9 +256,9 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
         "reality": "Use reviewed imports, segments and source records to organize opportunities already in the business."
       },
       {
-        "title": "Recorded activity & insights",
+        "title": "Follow-up proposals",
         "stage": "workspace",
-        "reality": "Inspect pipeline and activity reports. Recommendations support a staff decision; they do not prove additional revenue by themselves."
+        "reality": "SCOUT finds unanswered estimates (three reminders 24 hours apart, then a staff call) and quiet leads, and proposes the next step. Every proposal waits for staff approval in Revenue Desk; nothing is sent automatically."
       },
       {
         "title": "Consented outreach",

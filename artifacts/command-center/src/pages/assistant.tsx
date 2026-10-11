@@ -3,6 +3,7 @@ import { Bot, Sparkles, Send, Plus, Loader2, ArrowRight, Activity, AlertCircle, 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
+import { AssistantProposalMarkers, isAssistantProposalMarker, type AssistantProposalMarker } from '@/components/assistant-proposal-marker';
 
 const TOOL_LABELS: Record<string, string> = {
   get_pipeline_snapshot: "Checking pipeline metrics...",
@@ -30,6 +31,8 @@ type Message = {
   content: string;
   error?: boolean;
   toolsRun?: string[];
+  /** Actions the assistant proposed this turn; they await approval in Revenue Desk. */
+  proposals?: AssistantProposalMarker[];
 };
 
 async function fetchHistory(): Promise<Message[]> {
@@ -189,6 +192,15 @@ export default function Assistant() {
                     next[next.length - 1] = { ...last, toolsRun: [...(last.toolsRun || []), data.tool] };
                     return next;
                  });
+              } else if (isAssistantProposalMarker(data.proposal)) {
+                 const marker = data.proposal;
+                 setMessages(prev => {
+                    const next = [...prev];
+                    if (next.length === 0 || next[next.length - 1].role !== 'assistant') return prev;
+                    const last = next[next.length - 1];
+                    next[next.length - 1] = { ...last, proposals: [...(last.proposals || []), marker] };
+                    return next;
+                 });
               } else if (data.content !== undefined) {
                  setCurrentTool(null);
                  setMessages(prev => {
@@ -315,6 +327,7 @@ export default function Assistant() {
                                   Analyzed {msg.toolsRun.length} {msg.toolsRun.length === 1 ? 'data source' : 'data sources'}
                                 </div>
                              )}
+                             <AssistantProposalMarkers proposals={msg.proposals} />
                              
                              <div className={cn(
                                "prose prose-sm md:prose-base dark:prose-invert max-w-none",

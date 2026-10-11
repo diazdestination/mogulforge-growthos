@@ -6,6 +6,25 @@ import './agent-team.css';
 
 type Focus = 'all' | 'finance' | 'operations';
 
+/** Specialists backed by proposal-only runs; their proposals wait for staff approval in Revenue Desk. */
+const PROPOSAL_SPECIALISTS = ['scout', 'invo'] as const;
+type PendingCounts = Partial<Record<(typeof PROPOSAL_SPECIALISTS)[number], number>>;
+
+async function loadPendingCounts(): Promise<PendingCounts> {
+  const counts: PendingCounts = {};
+  await Promise.all(PROPOSAL_SPECIALISTS.map(async key => {
+    try {
+      const response = await fetch(`/api/v1/bie/specialists/${key}/proposals`, { credentials: 'include' });
+      if (!response.ok) return;
+      const rows = (await response.json()) as Array<{ status?: string }>;
+      if (Array.isArray(rows)) counts[key] = rows.filter(row => row.status === 'proposed').length;
+    } catch {
+      // Counts are a convenience; the guide still works without them.
+    }
+  }));
+  return counts;
+}
+
 const FILTERS: readonly { id: Focus; label: string }[] = [
   { id: 'all', label: 'All specialists' },
   { id: 'finance', label: 'Sales & finance' },
@@ -16,6 +35,14 @@ export default function AgentTeam({ publicMode = false }: { publicMode?: boolean
   const search = useSearch();
   const [focus, setFocus] = useState<Focus>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingCounts>({});
+  useEffect(() => {
+    if (publicMode) return;
+    let live = true;
+    void loadPendingCounts().then(counts => { if (live) setPending(counts); });
+    return () => { live = false; };
+  }, [publicMode]);
+  const pendingFor = (id: string) => (pending as Record<string, number | undefined>)[id];
   const visible = AGENT_TEAM.filter(agent =>
     focus === 'all' || agent.category === focus,
   );
@@ -90,6 +117,9 @@ export default function AgentTeam({ publicMode = false }: { publicMode?: boolean
                 <span className="agent-team__card-name">{agent.name}</span>
                 <span className="agent-team__card-role">{agent.role}</span>
                 <span className="agent-team__card-promise">{agent.promise}</span>
+                {pendingFor(agent.id) !== undefined && (
+                  <span className="agent-team__pending">{pendingFor(agent.id)} awaiting approval</span>
+                )}
                 <span className="agent-team__specialties">
                   <strong>Workspace focus</strong>
                   {agent.tasks.filter(task => task.stage === 'workspace').slice(0, 2).map(task => <span key={task.title}>{task.title}</span>)}
@@ -119,6 +149,12 @@ export default function AgentTeam({ publicMode = false }: { publicMode?: boolean
                 <span className="agent-team__not-live">Not available as an automated agent yet</span>
               )}
             </div>
+            {pendingFor(selected.id) !== undefined && (
+              <p className="agent-team__pending-detail">
+                {selected.name} has {pendingFor(selected.id)} proposal{pendingFor(selected.id) === 1 ? '' : 's'} awaiting staff approval. Specialists only propose; nothing runs until your team approves it.{' '}
+                <Link href="/bie">Review in Revenue Desk</Link>
+              </p>
+            )}
             <div className="agent-team__task-grid">
               {selected.tasks.map(task => (
                 <div key={task.title} className="agent-team__task">
