@@ -1,0 +1,3 @@
+{"phase":"begin-intent"}
+{"phase":"begin-ack","pid":122}
+{"phase":"rollback-ack","afterFailure":true}
