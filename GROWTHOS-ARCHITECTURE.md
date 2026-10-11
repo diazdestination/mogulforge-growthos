@@ -116,6 +116,21 @@ credential, spend, or live target action is implied by this repository.
 The exact no-memory implementation and verification handoff is maintained in
 [GROWTHOS-RESUME.md](GROWTHOS-RESUME.md).
 
+## Approval-gated specialists
+
+SCOUT (follow-up), INVO (invoice exceptions) and the CRM assistant are
+proposers over the existing BIE queue, not executors. Each run is a
+`bie_agent_runs` row of kind `specialist_scout`, `specialist_invo` or
+`assistant_proposal`; it may only insert `proposed` rows in
+`bie_action_proposals` through `services/specialists/contract.ts`, with a
+deterministic subject key and the triggering facts as evidence. Approval with
+the exact saved payload and the durable, non-replayable execution path in
+`services/bie.ts` are unchanged. SCOUT and INVO call no model. Assistant tools
+declare `effect: "read" | "propose"`; the tool loop refuses anything else and
+offers propose tools only to an interactive `crm.write` session. No schema
+change was needed. Details and open gates:
+[reports/approval-gated-specialists-2026-10-11.md](reports/approval-gated-specialists-2026-10-11.md).
+
 ## Non-negotiable safety rules
 
 - No raw tenant artifact is used by AI without explicit authorization.
