@@ -7,6 +7,7 @@
  * SSE stream events for chat:
  *   data: {"tool":"get_pipeline_snapshot"}   (progress: data being looked up)
  *   data: {"content":"..."}                  (answer text delta)
+ *   data: {"proposal":{...}}                 (action PROPOSED; awaits approval in Revenue Desk)
  *   data: {"done":true}                      (turn complete)
  *   data: {"error":"..."}                    (fatal error for this turn)
  */
@@ -24,6 +25,7 @@ import { db, assistantHistoryTable } from "@workspace/db";
 import { logger } from "../../lib/logger";
 import { rateLimit } from "../../lib/rateLimit";
 import { requireMember } from "../../middlewares/requireMember";
+import { hasPermission } from "../../lib/permissions";
 import {
   runAssistantChat,
   type AssistantChatMessage,
@@ -122,6 +124,13 @@ router.post(
         messages: parsed.data.messages as AssistantChatMessage[],
         onDelta: (content) => send({ content }),
         onToolCall: (tool) => send({ tool }),
+        // Only an interactive staff session with crm.write may queue proposals; API keys stay read-only.
+        userId: req.member!.user.id,
+        canPropose: !req.get("x-api-key") && req.isAuthenticated() && hasPermission(req.member!.role, "crm.write"),
+        onProposal: (proposal) => send({ proposal: {
+          id: proposal.proposalId, actionType: proposal.actionType, title: proposal.title, leadId: proposal.leadId,
+          status: "proposed", duplicate: proposal.duplicate === true, reviewPath: "/bie",
+        } }),
       });
       send({ done: true });
     } catch (err) {

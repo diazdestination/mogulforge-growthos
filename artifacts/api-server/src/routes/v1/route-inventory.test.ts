@@ -318,6 +318,9 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /bie/sources": "crm.read",
   "GET /bie/actions": "crm.read",
   "POST /bie/actions/generate": "crm.write",
+  // Specialists only append proposed rows; INVO additionally checks invoices.read.
+  "POST /bie/specialists/:key/run": "crm.write",
+  "GET /bie/specialists/:key/proposals": "crm.read",
   "POST /bie/actions/:id/prepare-email": "crm.write",
   "POST /bie/actions/:id/approve": "crm.write",
   "POST /bie/actions/:id/reject": "crm.write",

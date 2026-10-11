@@ -43,6 +43,7 @@ import { hasCustomerReplyHold } from "./response-correlation";
 import { z } from "zod/v4";
 import { EmailDispatchBlockedError } from "./email-dispatch-guard";
 import { mailboxDigest } from "./mailbox-contract";
+import { specialistForRunKind } from "./specialists/contract";
 import { getMicrosoftMailboxIdentity, getLeadMonitoringApproval, assertLeadMonitoringApproval } from "./mailbox-connector";
 import { reserveLeadMailboxParent, recordMailboxParentAcceptance, leadReplySendSnapshotSchema, type LeadReplySendSnapshot } from "./mailbox-communication";
 
@@ -693,13 +694,24 @@ async function generateBieProposalsOwned(
   }
 }
 
+/** Queue rows plus the proposing specialist, derived from the server-owned run kind. */
 export async function listBieProposals(organizationId: string) {
-  return db
-    .select()
+  const rows = await db
+    .select({ proposal: bieActionProposalsTable, runKind: bieAgentRunsTable.kind })
     .from(bieActionProposalsTable)
+    .leftJoin(bieAgentRunsTable, and(eq(bieActionProposalsTable.runId, bieAgentRunsTable.id), eq(bieAgentRunsTable.organizationId, organizationId)))
     .where(eq(bieActionProposalsTable.organizationId, organizationId))
     .orderBy(desc(bieActionProposalsTable.createdAt))
     .limit(200);
+  return rows.map(({ proposal, runKind }) => ({ ...proposal, specialist: specialistForRunKind(runKind) }));
+}
+
+/** INVO's internal invoice tasks are expected on won/completed work; outreach gates do not apply to them. */
+async function isInvoiceReviewTask(organizationId: string, proposal: BieActionProposal) {
+  if (proposal.actionType !== "create_task" || !proposal.runId) return false;
+  const [run] = await db.select({ kind: bieAgentRunsTable.kind }).from(bieAgentRunsTable)
+    .where(and(eq(bieAgentRunsTable.id, proposal.runId), eq(bieAgentRunsTable.organizationId, organizationId)));
+  return run?.kind === "specialist_invo";
 }
 
 async function getProposal(organizationId: string, actionId: string) {
@@ -1039,7 +1051,8 @@ async function executeBieProposalEffect(
     );
   }
   const lead = await crm.getLead(organizationId, proposal.leadId);
-  if (lead && await hasCustomerReplyHold(organizationId, lead.id))
+  const invoiceTask = await isInvoiceReviewTask(organizationId, proposal);
+  if (lead && !invoiceTask && await hasCustomerReplyHold(organizationId, lead.id))
     return markAction(proposal.id, "blocked", "Customer replied; resolve the reply review before new follow-up.");
   if (!lead)
     return markAction(
@@ -1048,6 +1061,7 @@ async function executeBieProposalEffect(
       "Lead no longer exists in this organization.",
     );
   if (
+    !invoiceTask &&
     [
       "won",
       "lost",
@@ -1094,7 +1108,7 @@ async function executeBieProposalEffect(
       ),
     )
     .limit(1);
-  if (reply || appointment)
+  if (!invoiceTask && (reply || appointment))
     return markAction(
       proposal.id,
       "blocked",

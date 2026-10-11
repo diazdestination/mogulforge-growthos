@@ -21,6 +21,13 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod/v4";
 import { assertCapabilityForActor, CapabilityAccessError } from "../../services/entitlements";
 import { contractorMutation } from "../../middlewares/contractor-mutation";
+import {
+  RUNNABLE_SPECIALISTS,
+  SPECIALIST_KEYS,
+  SpecialistAccessError,
+  listSpecialistProposals,
+  runSpecialist,
+} from "../../services/specialists";
 
 const router: IRouter = Router();
 
@@ -109,6 +116,37 @@ router.post(
           req.member!.user.id,
         ),
       );
+  },
+);
+
+/**
+ * Approval-gated specialists. Running SCOUT/INVO only appends `proposed` queue
+ * rows; approval and execution stay on the routes below.
+ */
+const runnableSpecialist = z.enum(RUNNABLE_SPECIALISTS);
+router.post(
+  "/bie/specialists/:key/run",
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    const key = runnableSpecialist.safeParse(req.params.key);
+    const body = z.object({ warrantyDatesRequired: z.boolean().optional() }).strict().safeParse(req.body ?? {});
+    if (!key.success || !body.success) { res.status(400).json({ error: "Choose SCOUT or INVO with valid options." }); return; }
+    try {
+      res.status(201).json(await runSpecialist(req.member!.organizationId, key.data, req.member!.user.id, body.data));
+    } catch (error) {
+      if (!(error instanceof SpecialistAccessError)) throw error;
+      res.status(error.status).json({ error: error.message, code: "specialist_access_denied" });
+    }
+  },
+);
+
+router.get(
+  "/bie/specialists/:key/proposals",
+  requireMember("crm.read"),
+  async (req: Request, res: Response): Promise<void> => {
+    const key = z.enum(SPECIALIST_KEYS).safeParse(req.params.key);
+    if (!key.success) { res.status(400).json({ error: "Unknown specialist." }); return; }
+    res.json(await listSpecialistProposals(req.member!.organizationId, key.data));
   },
 );
 

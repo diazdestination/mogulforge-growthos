@@ -175,6 +175,27 @@ describe("POST /v1/assistant/chat — SSE stream", () => {
     }
   });
 
+  it("passes the writer's propose capability and streams a proposal marker (never an executed action)", async () => {
+    runAssistantChatMock.mockImplementationOnce(async (params) => {
+      const p = params as typeof params & { userId?: string; canPropose?: boolean; onProposal?: (x: unknown) => void };
+      expect(p.canPropose).toBe(true); // sales_rep has crm.write on an interactive session
+      expect(typeof p.userId).toBe("string");
+      p.onProposal?.({ ok: true, proposalId: "11111111-1111-4111-8111-111111111111", actionType: "create_task", title: "Follow-up task: Call", leadId: "22222222-2222-4222-8222-222222222222", status: "proposed", message: "awaiting" });
+      params.onDelta("Proposed for approval.");
+      return "Proposed for approval.";
+    });
+    const prev = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "test-key";
+    try {
+      const lines = parseSseLines(await (await postChat(VALID_BODY)).text());
+      expect(lines.find((e) => "proposal" in e)).toEqual({ proposal: expect.objectContaining({
+        id: "11111111-1111-4111-8111-111111111111", status: "proposed", reviewPath: "/bie", actionType: "create_task" }) });
+    } finally {
+      if (prev !== undefined) process.env.OPENAI_API_KEY = prev;
+      else delete process.env.OPENAI_API_KEY;
+    }
+  });
+
   it("rejects malformed bodies with 400", async () => {
     const prev = process.env.OPENAI_API_KEY;
     process.env.OPENAI_API_KEY = "test-key";

@@ -1,0 +1,243 @@
+/**
+ * INVO — deterministic invoice-exception specialist (proposal-only).
+ *
+ * Rules are grounded in two real, redacted contractor invoices supplied by the
+ * owner (no customer data is stored in code or tests):
+ *  - HVAC: "Upon receipt" terms, two flat-rate repair lines whose descriptions
+ *    list components without per-part prices, no warranty-validity dates even
+ *    though the owner requires them; multi-repair invoices need office review
+ *    before sending.
+ *  - Roofing: "Due on receipt", one lump-sum line, $0 paid, full balance open,
+ *    and estimate wording ("This shingle estimate includes …") carried into
+ *    the invoice.
+ *
+ * INVO reads balances only through the canonical invoice service (getInvoice),
+ * so it never re-derives money. It proposes staff tasks only. A reminder email
+ * is NOT proposed: BIE's send_email path is lead-outreach-shaped (it blocks
+ * won/completed leads and uses outreach consent), so it cannot correctly and
+ * safely target an invoice customer. See reports/approval-gated-specialists-2026-10-11.md.
+ */
+import {
+  db,
+  invoiceDeliveryAttemptsTable,
+  invoicesTable,
+  leadsTable,
+  propertyAssetsTable,
+  serviceObligationsTable,
+  usersTable,
+  type BieActionProposal,
+  type InvoiceDocument,
+  type InvoiceState,
+} from "@workspace/db";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+
+import { hasPermission } from "../../lib/permissions";
+import { getInvoice } from "../invoices";
+import {
+  OPEN_PROPOSAL_STATUSES,
+  insertSpecialistProposals,
+  specialistSubjectKeys,
+  withSpecialistRun,
+  type SpecialistProposalDraft,
+} from "./contract";
+
+export const INVO_POLICY = {
+  /** "Due on receipt" means due at issue; a staff call is proposed this many days later. */
+  overdueAfterDays: 7,
+  /** Two or more lines (e.g. two "Standard Repair" lines) need office review before sending. */
+  officeReviewMinLines: 2,
+  maxInvoicesPerRun: 200,
+} as const;
+
+const DAY = 86_400_000;
+const ESTIMATE_WORDING = /\bestimates?\b/i;
+const WARRANTY_WORDING = /\bwarrant(y|ies|ed)\b/i;
+const DATE_TEXT = /\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}\/\d{2,4}\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}\b/i;
+
+export interface InvoFact {
+  invoiceId: string;
+  invoiceNumber: string | null;
+  leadId: string | null;
+  status: InvoiceState;
+  version: number;
+  document: Pick<InvoiceDocument, "title" | "notes" | "dueDate" | "lineItems" | "totalCents">;
+  issuedAt: Date | null;
+  /** From the canonical invoice service; null when draft or reconciliation is required. */
+  balanceDueCents: number | null;
+  paymentState: string;
+  deliveryAttemptCount: number;
+  warrantyReference: { warrantyObligations: Array<{ equipmentLabel: string; coverageStartsOn: string | null; coverageEndsOn: string | null }>; activeAssetCount: number };
+}
+
+export interface InvoOptions {
+  /** Staff/owner choice for this run: invoices must show warranty-validity dates (HVAC intake). */
+  warrantyDatesRequired: boolean;
+}
+
+export type InvoDecision =
+  | { kind: "draft"; draft: SpecialistProposalDraft }
+  | { kind: "skip"; subject: string; reason: string };
+
+type History = Map<string, Pick<BieActionProposal, "status">[]>;
+
+const documentText = (doc: InvoFact["document"]) =>
+  [doc.title, doc.notes ?? "", ...doc.lineItems.map((line) => line.description)].join("\n");
+/** A proposal that was blocked/failed may be proposed again; anything else is settled or open. */
+const alreadyHandled = (history: History, key: string) =>
+  (history.get(key) ?? []).some((row) => row.status !== "blocked" && row.status !== "failed");
+const label = (fact: InvoFact) => fact.invoiceNumber ?? `draft ${fact.document.title}`;
+
+/** Pure: every INVO exception for one invoice. Never invents dates or amounts. */
+export function planInvoice(fact: InvoFact, history: History, now: Date, options: InvoOptions): InvoDecision[] {
+  const subject = `invo:${fact.invoiceId}`;
+  if (fact.status === "void") return [{ kind: "skip", subject, reason: "void" }];
+  if (!fact.leadId) return [{ kind: "skip", subject, reason: "customer_work_invoice_has_no_lead_queue_scope" }];
+  const doc = fact.document;
+  const text = documentText(doc);
+  const unsent = fact.deliveryAttemptCount === 0;
+  const common = {
+    invoiceId: fact.invoiceId, invoiceNumber: fact.invoiceNumber, invoiceStatus: fact.status, invoiceVersion: fact.version,
+    lineCount: doc.lineItems.length, totalCents: doc.totalCents, deliveryAttemptCount: fact.deliveryAttemptCount,
+  };
+  const out: InvoDecision[] = [];
+  const add = (key: string, draft: Omit<SpecialistProposalDraft, "leadId" | "actionType" | "subjectKey">) => {
+    if (alreadyHandled(history, key)) out.push({ kind: "skip", subject: key, reason: "already_proposed" });
+    else out.push({ kind: "draft", draft: { leadId: fact.leadId!, actionType: "create_task", subjectKey: key, ...draft } });
+  };
+
+  // (1) Multi-repair invoice not yet sent → office review before send.
+  if (unsent && doc.lineItems.length >= INVO_POLICY.officeReviewMinLines) {
+    add(`${subject}:v${fact.version}:office_review`, {
+      title: "Office review: multi-repair invoice before sending",
+      rationale: `Invoice ${label(fact)} has ${doc.lineItems.length} lines and has not been sent. Multi-repair invoices are reviewed by the office before sending.`,
+      evidence: { ...common, rule: "multi_line_office_review", lineDescriptions: doc.lineItems.map((line) => line.description.slice(0, 160)) },
+      payload: { title: `Review invoice ${label(fact)} before sending`, description: `Confirm each of the ${doc.lineItems.length} repair lines, quantities and totals before the invoice is sent. Nothing has been sent.`, priority: "high" },
+      estimatedValueCents: doc.totalCents,
+    });
+  }
+
+  // (2) Warranty-validity dates expected (HVAC owner requirement, or warranty wording) but none shown.
+  const mentionsWarranty = WARRANTY_WORDING.test(text);
+  if (unsent || fact.status === "draft") {
+    if ((options.warrantyDatesRequired || mentionsWarranty) && !DATE_TEXT.test(text)) {
+      add(`${subject}:v${fact.version}:warranty_dates`, {
+        title: "Add warranty-validity dates before sending",
+        rationale: `Invoice ${label(fact)} ${mentionsWarranty ? "mentions a warranty" : "is for a company that requires warranty dates on invoices"} but shows no warranty start/end date. INVO does not invent dates; office staff should confirm them from the job and equipment records.`,
+        evidence: { ...common, rule: "warranty_dates_missing", warrantyDatesRequired: options.warrantyDatesRequired, mentionsWarranty,
+          knownWarrantyObligations: fact.warrantyReference.warrantyObligations, activeEquipmentRecords: fact.warrantyReference.activeAssetCount },
+        payload: { title: `Add warranty dates to invoice ${label(fact)}`, description: "Confirm warranty-validity (and equipment install) dates from the job/equipment records and add them to the invoice before sending.", priority: "high" },
+        estimatedValueCents: doc.totalCents,
+      });
+    }
+  }
+
+  // (3) Issued, unpaid balance past due ("due on receipt" = due at issue).
+  if (fact.status === "issued") {
+    if (fact.balanceDueCents == null) out.push({ kind: "skip", subject: `${subject}:overdue`, reason: "balance_unavailable_or_reconciliation_required" });
+    else if (fact.balanceDueCents > 0 && fact.issuedAt) {
+      const explicitDue = doc.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(doc.dueDate) ? new Date(`${doc.dueDate}T23:59:59Z`) : null;
+      const dueAt = explicitDue ?? fact.issuedAt;
+      const daysPastDue = Math.floor((now.getTime() - dueAt.getTime()) / DAY);
+      const prefix = `${subject}:overdue:`;
+      const openOverdue = [...history.entries()].some(([key, rows]) => key.startsWith(prefix) && rows.some((row) => (OPEN_PROPOSAL_STATUSES as readonly string[]).includes(row.status)));
+      if (daysPastDue < INVO_POLICY.overdueAfterDays) out.push({ kind: "skip", subject: `${prefix}pending`, reason: "not_yet_overdue" });
+      else if (openOverdue) out.push({ kind: "skip", subject: `${prefix}open`, reason: "open_overdue_follow_up" });
+      else {
+        const week = Math.floor(daysPastDue / INVO_POLICY.overdueAfterDays);
+        add(`${prefix}w${week}`, {
+          title: "Call about unpaid invoice balance",
+          rationale: `Invoice ${label(fact)} has a recorded balance of $${(fact.balanceDueCents / 100).toFixed(2)} and is ${daysPastDue} days past due (${explicitDue ? `due ${doc.dueDate}` : "due on receipt"}). Recorded balances reflect staff-entered receipts only.`,
+          evidence: { ...common, rule: "overdue_unpaid_balance", balanceDueCents: fact.balanceDueCents, paymentState: fact.paymentState,
+            dueBasis: explicitDue ? "due_date" : "due_on_receipt", dueAt: dueAt.toISOString(), issuedAt: fact.issuedAt.toISOString(), daysPastDue },
+          payload: { title: `Follow up on unpaid invoice ${label(fact)}`, description: `Recorded balance $${(fact.balanceDueCents / 100).toFixed(2)}, ${daysPastDue} days past due. Call the customer, confirm whether payment was made elsewhere, and record any receipt.`, priority: "high" },
+          estimatedValueCents: fact.balanceDueCents,
+        });
+      }
+    }
+  }
+
+  // (4) Estimate wording carried into an invoice.
+  if (ESTIMATE_WORDING.test(text)) {
+    const matches = [doc.title, doc.notes ?? "", ...doc.lineItems.map((line) => line.description)]
+      .filter((part) => ESTIMATE_WORDING.test(part)).map((part) => part.slice(0, 200));
+    add(`${subject}:v${fact.version}:estimate_wording`, {
+      title: "Review estimate wording on an invoice",
+      rationale: `Invoice ${label(fact)} contains the word "estimate". Invoices should state billed work, not estimate terms.${unsent ? "" : " The issued document is immutable; correct the template for future invoices or void and reissue if needed."}`,
+      evidence: { ...common, rule: "estimate_wording_on_invoice", matchingText: matches },
+      payload: { title: `Review wording on invoice ${label(fact)}`, description: "The invoice text uses estimate wording. Confirm the billed scope and warranty language are invoice-appropriate.", priority: "high" },
+      estimatedValueCents: null,
+    });
+  }
+  return out;
+}
+
+export class SpecialistAccessError extends Error {
+  readonly status = 403;
+}
+
+async function loadFacts(organizationId: string, actorUserId: string): Promise<{ facts: InvoFact[]; skippedCustomerWork: number }> {
+  const rows = await db.select({ id: invoicesTable.id, leadId: invoicesTable.leadId, customerWorkId: invoicesTable.customerWorkId })
+    .from(invoicesTable)
+    .where(and(eq(invoicesTable.organizationId, organizationId), inArray(invoicesTable.status, ["draft", "issued"])))
+    .orderBy(desc(invoicesTable.updatedAt))
+    .limit(INVO_POLICY.maxInvoicesPerRun);
+  const leadRows = rows.filter((row) => row.leadId);
+  const ids = leadRows.map((row) => row.id);
+  const attempts = ids.length ? await db.select({ invoiceId: invoiceDeliveryAttemptsTable.invoiceId, count: sql<number>`count(*)::int` })
+    .from(invoiceDeliveryAttemptsTable)
+    .where(and(eq(invoiceDeliveryAttemptsTable.organizationId, organizationId), inArray(invoiceDeliveryAttemptsTable.invoiceId, ids)))
+    .groupBy(invoiceDeliveryAttemptsTable.invoiceId) : [];
+  const attemptCount = new Map(attempts.map((row) => [row.invoiceId, row.count]));
+  const facts: InvoFact[] = [];
+  for (const row of leadRows) {
+    const invoice = await getInvoice(organizationId, actorUserId, row.id); // canonical money + tenant/role checks
+    const [lead] = await db.select({ contactId: leadsTable.contactId }).from(leadsTable)
+      .where(and(eq(leadsTable.organizationId, organizationId), eq(leadsTable.id, row.leadId!)));
+    const obligations = lead ? await db.select({
+      equipmentLabel: serviceObligationsTable.equipmentLabel, coverageStartsOn: serviceObligationsTable.coverageStartsOn, coverageEndsOn: serviceObligationsTable.coverageEndsOn,
+    }).from(serviceObligationsTable).where(and(eq(serviceObligationsTable.organizationId, organizationId), eq(serviceObligationsTable.contactId, lead.contactId),
+      eq(serviceObligationsTable.kind, "warranty_check"))).limit(10) : [];
+    const [assets] = lead ? await db.select({ count: sql<number>`count(*)::int` }).from(propertyAssetsTable)
+      .where(and(eq(propertyAssetsTable.organizationId, organizationId), eq(propertyAssetsTable.contactId, lead.contactId), eq(propertyAssetsTable.status, "active"))) : [];
+    facts.push({
+      invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, leadId: invoice.leadId, status: invoice.status, version: invoice.version,
+      document: invoice.document, issuedAt: invoice.issuedAt ? new Date(invoice.issuedAt) : null,
+      balanceDueCents: invoice.balanceDueCents, paymentState: invoice.paymentState,
+      deliveryAttemptCount: attemptCount.get(invoice.id) ?? 0,
+      warrantyReference: { warrantyObligations: obligations, activeAssetCount: assets?.count ?? 0 },
+    });
+  }
+  return { facts, skippedCustomerWork: rows.length - leadRows.length };
+}
+
+export interface InvoRunResult {
+  runId: string;
+  inserted: BieActionProposal[];
+  skipped: Array<{ subject: string; reason: string }>;
+}
+
+/** Run INVO for one tenant. Requires invoice read access in addition to the route's crm.write. */
+export async function runInvo(organizationId: string, actorUserId: string, options: Partial<InvoOptions> = {}, now = new Date()): Promise<InvoRunResult> {
+  const [actor] = await db.select({ role: usersTable.role }).from(usersTable)
+    .where(and(eq(usersTable.id, actorUserId), eq(usersTable.organizationId, organizationId), eq(usersTable.isActive, true)));
+  if (!actor || !hasPermission(actor.role, "invoices.read"))
+    throw new SpecialistAccessError("INVO reads invoices. An owner, admin, office or sales manager must run it.");
+  const resolved: InvoOptions = { warrantyDatesRequired: options.warrantyDatesRequired === true };
+  const { facts, skippedCustomerWork } = await loadFacts(organizationId, actorUserId);
+  return withSpecialistRun({ organizationId, key: "invo", actorUserId }, async (tx, runId) => {
+    const history = await specialistSubjectKeys(tx, organizationId, "invo");
+    const drafts: SpecialistProposalDraft[] = [];
+    const skipped: Array<{ subject: string; reason: string }> = [];
+    for (const fact of facts)
+      for (const decision of planInvoice(fact, history, now, resolved))
+        if (decision.kind === "draft") drafts.push(decision.draft); else skipped.push(decision);
+    const { inserted, skippedOpen } = await insertSpecialistProposals(tx, { organizationId, runId, key: "invo", actorUserId, drafts });
+    for (const subject of skippedOpen) skipped.push({ subject, reason: "open_proposal_exists" });
+    return {
+      inserted, skipped,
+      summary: `INVO proposed ${inserted.length} invoice review task${inserted.length === 1 ? "" : "s"}.`,
+      result: { invoicesReviewed: facts.length, skippedCustomerWorkInvoices: skippedCustomerWork, skippedCount: skipped.length,
+        warrantyDatesRequired: resolved.warrantyDatesRequired, policy: INVO_POLICY, reminderEmail: "not_supported_for_invoices" },
+    };
+  });
+}
