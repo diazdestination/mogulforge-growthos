@@ -8,6 +8,7 @@ import { db, organizationsTable, usersTable, contactsTable, customerLifecycleTab
 import app from "../../app";
 import { createSession, deleteSession } from "../../lib/auth";
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
+import { syntheticTwilioNumber } from "../../test-helpers/synthetic-twilio";
 import { transitionCustomerLifecycle } from "../../services/customer-lifecycle";
 import * as lifecycle from "../../services/customer-lifecycle-runtime";
 
@@ -36,7 +37,7 @@ beforeAll(async () => {
     const [contact] = await db.insert(contactsTable).values({ organizationId: org.id, firstName: "Synthetic caller", phone }).returning();
     const sid = await createSession({ user: { id: owner.id, email: null, firstName: null, lastName: null, profileImageUrl: null }, access_token: "synthetic", expires_at: Math.floor(Date.now() / 1000) + 3600 });
     const token = `synthetic-lifecycle-voice-${label}`, account = `AC${randomUUID().replaceAll("-", "")}`;
-    const number = index ? "+15005550007" : "+15005550006", staff = index ? "+12025550119" : "+12025550109";
+    const number = syntheticTwilioNumber(), staff = index ? "+12025550119" : "+12025550109";
     const tokenRef = `TWILIO_CLIENT_LIFECYCLE_${label}_AUTH_TOKEN`, apiRef = `TWILIO_CLIENT_LIFECYCLE_${label}_API_KEY_SECRET`;
     vi.stubEnv(tokenRef, token); vi.stubEnv(apiRef, "synthetic-api-key-only");
     await db.insert(twilioClientBindingsTable).values({ organizationId: org.id, accountSid: account, phoneNumber: number,

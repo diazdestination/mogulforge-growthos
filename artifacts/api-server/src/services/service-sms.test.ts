@@ -10,6 +10,7 @@ import app from "../app";
 import { createSession, deleteSession } from "../lib/auth";
 import { createApiKey } from "./api-keys";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+import { syntheticTwilioNumber } from "../test-helpers/synthetic-twilio";
 import { approveServiceCare, bookServiceCareVisit, getServiceCare, recordServiceCareResponse } from "./service-care";
 import { approveServiceRecurrence, createServiceObligation, updateServiceObligation } from "./service-obligations";
 import { processDueScheduledActions } from "./automation";
@@ -21,7 +22,7 @@ import { twilioForOrganization } from "./twilio-controls";
 
 const realFetch = globalThis.fetch, orgs: string[] = [], sessions: string[] = [];
 const token = "synthetic-service-sms-webhook", recipient = "+14045550123", origin = "https://growth.example";
-let server: Server, base: string, serial = 100, unknown = false;
+let server: Server, base: string, unknown = false;
 const posts: URLSearchParams[] = [];
 beforeAll(async () => { server = app.listen(0, "127.0.0.1"); await new Promise<void>(resolve => server.once("listening", resolve)); base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`; });
 beforeEach(() => {
@@ -46,7 +47,7 @@ async function fixture() {
   const [staff] = await db.insert(usersTable).values({ organizationId: org.id, role: "owner", emailVerifiedAt: new Date() }).returning();
   const [contact] = await db.insert(contactsTable).values({ organizationId: org.id, firstName: "Fictional service customer", phone: recipient }).returning();
   await db.insert(orgSettingsTable).values({ organizationId: org.id, sendingHours: { quietHoursEnabled: false, maxTouchesPerDay: 20 } });
-  const [binding] = await db.insert(twilioClientBindingsTable).values({ organizationId: org.id, accountSid: `AC${randomUUID().replaceAll("-", "")}`, phoneNumber: `+1500555${String(++serial).padStart(4, "0")}`,
+  const [binding] = await db.insert(twilioClientBindingsTable).values({ organizationId: org.id, accountSid: `AC${randomUUID().replaceAll("-", "")}`, phoneNumber: syntheticTwilioNumber(),
     messagingServiceSid: `MG${randomUUID().replaceAll("-", "")}`, apiKeySid: `SK${"a".repeat(32)}`, authTokenSecretRef: "TWILIO_CLIENT_SERVICE_SMS_AUTH_TOKEN", apiKeySecretRef: "TWILIO_CLIENT_SERVICE_SMS_API_KEY_SECRET", publicOrigin: origin,
     businessName: "Synthetic standing SMS", smsDisclosureVersion: "synthetic-service-sms-v1", dailySmsLimit: 50, launchApproved: true, smsEnabled: true, registrationApproved: true, advancedOptOut: true, geoPermissionsReviewed: true }).returning();
   await db.insert(consentRecordsTable).values({ organizationId: org.id, contactId: contact.id, channel: "sms", granted: true, disclosureVersion: binding.smsDisclosureVersion! });

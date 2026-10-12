@@ -8,6 +8,7 @@ import { auditEventsTable, callieAckDispatchesTable as acks, callieIntakesTable 
   missedCallHandoffsTable, organizationsTable, revenueExecutionsTable as executions, twilioCallsTable as calls,
   twilioClientBindingsTable as bindings, twilioConsentProofsTable, twilioDispatchesTable, twilioInboundEventsTable as inbound, usersTable } from "@workspace/db";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+import { syntheticTwilioNumber, syntheticTwilioSid } from "../test-helpers/synthetic-twilio";
 import { approveCalliePolicy, assertCallieCurrentAuthority, getCalliePolicy, previewCalliePolicy } from "./callie-policy";
 import { acceptCallieStatusCallback, processCallieIntakes } from "./callie-runtime";
 import { callieChallengeHash, callieOperationKey, callieTriggerHash, DEFAULT_CALLIE_POLICY } from "./callie-contract";
@@ -26,7 +27,7 @@ vi.mock("./callie-ack-transport", async original => {
 });
 let org: string, otherOrg: string, owner: string, afterOwner: string, foreignOwner: string, bindingId: string, accountSid: string;
 let revisionId: string;
-const phone = "+12025550101", sender = "+15005550009", provider = vi.fn<typeof fetch>();
+const phone = "+12025550101", sender = syntheticTwilioNumber(), providerMessageSid = syntheticTwilioSid("SM"), provider = vi.fn<typeof fetch>();
 const settings = () => ({ ...DEFAULT_CALLIE_POLICY, enabled: true, days: [1, 2, 3, 4, 5, 6, 7], opensAt: "00:00", closesAt: "23:59", businessHoursOwnerId: owner, afterHoursOwnerId: afterOwner });
 async function approvePolicy(policy = settings()) {
   const current = await getCalliePolicy(org);
@@ -241,10 +242,10 @@ describe("CALLIE one-call acknowledgment actual adapter", () => {
     await approvePolicy(); const f = await fixture();
     provider.mockImplementationOnce(async () => {
       await db.update(executions).set({ state: "confirmed_not_performed" }).where(eq(executions.organizationId, org));
-      return Response.json({ sid: `SM${"a".repeat(32)}` }, { status: 201 });
+      return Response.json({ sid: providerMessageSid }, { status: 201 });
     });
     await processCallieIntakes(org);
-    expect(await operations()).toMatchObject([{ status: "accepted", providerSid: `SM${"a".repeat(32)}` }]);
+    expect(await operations()).toMatchObject([{ status: "accepted", providerSid: providerMessageSid }]);
     expect(await receipts()).toMatchObject([{ state: "confirmed_not_performed" }]);
     expect(await currentIntake(f.intake.id)).toMatchObject({ state: "indeterminate" });
     await processCallieIntakes(org); expect(provider).toHaveBeenCalledOnce();
@@ -259,14 +260,14 @@ describe("CALLIE one-call acknowledgment actual adapter", () => {
     await approvePolicy(); await fixture(); provider.mockRejectedValueOnce(new Error("Synthetic timeout")); await processCallieIntakes(org);
     const [ack] = await operations();
     const request = (overrides: Record<string, string> = {}, signed = true) => {
-      const body = { AccountSid: accountSid, From: sender, To: phone, MessageSid: `SM${"a".repeat(32)}`, MessageStatus: "delivered", MessagingServiceSid: `MG${"2".repeat(32)}`, ...overrides };
+      const body = { AccountSid: accountSid, From: sender, To: phone, MessageSid: providerMessageSid, MessageStatus: "delivered", MessagingServiceSid: `MG${"2".repeat(32)}`, ...overrides };
       const originalUrl = `/api/v1/public/sms/status?callieOperation=${ack.id}`;
       return { body, query: { callieOperation: ack.id }, originalUrl, is: () => "application/x-www-form-urlencoded", headers: { "x-twilio-signature": signed ? getExpectedTwilioSignature("callie-synthetic-signature", `https://growth.example${originalUrl}`, body) : "bad" } } as unknown as Request;
     };
     expect(await acceptCallieStatusCallback(request({}, false))).toBe(false);
     expect(await acceptCallieStatusCallback(request({ To: "+12025550102" }))).toBe(false);
     expect(await acceptCallieStatusCallback(request())).toBe(true);
-    expect(await operations()).toMatchObject([{ status: "delivered", providerSid: `SM${"a".repeat(32)}` }]);
+    expect(await operations()).toMatchObject([{ status: "delivered", providerSid: providerMessageSid }]);
     expect(await receipts()).toMatchObject([{ state: "indeterminate" }]);
     expect(await acceptCallieStatusCallback(request({ MessageStatus: "sent" }))).toBe(true);
     expect(await operations()).toMatchObject([{ status: "delivered" }]);
