@@ -93,6 +93,9 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
       else { setDone(result); onImported(result); }
     } catch (err) {
       setError(errorText(err, dryRun));
+      // Some rows may now be saved, so the old preview no longer describes the
+      // next import. Staff check history and preview again before any retry.
+      if (!dryRun) { setPreview(null); setReviewed(false); }
     } finally {
       setBusy(false);
     }

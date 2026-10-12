@@ -72,6 +72,8 @@ describe("Housecall Pro customer import", () => {
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toMatch(/could not confirm the import result.*Check your import history/);
     expect(alert.textContent).not.toMatch(/Nothing was imported/);
+    expect(screen.queryByTestId("hcp-import-preview")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Import customers" })).toBeNull();
   });
 
   it("explains how to convert an Excel export instead of uploading it", async () => {
