@@ -43,10 +43,10 @@ roleSettings,extensions,extensionObjects,databases}. Supplied clients own socket
 and transactions. Exact known metadata and trusted canonical projection queries
 are accepted; others fail before dispatch. Errors expose safe codes only.
 
-- [ ] Write regressions for forbidden SELECT/function/write/multiple statements,
+- [x] Write regressions for forbidden SELECT/function/write/multiple statements,
       unexpected parameters, malicious catalog, bounds/deadline/error redaction.
-- [ ] Observe RED; implement the minimal registry, identity and bounded wrapper.
-- [ ] Run GREEN and integrate existing catalog/policy captures through it.
+- [x] Observe RED; implement the minimal registry, identity and bounded wrapper.
+- [x] Run GREEN and integrate existing catalog/policy captures through it.
 
 ## Task2: Actual legacy model and native oracle
 
@@ -57,12 +57,12 @@ model; assertLegacyReaderCapabilities(policy,{readerLogin,readerRole,writerRole}
 returns measured scope and never claims zero-DDL globally. Native runner consumes
 existing source/catalogs and creates one exact-owned container, no live URL.
 
-- [ ] RED role/edge/default-model and dangerous-membership capability tests.
-- [ ] Implement recorded23role/12edge basis, proposed copy-reader delta and
+- [x] RED role/edge/default-model and dangerous-membership capability tests.
+- [x] Implement recorded23role/12edge basis, proposed copy-reader delta and
       native fixture wiring; report opaque settings and provider stubs separately.
-- [ ] Run actual75/95/142 oracle and rollback/commit/fresh Reader on both layouts;
+- [x] Run actual75/95/142 oracle and rollback/commit/fresh Reader on both layouts;
       measure denied persistent application writes/DDL and maintenance TEMP truth.
-- [ ] Record safe hashes/counts and require all owned sockets/container cleanup.
+- [x] Record safe hashes/counts and require all owned sockets/container cleanup.
 
 ## Task3: Upgrade/rollback contract and source acceptance
 
@@ -73,9 +73,9 @@ capabilityReview}) verifies full extra vectors; runProduction75Verification with
 supplied Writer/Reader, pinned plan and durable reserve/persist callbacks invokes
 the existing mechanism and refuses replay or unreviewed capability scope.
 
-- [ ] RED missing/unreviewed scope, changed extras/other DBs, wrong Reader,
+- [x] RED missing/unreviewed scope, changed extras/other DBs, wrong Reader,
       duplicate reservation and unknown COMMIT cases; GREEN minimal contract.
-- [ ] Verify focused and full scripts tests, types, exact unchanged app/SQL source,
+- [x] Verify focused and full scripts tests, types, exact unchanged app/SQL source,
       secret scan and independent whole-branch review.
 - [ ] Publish separate reviewed source PR and exact CI; retain a concrete list of
       provider/native/cost/admission items still required before hosted execution.

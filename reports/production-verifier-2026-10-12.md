@@ -76,7 +76,36 @@ or permission to replace either contractor's system.
 
 ## Evidence
 
-Focused unit/regression suite: 68/68 PASS. Full scripts suite prior to the final
-two role regressions: 421/421 PASS. Workspace typecheck PASS. Final source-bound
-native proof, current full suite and independent review are recorded below when
-complete; earlier drill receipts remain local historical evidence.
+Focused unit/regression suite: 77/77 PASS; full scripts suite: 432/432 PASS.
+Workspace typecheck PASS. Gitleaks found zero leaks in source and review fixes.
+
+Fresh independent review of d799766 found five Important issues and no Critical
+or Minor issues. Nine added regressions reproduced async parameter mutation,
+foreign-reader review binding, custom SET-only authority, per-call late results
+and backend safeCode redaction bypass. All were fixed RED->GREEN in d3a4f36.
+Arguments/evidence are snapshotted; review identity binds to the actual Reader;
+unassessed SET-only roles are refused and fully measured read-only scopes accepted;
+absolute deadlines reject late responses; backend errors are freshly sanitized.
+
+Final native run264da539-582b-46e6-8120-74b8b167e8f2 PASS at20:21:52UTC:
+both layouts plus both lost-ack variants, native privilege denials, independent
+INHERIT/SET probes, rollback, late failure recovery, one-dispatch commit and
+fresh Reader proof; both non-target record/metadata vectors remained unchanged.
+All38 clients/sockets closed and the unique owned container was removed.
+The four normalized module hashes match implementation commit
+d3a4f36626d5312997eaf39e4a24712c829f2eae before/after the run.
+
+[Source acceptance](production-verifier-2026-10-12/source-acceptance.json)
+authenticates25 content-free native receipt/reservation/journal files.
+[Native result](production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/native-result.json)
+records exact source/cleanup boundaries. Earlier failed and superseded runs remain
+local historical evidence and are not included in this source acceptance.
+
+Reviewed scope decisions: direct application privilege checks do not establish
+global no-side-effects; native stubs/settings are local-only; future callers own
+authenticated review, exact transport/Reader profile, durable custody and paid
+admission. Hosted creation/cleanup, real provider binary/settings proof, paid
+admission/deployment, company acceptance and unrelated existing application behavior
+remain separate gates. Mistaking these boundaries for passes could cause an
+incomplete hosted run, unsupported assumptions, caller misuse or premature cutover.
+No reviewer findings were deferred.
