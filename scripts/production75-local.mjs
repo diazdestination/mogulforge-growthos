@@ -17,6 +17,12 @@ const sha=v=>createHash('sha256').update(v).digest('hex');
 const check=(v,code)=>{if(!v)throw Object.assign(new Error(code),{safeCode:code});};
 const q=v=>{check(/^[a-z_][a-z0-9_]*$/.test(v),'production75_local_identifier');return `"${v}"`;};
 const literal=v=>`'${v.replaceAll("'","''")}'`;
+// Harmless provider-style metadata fixture only; no provider extension is
+// installed or claimed. This view lies outside the application table catalog.
+const SYNTHETIC_PROVIDER_VIEW_SQL=`CREATE VIEW public.production75_provider_fixture AS
+  SELECT 'synthetic_metadata_only'::text AS marker,NULL::integer AS sample_count;
+  GRANT SELECT ON public.production75_provider_fixture TO PUBLIC;
+  GRANT SELECT(marker,sample_count) ON public.production75_provider_fixture TO postgres`;
 function fixtureSql(catalog) {
   const sql=[];
   for(const type of catalog.enums)sql.push(`CREATE TYPE public.${q(type.name)} AS ENUM(${type.labels.map(literal).join(',')});`);
@@ -132,7 +138,7 @@ async function runLocal() {
       // Begin with explicit owner ACLs so GRANT/REVOKE negatives return to an
       // exactly representable baseline (NULL ACL would become an explicit ACL).
       await admin.query('GRANT ALL ON ALL TABLES IN SCHEMA public TO production75_owner; GRANT SELECT(name) ON organizations TO production75_owner');
-      await admin.query('RESET ROLE');await seed(admin);
+      await admin.query('RESET ROLE');await admin.query(SYNTHETIC_PROVIDER_VIEW_SQL);await seed(admin);
       const target={database,writerLogin:'production75-writer',writerInitialRoles:['production75-writer','production75_owner'],writerRole:'production75_owner',readerLogin:'production75-reader',readerRole:'production75-reader',principals:['production75-reader','production75-writer']};
       const policy75=await captureProduction75Policy(admin,target.principals);
       // Independent oracle transaction creates the source-defined schema then rolls
@@ -147,6 +153,9 @@ async function runLocal() {
       const input={source,catalog75,canonical95,canonical142,target,policy75,policy95,policy142};const newPlan=until=>prepareProduction75({...input,until:until??142});
       const capture=async(plan)=>{const reader=await connect(database,'production75-reader');await reader.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL search_path=public,pg_catalog; SET LOCAL timezone='UTC'; SET LOCAL datestyle='ISO,YMD'; SET LOCAL intervalstyle='postgres'; SET LOCAL extra_float_digits=3; SET LOCAL bytea_output='hex'; SET LOCAL row_security=off");try{return await captureProduction75State(reader,plan);}finally{check((await reader.query('ROLLBACK')).command==='ROLLBACK','production75_local_reader_rollback');}};
       const baseline=await capture(newPlan()),entry={baseline:safeState(baseline),cases:{},checks:{}};receipt.variants[variant]=entry;
+      const syntheticProviderRows=baseline.policy.ownership.filter(r=>r.name==='production75_provider_fixture');
+      check(syntheticProviderRows.length===3&&syntheticProviderRows.every(r=>r.owner==='postgres')&&syntheticProviderRows.filter(r=>r.kind==='column').length===2,'production75_local_provider_fixture');
+      entry.syntheticProviderMetadata={actualProviderExtensionProof:false,ownershipRows:syntheticProviderRows};entry.checks['provider-view-baseline']=true;
       const run=async(label,{until=142,outcome='rollback',inject}={})=>{const plan=newPlan(until),client=await connect(database,'production75-writer'),path=resolve(journalDirectory,`${variant}-${label}.jsonl`),fd=openSync(path,'wx');let dispatches=[];
         const wrapped={connection:client.connection,query:async(...args)=>{dispatches.push(args[0]);return inject?inject(args,client,plan):client.query(...args);}};
         try{const result=await executeProduction75(wrapped,{plan,expectedBefore:baseline,outcome,persist:async event=>{writeSync(fd,JSON.stringify(event)+'\n');fsyncSync(fd);}});entry.cases[label]={...safeResult(result),journal:`journals/${runId}/${variant}-${label}.jsonl`};return{result,plan,client,dispatches};}finally{closeSync(fd);}};
@@ -159,6 +168,11 @@ async function runLocal() {
       await refusal('table-acl','GRANT SELECT ON organizations TO production75_rogue','REVOKE SELECT ON organizations FROM production75_rogue');
       await refusal('column-acl','GRANT SELECT(name) ON organizations TO production75_rogue','REVOKE SELECT(name) ON organizations FROM production75_rogue');
       await refusal('reader-permission','REVOKE pg_read_all_data FROM "production75-reader"','GRANT pg_read_all_data TO "production75-reader"');
+      await refusal('provider-view-acl','GRANT SELECT ON production75_provider_fixture TO production75_rogue','REVOKE SELECT ON production75_provider_fixture FROM production75_rogue');
+      await refusal('provider-column-acl','GRANT SELECT(marker) ON production75_provider_fixture TO production75_rogue','REVOKE SELECT(marker) ON production75_provider_fixture FROM production75_rogue');
+      await refusal('provider-view-removal','DROP VIEW production75_provider_fixture',SYNTHETIC_PROVIDER_VIEW_SQL);
+      await refusal('provider-view-owner','ALTER VIEW production75_provider_fixture OWNER TO production75_owner','ALTER VIEW production75_provider_fixture OWNER TO postgres');
+      await refusal('provider-rogue-addition','CREATE VIEW production75_rogue_metadata AS SELECT 1::integer AS marker','DROP VIEW production75_rogue_metadata');
       const wrongOrdinal=structuredClone(catalog75);wrongOrdinal.columns.find(c=>c.table_name==='users'&&c.name==='id').ordinal=999;
       let refused=false;try{prepareProduction75({...input,catalog75:wrongOrdinal});}catch{refused=true;}check(refused,'production75_local_ordinal_negative');entry.checks['physical-ordinal-input']=true;
       for(const [label,until] of [['bridge-rollback',95],['full-rollback',142]]){const{result}=await run(label,{until});check(result.status==='rehearsed-rolled-back'&&result.stepsAcknowledged===(until===95?3:19),'production75_local_rehearsal');await restored();entry.checks[label]=true;}
@@ -173,7 +187,7 @@ async function runLocal() {
         const specialDatabase=`production75_${caseName.replaceAll('-','_')}`;
         await control.query(`CREATE DATABASE ${q(specialDatabase)}`);const specialAdmin=await connect(specialDatabase);
         await specialAdmin.query(`ALTER SCHEMA public OWNER TO production75_owner; REVOKE CREATE ON SCHEMA public FROM PUBLIC; REVOKE TEMP ON DATABASE ${q(specialDatabase)} FROM PUBLIC; SET ROLE production75_owner; SET search_path=public,pg_catalog; SET timezone='UTC'`);
-        await specialAdmin.query(fixture);await specialAdmin.query('GRANT ALL ON ALL TABLES IN SCHEMA public TO production75_owner; GRANT SELECT(name) ON organizations TO production75_owner; RESET ROLE');await seed(specialAdmin);
+        await specialAdmin.query(fixture);await specialAdmin.query('GRANT ALL ON ALL TABLES IN SCHEMA public TO production75_owner; GRANT SELECT(name) ON organizations TO production75_owner; RESET ROLE');await specialAdmin.query(SYNTHETIC_PROVIDER_VIEW_SQL);await seed(specialAdmin);
         const specialTarget={...target,database:specialDatabase},special75=await captureProduction75Policy(specialAdmin,target.principals);
         await specialAdmin.query('BEGIN; SET LOCAL ROLE production75_owner');for(const step of source.steps.slice(0,3))await specialAdmin.query(step.sql);const special95=await captureProduction75Policy(specialAdmin,target.principals);
         for(const step of source.steps.slice(3))await specialAdmin.query(step.sql);const special142=await captureProduction75Policy(specialAdmin,target.principals);await specialAdmin.query('ROLLBACK');
@@ -195,6 +209,7 @@ async function runLocal() {
       }
       const committed=await run('commit',{outcome:'commit'});check(committed.result.status==='committed-awaiting-reader'&&committed.result.stepsAcknowledged===19&&committed.result.commitAcknowledged,'production75_local_commit');
       const reader=await capture(committed.plan);entry.freshReader=safeState(reader);entry.verified=verifyProduction75Reader(committed.result,reader,committed.plan);entry.checks.commit=true;entry.checks.freshReader=entry.verified.status==='verified';
+      entry.checks['provider-view-preserved']=isDeepStrictEqual(reader.policy.ownership.filter(r=>r.name==='production75_provider_fixture'),syntheticProviderRows);
       await writeFile(resolve(directory,`local-policy-${variant}.json`),JSON.stringify({target,policy75,policy95,policy142},null,2)+'\n');
       entry.checks.syntheticRows=baseline.fingerprints.filter(r=>r.rows>0).length===9&&baseline.fingerprints.reduce((n,r)=>n+r.rows,0)===22;
       check(Object.values(entry.checks).every(Boolean),'production75_local_checks');

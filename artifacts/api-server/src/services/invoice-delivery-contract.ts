@@ -74,9 +74,11 @@ export function deliveryFingerprint(value: unknown): string {
 /** Recorded equipment and staff-entered terms only; never a coverage decision. */
 export function invoiceEquipmentText(section: InvoiceDocument["equipment"]): string[] {
   if (!section) return [];
+  const hasDates = section.items.some((item) => item.warrantyStartsOn || item.warrantyEndsOn);
+  const hasWarranty = section.items.some((item) => item.warrantyStartsOn || item.warrantyEndsOn || item.warrantySource);
   const lines = section.items.flatMap((item, i) => {
     const identity = [item.manufacturer, item.model].filter(Boolean).join(" ");
-    const warranty = item.warrantyStartsOn || item.warrantyEndsOn
+    const warranty = item.warrantyStartsOn || item.warrantyEndsOn || item.warrantySource
       ? [`   Recorded warranty: ${item.warrantyStartsOn ?? "start not recorded"} to ${item.warrantyEndsOn ?? "end not recorded"}${item.warrantySource ? ` (source: ${item.warrantySource})` : ""}`]
       : [];
     return [
@@ -90,8 +92,8 @@ export function invoiceEquipmentText(section: InvoiceDocument["equipment"]): str
   return [
     ...(lines.length ? ["", "Equipment serviced:", ...lines] : []),
     ...(section.warrantyTerms ? ["", "Warranty terms:", section.warrantyTerms] : []),
-    ...(section.items.some((item) => item.warrantyStartsOn || item.warrantyEndsOn)
-      ? ["Recorded warranty dates are listed for reference; the warranty provider determines coverage."]
+    ...(hasWarranty
+      ? [`Recorded warranty ${hasDates ? "dates are" : "information is"} listed for reference; the warranty provider determines coverage.`]
       : []),
   ];
 }

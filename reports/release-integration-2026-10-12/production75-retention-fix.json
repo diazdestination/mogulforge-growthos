@@ -1,0 +1,216 @@
+{
+  "kind": "PRODUCTION75_PREEXISTING_OWNERSHIP_RETENTION_FIX",
+  "at": "2026-10-12T15:03:27.657Z",
+  "status": "LOCAL_VERIFIED_AWAITING_ROOT_REVIEW",
+  "scope": "Pure ownership retention and harmless synthetic provider-style local view; no hosted operator or real extension proof",
+  "red": {
+    "command": "node node_modules/vitest/vitest.mjs run production75-core.test.mjs production75-local.test.mjs",
+    "exitCode": 1,
+    "testFilesFailed": 1,
+    "testsFailed": 1,
+    "testsPassed": 14,
+    "errorCode": "production75_original_acl_changed",
+    "positiveCase": "unchanged provider-owned view, column and function metadata outside75 application catalog",
+    "beforeCoreSha256": "93cfc5199443c131f7f4c7c588f2c848559361cb2f75d0690280aee7d77cf9d3"
+  },
+  "green": {
+    "command": "node node_modules/vitest/vitest.mjs run production75-core.test.mjs production75-local.test.mjs",
+    "cwd": "scripts",
+    "exitCode": 0,
+    "testFilesPassed": 2,
+    "testsPassed": 16
+  },
+  "native": {
+    "command": "node scripts/production75-local.mjs --run-local",
+    "exitCode": 0,
+    "status": "PASS",
+    "runId": "05010f4b-4153-4abf-a9ed-e907cce1d426",
+    "receiptSha256": "ff02bbdc1995bc3b7429f9759824d806c750201924043ca69e50fdb28d78f0fc",
+    "sourceHashes": {
+      "production75-core.mjs": "196a28729f637b678ab9c6cd9cd55420824a8220dbce1dcdafa27abafad90858",
+      "production75-source.mjs": "5d4d11280ae7bac63f8eb71a7890ad8f3b947930bc6a0368c7be6ee46bf4ad7d",
+      "production75-pins.mjs": "49659d051413a9df57ce6ab85ddd17cf108ee9f5cffdd4de935e93e8db63475e",
+      "production75-local.mjs": "495caf65ffa60c023569f402f10f3716bd3203917258ff01e7ce6cd816eb0155"
+    },
+    "cleanup": {
+      "clientsClosed": 89,
+      "socketsClosed": 89,
+      "containerRemoved": true,
+      "expectedClients": 89,
+      "idRecovered": false,
+      "containerAbsent": false,
+      "removedId": "e4dce954f84beb9e43acc307d6112271b74c0a7d81f6b0794b897c36e12be184"
+    },
+    "lostRunResponseCleanup": {
+      "name": "production75-local-35504-0ec7e19b",
+      "containerRemoved": true,
+      "idRecovered": true,
+      "containerAbsent": false,
+      "removedId": "caf9cc13a8eb7086e9a5f2a7208d5cdff0b1b4222b7f53037426d9efb3278fe2"
+    },
+    "syntheticProviderView": true,
+    "actualProviderExtensionProof": false
+  },
+  "nativeStartedAt": "2026-10-12T14:59:43.845Z",
+  "nativeFinishedAt": "2026-10-12T15:01:18.066Z",
+  "variantProofs": {
+    "fly-db": {
+      "checks": {
+        "provider-view-baseline": true,
+        "same-count-data": true,
+        "column-type": true,
+        "column-default": true,
+        "new-table-collision": true,
+        "table-acl": true,
+        "column-acl": true,
+        "reader-permission": true,
+        "provider-view-acl": true,
+        "provider-column-acl": true,
+        "provider-view-removal": true,
+        "provider-view-owner": true,
+        "provider-rogue-addition": true,
+        "physical-ordinal-input": true,
+        "bridge-rollback": true,
+        "full-rollback": true,
+        "late-bridge-error": true,
+        "late-0018-error": true,
+        "wrong-target": true,
+        "new-table-grant": true,
+        "bridge-commit": true,
+        "lost-commit": true,
+        "commit": true,
+        "freshReader": true,
+        "provider-view-preserved": true,
+        "syntheticRows": true
+      },
+      "verified": {
+        "status": "verified",
+        "originalTables": 75,
+        "originalColumns": 849,
+        "newTablesEmpty": 67,
+        "defaultsVerified": 13,
+        "freshReaderVerified": true
+      },
+      "syntheticProviderMetadata": {
+        "actualProviderExtensionProof": false,
+        "ownershipRows": [
+          {
+            "kind": "column",
+            "schema": "public",
+            "name": "production75_provider_fixture",
+            "sub_name": "marker",
+            "owner": "postgres",
+            "acl": "{postgres=r/postgres}"
+          },
+          {
+            "kind": "column",
+            "schema": "public",
+            "name": "production75_provider_fixture",
+            "sub_name": "sample_count",
+            "owner": "postgres",
+            "acl": "{postgres=r/postgres}"
+          },
+          {
+            "kind": "relation",
+            "schema": "public",
+            "name": "production75_provider_fixture",
+            "sub_name": null,
+            "owner": "postgres",
+            "acl": "{postgres=arwdDxt/postgres,=r/postgres}"
+          }
+        ]
+      }
+    },
+    "growthos_staging": {
+      "checks": {
+        "provider-view-baseline": true,
+        "same-count-data": true,
+        "column-type": true,
+        "column-default": true,
+        "new-table-collision": true,
+        "table-acl": true,
+        "column-acl": true,
+        "reader-permission": true,
+        "provider-view-acl": true,
+        "provider-column-acl": true,
+        "provider-view-removal": true,
+        "provider-view-owner": true,
+        "provider-rogue-addition": true,
+        "physical-ordinal-input": true,
+        "bridge-rollback": true,
+        "full-rollback": true,
+        "late-bridge-error": true,
+        "late-0018-error": true,
+        "wrong-target": true,
+        "new-table-grant": true,
+        "commit": true,
+        "freshReader": true,
+        "provider-view-preserved": true,
+        "syntheticRows": true
+      },
+      "verified": {
+        "status": "verified",
+        "originalTables": 75,
+        "originalColumns": 849,
+        "newTablesEmpty": 67,
+        "defaultsVerified": 13,
+        "freshReaderVerified": true
+      },
+      "syntheticProviderMetadata": {
+        "actualProviderExtensionProof": false,
+        "ownershipRows": [
+          {
+            "kind": "column",
+            "schema": "public",
+            "name": "production75_provider_fixture",
+            "sub_name": "marker",
+            "owner": "postgres",
+            "acl": "{postgres=r/postgres}"
+          },
+          {
+            "kind": "column",
+            "schema": "public",
+            "name": "production75_provider_fixture",
+            "sub_name": "sample_count",
+            "owner": "postgres",
+            "acl": "{postgres=r/postgres}"
+          },
+          {
+            "kind": "relation",
+            "schema": "public",
+            "name": "production75_provider_fixture",
+            "sub_name": null,
+            "owner": "postgres",
+            "acl": "{postgres=arwdDxt/postgres,=r/postgres}"
+          }
+        ]
+      }
+    }
+  },
+  "sourceHashes": {
+    "production75-core.mjs": "196a28729f637b678ab9c6cd9cd55420824a8220dbce1dcdafa27abafad90858",
+    "production75-core.test.mjs": "8be629070e815ce04547f9edea6b9e282b593f10def1beb4bd450012bf526173",
+    "production75-local.mjs": "495caf65ffa60c023569f402f10f3716bd3203917258ff01e7ce6cd816eb0155",
+    "production75-local.test.mjs": "dac7a97f152e3dff8e3cc6e5ed1dcf570a9dd99d75a9876d7fd5e8623fcb9f57",
+    "production75-source.mjs": "5d4d11280ae7bac63f8eb71a7890ad8f3b947930bc6a0368c7be6ee46bf4ad7d",
+    "production75-pins.mjs": "49659d051413a9df57ce6ab85ddd17cf108ee9f5cffdd4de935e93e8db63475e"
+  },
+  "verificationReceiptSha256": "6e8b30345f054242ee2e3f125b386db2ef4360adf98e25bb4546884eda37a3cc",
+  "sourceManifestSha256": "4f62b261bcf0babe7be0c845e69f70459307441a33d7b2b5f14e039ff087d1bb",
+  "priorProof": {
+    "runId": "90be0806-3986-480d-b7a5-3c9d19299756",
+    "receiptSha256": "bd75b3c4eb9a5119104b9be31d16b8abfee5b1af0a83087bb4bb7c048494ebfe",
+    "preservedDirectory": "C:/Forge/artifacts/growthos-release-integration-20261012/preserved-production75-90be0806",
+    "preservationManifestSha256": "a65428d42c8d52f51ca8c3684365b8e1b0f3bca292a4b6ec2531012a07cec1f6",
+    "filesCopied": 16,
+    "historicalFailedJournalsCopied": false
+  },
+  "sourceAndPinsUnchanged": true,
+  "fullScriptsRunByThisLane": false,
+  "fullScriptsGateOwner": "root",
+  "providerCalls": false,
+  "authOrKeyReads": false,
+  "originalMutations": false,
+  "committed": false,
+  "pushed": false
+}

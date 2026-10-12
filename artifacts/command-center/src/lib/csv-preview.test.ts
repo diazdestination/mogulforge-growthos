@@ -13,6 +13,22 @@ describe("parseCsvPreview", () => {
   it("stops after the requested rows", () => {
     expect(parseCsvPreview("a\n1\n2\n3\n4", 2)).toEqual([["a"], ["1"]]);
   });
+
+  it("preserves multiline quoted fields", () => {
+    expect(parseCsvPreview('First,Email\r\n"Ann\r\nAble",ann@example.invalid\r\n')).toEqual([
+      ["First", "Email"], ["Ann\r\nAble", "ann@example.invalid"],
+    ]);
+  });
+
+  it.each([
+    'First,Email\n"Ann","ann@example.invalid\nBob,bob@example.invalid\n',
+    'First,Email\nAn"n,ann@example.invalid\n',
+    'First,Email\n"Ann"x,ann@example.invalid\n',
+    'First,Email\nAnn,ann@example.invalid\nBob,bob@example.invalid\n"Unclosed,email@example.invalid',
+    'First,Email\nAnn,ann@example.invalid\nBob,bob@example.invalid\nStray"quote,email@example.invalid',
+  ])("rejects malformed quotes across the entire file even beyond the preview sample", (csv) => {
+    expect(() => parseCsvPreview(csv, 2)).toThrow(/CSV.*quot/i);
+  });
 });
 
 describe("suggestCustomerMapping", () => {

@@ -2,7 +2,7 @@ import { it as test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { buildProduction75Source } from './production75-source.mjs';
-import { prepareProduction75, ORIGINAL_DEFAULTS } from './production75-core.mjs';
+import { prepareProduction75, assertProduction75Preserved, ORIGINAL_DEFAULTS } from './production75-core.mjs';
 
 const commit = '7091af816715cfd437925eb0af82fb47d3411e34';
 const sourceManifest = JSON.parse(await readFile(new URL('../reports/release-preparation-2026-10-09/source-manifest.json', import.meta.url)));
@@ -94,4 +94,51 @@ test('Reader admission requires a different login and effective role from Writer
     {readerLogin:input.target.writerLogin},
     {readerRole:input.target.writerRole},
   ])assert.throws(()=>prepareProduction75({...input,target:{...input.target,...change}}),/production75_explicit_target/);
+});
+
+async function providerMetadataFixture() {
+  const input={source:buildProduction75Source(files),catalog75:await fixture('catalog75-fly-db.json'),canonical95:await canonical('catalog-95.json'),canonical142:await canonical('catalog-142.json'),...await fixture('local-policy-fly-db.json')};
+  const providerRows=[
+    {kind:'relation',schema:'public',name:'synthetic_provider_view',sub_name:null,owner:'postgres',acl:'{postgres=arwdDxt/postgres,=r/postgres}'},
+    {kind:'column',schema:'public',name:'synthetic_provider_view',sub_name:'sample_count',owner:'postgres',acl:'DEFAULT'},
+    {kind:'function',schema:'public',name:'synthetic_provider_function',sub_name:'integer',owner:'postgres',acl:'DEFAULT'},
+  ];
+  const sort=rows=>rows.sort((a,b)=>JSON.stringify([a.kind,a.schema,a.name,a.sub_name]).localeCompare(JSON.stringify([b.kind,b.schema,b.name,b.sub_name])));
+  for(const name of ['policy75','policy95','policy142'])input[name].ownership=sort([...input[name].ownership,...structuredClone(providerRows)]);
+  const plan=prepareProduction75(input),fingerprints=plan.catalog75.tables.map(t=>({table:t.name,rows:0,bytes:0,digest:'d41d8cd98f00b204e9800998ecf8427e'}));
+  const before={catalog:plan.catalog75,policy:plan.policies[75],fingerprints};
+  const after={catalog:plan.catalog142,policy:plan.policies[142],fingerprints,defaults:Array(13).fill('verified'),newTables:plan.catalog142.tables.filter(t=>!plan.catalog75.tables.some(old=>old.name===t.name)).map(t=>t.name)};
+  return{input,plan,before,after,providerRows};
+}
+
+test('preserves unchanged provider-owned view/column/function metadata outside the75 application catalog', async () => {
+  const {plan,before,after}=await providerMetadataFixture();
+  assert.deepEqual(assertProduction75Preserved(before,after,plan),{originalTables:75,originalColumns:849,newTablesEmpty:67,defaultsVerified:13});
+});
+
+test('pre-existing provider metadata cannot change, disappear or be replaced even in explicit future policy', async () => {
+  for(const change of ['changed-acl','removed-column','changed-owner','removed-function','changed-schema-owner','changed-type-acl','changed-database-acl']) {
+    const {input,before,after}=await providerMetadataFixture();const altered=structuredClone(input.policy142);
+    if(change==='removed-column')altered.ownership=altered.ownership.filter(r=>!(r.kind==='column'&&r.name==='synthetic_provider_view'));
+    else if(change==='removed-function')altered.ownership=altered.ownership.filter(r=>r.name!=='synthetic_provider_function');
+    else {const row=change.startsWith('changed-schema')?altered.ownership.find(r=>r.kind==='schema'):change.startsWith('changed-type')?altered.ownership.find(r=>r.kind==='type'):change.startsWith('changed-database')?altered.ownership.find(r=>r.kind==='database'):altered.ownership.find(r=>r.kind==='relation'&&r.name==='synthetic_provider_view');row[change.includes('owner')?'owner':'acl']='unexpected';}
+    const plan=prepareProduction75({...input,policy142:altered});
+    assert.throws(()=>assertProduction75Preserved(before,{...after,policy:plan.policies[142]},plan),/production75_original_acl_changed/,change);
+  }
+});
+
+test('rogue added ownership objects are not hidden by an explicit future policy', async () => {
+  const {input,before,after}=await providerMetadataFixture();
+  input.policy142.ownership.push({kind:'relation',schema:'public',name:'rogue_provider_view',sub_name:null,owner:'postgres',acl:'DEFAULT'});
+  const plan=prepareProduction75(input);
+  assert.throws(()=>assertProduction75Preserved(before,{...after,policy:plan.policies[142]},plan),/production75_original_acl_changed/);
+});
+
+test('an original ownership identity is retained even if its name coincides with a known added table', async () => {
+  const {input,before,after}=await providerMetadataFixture();
+  const original={kind:'relation',schema:'public',name:'service_obligations',sub_name:null,owner:'postgres',acl:'DEFAULT'};
+  input.policy75.ownership.push(original);
+  input.policy142.ownership.find(r=>r.kind==='relation'&&r.name==='service_obligations').owner='unexpected';
+  const plan=prepareProduction75(input);
+  assert.throws(()=>assertProduction75Preserved({...before,policy:plan.policies[75]},{...after,policy:plan.policies[142]},plan),/production75_original_acl_changed/);
 });

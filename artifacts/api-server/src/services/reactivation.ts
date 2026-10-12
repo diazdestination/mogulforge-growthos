@@ -21,6 +21,7 @@ import {
 } from "@workspace/db";
 import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, notInArray, or, sql } from "drizzle-orm";
+import { z } from "zod/v4";
 
 import { recordAudit } from "./audit";
 import { OUTREACH_ACTIVE_STATUSES, enrollLead, stopEnrollmentById } from "./playbooks";
@@ -40,39 +41,51 @@ import { needsSourceVerification, parseSourceAmount, parseSourceDate, SourceHist
 // CSV parsing (RFC 4180-ish, dependency-free)
 // ---------------------------------------------------------------------------
 
+export class CsvParseError extends Error {
+  constructor() { super("The CSV contains invalid quoting. No rows were imported."); }
+}
+
 export function parseCsv(text: string): string[][] {
+  const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
   let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
+  let afterQuote = false;
+  for (let i = 0; i < source.length; i++) {
+    const c = source[i];
     if (inQuotes) {
       if (c === '"') {
-        if (text[i + 1] === '"') {
+        if (source[i + 1] === '"') {
           field += '"';
           i++;
         } else {
           inQuotes = false;
+          afterQuote = true;
         }
       } else {
         field += c;
       }
     } else if (c === '"') {
+      if (field !== "" || afterQuote) throw new CsvParseError();
       inQuotes = true;
     } else if (c === ",") {
       row.push(field);
       field = "";
+      afterQuote = false;
     } else if (c === "\n" || c === "\r") {
-      if (c === "\r" && text[i + 1] === "\n") i++;
+      if (c === "\r" && source[i + 1] === "\n") i++;
       row.push(field);
       field = "";
+      afterQuote = false;
       if (row.some((f) => f.trim() !== "")) rows.push(row);
       row = [];
     } else {
+      if (afterQuote) throw new CsvParseError();
       field += c;
     }
   }
+  if (inQuotes) throw new CsvParseError();
   row.push(field);
   if (row.some((f) => f.trim() !== "")) rows.push(row);
   return rows;
@@ -189,7 +202,12 @@ async function runLeadImport(
   organizationId: string,
   params: ImportLeadsParams,
 ): Promise<LeadImport | LeadImportPreview | { error: string }> {
-  const all = parseCsv(params.csv);
+  let all: string[][];
+  try { all = parseCsv(params.csv); }
+  catch (error) {
+    if (error instanceof CsvParseError) return { error: error.message };
+    throw error;
+  }
   const rows = params.hasHeader === false ? all : all.slice(1);
   if (rows.length === 0) return { error: "No data rows found in the file" };
   if (rows.length > MAX_IMPORT_ROWS) {
@@ -265,9 +283,26 @@ async function runLeadImport(
     }
     const get = (f: ImportField) => (m[f] === undefined ? undefined : row[m[f]!]);
     const firstName = clean(get("firstName"), 100);
-    const email = clean(get("email"), 200)?.toLowerCase() ?? null;
-    const phone = clean(get("phone"), 40);
+    const rawEmail = get("email") ?? "";
+    const rawPhone = get("phone") ?? "";
+    const email = rawEmail.trim().toLowerCase() || null;
+    const phone = rawPhone.trim() || null;
     const phoneDigits = phone ? phone.replace(/\D/g, "") : null;
+    // Validate every supplied mapped address before trimming/truncation can hide
+    // a malformed value. Keep the source phone format and existing normalization.
+    const controls = /[\x00-\x1f\x7f-\x9f]/;
+    const emailInvalid = controls.test(rawEmail) || rawEmail.length > 200 || (email !== null && !z.email().safeParse(email).success);
+    // Use the bounded formatting/extension policy from customer corrections,
+    // also retaining international slash separators, the seven-digit minimum
+    // and this import's existing 40-character bound.
+    const phoneInvalid = controls.test(rawPhone) || rawPhone.length > 40 || (phone !== null &&
+      (!/^(?:\+?[0-9(][0-9 ()./-]*[0-9])(?:\s*(?:x|ext\.?)\s*\d{1,8})?$/i.test(phone) ||
+       !phoneDigits || phoneDigits.length < 7 || phoneDigits.length > 23));
+    if (emailInvalid || phoneInvalid) {
+      skipped++;
+      if (errors.length < maxErrors) errors.push(`Row ${rowNo}: ${emailInvalid ? "email must be a valid address of at most 200 characters" : "phone must be a valid number of at most 40 characters"}; no values were applied`);
+      continue;
+    }
 
     if (!firstName) {
       skipped++;

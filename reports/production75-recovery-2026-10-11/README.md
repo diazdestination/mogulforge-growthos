@@ -41,6 +41,12 @@ Only original `estimates.lead_id` and `projects.lead_id` become nullable. The lo
 fixture's owner grants are explicit so permission negatives can restore the exact
 ACL representation through ordinary GRANT/REVOKE.
 
+Ownership retention keeps every pre-existing object identity (kind, schema, name,
+sub-name), including non-application views/columns, functions, schema, enum type
+and database metadata. It excludes only exact table/column identities introduced
+by the reviewed SQL lineage; missing/changed originals and rogue additions fail.
+The complete explicit policy equality check remains in place.
+
 One bounded transaction contains either the bridge or the full upgrade. Journal
 intents must durably acknowledge before SQL dispatch. Plans and clients are
 single-use. Acknowledged COMMIT still requires a distinct read-only Reader login,
@@ -83,16 +89,27 @@ loss, wrong physical-ordinal input, unexpected target and unauthorized new-table
 grant. Bridge/full rollback, late0002/0018 failures, full commit plus fresh Reader,
 bridge-only commit, lost actual COMMIT acknowledgment and stale-plan replay refusal
 are checked against real PostgreSQL16.
+Both layouts now include a harmless postgres-owned synthetic view with two
+columns outside the application catalog. Its owner/ACL metadata survives rollback,
+commit and fresh Reader capture. View/column ACL changes, owner changes, removal
+and a rogue extra view are refused. This is actual PostgreSQL metadata mechanism
+proof; no provider extension was installed and no real pgaudit/pg_stat_monitor
+binary/version or hosted permission proof is claimed.
 
 The generated catalogs, synthetic fixture DDL and `local-policy-*` files are local
 review inputs only. They cannot substitute for actual production records, role
 policy, application binding or recovery proof.
 
-Final source verification after independent review fixes:
-`verification-receipt.json` records28 passing scripts test files/351 tests,
-including12 new focused tests. Native run
-`90be0806-3986-480d-b7a5-3c9d19299756` passed both variants at
-2026-10-11T06:44:16.340Z, with all69 clients/sockets closed, the main owned
+Final ownership-retention verification:
+`verification-receipt.json` records2 focused files/16 passing tests. Root owns the
+combined full-scripts run: all28 files/355 tests passed in the4457-test combined
+release gate at15:18:46UTC. Prior351-test
+and native90be0806 evidence is preserved with16 matching metadata copies and a
+hash manifest at
+`C:\Forge\artifacts\growthos-release-integration-20261012\preserved-production75-90be0806`.
+No historical failed journals were copied or removed. Native run
+`05010f4b-4153-4abf-a9ed-e907cce1d426` passed both variants at
+2026-10-12T15:01:18.066Z, with all89 clients/sockets closed, the main owned
 container removed by verified ID, and the unknown-ID response-loss probe
 independently recovered and removed by verified ID. Its original75 physical hashes are respectively
 `2ca3d8dbc10313fb7f23bab2e87f61ad13a21e925664e190c087683aad1daf55` and
@@ -102,3 +119,5 @@ the verified142 physical hashes are
 `2ed9500b5fb077a19aa16003bd346f8369a1b1cb3da8ea8f9a396265b6410f7b`.
 Both final logical catalogs are
 `f0399b47ba79f843eab66b0fa554923fdd21e26d1e6b22cf62002ec6c353d9fd`.
+The RED/GREEN cases, source/native hashes and preservation record are in
+`C:\Forge\artifacts\growthos-release-integration-20261012\production75-retention-fix.json`.

@@ -11,9 +11,30 @@ const saved = { id: "imp-1", fileName: "customers.csv", totalRows: 1, imported: 
 const upload = (name: string, body: string) =>
   fireEvent.change(screen.getByLabelText("Housecall Pro customer CSV"), { target: { files: [new File([body], name, { type: "text/csv" })] } });
 
-afterEach(() => { cleanup(); vi.mocked(importLeadsCsv).mockReset(); });
+afterEach(() => { cleanup(); vi.mocked(importLeadsCsv).mockReset(); vi.restoreAllMocks(); });
 
 describe("Housecall Pro customer import", () => {
+  it("shows a safe error for malformed CSV and never offers a preview", async () => {
+    render(<HousecallCustomerImport onImported={vi.fn()} />);
+    upload("customers.csv", 'First,Email\n"Ann","ann@example.invalid\nBob,bob@example.invalid\n');
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/CSV.*Nothing was imported/);
+    expect(alert.textContent).not.toContain("ann@example.invalid");
+    expect(screen.queryByRole("button", { name: "Preview import" })).toBeNull();
+    expect(importLeadsCsv).not.toHaveBeenCalled();
+  });
+
+  it.each(["error", "abort"])("shows a safe error when the file read ends with %s", async (event) => {
+    vi.spyOn(FileReader.prototype, "readAsText").mockImplementation(function (this: FileReader) {
+      this.dispatchEvent(new ProgressEvent(event));
+    });
+    render(<HousecallCustomerImport onImported={vi.fn()} />);
+    upload("customers.csv", csv);
+    expect((await screen.findByRole("alert")).textContent).toMatch(/CSV.*Nothing was imported/);
+    expect(screen.queryByRole("button", { name: "Preview import" })).toBeNull();
+    expect(importLeadsCsv).not.toHaveBeenCalled();
+  });
+
   it("previews with suggested columns before an explicit, reviewed import", async () => {
     vi.mocked(importLeadsCsv).mockResolvedValueOnce(preview).mockResolvedValueOnce(saved);
     const onImported = vi.fn();

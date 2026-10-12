@@ -1,56 +1,79 @@
 {
   "kind": "PRODUCTION75_LOCAL_SOURCE_VERIFICATION",
-  "at": "2026-10-11T06:44:40.377Z",
-  "repositoryHead": "5a0e516b71a59fff87851e2993ae3c45e0f2f3f0",
-  "branch": "agent/growthos-staging-upgrade-20261010",
-  "trackedChanges": [],
-  "scriptsSuite": {
+  "at": "2026-10-12T15:03:27.572Z",
+  "repositoryHead": "3bcdaee08041468c1f0293e9af8f3e2855fa5d78",
+  "branch": "agent/growthos-release-integration-20261012",
+  "focusedSuite": {
+    "command": "node node_modules/vitest/vitest.mjs run production75-core.test.mjs production75-local.test.mjs",
+    "cwd": "scripts",
+    "exitCode": 0,
+    "testFilesPassed": 2,
+    "testsPassed": 16
+  },
+  "previousCompleteScriptsSuite": {
     "command": "node node_modules/vitest/vitest.mjs run",
     "cwd": "scripts",
     "exitCode": 0,
     "testFilesPassed": 28,
     "testsPassed": 351,
-    "durationSeconds": 70.16
+    "durationSeconds": 70.16,
+    "currentSourceAcceptance": false,
+    "preservedReceipt": "C:/Forge/artifacts/growthos-release-integration-20261012/preserved-production75-90be0806/verification-receipt.json"
   },
-  "newFocusedTests": 12,
+  "currentCombinedFullScriptsSuite": {
+    "status": "PASS",
+    "command": "node scripts/local-dev.mjs test",
+    "exitCode": 0,
+    "testFilesPassed": 28,
+    "testsPassed": 355,
+    "fullCombinedTestsPassed": 4457,
+    "apiSkipped": 15,
+    "finishedAt": "2026-10-12T15:18:46.294Z",
+    "logSha256": "adb19d8b297c651cbdf48483329156991ddf0e80cf86ca7dc174edcf2f444b9b"
+  },
+  "newFocusedTests": 16,
+  "reviewFixes": [
+    "unknown run ID requires one exact-name candidate and both nonce/task labels before verified-ID deletion",
+    "empty/malformed successful run response remains unknown for owned recovery",
+    "Reader login and effective role must each differ from Writer",
+    "retain every pre-existing ownership identity; exclude only known source-added relation/column identities; reject original provider metadata loss/change and unexpected objects"
+  ],
   "native": {
     "command": "node scripts/production75-local.mjs --run-local",
     "exitCode": 0,
     "status": "PASS",
-    "runId": "90be0806-3986-480d-b7a5-3c9d19299756",
-    "receiptSha256": "bd75b3c4eb9a5119104b9be31d16b8abfee5b1af0a83087bb4bb7c048494ebfe",
+    "runId": "05010f4b-4153-4abf-a9ed-e907cce1d426",
+    "receiptSha256": "ff02bbdc1995bc3b7429f9759824d806c750201924043ca69e50fdb28d78f0fc",
     "sourceHashes": {
-      "production75-core.mjs": "93cfc5199443c131f7f4c7c588f2c848559361cb2f75d0690280aee7d77cf9d3",
+      "production75-core.mjs": "196a28729f637b678ab9c6cd9cd55420824a8220dbce1dcdafa27abafad90858",
       "production75-source.mjs": "5d4d11280ae7bac63f8eb71a7890ad8f3b947930bc6a0368c7be6ee46bf4ad7d",
       "production75-pins.mjs": "49659d051413a9df57ce6ab85ddd17cf108ee9f5cffdd4de935e93e8db63475e",
-      "production75-local.mjs": "598a3be862dccec628b1e404f575974a7799c69048de36a4ed862f8b3451801e"
+      "production75-local.mjs": "495caf65ffa60c023569f402f10f3716bd3203917258ff01e7ce6cd816eb0155"
     },
     "cleanup": {
-      "clientsClosed": 69,
-      "socketsClosed": 69,
+      "clientsClosed": 89,
+      "socketsClosed": 89,
       "containerRemoved": true,
-      "expectedClients": 69,
+      "expectedClients": 89,
       "idRecovered": false,
       "containerAbsent": false,
-      "removedId": "dafc7dd02b7591f442cf62c4035cbc83e52a38603beb4c107d729ab89b4cc629"
+      "removedId": "e4dce954f84beb9e43acc307d6112271b74c0a7d81f6b0794b897c36e12be184"
     },
     "lostRunResponseCleanup": {
-      "name": "production75-local-11008-153d7ef8",
+      "name": "production75-local-35504-0ec7e19b",
       "containerRemoved": true,
       "idRecovered": true,
       "containerAbsent": false,
-      "removedId": "e517044a58b39464de7b0f2bdc57e8efa2377ae12aa021ac1a2d986eeaab96ec"
-    }
+      "removedId": "caf9cc13a8eb7086e9a5f2a7208d5cdff0b1b4222b7f53037426d9efb3278fe2"
+    },
+    "syntheticProviderView": true,
+    "actualProviderExtensionProof": false
   },
   "sourceManifestSha256": "4f62b261bcf0babe7be0c845e69f70459307441a33d7b2b5f14e039ff087d1bb",
-  "testFileSha256": "d74970305f0101407fc0b72e4ea6cff01408436d3d0bdceae587a866cabdb0fc",
+  "testFileSha256": "8be629070e815ce04547f9edea6b9e282b593f10def1beb4bd450012bf526173",
+  "localTestFileSha256": "dac7a97f152e3dff8e3cc6e5ed1dcf570a9dd99d75a9876d7fd5e8623fcb9f57",
   "hostedActions": false,
   "committed": false,
   "pushed": false,
-  "reviewFixes": [
-    "unknown run ID requires one exact-name candidate and both nonce/task labels before verified-ID deletion",
-    "empty/malformed successful run response remains unknown for owned recovery",
-    "Reader login and effective role must each differ from Writer"
-  ],
-  "localTestFileSha256": "dac7a97f152e3dff8e3cc6e5ed1dcf570a9dd99d75a9876d7fd5e8623fcb9f57"
+  "fixtureNormalizationReceipt": "C:/Forge/artifacts/growthos-release-integration-20261012/fixture-json-normalization.json"
 }

@@ -873,4 +873,33 @@ describe("Invoice equipment and warranty", () => {
     expect(section.textContent).toContain("Fictional workmanship terms.");
     expect(section.textContent).toContain("the warranty provider determines coverage");
   });
+
+  it("retains a source without dates in the saved document used for printing", async () => {
+    const snapshot = { assetId, assetVersion: 1, category: "hvac_equipment" as const,
+      label: "Fictional heat pump", manufacturer: null, model: null, serial: null,
+      location: null, installedOn: null, warrantyStartsOn: null, warrantyEndsOn: null,
+      warrantySource: "Fictional registration record" };
+    server("office", scoped({ status: "issued", invoiceNumber: "INV-000002", issuedAt: "2026-10-02T12:00:00Z",
+      document: { ...sampleInvoice().document, equipment: { items: [snapshot], warrantyTerms: null } } }), assetRoute);
+    renderInvoices();
+    const section = await screen.findByRole("region", { name: "Equipment and warranty" });
+    expect(section.textContent).toContain("Recorded warranty: start not recorded to end not recorded (source: Fictional registration record)");
+    expect(section.textContent).toContain("Recorded warranty information is listed for reference; the warranty provider determines coverage.");
+    expect(document.getElementById("customer-invoice-document")?.outerHTML).toContain("Fictional registration record");
+    const append = document.body.append.bind(document.body);
+    let printed = "";
+    vi.spyOn(document.body, "append").mockImplementation((...nodes) => {
+      append(...nodes);
+      const frame = nodes[0] as HTMLIFrameElement;
+      frame.contentWindow!.focus = vi.fn();
+      frame.contentWindow!.print = () => {
+        printed = frame.contentDocument!.body.textContent ?? "";
+        frame.contentWindow!.dispatchEvent(new Event("afterprint"));
+      };
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Print / Save PDF" }));
+    expect(printed).toContain("Fictional registration record");
+    expect(printed).toContain("start not recorded to end not recorded");
+    expect(document.querySelector("iframe")).toBeNull();
+  });
 });

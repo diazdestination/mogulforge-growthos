@@ -1,0 +1,116 @@
+{
+  "kind": "INDEPENDENT_INTEGRATED_INVOICE_AND_PRODUCTION75_REVIEW",
+  "at": "2026-10-12T15:24:59.582Z",
+  "verdict": "GO_FOR_REVIEWED_SOURCE_SCOPE",
+  "base": "87adc3eb21599e84aedcf3a9719b9e996f84f8e0",
+  "workingHead": "3bcdaee08041468c1f0293e9af8f3e2855fa5d78",
+  "uncommittedFixesIncluded": true,
+  "criticalIssues": [],
+  "importantIssues": [],
+  "sourceHashes": {
+    "artifacts/api-server/src/services/invoice-delivery-contract.ts": "6158ef0b98bf29747be5ea6e73f028bee5337303519275611629ab3efe00fb4e",
+    "artifacts/api-server/src/services/invoice-delivery-contract.test.ts": "f4c7d2c05cfec011defad539a5bd80bc482d70c25dd63c7faef3ce162f117629",
+    "artifacts/command-center/src/components/invoice-equipment.tsx": "5d3c99a14ea60aee4a6c1bd5f48984d921032c2c5b5f30127adb7dae3b8a880d",
+    "artifacts/command-center/src/pages/invoices.test.tsx": "f092effffd2689a9f8c34231225e415673143cf8e053a3d1947970111fbacfe3",
+    "scripts/production75-core.mjs": "196a28729f637b678ab9c6cd9cd55420824a8220dbce1dcdafa27abafad90858",
+    "scripts/production75-core.test.mjs": "8be629070e815ce04547f9edea6b9e282b593f10def1beb4bd450012bf526173",
+    "scripts/production75-local.mjs": "495caf65ffa60c023569f402f10f3716bd3203917258ff01e7ce6cd816eb0155",
+    "scripts/production75-local.test.mjs": "dac7a97f152e3dff8e3cc6e5ed1dcf570a9dd99d75a9876d7fd5e8623fcb9f57",
+    "scripts/production75-source.mjs": "5d4d11280ae7bac63f8eb71a7890ad8f3b947930bc6a0368c7be6ee46bf4ad7d",
+    "scripts/production75-pins.mjs": "49659d051413a9df57ce6ab85ddd17cf108ee9f5cffdd4de935e93e8db63475e"
+  },
+  "invoice": {
+    "originalFinding": "invoice_warranty_source_without_dates_hidden",
+    "resolved": true,
+    "scopeSnapshotExportLogicUnchangedFromExactPR42": "6664df1f4b0a4cfbcafe480b68c8f878fab1c8a5",
+    "independentChecks": {
+      "sourceOnlyEmailAndReactViewContainSource": true,
+      "missingDatesExplicit": true,
+      "informationCaveat": true,
+      "oldAndCurrentLegacyOrDatedEmailAndViewByteIdenticalCases": 4,
+      "actualIframePrintRegressionPassed": 1,
+      "uiTestFiltersSkipped": 26
+    },
+    "rootRecordedTdd": {
+      "redApiFailed": 1,
+      "redUiFailed": 1,
+      "greenApiPassed": 12,
+      "greenUiPassed": 34
+    }
+  },
+  "recovery": {
+    "ownershipRetention": "Every original kind/schema/name/sub_name identity is retained; exclusions cover only known source-added table/column identities; unknown additions are compared, never masked.",
+    "independentPurePolicyCases": 16,
+    "phasesChecked": [
+      95,
+      142
+    ],
+    "futurePolicyCannotPermitOriginalOwnerAclLossOrUnknownViewFunctionAddition": true,
+    "wrongSchemaKnownAddedNameRejected": true,
+    "sourceAndPinMechanismUnchanged": true,
+    "sqlSourcePinsVerified": 19,
+    "selected0000": {
+      "createTables": 15,
+      "foreignKeys": 32,
+      "indexes": 21
+    },
+    "dbSchemaDiffVerifiedTypeOnly": true,
+    "native": {
+      "runId": "05010f4b-4153-4abf-a9ed-e907cce1d426",
+      "sha256": "ff02bbdc1995bc3b7429f9759824d806c750201924043ca69e50fdb28d78f0fc",
+      "sourceAndTestHashesVerified": true,
+      "status": "PASS",
+      "physicalLayouts": 2,
+      "originalTables": 75,
+      "originalColumns": 849,
+      "newTablesEmpty": 67,
+      "defaultsVerified": 13,
+      "providerNegativesVerified": 10,
+      "journalsVerified": 40,
+      "clientsClosed": 89,
+      "socketsClosed": 89,
+      "ownedContainersRemoved": 2,
+      "actualProviderExtensionProof": false
+    },
+    "historicalEvidence": {
+      "nativeRun": "90be0806-3986-480d-b7a5-3c9d19299756",
+      "filesPreservedAndHashVerified": 16,
+      "nativeReceiptSha256": "bd75b3c4eb9a5119104b9be31d16b8abfee5b1af0a83087bb4bb7c048494ebfe",
+      "preservationManifestSha256": "a65428d42c8d52f51ca8c3684365b8e1b0f3bca292a4b6ec2531012a07cec1f6"
+    },
+    "rootRecordedFocusedTests": 16,
+    "currentFullScriptsReceiptStatus": {
+      "status": "PENDING_ROOT_RUN"
+    }
+  },
+  "evidenceHashes": {
+    "invoice-source-red-api.log": "2985606030e005be3514d7ef0445986f01bf538c1025e915d122996660017572",
+    "invoice-source-red-ui.log": "c4cc034f4be34119230fdb816d775bdcbc96ab0a773ebbb3e3fb09b881184f18",
+    "invoice-source-green-api.log": "1f0b5821d4918c3ea29f6a2eee37e5439c06e71ff7c4907e2f5bc337a83222ba",
+    "invoice-source-green-ui.log": "09180f634167cb7e1b892be287220bca97631267fda07c70bf103b63eb0530b6",
+    "production75-retention-fix.json": "bad4a1eb83880dacba2fb126ff3f2d5c7a56e9f17e22323a15c114b0f839a27a",
+    "generated-contract-verification.json": "a785d39b19b3f610395698cec956a7de702768416ff06c3d1c8e29365348f287"
+  },
+  "declinedToJudge": [
+    {
+      "behavior": "Final combined-source full native suite/types/builds/Docker and exact publication-headCI.",
+      "reason": "Root-owned concurrent release acceptance; not repeated by this reviewer."
+    },
+    {
+      "behavior": "Customer CSV logic and remaining merged launch changes.",
+      "reason": "Covered by separately assigned independent reviewer."
+    },
+    {
+      "behavior": "Hosted migrations/provider-extension compatibility/live delivery/rotation/cutover/paid restore-copy execution.",
+      "reason": "Source-only scope; no authority expansion or provider evidence implied."
+    }
+  ],
+  "reviewerActions": {
+    "sourceEdits": 0,
+    "gitMutations": 0,
+    "providerCalls": 0,
+    "authOrKeyReads": 0,
+    "liveDatabaseActions": 0,
+    "nativeOrFullSuiteRerun": false
+  }
+}

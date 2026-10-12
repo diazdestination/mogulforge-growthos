@@ -8,7 +8,7 @@ import {
   usersTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import {
@@ -93,6 +93,26 @@ describe("customer/service CSV import", () => {
     source: "housecall-pro",
     noticeDays: 21,
   };
+
+  it.each([false, true])("refuses malformed CSV with a safe validation result before service queries or writes (commit=%s)", async (commit) => {
+    const select = vi.spyOn(db, "select");
+    const insert = vi.spyOn(db, "insert");
+    const transaction = vi.spyOn(db, "transaction");
+    try {
+      for (const csv of [
+        'First,Email\n"Ann","ann@example.invalid\nBob,bob@example.invalid\n',
+        'First,Email\nAn"n,ann@example.invalid\n',
+        'First,Email\n"Ann"x,ann@example.invalid\n',
+      ]) {
+        expect(await importServiceCustomers(orgA, actorA, { ...input, csv, commit })).toEqual({ error: "invalid_csv" });
+      }
+      expect(select).not.toHaveBeenCalled();
+      expect(insert).not.toHaveBeenCalled();
+      expect(transaction).not.toHaveBeenCalled();
+    } finally {
+      select.mockRestore(); insert.mockRestore(); transaction.mockRestore();
+    }
+  });
 
   it("previews without saving, then imports customers without consent or opportunities", async () => {
     const preview = await importServiceCustomers(orgA, actorA, { ...input, commit: false });

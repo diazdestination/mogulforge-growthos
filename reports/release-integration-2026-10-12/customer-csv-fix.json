@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "recordedAtUtc": "2026-10-12T15:05:57.3827514Z",
+  "status": "focused-green-ready-for-independent-review",
+  "repository": "diazdestination/mogulforge-growthos",
+  "workspace": "C:\\Forge\\worktrees\\growthos-db-recovery-20261010",
+  "branch": "agent/growthos-release-integration-20261012",
+  "integrationHeadAtReceipt": "3bcdaee08041468c1f0293e9af8f3e2855fa5d78",
+  "ownership": "Customer CSV fix worker; root owns combined verification, independent review, staging, commits and remote integration.",
+  "extensionScope": "Parent explicitly added service-obligations.ts and its focused test to convert the shared parser failure into a safe normal validation result before DB work.",
+  "files": [
+    {
+      "path": "artifacts/api-server/src/services/reactivation.ts",
+      "sha256": "bd0dc5f590ad3306c957c29f3576e32e5b6e24d34bc08fd24ca469eb97ad54dc"
+    },
+    {
+      "path": "artifacts/api-server/src/services/reactivation.test.ts",
+      "sha256": "bc52ef3738f5a338c89fdd938a9910c86c6ca3a172d187516b343b0524bad4f1"
+    },
+    {
+      "path": "artifacts/api-server/src/services/service-obligations.ts",
+      "sha256": "7536f3be7a4b6c160f72c0243951405988aa28f2900ccff1a05c0c5707fd7432"
+    },
+    {
+      "path": "artifacts/api-server/src/services/service-obligations.test.ts",
+      "sha256": "e08963dc627b9a01f6c819202feac688ca4b46cb0c8eb3fe84464729e4740dbe"
+    },
+    {
+      "path": "artifacts/command-center/src/lib/csv-preview.ts",
+      "sha256": "4da08826f065f7f7268758375d6cfc3d71342b6e760a193a7e2d7b95c35cc56c"
+    },
+    {
+      "path": "artifacts/command-center/src/lib/csv-preview.test.ts",
+      "sha256": "3c97e57a298c3139c077751f99fbfb4a985a1e8f1321f6b50b3ed04a907894f4"
+    },
+    {
+      "path": "artifacts/command-center/src/components/housecall-customer-import.tsx",
+      "sha256": "b37dcdaeed82f9a9b0ed39484230bf960016bbaa397ddfb62550d01d585d45e0"
+    },
+    {
+      "path": "artifacts/command-center/src/components/housecall-customer-import.test.tsx",
+      "sha256": "4f58fa6718c6b8d6a00c8bf8b6460392465b340a4bd275e20ddc8d40f1daa4cb"
+    }
+  ],
+  "changes": [
+    "Reject unterminated quotes, quotes embedded in unquoted fields and text after closing quotes. Validate the whole frontend CSV even after the sample row limit.",
+    "Preserve BOM, CRLF, quoted commas, doubled quotes and multiline quoted fields. Malformed customer CSV returns a safe error before any service query or write in preview and apply.",
+    "Validate every supplied mapped email and phone before truncation; reject raw control characters, excess length and malformed values with safe row errors. A valid alternate channel does not cause an invalid mapped field to be silently discarded.",
+    "Email uses the existing 200-character import bound and Zod mailbox validation, then trimming/lowercasing. Phone retains the 40-character import bound, seven-digit minimum, source formatting and existing normalization; bounded extensions follow the customer correction policy, with international slash separators retained.",
+    "File read, parse and abort failures produce a safe visible error with no preview/import opportunity or unhandled rejection.",
+    "The shared service customer importer catches only CsvParseError and returns invalid_csv, which its existing route treats as400. Unexpected failures are not masked."
+  ],
+  "red": [
+    {
+      "command": "node scripts/local-dev.mjs test src/services/reactivation.test.ts",
+      "exitCode": 1,
+      "tests": 25,
+      "failed": 8,
+      "passed": 17,
+      "log": "customer-csv-api-red.log",
+      "observed": "Original malformed input was counted as1 imported in preview and apply; invalid mapped address fixtures were counted as10 imported and1 duplicate instead of12 skipped. BOM and malformed-quote parser regressions failed."
+    },
+    {
+      "command": "pnpm --filter @workspace/command-center run test src/lib/csv-preview.test.ts src/components/housecall-customer-import.test.tsx",
+      "exitCode": 1,
+      "tests": 18,
+      "failed": 8,
+      "passed": 10,
+      "unhandledErrors": 1,
+      "log": "customer-csv-ui-red.log",
+      "observed": "All five malformed CSV cases were accepted, including after the sample limit; file read and abort did not display a safe error, with one reproduced unhandled rejection."
+    },
+    {
+      "command": "node scripts/local-dev.mjs test src/services/reactivation.test.ts",
+      "exitCode": 1,
+      "tests": 25,
+      "failed": 1,
+      "passed": 24,
+      "log": "customer-csv-phone-format-red.log",
+      "observed": "The new slash-format compatibility regression was rejected by the initial validation regex; admitting slash separators restored the existing format without changing normalization."
+    },
+    {
+      "command": "node scripts/local-dev.mjs test src/services/service-obligations.test.ts",
+      "exitCode": 1,
+      "tests": 5,
+      "failed": 2,
+      "passed": 3,
+      "log": "customer-csv-shared-caller-red.log",
+      "observed": "Both preview and apply propagated CsvParseError instead of a normal safe validation result."
+    }
+  ],
+  "green": [
+    {
+      "command": "node scripts/local-dev.mjs test src/services/reactivation.test.ts src/services/service-obligations.test.ts",
+      "exitCode": 0,
+      "files": 2,
+      "tests": 30,
+      "passed": 30,
+      "failed": 0,
+      "log": "customer-csv-services-final-green.log"
+    },
+    {
+      "command": "pnpm --filter @workspace/command-center run test src/lib/csv-preview.test.ts src/components/housecall-customer-import.test.tsx",
+      "exitCode": 0,
+      "files": 2,
+      "tests": 18,
+      "passed": 18,
+      "failed": 0,
+      "unhandledErrors": 0,
+      "log": "customer-csv-ui-green.log"
+    },
+    {
+      "command": "git diff --check -- <the eight owned files>",
+      "exitCode": 0,
+      "result": "No whitespace errors"
+    }
+  ],
+  "warnings": [
+    "Existing pnpm configuration deprecation warning.",
+    "Existing Vite React/esbuild and oxc option deprecation warnings.",
+    "Expected provider-down stderr emitted by the existing campaign crash-safety regression; its test passes."
+  ],
+  "fixtureAndCleanup": {
+    "apiRunner": "Existing native scripts/local-dev.mjs used only its generated loopback PostgreSQL16 fixture URL, fixture credentials and environment allowlist.",
+    "cleanup": "Every native invocation returned after the runner label-checked and removed its own disposable container in finally; its owned WSL session closes after cleanup. No shared WSL termination or unrelated container cleanup.",
+    "liveAccess": "No live database, provider, auth store, key or real customer record accessed."
+  },
+  "boundaries": [
+    "Customer mode remains contacts only with existing tenant scoping, contact matching restrictions and provenance.",
+    "No consent, leads or nurture activity added.",
+    "No full Housecall history, preset or undo claim.",
+    "No schemas, invoice code, production75 scripts, provider routes, docs, Git staging/commits/push changed by this worker."
+  ],
+  "pending": [
+    "Root combined full suites/type checks/builds/parity and independent review; focused success is not a project-wide or hosted acceptance claim."
+  ],
+  "logs": [
+    {
+      "path": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\customer-csv-api-red.log",
+      "sha256": "dc41ce24d826c61fffa87a3d33507f18cfa6b8a691bf87b27a3d7f88447ac25f"
+    },
+    {
+      "path": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\customer-csv-ui-red.log",
+      "sha256": "f0275c2057c24ceee8d151ec9a5c6cb3c578bace78faaf7492fc99d0c4b3c947"
+    },
+    {
+      "path": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\customer-csv-api-green.log",
+      "sha256": "161ee2fcb240761cabdac3bca03f44c4e86fcd3e8fee3480685ca891764e8128"
+    },
+    {
+      "path": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\customer-csv-ui-green.log",
+      "sha256": "3f94994c5dc3ce1f02bb7c72c8ad36d4c55a6c4a26eb48489d8bfd249b8129b2"
+    },
+    {
+      "path": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\customer-csv-phone-format-red.log",
+      "sha256": "8d1571e8018c6327aa0fa94a2e8f22f9aaea6ab00f87c5c5bf49bd2db002f5a7"
+    },
+    {
+      "path": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\customer-csv-api-final-green.log",
+      "sha256": "02a1be104b6dcfdb967da1120e0a5a07f7ec71833a2228b080d8fdc85bf610d9"
+    },
+    {
+      "path": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\customer-csv-shared-caller-red.log",
+      "sha256": "c654d7b1993a917ed25fdb39d1ec4c50325a8870779d40e713c25ce365413bac"
+    },
+    {
+      "path": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\customer-csv-services-final-green.log",
+      "sha256": "b576d4874a7d797262af6748b9a6006cc7ad27749ba0043c9f45ae9132f8e8b8"
+    }
+  ]
+}

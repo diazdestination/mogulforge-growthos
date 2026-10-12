@@ -1,5 +1,18 @@
 # Next acceptance work
 
+## October12 combined launch candidate — local gates passed
+
+PR35 plus39–43 are combined on agent/growthos-release-integration-20261012.
+Independent review corrections cover strict CSV/address handling, source-only
+warranty rendering and preservation of provider-owned recovery metadata.
+4457 full-suite tests passed (15 skipped), types/both builds/Docker parity passed,
+and fictional browser import/preview checks passed. Source remains142 tables;
+all19 SQL pins are unchanged. The real Fly75 upgrade, supported credential
+retirement and client/provider/device/payment/cutover gates remain open.
+See reports/release-integration-2026-10-12.md and its companion receipts.
+Exact publication-head GitHub CI is still required; no hosted actions occurred.
+
+
 ## October 10 current order
 
 1. Accept PR30 plus canonical main d6be1e1 as one isolated candidate under

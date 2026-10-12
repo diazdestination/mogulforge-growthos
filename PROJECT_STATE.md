@@ -1,5 +1,51 @@
 # GrowthOS project state
 
+## October12 combined launch candidate — local gates passed
+
+PR35 plus39–43 are combined on agent/growthos-release-integration-20261012.
+Independent review corrections cover strict CSV/address handling, source-only
+warranty rendering and preservation of provider-owned recovery metadata.
+4457 full-suite tests passed (15 skipped), types/both builds/Docker parity passed,
+and fictional browser import/preview checks passed. Source remains142 tables;
+all19 SQL pins are unchanged. The real Fly75 upgrade, supported credential
+retirement and client/provider/device/payment/cutover gates remain open.
+See reports/release-integration-2026-10-12.md and its companion receipts.
+Exact publication-head GitHub CI is still required; no hosted actions occurred.
+
+
+## October 12 reviewed production restore retry — PASS, owned copy deleted
+
+New owner grant71fed7d3 consumed one restore POST201 and exact-owned DELETE202.
+The restored copy matched all three source databases/150table fingerprints/
+184records/full catalogs, permissions, ACLs, roles/settings and extension
+definitions. Fresh source-after matches; all read-only transactions rolled
+back and owned clients/sockets/proxies/agents closed. Copyq49ypo494e2017ln is
+terminal deleted and absent; originals and both stopped app configurations/
+secret metadata are unchanged.459.529seconds, cost estimateUSD0.07, billing
+unverified. Independent review accepted the V1 correction and final receipts.
+SourceHEAD remains87adc3e; prior64ddbaa9 FAIL remains preserved.
+
+Approved invoice6664df1 is published as draftPR42 against this branch.
+Local leaked-credential log redaction is recorded with service/backups/disk-WAL
+limitations. Rotation remains approved but deferred: providerV1 native rotation
+is unsupported; any V2 migration and production cutover/private-health start
+need separately admitted scope. No migration/cutover/secret/config/deployment
+occurred. Managed75-to142 upgrade/recovery and client acceptance remain open.
+See reports/production75-recovery-2026-10-11/managed-restore-retry-2026-10-12.md
+and C:\Forge\GROWTHOS_PRODUCTION_RESTORE_RETRY_2026-10-12.md.
+
+## October 12 production restore attempt — FAIL, cleanup verified
+
+PR35/87adc3e one-resource grant was consumed by one restore POST201 and one
+exact-owned DELETE202. Copy nlkxjo5wz64oy93v is terminal deleted and absent.
+Legacy API attachment metadata omission stopped restored-copy SQL verification;
+the production restore gate remains open. All three original DB snapshots and
+both stopped app configuration/secret metadata match, and all transports closed.
+Best costUSD0.07,3m42s through final verification; final billing unverified.
+No replacement, migration/cutover, secret-config or deployment authority.
+See reports/production75-recovery-2026-10-11/managed-restore-2026-10-12.md;
+correct/review V1 response handling and obtain fresh paid-restore approval next.
+
 ## October 10 consolidated local workday
 
 PR30 baf2c335 already contains PR28/29, GEEKOM's approved contractor/specialist

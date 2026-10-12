@@ -117,9 +117,90 @@ describe("parseCsv", () => {
       ['say "hi"', "y"],
     ]);
   });
+
+  it("preserves a BOM and multiline quoted fields", () => {
+    expect(parseCsv('\uFEFFFirst,Email\r\n"Ann\r\nAble",ann@example.invalid\r\n')).toEqual([
+      ["First", "Email"], ["Ann\r\nAble", "ann@example.invalid"],
+    ]);
+  });
+
+  it.each([
+    'First,Email\n"Ann","ann@example.invalid\nBob,bob@example.invalid\n',
+    'First,Email\nAn"n,ann@example.invalid\n',
+    'First,Email\n"Ann"x,ann@example.invalid\n',
+  ])("rejects malformed quotes rather than combining or changing fields", (csv) => {
+    expect(() => parseCsv(csv)).toThrow(/CSV.*quot/i);
+  });
 });
 
 describe("importLeads", () => {
+  it.each([true, false])("refuses malformed customer CSV before service queries or writes (dryRun=%s)", async (dryRun) => {
+    const select = vi.spyOn(db, "select");
+    const insert = vi.spyOn(db, "insert");
+    const transaction = vi.spyOn(db, "transaction");
+    try {
+      for (const csv of [
+        'First,Email\n"Ann","ann@example.invalid\nBob,bob@example.invalid\n',
+        'First,Email\nAn"n,ann@example.invalid\n',
+        'First,Email\n"Ann"x,ann@example.invalid\n',
+      ]) {
+        const result = await importLeads(orgId, { csv, mapping: { firstName: 0, email: 1 }, mode: "customers", dryRun });
+        expect(result).toMatchObject({ error: expect.stringMatching(/CSV.*quot/i) });
+        expect(JSON.stringify(result)).not.toContain("ann@example.invalid");
+      }
+      expect(select).not.toHaveBeenCalled();
+      expect(insert).not.toHaveBeenCalled();
+      expect(transaction).not.toHaveBeenCalled();
+    } finally {
+      select.mockRestore(); insert.mockRestore(); transaction.mockRestore();
+    }
+  });
+
+  it.each([true, false])("skips invalid mapped email and phone without truncating or discarding them (dryRun=%s)", async (dryRun) => {
+    const tag = crypto.randomUUID();
+    const oversizedEmail = `${"a".repeat(64)}@${"b".repeat(63)}.${"c".repeat(63)}.example.test`;
+    const invalid = [
+      { email: "not-an-email", phone: "+44 20 7946 0123" },
+      { email: "a..b@example.invalid", phone: "" },
+      { email: "ann@example..invalid", phone: "" },
+      { email: "ann@@example.invalid", phone: "" },
+      { email: "\tann@example.invalid", phone: "" },
+      { email: "ann@example.invalid\nBob", phone: "" },
+      { email: oversizedEmail, phone: "" },
+      { email: `valid-${tag}@example.invalid`, phone: "call 4045550199" },
+      { email: "", phone: "4045550199\t" },
+      { email: "", phone: "4".repeat(41) },
+      { email: "", phone: "4".repeat(24) },
+      { email: "", phone: "123456" },
+    ];
+    const csv = ["First,Email,Phone", ...invalid.map(({ email, phone }, i) => `Invalid${i},"${email}","${phone}"`)].join("\n");
+    const contactsBefore = await db.select({ id: contactsTable.id }).from(contactsTable).where(eq(contactsTable.organizationId, orgId));
+    const result = await importLeads(orgId, { csv, mapping: { firstName: 0, email: 1, phone: 2 }, mode: "customers", dryRun });
+    if ("error" in result) throw new Error(result.error);
+    expect(result).toMatchObject({ imported: 0, updated: 0, duplicates: 0, conflicts: 0, skipped: invalid.length });
+    expect(result.errors).toHaveLength(invalid.length);
+    expect(result.errors.every((error) => /^Row \d+:/.test(error))).toBe(true);
+    expect(result.errors.join("\n")).not.toMatch(/ann@|call 404|valid-/);
+    expect(await db.select({ id: contactsTable.id }).from(contactsTable).where(eq(contactsTable.organizationId, orgId))).toEqual(contactsBefore);
+  });
+
+  it("preserves international phone formatting, extensions and optional blanks in customer imports", async () => {
+    const tag = crypto.randomUUID();
+    const input = {
+      csv: `First,Last,Email,Phone\nPhoneOnly,,,"+44 (0)20 7946 0123 ext. 123"\nEmailOnly,,"  Mixed-${tag}@Example.invalid  ",\nLocalPhone,,,5550199\nSlashPhone,,,+49 (0)30/12345678`,
+      mapping: { firstName: 0, lastName: 1, email: 2, phone: 3 }, mode: "customers" as const,
+    };
+    expect(await importLeads(orgId, { ...input, dryRun: true })).toMatchObject({ imported: 4, skipped: 0 });
+    expect(await importLeads(orgId, input)).toMatchObject({ imported: 4, skipped: 0 });
+    const contacts = await db.select().from(contactsTable).where(and(eq(contactsTable.organizationId, orgId), sql`${contactsTable.firstName} in ('PhoneOnly', 'EmailOnly', 'LocalPhone', 'SlashPhone')`));
+    expect(contacts.map(({ firstName, lastName, email, phone }) => ({ firstName, lastName, email, phone })).sort((a, b) => a.firstName.localeCompare(b.firstName))).toEqual([
+      { firstName: "EmailOnly", lastName: null, email: `mixed-${tag}@example.invalid`, phone: null },
+      { firstName: "LocalPhone", lastName: null, email: null, phone: "5550199" },
+      { firstName: "PhoneOnly", lastName: null, email: null, phone: "+44 (0)20 7946 0123 ext. 123" },
+      { firstName: "SlashPhone", lastName: null, email: null, phone: "+49 (0)30/12345678" },
+    ]);
+  });
+
   it("imports, dedupes, flags suppressed, and skips invalid rows", async () => {
     // Existing contact to collide with.
     await makeLead(orgId, { email: "existing@example.com" });

@@ -22,6 +22,7 @@ function readText(file: File) {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ""));
     reader.onerror = () => reject(reader.error);
+    reader.onabort = () => reject(new Error("File read aborted"));
     reader.readAsText(file);
   });
 }
@@ -74,11 +75,15 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
       return;
     }
     if (selected.size > MAX_BYTES) { setError("The file is larger than 5 MB. Contact us and we will help split it."); return; }
-    const text = await readText(selected);
-    const [header = [], ...samples] = parseCsvPreview(text, 6);
-    if (header.length < 2) { setError("No columns were found. Upload the CSV file from the Housecall Pro email."); return; }
-    setFile({ name: selected.name, text, header, samples });
-    setMapping(suggestCustomerMapping(header));
+    try {
+      const text = await readText(selected);
+      const [header = [], ...samples] = parseCsvPreview(text, 6);
+      if (header.length < 2) { setError("No columns were found. Upload the CSV file from the Housecall Pro email."); return; }
+      setFile({ name: selected.name, text, header, samples });
+      setMapping(suggestCustomerMapping(header));
+    } catch {
+      setError("The CSV could not be read. Check that it is a valid CSV file and upload it again. Nothing was imported.");
+    }
   }
 
   async function run(dryRun: boolean) {

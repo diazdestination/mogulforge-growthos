@@ -1,13 +1,13 @@
 {
   "kind": "LOCAL_POSTGRES16_PRODUCTION75_REHEARSAL",
-  "startedAt": "2026-10-11T06:42:57.323Z",
-  "runId": "90be0806-3986-480d-b7a5-3c9d19299756",
+  "startedAt": "2026-10-12T14:59:43.845Z",
+  "runId": "05010f4b-4153-4abf-a9ed-e907cce1d426",
   "sourceCommit": "7091af816715cfd437925eb0af82fb47d3411e34",
   "sourceHashes": {
-    "production75-core.mjs": "93cfc5199443c131f7f4c7c588f2c848559361cb2f75d0690280aee7d77cf9d3",
+    "production75-core.mjs": "196a28729f637b678ab9c6cd9cd55420824a8220dbce1dcdafa27abafad90858",
     "production75-source.mjs": "5d4d11280ae7bac63f8eb71a7890ad8f3b947930bc6a0368c7be6ee46bf4ad7d",
     "production75-pins.mjs": "49659d051413a9df57ce6ab85ddd17cf108ee9f5cffdd4de935e93e8db63475e",
-    "production75-local.mjs": "598a3be862dccec628b1e404f575974a7799c69048de36a4ed862f8b3451801e"
+    "production75-local.mjs": "495caf65ffa60c023569f402f10f3716bd3203917258ff01e7ce6cd816eb0155"
   },
   "status": "PASS",
   "hostedAccess": false,
@@ -188,7 +188,7 @@
             "table": "contacts",
             "rows": 2,
             "bytes": 773,
-            "digest": "7fc967193b8aedd90f004326012607e4"
+            "digest": "a3850fee94a74fcbc49aa5d1b2d80010"
           },
           {
             "table": "conversation_messages",
@@ -236,7 +236,7 @@
             "table": "estimates",
             "rows": 2,
             "bytes": 904,
-            "digest": "d555b27361700605abffc44692492af8"
+            "digest": "73ecf0988d08569ac3ba39b2344da0e6"
           },
           {
             "table": "form_submissions",
@@ -290,7 +290,7 @@
             "table": "lead_imports",
             "rows": 2,
             "bytes": 693,
-            "digest": "1bf079b1592ec39caa8d84ed224669d3"
+            "digest": "00aeb9922cf9fda57477f3f3608eeabe"
           },
           {
             "table": "lead_tags",
@@ -302,7 +302,7 @@
             "table": "leads",
             "rows": 2,
             "bytes": 1467,
-            "digest": "1399cffe2ff41579bd6da7c593e6067d"
+            "digest": "88016d741e06ebd7e99c54c3466c4f03"
           },
           {
             "table": "message_templates",
@@ -326,13 +326,13 @@
             "table": "org_settings",
             "rows": 2,
             "bytes": 1360,
-            "digest": "f15bf21cc3a221bc01d39287eb720023"
+            "digest": "9ed9e27a70a412e8045bc52461e43fae"
           },
           {
             "table": "organizations",
             "rows": 2,
-            "bytes": 728,
-            "digest": "e90db3b3bc10a0ace792e2e1702d13dc"
+            "bytes": 726,
+            "digest": "04892d6d36db933f98e178bf3076e11c"
           },
           {
             "table": "playbook_decisions",
@@ -374,7 +374,7 @@
             "table": "projects",
             "rows": 2,
             "bytes": 852,
-            "digest": "7a4ecd3ae05645210b0cb064dcd670d8"
+            "digest": "a922f521e9479d4a1199d616c59d9dcb"
           },
           {
             "table": "properties",
@@ -409,8 +409,8 @@
           {
             "table": "scheduled_actions",
             "rows": 6,
-            "bytes": 2522,
-            "digest": "14628e6893f99e4eab4b8635c7a4b50b"
+            "bytes": 2520,
+            "digest": "bacf96622f9d776251a1eb476cbc03be"
           },
           {
             "table": "sessions",
@@ -464,7 +464,7 @@
             "table": "users",
             "rows": 2,
             "bytes": 772,
-            "digest": "1b876b40200b30e824a28055d05e4fe7"
+            "digest": "a20983f1d9ef21e355ff60d21eff7a44"
           },
           {
             "table": "webhook_deliveries",
@@ -479,7 +479,7 @@
             "digest": "d41d8cd98f00b204e9800998ecf8427e"
           }
         ],
-        "policySha256": "1eed2e4cf1b13cf1e21072e1e408e0ec8736918d6c6c88c64b506a47bdff85ce",
+        "policySha256": "2c7114a62e59c7b74e23993e372bf6d27276b8fdf56e683f87a6e63f4f4d1b34",
         "defaults": [],
         "newTables": []
       },
@@ -499,7 +499,7 @@
             "pid": true
           },
           "errorCode": "production75_baseline_drift",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-same-count-data.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-same-count-data.jsonl"
         },
         "column-type": {
           "status": "failed",
@@ -516,7 +516,7 @@
             "pid": true
           },
           "errorCode": "production75_unrecognized_catalog",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-column-type.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-column-type.jsonl"
         },
         "column-default": {
           "status": "failed",
@@ -533,7 +533,7 @@
             "pid": true
           },
           "errorCode": "production75_unrecognized_catalog",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-column-default.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-column-default.jsonl"
         },
         "new-table-collision": {
           "status": "failed",
@@ -550,7 +550,7 @@
             "pid": true
           },
           "errorCode": "production75_unrecognized_catalog",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-new-table-collision.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-new-table-collision.jsonl"
         },
         "table-acl": {
           "status": "failed",
@@ -567,7 +567,7 @@
             "pid": true
           },
           "errorCode": "production75_baseline_drift",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-table-acl.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-table-acl.jsonl"
         },
         "column-acl": {
           "status": "failed",
@@ -584,7 +584,7 @@
             "pid": true
           },
           "errorCode": "production75_baseline_drift",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-column-acl.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-column-acl.jsonl"
         },
         "reader-permission": {
           "status": "failed",
@@ -601,7 +601,92 @@
             "pid": true
           },
           "errorCode": "production75_baseline_drift",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-reader-permission.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-reader-permission.jsonl"
+        },
+        "provider-view-acl": {
+          "status": "failed",
+          "commitDispatched": false,
+          "commitAcknowledged": false,
+          "rollbackAcknowledged": true,
+          "stepsAcknowledged": 0,
+          "requiresFreshReader": false,
+          "initialIdentityChecks": {
+            "database": true,
+            "login": true,
+            "role": true,
+            "version": true,
+            "pid": true
+          },
+          "errorCode": "production75_baseline_drift",
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-provider-view-acl.jsonl"
+        },
+        "provider-column-acl": {
+          "status": "failed",
+          "commitDispatched": false,
+          "commitAcknowledged": false,
+          "rollbackAcknowledged": true,
+          "stepsAcknowledged": 0,
+          "requiresFreshReader": false,
+          "initialIdentityChecks": {
+            "database": true,
+            "login": true,
+            "role": true,
+            "version": true,
+            "pid": true
+          },
+          "errorCode": "production75_baseline_drift",
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-provider-column-acl.jsonl"
+        },
+        "provider-view-removal": {
+          "status": "failed",
+          "commitDispatched": false,
+          "commitAcknowledged": false,
+          "rollbackAcknowledged": true,
+          "stepsAcknowledged": 0,
+          "requiresFreshReader": false,
+          "initialIdentityChecks": {
+            "database": true,
+            "login": true,
+            "role": true,
+            "version": true,
+            "pid": true
+          },
+          "errorCode": "production75_baseline_drift",
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-provider-view-removal.jsonl"
+        },
+        "provider-view-owner": {
+          "status": "failed",
+          "commitDispatched": false,
+          "commitAcknowledged": false,
+          "rollbackAcknowledged": true,
+          "stepsAcknowledged": 0,
+          "requiresFreshReader": false,
+          "initialIdentityChecks": {
+            "database": true,
+            "login": true,
+            "role": true,
+            "version": true,
+            "pid": true
+          },
+          "errorCode": "production75_baseline_drift",
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-provider-view-owner.jsonl"
+        },
+        "provider-rogue-addition": {
+          "status": "failed",
+          "commitDispatched": false,
+          "commitAcknowledged": false,
+          "rollbackAcknowledged": true,
+          "stepsAcknowledged": 0,
+          "requiresFreshReader": false,
+          "initialIdentityChecks": {
+            "database": true,
+            "login": true,
+            "role": true,
+            "version": true,
+            "pid": true
+          },
+          "errorCode": "production75_baseline_drift",
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-provider-rogue-addition.jsonl"
         },
         "bridge-rollback": {
           "status": "rehearsed-rolled-back",
@@ -636,7 +721,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 91,
+              "pid": 101,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -803,7 +888,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "7fc967193b8aedd90f004326012607e4"
+                "digest": "a3850fee94a74fcbc49aa5d1b2d80010"
               },
               {
                 "table": "conversation_messages",
@@ -851,7 +936,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "d555b27361700605abffc44692492af8"
+                "digest": "73ecf0988d08569ac3ba39b2344da0e6"
               },
               {
                 "table": "form_submissions",
@@ -905,7 +990,7 @@
                 "table": "lead_imports",
                 "rows": 2,
                 "bytes": 693,
-                "digest": "1bf079b1592ec39caa8d84ed224669d3"
+                "digest": "00aeb9922cf9fda57477f3f3608eeabe"
               },
               {
                 "table": "lead_tags",
@@ -917,7 +1002,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "1399cffe2ff41579bd6da7c593e6067d"
+                "digest": "88016d741e06ebd7e99c54c3466c4f03"
               },
               {
                 "table": "message_templates",
@@ -941,13 +1026,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "f15bf21cc3a221bc01d39287eb720023"
+                "digest": "9ed9e27a70a412e8045bc52461e43fae"
               },
               {
                 "table": "organizations",
                 "rows": 2,
-                "bytes": 728,
-                "digest": "e90db3b3bc10a0ace792e2e1702d13dc"
+                "bytes": 726,
+                "digest": "04892d6d36db933f98e178bf3076e11c"
               },
               {
                 "table": "playbook_decisions",
@@ -989,7 +1074,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "7a4ecd3ae05645210b0cb064dcd670d8"
+                "digest": "a922f521e9479d4a1199d616c59d9dcb"
               },
               {
                 "table": "properties",
@@ -1024,8 +1109,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "14628e6893f99e4eab4b8635c7a4b50b"
+                "bytes": 2520,
+                "digest": "bacf96622f9d776251a1eb476cbc03be"
               },
               {
                 "table": "sessions",
@@ -1079,7 +1164,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "1b876b40200b30e824a28055d05e4fe7"
+                "digest": "a20983f1d9ef21e355ff60d21eff7a44"
               },
               {
                 "table": "webhook_deliveries",
@@ -1094,7 +1179,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "1eed2e4cf1b13cf1e21072e1e408e0ec8736918d6c6c88c64b506a47bdff85ce",
+            "policySha256": "2c7114a62e59c7b74e23993e372bf6d27276b8fdf56e683f87a6e63f4f4d1b34",
             "defaults": [],
             "newTables": []
           },
@@ -1105,7 +1190,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 91,
+              "pid": 101,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -1272,7 +1357,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "7fc967193b8aedd90f004326012607e4"
+                "digest": "a3850fee94a74fcbc49aa5d1b2d80010"
               },
               {
                 "table": "conversation_messages",
@@ -1320,7 +1405,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "d555b27361700605abffc44692492af8"
+                "digest": "73ecf0988d08569ac3ba39b2344da0e6"
               },
               {
                 "table": "form_submissions",
@@ -1374,7 +1459,7 @@
                 "table": "lead_imports",
                 "rows": 2,
                 "bytes": 693,
-                "digest": "1bf079b1592ec39caa8d84ed224669d3"
+                "digest": "00aeb9922cf9fda57477f3f3608eeabe"
               },
               {
                 "table": "lead_tags",
@@ -1386,7 +1471,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "1399cffe2ff41579bd6da7c593e6067d"
+                "digest": "88016d741e06ebd7e99c54c3466c4f03"
               },
               {
                 "table": "message_templates",
@@ -1410,13 +1495,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "f15bf21cc3a221bc01d39287eb720023"
+                "digest": "9ed9e27a70a412e8045bc52461e43fae"
               },
               {
                 "table": "organizations",
                 "rows": 2,
-                "bytes": 728,
-                "digest": "e90db3b3bc10a0ace792e2e1702d13dc"
+                "bytes": 726,
+                "digest": "04892d6d36db933f98e178bf3076e11c"
               },
               {
                 "table": "playbook_decisions",
@@ -1458,7 +1543,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "7a4ecd3ae05645210b0cb064dcd670d8"
+                "digest": "a922f521e9479d4a1199d616c59d9dcb"
               },
               {
                 "table": "properties",
@@ -1493,8 +1578,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "14628e6893f99e4eab4b8635c7a4b50b"
+                "bytes": 2520,
+                "digest": "bacf96622f9d776251a1eb476cbc03be"
               },
               {
                 "table": "sessions",
@@ -1548,7 +1633,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "1b876b40200b30e824a28055d05e4fe7"
+                "digest": "a20983f1d9ef21e355ff60d21eff7a44"
               },
               {
                 "table": "webhook_deliveries",
@@ -1563,7 +1648,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "b72dd8479268174f676db1513b80f610a0786c7a23fc60543e7b23a022936b45",
+            "policySha256": "11aea57e11be170f656e67f166e97480effe432f7926c3444a313f5fe1eea9c6",
             "defaults": [
               "org_settings.customer_email_sender_user_id"
             ],
@@ -1590,7 +1675,7 @@
               "value_entries"
             ]
           },
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-bridge-rollback.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-bridge-rollback.jsonl"
         },
         "full-rollback": {
           "status": "rehearsed-rolled-back",
@@ -1625,7 +1710,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 93,
+              "pid": 103,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -1792,7 +1877,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "7fc967193b8aedd90f004326012607e4"
+                "digest": "a3850fee94a74fcbc49aa5d1b2d80010"
               },
               {
                 "table": "conversation_messages",
@@ -1840,7 +1925,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "d555b27361700605abffc44692492af8"
+                "digest": "73ecf0988d08569ac3ba39b2344da0e6"
               },
               {
                 "table": "form_submissions",
@@ -1894,7 +1979,7 @@
                 "table": "lead_imports",
                 "rows": 2,
                 "bytes": 693,
-                "digest": "1bf079b1592ec39caa8d84ed224669d3"
+                "digest": "00aeb9922cf9fda57477f3f3608eeabe"
               },
               {
                 "table": "lead_tags",
@@ -1906,7 +1991,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "1399cffe2ff41579bd6da7c593e6067d"
+                "digest": "88016d741e06ebd7e99c54c3466c4f03"
               },
               {
                 "table": "message_templates",
@@ -1930,13 +2015,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "f15bf21cc3a221bc01d39287eb720023"
+                "digest": "9ed9e27a70a412e8045bc52461e43fae"
               },
               {
                 "table": "organizations",
                 "rows": 2,
-                "bytes": 728,
-                "digest": "e90db3b3bc10a0ace792e2e1702d13dc"
+                "bytes": 726,
+                "digest": "04892d6d36db933f98e178bf3076e11c"
               },
               {
                 "table": "playbook_decisions",
@@ -1978,7 +2063,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "7a4ecd3ae05645210b0cb064dcd670d8"
+                "digest": "a922f521e9479d4a1199d616c59d9dcb"
               },
               {
                 "table": "properties",
@@ -2013,8 +2098,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "14628e6893f99e4eab4b8635c7a4b50b"
+                "bytes": 2520,
+                "digest": "bacf96622f9d776251a1eb476cbc03be"
               },
               {
                 "table": "sessions",
@@ -2068,7 +2153,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "1b876b40200b30e824a28055d05e4fe7"
+                "digest": "a20983f1d9ef21e355ff60d21eff7a44"
               },
               {
                 "table": "webhook_deliveries",
@@ -2083,7 +2168,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "1eed2e4cf1b13cf1e21072e1e408e0ec8736918d6c6c88c64b506a47bdff85ce",
+            "policySha256": "2c7114a62e59c7b74e23993e372bf6d27276b8fdf56e683f87a6e63f4f4d1b34",
             "defaults": [],
             "newTables": []
           },
@@ -2094,7 +2179,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 93,
+              "pid": 103,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -2261,7 +2346,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "7fc967193b8aedd90f004326012607e4"
+                "digest": "a3850fee94a74fcbc49aa5d1b2d80010"
               },
               {
                 "table": "conversation_messages",
@@ -2309,7 +2394,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "d555b27361700605abffc44692492af8"
+                "digest": "73ecf0988d08569ac3ba39b2344da0e6"
               },
               {
                 "table": "form_submissions",
@@ -2363,7 +2448,7 @@
                 "table": "lead_imports",
                 "rows": 2,
                 "bytes": 693,
-                "digest": "1bf079b1592ec39caa8d84ed224669d3"
+                "digest": "00aeb9922cf9fda57477f3f3608eeabe"
               },
               {
                 "table": "lead_tags",
@@ -2375,7 +2460,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "1399cffe2ff41579bd6da7c593e6067d"
+                "digest": "88016d741e06ebd7e99c54c3466c4f03"
               },
               {
                 "table": "message_templates",
@@ -2399,13 +2484,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "f15bf21cc3a221bc01d39287eb720023"
+                "digest": "9ed9e27a70a412e8045bc52461e43fae"
               },
               {
                 "table": "organizations",
                 "rows": 2,
-                "bytes": 728,
-                "digest": "e90db3b3bc10a0ace792e2e1702d13dc"
+                "bytes": 726,
+                "digest": "04892d6d36db933f98e178bf3076e11c"
               },
               {
                 "table": "playbook_decisions",
@@ -2447,7 +2532,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "7a4ecd3ae05645210b0cb064dcd670d8"
+                "digest": "a922f521e9479d4a1199d616c59d9dcb"
               },
               {
                 "table": "properties",
@@ -2482,8 +2567,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "14628e6893f99e4eab4b8635c7a4b50b"
+                "bytes": 2520,
+                "digest": "bacf96622f9d776251a1eb476cbc03be"
               },
               {
                 "table": "sessions",
@@ -2537,7 +2622,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "1b876b40200b30e824a28055d05e4fe7"
+                "digest": "a20983f1d9ef21e355ff60d21eff7a44"
               },
               {
                 "table": "webhook_deliveries",
@@ -2552,7 +2637,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "7b0aeb55f90e8af2ef4898c086e447af83325fee846250842201d6434d5d4de2",
+            "policySha256": "7eb67c600de3ee8a1267fd0d46d4625900155fe41edc54e786107256bff91edc",
             "defaults": [
               "organizations.entitlements",
               "org_settings.customer_email_sender_user_id",
@@ -2638,7 +2723,7 @@
               "work_checklist_templates"
             ]
           },
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-full-rollback.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-full-rollback.jsonl"
         },
         "late-bridge-error": {
           "status": "failed",
@@ -2662,7 +2747,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 95,
+              "pid": 105,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -2829,7 +2914,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "7fc967193b8aedd90f004326012607e4"
+                "digest": "a3850fee94a74fcbc49aa5d1b2d80010"
               },
               {
                 "table": "conversation_messages",
@@ -2877,7 +2962,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "d555b27361700605abffc44692492af8"
+                "digest": "73ecf0988d08569ac3ba39b2344da0e6"
               },
               {
                 "table": "form_submissions",
@@ -2931,7 +3016,7 @@
                 "table": "lead_imports",
                 "rows": 2,
                 "bytes": 693,
-                "digest": "1bf079b1592ec39caa8d84ed224669d3"
+                "digest": "00aeb9922cf9fda57477f3f3608eeabe"
               },
               {
                 "table": "lead_tags",
@@ -2943,7 +3028,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "1399cffe2ff41579bd6da7c593e6067d"
+                "digest": "88016d741e06ebd7e99c54c3466c4f03"
               },
               {
                 "table": "message_templates",
@@ -2967,13 +3052,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "f15bf21cc3a221bc01d39287eb720023"
+                "digest": "9ed9e27a70a412e8045bc52461e43fae"
               },
               {
                 "table": "organizations",
                 "rows": 2,
-                "bytes": 728,
-                "digest": "e90db3b3bc10a0ace792e2e1702d13dc"
+                "bytes": 726,
+                "digest": "04892d6d36db933f98e178bf3076e11c"
               },
               {
                 "table": "playbook_decisions",
@@ -3015,7 +3100,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "7a4ecd3ae05645210b0cb064dcd670d8"
+                "digest": "a922f521e9479d4a1199d616c59d9dcb"
               },
               {
                 "table": "properties",
@@ -3050,8 +3135,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "14628e6893f99e4eab4b8635c7a4b50b"
+                "bytes": 2520,
+                "digest": "bacf96622f9d776251a1eb476cbc03be"
               },
               {
                 "table": "sessions",
@@ -3105,7 +3190,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "1b876b40200b30e824a28055d05e4fe7"
+                "digest": "a20983f1d9ef21e355ff60d21eff7a44"
               },
               {
                 "table": "webhook_deliveries",
@@ -3120,11 +3205,11 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "1eed2e4cf1b13cf1e21072e1e408e0ec8736918d6c6c88c64b506a47bdff85ce",
+            "policySha256": "2c7114a62e59c7b74e23993e372bf6d27276b8fdf56e683f87a6e63f4f4d1b34",
             "defaults": [],
             "newTables": []
           },
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-late-bridge-error.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-late-bridge-error.jsonl"
         },
         "late-0018-error": {
           "status": "failed",
@@ -3154,7 +3239,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 97,
+              "pid": 107,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -3321,7 +3406,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "7fc967193b8aedd90f004326012607e4"
+                "digest": "a3850fee94a74fcbc49aa5d1b2d80010"
               },
               {
                 "table": "conversation_messages",
@@ -3369,7 +3454,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "d555b27361700605abffc44692492af8"
+                "digest": "73ecf0988d08569ac3ba39b2344da0e6"
               },
               {
                 "table": "form_submissions",
@@ -3423,7 +3508,7 @@
                 "table": "lead_imports",
                 "rows": 2,
                 "bytes": 693,
-                "digest": "1bf079b1592ec39caa8d84ed224669d3"
+                "digest": "00aeb9922cf9fda57477f3f3608eeabe"
               },
               {
                 "table": "lead_tags",
@@ -3435,7 +3520,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "1399cffe2ff41579bd6da7c593e6067d"
+                "digest": "88016d741e06ebd7e99c54c3466c4f03"
               },
               {
                 "table": "message_templates",
@@ -3459,13 +3544,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "f15bf21cc3a221bc01d39287eb720023"
+                "digest": "9ed9e27a70a412e8045bc52461e43fae"
               },
               {
                 "table": "organizations",
                 "rows": 2,
-                "bytes": 728,
-                "digest": "e90db3b3bc10a0ace792e2e1702d13dc"
+                "bytes": 726,
+                "digest": "04892d6d36db933f98e178bf3076e11c"
               },
               {
                 "table": "playbook_decisions",
@@ -3507,7 +3592,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "7a4ecd3ae05645210b0cb064dcd670d8"
+                "digest": "a922f521e9479d4a1199d616c59d9dcb"
               },
               {
                 "table": "properties",
@@ -3542,8 +3627,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "14628e6893f99e4eab4b8635c7a4b50b"
+                "bytes": 2520,
+                "digest": "bacf96622f9d776251a1eb476cbc03be"
               },
               {
                 "table": "sessions",
@@ -3597,7 +3682,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "1b876b40200b30e824a28055d05e4fe7"
+                "digest": "a20983f1d9ef21e355ff60d21eff7a44"
               },
               {
                 "table": "webhook_deliveries",
@@ -3612,11 +3697,11 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "1eed2e4cf1b13cf1e21072e1e408e0ec8736918d6c6c88c64b506a47bdff85ce",
+            "policySha256": "2c7114a62e59c7b74e23993e372bf6d27276b8fdf56e683f87a6e63f4f4d1b34",
             "defaults": [],
             "newTables": []
           },
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-late-0018-error.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-late-0018-error.jsonl"
         },
         "wrong-target": {
           "status": "failed",
@@ -3633,7 +3718,7 @@
             "pid": true
           },
           "errorCode": "production75_identity",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-wrong-target.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-wrong-target.jsonl"
         },
         "new-table-grant": {
           "status": "failed",
@@ -3663,7 +3748,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 100,
+              "pid": 110,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -3830,7 +3915,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "7fc967193b8aedd90f004326012607e4"
+                "digest": "a3850fee94a74fcbc49aa5d1b2d80010"
               },
               {
                 "table": "conversation_messages",
@@ -3878,7 +3963,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "d555b27361700605abffc44692492af8"
+                "digest": "73ecf0988d08569ac3ba39b2344da0e6"
               },
               {
                 "table": "form_submissions",
@@ -3932,7 +4017,7 @@
                 "table": "lead_imports",
                 "rows": 2,
                 "bytes": 693,
-                "digest": "1bf079b1592ec39caa8d84ed224669d3"
+                "digest": "00aeb9922cf9fda57477f3f3608eeabe"
               },
               {
                 "table": "lead_tags",
@@ -3944,7 +4029,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "1399cffe2ff41579bd6da7c593e6067d"
+                "digest": "88016d741e06ebd7e99c54c3466c4f03"
               },
               {
                 "table": "message_templates",
@@ -3968,13 +4053,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "f15bf21cc3a221bc01d39287eb720023"
+                "digest": "9ed9e27a70a412e8045bc52461e43fae"
               },
               {
                 "table": "organizations",
                 "rows": 2,
-                "bytes": 728,
-                "digest": "e90db3b3bc10a0ace792e2e1702d13dc"
+                "bytes": 726,
+                "digest": "04892d6d36db933f98e178bf3076e11c"
               },
               {
                 "table": "playbook_decisions",
@@ -4016,7 +4101,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "7a4ecd3ae05645210b0cb064dcd670d8"
+                "digest": "a922f521e9479d4a1199d616c59d9dcb"
               },
               {
                 "table": "properties",
@@ -4051,8 +4136,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "14628e6893f99e4eab4b8635c7a4b50b"
+                "bytes": 2520,
+                "digest": "bacf96622f9d776251a1eb476cbc03be"
               },
               {
                 "table": "sessions",
@@ -4106,7 +4191,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "1b876b40200b30e824a28055d05e4fe7"
+                "digest": "a20983f1d9ef21e355ff60d21eff7a44"
               },
               {
                 "table": "webhook_deliveries",
@@ -4121,11 +4206,11 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "1eed2e4cf1b13cf1e21072e1e408e0ec8736918d6c6c88c64b506a47bdff85ce",
+            "policySha256": "2c7114a62e59c7b74e23993e372bf6d27276b8fdf56e683f87a6e63f4f4d1b34",
             "defaults": [],
             "newTables": []
           },
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-new-table-grant.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-new-table-grant.jsonl"
         },
         "bridge-commit": {
           "status": "committed-awaiting-reader",
@@ -4160,7 +4245,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 104,
+              "pid": 115,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -4326,8 +4411,8 @@
               {
                 "table": "contacts",
                 "rows": 2,
-                "bytes": 771,
-                "digest": "eb7848529793bc079c3c3694f3377317"
+                "bytes": 773,
+                "digest": "4335d771186ace5811544a21008cbe2c"
               },
               {
                 "table": "conversation_messages",
@@ -4375,7 +4460,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "96ea31738dbc87a8fac442c701efe43b"
+                "digest": "4fb6565142088b4350c42a3465efad5d"
               },
               {
                 "table": "form_submissions",
@@ -4428,8 +4513,8 @@
               {
                 "table": "lead_imports",
                 "rows": 2,
-                "bytes": 692,
-                "digest": "eb02e3c93e06be14b344a307e771bad1"
+                "bytes": 693,
+                "digest": "bf3f71a4a2ad67b789ddc920b99b2236"
               },
               {
                 "table": "lead_tags",
@@ -4441,7 +4526,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "d06d6b61652aa6e9a73b7292a7c6336d"
+                "digest": "d44d889f23386e87247493e333ff6493"
               },
               {
                 "table": "message_templates",
@@ -4465,13 +4550,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "91dac5460cd29692b8669da5eb5e2922"
+                "digest": "922624dfd685d5219470699d480f5d01"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "d41d9e173dd8f1e26c9911af847efbe1"
+                "digest": "e41041d68025135301587564ce1fc267"
               },
               {
                 "table": "playbook_decisions",
@@ -4513,7 +4598,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "8b975af9721e0d3f24a845d75cae00f8"
+                "digest": "d9238b0e9980cf50137e814bec787bdb"
               },
               {
                 "table": "properties",
@@ -4548,8 +4633,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2516,
-                "digest": "4c93d8987621805906da184be0ab4bd0"
+                "bytes": 2522,
+                "digest": "0c0b37957caa377927f4764ef4b27fd6"
               },
               {
                 "table": "sessions",
@@ -4602,8 +4687,8 @@
               {
                 "table": "users",
                 "rows": 2,
-                "bytes": 769,
-                "digest": "e9f9472bfbc9e2966d6aa3492bfff49b"
+                "bytes": 763,
+                "digest": "ca5b2b127cc880a11064842020b66a77"
               },
               {
                 "table": "webhook_deliveries",
@@ -4618,7 +4703,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "a46e4de83e1967748c1ac08a23ef09b8af94adb3e864febfafdbc9bae0a7859d",
+            "policySha256": "707e08a86f9d023eeb50152ea42f7fddaa2885f4c9a4e45db2dbe8b73b7f7345",
             "defaults": [],
             "newTables": []
           },
@@ -4629,7 +4714,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 104,
+              "pid": 115,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -4795,8 +4880,8 @@
               {
                 "table": "contacts",
                 "rows": 2,
-                "bytes": 771,
-                "digest": "eb7848529793bc079c3c3694f3377317"
+                "bytes": 773,
+                "digest": "4335d771186ace5811544a21008cbe2c"
               },
               {
                 "table": "conversation_messages",
@@ -4844,7 +4929,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "96ea31738dbc87a8fac442c701efe43b"
+                "digest": "4fb6565142088b4350c42a3465efad5d"
               },
               {
                 "table": "form_submissions",
@@ -4897,8 +4982,8 @@
               {
                 "table": "lead_imports",
                 "rows": 2,
-                "bytes": 692,
-                "digest": "eb02e3c93e06be14b344a307e771bad1"
+                "bytes": 693,
+                "digest": "bf3f71a4a2ad67b789ddc920b99b2236"
               },
               {
                 "table": "lead_tags",
@@ -4910,7 +4995,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "d06d6b61652aa6e9a73b7292a7c6336d"
+                "digest": "d44d889f23386e87247493e333ff6493"
               },
               {
                 "table": "message_templates",
@@ -4934,13 +5019,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "91dac5460cd29692b8669da5eb5e2922"
+                "digest": "922624dfd685d5219470699d480f5d01"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "d41d9e173dd8f1e26c9911af847efbe1"
+                "digest": "e41041d68025135301587564ce1fc267"
               },
               {
                 "table": "playbook_decisions",
@@ -4982,7 +5067,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "8b975af9721e0d3f24a845d75cae00f8"
+                "digest": "d9238b0e9980cf50137e814bec787bdb"
               },
               {
                 "table": "properties",
@@ -5017,8 +5102,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2516,
-                "digest": "4c93d8987621805906da184be0ab4bd0"
+                "bytes": 2522,
+                "digest": "0c0b37957caa377927f4764ef4b27fd6"
               },
               {
                 "table": "sessions",
@@ -5071,8 +5156,8 @@
               {
                 "table": "users",
                 "rows": 2,
-                "bytes": 769,
-                "digest": "e9f9472bfbc9e2966d6aa3492bfff49b"
+                "bytes": 763,
+                "digest": "ca5b2b127cc880a11064842020b66a77"
               },
               {
                 "table": "webhook_deliveries",
@@ -5087,7 +5172,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "4db617fd11f516547414959d820eb05063bf0b70daf1557c2ae1f95ca59e0e1e",
+            "policySha256": "ce80e0d824191b9950a18dfbb3e097c544e9e40724bee68c713698cf1489d4e1",
             "defaults": [
               "org_settings.customer_email_sender_user_id"
             ],
@@ -5121,7 +5206,7 @@
               "login": "production75-reader",
               "role": "production75-reader",
               "version": 160015,
-              "pid": 106,
+              "pid": 116,
               "isolation": "repeatable read",
               "read_only": "on"
             },
@@ -5287,8 +5372,8 @@
               {
                 "table": "contacts",
                 "rows": 2,
-                "bytes": 771,
-                "digest": "eb7848529793bc079c3c3694f3377317"
+                "bytes": 773,
+                "digest": "4335d771186ace5811544a21008cbe2c"
               },
               {
                 "table": "conversation_messages",
@@ -5336,7 +5421,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "96ea31738dbc87a8fac442c701efe43b"
+                "digest": "4fb6565142088b4350c42a3465efad5d"
               },
               {
                 "table": "form_submissions",
@@ -5389,8 +5474,8 @@
               {
                 "table": "lead_imports",
                 "rows": 2,
-                "bytes": 692,
-                "digest": "eb02e3c93e06be14b344a307e771bad1"
+                "bytes": 693,
+                "digest": "bf3f71a4a2ad67b789ddc920b99b2236"
               },
               {
                 "table": "lead_tags",
@@ -5402,7 +5487,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "d06d6b61652aa6e9a73b7292a7c6336d"
+                "digest": "d44d889f23386e87247493e333ff6493"
               },
               {
                 "table": "message_templates",
@@ -5426,13 +5511,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "91dac5460cd29692b8669da5eb5e2922"
+                "digest": "922624dfd685d5219470699d480f5d01"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "d41d9e173dd8f1e26c9911af847efbe1"
+                "digest": "e41041d68025135301587564ce1fc267"
               },
               {
                 "table": "playbook_decisions",
@@ -5474,7 +5559,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "8b975af9721e0d3f24a845d75cae00f8"
+                "digest": "d9238b0e9980cf50137e814bec787bdb"
               },
               {
                 "table": "properties",
@@ -5509,8 +5594,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2516,
-                "digest": "4c93d8987621805906da184be0ab4bd0"
+                "bytes": 2522,
+                "digest": "0c0b37957caa377927f4764ef4b27fd6"
               },
               {
                 "table": "sessions",
@@ -5563,8 +5648,8 @@
               {
                 "table": "users",
                 "rows": 2,
-                "bytes": 769,
-                "digest": "e9f9472bfbc9e2966d6aa3492bfff49b"
+                "bytes": 763,
+                "digest": "ca5b2b127cc880a11064842020b66a77"
               },
               {
                 "table": "webhook_deliveries",
@@ -5579,7 +5664,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "4db617fd11f516547414959d820eb05063bf0b70daf1557c2ae1f95ca59e0e1e",
+            "policySha256": "ce80e0d824191b9950a18dfbb3e097c544e9e40724bee68c713698cf1489d4e1",
             "defaults": [
               "org_settings.customer_email_sender_user_id"
             ],
@@ -5617,7 +5702,7 @@
           "planReplayRefused": true,
           "stalePlanReplayRefused": true,
           "commitDispatches": 1,
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-bridge-commit.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-bridge-commit.jsonl"
         },
         "lost-commit": {
           "status": "commit-unknown",
@@ -5653,7 +5738,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 110,
+              "pid": 120,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -5819,8 +5904,8 @@
               {
                 "table": "contacts",
                 "rows": 2,
-                "bytes": 773,
-                "digest": "10db1c9fcb1b6fad8cf5dcdcf55c690d"
+                "bytes": 771,
+                "digest": "83211cec97928e11a2fa9da4ccc91f52"
               },
               {
                 "table": "conversation_messages",
@@ -5868,7 +5953,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "2e1276960ae1b9dfc4933a222621da9f"
+                "digest": "e495f193b652cb9582bc73c4fe320cec"
               },
               {
                 "table": "form_submissions",
@@ -5922,7 +6007,7 @@
                 "table": "lead_imports",
                 "rows": 2,
                 "bytes": 693,
-                "digest": "41cc773c293156eedc90371d078d4f22"
+                "digest": "0c309b7eae45ddf57dc3ecb39bd7c78d"
               },
               {
                 "table": "lead_tags",
@@ -5934,7 +6019,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "e19c7b06bf8cc34ce827b4f65cc015a2"
+                "digest": "fd9e71f407b8c926751ef6a36a93ccfb"
               },
               {
                 "table": "message_templates",
@@ -5958,13 +6043,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "4b18923d70c7469bac48dba1f1d8d778"
+                "digest": "de67734d716fb27d56bd3fa708963588"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "0dedd5f61644c135cd475f43b5e88727"
+                "digest": "1ae0853599ef40ec4fc70d1d18632849"
               },
               {
                 "table": "playbook_decisions",
@@ -6006,7 +6091,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "8911975965887a0e4fae1b7e151dc784"
+                "digest": "ce4efe6aceb03afe5bab776f5ee32423"
               },
               {
                 "table": "properties",
@@ -6041,8 +6126,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2518,
-                "digest": "fce82fe950ff7b9ef22334b49050ab65"
+                "bytes": 2522,
+                "digest": "899179ab4d0dd1a01d2c8c5c018e443e"
               },
               {
                 "table": "sessions",
@@ -6096,7 +6181,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "18fff5eea4d0481fb387252f0f99cb8d"
+                "digest": "7c0e896fcf57f6e847db995c58d5bbc2"
               },
               {
                 "table": "webhook_deliveries",
@@ -6111,7 +6196,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "5c13b3d9d68d825769fa58ca7193dcea4664d24b8eb27763dde3a42569081944",
+            "policySha256": "54f3b967c13f967c06753a4970631d231107f6063ad372dc843ea539afc254d3",
             "defaults": [],
             "newTables": []
           },
@@ -6122,7 +6207,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 110,
+              "pid": 120,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -6288,8 +6373,8 @@
               {
                 "table": "contacts",
                 "rows": 2,
-                "bytes": 773,
-                "digest": "10db1c9fcb1b6fad8cf5dcdcf55c690d"
+                "bytes": 771,
+                "digest": "83211cec97928e11a2fa9da4ccc91f52"
               },
               {
                 "table": "conversation_messages",
@@ -6337,7 +6422,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "2e1276960ae1b9dfc4933a222621da9f"
+                "digest": "e495f193b652cb9582bc73c4fe320cec"
               },
               {
                 "table": "form_submissions",
@@ -6391,7 +6476,7 @@
                 "table": "lead_imports",
                 "rows": 2,
                 "bytes": 693,
-                "digest": "41cc773c293156eedc90371d078d4f22"
+                "digest": "0c309b7eae45ddf57dc3ecb39bd7c78d"
               },
               {
                 "table": "lead_tags",
@@ -6403,7 +6488,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "e19c7b06bf8cc34ce827b4f65cc015a2"
+                "digest": "fd9e71f407b8c926751ef6a36a93ccfb"
               },
               {
                 "table": "message_templates",
@@ -6427,13 +6512,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "4b18923d70c7469bac48dba1f1d8d778"
+                "digest": "de67734d716fb27d56bd3fa708963588"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "0dedd5f61644c135cd475f43b5e88727"
+                "digest": "1ae0853599ef40ec4fc70d1d18632849"
               },
               {
                 "table": "playbook_decisions",
@@ -6475,7 +6560,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "8911975965887a0e4fae1b7e151dc784"
+                "digest": "ce4efe6aceb03afe5bab776f5ee32423"
               },
               {
                 "table": "properties",
@@ -6510,8 +6595,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2518,
-                "digest": "fce82fe950ff7b9ef22334b49050ab65"
+                "bytes": 2522,
+                "digest": "899179ab4d0dd1a01d2c8c5c018e443e"
               },
               {
                 "table": "sessions",
@@ -6565,7 +6650,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "18fff5eea4d0481fb387252f0f99cb8d"
+                "digest": "7c0e896fcf57f6e847db995c58d5bbc2"
               },
               {
                 "table": "webhook_deliveries",
@@ -6580,7 +6665,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "81759321ee58fd895989095ff719e5f0ee8a9f22efe27735c2613d66f0e78427",
+            "policySha256": "f159f4ac85dae401df54130243c4425f023761a37813b5430ee6c48522e3fb37",
             "defaults": [
               "organizations.entitlements",
               "org_settings.customer_email_sender_user_id",
@@ -6673,7 +6758,7 @@
               "login": "production75-reader",
               "role": "production75-reader",
               "version": 160015,
-              "pid": 111,
+              "pid": 122,
               "isolation": "repeatable read",
               "read_only": "on"
             },
@@ -6839,8 +6924,8 @@
               {
                 "table": "contacts",
                 "rows": 2,
-                "bytes": 773,
-                "digest": "10db1c9fcb1b6fad8cf5dcdcf55c690d"
+                "bytes": 771,
+                "digest": "83211cec97928e11a2fa9da4ccc91f52"
               },
               {
                 "table": "conversation_messages",
@@ -6888,7 +6973,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "2e1276960ae1b9dfc4933a222621da9f"
+                "digest": "e495f193b652cb9582bc73c4fe320cec"
               },
               {
                 "table": "form_submissions",
@@ -6942,7 +7027,7 @@
                 "table": "lead_imports",
                 "rows": 2,
                 "bytes": 693,
-                "digest": "41cc773c293156eedc90371d078d4f22"
+                "digest": "0c309b7eae45ddf57dc3ecb39bd7c78d"
               },
               {
                 "table": "lead_tags",
@@ -6954,7 +7039,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "e19c7b06bf8cc34ce827b4f65cc015a2"
+                "digest": "fd9e71f407b8c926751ef6a36a93ccfb"
               },
               {
                 "table": "message_templates",
@@ -6978,13 +7063,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "4b18923d70c7469bac48dba1f1d8d778"
+                "digest": "de67734d716fb27d56bd3fa708963588"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "0dedd5f61644c135cd475f43b5e88727"
+                "digest": "1ae0853599ef40ec4fc70d1d18632849"
               },
               {
                 "table": "playbook_decisions",
@@ -7026,7 +7111,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "8911975965887a0e4fae1b7e151dc784"
+                "digest": "ce4efe6aceb03afe5bab776f5ee32423"
               },
               {
                 "table": "properties",
@@ -7061,8 +7146,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2518,
-                "digest": "fce82fe950ff7b9ef22334b49050ab65"
+                "bytes": 2522,
+                "digest": "899179ab4d0dd1a01d2c8c5c018e443e"
               },
               {
                 "table": "sessions",
@@ -7116,7 +7201,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "18fff5eea4d0481fb387252f0f99cb8d"
+                "digest": "7c0e896fcf57f6e847db995c58d5bbc2"
               },
               {
                 "table": "webhook_deliveries",
@@ -7131,7 +7216,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "81759321ee58fd895989095ff719e5f0ee8a9f22efe27735c2613d66f0e78427",
+            "policySha256": "f159f4ac85dae401df54130243c4425f023761a37813b5430ee6c48522e3fb37",
             "defaults": [
               "organizations.entitlements",
               "org_settings.customer_email_sender_user_id",
@@ -7229,7 +7314,7 @@
           "planReplayRefused": true,
           "stalePlanReplayRefused": true,
           "commitDispatches": 1,
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-lost-commit.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-lost-commit.jsonl"
         },
         "commit": {
           "status": "committed-awaiting-reader",
@@ -7264,7 +7349,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 113,
+              "pid": 124,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -7431,7 +7516,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "7fc967193b8aedd90f004326012607e4"
+                "digest": "a3850fee94a74fcbc49aa5d1b2d80010"
               },
               {
                 "table": "conversation_messages",
@@ -7479,7 +7564,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "d555b27361700605abffc44692492af8"
+                "digest": "73ecf0988d08569ac3ba39b2344da0e6"
               },
               {
                 "table": "form_submissions",
@@ -7533,7 +7618,7 @@
                 "table": "lead_imports",
                 "rows": 2,
                 "bytes": 693,
-                "digest": "1bf079b1592ec39caa8d84ed224669d3"
+                "digest": "00aeb9922cf9fda57477f3f3608eeabe"
               },
               {
                 "table": "lead_tags",
@@ -7545,7 +7630,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "1399cffe2ff41579bd6da7c593e6067d"
+                "digest": "88016d741e06ebd7e99c54c3466c4f03"
               },
               {
                 "table": "message_templates",
@@ -7569,13 +7654,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "f15bf21cc3a221bc01d39287eb720023"
+                "digest": "9ed9e27a70a412e8045bc52461e43fae"
               },
               {
                 "table": "organizations",
                 "rows": 2,
-                "bytes": 728,
-                "digest": "e90db3b3bc10a0ace792e2e1702d13dc"
+                "bytes": 726,
+                "digest": "04892d6d36db933f98e178bf3076e11c"
               },
               {
                 "table": "playbook_decisions",
@@ -7617,7 +7702,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "7a4ecd3ae05645210b0cb064dcd670d8"
+                "digest": "a922f521e9479d4a1199d616c59d9dcb"
               },
               {
                 "table": "properties",
@@ -7652,8 +7737,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "14628e6893f99e4eab4b8635c7a4b50b"
+                "bytes": 2520,
+                "digest": "bacf96622f9d776251a1eb476cbc03be"
               },
               {
                 "table": "sessions",
@@ -7707,7 +7792,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "1b876b40200b30e824a28055d05e4fe7"
+                "digest": "a20983f1d9ef21e355ff60d21eff7a44"
               },
               {
                 "table": "webhook_deliveries",
@@ -7722,7 +7807,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "1eed2e4cf1b13cf1e21072e1e408e0ec8736918d6c6c88c64b506a47bdff85ce",
+            "policySha256": "2c7114a62e59c7b74e23993e372bf6d27276b8fdf56e683f87a6e63f4f4d1b34",
             "defaults": [],
             "newTables": []
           },
@@ -7733,7 +7818,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 113,
+              "pid": 124,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -7900,7 +7985,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "7fc967193b8aedd90f004326012607e4"
+                "digest": "a3850fee94a74fcbc49aa5d1b2d80010"
               },
               {
                 "table": "conversation_messages",
@@ -7948,7 +8033,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "d555b27361700605abffc44692492af8"
+                "digest": "73ecf0988d08569ac3ba39b2344da0e6"
               },
               {
                 "table": "form_submissions",
@@ -8002,7 +8087,7 @@
                 "table": "lead_imports",
                 "rows": 2,
                 "bytes": 693,
-                "digest": "1bf079b1592ec39caa8d84ed224669d3"
+                "digest": "00aeb9922cf9fda57477f3f3608eeabe"
               },
               {
                 "table": "lead_tags",
@@ -8014,7 +8099,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "1399cffe2ff41579bd6da7c593e6067d"
+                "digest": "88016d741e06ebd7e99c54c3466c4f03"
               },
               {
                 "table": "message_templates",
@@ -8038,13 +8123,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "f15bf21cc3a221bc01d39287eb720023"
+                "digest": "9ed9e27a70a412e8045bc52461e43fae"
               },
               {
                 "table": "organizations",
                 "rows": 2,
-                "bytes": 728,
-                "digest": "e90db3b3bc10a0ace792e2e1702d13dc"
+                "bytes": 726,
+                "digest": "04892d6d36db933f98e178bf3076e11c"
               },
               {
                 "table": "playbook_decisions",
@@ -8086,7 +8171,7 @@
                 "table": "projects",
                 "rows": 2,
                 "bytes": 852,
-                "digest": "7a4ecd3ae05645210b0cb064dcd670d8"
+                "digest": "a922f521e9479d4a1199d616c59d9dcb"
               },
               {
                 "table": "properties",
@@ -8121,8 +8206,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "14628e6893f99e4eab4b8635c7a4b50b"
+                "bytes": 2520,
+                "digest": "bacf96622f9d776251a1eb476cbc03be"
               },
               {
                 "table": "sessions",
@@ -8176,7 +8261,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "1b876b40200b30e824a28055d05e4fe7"
+                "digest": "a20983f1d9ef21e355ff60d21eff7a44"
               },
               {
                 "table": "webhook_deliveries",
@@ -8191,7 +8276,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "7b0aeb55f90e8af2ef4898c086e447af83325fee846250842201d6434d5d4de2",
+            "policySha256": "7eb67c600de3ee8a1267fd0d46d4625900155fe41edc54e786107256bff91edc",
             "defaults": [
               "organizations.entitlements",
               "org_settings.customer_email_sender_user_id",
@@ -8277,10 +8362,11 @@
               "work_checklist_templates"
             ]
           },
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/fly-db-commit.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/fly-db-commit.jsonl"
         }
       },
       "checks": {
+        "provider-view-baseline": true,
         "same-count-data": true,
         "column-type": true,
         "column-default": true,
@@ -8288,6 +8374,11 @@
         "table-acl": true,
         "column-acl": true,
         "reader-permission": true,
+        "provider-view-acl": true,
+        "provider-column-acl": true,
+        "provider-view-removal": true,
+        "provider-view-owner": true,
+        "provider-rogue-addition": true,
         "physical-ordinal-input": true,
         "bridge-rollback": true,
         "full-rollback": true,
@@ -8299,7 +8390,37 @@
         "lost-commit": true,
         "commit": true,
         "freshReader": true,
+        "provider-view-preserved": true,
         "syntheticRows": true
+      },
+      "syntheticProviderMetadata": {
+        "actualProviderExtensionProof": false,
+        "ownershipRows": [
+          {
+            "kind": "column",
+            "schema": "public",
+            "name": "production75_provider_fixture",
+            "sub_name": "marker",
+            "owner": "postgres",
+            "acl": "{postgres=r/postgres}"
+          },
+          {
+            "kind": "column",
+            "schema": "public",
+            "name": "production75_provider_fixture",
+            "sub_name": "sample_count",
+            "owner": "postgres",
+            "acl": "{postgres=r/postgres}"
+          },
+          {
+            "kind": "relation",
+            "schema": "public",
+            "name": "production75_provider_fixture",
+            "sub_name": null,
+            "owner": "postgres",
+            "acl": "{postgres=arwdDxt/postgres,=r/postgres}"
+          }
+        ]
       },
       "freshReader": {
         "phase": 142,
@@ -8308,7 +8429,7 @@
           "login": "production75-reader",
           "role": "production75-reader",
           "version": 160015,
-          "pid": 115,
+          "pid": 125,
           "isolation": "repeatable read",
           "read_only": "on"
         },
@@ -8475,7 +8596,7 @@
             "table": "contacts",
             "rows": 2,
             "bytes": 773,
-            "digest": "7fc967193b8aedd90f004326012607e4"
+            "digest": "a3850fee94a74fcbc49aa5d1b2d80010"
           },
           {
             "table": "conversation_messages",
@@ -8523,7 +8644,7 @@
             "table": "estimates",
             "rows": 2,
             "bytes": 904,
-            "digest": "d555b27361700605abffc44692492af8"
+            "digest": "73ecf0988d08569ac3ba39b2344da0e6"
           },
           {
             "table": "form_submissions",
@@ -8577,7 +8698,7 @@
             "table": "lead_imports",
             "rows": 2,
             "bytes": 693,
-            "digest": "1bf079b1592ec39caa8d84ed224669d3"
+            "digest": "00aeb9922cf9fda57477f3f3608eeabe"
           },
           {
             "table": "lead_tags",
@@ -8589,7 +8710,7 @@
             "table": "leads",
             "rows": 2,
             "bytes": 1467,
-            "digest": "1399cffe2ff41579bd6da7c593e6067d"
+            "digest": "88016d741e06ebd7e99c54c3466c4f03"
           },
           {
             "table": "message_templates",
@@ -8613,13 +8734,13 @@
             "table": "org_settings",
             "rows": 2,
             "bytes": 1360,
-            "digest": "f15bf21cc3a221bc01d39287eb720023"
+            "digest": "9ed9e27a70a412e8045bc52461e43fae"
           },
           {
             "table": "organizations",
             "rows": 2,
-            "bytes": 728,
-            "digest": "e90db3b3bc10a0ace792e2e1702d13dc"
+            "bytes": 726,
+            "digest": "04892d6d36db933f98e178bf3076e11c"
           },
           {
             "table": "playbook_decisions",
@@ -8661,7 +8782,7 @@
             "table": "projects",
             "rows": 2,
             "bytes": 852,
-            "digest": "7a4ecd3ae05645210b0cb064dcd670d8"
+            "digest": "a922f521e9479d4a1199d616c59d9dcb"
           },
           {
             "table": "properties",
@@ -8696,8 +8817,8 @@
           {
             "table": "scheduled_actions",
             "rows": 6,
-            "bytes": 2522,
-            "digest": "14628e6893f99e4eab4b8635c7a4b50b"
+            "bytes": 2520,
+            "digest": "bacf96622f9d776251a1eb476cbc03be"
           },
           {
             "table": "sessions",
@@ -8751,7 +8872,7 @@
             "table": "users",
             "rows": 2,
             "bytes": 772,
-            "digest": "1b876b40200b30e824a28055d05e4fe7"
+            "digest": "a20983f1d9ef21e355ff60d21eff7a44"
           },
           {
             "table": "webhook_deliveries",
@@ -8766,7 +8887,7 @@
             "digest": "d41d8cd98f00b204e9800998ecf8427e"
           }
         ],
-        "policySha256": "7b0aeb55f90e8af2ef4898c086e447af83325fee846250842201d6434d5d4de2",
+        "policySha256": "7eb67c600de3ee8a1267fd0d46d4625900155fe41edc54e786107256bff91edc",
         "defaults": [
           "organizations.entitlements",
           "org_settings.customer_email_sender_user_id",
@@ -8869,7 +8990,7 @@
           "login": "production75-reader",
           "role": "production75-reader",
           "version": 160015,
-          "pid": 117,
+          "pid": 127,
           "isolation": "repeatable read",
           "read_only": "on"
         },
@@ -9036,7 +9157,7 @@
             "table": "contacts",
             "rows": 2,
             "bytes": 773,
-            "digest": "dbfb8f76e518d80f19a397f59641f7d5"
+            "digest": "e3a1ae6cc6ce9014508b1cb878952c27"
           },
           {
             "table": "conversation_messages",
@@ -9084,7 +9205,7 @@
             "table": "estimates",
             "rows": 2,
             "bytes": 904,
-            "digest": "411a8dbd3ee6b97e5e7108bf8f657ac8"
+            "digest": "209a1affc4c2741ea4e158ed7a37aeb4"
           },
           {
             "table": "form_submissions",
@@ -9137,8 +9258,8 @@
           {
             "table": "lead_imports",
             "rows": 2,
-            "bytes": 693,
-            "digest": "341d8c71bd8a82c4aaf3361b787e79fd"
+            "bytes": 691,
+            "digest": "e80155545f429372b2e93187e8f6c93e"
           },
           {
             "table": "lead_tags",
@@ -9150,7 +9271,7 @@
             "table": "leads",
             "rows": 2,
             "bytes": 1467,
-            "digest": "785de0b43984c84f98e78c03471e381b"
+            "digest": "5930b17395b8e85347c904bb334fc5ac"
           },
           {
             "table": "message_templates",
@@ -9174,13 +9295,13 @@
             "table": "org_settings",
             "rows": 2,
             "bytes": 1360,
-            "digest": "dbe6583e2940794f32018075f5267140"
+            "digest": "bed69b9eed039bc5f501e813857f6536"
           },
           {
             "table": "organizations",
             "rows": 2,
             "bytes": 728,
-            "digest": "3bd0ce735dc83dfd3598a3084d647364"
+            "digest": "52de63f33ec471d5d8ff21835650fa4e"
           },
           {
             "table": "playbook_decisions",
@@ -9221,8 +9342,8 @@
           {
             "table": "projects",
             "rows": 2,
-            "bytes": 852,
-            "digest": "5e5580735236e7d125be112d01d00adc"
+            "bytes": 850,
+            "digest": "723d7723eafa79c58e9a7f6c319920af"
           },
           {
             "table": "properties",
@@ -9257,8 +9378,8 @@
           {
             "table": "scheduled_actions",
             "rows": 6,
-            "bytes": 2522,
-            "digest": "aba12db694c86c17d275c6b837da7e6b"
+            "bytes": 2520,
+            "digest": "032f295238c34bf8b1bbd5ffc9222bb4"
           },
           {
             "table": "sessions",
@@ -9312,7 +9433,7 @@
             "table": "users",
             "rows": 2,
             "bytes": 772,
-            "digest": "e6251933653c6f9da5b1ea1aa98a94b7"
+            "digest": "90929750973f97719ae2210dcbd667db"
           },
           {
             "table": "webhook_deliveries",
@@ -9327,7 +9448,7 @@
             "digest": "d41d8cd98f00b204e9800998ecf8427e"
           }
         ],
-        "policySha256": "41b4d6f29704a56df6d60192a43fc501b0df88f6ca7688d2f08536fa432d4d74",
+        "policySha256": "bd4d592bc10e33698eed16c527037c3f7bb792ce93b4b6265efb045e974a183a",
         "defaults": [],
         "newTables": []
       },
@@ -9347,7 +9468,7 @@
             "pid": true
           },
           "errorCode": "production75_baseline_drift",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-same-count-data.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-same-count-data.jsonl"
         },
         "column-type": {
           "status": "failed",
@@ -9364,7 +9485,7 @@
             "pid": true
           },
           "errorCode": "production75_unrecognized_catalog",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-column-type.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-column-type.jsonl"
         },
         "column-default": {
           "status": "failed",
@@ -9381,7 +9502,7 @@
             "pid": true
           },
           "errorCode": "production75_unrecognized_catalog",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-column-default.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-column-default.jsonl"
         },
         "new-table-collision": {
           "status": "failed",
@@ -9398,7 +9519,7 @@
             "pid": true
           },
           "errorCode": "production75_unrecognized_catalog",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-new-table-collision.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-new-table-collision.jsonl"
         },
         "table-acl": {
           "status": "failed",
@@ -9415,7 +9536,7 @@
             "pid": true
           },
           "errorCode": "production75_baseline_drift",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-table-acl.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-table-acl.jsonl"
         },
         "column-acl": {
           "status": "failed",
@@ -9432,7 +9553,7 @@
             "pid": true
           },
           "errorCode": "production75_baseline_drift",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-column-acl.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-column-acl.jsonl"
         },
         "reader-permission": {
           "status": "failed",
@@ -9449,7 +9570,92 @@
             "pid": true
           },
           "errorCode": "production75_baseline_drift",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-reader-permission.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-reader-permission.jsonl"
+        },
+        "provider-view-acl": {
+          "status": "failed",
+          "commitDispatched": false,
+          "commitAcknowledged": false,
+          "rollbackAcknowledged": true,
+          "stepsAcknowledged": 0,
+          "requiresFreshReader": false,
+          "initialIdentityChecks": {
+            "database": true,
+            "login": true,
+            "role": true,
+            "version": true,
+            "pid": true
+          },
+          "errorCode": "production75_baseline_drift",
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-provider-view-acl.jsonl"
+        },
+        "provider-column-acl": {
+          "status": "failed",
+          "commitDispatched": false,
+          "commitAcknowledged": false,
+          "rollbackAcknowledged": true,
+          "stepsAcknowledged": 0,
+          "requiresFreshReader": false,
+          "initialIdentityChecks": {
+            "database": true,
+            "login": true,
+            "role": true,
+            "version": true,
+            "pid": true
+          },
+          "errorCode": "production75_baseline_drift",
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-provider-column-acl.jsonl"
+        },
+        "provider-view-removal": {
+          "status": "failed",
+          "commitDispatched": false,
+          "commitAcknowledged": false,
+          "rollbackAcknowledged": true,
+          "stepsAcknowledged": 0,
+          "requiresFreshReader": false,
+          "initialIdentityChecks": {
+            "database": true,
+            "login": true,
+            "role": true,
+            "version": true,
+            "pid": true
+          },
+          "errorCode": "production75_baseline_drift",
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-provider-view-removal.jsonl"
+        },
+        "provider-view-owner": {
+          "status": "failed",
+          "commitDispatched": false,
+          "commitAcknowledged": false,
+          "rollbackAcknowledged": true,
+          "stepsAcknowledged": 0,
+          "requiresFreshReader": false,
+          "initialIdentityChecks": {
+            "database": true,
+            "login": true,
+            "role": true,
+            "version": true,
+            "pid": true
+          },
+          "errorCode": "production75_baseline_drift",
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-provider-view-owner.jsonl"
+        },
+        "provider-rogue-addition": {
+          "status": "failed",
+          "commitDispatched": false,
+          "commitAcknowledged": false,
+          "rollbackAcknowledged": true,
+          "stepsAcknowledged": 0,
+          "requiresFreshReader": false,
+          "initialIdentityChecks": {
+            "database": true,
+            "login": true,
+            "role": true,
+            "version": true,
+            "pid": true
+          },
+          "errorCode": "production75_baseline_drift",
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-provider-rogue-addition.jsonl"
         },
         "bridge-rollback": {
           "status": "rehearsed-rolled-back",
@@ -9484,7 +9690,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 133,
+              "pid": 153,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -9651,7 +9857,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "dbfb8f76e518d80f19a397f59641f7d5"
+                "digest": "e3a1ae6cc6ce9014508b1cb878952c27"
               },
               {
                 "table": "conversation_messages",
@@ -9699,7 +9905,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "411a8dbd3ee6b97e5e7108bf8f657ac8"
+                "digest": "209a1affc4c2741ea4e158ed7a37aeb4"
               },
               {
                 "table": "form_submissions",
@@ -9752,8 +9958,8 @@
               {
                 "table": "lead_imports",
                 "rows": 2,
-                "bytes": 693,
-                "digest": "341d8c71bd8a82c4aaf3361b787e79fd"
+                "bytes": 691,
+                "digest": "e80155545f429372b2e93187e8f6c93e"
               },
               {
                 "table": "lead_tags",
@@ -9765,7 +9971,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "785de0b43984c84f98e78c03471e381b"
+                "digest": "5930b17395b8e85347c904bb334fc5ac"
               },
               {
                 "table": "message_templates",
@@ -9789,13 +9995,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "dbe6583e2940794f32018075f5267140"
+                "digest": "bed69b9eed039bc5f501e813857f6536"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "3bd0ce735dc83dfd3598a3084d647364"
+                "digest": "52de63f33ec471d5d8ff21835650fa4e"
               },
               {
                 "table": "playbook_decisions",
@@ -9836,8 +10042,8 @@
               {
                 "table": "projects",
                 "rows": 2,
-                "bytes": 852,
-                "digest": "5e5580735236e7d125be112d01d00adc"
+                "bytes": 850,
+                "digest": "723d7723eafa79c58e9a7f6c319920af"
               },
               {
                 "table": "properties",
@@ -9872,8 +10078,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "aba12db694c86c17d275c6b837da7e6b"
+                "bytes": 2520,
+                "digest": "032f295238c34bf8b1bbd5ffc9222bb4"
               },
               {
                 "table": "sessions",
@@ -9927,7 +10133,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "e6251933653c6f9da5b1ea1aa98a94b7"
+                "digest": "90929750973f97719ae2210dcbd667db"
               },
               {
                 "table": "webhook_deliveries",
@@ -9942,7 +10148,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "41b4d6f29704a56df6d60192a43fc501b0df88f6ca7688d2f08536fa432d4d74",
+            "policySha256": "bd4d592bc10e33698eed16c527037c3f7bb792ce93b4b6265efb045e974a183a",
             "defaults": [],
             "newTables": []
           },
@@ -9953,7 +10159,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 133,
+              "pid": 153,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -10120,7 +10326,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "dbfb8f76e518d80f19a397f59641f7d5"
+                "digest": "e3a1ae6cc6ce9014508b1cb878952c27"
               },
               {
                 "table": "conversation_messages",
@@ -10168,7 +10374,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "411a8dbd3ee6b97e5e7108bf8f657ac8"
+                "digest": "209a1affc4c2741ea4e158ed7a37aeb4"
               },
               {
                 "table": "form_submissions",
@@ -10221,8 +10427,8 @@
               {
                 "table": "lead_imports",
                 "rows": 2,
-                "bytes": 693,
-                "digest": "341d8c71bd8a82c4aaf3361b787e79fd"
+                "bytes": 691,
+                "digest": "e80155545f429372b2e93187e8f6c93e"
               },
               {
                 "table": "lead_tags",
@@ -10234,7 +10440,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "785de0b43984c84f98e78c03471e381b"
+                "digest": "5930b17395b8e85347c904bb334fc5ac"
               },
               {
                 "table": "message_templates",
@@ -10258,13 +10464,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "dbe6583e2940794f32018075f5267140"
+                "digest": "bed69b9eed039bc5f501e813857f6536"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "3bd0ce735dc83dfd3598a3084d647364"
+                "digest": "52de63f33ec471d5d8ff21835650fa4e"
               },
               {
                 "table": "playbook_decisions",
@@ -10305,8 +10511,8 @@
               {
                 "table": "projects",
                 "rows": 2,
-                "bytes": 852,
-                "digest": "5e5580735236e7d125be112d01d00adc"
+                "bytes": 850,
+                "digest": "723d7723eafa79c58e9a7f6c319920af"
               },
               {
                 "table": "properties",
@@ -10341,8 +10547,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "aba12db694c86c17d275c6b837da7e6b"
+                "bytes": 2520,
+                "digest": "032f295238c34bf8b1bbd5ffc9222bb4"
               },
               {
                 "table": "sessions",
@@ -10396,7 +10602,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "e6251933653c6f9da5b1ea1aa98a94b7"
+                "digest": "90929750973f97719ae2210dcbd667db"
               },
               {
                 "table": "webhook_deliveries",
@@ -10411,7 +10617,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "02f0aacd6f9d35face5d02f1e91d9f6eb24a598c67bb532aa709cf023929a444",
+            "policySha256": "379f8860461e3a12f18691c0b9eb4f65b1e49b4b97ca49fe03e81b3e5aad162a",
             "defaults": [
               "org_settings.customer_email_sender_user_id"
             ],
@@ -10438,7 +10644,7 @@
               "value_entries"
             ]
           },
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-bridge-rollback.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-bridge-rollback.jsonl"
         },
         "full-rollback": {
           "status": "rehearsed-rolled-back",
@@ -10473,7 +10679,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 135,
+              "pid": 155,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -10640,7 +10846,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "dbfb8f76e518d80f19a397f59641f7d5"
+                "digest": "e3a1ae6cc6ce9014508b1cb878952c27"
               },
               {
                 "table": "conversation_messages",
@@ -10688,7 +10894,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "411a8dbd3ee6b97e5e7108bf8f657ac8"
+                "digest": "209a1affc4c2741ea4e158ed7a37aeb4"
               },
               {
                 "table": "form_submissions",
@@ -10741,8 +10947,8 @@
               {
                 "table": "lead_imports",
                 "rows": 2,
-                "bytes": 693,
-                "digest": "341d8c71bd8a82c4aaf3361b787e79fd"
+                "bytes": 691,
+                "digest": "e80155545f429372b2e93187e8f6c93e"
               },
               {
                 "table": "lead_tags",
@@ -10754,7 +10960,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "785de0b43984c84f98e78c03471e381b"
+                "digest": "5930b17395b8e85347c904bb334fc5ac"
               },
               {
                 "table": "message_templates",
@@ -10778,13 +10984,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "dbe6583e2940794f32018075f5267140"
+                "digest": "bed69b9eed039bc5f501e813857f6536"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "3bd0ce735dc83dfd3598a3084d647364"
+                "digest": "52de63f33ec471d5d8ff21835650fa4e"
               },
               {
                 "table": "playbook_decisions",
@@ -10825,8 +11031,8 @@
               {
                 "table": "projects",
                 "rows": 2,
-                "bytes": 852,
-                "digest": "5e5580735236e7d125be112d01d00adc"
+                "bytes": 850,
+                "digest": "723d7723eafa79c58e9a7f6c319920af"
               },
               {
                 "table": "properties",
@@ -10861,8 +11067,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "aba12db694c86c17d275c6b837da7e6b"
+                "bytes": 2520,
+                "digest": "032f295238c34bf8b1bbd5ffc9222bb4"
               },
               {
                 "table": "sessions",
@@ -10916,7 +11122,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "e6251933653c6f9da5b1ea1aa98a94b7"
+                "digest": "90929750973f97719ae2210dcbd667db"
               },
               {
                 "table": "webhook_deliveries",
@@ -10931,7 +11137,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "41b4d6f29704a56df6d60192a43fc501b0df88f6ca7688d2f08536fa432d4d74",
+            "policySha256": "bd4d592bc10e33698eed16c527037c3f7bb792ce93b4b6265efb045e974a183a",
             "defaults": [],
             "newTables": []
           },
@@ -10942,7 +11148,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 135,
+              "pid": 155,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -11109,7 +11315,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "dbfb8f76e518d80f19a397f59641f7d5"
+                "digest": "e3a1ae6cc6ce9014508b1cb878952c27"
               },
               {
                 "table": "conversation_messages",
@@ -11157,7 +11363,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "411a8dbd3ee6b97e5e7108bf8f657ac8"
+                "digest": "209a1affc4c2741ea4e158ed7a37aeb4"
               },
               {
                 "table": "form_submissions",
@@ -11210,8 +11416,8 @@
               {
                 "table": "lead_imports",
                 "rows": 2,
-                "bytes": 693,
-                "digest": "341d8c71bd8a82c4aaf3361b787e79fd"
+                "bytes": 691,
+                "digest": "e80155545f429372b2e93187e8f6c93e"
               },
               {
                 "table": "lead_tags",
@@ -11223,7 +11429,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "785de0b43984c84f98e78c03471e381b"
+                "digest": "5930b17395b8e85347c904bb334fc5ac"
               },
               {
                 "table": "message_templates",
@@ -11247,13 +11453,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "dbe6583e2940794f32018075f5267140"
+                "digest": "bed69b9eed039bc5f501e813857f6536"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "3bd0ce735dc83dfd3598a3084d647364"
+                "digest": "52de63f33ec471d5d8ff21835650fa4e"
               },
               {
                 "table": "playbook_decisions",
@@ -11294,8 +11500,8 @@
               {
                 "table": "projects",
                 "rows": 2,
-                "bytes": 852,
-                "digest": "5e5580735236e7d125be112d01d00adc"
+                "bytes": 850,
+                "digest": "723d7723eafa79c58e9a7f6c319920af"
               },
               {
                 "table": "properties",
@@ -11330,8 +11536,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "aba12db694c86c17d275c6b837da7e6b"
+                "bytes": 2520,
+                "digest": "032f295238c34bf8b1bbd5ffc9222bb4"
               },
               {
                 "table": "sessions",
@@ -11385,7 +11591,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "e6251933653c6f9da5b1ea1aa98a94b7"
+                "digest": "90929750973f97719ae2210dcbd667db"
               },
               {
                 "table": "webhook_deliveries",
@@ -11400,7 +11606,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "84f22b886e10daec4e5326db49d2360b8996fd0ebea9cf7e2b446bc178cde10f",
+            "policySha256": "c5eb4c5427ef52a2232a52e22454cf13c048c3da758f7e3fb9e9406ae7baecb1",
             "defaults": [
               "organizations.entitlements",
               "org_settings.customer_email_sender_user_id",
@@ -11486,7 +11692,7 @@
               "work_checklist_templates"
             ]
           },
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-full-rollback.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-full-rollback.jsonl"
         },
         "late-bridge-error": {
           "status": "failed",
@@ -11510,7 +11716,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 137,
+              "pid": 157,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -11677,7 +11883,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "dbfb8f76e518d80f19a397f59641f7d5"
+                "digest": "e3a1ae6cc6ce9014508b1cb878952c27"
               },
               {
                 "table": "conversation_messages",
@@ -11725,7 +11931,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "411a8dbd3ee6b97e5e7108bf8f657ac8"
+                "digest": "209a1affc4c2741ea4e158ed7a37aeb4"
               },
               {
                 "table": "form_submissions",
@@ -11778,8 +11984,8 @@
               {
                 "table": "lead_imports",
                 "rows": 2,
-                "bytes": 693,
-                "digest": "341d8c71bd8a82c4aaf3361b787e79fd"
+                "bytes": 691,
+                "digest": "e80155545f429372b2e93187e8f6c93e"
               },
               {
                 "table": "lead_tags",
@@ -11791,7 +11997,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "785de0b43984c84f98e78c03471e381b"
+                "digest": "5930b17395b8e85347c904bb334fc5ac"
               },
               {
                 "table": "message_templates",
@@ -11815,13 +12021,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "dbe6583e2940794f32018075f5267140"
+                "digest": "bed69b9eed039bc5f501e813857f6536"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "3bd0ce735dc83dfd3598a3084d647364"
+                "digest": "52de63f33ec471d5d8ff21835650fa4e"
               },
               {
                 "table": "playbook_decisions",
@@ -11862,8 +12068,8 @@
               {
                 "table": "projects",
                 "rows": 2,
-                "bytes": 852,
-                "digest": "5e5580735236e7d125be112d01d00adc"
+                "bytes": 850,
+                "digest": "723d7723eafa79c58e9a7f6c319920af"
               },
               {
                 "table": "properties",
@@ -11898,8 +12104,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "aba12db694c86c17d275c6b837da7e6b"
+                "bytes": 2520,
+                "digest": "032f295238c34bf8b1bbd5ffc9222bb4"
               },
               {
                 "table": "sessions",
@@ -11953,7 +12159,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "e6251933653c6f9da5b1ea1aa98a94b7"
+                "digest": "90929750973f97719ae2210dcbd667db"
               },
               {
                 "table": "webhook_deliveries",
@@ -11968,11 +12174,11 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "41b4d6f29704a56df6d60192a43fc501b0df88f6ca7688d2f08536fa432d4d74",
+            "policySha256": "bd4d592bc10e33698eed16c527037c3f7bb792ce93b4b6265efb045e974a183a",
             "defaults": [],
             "newTables": []
           },
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-late-bridge-error.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-late-bridge-error.jsonl"
         },
         "late-0018-error": {
           "status": "failed",
@@ -12002,7 +12208,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 139,
+              "pid": 160,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -12169,7 +12375,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "dbfb8f76e518d80f19a397f59641f7d5"
+                "digest": "e3a1ae6cc6ce9014508b1cb878952c27"
               },
               {
                 "table": "conversation_messages",
@@ -12217,7 +12423,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "411a8dbd3ee6b97e5e7108bf8f657ac8"
+                "digest": "209a1affc4c2741ea4e158ed7a37aeb4"
               },
               {
                 "table": "form_submissions",
@@ -12270,8 +12476,8 @@
               {
                 "table": "lead_imports",
                 "rows": 2,
-                "bytes": 693,
-                "digest": "341d8c71bd8a82c4aaf3361b787e79fd"
+                "bytes": 691,
+                "digest": "e80155545f429372b2e93187e8f6c93e"
               },
               {
                 "table": "lead_tags",
@@ -12283,7 +12489,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "785de0b43984c84f98e78c03471e381b"
+                "digest": "5930b17395b8e85347c904bb334fc5ac"
               },
               {
                 "table": "message_templates",
@@ -12307,13 +12513,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "dbe6583e2940794f32018075f5267140"
+                "digest": "bed69b9eed039bc5f501e813857f6536"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "3bd0ce735dc83dfd3598a3084d647364"
+                "digest": "52de63f33ec471d5d8ff21835650fa4e"
               },
               {
                 "table": "playbook_decisions",
@@ -12354,8 +12560,8 @@
               {
                 "table": "projects",
                 "rows": 2,
-                "bytes": 852,
-                "digest": "5e5580735236e7d125be112d01d00adc"
+                "bytes": 850,
+                "digest": "723d7723eafa79c58e9a7f6c319920af"
               },
               {
                 "table": "properties",
@@ -12390,8 +12596,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "aba12db694c86c17d275c6b837da7e6b"
+                "bytes": 2520,
+                "digest": "032f295238c34bf8b1bbd5ffc9222bb4"
               },
               {
                 "table": "sessions",
@@ -12445,7 +12651,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "e6251933653c6f9da5b1ea1aa98a94b7"
+                "digest": "90929750973f97719ae2210dcbd667db"
               },
               {
                 "table": "webhook_deliveries",
@@ -12460,11 +12666,11 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "41b4d6f29704a56df6d60192a43fc501b0df88f6ca7688d2f08536fa432d4d74",
+            "policySha256": "bd4d592bc10e33698eed16c527037c3f7bb792ce93b4b6265efb045e974a183a",
             "defaults": [],
             "newTables": []
           },
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-late-0018-error.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-late-0018-error.jsonl"
         },
         "wrong-target": {
           "status": "failed",
@@ -12481,7 +12687,7 @@
             "pid": true
           },
           "errorCode": "production75_identity",
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-wrong-target.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-wrong-target.jsonl"
         },
         "new-table-grant": {
           "status": "failed",
@@ -12511,7 +12717,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 142,
+              "pid": 163,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -12678,7 +12884,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "dbfb8f76e518d80f19a397f59641f7d5"
+                "digest": "e3a1ae6cc6ce9014508b1cb878952c27"
               },
               {
                 "table": "conversation_messages",
@@ -12726,7 +12932,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "411a8dbd3ee6b97e5e7108bf8f657ac8"
+                "digest": "209a1affc4c2741ea4e158ed7a37aeb4"
               },
               {
                 "table": "form_submissions",
@@ -12779,8 +12985,8 @@
               {
                 "table": "lead_imports",
                 "rows": 2,
-                "bytes": 693,
-                "digest": "341d8c71bd8a82c4aaf3361b787e79fd"
+                "bytes": 691,
+                "digest": "e80155545f429372b2e93187e8f6c93e"
               },
               {
                 "table": "lead_tags",
@@ -12792,7 +12998,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "785de0b43984c84f98e78c03471e381b"
+                "digest": "5930b17395b8e85347c904bb334fc5ac"
               },
               {
                 "table": "message_templates",
@@ -12816,13 +13022,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "dbe6583e2940794f32018075f5267140"
+                "digest": "bed69b9eed039bc5f501e813857f6536"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "3bd0ce735dc83dfd3598a3084d647364"
+                "digest": "52de63f33ec471d5d8ff21835650fa4e"
               },
               {
                 "table": "playbook_decisions",
@@ -12863,8 +13069,8 @@
               {
                 "table": "projects",
                 "rows": 2,
-                "bytes": 852,
-                "digest": "5e5580735236e7d125be112d01d00adc"
+                "bytes": 850,
+                "digest": "723d7723eafa79c58e9a7f6c319920af"
               },
               {
                 "table": "properties",
@@ -12899,8 +13105,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "aba12db694c86c17d275c6b837da7e6b"
+                "bytes": 2520,
+                "digest": "032f295238c34bf8b1bbd5ffc9222bb4"
               },
               {
                 "table": "sessions",
@@ -12954,7 +13160,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "e6251933653c6f9da5b1ea1aa98a94b7"
+                "digest": "90929750973f97719ae2210dcbd667db"
               },
               {
                 "table": "webhook_deliveries",
@@ -12969,11 +13175,11 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "41b4d6f29704a56df6d60192a43fc501b0df88f6ca7688d2f08536fa432d4d74",
+            "policySha256": "bd4d592bc10e33698eed16c527037c3f7bb792ce93b4b6265efb045e974a183a",
             "defaults": [],
             "newTables": []
           },
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-new-table-grant.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-new-table-grant.jsonl"
         },
         "commit": {
           "status": "committed-awaiting-reader",
@@ -13008,7 +13214,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 145,
+              "pid": 165,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -13175,7 +13381,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "dbfb8f76e518d80f19a397f59641f7d5"
+                "digest": "e3a1ae6cc6ce9014508b1cb878952c27"
               },
               {
                 "table": "conversation_messages",
@@ -13223,7 +13429,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "411a8dbd3ee6b97e5e7108bf8f657ac8"
+                "digest": "209a1affc4c2741ea4e158ed7a37aeb4"
               },
               {
                 "table": "form_submissions",
@@ -13276,8 +13482,8 @@
               {
                 "table": "lead_imports",
                 "rows": 2,
-                "bytes": 693,
-                "digest": "341d8c71bd8a82c4aaf3361b787e79fd"
+                "bytes": 691,
+                "digest": "e80155545f429372b2e93187e8f6c93e"
               },
               {
                 "table": "lead_tags",
@@ -13289,7 +13495,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "785de0b43984c84f98e78c03471e381b"
+                "digest": "5930b17395b8e85347c904bb334fc5ac"
               },
               {
                 "table": "message_templates",
@@ -13313,13 +13519,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "dbe6583e2940794f32018075f5267140"
+                "digest": "bed69b9eed039bc5f501e813857f6536"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "3bd0ce735dc83dfd3598a3084d647364"
+                "digest": "52de63f33ec471d5d8ff21835650fa4e"
               },
               {
                 "table": "playbook_decisions",
@@ -13360,8 +13566,8 @@
               {
                 "table": "projects",
                 "rows": 2,
-                "bytes": 852,
-                "digest": "5e5580735236e7d125be112d01d00adc"
+                "bytes": 850,
+                "digest": "723d7723eafa79c58e9a7f6c319920af"
               },
               {
                 "table": "properties",
@@ -13396,8 +13602,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "aba12db694c86c17d275c6b837da7e6b"
+                "bytes": 2520,
+                "digest": "032f295238c34bf8b1bbd5ffc9222bb4"
               },
               {
                 "table": "sessions",
@@ -13451,7 +13657,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "e6251933653c6f9da5b1ea1aa98a94b7"
+                "digest": "90929750973f97719ae2210dcbd667db"
               },
               {
                 "table": "webhook_deliveries",
@@ -13466,7 +13672,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "41b4d6f29704a56df6d60192a43fc501b0df88f6ca7688d2f08536fa432d4d74",
+            "policySha256": "bd4d592bc10e33698eed16c527037c3f7bb792ce93b4b6265efb045e974a183a",
             "defaults": [],
             "newTables": []
           },
@@ -13477,7 +13683,7 @@
               "login": "production75-writer",
               "role": "production75_owner",
               "version": 160015,
-              "pid": 145,
+              "pid": 165,
               "isolation": "repeatable read",
               "read_only": "off"
             },
@@ -13644,7 +13850,7 @@
                 "table": "contacts",
                 "rows": 2,
                 "bytes": 773,
-                "digest": "dbfb8f76e518d80f19a397f59641f7d5"
+                "digest": "e3a1ae6cc6ce9014508b1cb878952c27"
               },
               {
                 "table": "conversation_messages",
@@ -13692,7 +13898,7 @@
                 "table": "estimates",
                 "rows": 2,
                 "bytes": 904,
-                "digest": "411a8dbd3ee6b97e5e7108bf8f657ac8"
+                "digest": "209a1affc4c2741ea4e158ed7a37aeb4"
               },
               {
                 "table": "form_submissions",
@@ -13745,8 +13951,8 @@
               {
                 "table": "lead_imports",
                 "rows": 2,
-                "bytes": 693,
-                "digest": "341d8c71bd8a82c4aaf3361b787e79fd"
+                "bytes": 691,
+                "digest": "e80155545f429372b2e93187e8f6c93e"
               },
               {
                 "table": "lead_tags",
@@ -13758,7 +13964,7 @@
                 "table": "leads",
                 "rows": 2,
                 "bytes": 1467,
-                "digest": "785de0b43984c84f98e78c03471e381b"
+                "digest": "5930b17395b8e85347c904bb334fc5ac"
               },
               {
                 "table": "message_templates",
@@ -13782,13 +13988,13 @@
                 "table": "org_settings",
                 "rows": 2,
                 "bytes": 1360,
-                "digest": "dbe6583e2940794f32018075f5267140"
+                "digest": "bed69b9eed039bc5f501e813857f6536"
               },
               {
                 "table": "organizations",
                 "rows": 2,
                 "bytes": 728,
-                "digest": "3bd0ce735dc83dfd3598a3084d647364"
+                "digest": "52de63f33ec471d5d8ff21835650fa4e"
               },
               {
                 "table": "playbook_decisions",
@@ -13829,8 +14035,8 @@
               {
                 "table": "projects",
                 "rows": 2,
-                "bytes": 852,
-                "digest": "5e5580735236e7d125be112d01d00adc"
+                "bytes": 850,
+                "digest": "723d7723eafa79c58e9a7f6c319920af"
               },
               {
                 "table": "properties",
@@ -13865,8 +14071,8 @@
               {
                 "table": "scheduled_actions",
                 "rows": 6,
-                "bytes": 2522,
-                "digest": "aba12db694c86c17d275c6b837da7e6b"
+                "bytes": 2520,
+                "digest": "032f295238c34bf8b1bbd5ffc9222bb4"
               },
               {
                 "table": "sessions",
@@ -13920,7 +14126,7 @@
                 "table": "users",
                 "rows": 2,
                 "bytes": 772,
-                "digest": "e6251933653c6f9da5b1ea1aa98a94b7"
+                "digest": "90929750973f97719ae2210dcbd667db"
               },
               {
                 "table": "webhook_deliveries",
@@ -13935,7 +14141,7 @@
                 "digest": "d41d8cd98f00b204e9800998ecf8427e"
               }
             ],
-            "policySha256": "84f22b886e10daec4e5326db49d2360b8996fd0ebea9cf7e2b446bc178cde10f",
+            "policySha256": "c5eb4c5427ef52a2232a52e22454cf13c048c3da758f7e3fb9e9406ae7baecb1",
             "defaults": [
               "organizations.entitlements",
               "org_settings.customer_email_sender_user_id",
@@ -14021,10 +14227,11 @@
               "work_checklist_templates"
             ]
           },
-          "journal": "journals/90be0806-3986-480d-b7a5-3c9d19299756/growthos_staging-commit.jsonl"
+          "journal": "journals/05010f4b-4153-4abf-a9ed-e907cce1d426/growthos_staging-commit.jsonl"
         }
       },
       "checks": {
+        "provider-view-baseline": true,
         "same-count-data": true,
         "column-type": true,
         "column-default": true,
@@ -14032,6 +14239,11 @@
         "table-acl": true,
         "column-acl": true,
         "reader-permission": true,
+        "provider-view-acl": true,
+        "provider-column-acl": true,
+        "provider-view-removal": true,
+        "provider-view-owner": true,
+        "provider-rogue-addition": true,
         "physical-ordinal-input": true,
         "bridge-rollback": true,
         "full-rollback": true,
@@ -14041,7 +14253,37 @@
         "new-table-grant": true,
         "commit": true,
         "freshReader": true,
+        "provider-view-preserved": true,
         "syntheticRows": true
+      },
+      "syntheticProviderMetadata": {
+        "actualProviderExtensionProof": false,
+        "ownershipRows": [
+          {
+            "kind": "column",
+            "schema": "public",
+            "name": "production75_provider_fixture",
+            "sub_name": "marker",
+            "owner": "postgres",
+            "acl": "{postgres=r/postgres}"
+          },
+          {
+            "kind": "column",
+            "schema": "public",
+            "name": "production75_provider_fixture",
+            "sub_name": "sample_count",
+            "owner": "postgres",
+            "acl": "{postgres=r/postgres}"
+          },
+          {
+            "kind": "relation",
+            "schema": "public",
+            "name": "production75_provider_fixture",
+            "sub_name": null,
+            "owner": "postgres",
+            "acl": "{postgres=arwdDxt/postgres,=r/postgres}"
+          }
+        ]
       },
       "freshReader": {
         "phase": 142,
@@ -14050,7 +14292,7 @@
           "login": "production75-reader",
           "role": "production75-reader",
           "version": 160015,
-          "pid": 146,
+          "pid": 166,
           "isolation": "repeatable read",
           "read_only": "on"
         },
@@ -14217,7 +14459,7 @@
             "table": "contacts",
             "rows": 2,
             "bytes": 773,
-            "digest": "dbfb8f76e518d80f19a397f59641f7d5"
+            "digest": "e3a1ae6cc6ce9014508b1cb878952c27"
           },
           {
             "table": "conversation_messages",
@@ -14265,7 +14507,7 @@
             "table": "estimates",
             "rows": 2,
             "bytes": 904,
-            "digest": "411a8dbd3ee6b97e5e7108bf8f657ac8"
+            "digest": "209a1affc4c2741ea4e158ed7a37aeb4"
           },
           {
             "table": "form_submissions",
@@ -14318,8 +14560,8 @@
           {
             "table": "lead_imports",
             "rows": 2,
-            "bytes": 693,
-            "digest": "341d8c71bd8a82c4aaf3361b787e79fd"
+            "bytes": 691,
+            "digest": "e80155545f429372b2e93187e8f6c93e"
           },
           {
             "table": "lead_tags",
@@ -14331,7 +14573,7 @@
             "table": "leads",
             "rows": 2,
             "bytes": 1467,
-            "digest": "785de0b43984c84f98e78c03471e381b"
+            "digest": "5930b17395b8e85347c904bb334fc5ac"
           },
           {
             "table": "message_templates",
@@ -14355,13 +14597,13 @@
             "table": "org_settings",
             "rows": 2,
             "bytes": 1360,
-            "digest": "dbe6583e2940794f32018075f5267140"
+            "digest": "bed69b9eed039bc5f501e813857f6536"
           },
           {
             "table": "organizations",
             "rows": 2,
             "bytes": 728,
-            "digest": "3bd0ce735dc83dfd3598a3084d647364"
+            "digest": "52de63f33ec471d5d8ff21835650fa4e"
           },
           {
             "table": "playbook_decisions",
@@ -14402,8 +14644,8 @@
           {
             "table": "projects",
             "rows": 2,
-            "bytes": 852,
-            "digest": "5e5580735236e7d125be112d01d00adc"
+            "bytes": 850,
+            "digest": "723d7723eafa79c58e9a7f6c319920af"
           },
           {
             "table": "properties",
@@ -14438,8 +14680,8 @@
           {
             "table": "scheduled_actions",
             "rows": 6,
-            "bytes": 2522,
-            "digest": "aba12db694c86c17d275c6b837da7e6b"
+            "bytes": 2520,
+            "digest": "032f295238c34bf8b1bbd5ffc9222bb4"
           },
           {
             "table": "sessions",
@@ -14493,7 +14735,7 @@
             "table": "users",
             "rows": 2,
             "bytes": 772,
-            "digest": "e6251933653c6f9da5b1ea1aa98a94b7"
+            "digest": "90929750973f97719ae2210dcbd667db"
           },
           {
             "table": "webhook_deliveries",
@@ -14508,7 +14750,7 @@
             "digest": "d41d8cd98f00b204e9800998ecf8427e"
           }
         ],
-        "policySha256": "84f22b886e10daec4e5326db49d2360b8996fd0ebea9cf7e2b446bc178cde10f",
+        "policySha256": "c5eb4c5427ef52a2232a52e22454cf13c048c3da758f7e3fb9e9406ae7baecb1",
         "defaults": [
           "organizations.entitlements",
           "org_settings.customer_email_sender_user_id",
@@ -14610,35 +14852,35 @@
     "cleanup": true
   },
   "cleanup": {
-    "clientsClosed": 69,
-    "socketsClosed": 69,
+    "clientsClosed": 89,
+    "socketsClosed": 89,
     "containerRemoved": true,
-    "expectedClients": 69,
+    "expectedClients": 89,
     "idRecovered": false,
     "containerAbsent": false,
-    "removedId": "dafc7dd02b7591f442cf62c4035cbc83e52a38603beb4c107d729ab89b4cc629"
+    "removedId": "e4dce954f84beb9e43acc307d6112271b74c0a7d81f6b0794b897c36e12be184"
   },
   "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
   "lostRunResponseCleanup": {
-    "name": "production75-local-11008-153d7ef8",
+    "name": "production75-local-35504-0ec7e19b",
     "containerRemoved": true,
     "idRecovered": true,
     "containerAbsent": false,
-    "removedId": "e517044a58b39464de7b0f2bdc57e8efa2377ae12aa021ac1a2d986eeaab96ec"
+    "removedId": "caf9cc13a8eb7086e9a5f2a7208d5cdff0b1b4222b7f53037426d9efb3278fe2"
   },
   "container": {
-    "name": "production75-local-11008-90be0806",
-    "id": "dafc7dd02b7591f442cf62c4035cbc83e52a38603beb4c107d729ab89b4cc629"
+    "name": "production75-local-35504-05010f4b",
+    "id": "e4dce954f84beb9e43acc307d6112271b74c0a7d81f6b0794b897c36e12be184"
   },
   "loopback": {
     "host": "127.0.0.1",
-    "port": 32768
+    "port": 32770
   },
   "sourceHashesAfter": {
-    "production75-core.mjs": "93cfc5199443c131f7f4c7c588f2c848559361cb2f75d0690280aee7d77cf9d3",
+    "production75-core.mjs": "196a28729f637b678ab9c6cd9cd55420824a8220dbce1dcdafa27abafad90858",
     "production75-source.mjs": "5d4d11280ae7bac63f8eb71a7890ad8f3b947930bc6a0368c7be6ee46bf4ad7d",
     "production75-pins.mjs": "49659d051413a9df57ce6ab85ddd17cf108ee9f5cffdd4de935e93e8db63475e",
-    "production75-local.mjs": "598a3be862dccec628b1e404f575974a7799c69048de36a4ed862f8b3451801e"
+    "production75-local.mjs": "495caf65ffa60c023569f402f10f3716bd3203917258ff01e7ce6cd816eb0155"
   },
-  "finishedAt": "2026-10-11T06:44:16.340Z"
+  "finishedAt": "2026-10-12T15:01:18.066Z"
 }

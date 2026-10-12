@@ -1,7 +1,6 @@
 /**
- * Read the first rows of a CSV for column mapping. Mirrors the server's
- * RFC 4180-style parser (quoted commas, doubled quotes, CRLF) so the column
- * numbers chosen here are the ones the server applies.
+ * Validate the whole CSV and retain its first rows for column mapping. Mirrors
+ * the server's parser so the selected columns are the ones the server applies.
  */
 export function parseCsvPreview(text: string, maxRows = 6): string[][] {
   const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
@@ -9,21 +8,30 @@ export function parseCsvPreview(text: string, maxRows = 6): string[][] {
   let row: string[] = [];
   let field = "";
   let inQuotes = false;
-  for (let i = 0; i < source.length && rows.length < maxRows; i++) {
+  let afterQuote = false;
+  const invalid = () => { throw new Error("The CSV contains invalid quoting."); };
+  for (let i = 0; i < source.length; i++) {
     const c = source[i];
     if (inQuotes) {
       if (c === '"' && source[i + 1] === '"') { field += '"'; i++; }
-      else if (c === '"') inQuotes = false;
+      else if (c === '"') { inQuotes = false; afterQuote = true; }
       else field += c;
-    } else if (c === '"') inQuotes = true;
-    else if (c === ",") { row.push(field); field = ""; }
+    } else if (c === '"') {
+      if (field !== "" || afterQuote) invalid();
+      inQuotes = true;
+    }
+    else if (c === ",") { row.push(field); field = ""; afterQuote = false; }
     else if (c === "\n" || c === "\r") {
       if (c === "\r" && source[i + 1] === "\n") i++;
-      row.push(field); field = "";
-      if (row.some((f) => f.trim() !== "")) rows.push(row);
+      row.push(field); field = ""; afterQuote = false;
+      if (rows.length < maxRows && row.some((f) => f.trim() !== "")) rows.push(row);
       row = [];
-    } else field += c;
+    } else {
+      if (afterQuote) invalid();
+      field += c;
+    }
   }
+  if (inQuotes) invalid();
   if (rows.length < maxRows) {
     row.push(field);
     if (row.some((f) => f.trim() !== "")) rows.push(row);

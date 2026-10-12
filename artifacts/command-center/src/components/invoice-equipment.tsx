@@ -155,6 +155,7 @@ export function InvoiceEquipmentPicker({
 export function InvoiceEquipmentView({ equipment }: { equipment: InvoiceDocument["equipment"] }) {
   if (!equipment) return null;
   const dated = equipment.items.some((item) => item.warrantyStartsOn || item.warrantyEndsOn);
+  const recordedWarranty = equipment.items.some((item) => item.warrantyStartsOn || item.warrantyEndsOn || item.warrantySource);
   return (
     <section aria-label="Equipment and warranty" className="space-y-3 text-sm">
       {equipment.items.length > 0 && (
@@ -168,7 +169,7 @@ export function InvoiceEquipmentView({ equipment }: { equipment: InvoiceDocument
                 {item.serial && <span className="block">Serial: {item.serial}</span>}
                 {item.location && <span className="block">Location: {item.location}</span>}
                 {item.installedOn && <span className="block">Installed: {item.installedOn}</span>}
-                {(item.warrantyStartsOn || item.warrantyEndsOn) && (
+                {(item.warrantyStartsOn || item.warrantyEndsOn || item.warrantySource) && (
                   <span className="block">
                     Recorded warranty: {item.warrantyStartsOn ?? "start not recorded"} to{" "}
                     {item.warrantyEndsOn ?? "end not recorded"}
@@ -186,9 +187,9 @@ export function InvoiceEquipmentView({ equipment }: { equipment: InvoiceDocument
           <p className="whitespace-pre-wrap break-words">{equipment.warrantyTerms}</p>
         </>
       )}
-      {dated && (
+      {recordedWarranty && (
         <p className="text-xs text-muted-foreground">
-          Recorded warranty dates are listed for reference; the warranty provider determines coverage.
+          Recorded warranty {dated ? "dates are" : "information is"} listed for reference; the warranty provider determines coverage.
         </p>
       )}
     </section>

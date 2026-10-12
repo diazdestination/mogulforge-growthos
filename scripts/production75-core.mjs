@@ -156,7 +156,16 @@ export function assertProduction75Preserved(before,after,plan,phase=plan.until) 
   equal(after.fingerprints,before.fingerprints,'production75_original_data_changed');
   equal(before.policy,plan.policies[75],'production75_baseline_policy');equal(after.policy,plan.policies[phase],'production75_policy_changed');
   const originals=new Set(plan.catalog75.tables.map(t=>t.name)),columns=new Set(plan.catalog75.columns.map(c=>`${c.table_name}.${c.name}`));
-  const retain=r=>r.kind!=='relation'&&r.kind!=='column'||(r.kind==='relation'? originals.has(r.name):columns.has(`${r.name}.${r.sub_name}`));
+  const ownershipKey=r=>JSON.stringify([r.kind,r.schema,r.name,r.sub_name??null]);
+  const originalOwnership=new Set(before.policy.ownership.map(ownershipKey));
+  const addedOwnership=new Set([
+    ...plan[`catalog${phase}`].tables.filter(t=>!originals.has(t.name)).map(t=>ownershipKey({kind:'relation',schema:t.schema,name:t.name,sub_name:null})),
+    ...plan[`catalog${phase}`].columns.filter(c=>!columns.has(`${c.table_name}.${c.name}`)).map(c=>ownershipKey({kind:'column',schema:'public',name:c.table_name,sub_name:c.name})),
+  ]);
+  // Keep every pre-existing object, including provider-owned views/functions and
+  // their column ACLs. Exclude only known SQL-added table/column identities;
+  // unexpected additions remain in the comparison and cannot be masked.
+  const retain=r=>originalOwnership.has(ownershipKey(r))||!addedOwnership.has(ownershipKey(r));
   equal(after.policy.ownership.filter(retain),before.policy.ownership,'production75_original_acl_changed');
   for(const [section,rows] of Object.entries(before.policy.privileges)) {
     const actual=after.policy.privileges[section],retained=section==='tables'?actual.filter(r=>originals.has(r.name)):section==='columns'?actual.filter(r=>columns.has(`${r.table_name}.${r.name}`)):actual;
