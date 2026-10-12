@@ -9,6 +9,7 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -b ../../lib/db ../../lib/api-zod && tsc -p tsconfig.json --noEmit",
     "smoke": "node ./scripts/smoke.mjs",
+    "eval:contractor": "node ./scripts/eval-contractor.mjs",
     "test": "vitest run",
     "test:twilio": "node scripts/test-twilio-isolated.mjs",
     "test:scheduler": "node scripts/test-scheduler-isolated.mjs",
