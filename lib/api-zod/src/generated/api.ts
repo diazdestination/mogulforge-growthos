@@ -13477,23 +13477,25 @@ export const ImportLeadsCsvBody = zod.object({
   "defaultStatus": zod.string().optional(),
   "defaultSource": zod.string().optional(),
   "sourceKey": zod.string().optional().describe('Stable lowercase source\/account key, required with external opportunity IDs. Reuse it on every import from the same account.'),
-  "snapshotAsOf": zod.string().optional().describe('Original export snapshot date (ISO date or timestamp with timezone). Omit when unknown; upload time is never source freshness.')
+  "snapshotAsOf": zod.string().optional().describe('Original export snapshot date (ISO date or timestamp with timezone). Omit when unknown; upload time is never source freshness.'),
+  "mode": zod.enum(['leads', 'customers']).optional().describe('customers imports existing customers as contacts only (no lead, pipeline stage or nurture); only name, email, phone and customer ID columns may be mapped. Defaults to leads.'),
+  "dryRun": zod.boolean().optional().describe('Check and match every row inside one rolled-back transaction and return a preview. Nothing is saved and no import record is created.')
 })
 
 export const ImportLeadsCsvResponse = zod.object({
-  "id": zod.string(),
-  "fileName": zod.string().nullish(),
+  "dryRun": zod.literal(true),
+  "fileName": zod.string().nullable(),
   "totalRows": zod.number(),
-  "imported": zod.number(),
+  "imported": zod.number().describe('Rows that would create a new record.'),
   "updated": zod.number(),
   "duplicates": zod.number(),
   "conflicts": zod.number(),
-  "sourceKey": zod.string().nullish(),
-  "snapshotAsOf": zod.string().nullish(),
   "skipped": zod.number(),
   "suppressed": zod.number(),
   "errors": zod.array(zod.string()),
-  "createdAt": zod.string()
+  "errorsTruncated": zod.boolean(),
+  "sourceKey": zod.string().nullable(),
+  "snapshotAsOf": zod.string().nullable()
 })
 
 

@@ -11400,6 +11400,17 @@ export interface LeadEnrollmentEnvelope {
  */
 export type LeadImportRequestMapping = {[key: string]: number};
 
+/**
+ * customers imports existing customers as contacts only (no lead, pipeline stage or nurture); only name, email, phone and customer ID columns may be mapped. Defaults to leads.
+ */
+export type LeadImportRequestMode = typeof LeadImportRequestMode[keyof typeof LeadImportRequestMode];
+
+
+export const LeadImportRequestMode = {
+  leads: 'leads',
+  customers: 'customers',
+} as const;
+
 export interface LeadImportRequest {
   csv: string;
   /** Map of import field name to 0-based CSV column index. */
@@ -11412,6 +11423,27 @@ export interface LeadImportRequest {
   sourceKey?: string;
   /** Original export snapshot date (ISO date or timestamp with timezone). Omit when unknown; upload time is never source freshness. */
   snapshotAsOf?: string;
+  /** customers imports existing customers as contacts only (no lead, pipeline stage or nurture); only name, email, phone and customer ID columns may be mapped. Defaults to leads. */
+  mode?: LeadImportRequestMode;
+  /** Check and match every row inside one rolled-back transaction and return a preview. Nothing is saved and no import record is created. */
+  dryRun?: boolean;
+}
+
+export interface LeadImportPreview {
+  dryRun: true;
+  fileName: string | null;
+  totalRows: number;
+  /** Rows that would create a new record. */
+  imported: number;
+  updated: number;
+  duplicates: number;
+  conflicts: number;
+  skipped: number;
+  suppressed: number;
+  errors: string[];
+  errorsTruncated: boolean;
+  sourceKey: string | null;
+  snapshotAsOf: string | null;
 }
 
 export interface LeadImport {

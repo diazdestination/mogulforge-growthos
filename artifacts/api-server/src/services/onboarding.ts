@@ -25,6 +25,7 @@ export const ONBOARDING_STEPS = [
   "domain",
   "snippet",
   "verify",
+  "import-customers",
   "test-lead",
   "invite-team",
   "launch",

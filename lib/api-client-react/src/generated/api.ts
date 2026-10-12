@@ -155,6 +155,7 @@ import type {
   LeadBehaviorSummary,
   LeadEnrollmentEnvelope,
   LeadImport,
+  LeadImportPreview,
   LeadImportRequest,
   LeadInput,
   LeadMailboxReplyPage,
@@ -16131,8 +16132,8 @@ export const getImportLeadsCsvUrl = () => {
 export const importLeadsCsv = async (
   leadImportRequest: LeadImportRequest,
   options?: Parameters<typeof customFetch>[1],
-): Promise<LeadImport> => {
-  return customFetch<LeadImport>(getImportLeadsCsvUrl(), {
+): Promise<LeadImportPreview | LeadImport> => {
+  return customFetch<LeadImportPreview | LeadImport>(getImportLeadsCsvUrl(), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
