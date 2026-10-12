@@ -120,15 +120,44 @@ const VALID_STATUSES = new Set([
 
 const MAX_IMPORT_ROWS = 10_000;
 const MAX_ERROR_SAMPLES = 20;
+const MAX_PREVIEW_ERROR_SAMPLES = 200;
+
+class DryRunRollback extends Error {}
+/** What an import would do. Nothing is saved and no import record is created. */
+export interface LeadImportPreview {
+  dryRun: true;
+  fileName: string | null;
+  totalRows: number;
+  imported: number;
+  updated: number;
+  duplicates: number;
+  conflicts: number;
+  skipped: number;
+  suppressed: number;
+  errors: string[];
+  errorsTruncated: boolean;
+  sourceKey: string | null;
+  snapshotAsOf: string | null;
+}
 
 function clean(v: string | undefined, max = 200): string | null {
   const s = (v ?? "").trim();
   return s ? s.slice(0, max) : null;
 }
 
+type ImportLeadsResult<P> = P extends { dryRun: true }
+  ? LeadImportPreview | { error: string }
+  : P extends { dryRun: boolean }
+    ? LeadImport | LeadImportPreview | { error: string }
+    : LeadImport | { error: string };
+export function importLeads<P extends ImportLeadsParams>(organizationId: string, params: P): Promise<ImportLeadsResult<P>>;
 export async function importLeads(
   organizationId: string,
-  params: {
+  params: ImportLeadsParams,
+): Promise<LeadImport | LeadImportPreview | { error: string }> {
+  return runLeadImport(organizationId, params);
+}
+interface ImportLeadsParams {
     csv: string;
     /** Map of import field → 0-based CSV column index. */
     mapping: Partial<Record<ImportField, number>>;
@@ -141,8 +170,13 @@ export async function importLeads(
     /** When the source export was captured, not when this upload occurred. */
     snapshotAsOf?: string;
     createdByUserId?: string | null;
-  },
-): Promise<LeadImport | { error: string }> {
+    /** Run every row check and match in one transaction, then roll it back. */
+    dryRun?: boolean;
+}
+async function runLeadImport(
+  organizationId: string,
+  params: ImportLeadsParams,
+): Promise<LeadImport | LeadImportPreview | { error: string }> {
   const all = parseCsv(params.csv);
   const rows = params.hasHeader === false ? all : all.slice(1);
   if (rows.length === 0) return { error: "No data rows found in the file" };
@@ -186,6 +220,10 @@ export async function importLeads(
   let skipped = 0;
   let suppressedCount = 0;
   const errors: string[] = [];
+  // A preview is for reviewing every problem row before anything is saved.
+  const maxErrors = params.dryRun ? MAX_PREVIEW_ERROR_SAMPLES : MAX_ERROR_SAMPLES;
+  type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+  let runRow = <T>(work: (tx: Tx) => Promise<T>): Promise<T> => db.transaction(work);
 
   // Suppression list snapshot for flagging (send gate re-checks at send time).
   const suppressions = await db
@@ -194,13 +232,14 @@ export async function importLeads(
     .where(eq(suppressionsTable.organizationId, organizationId));
   const suppressedSet = new Set(suppressions.map((s) => `${s.channel}:${s.value}`));
 
+  const processRows = async () => {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const rowNo = i + (params.hasHeader === false ? 1 : 2);
     if (Object.values(m).some((index) => index >= row.length) ||
         (params.hasHeader !== false && row.length !== all[0].length)) {
       skipped++;
-      if (errors.length < MAX_ERROR_SAMPLES) errors.push(`Row ${rowNo}: column count does not match the header or mapping; no values were applied`);
+      if (errors.length < maxErrors) errors.push(`Row ${rowNo}: column count does not match the header or mapping; no values were applied`);
       continue;
     }
     const get = (f: ImportField) => (m[f] === undefined ? undefined : row[m[f]!]);
@@ -211,12 +250,12 @@ export async function importLeads(
 
     if (!firstName) {
       skipped++;
-      if (errors.length < MAX_ERROR_SAMPLES) errors.push(`Row ${rowNo}: missing first name`);
+      if (errors.length < maxErrors) errors.push(`Row ${rowNo}: missing first name`);
       continue;
     }
     if (!email && (!phoneDigits || phoneDigits.length < 7)) {
       skipped++;
-      if (errors.length < MAX_ERROR_SAMPLES) {
+      if (errors.length < maxErrors) {
         errors.push(`Row ${rowNo}: needs a valid email or phone`);
       }
       continue;
@@ -281,7 +320,7 @@ export async function importLeads(
         firstImportedAt: receivedAt.toISOString(), lastImportedAt: receivedAt.toISOString(),
       };
       importedOpportunityHistorySchema.parse(history);
-      const outcome = await db.transaction(async (tx) => {
+      const outcome = await runRow(async (tx) => {
         // Import requests for one tenant serialize contact matching and opportunity creation.
         // The unique index remains the final protection against duplicate source IDs.
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`lead-import:${organizationId}`}))`);
@@ -380,7 +419,7 @@ export async function importLeads(
       });
       if (outcome.kind === "conflict") {
         conflicts++;
-        if (errors.length < MAX_ERROR_SAMPLES) errors.push(`Row ${rowNo}: ${outcome.reason}`);
+        if (errors.length < maxErrors) errors.push(`Row ${rowNo}: ${outcome.reason}`);
       } else if (outcome.kind === "duplicate") duplicates++;
       else {
         if (outcome.kind === "updated") updated++;
@@ -391,9 +430,30 @@ export async function importLeads(
       skipped++;
       // Only our validation errors are safe to show; never leak SQL or uploaded values.
       const message = err instanceof SourceHistoryValidationError ? err.message : "failed to save";
-      if (errors.length < MAX_ERROR_SAMPLES) errors.push(`Row ${rowNo}: ${message}`);
+      if (errors.length < maxErrors) errors.push(`Row ${rowNo}: ${message}`);
     }
   }
+  };
+
+  if (params.dryRun) {
+    // Rows run as savepoints of one outer transaction, so later rows see earlier
+    // rows of the same file exactly as a real import would; then all of it is undone.
+    await db
+      .transaction(async (outer) => {
+        runRow = (work) => outer.transaction(work);
+        await processRows();
+        throw new DryRunRollback();
+      })
+      .catch((err) => {
+        if (!(err instanceof DryRunRollback)) throw err;
+      });
+    return {
+      dryRun: true, fileName: clean(params.fileName, 200), totalRows: rows.length,
+      imported, updated, duplicates, conflicts, skipped, suppressed: suppressedCount,
+      errors, errorsTruncated: errors.length >= maxErrors, sourceKey, snapshotAsOf,
+    };
+  }
+  await processRows();
 
   const [record] = await db
     .insert(leadImportsTable)

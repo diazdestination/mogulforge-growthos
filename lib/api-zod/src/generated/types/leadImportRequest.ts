@@ -19,4 +19,6 @@ export interface LeadImportRequest {
   sourceKey?: string;
   /** Original export snapshot date (ISO date or timestamp with timezone). Omit when unknown; upload time is never source freshness. */
   snapshotAsOf?: string;
+  /** Check and match every row inside one rolled-back transaction and return a preview. Nothing is saved and no import record is created. */
+  dryRun?: boolean;
 }

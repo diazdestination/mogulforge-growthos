@@ -422,6 +422,7 @@ export * from './leadBehaviorSummaryBehavior';
 export * from './leadBehaviorSummaryBehaviorTopPagesItem';
 export * from './leadEnrollmentEnvelope';
 export * from './leadImport';
+export * from './leadImportPreview';
 export * from './leadImportRequest';
 export * from './leadImportRequestMapping';
 export * from './leadInput';

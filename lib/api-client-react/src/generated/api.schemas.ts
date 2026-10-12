@@ -11412,6 +11412,25 @@ export interface LeadImportRequest {
   sourceKey?: string;
   /** Original export snapshot date (ISO date or timestamp with timezone). Omit when unknown; upload time is never source freshness. */
   snapshotAsOf?: string;
+  /** Check and match every row inside one rolled-back transaction and return a preview. Nothing is saved and no import record is created. */
+  dryRun?: boolean;
+}
+
+export interface LeadImportPreview {
+  dryRun: true;
+  fileName: string | null;
+  totalRows: number;
+  /** Rows that would create a new record. */
+  imported: number;
+  updated: number;
+  duplicates: number;
+  conflicts: number;
+  skipped: number;
+  suppressed: number;
+  errors: string[];
+  errorsTruncated: boolean;
+  sourceKey: string | null;
+  snapshotAsOf: string | null;
 }
 
 export interface LeadImport {

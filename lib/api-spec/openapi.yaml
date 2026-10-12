@@ -2947,6 +2947,12 @@ paths:
             schema:
               $ref: "#/components/schemas/LeadImportRequest"
       responses:
+        "200":
+          description: Dry-run preview (dryRun true). Nothing was saved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadImportPreview"
         "201":
           description: Import summary
           content:
@@ -7791,6 +7797,46 @@ components:
         snapshotAsOf:
           type: string
           description: Original export snapshot date (ISO date or timestamp with timezone). Omit when unknown; upload time is never source freshness.
+        dryRun:
+          type: boolean
+          description: Check and match every row inside one rolled-back transaction and return a preview. Nothing is saved and no import record is created.
+    LeadImportPreview:
+      type: object
+      required: [dryRun, fileName, totalRows, imported, updated, duplicates, conflicts, skipped, suppressed, errors, errorsTruncated, sourceKey, snapshotAsOf]
+      properties:
+        dryRun:
+          type: boolean
+          enum: [true]
+        fileName:
+          type: string
+          nullable: true
+        totalRows:
+          type: number
+        imported:
+          type: number
+          description: Rows that would create a new record.
+        updated:
+          type: number
+        duplicates:
+          type: number
+        conflicts:
+          type: number
+        skipped:
+          type: number
+        suppressed:
+          type: number
+        errors:
+          type: array
+          items:
+            type: string
+        errorsTruncated:
+          type: boolean
+        sourceKey:
+          type: string
+          nullable: true
+        snapshotAsOf:
+          type: string
+          nullable: true
     LeadImport:
       type: object
       required: [id, totalRows, imported, updated, duplicates, conflicts, skipped, suppressed, errors, createdAt]

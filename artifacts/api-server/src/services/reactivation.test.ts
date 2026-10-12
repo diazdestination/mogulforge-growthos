@@ -2,6 +2,7 @@ import {
   appointmentsTable,
   contactsTable,
   db,
+  leadImportsTable,
   leadsTable,
   organizationsTable,
   playbookEnrollmentsTable,
@@ -161,6 +162,34 @@ describe("importLeads", () => {
     expect(imported.leads.creationMethod).toBe("import");
     expect(imported.leads.status).toBe("lost");
     expect(imported.leads.source).toBe("csv-import");
+  });
+
+  it("previews exactly what an import would do, then saves nothing", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    await makeLead(orgId, { email: `known-${tag}@example.com` });
+    const csv = [
+      "First Name,Last Name,Email,Mobile Number",
+      `"Gale, Jr.",Green,gale-${tag}@example.com,`,
+      `Hank,Hill,known-${tag}@example.com,`, // already in GrowthOS
+      `Hal,Hill,gale-${tag}@example.com,`, // repeats an earlier row of this file
+      ",Nobody,nobody@example.com,",
+    ].join("\n");
+    const input = { csv, mapping: { firstName: 0, lastName: 1, email: 2, phone: 3 }, fileName: "customers.csv", sourceKey: "housecall-pro" };
+    const countRows = async () => ({
+      contacts: (await db.select({ id: contactsTable.id }).from(contactsTable).where(eq(contactsTable.organizationId, orgId))).length,
+      imports: (await db.select({ id: leadImportsTable.id }).from(leadImportsTable).where(eq(leadImportsTable.organizationId, orgId))).length,
+    });
+    const before = await countRows();
+
+    const preview = await importLeads(orgId, { ...input, dryRun: true });
+    if ("error" in preview) throw new Error(preview.error);
+    expect(preview).toMatchObject({ dryRun: true, totalRows: 4, imported: 1, duplicates: 2, skipped: 1, errorsTruncated: false });
+    expect(await countRows()).toEqual(before);
+
+    const saved = await importLeads(orgId, input);
+    if ("error" in saved) throw new Error(saved.error);
+    expect(saved).toMatchObject({ imported: preview.imported, duplicates: preview.duplicates, skipped: preview.skipped });
+    expect(await countRows()).toEqual({ contacts: before.contacts + 1, imports: before.imports + 1 });
   });
 
   it("rejects a mapping without email or phone", async () => {
