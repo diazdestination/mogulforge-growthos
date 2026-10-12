@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import Invoices from "./invoices";
-import { mockApi } from "@/test/mock-api";
+import { mockApi, sampleMe } from "@/test/mock-api";
 import { renderWithQuery } from "@/test/render";
 import {
   invoiceId,
@@ -19,6 +19,7 @@ import {
 import { invoiceRequestStorageKey } from "@/hooks/use-invoice-command";
 import type { InvoiceDetail, InvoiceDraft } from "@/lib/invoice-ui";
 import { sampleDelivery } from "@/test/invoice-delivery-fixtures";
+import { asset as workdayAsset, assetId, assets, contact as workdayContact, org as workdayOrg, property as workdayProperty, wid } from "@/test/workday-fixtures";
 
 function json(value: unknown, status = 200) {
   return new Response(JSON.stringify(value), {
@@ -795,5 +796,64 @@ describe("Customer invoices", () => {
     expect(
       screen.getByRole("region", { name: "Invoice balance" }).textContent,
     ).toContain("$100.00");
+  });
+});
+
+describe("Invoice equipment and warranty", () => {
+  const scoped = (overrides: Partial<InvoiceDetail> = {}) =>
+    sampleInvoice({ organizationId: workdayOrg, contactId: workdayContact, propertyId: workdayProperty, ...overrides });
+  const page = assets({
+    propertyId: workdayProperty,
+    items: [
+      workdayAsset({ label: "Fictional heat pump", manufacturer: "Example Make", model: "EX-1", serial: "FIC-1", warrantyStartsOn: "2024-01-01", warrantyEndsOn: "2034-01-01", warrantySource: "Fictional registration" }),
+      workdayAsset({ id: wid(70), label: "Retired furnace", status: "retired" }),
+    ],
+  });
+  // The equipment reader is company-scoped, so sign in to the fixture company.
+  const assetRoute = (request: Request) =>
+    request.path === "/api/v1/me"
+      ? json({ ...sampleMe("office"), organization: { ...sampleMe("office").organization, id: workdayOrg } })
+      : request.method === "GET" && request.path === `/api/v1/contacts/${workdayContact}/assets`
+        ? json(page)
+        : undefined;
+
+  it("sends a selection only when staff attach equipment or terms", async () => {
+    const api = server("office", scoped(), (request) => {
+      if (request.method === "PATCH") return json({ invoice: scoped({ version: 2 }), duplicate: false });
+      return assetRoute(request);
+    });
+    renderInvoices();
+    fireEvent.click(await screen.findByRole("button", { name: "Edit draft" }));
+    await screen.findByLabelText(/Fictional heat pump/);
+    expect(screen.queryByLabelText(/Retired furnace/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await waitFor(() => expect(writes(api.requests)).toHaveLength(1));
+    expect(writes(api.requests)[0].body).not.toHaveProperty("equipment");
+  });
+
+  it("attaches recorded equipment and staff warranty terms to the draft save", async () => {
+    const api = server("office", scoped(), (request) => {
+      if (request.method === "PATCH") return json({ invoice: scoped({ version: 2 }), duplicate: false });
+      return assetRoute(request);
+    });
+    renderInvoices();
+    fireEvent.click(await screen.findByRole("button", { name: "Edit draft" }));
+    fireEvent.click(await screen.findByLabelText(/Fictional heat pump/));
+    fireEvent.change(screen.getByLabelText(/Warranty terms to print/), { target: { value: "  Fictional workmanship terms.  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await waitFor(() => expect(writes(api.requests)).toHaveLength(1));
+    expect(writes(api.requests)[0].body.equipment).toEqual({ assetIds: [assetId], warrantyTerms: "Fictional workmanship terms." });
+  });
+
+  it("shows the saved snapshot with recorded dates and no coverage claim", async () => {
+    const snapshot = { assetId, assetVersion: 1, category: "hvac_equipment" as const, label: "Fictional heat pump", manufacturer: "Example Make", model: "EX-1", serial: "FIC-1", location: null, installedOn: null, warrantyStartsOn: "2024-01-01", warrantyEndsOn: "2034-01-01", warrantySource: "Fictional registration" };
+    server("office", scoped({ status: "issued", invoiceNumber: "INV-000001", issuedAt: "2026-10-02T12:00:00Z", document: { ...sampleInvoice().document, equipment: { items: [snapshot], warrantyTerms: "Fictional workmanship terms." } } }), assetRoute);
+    renderInvoices();
+    const section = await screen.findByRole("region", { name: "Equipment and warranty" });
+    expect(section.textContent).toContain("Fictional heat pump — Example Make EX-1");
+    expect(section.textContent).toContain("Serial: FIC-1");
+    expect(section.textContent).toContain("Recorded warranty: 2024-01-01 to 2034-01-01 (source: Fictional registration)");
+    expect(section.textContent).toContain("Fictional workmanship terms.");
+    expect(section.textContent).toContain("the warranty provider determines coverage");
   });
 });
