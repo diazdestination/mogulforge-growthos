@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import { and, eq } from "drizzle-orm";
 import { activitiesTable, appointmentsTable, auditEventsTable, consentRecordsTable, contactsTable, crmTasksTable, customerLifecycleTable, db, emailIntelligenceSourcesTable, emailResponseReviewsTable, leadsTable, organizationsTable, orgSettingsTable, revenueExecutionsTable, scheduledActionsTable, serviceObligationsTable, twilioClientBindingsTable, twilioConsentProofsTable, usersTable } from "@workspace/db";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+import { syntheticTwilioNumber, syntheticTwilioSid } from "../test-helpers/synthetic-twilio";
 import { approveServiceCare, bookServiceCareVisit, executeServiceCareReminder, getServiceCare, preflightServiceCareReminder, recordServiceCareResponse } from "./service-care";
 import { careFingerprint, serviceCareMessage } from "./service-care-policy";
 import { createServiceObligation, updateServiceObligation } from "./service-obligations";
@@ -93,9 +94,9 @@ describe("one reviewed service reminder", () => {
     vi.stubEnv("EMAIL_INTELLIGENCE_ENCRYPTION_KEY", Buffer.alloc(32, 19).toString("base64"));
     vi.stubEnv("TWILIO_CLIENT_SERVICE_CARE_AUTH_TOKEN", "synthetic-webhook");
     vi.stubEnv("TWILIO_CLIENT_SERVICE_CARE_API_KEY_SECRET", "synthetic-secret");
-    const provider = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ sid: `SM${"a".repeat(32)}` }), { status: 201 }));
+    const provider = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ sid: syntheticTwilioSid("SM") }), { status: 201 }));
     vi.stubGlobal("fetch", provider);
-    await db.insert(twilioClientBindingsTable).values({ organizationId: f.org, accountSid: `AC${randomUUID().replaceAll("-", "")}`, phoneNumber: "+15005550009", messagingServiceSid: `MG${"2".repeat(32)}`, apiKeySid: `SK${"3".repeat(32)}`, authTokenSecretRef: "TWILIO_CLIENT_SERVICE_CARE_AUTH_TOKEN", apiKeySecretRef: "TWILIO_CLIENT_SERVICE_CARE_API_KEY_SECRET", publicOrigin: "https://synthetic.example.invalid", businessName: "Synthetic Service Company", smsDisclosureVersion: "synthetic-care-v1", dailySmsLimit: 20, launchApproved: true, smsEnabled: true, registrationApproved: true, advancedOptOut: true, geoPermissionsReviewed: true });
+    await db.insert(twilioClientBindingsTable).values({ organizationId: f.org, accountSid: `AC${randomUUID().replaceAll("-", "")}`, phoneNumber: syntheticTwilioNumber(), messagingServiceSid: `MG${"2".repeat(32)}`, apiKeySid: `SK${"3".repeat(32)}`, authTokenSecretRef: "TWILIO_CLIENT_SERVICE_CARE_AUTH_TOKEN", apiKeySecretRef: "TWILIO_CLIENT_SERVICE_CARE_API_KEY_SECRET", publicOrigin: "https://synthetic.example.invalid", businessName: "Synthetic Service Company", smsDisclosureVersion: "synthetic-care-v1", dailySmsLimit: 20, launchApproved: true, smsEnabled: true, registrationApproved: true, advancedOptOut: true, geoPermissionsReviewed: true });
     await db.insert(consentRecordsTable).values({ organizationId: f.org, contactId: f.contact, channel: "sms", granted: true, disclosureVersion: "synthetic-care-v1" });
     await db.insert(twilioConsentProofsTable).values({ organizationId: f.org, contactId: f.contact, phone: "+14045550123", purpose: "customer_care", granted: true, disclosureVersion: "synthetic-care-v1", source: "synthetic fixture only" });
     await queue(f, "sms"); await processDueScheduledActions(f.org); await processDueScheduledActions(f.org);

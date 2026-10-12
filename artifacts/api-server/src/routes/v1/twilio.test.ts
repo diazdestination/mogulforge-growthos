@@ -24,6 +24,7 @@ import {
 import app from "../../app";
 import { createSession } from "../../lib/auth";
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
+import { syntheticTwilioNumber, syntheticTwilioSidSequence } from "../../test-helpers/synthetic-twilio";
 import { sendTwilioSms } from "../../services/twilio-delivery";
 import {
   SMS_DISCLOSURE_VERSION,
@@ -43,20 +44,20 @@ let server: Server,
 let sends = 0,
   sendsB = 0,
   voiceSends = 0,
-  serial = 0,
   mode = "ok";
 const realFetch = globalThis.fetch;
 const account = "AC" + "1".repeat(32),
   accountB = "AC" + "4".repeat(32),
   service = "MG" + "2".repeat(32),
   serviceB = "MG" + "5".repeat(32),
-  sender = "+15005550006",
-  senderB = "+15005550007",
+  sender = syntheticTwilioNumber(),
+  senderB = syntheticTwilioNumber(),
   phone = "+12025550101",
   token = "synthetic-webhook-token",
   tokenB = "synthetic-webhook-token-b",
   program = "synthetic_twilio_program_a_12345",
-  programB = "synthetic_twilio_program_b_12345";
+  programB = "synthetic_twilio_program_b_12345",
+  nextInboundSid = syntheticTwilioSidSequence("SM");
 async function webhook(
   path: string,
   fields: Record<string, string>,
@@ -67,7 +68,7 @@ async function webhook(
     MessagingServiceSid: service,
     From: phone,
     To: sender,
-    MessageSid: "SM" + (++serial).toString(16).padStart(32, "0"),
+    MessageSid: nextInboundSid(),
     ...fields,
   };
   if (path.includes("/public/voice/")) delete params.MessagingServiceSid;
