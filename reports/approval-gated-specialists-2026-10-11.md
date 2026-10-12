@@ -119,6 +119,7 @@ routes follow that existing untyped pattern, so no codegen was run. Route permis
 | Check | Result |
 | --- | --- |
 | Focused API DB tests | 15 files, 146 tests passed. Files: `bie`, `bie-capabilities`, `bie-email-provider`, `bie-reviewed-email`, `bie-email-review`, `bie-specialists`, `assistant`, `assistant-proposals`, `assistant-chat`, `assistant-history`, `route-inventory`, the 3 specialist suites and `invoices` |
+| Focused API DB tests after review fixes (adds `invo-revalidation`, `routes/v1/invoices`, `revenue-workspace`, `restore-app-readonly`) | 19 files, 177 tests passed |
 | Full command-center suite | 117 files, 1039 tests passed |
 | Typecheck (`pnpm run typecheck`) | Passed (libs, api-server, command-center, scripts) |
 | Builds | `@workspace/command-center` and `@workspace/api-server` built |
@@ -128,6 +129,36 @@ The guard test checks two things:
 - **Statically:** specialist modules never import or call review, execute, autopilot, prepare or send functions.
   They never update or delete proposal rows, and only `contract.ts` inserts them.
 - **At runtime:** drafts that try to set a status, reviewer or run are rejected.
+
+## Review fixes (Codex review, October 12)
+
+1. **Effective principal.** `runSpecialist` → `runInvo` → `getInvoice` now carries the request's effective role.
+   INVO requires `invoices.read` for both the stored member role and the effective role, so an owner-created API
+   key capped to `sales_rep` is refused. Active-member and tenant checks are kept.
+2. **INVO visibility.** INVO proposals are left out of these endpoints unless the caller may read invoices
+   (member and effective role):
+   - `GET /bie/actions`, filtered in SQL before the 200-row limit;
+   - `GET /revenue/desk`, which also lists the queue.
+
+   `GET /bie/specialists/invo/proposals` returns 403 to those callers. Approve, reject and execute on an INVO
+   proposal return 403 (`invoice_access_required`) for them, and the service re-checks the same permission. An
+   unauthorized execute leaves the approved proposal in place and creates nothing. INVO task text no longer
+   carries amounts, because CRM tasks are visible to `crm.read` roles.
+3. **Execution-time revalidation.** INVO evidence records the rule, invoice id, invoice version and, for overdue,
+   the balance. Before creating the task, execution runs one transaction:
+   - It takes `lockCustomerWork(…, billing)`, the same locks invoice mutations take.
+   - It re-reads the invoice through `readInvoiceDetail(…, { lockRows: true, effectiveRole })` and counts delivery
+     attempts under that lock.
+   - It applies `revalidateInvoiceProposal`, then inserts the task and audit row.
+
+   A stale proposal is marked `blocked` with a reason and no task. Stale means any of: invoice not found, not this
+   lead's, or in another tenant; voided; a different version (edit, issue, payment, refund or reversal); balance
+   needs reconciliation; paid in full or balance changed; a delivery attempt now exists (unsent-invoice rules);
+   or the triggering text has been fixed. The payload and approval rules are unchanged. These cases are covered
+   by DB regressions (fully paid, partially paid, unallocated refund, void, edited draft, new delivery,
+   cross-tenant and invalid reference, capped role) and pure-function cases.
+4. **Clock.** The INVO DB test sets an explicit `issued_at` from one shared `NOW` and calls `runInvo(..., NOW)`.
+   Facade coverage through `runSpecialist` is kept.
 
 ## Limitations and open gates
 

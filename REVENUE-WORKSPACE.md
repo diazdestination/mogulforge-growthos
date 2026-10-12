@@ -40,7 +40,10 @@ canonical tenant-owned IDs. The existing visual system and permission model are 
 - SCOUT, INVO and the CRM assistant are proposal-only specialists over this same queue (`POST
   /bie/specialists/:key/run`, `crm.write`; INVO also needs invoice read access). They insert `proposed` rows
   only, labelled by run kind; approval and execution above are unchanged. INVO's internal invoice tasks skip
-  the outreach-only lead-stage/new-activity gates at execution, since won/completed work is expected there.
+  the outreach-only lead-stage/new-activity gates at execution, since won/completed work is expected there;
+  instead the invoice is revalidated under the invoice locks and stale work is blocked. INVO proposals are
+  hidden from `/bie/actions` and `/revenue/desk`, and cannot be reviewed or executed, unless both the member
+  and the effective (API-key) role have `invoices.read`.
 
 ## Customer access and content
 

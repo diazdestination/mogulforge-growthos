@@ -28,8 +28,10 @@ import {
   type BieActionProposal,
   type InvoiceDocument,
   type InvoiceState,
+  type UserRole,
 } from "@workspace/db";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { z } from "zod/v4";
 
 import { hasPermission } from "../../lib/permissions";
 import { getInvoice } from "../invoices";
@@ -149,7 +151,8 @@ export function planInvoice(fact: InvoFact, history: History, now: Date, options
           rationale: `Invoice ${label(fact)} has a recorded balance of $${(fact.balanceDueCents / 100).toFixed(2)} and is ${daysPastDue} days past due (${explicitDue ? `due ${doc.dueDate}` : "due on receipt"}). Recorded balances reflect staff-entered receipts only.`,
           evidence: { ...common, rule: "overdue_unpaid_balance", balanceDueCents: fact.balanceDueCents, paymentState: fact.paymentState,
             dueBasis: explicitDue ? "due_date" : "due_on_receipt", dueAt: dueAt.toISOString(), issuedAt: fact.issuedAt.toISOString(), daysPastDue },
-          payload: { title: `Follow up on unpaid invoice ${label(fact)}`, description: `Recorded balance $${(fact.balanceDueCents / 100).toFixed(2)}, ${daysPastDue} days past due. Call the customer, confirm whether payment was made elsewhere, and record any receipt.`, priority: "high" },
+          // Task text stays free of amounts: CRM tasks are visible to roles without invoice access.
+          payload: { title: `Follow up on unpaid invoice ${label(fact)}`, description: "The invoice is past due with an open recorded balance. Open the invoice, call the customer, confirm whether payment was made elsewhere, and record any receipt.", priority: "high" },
           estimatedValueCents: fact.balanceDueCents,
         });
       }
@@ -175,7 +178,82 @@ export class SpecialistAccessError extends Error {
   readonly status = 403;
 }
 
-async function loadFacts(organizationId: string, actorUserId: string): Promise<{ facts: InvoFact[]; skippedCustomerWork: number }> {
+/**
+ * Invoice-derived proposals (balances, line text, warranty evidence) are only
+ * visible to, and actionable by, principals with invoice read access. Both the
+ * stored member role and the effective role (e.g. a capped API key) must allow it.
+ */
+export function canReadInvoiceProposals(storedRole: UserRole | null | undefined, effectiveRole?: UserRole | null): boolean {
+  return Boolean(storedRole && hasPermission(storedRole, "invoices.read") && hasPermission(effectiveRole ?? storedRole, "invoices.read"));
+}
+
+export interface InvoPrincipal {
+  /** Effective role for this request (API-key cap). Defaults to the stored member role. */
+  effectiveRole?: UserRole;
+}
+
+/** What INVO recorded at proposal time; used to revalidate before any task is created. */
+const invoiceProposalEvidence = z.object({
+  rule: z.enum(["multi_line_office_review", "warranty_dates_missing", "overdue_unpaid_balance", "estimate_wording_on_invoice"]),
+  invoiceId: z.uuid(),
+  invoiceVersion: z.number().int().positive(),
+  balanceDueCents: z.number().int().nonnegative().optional(),
+}).passthrough();
+
+export interface CurrentInvoiceState {
+  id: string;
+  leadId: string | null;
+  status: InvoiceState;
+  version: number;
+  document: Pick<InvoiceDocument, "title" | "notes" | "lineItems">;
+  balanceDueCents: number | null;
+  reconciliationRequired: boolean;
+  deliveryAttemptCount: number;
+}
+
+export function invoiceProposalReference(evidence: Record<string, unknown>) {
+  const parsed = invoiceProposalEvidence.safeParse(evidence);
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Pure: is a previously proposed INVO task still valid against the invoice's
+ * current canonical state? Returns null when valid, otherwise a block reason.
+ * Any version change (edit, issue, payment, refund, reversal) makes it stale.
+ */
+export function revalidateInvoiceProposal(
+  evidence: Record<string, unknown>,
+  proposalLeadId: string,
+  current: CurrentInvoiceState | null,
+): string | null {
+  const ref = invoiceProposalReference(evidence);
+  if (!ref) return "The proposal has no valid invoice reference.";
+  if (!current || current.id !== ref.invoiceId || current.leadId !== proposalLeadId) return "The referenced invoice is not available for this lead.";
+  if (current.status === "void") return "The invoice was voided after this proposal.";
+  if (current.version !== ref.invoiceVersion) return "The invoice changed after this proposal (edited, issued, paid or corrected). Run INVO again.";
+  const text = [current.document.title, current.document.notes ?? "", ...current.document.lineItems.map((line) => line.description)].join("\n");
+  switch (ref.rule) {
+    case "multi_line_office_review":
+      if (current.deliveryAttemptCount > 0) return "The invoice has already been sent.";
+      if (current.document.lineItems.length < INVO_POLICY.officeReviewMinLines) return "The invoice no longer has multiple lines.";
+      return null;
+    case "warranty_dates_missing":
+      if (current.deliveryAttemptCount > 0) return "The invoice has already been sent.";
+      if (DATE_TEXT.test(text)) return "The invoice now shows a date.";
+      return null;
+    case "overdue_unpaid_balance":
+      if (current.status !== "issued") return "The invoice is not issued.";
+      if (current.reconciliationRequired || current.balanceDueCents == null) return "The invoice balance needs reconciliation.";
+      if (current.balanceDueCents <= 0) return "The invoice is paid in full.";
+      if (current.balanceDueCents !== ref.balanceDueCents) return "The invoice balance changed after this proposal.";
+      return null;
+    case "estimate_wording_on_invoice":
+      if (!ESTIMATE_WORDING.test(text)) return "The invoice no longer contains estimate wording.";
+      return null;
+  }
+}
+
+async function loadFacts(organizationId: string, actorUserId: string, principal: InvoPrincipal): Promise<{ facts: InvoFact[]; skippedCustomerWork: number }> {
   const rows = await db.select({ id: invoicesTable.id, leadId: invoicesTable.leadId, customerWorkId: invoicesTable.customerWorkId })
     .from(invoicesTable)
     .where(and(eq(invoicesTable.organizationId, organizationId), inArray(invoicesTable.status, ["draft", "issued"])))
@@ -190,7 +268,8 @@ async function loadFacts(organizationId: string, actorUserId: string): Promise<{
   const attemptCount = new Map(attempts.map((row) => [row.invoiceId, row.count]));
   const facts: InvoFact[] = [];
   for (const row of leadRows) {
-    const invoice = await getInvoice(organizationId, actorUserId, row.id); // canonical money + tenant/role checks
+    // Canonical money plus tenant/role checks, under the caller's effective role.
+    const invoice = await getInvoice(organizationId, actorUserId, row.id, principal.effectiveRole);
     const [lead] = await db.select({ contactId: leadsTable.contactId }).from(leadsTable)
       .where(and(eq(leadsTable.organizationId, organizationId), eq(leadsTable.id, row.leadId!)));
     const obligations = lead ? await db.select({
@@ -216,14 +295,14 @@ export interface InvoRunResult {
   skipped: Array<{ subject: string; reason: string }>;
 }
 
-/** Run INVO for one tenant. Requires invoice read access in addition to the route's crm.write. */
-export async function runInvo(organizationId: string, actorUserId: string, options: Partial<InvoOptions> = {}, now = new Date()): Promise<InvoRunResult> {
+/** Run INVO for one tenant. Requires invoice read access for both the member and the effective (API-key) role. */
+export async function runInvo(organizationId: string, actorUserId: string, options: Partial<InvoOptions> = {}, now = new Date(), principal: InvoPrincipal = {}): Promise<InvoRunResult> {
   const [actor] = await db.select({ role: usersTable.role }).from(usersTable)
     .where(and(eq(usersTable.id, actorUserId), eq(usersTable.organizationId, organizationId), eq(usersTable.isActive, true)));
-  if (!actor || !hasPermission(actor.role, "invoices.read"))
+  if (!actor || !canReadInvoiceProposals(actor.role, principal.effectiveRole))
     throw new SpecialistAccessError("INVO reads invoices. An owner, admin, office or sales manager must run it.");
   const resolved: InvoOptions = { warrantyDatesRequired: options.warrantyDatesRequired === true };
-  const { facts, skippedCustomerWork } = await loadFacts(organizationId, actorUserId);
+  const { facts, skippedCustomerWork } = await loadFacts(organizationId, actorUserId, principal);
   return withSpecialistRun({ organizationId, key: "invo", actorUserId }, async (tx, runId) => {
     const history = await specialistSubjectKeys(tx, organizationId, "invo");
     const drafts: SpecialistProposalDraft[] = [];

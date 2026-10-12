@@ -9,6 +9,9 @@
 import {
   activitiesTable,
   auditEventsTable,
+  crmTasksTable,
+  invoiceDeliveryAttemptsTable,
+  type UserRole,
   bieActionProposalsTable,
   bieAgentRunsTable,
   bieAutopilotPoliciesTable,
@@ -44,6 +47,10 @@ import { z } from "zod/v4";
 import { EmailDispatchBlockedError } from "./email-dispatch-guard";
 import { mailboxDigest } from "./mailbox-contract";
 import { specialistForRunKind } from "./specialists/contract";
+import { canReadInvoiceProposals, invoiceProposalReference, revalidateInvoiceProposal, type CurrentInvoiceState } from "./specialists/invo";
+import { readInvoiceDetail } from "./invoices";
+import { InvoiceError } from "./invoice-contract";
+import { lockCustomerWork } from "./customer-work-lineage";
 import { getMicrosoftMailboxIdentity, getLeadMonitoringApproval, assertLeadMonitoringApproval } from "./mailbox-connector";
 import { reserveLeadMailboxParent, recordMailboxParentAcceptance, leadReplySendSnapshotSchema, type LeadReplySendSnapshot } from "./mailbox-communication";
 
@@ -694,24 +701,89 @@ async function generateBieProposalsOwned(
   }
 }
 
-/** Queue rows plus the proposing specialist, derived from the server-owned run kind. */
-export async function listBieProposals(organizationId: string) {
+/**
+ * Queue rows plus the proposing specialist, derived from the server-owned run kind.
+ * INVO proposals carry invoice balances, line text and warranty evidence, so they
+ * are omitted (in SQL, before the page limit) unless the caller may read invoices.
+ */
+export async function listBieProposals(organizationId: string, visibility: { includeInvoiceProposals: boolean }) {
   const rows = await db
     .select({ proposal: bieActionProposalsTable, runKind: bieAgentRunsTable.kind })
     .from(bieActionProposalsTable)
     .leftJoin(bieAgentRunsTable, and(eq(bieActionProposalsTable.runId, bieAgentRunsTable.id), eq(bieAgentRunsTable.organizationId, organizationId)))
-    .where(eq(bieActionProposalsTable.organizationId, organizationId))
+    .where(and(
+      eq(bieActionProposalsTable.organizationId, organizationId),
+      visibility.includeInvoiceProposals ? undefined : sql`${bieAgentRunsTable.kind} is distinct from 'specialist_invo'`,
+    ))
     .orderBy(desc(bieActionProposalsTable.createdAt))
     .limit(200);
   return rows.map(({ proposal, runKind }) => ({ ...proposal, specialist: specialistForRunKind(runKind) }));
 }
 
-/** INVO's internal invoice tasks are expected on won/completed work; outreach gates do not apply to them. */
-async function isInvoiceReviewTask(organizationId: string, proposal: BieActionProposal) {
-  if (proposal.actionType !== "create_task" || !proposal.runId) return false;
+export async function actorCanReadInvoices(organizationId: string, actorUserId: string, effectiveRole?: UserRole) {
+  const [actor] = await db.select({ role: usersTable.role }).from(usersTable)
+    .where(and(eq(usersTable.id, actorUserId), eq(usersTable.organizationId, organizationId), eq(usersTable.isActive, true)));
+  return canReadInvoiceProposals(actor?.role, effectiveRole);
+}
+
+/** True when the proposal came from an INVO run (server-owned run kind, same tenant). */
+export async function isInvoiceProposal(organizationId: string, proposal: Pick<BieActionProposal, "runId">) {
+  if (!proposal.runId) return false;
   const [run] = await db.select({ kind: bieAgentRunsTable.kind }).from(bieAgentRunsTable)
     .where(and(eq(bieAgentRunsTable.id, proposal.runId), eq(bieAgentRunsTable.organizationId, organizationId)));
   return run?.kind === "specialist_invo";
+}
+
+/**
+ * Create an approved INVO staff task only if the invoice still matches what was
+ * proposed. Validation and the task insert share one transaction under the
+ * same customer-work/invoice locks invoice mutations take, so a concurrent
+ * payment, void, edit or delivery cannot slip between check and insert.
+ */
+async function executeInvoiceReviewTask(
+  organizationId: string,
+  proposal: BieActionProposal,
+  lead: { id: string; contactId: string; assignedUserId: string | null },
+  actorUserId: string,
+  effectiveRole?: UserRole,
+): Promise<{ ok: true; taskId: string } | { ok: false; reason: string }> {
+  const ref = invoiceProposalReference(proposal.evidence);
+  if (!ref) return { ok: false, reason: "The proposal has no valid invoice reference." };
+  try {
+    return await db.transaction(async (tx) => {
+      await lockCustomerWork(tx, organizationId, true);
+      let current: CurrentInvoiceState | null = null;
+      try {
+        const invoice = await readInvoiceDetail(tx, organizationId, actorUserId, ref.invoiceId, { effectiveRole, lockRows: true });
+        const [attempts] = await tx.select({ count: sql<number>`count(*)::int` }).from(invoiceDeliveryAttemptsTable)
+          .where(and(eq(invoiceDeliveryAttemptsTable.organizationId, organizationId), eq(invoiceDeliveryAttemptsTable.invoiceId, invoice.id)));
+        current = { id: invoice.id, leadId: invoice.leadId, status: invoice.status, version: invoice.version, document: invoice.document,
+          balanceDueCents: invoice.balanceDueCents, reconciliationRequired: invoice.reconciliationRequired, deliveryAttemptCount: attempts?.count ?? 0 };
+      } catch (error) {
+        if (!(error instanceof InvoiceError)) throw error;
+        if (error.status === 403) return { ok: false as const, reason: "Invoice access is required to act on this proposal." };
+        current = null;
+      }
+      const stale = revalidateInvoiceProposal(proposal.evidence, proposal.leadId, current);
+      if (stale) return { ok: false as const, reason: stale };
+      const [task] = await tx.insert(crmTasksTable).values({
+        organizationId,
+        leadId: lead.id,
+        contactId: lead.contactId,
+        assignedUserId: lead.assignedUserId,
+        title: typeof proposal.payload.title === "string" ? proposal.payload.title : "Invoice review",
+        description: typeof proposal.payload.description === "string" ? proposal.payload.description : null,
+        priority: proposal.payload.priority === "emergency" ? "emergency" : "high",
+        sourceEvent: "bie.invoice_review",
+      }).returning({ id: crmTasksTable.id });
+      await tx.insert(auditEventsTable).values({ organizationId, actorUserId, action: "bie.task_created", entityType: "bie_action_proposal", entityId: proposal.id,
+        metadata: { taskId: task!.id, leadId: lead.id, invoiceId: ref.invoiceId, invoiceVersion: ref.invoiceVersion, rule: ref.rule, revalidated: true } });
+      return { ok: true as const, taskId: task!.id };
+    });
+  } catch (error) {
+    if (error instanceof InvoiceError) return { ok: false, reason: "The invoice could not be revalidated. Review it before acting." };
+    throw error;
+  }
 }
 
 async function getProposal(organizationId: string, actionId: string) {
@@ -821,10 +893,14 @@ export async function reviewBieProposal(
   actorUserId: string,
   decision: "approve" | "reject",
   expectedPayload?: Record<string, unknown>,
+  access: { effectiveRole?: UserRole } = {},
 ): Promise<BieActionProposal | null> {
   const proposal = await getProposal(organizationId, actionId);
   if (!proposal || proposal.status !== "proposed") return null;
   if (expectedPayload && !isDeepStrictEqual(expectedPayload, proposal.payload))
+    return null;
+  // Invoice-derived proposals are reviewable only with invoice read access (member and effective role).
+  if (await isInvoiceProposal(organizationId, proposal) && !(await actorCanReadInvoices(organizationId, actorUserId, access.effectiveRole)))
     return null;
   if (decision === "approve" && proposal.actionType === "send_email") {
     if (!expectedPayload) return null;
@@ -941,7 +1017,7 @@ export async function executeBieProposal(
   organizationId: string,
   actionId: string,
   actorUserId: string | null,
-  options: { automated?: boolean } = {},
+  options: { automated?: boolean; effectiveRole?: UserRole } = {},
 ): Promise<BieActionProposal | null> {
   const proposal = await getProposal(organizationId, actionId);
   if (!proposal) return null;
@@ -977,6 +1053,9 @@ export async function executeBieProposal(
       "blocked",
       "An active, authorized responder must own this action.",
     );
+  // An unauthorized caller must neither run nor consume an approved invoice task.
+  if (await isInvoiceProposal(organizationId, proposal) && !canReadInvoiceProposals(actor.role, options.effectiveRole))
+    return { ...proposal, executionDetail: "Invoice access is required to execute this invoice proposal." };
   let contactTouch: ContactTouchClaim | undefined;
   if (proposal.actionType === "send_email") {
     const [lead] = await db.select().from(leadsTable).where(and(eq(leadsTable.organizationId, organizationId), eq(leadsTable.id, proposal.leadId)));
@@ -1033,7 +1112,7 @@ async function executeBieProposalEffect(
   organizationId: string,
   actionId: string,
   actorUserId: string | null,
-  options: { automated?: boolean } = {},
+  options: { automated?: boolean; effectiveRole?: UserRole } = {},
 ): Promise<BieActionProposal | null> {
   const proposal = await getProposal(organizationId, actionId);
   if (!proposal || proposal.status !== "approved") return null;
@@ -1051,7 +1130,9 @@ async function executeBieProposalEffect(
     );
   }
   const lead = await crm.getLead(organizationId, proposal.leadId);
-  const invoiceTask = await isInvoiceReviewTask(organizationId, proposal);
+  // INVO staff tasks are expected on won/completed work, so outreach gates do not
+  // apply; instead the invoice itself is revalidated under its locks before insert.
+  const invoiceTask = proposal.actionType === "create_task" && await isInvoiceProposal(organizationId, proposal);
   if (lead && !invoiceTask && await hasCustomerReplyHold(organizationId, lead.id))
     return markAction(proposal.id, "blocked", "Customer replied; resolve the reply review before new follow-up.");
   if (!lead)
@@ -1128,6 +1209,12 @@ async function executeBieProposalEffect(
   }
 
   try {
+    if (invoiceTask) {
+      if (!actorUserId) return markAction(proposal.id, "blocked", "An authorized responder must execute invoice proposals.");
+      const outcome = await executeInvoiceReviewTask(organizationId, proposal, lead, actorUserId, options.effectiveRole);
+      if (!outcome.ok) return markAction(proposal.id, "blocked", `${outcome.reason} No task was created.`);
+      return markAction(proposal.id, "executed", `Created task ${outcome.taskId} after revalidating the invoice.`);
+    }
     if (proposal.actionType === "create_task") {
       const task = await crm.createTask(organizationId, {
         leadId: lead.id,

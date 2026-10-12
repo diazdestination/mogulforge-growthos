@@ -5,17 +5,24 @@
 import { bieActionProposalsTable, bieAgentRunsTable, db } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 
-import { runInvo, type InvoOptions } from "./invo";
+import { runInvo, type InvoOptions, type InvoPrincipal } from "./invo";
 import { runScout } from "./scout";
 import { SPECIALIST_LABEL, SPECIALIST_RUN_KIND, type RunnableSpecialistKey, type SpecialistKey } from "./contract";
 
-export { SpecialistAccessError } from "./invo";
+export { SpecialistAccessError, canReadInvoiceProposals } from "./invo";
 export { RUNNABLE_SPECIALISTS, SPECIALIST_KEYS, type SpecialistKey } from "./contract";
 
-export async function runSpecialist(organizationId: string, key: RunnableSpecialistKey, actorUserId: string, options: Partial<InvoOptions> = {}) {
+export async function runSpecialist(
+  organizationId: string,
+  key: RunnableSpecialistKey,
+  actorUserId: string,
+  options: Partial<InvoOptions> = {},
+  principal: InvoPrincipal = {},
+  now = new Date(),
+) {
   const outcome = key === "scout"
-    ? await runScout(organizationId, actorUserId)
-    : await runInvo(organizationId, actorUserId, options);
+    ? await runScout(organizationId, actorUserId, now)
+    : await runInvo(organizationId, actorUserId, options, now, principal);
   return {
     specialist: SPECIALIST_LABEL[key],
     runId: outcome.runId,
@@ -25,7 +32,10 @@ export async function runSpecialist(organizationId: string, key: RunnableSpecial
   };
 }
 
-/** Proposals attributed (by run kind, not client data) to one specialist. */
+/**
+ * Proposals attributed (by run kind, not client data) to one specialist.
+ * Callers must check invoice visibility before listing INVO proposals.
+ */
 export async function listSpecialistProposals(organizationId: string, key: SpecialistKey) {
   const rows = await db.select({ proposal: bieActionProposalsTable })
     .from(bieActionProposalsTable)

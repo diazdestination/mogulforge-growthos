@@ -12,17 +12,19 @@ import {
   crmTasksTable,
   db,
   estimatesTable,
+  invoicesTable,
   leadsTable,
   organizationsTable,
   usersTable,
 } from "@workspace/db";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
 import { executeBieProposal, listBieProposals, reviewBieProposal } from "../bie";
 import { createInvoice, issueInvoice } from "../invoices";
 import { listSpecialistProposals, runSpecialist, SpecialistAccessError } from "./index";
+import { runInvo } from "./invo";
 
 const orgs: string[] = [];
 async function fixture(name: string) {
@@ -107,11 +109,14 @@ describe("INVO (proposal-only, synthetic invoices modeled on owner examples)", (
       notes: "Due on receipt. This shingle estimate includes a manufacturer limited lifetime warranty and 5 year workmanship warranty.",
       lineItems: [{ description: "Architectural shingle system — synthetic scope", quantity: "1", unitPriceCents: 1_105_000 }], taxCents: 0 } })).invoice;
     const issued = (await issueInvoice(a.org, a.owner, draft.id, { requestId: randomUUID(), expectedVersion: draft.version, confirmed: true })).invoice;
-    await db.execute(sql`update invoices set issued_at = now() - interval '12 days' where id = ${issued.id}`);
+    // One shared clock: an explicit issue timestamp and the injected planner clock.
+    const NOW = new Date();
+    await db.update(invoicesTable).set({ issuedAt: new Date(NOW.getTime() - 12 * 86_400_000) }).where(eq(invoicesTable.id, issued.id));
 
     await expect(runSpecialist(a.org, "invo", a.rep)).rejects.toBeInstanceOf(SpecialistAccessError);
 
-    const run = await runSpecialist(a.org, "invo", a.owner, { warrantyDatesRequired: true });
+    const ran = await runInvo(a.org, a.owner, { warrantyDatesRequired: true }, NOW);
+    const run = { specialist: "INVO", proposals: ran.inserted };
     expect(run.specialist).toBe("INVO");
     const byRule = Object.fromEntries(run.proposals.map((p) => [`${p.leadId === hvacLead.id ? "hvac" : "roof"}:${p.evidence.rule}`, p]));
     expect(Object.keys(byRule).sort()).toEqual([
@@ -121,9 +126,14 @@ describe("INVO (proposal-only, synthetic invoices modeled on owner examples)", (
     expect(run.proposals.every((p) => p.actionType === "create_task" && p.status === "proposed")).toBe(true);
     expect(byRule["roof:overdue_unpaid_balance"]!.evidence).toMatchObject({ balanceDueCents: 1_105_000, dueBasis: "due_on_receipt", daysPastDue: 12 });
 
+    expect((await runInvo(a.org, a.owner, { warrantyDatesRequired: true }, NOW)).inserted).toHaveLength(0);
+    // Facade coverage: the route entry point reaches the same idempotent planner.
     expect((await runSpecialist(a.org, "invo", a.owner, { warrantyDatesRequired: true })).proposals).toHaveLength(0);
 
-    const listed = await listBieProposals(a.org);
+    const listed = await listBieProposals(a.org, { includeInvoiceProposals: true });
+    const hidden = await listBieProposals(a.org, { includeInvoiceProposals: false });
+    expect(hidden.some((p) => p.specialist === "invo")).toBe(false);
+    expect(hidden.some((p) => p.specialist === "scout")).toBe(true);
     expect(listed.find((p) => p.id === byRule["roof:overdue_unpaid_balance"]!.id)?.specialist).toBe("invo");
 
     // Internal invoice tasks execute on won/completed work through the unchanged approval path.

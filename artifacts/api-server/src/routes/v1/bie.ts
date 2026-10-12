@@ -15,6 +15,7 @@ import {
   prepareBieEmailProposal,
   prepareBieEmailInput,
   BieEmailReviewError,
+  isInvoiceProposal,
 } from "../../services/bie";
 import { db, bieActionProposalsTable, type BieActionType, type BieAutopilotPolicy } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
@@ -25,6 +26,7 @@ import {
   RUNNABLE_SPECIALISTS,
   SPECIALIST_KEYS,
   SpecialistAccessError,
+  canReadInvoiceProposals,
   listSpecialistProposals,
   runSpecialist,
 } from "../../services/specialists";
@@ -42,6 +44,19 @@ async function humanEmailAction(req: Request, res: Response, next: NextFunction)
     res.status(403).json({ error: "An accepted, verified staff session must review and send this email." }); return;
   }
   contractorMutation(req, res, next);
+}
+
+/** Invoice-derived proposals need invoice read access for both the member and the effective (API-key) role. */
+const invoiceVisible = (req: Request) => canReadInvoiceProposals(req.member!.user.role, req.member!.role);
+async function invoiceProposalAccess(req: Request, res: Response, next: NextFunction) {
+  const id = z.uuid().safeParse(req.params.id);
+  if (!id.success) return next();
+  const [proposal] = await db.select({ runId: bieActionProposalsTable.runId }).from(bieActionProposalsTable)
+    .where(and(eq(bieActionProposalsTable.organizationId, req.member!.organizationId), eq(bieActionProposalsTable.id, id.data)));
+  if (proposal && !invoiceVisible(req) && await isInvoiceProposal(req.member!.organizationId, proposal)) {
+    res.status(403).json({ error: "Invoice access is required to review or execute this INVO proposal.", code: "invoice_access_required" }); return;
+  }
+  next();
 }
 
 const ACTION_TYPES: BieActionType[] = [
@@ -83,7 +98,7 @@ router.get(
   "/bie/actions",
   requireMember("crm.read"),
   async (req: Request, res: Response): Promise<void> => {
-    res.json(await listBieProposals(req.member!.organizationId));
+    res.json(await listBieProposals(req.member!.organizationId, { includeInvoiceProposals: invoiceVisible(req) }));
   },
 );
 
@@ -132,7 +147,7 @@ router.post(
     const body = z.object({ warrantyDatesRequired: z.boolean().optional() }).strict().safeParse(req.body ?? {});
     if (!key.success || !body.success) { res.status(400).json({ error: "Choose SCOUT or INVO with valid options." }); return; }
     try {
-      res.status(201).json(await runSpecialist(req.member!.organizationId, key.data, req.member!.user.id, body.data));
+      res.status(201).json(await runSpecialist(req.member!.organizationId, key.data, req.member!.user.id, body.data, { effectiveRole: req.member!.role }));
     } catch (error) {
       if (!(error instanceof SpecialistAccessError)) throw error;
       res.status(error.status).json({ error: error.message, code: "specialist_access_denied" });
@@ -146,6 +161,7 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     const key = z.enum(SPECIALIST_KEYS).safeParse(req.params.key);
     if (!key.success) { res.status(400).json({ error: "Unknown specialist." }); return; }
+    if (key.data === "invo" && !invoiceVisible(req)) { res.status(403).json({ error: "Invoice access is required to view INVO proposals.", code: "invoice_access_required" }); return; }
     res.json(await listSpecialistProposals(req.member!.organizationId, key.data));
   },
 );
@@ -154,6 +170,7 @@ for (const decision of ["approve", "reject"] as const) {
   router.post(
     `/bie/actions/:id/${decision}`,
     requireMember("crm.write"),
+    invoiceProposalAccess,
     humanEmailAction,
     async (req: Request, res: Response): Promise<void> => {
       const input = z
@@ -174,6 +191,7 @@ for (const decision of ["approve", "reject"] as const) {
         req.member!.user.id,
         decision,
         input.success ? input.data.expectedPayload : undefined,
+        { effectiveRole: req.member!.role },
       );
       if (!result) {
         res
@@ -192,6 +210,7 @@ for (const decision of ["approve", "reject"] as const) {
 router.post(
   "/bie/actions/:id/execute",
   requireMember("crm.write"),
+  invoiceProposalAccess,
   humanEmailAction,
   async (req: Request, res: Response): Promise<void> => {
     let result;
@@ -200,6 +219,7 @@ router.post(
         req.member!.organizationId,
         String(req.params.id),
         req.member!.user.id,
+        { effectiveRole: req.member!.role },
       );
     } catch (error) {
       if (!(error instanceof BieEmailReviewError)) throw error;
