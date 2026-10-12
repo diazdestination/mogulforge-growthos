@@ -13,6 +13,7 @@ import {
   suppressionsTable,
 } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
+import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { vi } from "vitest";
@@ -190,6 +191,22 @@ describe("importLeads", () => {
     if ("error" in saved) throw new Error(saved.error);
     expect(saved).toMatchObject({ imported: preview.imported, duplicates: preview.duplicates, skipped: preview.skipped });
     expect(await countRows()).toEqual({ contacts: before.contacts + 1, imports: before.imports + 1 });
+  });
+
+  it("ends a preview that waits on another import's lock without saving anything", async () => {
+    const holder = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await holder.connect();
+    try {
+      await holder.query("select pg_advisory_lock(hashtext($1))", [`lead-import:${orgId}`]);
+      const started = Date.now();
+      const result = await importLeads(orgId, {
+        csv: `First,Email\nIvy,ivy-${crypto.randomUUID()}@example.com`, mapping: { firstName: 0, email: 1 }, dryRun: true,
+      });
+      expect(result).toMatchObject({ error: expect.stringMatching(/could not finish in time.*Nothing was saved/) });
+      expect(Date.now() - started).toBeLessThan(15_000);
+    } finally {
+      await holder.end();
+    }
   });
 
   it("rejects a mapping without email or phone", async () => {

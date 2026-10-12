@@ -26,9 +26,15 @@ function readText(file: File) {
     reader.readAsText(file);
   });
 }
-function errorText(err: unknown) {
+function errorText(err: unknown, dryRun: boolean) {
   const data = (err as { data?: { error?: unknown } } | null)?.data;
-  return typeof data?.error === "string" ? data.error : "The file could not be checked. Nothing was imported.";
+  const status = (err as { status?: unknown } | null)?.status;
+  // A rejected request (4xx with a reason) saved nothing; anything else after an
+  // import was sent may have saved some rows.
+  if (typeof data?.error === "string" && typeof status === "number" && status >= 400 && status < 500) return data.error;
+  return dryRun
+    ? "The file could not be checked. Nothing was imported."
+    : "We could not confirm the import result. Some customers may have been saved. Check your import history before trying again.";
 }
 
 /**
@@ -79,12 +85,14 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
   async function run(dryRun: boolean) {
     if (!request || busy) return;
     setBusy(true); setError("");
+    // Each preview needs its own explicit review.
+    if (dryRun) setReviewed(false);
     try {
       const result = await importLeadsCsv({ ...request, dryRun });
       if ("dryRun" in result) setPreview({ key: requestKey, result });
       else { setDone(result); onImported(result); }
     } catch (err) {
-      setError(errorText(err));
+      setError(errorText(err, dryRun));
     } finally {
       setBusy(false);
     }
@@ -133,6 +141,7 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
                     disabled={busy}
                     onChange={(event) => {
                       const value = event.target.value === "" ? undefined : Number(event.target.value);
+                      setReviewed(false);
                       setMapping((current) => {
                         const next = { ...current };
                         for (const key of Object.keys(next) as CustomerImportField[]) if (next[key] === value) delete next[key];
@@ -150,7 +159,7 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
             })}
             <label className="block">
               <span className="font-medium">Date you exported the file</span>
-              <input type="date" className={control} value={exportedOn} onChange={(event) => setExportedOn(event.target.value)} disabled={busy} />
+              <input type="date" className={control} value={exportedOn} onChange={(event) => { setReviewed(false); setExportedOn(event.target.value); }} disabled={busy} />
             </label>
           </div>
           {missing && <p role="alert" className="text-destructive">Choose a first name column and an email or phone column.</p>}

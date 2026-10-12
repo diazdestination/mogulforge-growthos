@@ -122,7 +122,9 @@ const MAX_IMPORT_ROWS = 10_000;
 const MAX_ERROR_SAMPLES = 20;
 const MAX_PREVIEW_ERROR_SAMPLES = 200;
 
+const PREVIEW_BUDGET_MS = 45_000;
 class DryRunRollback extends Error {}
+class PreviewTooSlow extends Error {}
 /** What an import would do. Nothing is saved and no import record is created. */
 export interface LeadImportPreview {
   dryRun: true;
@@ -427,6 +429,9 @@ async function runLeadImport(
         if (isSuppressed) suppressedCount++;
       }
     } catch (err) {
+      // A preview must not report an unexpected database failure (such as a
+      // lock or time limit) as an ordinary skipped row.
+      if (params.dryRun && !(err instanceof SourceHistoryValidationError)) throw err;
       skipped++;
       // Only our validation errors are safe to show; never leak SQL or uploaded values.
       const message = err instanceof SourceHistoryValidationError ? err.message : "failed to save";
@@ -438,15 +443,29 @@ async function runLeadImport(
   if (params.dryRun) {
     // Rows run as savepoints of one outer transaction, so later rows see earlier
     // rows of the same file exactly as a real import would; then all of it is undone.
+    // The transaction holds this tenant's import lock, so it is bounded.
+    const deadline = Date.now() + PREVIEW_BUDGET_MS;
+    let tooSlow = false;
     await db
       .transaction(async (outer) => {
-        runRow = (work) => outer.transaction(work);
+        await outer.execute(sql`select set_config('lock_timeout','3000ms',true), set_config('statement_timeout','10000ms',true), set_config('idle_in_transaction_session_timeout','15000ms',true)`);
+        runRow = (work) => {
+          if (Date.now() > deadline) throw new PreviewTooSlow();
+          return outer.transaction(work);
+        };
         await processRows();
         throw new DryRunRollback();
       })
       .catch((err) => {
-        if (!(err instanceof DryRunRollback)) throw err;
+        if (err instanceof DryRunRollback) return;
+        const code = (err as { code?: unknown; cause?: { code?: unknown } }).code ?? (err as { cause?: { code?: unknown } }).cause?.code;
+        // 55P03 lock_not_available, 57014 query_canceled (statement timeout).
+        if (err instanceof PreviewTooSlow || code === "55P03" || code === "57014") { tooSlow = true; return; }
+        throw err;
       });
+    if (tooSlow) {
+      return { error: "The preview could not finish in time (the file is large or another import is running). Nothing was saved. Try again, or split the file and preview each part." };
+    }
     return {
       dryRun: true, fileName: clean(params.fileName, 200), totalRows: rows.length,
       imported, updated, duplicates, conflicts, skipped, suppressed: suppressedCount,

@@ -49,6 +49,31 @@ describe("Housecall Pro customer import", () => {
     await waitFor(() => expect(screen.queryByTestId("hcp-import-preview")).toBeNull());
   });
 
+  it("clears the review confirmation when a new preview is generated", async () => {
+    vi.mocked(importLeadsCsv).mockResolvedValue(preview);
+    render(<HousecallCustomerImport onImported={vi.fn()} />);
+    upload("customers.csv", csv);
+    fireEvent.click(await screen.findByRole("button", { name: "Preview import" }));
+    fireEvent.click(await screen.findByLabelText(/I reviewed this preview/));
+    fireEvent.change(screen.getByLabelText(/Notes/), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
+    await screen.findByTestId("hcp-import-preview");
+    expect((screen.getByLabelText(/I reviewed this preview/) as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByRole("button", { name: "Import customers" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("does not claim nothing was saved when the import outcome is unknown", async () => {
+    vi.mocked(importLeadsCsv).mockResolvedValueOnce(preview).mockRejectedValueOnce(new TypeError("network lost"));
+    render(<HousecallCustomerImport onImported={vi.fn()} />);
+    upload("customers.csv", csv);
+    fireEvent.click(await screen.findByRole("button", { name: "Preview import" }));
+    fireEvent.click(await screen.findByLabelText(/I reviewed this preview/));
+    fireEvent.click(screen.getByRole("button", { name: "Import customers" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/could not confirm the import result.*Check your import history/);
+    expect(alert.textContent).not.toMatch(/Nothing was imported/);
+  });
+
   it("explains how to convert an Excel export instead of uploading it", async () => {
     render(<HousecallCustomerImport onImported={vi.fn()} />);
     upload("customers.xlsx", "binary");
