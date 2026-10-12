@@ -4,22 +4,29 @@
  *
  * Ranking is deterministic for a given index and query:
  * - With an embedding provider, pgvector cosine similarity over the company's
- *   own chunks (exact scan of the tenant-filtered rows, so the HNSW index can
- *   never drop rows another tenant "used up"), merged with the keyword rule.
- * - Without one (or if the query embedding fails), the existing keyword
- *   matching answers alone and the result says `mode: "keyword"`.
- * - The hash embedder reports `mode: "lexical_hash"`; it is never presented
- *   as semantic search.
+ *   own chunks (exact scan of the tenant-filtered rows, so an approximate index
+ *   scan can never drop rows after filtering), merged with the keyword rule.
+ * - Without one (or if the query embedding fails), keyword matching answers
+ *   alone and the result says `mode: "keyword"`.
+ * - The hash embedder reports `mode: "lexical_hash"`; never "semantic".
+ *
+ * A stored vector is only a ranking hint. Every candidate is checked against
+ * the CURRENT authoritative source before it is returned: knowledge entries
+ * must be active with unchanged content; customer sources must be in the
+ * customer's current coherent history, unchanged, and visible to the caller
+ * (invoice sources and invoice activity require invoices.read). Returned text
+ * always comes from the current source, never from a possibly stale chunk.
  */
-import { contactsTable, db, knowledgeEntriesTable, type KnowledgeEntry } from "@workspace/db";
-import { and, eq, sql } from "drizzle-orm";
+import { db, knowledgeEntriesTable, type KnowledgeEntry } from "@workspace/db";
+import { sql } from "drizzle-orm";
 
 import { tryGetEmbeddingProvider, type EmbeddingProvider } from "./embeddings";
 import { listActiveKnowledgeEntries, scoreKnowledgeKeywords } from "./knowledge";
 import {
-  collectCustomerHistory,
+  currentCustomerDocuments,
+  documentKey,
+  knowledgeDocument,
   logIndexFailure,
-  prepareDocument,
   redactForRetrieval,
   syncCustomerHistoryIndex,
   vectorLiteral,
@@ -28,6 +35,11 @@ import {
 
 export type RetrievalMode = "semantic" | "lexical_hash" | "keyword";
 
+/** What the caller may read from a customer's history (from resolveCustomerReadAccess). */
+export interface CustomerRetrievalAccess {
+  canReadInvoices: boolean;
+}
+
 /** Minimum cosine similarity before a knowledge chunk may answer a visitor. */
 export const KNOWLEDGE_MIN_SIMILARITY = { semantic: 0.4, lexical_hash: 0.3 } as const;
 /** Customer context is staff-facing; a lower bar still drops unrelated records. */
@@ -35,6 +47,8 @@ export const CUSTOMER_MIN_SIMILARITY = { semantic: 0.2, lexical_hash: 0.15 } as 
 /** Bonus that lets a deterministic keyword hit outrank a weak vector neighbour. */
 const KEYWORD_BONUS = 0.25;
 export const MAX_RETRIEVAL_RESULTS = 10;
+/** Vector candidates scanned per customer before visibility/currency filtering. */
+const CUSTOMER_VECTOR_CANDIDATES = 500;
 
 function clampK(k: number | undefined, fallback: number): number {
   const n = Math.floor(Number(k));
@@ -96,11 +110,9 @@ export async function searchKnowledge(
   }
   const mode = modeOf(provider);
   const literal = vectorLiteral(queryVector);
-  // Exact tenant-filtered scan; inactive entries are excluded by the join
-  // even if a stale chunk survived.
-  const rows = await db.execute<{ source_id: string; similarity: number }>(sql`
+  const rows = await db.execute<{ source_id: string; content_sha256: string; similarity: number }>(sql`
     WITH candidates AS MATERIALIZED (
-      SELECT c.source_id, c.embedding
+      SELECT c.source_id, c.content_sha256, c.embedding
       FROM retrieval_chunks c
       JOIN ${knowledgeEntriesTable} k
         ON k.id = c.source_id AND k.organization_id = c.organization_id AND k.is_active
@@ -108,7 +120,7 @@ export async function searchKnowledge(
         AND c.scope = 'knowledge'
         AND c.embedding_model = ${provider.model}
     )
-    SELECT source_id, 1 - (embedding <=> ${literal}::vector) AS similarity
+    SELECT source_id, content_sha256, 1 - (embedding <=> ${literal}::vector) AS similarity
     FROM candidates
     ORDER BY embedding <=> ${literal}::vector, source_id
     LIMIT ${MAX_RETRIEVAL_RESULTS * 2}
@@ -121,6 +133,8 @@ export async function searchKnowledge(
     const similarity = Number(row.similarity);
     const entry = byId.get(row.source_id);
     if (!entry || !(similarity >= threshold)) continue;
+    // A vector embedded from older text must not rank the current entry.
+    if (knowledgeDocument(entry)?.contentSha256 !== row.content_sha256) continue;
     const keywordScore = keywordById.get(entry.id) ?? 0;
     merged.set(entry.id, { entry, similarity, keywordScore, score: similarity + (keywordScore ? KEYWORD_BONUS : 0) });
   }
@@ -154,7 +168,7 @@ export async function answerFromKnowledge(organizationId: string, question: stri
 export interface CustomerContextResult {
   sourceType: PreparedDocument["sourceType"];
   sourceId: string;
-  /** Redacted text; never raw email/phone/SSN/policy identifiers. */
+  /** Redacted text of the CURRENT source; never raw email/phone/SSN/policy identifiers. */
   content: string;
   score: number;
   similarity: number | null;
@@ -178,40 +192,45 @@ function keywordScore(terms: string[], content: string): number {
 }
 
 /**
- * Context for ONE customer. Returns null when the contact is not in this
- * organization, so callers answer 404 without revealing other tenants.
- * Every query is filtered by organization_id AND contact_id.
+ * Context for ONE customer, as visible to the caller. Returns null when the
+ * contact is not in this organization, so callers answer 404 without
+ * revealing other tenants. Every query is filtered by organization_id AND
+ * contact_id, and every result is re-validated against the current coherent
+ * history and the caller's invoice visibility.
  */
 export async function retrieveCustomerContext(
   organizationId: string,
   contactId: string,
   query: string,
-  k = 5,
+  k: number,
+  access: CustomerRetrievalAccess,
 ): Promise<{ mode: RetrievalMode; results: CustomerContextResult[] } | null> {
   const limit = clampK(k, 5);
-  const [contact] = await db
-    .select({ id: contactsTable.id })
-    .from(contactsTable)
-    .where(and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, contactId)));
-  if (!contact) return null;
-  const history = await collectCustomerHistory(organizationId, contactId);
-  const documents = history.map(prepareDocument).filter((d): d is PreparedDocument => d !== null);
-  const terms = keywordTerms(redactForRetrieval(query));
-  const keywordResults = documents
-    .map((d) => ({ d, score: keywordScore(terms, d.content) }))
-    .filter((r) => r.score > 0);
+  const exists = await db.execute(
+    sql`SELECT 1 FROM contacts WHERE organization_id=${organizationId} AND id=${contactId} LIMIT 1`,
+  );
+  if (!exists.rows[0]) return null;
 
   const provider = providerFor(organizationId);
-  let queryVector: number[] | null = null;
   if (provider) {
     try {
-      // Freshen this customer's chunks first (idempotent; only changed records embed).
-      await syncCustomerHistoryIndex(provider, organizationId, contactId, history);
-      queryVector = await embedQuery(provider, organizationId, query, "customer_query");
+      // Shared index maintenance is independent of the caller's visibility:
+      // it indexes every coherent source and never deletes what a more
+      // privileged reader can see.
+      await syncCustomerHistoryIndex(provider, organizationId, contactId);
     } catch (error) {
       logIndexFailure(organizationId, "customer_history", error);
     }
   }
+  // Authoritative, caller-visible current history (read after the sync).
+  const visible = (await currentCustomerDocuments(organizationId, contactId)).filter(
+    (d) => !d.restricted || access.canReadInvoices,
+  );
+  const visibleByKey = new Map(visible.map((d) => [documentKey(d), d]));
+  const terms = keywordTerms(redactForRetrieval(query));
+  const keywordResults = visible.map((d) => ({ d, score: keywordScore(terms, d.content) })).filter((r) => r.score > 0);
+
+  const queryVector = await embedQuery(provider, organizationId, query, "customer_query");
   if (!provider || !queryVector) {
     return {
       mode: "keyword",
@@ -223,38 +242,43 @@ export async function retrieveCustomerContext(
   }
   const mode = modeOf(provider);
   const literal = vectorLiteral(queryVector);
-  const rows = await db.execute<{ source_type: CustomerContextResult["sourceType"]; source_id: string; content: string; similarity: number }>(sql`
+  const rows = await db.execute<{ source_type: CustomerContextResult["sourceType"]; source_id: string; content_sha256: string; similarity: number }>(sql`
     WITH candidates AS MATERIALIZED (
-      SELECT source_type, source_id, content, embedding
+      SELECT source_type, source_id, content_sha256, embedding
       FROM retrieval_chunks
       WHERE organization_id = ${organizationId}
         AND scope = 'customer'
         AND contact_id = ${contactId}
         AND embedding_model = ${provider.model}
     )
-    SELECT source_type, source_id, content, 1 - (embedding <=> ${literal}::vector) AS similarity
+    SELECT source_type, source_id, content_sha256, 1 - (embedding <=> ${literal}::vector) AS similarity
     FROM candidates
     ORDER BY embedding <=> ${literal}::vector, source_id
-    LIMIT ${MAX_RETRIEVAL_RESULTS * 2}
+    LIMIT ${CUSTOMER_VECTOR_CANDIDATES}
   `);
   const threshold = CUSTOMER_MIN_SIMILARITY[mode];
-  const keywordById = new Map(keywordResults.map((r) => [r.d.sourceId, r.score]));
+  const keywordById = new Map(keywordResults.map((r) => [documentKey(r.d), r.score]));
   const merged = new Map<string, CustomerContextResult>();
   for (const row of rows.rows) {
     const similarity = Number(row.similarity);
     if (!(similarity >= threshold)) continue;
-    const kw = keywordById.get(row.source_id) ?? 0;
-    merged.set(row.source_id, {
-      sourceType: row.source_type,
-      sourceId: row.source_id,
-      content: row.content,
+    const key = documentKey({ sourceType: row.source_type, sourceId: row.source_id });
+    const current = visibleByKey.get(key);
+    // Hidden, retired, deleted, incoherent or changed sources never surface.
+    if (!current || current.contentSha256 !== row.content_sha256) continue;
+    const kw = keywordById.get(key) ?? 0;
+    merged.set(key, {
+      sourceType: current.sourceType,
+      sourceId: current.sourceId,
+      content: current.content,
       similarity,
       score: similarity + (kw ? KEYWORD_BONUS : 0),
     });
   }
   for (const { d } of keywordResults) {
-    if (merged.has(d.sourceId)) continue;
-    merged.set(d.sourceId, { sourceType: d.sourceType, sourceId: d.sourceId, content: d.content, similarity: null, score: KEYWORD_BONUS });
+    const key = documentKey(d);
+    if (merged.has(key)) continue;
+    merged.set(key, { sourceType: d.sourceType, sourceId: d.sourceId, content: d.content, similarity: null, score: KEYWORD_BONUS });
   }
   const results = [...merged.values()]
     .sort((a, b) => b.score - a.score || a.sourceId.localeCompare(b.sourceId))

@@ -2,29 +2,37 @@
  * Per-customer memory: short, staff-authored notes that should travel with a
  * customer ("prefers text over calls", "dog in backyard — call first").
  *
- * Deterministic rules only: tenant + contact checks are SQL filters, provenance
- * links are verified against the same customer, and retirement is a recorded
- * human decision (the row stays for provenance; its retrieval chunk is removed
- * in the same transaction). Indexing a new memory is best-effort.
+ * Deterministic rules only: tenant + contact checks are SQL filters,
+ * provenance must be in the customer's canonical coherent record (the same
+ * graph as the customer workspace), invoice provenance needs invoices.read,
+ * and retirement is a recorded human decision. The row stays for provenance;
+ * its retrieval chunks are removed in the same transaction under the
+ * per-customer index lock, so an in-flight index write cannot resurrect it.
  */
 import {
-  activitiesTable,
-  appointmentsTable,
   contactsTable,
   customerMemoriesTable,
-  customerWorkRootsTable,
   db,
-  estimatesTable,
-  invoicesTable,
-  leadsTable,
   type CustomerMemory,
 } from "@workspace/db";
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import type { CreateCustomerMemoryInput, CustomerMemoryDto } from "./customer-memory-contract";
 import { createCustomerMemorySchema } from "./customer-memory-contract";
+import {
+  RESTRICTED_INVOICE_ACTIVITY_TYPES,
+  coherentCustomerActivity,
+  coherentCustomerActivityJoins,
+  customerRecordGraph,
+} from "./customer-workspace";
 import { tryGetEmbeddingProvider } from "./embeddings";
-import { logIndexFailure, prepareDocument, removeChunks, upsertChunks, type IndexStatus } from "./retrieval-index";
+import {
+  lockCustomerIndex,
+  logIndexFailure,
+  removeChunks,
+  syncCustomerHistoryIndex,
+  type IndexStatus,
+} from "./retrieval-index";
 
 export class CustomerMemoryError extends Error {
   constructor(
@@ -68,75 +76,42 @@ async function contactExists(organizationId: string, contactId: string): Promise
   return Boolean(row);
 }
 
-/** True only when the cited record belongs to this organization AND this customer. */
+/**
+ * True only when the cited record is in this customer's canonical coherent
+ * record in this organization (every populated parent agrees on the
+ * customer), and is visible to the caller (invoices need invoices.read).
+ */
 export async function customerOwnsSource(
   organizationId: string,
   contactId: string,
   sourceType: Exclude<CustomerMemoryDto["sourceType"], "manual">,
   sourceId: string,
+  access: { canReadInvoices: boolean },
 ): Promise<boolean> {
-  const leadIds = (
-    await db
-      .select({ id: leadsTable.id })
-      .from(leadsTable)
-      .where(and(eq(leadsTable.organizationId, organizationId), eq(leadsTable.contactId, contactId)))
-  ).map((row) => row.id);
-  const rootIds = (
-    await db
-      .select({ id: customerWorkRootsTable.id })
-      .from(customerWorkRootsTable)
-      .where(and(eq(customerWorkRootsTable.organizationId, organizationId), eq(customerWorkRootsTable.contactId, contactId)))
-  ).map((row) => row.id);
-  const viaLead = <T>(column: T) => (leadIds.length ? inArray(column as never, leadIds) : undefined);
-  const viaRoot = <T>(column: T) => (rootIds.length ? inArray(column as never, rootIds) : undefined);
+  const graph = customerRecordGraph(organizationId, contactId);
+  let selection;
   switch (sourceType) {
     case "lead":
-      return leadIds.includes(sourceId);
-    case "activity": {
-      const [row] = await db
-        .select({ id: activitiesTable.id })
-        .from(activitiesTable)
-        .where(
-          and(
-            eq(activitiesTable.organizationId, organizationId),
-            eq(activitiesTable.id, sourceId),
-            or(eq(activitiesTable.contactId, contactId), viaLead(activitiesTable.leadId)),
-          ),
-        );
-      return Boolean(row);
-    }
-    case "appointment": {
-      const [row] = await db
-        .select({ id: appointmentsTable.id })
-        .from(appointmentsTable)
-        .where(
-          and(
-            eq(appointmentsTable.organizationId, organizationId),
-            eq(appointmentsTable.id, sourceId),
-            or(eq(appointmentsTable.contactId, contactId), viaLead(appointmentsTable.leadId)),
-          ),
-        );
-      return Boolean(row);
-    }
-    case "estimate": {
-      const scope = or(viaLead(estimatesTable.leadId), viaRoot(estimatesTable.customerWorkId));
-      if (!scope) return false;
-      const [row] = await db
-        .select({ id: estimatesTable.id })
-        .from(estimatesTable)
-        .where(and(eq(estimatesTable.organizationId, organizationId), eq(estimatesTable.id, sourceId), scope));
-      return Boolean(row);
-    }
-    case "invoice": {
-      const scope = or(viaLead(invoicesTable.leadId), viaRoot(invoicesTable.customerWorkId));
-      if (!scope) return false;
-      const [row] = await db
-        .select({ id: invoicesTable.id })
-        .from(invoicesTable)
-        .where(and(eq(invoicesTable.organizationId, organizationId), eq(invoicesTable.id, sourceId), scope));
-      return Boolean(row);
-    }
+      selection = sql`SELECT 1 FROM valid_leads l WHERE l.id=${sourceId}`;
+      break;
+    case "activity":
+      selection = sql`SELECT 1 FROM activities a ${coherentCustomerActivityJoins(organizationId)}
+        WHERE ${coherentCustomerActivity(organizationId, contactId)} AND a.id=${sourceId}
+        ${access.canReadInvoices ? sql`` : sql`AND a.type NOT IN (${sql.join(RESTRICTED_INVOICE_ACTIVITY_TYPES.map((t) => sql`${t}`), sql`,`)})`}`;
+      break;
+    case "appointment":
+      selection = sql`SELECT 1 FROM valid_appointments a WHERE a.id=${sourceId} AND a.resolved_contact_id=${contactId}`;
+      break;
+    case "estimate":
+      selection = sql`SELECT 1 FROM valid_estimates e WHERE e.id=${sourceId} AND e.resolved_contact_id=${contactId}`;
+      break;
+    case "invoice":
+      if (!access.canReadInvoices) return false;
+      selection = sql`SELECT 1 FROM valid_invoices i WHERE i.id=${sourceId} AND i.resolved_contact_id=${contactId}`;
+      break;
   }
+  const result = await db.execute(sql`${graph} ${selection} LIMIT 1`);
+  return result.rows.length > 0;
 }
 
 export async function listCustomerMemories(
@@ -159,23 +134,16 @@ export async function listCustomerMemories(
     .limit(MAX_LISTED_MEMORIES);
 }
 
-async function indexMemory(row: CustomerMemory): Promise<IndexStatus> {
+/** Best-effort: refresh this customer's index (only changed sources are embedded). */
+async function indexCustomer(organizationId: string, contactId: string): Promise<IndexStatus> {
   try {
     const { provider, misconfigured } = tryGetEmbeddingProvider();
-    if (misconfigured) logIndexFailure(row.organizationId, "customer_memory", { code: "embedding_provider_misconfigured" });
+    if (misconfigured) logIndexFailure(organizationId, "customer_memory", { code: "embedding_provider_misconfigured" });
     if (!provider) return "skipped_no_provider";
-    const document = prepareDocument({
-      scope: "customer",
-      contactId: row.contactId,
-      sourceType: "customer_memory",
-      sourceId: row.id,
-      text: `Customer memory (${row.kind}): ${row.content}`,
-    });
-    if (!document) return "unchanged";
-    const result = await upsertChunks(provider, row.organizationId, [document]);
-    return result.indexed ? "indexed" : "unchanged";
+    const result = await syncCustomerHistoryIndex(provider, organizationId, contactId);
+    return result.indexed ? "indexed" : result.superseded ? "superseded" : "unchanged";
   } catch (error) {
-    logIndexFailure(row.organizationId, "customer_memory", error);
+    logIndexFailure(organizationId, "customer_memory", error);
     return "failed";
   }
 }
@@ -185,13 +153,14 @@ export async function createCustomerMemory(
   contactId: string,
   actorUserId: string,
   input: CreateCustomerMemoryInput,
+  access: { canReadInvoices: boolean },
 ): Promise<{ memory: CustomerMemory; retrievalIndex: IndexStatus }> {
   const parsed = createCustomerMemorySchema.safeParse(input);
   if (!parsed.success) throw new CustomerMemoryError(400, "memory_invalid");
   const value = parsed.data;
   if (!(await contactExists(organizationId, contactId))) throw new CustomerMemoryError(404, "customer_not_found");
   if (value.sourceType !== "manual") {
-    if (!value.sourceId || !(await customerOwnsSource(organizationId, contactId, value.sourceType, value.sourceId))) {
+    if (!value.sourceId || !(await customerOwnsSource(organizationId, contactId, value.sourceType, value.sourceId, access))) {
       throw new CustomerMemoryError(404, "memory_source_not_found");
     }
   }
@@ -207,7 +176,7 @@ export async function createCustomerMemory(
       createdByUserId: actorUserId,
     })
     .returning();
-  return { memory: memory!, retrievalIndex: await indexMemory(memory!) };
+  return { memory: memory!, retrievalIndex: await indexCustomer(organizationId, contactId) };
 }
 
 export async function retireCustomerMemory(
@@ -241,7 +210,9 @@ export async function retireCustomerMemory(
         ),
       )
       .returning();
-    // Retired memories leave retrieval atomically, for every embedding model.
+    // Same lock as index writers: any in-flight write commits before this
+    // removal, and any later one re-reads the memory as retired.
+    await lockCustomerIndex(tx, organizationId, contactId);
     await removeChunks(organizationId, "customer_memory", [memoryId], tx);
     return retired!;
   });

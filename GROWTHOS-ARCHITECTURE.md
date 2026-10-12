@@ -135,10 +135,22 @@ Implemented on `agent/growthos-pgvector-memory-20261011` (local only):
   contact name/email/phone/address before storage or embedding. Only changed
   content hashes are re-embedded. Knowledge create/update re-index best-effort;
   deactivate/delete and memory retirement delete chunks in the same transaction.
+- **Coherence and concurrency:** customer history uses the customer-workspace
+  canonical graph (`customerRecordGraph`, `coherentCustomerActivity`), so a
+  record whose parents disagree about the customer is in nobody's history and
+  cannot be cited as memory provenance. Embedding runs outside transactions;
+  writes then take the source lock (knowledge row `FOR UPDATE`, or the
+  per-customer advisory lock that memory retirement also takes), re-read the
+  authoritative source and only store vectors whose content hash is current.
 - **Reads** (`services/retrieval.ts`): exact cosine scan over the tenant's (and,
   for customers, the contact's) own rows, merged with the deterministic keyword
   rule; falls back to keyword-only without a provider or when the query embed
-  fails. The concierge still answers only by quoting a stored entry.
+  fails. Every candidate is re-validated against the current source and the
+  caller's visibility (`resolveCustomerReadAccess`: stored AND effective role,
+  so API-key caps apply; invoices and `invoice_event` activity need
+  `invoices.read`), and returned text comes from the current source. The shared
+  index is maintained independently of the caller. The concierge still answers
+  only by quoting a stored entry.
 - **Surfaces:** `GET/POST /contacts/:id/memories`, `POST .../:memoryId/retire`,
   `GET /contacts/:id/context-search`, owner/admin `POST /retrieval/reindex`, the
   read-only assistant tool `search_customer_history`, and a Customer memory panel

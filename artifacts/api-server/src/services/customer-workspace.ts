@@ -243,6 +243,53 @@ function graph(organizationId: string, contactId: string | null): SQL {
       AND (j.estimate_id IS NULL OR i.estimate_id IS NULL OR j.estimate_id=i.estimate_id)
   )`;
 }
+/** The canonical coherent customer-record graph, shared with retrieval. */
+export const customerRecordGraph = graph;
+
+/** Activity types shown in the customer record; invoice_event needs invoices.read. */
+export const CUSTOMER_ACTIVITY_TYPES = [
+  "note", "lead_captured", "lead_status_changed", "appointment_scheduled", "appointment_updated",
+  "service_created", "service_completed", "service_updated", "task_created", "task_completed", "task_updated",
+  "customer_reply", "portal_message", "email_sent", "bie_email_sent", "automation_message_sent",
+  "playbook_touch_sent", "confirmation_sent", "appointment_reminder_sent", "smart_site_contact_attempt",
+  "message_bounced", "message_delivery_delayed", "message_delivery_failed", "message_unsubscribed", "invoice_event",
+] as const;
+export const RESTRICTED_INVOICE_ACTIVITY_TYPES: readonly string[] = ["invoice_event"];
+
+/** Joins that coherentCustomerActivity expects (aliases c, l, u over activity a). */
+export function coherentCustomerActivityJoins(organizationId: string): SQL {
+  return sql`LEFT JOIN scoped_contacts c ON c.id=a.contact_id LEFT JOIN valid_leads l ON l.id=a.lead_id
+      LEFT JOIN users u ON u.id=a.actor_user_id AND u.organization_id=${organizationId}`;
+}
+
+/**
+ * The coherent-activity predicate of the customer record: every populated
+ * parent exists for this company and agrees on the customer. Requires the
+ * graph CTEs and coherentCustomerActivityJoins.
+ */
+export function coherentCustomerActivity(organizationId: string, contactId: string): SQL {
+  return sql`a.organization_id=${organizationId}
+        AND (a.contact_id IS NULL OR c.id IS NOT NULL) AND (a.lead_id IS NULL OR l.id IS NOT NULL)
+        AND (a.contact_id IS NULL OR l.id IS NULL OR a.contact_id=l.contact_id)
+        AND (a.actor_user_id IS NULL OR u.id IS NOT NULL)
+        AND (c.id=${contactId} OR l.contact_id=${contactId})
+        AND a.type IN (${sql.join(CUSTOMER_ACTIVITY_TYPES.map((type) => sql`${type}`), sql`,`)})`;
+}
+
+/**
+ * The customer-record access decision: active, verified, crm.read on both the
+ * stored and the effective role; invoices only with invoices.read on both. API
+ * keys pass their capped key role as the effective role.
+ */
+export async function resolveCustomerReadAccess(
+  organizationId: string,
+  userId: string,
+  effectiveRole?: UserRole,
+): Promise<{ canWrite: boolean; canReadInvoices: boolean }> {
+  uuid(organizationId);
+  return db.transaction((tx) => actor(tx, organizationId, userId, effectiveRole), readOptions);
+}
+
 // SQL aliases below are fixed source identifiers, never input or saved URLs.
 function propertyJson(alias = "p") {
   const p = sql.raw(alias);
@@ -320,18 +367,8 @@ function selection(
         WHEN a.type IN ('customer_reply','portal_message') THEN 'Customer response recorded'
         ELSE 'Communication event recorded' END AS label,
       a.occurred_at AS "occurredAt",a.lead_id AS "leadId"
-      FROM activities a LEFT JOIN scoped_contacts c ON c.id=a.contact_id LEFT JOIN valid_leads l ON l.id=a.lead_id
-      LEFT JOIN users u ON u.id=a.actor_user_id AND u.organization_id=${organizationId}
-      WHERE a.organization_id=${organizationId}
-        AND (a.contact_id IS NULL OR c.id IS NOT NULL) AND (a.lead_id IS NULL OR l.id IS NOT NULL)
-        AND (a.contact_id IS NULL OR l.id IS NULL OR a.contact_id=l.contact_id)
-        AND (a.actor_user_id IS NULL OR u.id IS NOT NULL)
-        AND (c.id=${contactId} OR l.contact_id=${contactId})
-        AND a.type IN ('note','lead_captured','lead_status_changed','appointment_scheduled','appointment_updated',
-          'service_created','service_completed','service_updated','task_created','task_completed','task_updated',
-          'customer_reply','portal_message','email_sent','bie_email_sent','automation_message_sent',
-          'playbook_touch_sent','confirmation_sent','appointment_reminder_sent','smart_site_contact_attempt',
-          'message_bounced','message_delivery_delayed','message_delivery_failed','message_unsubscribed','invoice_event')
+      FROM activities a ${coherentCustomerActivityJoins(organizationId)}
+      WHERE ${coherentCustomerActivity(organizationId, contactId)}
         AND (a.type<>'invoice_event' OR ${canReadInvoices})`;
   }
 }

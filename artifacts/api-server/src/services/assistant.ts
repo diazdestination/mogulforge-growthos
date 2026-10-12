@@ -21,7 +21,7 @@ import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 
 import { logger } from "../lib/logger";
 import { validWorkReadScope } from "./customer-work-read-scope";
-import { searchCustomerHistory } from "./customer-history-tool";
+import { searchCustomerHistory, type AssistantPrincipal } from "./customer-history-tool";
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
@@ -337,7 +337,8 @@ async function staleLeads(organizationId: string, days: number, limit: number) {
 interface ToolDef {
   description: string;
   parameters: Record<string, unknown>;
-  run: (organizationId: string, args: Record<string, unknown>) => Promise<unknown>;
+  /** `principal` is the authenticated caller; tools needing record visibility fail closed without it. */
+  run: (organizationId: string, args: Record<string, unknown>, principal?: AssistantPrincipal) => Promise<unknown>;
 }
 
 const intArg = (v: unknown, fallback: number, max: number) => {
@@ -413,7 +414,7 @@ export const TOOLS: Record<string, ToolDef> = {
       },
       required: ["query"],
     },
-    run: (org, a) => searchCustomerHistory(org, a),
+    run: (org, a, principal) => searchCustomerHistory(org, a, principal),
   },
 };
 
@@ -489,6 +490,8 @@ async function callOpenAi(
  */
 export async function runAssistantChat(params: {
   organizationId: string;
+  /** The signed-in member (stored user + effective role, e.g. a capped API key role). */
+  principal?: AssistantPrincipal;
   messages: AssistantChatMessage[];
   onDelta: (text: string) => void;
   onToolCall?: (toolName: string) => void;
@@ -536,7 +539,7 @@ export async function runAssistantChat(params: {
       } else {
         try {
           const args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
-          result = await tool.run(params.organizationId, args);
+          result = await tool.run(params.organizationId, args, params.principal);
         } catch (err) {
           logger.error({ err, tool: call.function.name }, "assistant tool failed");
           result = { error: "This data lookup failed; answer with what you have and mention the gap." };

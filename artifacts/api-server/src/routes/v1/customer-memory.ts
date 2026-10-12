@@ -20,6 +20,8 @@ import {
   toCustomerMemoryDto,
 } from "../../services/customer-memory";
 import { reindexRequestSchema } from "../../services/customer-memory-contract";
+import { resolveCustomerReadAccess } from "../../services/customer-workspace";
+import { CustomerWorkspaceError } from "../../services/customer-workspace-contract";
 import { tryGetEmbeddingProvider } from "../../services/embeddings";
 import { retrieveCustomerContext } from "../../services/retrieval";
 import { reindexOrganization } from "../../services/retrieval-index";
@@ -44,7 +46,21 @@ function contactIdOr404(req: Request, res: Response): string | null {
   return null;
 }
 
+/**
+ * The caller's effective customer-record visibility: stored user role AND the
+ * effective role (an API key's capped role) must both allow it, exactly as in
+ * the customer workspace.
+ */
+function callerAccess(req: Request) {
+  const member = req.member!;
+  return resolveCustomerReadAccess(member.organizationId, member.user.id, member.role);
+}
+
 function respondToError(error: unknown, req: Request, res: Response): void {
+  if (error instanceof CustomerWorkspaceError) {
+    res.status(error.status).json({ error: error.message, code: error.code });
+    return;
+  }
   if (error instanceof CustomerMemoryError) {
     res.status(error.status).json({ error: error.message, code: error.code });
     return;
@@ -88,7 +104,8 @@ router.post(
     if (!contactId) return;
     try {
       const organizationId = req.member!.organizationId;
-      const { memory, retrievalIndex } = await createCustomerMemory(organizationId, contactId, req.member!.user.id, req.body ?? {});
+      const access = await callerAccess(req);
+      const { memory, retrievalIndex } = await createCustomerMemory(organizationId, contactId, req.member!.user.id, req.body ?? {}, access);
       await recordAudit({
         organizationId,
         actorUserId: req.member!.user.id,
@@ -148,13 +165,18 @@ router.get(
     }
     try {
       const organizationId = req.member!.organizationId;
-      const result = await retrieveCustomerContext(organizationId, contactId, parsed.data.q, parsed.data.limit ?? 5);
+      const access = await callerAccess(req);
+      const result = await retrieveCustomerContext(organizationId, contactId, parsed.data.q, parsed.data.limit ?? 5, access);
       if (!result) {
         res.status(404).json({ error: "Customer not found", code: "customer_not_found" });
         return;
       }
       res.json({ organizationId, contactId, ...result });
     } catch (error) {
+      if (error instanceof CustomerWorkspaceError) {
+        res.status(error.status).json({ error: error.message, code: error.code });
+        return;
+      }
       req.log?.error({ event: "customer_context_search_unavailable" }, "Customer context search failed");
       res.status(503).json({ error: "Customer search is temporarily unavailable.", code: "context_search_unavailable" });
     }

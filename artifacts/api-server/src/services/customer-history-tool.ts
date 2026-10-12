@@ -1,13 +1,22 @@
 /**
- * The CRM assistant's single read-only retrieval tool. The organization comes
- * from the authenticated chat (never from model arguments); a model-supplied
- * contactId outside that organization simply is not found.
+ * The CRM assistant's single read-only retrieval tool. The organization and
+ * the caller principal come from the authenticated chat (never from model
+ * arguments). Visibility is the customer-workspace decision for that caller:
+ * the stored user role AND the effective role (a capped API-key role) must
+ * both allow crm.read, and invoice sources additionally need invoices.read.
+ * Without a principal the tool fails closed.
  */
-import { contactsTable, db } from "@workspace/db";
+import { contactsTable, db, type UserRole } from "@workspace/db";
 import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 
+import { resolveCustomerReadAccess } from "./customer-workspace";
 import { retrieveCustomerContext } from "./retrieval";
+
+export interface AssistantPrincipal {
+  userId: string;
+  role: UserRole;
+}
 
 const MAX_CANDIDATES = 5;
 
@@ -15,7 +24,18 @@ function likePattern(value: string): string {
   return `%${value.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 }
 
-export async function searchCustomerHistory(organizationId: string, args: Record<string, unknown>) {
+export async function searchCustomerHistory(
+  organizationId: string,
+  args: Record<string, unknown>,
+  principal?: AssistantPrincipal,
+) {
+  if (!principal) return { error: "Customer history needs a signed-in staff member." };
+  let access;
+  try {
+    access = await resolveCustomerReadAccess(organizationId, principal.userId, principal.role);
+  } catch {
+    return { error: "Customer history is not available for your current access." };
+  }
   const query = typeof args.query === "string" ? args.query.trim().slice(0, 500) : "";
   if (!query) return { error: "Provide a query describing what to look for." };
   const limit = Math.min(Math.max(Math.floor(Number(args.limit) || 5), 1), 10);
@@ -57,12 +77,13 @@ export async function searchCustomerHistory(organizationId: string, args: Record
     contactId = candidates[0]!.id;
   }
 
-  const result = await retrieveCustomerContext(organizationId, contactId, query, limit);
+  const result = await retrieveCustomerContext(organizationId, contactId, query, limit, access);
   if (!result) return { found: false, message: "That customer is not in this company." };
   return {
     found: true,
     contactId,
     retrievalMode: result.mode,
+    invoiceDetailsIncluded: access.canReadInvoices,
     snippets: result.results.map((r) => ({ source: r.sourceType, sourceId: r.sourceId, text: r.content })),
   };
 }

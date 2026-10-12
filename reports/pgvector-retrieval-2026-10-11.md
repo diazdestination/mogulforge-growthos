@@ -137,6 +137,62 @@ Not run: the Docker staging-parity gate (`scripts/verify-docker-staging-parity.p
 `preview-runtime-isolated.mjs` (an interactive server) and the manual
 detail-corrections runner (see open gate 5).
 
+## Codex review fixes (2026-10-12)
+
+Codex review (`C:/Forge/workspace/growthos-claude-push-review-20261012T002130Z/REVIEW.md`) blocked
+the push of `3c0cb99`. All four findings are fixed in a follow-up commit:
+
+1. **P1 invoice visibility.** Context search and the assistant tool resolve the
+   caller through `resolveCustomerReadAccess` (customer-workspace actor rule:
+   active, verified, crm.read on the stored AND effective role; invoices need
+   invoices.read on both, so API-key role caps apply). Invoice documents and
+   `invoice_event` activity are flagged `restricted` at collection and filtered
+   from keyword results and stored-vector candidates. Memory provenance citing
+   an invoice or invoice activity needs invoices.read. The shared index always
+   stores every coherent source, so restricted reads never delete the chunks
+   authorized users rely on. The assistant receives `{userId, role}` from the
+   route and fails closed without it.
+2. **P1 in-flight resurrection/stale overwrite.** Embedding happens outside
+   transactions. Writes then lock (knowledge `FOR UPDATE` in id order; customer
+   `pg_advisory_xact_lock` that `retireCustomerMemory` also takes), re-read the
+   authoritative source and write only vectors whose content hash is current.
+   Superseded vectors are skipped and counted. Reads re-validate every vector
+   candidate against the current source/hash and return current text, so a
+   stale chunk can never surface.
+3. **P1 contradictory parents.** History collection, retrieval and memory
+   provenance reuse the customer-workspace canonical graph
+   (`customerRecordGraph`) and the activity predicate (now shared as
+   `coherentCustomerActivity`; the workspace activity section uses the same
+   function, and its tests still pass).
+4. **P2 detail-correction runner.** It now pins the pgvector index digest
+   `sha256:a132765e…` and linux/amd64 manifest `sha256:c72df104…`, runs
+   `ensure-extensions.mjs` with the same isolated env, and checks that the
+   extension exists before `drizzle-kit push`. Docker Desktop is not installed
+   on WILLOWFORGE, so it falls back to the Forge WSL bridge with an owned WSL
+   session.
+
+New tests use a controllable gated embedder for deletion, deactivation,
+newer-edit and memory-retirement races, plus a planted stale chunk. They cover
+contradictory activity and appointment exclusion in keyword and vector modes,
+invalid provenance, invoice visibility in keyword and vector modes, and HTTP
+role and capped API-key checks (`sales_rep` key hidden, `office` key shown).
+
+Verification for the fix commit:
+
+| Command | Result |
+| --- | --- |
+| Focused DB tests (retrieval, embeddings, customer-memory routes, knowledge, route-inventory, both data-lifecycle suites, assistant, assistant-chat, customer-workspace service + route, appointment-parent-coherence) | 12 files, 185/185 passed |
+| `scripts` vitest | 28 files, 351/351 passed |
+| `node artifacts/api-server/scripts/test-customer-detail-corrections-isolated.mjs` | PASS: native PostgreSQL 16.10 + pgvector, 7 files / 60 tests, container removed |
+| `node scripts/local-dev.mjs parity` | `DOCKER_STAGING_PARITY_PASSED` (restricted-role schema push, image health, DB failure/recovery) |
+| `test:scheduler` / `test:twilio` | 44 passed + 1 skipped / 79 passed |
+| `pnpm run typecheck`; api-server build | pass; pass |
+
+The full suite was not re-run for the fix commit. The `service-care.test.ts`
+collision on a shared `+15005550009` number already exists at base `87adc3e`.
+It is not caused by this branch, and it means the full suite cannot be claimed
+reliably green.
+
 ## Open gates (owner input)
 
 1. **Hosted pgvector.** Confirm that the Fly/managed Postgres cluster offers
@@ -151,8 +207,7 @@ detail-corrections runner (see open gate 5).
 4. **Similarity thresholds.** The values (semantic 0.40 knowledge / 0.20
    customer) are conservative defaults and have not been tuned on real
    questions.
-5. **Detail-correction runner.** `test-customer-detail-corrections-isolated.mjs`
-   pins a plain PostgreSQL 16 image digest and cannot apply the new schema until
-   that reviewed pin moves to the pgvector image.
+5. **Detail-correction runner (resolved 2026-10-12).** It now uses the pgvector
+   image pins and the extension step; see "Codex review fixes".
 6. **Existing local volumes.** Local developers with PG15 data must migrate with
    dump/restore (see `DEV-LOCAL.md`). The old volume is untouched.

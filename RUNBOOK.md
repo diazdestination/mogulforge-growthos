@@ -63,9 +63,11 @@ unverified). Embeddings stay off unless `EMBEDDINGS_PROVIDER` is set; `openai`
 is an owner spend decision. After enabling, an owner/admin runs
 `POST /api/v1/retrieval/reindex` (paged by `afterContactId`; safe to repeat
 because unchanged records are skipped by content hash). The manual
-`test-customer-detail-corrections-isolated.mjs` runner pins a plain PostgreSQL 16
-image digest and cannot apply this schema until that reviewed pin is moved to
-the pgvector image.
+`test-customer-detail-corrections-isolated.mjs` runner now pins the pgvector
+image (index `sha256:a132765e…`, linux/amd64 manifest `sha256:c72df104…`), runs
+`ensure-extensions.mjs` with its isolated env before the push, and uses the
+Forge WSL Docker bridge (with an owned WSL session) when Docker Desktop is not
+installed.
 
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.
