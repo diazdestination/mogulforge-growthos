@@ -86,7 +86,8 @@ For every executed row, record the fields that
 **What counts as evidence**
 
 - Screenshots or screen recordings of the GrowthOS screen and of the receiving
-  device or inbox.
+  device or inbox. Browser recordings and traces remain disabled unless Adam
+  explicitly opts in for that test.
 - A provider receipt or message ID, a GrowthOS audit event or record ID, and a
   short note from a person who saw the result.
 - Provider **acceptance** (HTTP 2xx, `202 Accepted`, a push `accepted`) is not
@@ -147,3 +148,20 @@ owner approval for that specific action:
 
 Contractor payment collection is back in engineering scope as of October 9
 (see G-01). No processor is selected and no payment may be taken in testing.
+
+## Review baseline and integration lane
+
+The October 11 Forge control-plane record already reports the original staging
+95-to-142 migration and held private runtime as passed. Production binding,
+encrypted recovery custody and a read-only 75-table baseline are also recorded;
+an actual PostgreSQL backup restoration and production migration/cutover remain
+separate gates. These earlier results do not mark any case in this packet run.
+Consult the current `C:\Forge\CONTROL_PLANE.md` and its dated receipts before
+deciding which further recovery operation is necessary. Do not repeat a
+completed migration, runtime attempt or consumed paid-resource grant.
+
+This draft is launch-supporting documentation beside the #33 → #34 → #35
+integration stack. It must not block or complicate PR #35 or production cutover.
+Its gap register remains visible for the separately required contractor
+acceptance decision; this packet neither changes that decision nor authorizes
+a merge, deployment or hosted operation.

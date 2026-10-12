@@ -62,8 +62,8 @@ facts.
 - **Pre:** E-01 completed more than one hour earlier, so the access token has
   expired.
 - **Steps:** send one approved email.
-- **Expect:** the send succeeds without reconnecting. No token appears in logs
-  or the database.
+- **Expect:** the send succeeds without reconnecting. No plaintext token appears
+  in logs or the database; encrypted refresh-token storage is expected.
 - **Evidence:**
   - the message ID
   - the inbox arrival
@@ -119,7 +119,9 @@ facts.
 - **Blocking:** O-05, O-03.
 
 ### E-08 Microsoft tracked reply
-- **Pre:** E-07. A test lead or service reminder was sent from that mailbox.
+- **Pre:** E-07, separate delegated `Mail.Read` consent and explicit GrowthOS
+  mailbox-reading opt-in (O-05). A tracked test lead or service reminder was
+  sent from that mailbox.
 - **Steps:** the test customer replies.
 - **Expect:**
   - The reply attaches to the correct lead or service item, with a hold or
@@ -134,7 +136,9 @@ facts.
   2. Try a send.
 - **Expect:**
   - The send is blocked.
-  - Pending flows are cancelled.
+  - Pending Microsoft OAuth connection attempts are invalidated and the
+    mailbox-reading connector is disabled. Existing uncertain send evidence
+    remains preserved; a blocked send must not be replayed.
   - Remote Microsoft consent **remains**; a local disconnect does not revoke it
     (`MOBILE-EMAIL-PILOT.md:86-88`).
 - **Blocking:** O-05.

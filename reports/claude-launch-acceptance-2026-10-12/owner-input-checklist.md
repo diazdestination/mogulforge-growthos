@@ -9,7 +9,9 @@ How to provide inputs safely:
 - Give each answer through the private intake or the approved secure credential
   flow. Never paste secrets, card or bank details, or customer PII into chat or
   Git.
-- One approval covers one action only. It never carries over to a later action.
+- Apply each authorization within its recorded scope, target, limits and
+  expiry. A consumed one-time grant cannot authorize another attempt; retain
+  existing decisions and reusable authorizations that are still applicable.
 
 **Who answers:**
 
@@ -21,8 +23,8 @@ How to provide inputs safely:
 
 | ID | Who | Exact ask | Unblocks |
 | --- | --- | --- | --- |
-| O-01 | A | **Approve one new paid managed backup-restore test.** The approval must state: (1) a **price ceiling** in USD; (2) a **maximum lifetime** from creation, with cleanup starting before it ends; (3) the **deletion proof** you will accept, for example terminal `deleted` plus absence from the active list (a 404 is not required). Also acknowledge that Fly offers **no provider-enforced invoice cap** and that the final bill is reconciled afterward. The October 10 approval was used once and cannot be reused. See `reports/staging-observation-2026-10-10/RESTORE-PLAN.md:3-6` and `reports/release-preparation-2026-10-09/cost-recovery-preflight-assessment.md:11` | L10, P0-6 |
-| O-02 | A | Approve the reviewed held-staging rollout of the selected candidate (exact source, SQL, image and target) after O-01 passes. This approval is separate from production | All hosted cases |
+| O-01 | A | **Only if a reviewed remaining backup-restore gate requires a new paid resource:** approve that exact test with (1) a price ceiling in USD, (2) a maximum lifetime and cleanup deadline, and (3) acceptable deletion proof, such as terminal `deleted` plus absence from active inventory. Fly has no provider-enforced invoice cap; reconcile the actual bill afterward. Earlier one-time grants are consumed. First reconcile the current `C:\Forge\CONTROL_PLANE.md` and its dated recovery receipts; do not replay completed staging recovery. Actual PostgreSQL backup restoration remains distinct from encrypted credential recovery | Remaining L10/P0-6 recovery evidence, if needed |
+| O-02 | A | Reconcile the already completed original staging migration and held private runtime from the October 11 control-plane receipts. If a further hosted operation is necessary, confirm applicable authorization for its exact source, SQL, image, target and holds before it runs. Production migration/cutover authority is separate; this packet requires no repetition of staging work | Any further hosted operation; all hosted test environments |
 | O-03 | A | For each test window, name: the exact test recipients (by role), the purpose, the maximum number of sends, the stop time, and the staging push/user allowlist | Every send case |
 
 ## B. Accounts and providers
@@ -30,7 +32,7 @@ How to provide inputs safely:
 | ID | Who | Exact ask | Unblocks |
 | --- | --- | --- | --- |
 | O-04 | A | **Gmail.** Create or confirm the *Staging* Google Cloud project (Testing audience, exact redirects). Provide **at least 2 Gmail test identities** for 2 organizations. Decide when to submit the *Production* project for verification (`GOOGLE-OAUTH-SETUP.md:25-80`) | E-01 to E-05, I-01 |
-| O-05 | A | **Azure first sign-in** with Adam present. Inspect the existing directory and app registration; do not open a new account (`HOUSECALL-PRO-REPLACEMENT-GATE.md:143`). **Per company:** name the actual mailbox provider and the sending mailbox. Painless's Microsoft mailbox is unverified and its Yahoo inbox is unsupported | E-07 to E-09, L1 |
+| O-05 | A | **Azure first sign-in** with Adam present. Inspect the existing directory and app registration; do not open a new account (`HOUSECALL-PRO-REPLACEMENT-GATE.md:143`). **Per company:** name the actual mailbox provider and the sending mailbox. Tracked replies also require separate approved delegated `Mail.Read` consent and GrowthOS mailbox-reading opt-in. Painless's Microsoft mailbox is unverified and its Yahoo inbox is unsupported | E-07 to E-09, L1 |
 | O-06 | A | **Resend.** Provide a verified platform sender domain and staff test inboxes for invitation, verification and reset mail (`PAID-BETA-READINESS-P0.md:299-309`) | E-10, L2 |
 | O-07 | A + each co. | **Twilio.** For each company: (1) the account model (platform subaccount or client-owned); (2) the number to use or buy; (3) A2P/TFV registration with that company's legal identity; (4) a one-time and a monthly spend cap; (5) allowed destinations; (6) the carrier forwarding plan and revert plan; (7) authorized test handsets (`TWILIO-CLIENT-READINESS.md:86-90`) | S-01 to S-08, V-01 to V-11 |
 | O-08 | A | **ElevenLabs/CALLIE.** For each company: (1) the account and agent version; (2) the caller disclosure; (3) the retention period; (4) the budget; (5) the recording decision (currently off); (6) the fixed human-handoff targets; (7) the after-hours owner (`reports/callie-conversation-operator-2026-10-05.md:149-160`) | V-02 to V-09 |
@@ -94,8 +96,10 @@ period. Cancelling Housecall Pro stays a separate, later owner action.
 
 1. **O-13 / O-12 — Housecall Pro exports and samples.** These unblock G-05, the
    migration line on both cards, and the layouts needed for G-03, G-12 and G-13.
-2. **O-01 — the paid managed-restore approval** (price ceiling, lifetime,
-   deletion proof). This blocks the hosted release and L10.
+2. **O-01 / O-02 — reconcile current recovery and hosted evidence.** Request
+   an exact new paid-restore approval only if the remaining recovery plan needs
+   it; do not repeat the completed staging migration/private runtime. Remaining
+   release gates do not make this documentation a prerequisite for PR #35.
 3. **O-20 — CSS payment decisions and a redacted statement.** These define G-01
    and G-02, the largest new engineering scope.
 4. **O-15 + O-16 + O-17 — CSS hours, time zone, urgent safeguards and messaging
