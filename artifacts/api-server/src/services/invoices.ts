@@ -20,6 +20,7 @@ import {
 } from "@workspace/db";
 import { hasPermission } from "../lib/permissions";
 import { lockContractorSchedule } from "./contractor-scheduling";
+import { invoiceEquipment } from "./invoice-equipment";
 import { assertCustomerWorkActive, assertCustomerWorkReader, createCustomerWorkRoot, customerWorkActor, customerWorkHash, lockCustomerWork, readNativeWorkLineage } from "./customer-work-lineage";
 import { CustomerWorkError } from "./returning-customer-contract";
 import {
@@ -755,6 +756,7 @@ export async function createInvoice(
       customerWorkId=input.source.kind === "customer_work" ? input.source.customerWorkId : (await createCustomerWorkRoot(tx,org,userId,input.source)).id;
     } else leadId=input.leadId;
     const refs = await related(tx, org, {...input,leadId,customerWorkId}, true, true);
+    const equipment = await invoiceEquipment(tx, org, refs.lineage, input.equipment);
     const [row] = await tx
       .insert(invoices)
       .values({
@@ -763,7 +765,7 @@ export async function createInvoice(
         customerWorkId,
         projectId: input.projectId,
         estimateId: refs.estimateId,
-        draftDocument: input.document,
+        draftDocument: equipment ? { ...input.document, equipment } : input.document,
         createdByUserId: userId,
       })
       .returning();
@@ -801,8 +803,9 @@ export async function updateInvoice(
         "invoice_transition_unavailable",
         "Only a draft invoice can be edited. Issued documents are retained unchanged.",
       );
+    const equipment = await invoiceEquipment(tx, org, (await related(tx, org, row, false, true)).lineage, input.equipment);
     return {
-      row: await advance(tx, org, row, { draftDocument: input.document }),
+      row: await advance(tx, org, row, { draftDocument: equipment ? { ...input.document, equipment } : input.document }),
     };
   },effectiveRole);
 }

@@ -184,6 +184,11 @@ export const recordInvoiceRefundResponseInvoiceDocumentSubtotalCentsMax = 100000
 export const recordInvoiceRefundResponseInvoiceDocumentTotalCentsMin = 0;
 export const recordInvoiceRefundResponseInvoiceDocumentTotalCentsMax = 1000000000;
 
+
+export const recordInvoiceRefundResponseInvoiceDocumentEquipmentItemsMax = 10;
+
+export const recordInvoiceRefundResponseInvoiceDocumentEquipmentWarrantyTermsMax = 2000;
+
 export const recordInvoiceRefundResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
 
 export const recordInvoiceRefundResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
@@ -250,7 +255,24 @@ export const RecordInvoiceRefundResponse = zod.object({
 })).max(recordInvoiceRefundResponseInvoiceDocumentLineItemsMax),
   "taxCents": zod.int().min(recordInvoiceRefundResponseInvoiceDocumentTaxCentsMin).max(recordInvoiceRefundResponseInvoiceDocumentTaxCentsMax),
   "subtotalCents": zod.int().min(recordInvoiceRefundResponseInvoiceDocumentSubtotalCentsMin).max(recordInvoiceRefundResponseInvoiceDocumentSubtotalCentsMax),
-  "totalCents": zod.int().min(recordInvoiceRefundResponseInvoiceDocumentTotalCentsMin).max(recordInvoiceRefundResponseInvoiceDocumentTotalCentsMax)
+  "totalCents": zod.int().min(recordInvoiceRefundResponseInvoiceDocumentTotalCentsMin).max(recordInvoiceRefundResponseInvoiceDocumentTotalCentsMax),
+  "equipment": zod.object({
+  "items": zod.array(zod.object({
+  "assetId": zod.uuid(),
+  "assetVersion": zod.int().min(1),
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string(),
+  "manufacturer": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "serial": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "installedOn": zod.coerce.date().nullable(),
+  "warrantyStartsOn": zod.coerce.date().nullable(),
+  "warrantyEndsOn": zod.coerce.date().nullable(),
+  "warrantySource": zod.string().nullable()
+})).max(recordInvoiceRefundResponseInvoiceDocumentEquipmentItemsMax),
+  "warrantyTerms": zod.string().max(recordInvoiceRefundResponseInvoiceDocumentEquipmentWarrantyTermsMax).nullable()
+}).optional().describe('Snapshot of staff-recorded property assets and staff-entered warranty terms. Absent when no equipment was attached. Recorded warranty dates are not a coverage decision.')
 }),
   "allocations": zod.array(zod.object({
   "id": zod.uuid(),
@@ -15067,6 +15089,11 @@ export const createInvoiceBodyOneDocumentLineItemsMax = 100;
 export const createInvoiceBodyOneDocumentTaxCentsMin = 0;
 export const createInvoiceBodyOneDocumentTaxCentsMax = 1000000000;
 
+export const createInvoiceBodyOneEquipmentAssetIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createInvoiceBodyOneEquipmentAssetIdsMax = 10;
+
+export const createInvoiceBodyOneEquipmentWarrantyTermsMax = 2000;
+
 export const createInvoiceBodyTwoRequestIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
 export const createInvoiceBodyTwoSourceOneCustomerWorkIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
 export const createInvoiceBodyTwoSourceTwoContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
@@ -15096,6 +15123,11 @@ export const createInvoiceBodyTwoDocumentLineItemsMax = 100;
 export const createInvoiceBodyTwoDocumentTaxCentsMin = 0;
 export const createInvoiceBodyTwoDocumentTaxCentsMax = 1000000000;
 
+export const createInvoiceBodyTwoEquipmentAssetIdsItemRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createInvoiceBodyTwoEquipmentAssetIdsMax = 10;
+
+export const createInvoiceBodyTwoEquipmentWarrantyTermsMax = 2000;
+
 
 
 export const CreateInvoiceBody = zod.union([zod.object({
@@ -15118,7 +15150,11 @@ export const CreateInvoiceBody = zod.union([zod.object({
   "unitPriceCents": zod.int().min(createInvoiceBodyOneDocumentLineItemsItemUnitPriceCentsMin).max(createInvoiceBodyOneDocumentLineItemsItemUnitPriceCentsMax)
 })).max(createInvoiceBodyOneDocumentLineItemsMax),
   "taxCents": zod.int().min(createInvoiceBodyOneDocumentTaxCentsMin).max(createInvoiceBodyOneDocumentTaxCentsMax)
-})
+}),
+  "equipment": zod.object({
+  "assetIds": zod.array(zod.uuid().regex(createInvoiceBodyOneEquipmentAssetIdsItemRegExp)).max(createInvoiceBodyOneEquipmentAssetIdsMax),
+  "warrantyTerms": zod.string().max(createInvoiceBodyOneEquipmentWarrantyTermsMax).nullish()
+}).optional()
 }),zod.object({
   "requestId": zod.uuid().regex(createInvoiceBodyTwoRequestIdRegExp),
   "source": zod.union([zod.object({
@@ -15146,7 +15182,11 @@ export const CreateInvoiceBody = zod.union([zod.object({
   "unitPriceCents": zod.int().min(createInvoiceBodyTwoDocumentLineItemsItemUnitPriceCentsMin).max(createInvoiceBodyTwoDocumentLineItemsItemUnitPriceCentsMax)
 })).max(createInvoiceBodyTwoDocumentLineItemsMax),
   "taxCents": zod.int().min(createInvoiceBodyTwoDocumentTaxCentsMin).max(createInvoiceBodyTwoDocumentTaxCentsMax)
-})
+}),
+  "equipment": zod.object({
+  "assetIds": zod.array(zod.uuid().regex(createInvoiceBodyTwoEquipmentAssetIdsItemRegExp)).max(createInvoiceBodyTwoEquipmentAssetIdsMax),
+  "warrantyTerms": zod.string().max(createInvoiceBodyTwoEquipmentWarrantyTermsMax).nullish()
+}).optional()
 })])
 
 export const createInvoiceResponseInvoiceOpeningReceivableCentsMin = 0;
@@ -15198,6 +15238,11 @@ export const createInvoiceResponseInvoiceDocumentSubtotalCentsMax = 1000000000;
 
 export const createInvoiceResponseInvoiceDocumentTotalCentsMin = 0;
 export const createInvoiceResponseInvoiceDocumentTotalCentsMax = 1000000000;
+
+
+export const createInvoiceResponseInvoiceDocumentEquipmentItemsMax = 10;
+
+export const createInvoiceResponseInvoiceDocumentEquipmentWarrantyTermsMax = 2000;
 
 export const createInvoiceResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
 
@@ -15265,7 +15310,24 @@ export const CreateInvoiceResponse = zod.object({
 })).max(createInvoiceResponseInvoiceDocumentLineItemsMax),
   "taxCents": zod.int().min(createInvoiceResponseInvoiceDocumentTaxCentsMin).max(createInvoiceResponseInvoiceDocumentTaxCentsMax),
   "subtotalCents": zod.int().min(createInvoiceResponseInvoiceDocumentSubtotalCentsMin).max(createInvoiceResponseInvoiceDocumentSubtotalCentsMax),
-  "totalCents": zod.int().min(createInvoiceResponseInvoiceDocumentTotalCentsMin).max(createInvoiceResponseInvoiceDocumentTotalCentsMax)
+  "totalCents": zod.int().min(createInvoiceResponseInvoiceDocumentTotalCentsMin).max(createInvoiceResponseInvoiceDocumentTotalCentsMax),
+  "equipment": zod.object({
+  "items": zod.array(zod.object({
+  "assetId": zod.uuid(),
+  "assetVersion": zod.int().min(1),
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string(),
+  "manufacturer": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "serial": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "installedOn": zod.coerce.date().nullable(),
+  "warrantyStartsOn": zod.coerce.date().nullable(),
+  "warrantyEndsOn": zod.coerce.date().nullable(),
+  "warrantySource": zod.string().nullable()
+})).max(createInvoiceResponseInvoiceDocumentEquipmentItemsMax),
+  "warrantyTerms": zod.string().max(createInvoiceResponseInvoiceDocumentEquipmentWarrantyTermsMax).nullable()
+}).optional().describe('Snapshot of staff-recorded property assets and staff-entered warranty terms. Absent when no equipment was attached. Recorded warranty dates are not a coverage decision.')
 }),
   "allocations": zod.array(zod.object({
   "id": zod.uuid(),
@@ -15363,6 +15425,11 @@ export const getInvoiceResponseDocumentSubtotalCentsMax = 1000000000;
 export const getInvoiceResponseDocumentTotalCentsMin = 0;
 export const getInvoiceResponseDocumentTotalCentsMax = 1000000000;
 
+
+export const getInvoiceResponseDocumentEquipmentItemsMax = 10;
+
+export const getInvoiceResponseDocumentEquipmentWarrantyTermsMax = 2000;
+
 export const getInvoiceResponseAllocationsItemAmountCentsMax = 1000000000;
 
 export const getInvoiceResponseAvailableValueEntriesItemAmountCentsMin = 0;
@@ -15428,7 +15495,24 @@ export const GetInvoiceResponse = zod.object({
 })).max(getInvoiceResponseDocumentLineItemsMax),
   "taxCents": zod.int().min(getInvoiceResponseDocumentTaxCentsMin).max(getInvoiceResponseDocumentTaxCentsMax),
   "subtotalCents": zod.int().min(getInvoiceResponseDocumentSubtotalCentsMin).max(getInvoiceResponseDocumentSubtotalCentsMax),
-  "totalCents": zod.int().min(getInvoiceResponseDocumentTotalCentsMin).max(getInvoiceResponseDocumentTotalCentsMax)
+  "totalCents": zod.int().min(getInvoiceResponseDocumentTotalCentsMin).max(getInvoiceResponseDocumentTotalCentsMax),
+  "equipment": zod.object({
+  "items": zod.array(zod.object({
+  "assetId": zod.uuid(),
+  "assetVersion": zod.int().min(1),
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string(),
+  "manufacturer": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "serial": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "installedOn": zod.coerce.date().nullable(),
+  "warrantyStartsOn": zod.coerce.date().nullable(),
+  "warrantyEndsOn": zod.coerce.date().nullable(),
+  "warrantySource": zod.string().nullable()
+})).max(getInvoiceResponseDocumentEquipmentItemsMax),
+  "warrantyTerms": zod.string().max(getInvoiceResponseDocumentEquipmentWarrantyTermsMax).nullable()
+}).optional().describe('Snapshot of staff-recorded property assets and staff-entered warranty terms. Absent when no equipment was attached. Recorded warranty dates are not a coverage decision.')
 }),
   "allocations": zod.array(zod.object({
   "id": zod.uuid(),
@@ -15499,6 +15583,10 @@ export const updateInvoiceBodyDocumentLineItemsMax = 100;
 export const updateInvoiceBodyDocumentTaxCentsMin = 0;
 export const updateInvoiceBodyDocumentTaxCentsMax = 1000000000;
 
+export const updateInvoiceBodyEquipmentAssetIdsMax = 10;
+
+export const updateInvoiceBodyEquipmentWarrantyTermsMax = 2000;
+
 
 
 export const UpdateInvoiceBody = zod.object({
@@ -15519,7 +15607,11 @@ export const UpdateInvoiceBody = zod.object({
   "unitPriceCents": zod.int().min(updateInvoiceBodyDocumentLineItemsItemUnitPriceCentsMin).max(updateInvoiceBodyDocumentLineItemsItemUnitPriceCentsMax)
 })).max(updateInvoiceBodyDocumentLineItemsMax),
   "taxCents": zod.int().min(updateInvoiceBodyDocumentTaxCentsMin).max(updateInvoiceBodyDocumentTaxCentsMax)
-})
+}),
+  "equipment": zod.object({
+  "assetIds": zod.array(zod.uuid()).max(updateInvoiceBodyEquipmentAssetIdsMax),
+  "warrantyTerms": zod.string().max(updateInvoiceBodyEquipmentWarrantyTermsMax).nullish()
+}).optional().describe('Recorded property assets for this invoice\'s customer\/property; the server copies their current facts into the draft.')
 })
 
 export const updateInvoiceResponseInvoiceOpeningReceivableCentsMin = 0;
@@ -15571,6 +15663,11 @@ export const updateInvoiceResponseInvoiceDocumentSubtotalCentsMax = 1000000000;
 
 export const updateInvoiceResponseInvoiceDocumentTotalCentsMin = 0;
 export const updateInvoiceResponseInvoiceDocumentTotalCentsMax = 1000000000;
+
+
+export const updateInvoiceResponseInvoiceDocumentEquipmentItemsMax = 10;
+
+export const updateInvoiceResponseInvoiceDocumentEquipmentWarrantyTermsMax = 2000;
 
 export const updateInvoiceResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
 
@@ -15638,7 +15735,24 @@ export const UpdateInvoiceResponse = zod.object({
 })).max(updateInvoiceResponseInvoiceDocumentLineItemsMax),
   "taxCents": zod.int().min(updateInvoiceResponseInvoiceDocumentTaxCentsMin).max(updateInvoiceResponseInvoiceDocumentTaxCentsMax),
   "subtotalCents": zod.int().min(updateInvoiceResponseInvoiceDocumentSubtotalCentsMin).max(updateInvoiceResponseInvoiceDocumentSubtotalCentsMax),
-  "totalCents": zod.int().min(updateInvoiceResponseInvoiceDocumentTotalCentsMin).max(updateInvoiceResponseInvoiceDocumentTotalCentsMax)
+  "totalCents": zod.int().min(updateInvoiceResponseInvoiceDocumentTotalCentsMin).max(updateInvoiceResponseInvoiceDocumentTotalCentsMax),
+  "equipment": zod.object({
+  "items": zod.array(zod.object({
+  "assetId": zod.uuid(),
+  "assetVersion": zod.int().min(1),
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string(),
+  "manufacturer": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "serial": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "installedOn": zod.coerce.date().nullable(),
+  "warrantyStartsOn": zod.coerce.date().nullable(),
+  "warrantyEndsOn": zod.coerce.date().nullable(),
+  "warrantySource": zod.string().nullable()
+})).max(updateInvoiceResponseInvoiceDocumentEquipmentItemsMax),
+  "warrantyTerms": zod.string().max(updateInvoiceResponseInvoiceDocumentEquipmentWarrantyTermsMax).nullable()
+}).optional().describe('Snapshot of staff-recorded property assets and staff-entered warranty terms. Absent when no equipment was attached. Recorded warranty dates are not a coverage decision.')
 }),
   "allocations": zod.array(zod.object({
   "id": zod.uuid(),
@@ -15747,6 +15861,11 @@ export const issueInvoiceResponseInvoiceDocumentSubtotalCentsMax = 1000000000;
 export const issueInvoiceResponseInvoiceDocumentTotalCentsMin = 0;
 export const issueInvoiceResponseInvoiceDocumentTotalCentsMax = 1000000000;
 
+
+export const issueInvoiceResponseInvoiceDocumentEquipmentItemsMax = 10;
+
+export const issueInvoiceResponseInvoiceDocumentEquipmentWarrantyTermsMax = 2000;
+
 export const issueInvoiceResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
 
 export const issueInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
@@ -15813,7 +15932,24 @@ export const IssueInvoiceResponse = zod.object({
 })).max(issueInvoiceResponseInvoiceDocumentLineItemsMax),
   "taxCents": zod.int().min(issueInvoiceResponseInvoiceDocumentTaxCentsMin).max(issueInvoiceResponseInvoiceDocumentTaxCentsMax),
   "subtotalCents": zod.int().min(issueInvoiceResponseInvoiceDocumentSubtotalCentsMin).max(issueInvoiceResponseInvoiceDocumentSubtotalCentsMax),
-  "totalCents": zod.int().min(issueInvoiceResponseInvoiceDocumentTotalCentsMin).max(issueInvoiceResponseInvoiceDocumentTotalCentsMax)
+  "totalCents": zod.int().min(issueInvoiceResponseInvoiceDocumentTotalCentsMin).max(issueInvoiceResponseInvoiceDocumentTotalCentsMax),
+  "equipment": zod.object({
+  "items": zod.array(zod.object({
+  "assetId": zod.uuid(),
+  "assetVersion": zod.int().min(1),
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string(),
+  "manufacturer": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "serial": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "installedOn": zod.coerce.date().nullable(),
+  "warrantyStartsOn": zod.coerce.date().nullable(),
+  "warrantyEndsOn": zod.coerce.date().nullable(),
+  "warrantySource": zod.string().nullable()
+})).max(issueInvoiceResponseInvoiceDocumentEquipmentItemsMax),
+  "warrantyTerms": zod.string().max(issueInvoiceResponseInvoiceDocumentEquipmentWarrantyTermsMax).nullable()
+}).optional().describe('Snapshot of staff-recorded property assets and staff-entered warranty terms. Absent when no equipment was attached. Recorded warranty dates are not a coverage decision.')
 }),
   "allocations": zod.array(zod.object({
   "id": zod.uuid(),
@@ -15926,6 +16062,11 @@ export const voidInvoiceResponseInvoiceDocumentSubtotalCentsMax = 1000000000;
 export const voidInvoiceResponseInvoiceDocumentTotalCentsMin = 0;
 export const voidInvoiceResponseInvoiceDocumentTotalCentsMax = 1000000000;
 
+
+export const voidInvoiceResponseInvoiceDocumentEquipmentItemsMax = 10;
+
+export const voidInvoiceResponseInvoiceDocumentEquipmentWarrantyTermsMax = 2000;
+
 export const voidInvoiceResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
 
 export const voidInvoiceResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
@@ -15992,7 +16133,24 @@ export const VoidInvoiceResponse = zod.object({
 })).max(voidInvoiceResponseInvoiceDocumentLineItemsMax),
   "taxCents": zod.int().min(voidInvoiceResponseInvoiceDocumentTaxCentsMin).max(voidInvoiceResponseInvoiceDocumentTaxCentsMax),
   "subtotalCents": zod.int().min(voidInvoiceResponseInvoiceDocumentSubtotalCentsMin).max(voidInvoiceResponseInvoiceDocumentSubtotalCentsMax),
-  "totalCents": zod.int().min(voidInvoiceResponseInvoiceDocumentTotalCentsMin).max(voidInvoiceResponseInvoiceDocumentTotalCentsMax)
+  "totalCents": zod.int().min(voidInvoiceResponseInvoiceDocumentTotalCentsMin).max(voidInvoiceResponseInvoiceDocumentTotalCentsMax),
+  "equipment": zod.object({
+  "items": zod.array(zod.object({
+  "assetId": zod.uuid(),
+  "assetVersion": zod.int().min(1),
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string(),
+  "manufacturer": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "serial": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "installedOn": zod.coerce.date().nullable(),
+  "warrantyStartsOn": zod.coerce.date().nullable(),
+  "warrantyEndsOn": zod.coerce.date().nullable(),
+  "warrantySource": zod.string().nullable()
+})).max(voidInvoiceResponseInvoiceDocumentEquipmentItemsMax),
+  "warrantyTerms": zod.string().max(voidInvoiceResponseInvoiceDocumentEquipmentWarrantyTermsMax).nullable()
+}).optional().describe('Snapshot of staff-recorded property assets and staff-entered warranty terms. Absent when no equipment was attached. Recorded warranty dates are not a coverage decision.')
 }),
   "allocations": zod.array(zod.object({
   "id": zod.uuid(),
@@ -16109,6 +16267,11 @@ export const recordInvoicePaymentResponseInvoiceDocumentSubtotalCentsMax = 10000
 export const recordInvoicePaymentResponseInvoiceDocumentTotalCentsMin = 0;
 export const recordInvoicePaymentResponseInvoiceDocumentTotalCentsMax = 1000000000;
 
+
+export const recordInvoicePaymentResponseInvoiceDocumentEquipmentItemsMax = 10;
+
+export const recordInvoicePaymentResponseInvoiceDocumentEquipmentWarrantyTermsMax = 2000;
+
 export const recordInvoicePaymentResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
 
 export const recordInvoicePaymentResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
@@ -16175,7 +16338,24 @@ export const RecordInvoicePaymentResponse = zod.object({
 })).max(recordInvoicePaymentResponseInvoiceDocumentLineItemsMax),
   "taxCents": zod.int().min(recordInvoicePaymentResponseInvoiceDocumentTaxCentsMin).max(recordInvoicePaymentResponseInvoiceDocumentTaxCentsMax),
   "subtotalCents": zod.int().min(recordInvoicePaymentResponseInvoiceDocumentSubtotalCentsMin).max(recordInvoicePaymentResponseInvoiceDocumentSubtotalCentsMax),
-  "totalCents": zod.int().min(recordInvoicePaymentResponseInvoiceDocumentTotalCentsMin).max(recordInvoicePaymentResponseInvoiceDocumentTotalCentsMax)
+  "totalCents": zod.int().min(recordInvoicePaymentResponseInvoiceDocumentTotalCentsMin).max(recordInvoicePaymentResponseInvoiceDocumentTotalCentsMax),
+  "equipment": zod.object({
+  "items": zod.array(zod.object({
+  "assetId": zod.uuid(),
+  "assetVersion": zod.int().min(1),
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string(),
+  "manufacturer": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "serial": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "installedOn": zod.coerce.date().nullable(),
+  "warrantyStartsOn": zod.coerce.date().nullable(),
+  "warrantyEndsOn": zod.coerce.date().nullable(),
+  "warrantySource": zod.string().nullable()
+})).max(recordInvoicePaymentResponseInvoiceDocumentEquipmentItemsMax),
+  "warrantyTerms": zod.string().max(recordInvoicePaymentResponseInvoiceDocumentEquipmentWarrantyTermsMax).nullable()
+}).optional().describe('Snapshot of staff-recorded property assets and staff-entered warranty terms. Absent when no equipment was attached. Recorded warranty dates are not a coverage decision.')
 }),
   "allocations": zod.array(zod.object({
   "id": zod.uuid(),
@@ -16288,6 +16468,11 @@ export const allocateInvoiceValueResponseInvoiceDocumentSubtotalCentsMax = 10000
 export const allocateInvoiceValueResponseInvoiceDocumentTotalCentsMin = 0;
 export const allocateInvoiceValueResponseInvoiceDocumentTotalCentsMax = 1000000000;
 
+
+export const allocateInvoiceValueResponseInvoiceDocumentEquipmentItemsMax = 10;
+
+export const allocateInvoiceValueResponseInvoiceDocumentEquipmentWarrantyTermsMax = 2000;
+
 export const allocateInvoiceValueResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
 
 export const allocateInvoiceValueResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
@@ -16354,7 +16539,24 @@ export const AllocateInvoiceValueResponse = zod.object({
 })).max(allocateInvoiceValueResponseInvoiceDocumentLineItemsMax),
   "taxCents": zod.int().min(allocateInvoiceValueResponseInvoiceDocumentTaxCentsMin).max(allocateInvoiceValueResponseInvoiceDocumentTaxCentsMax),
   "subtotalCents": zod.int().min(allocateInvoiceValueResponseInvoiceDocumentSubtotalCentsMin).max(allocateInvoiceValueResponseInvoiceDocumentSubtotalCentsMax),
-  "totalCents": zod.int().min(allocateInvoiceValueResponseInvoiceDocumentTotalCentsMin).max(allocateInvoiceValueResponseInvoiceDocumentTotalCentsMax)
+  "totalCents": zod.int().min(allocateInvoiceValueResponseInvoiceDocumentTotalCentsMin).max(allocateInvoiceValueResponseInvoiceDocumentTotalCentsMax),
+  "equipment": zod.object({
+  "items": zod.array(zod.object({
+  "assetId": zod.uuid(),
+  "assetVersion": zod.int().min(1),
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string(),
+  "manufacturer": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "serial": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "installedOn": zod.coerce.date().nullable(),
+  "warrantyStartsOn": zod.coerce.date().nullable(),
+  "warrantyEndsOn": zod.coerce.date().nullable(),
+  "warrantySource": zod.string().nullable()
+})).max(allocateInvoiceValueResponseInvoiceDocumentEquipmentItemsMax),
+  "warrantyTerms": zod.string().max(allocateInvoiceValueResponseInvoiceDocumentEquipmentWarrantyTermsMax).nullable()
+}).optional().describe('Snapshot of staff-recorded property assets and staff-entered warranty terms. Absent when no equipment was attached. Recorded warranty dates are not a coverage decision.')
 }),
   "allocations": zod.array(zod.object({
   "id": zod.uuid(),
@@ -16467,6 +16669,11 @@ export const reverseInvoiceAllocationResponseInvoiceDocumentSubtotalCentsMax = 1
 export const reverseInvoiceAllocationResponseInvoiceDocumentTotalCentsMin = 0;
 export const reverseInvoiceAllocationResponseInvoiceDocumentTotalCentsMax = 1000000000;
 
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentEquipmentItemsMax = 10;
+
+export const reverseInvoiceAllocationResponseInvoiceDocumentEquipmentWarrantyTermsMax = 2000;
+
 export const reverseInvoiceAllocationResponseInvoiceAllocationsItemAmountCentsMax = 1000000000;
 
 export const reverseInvoiceAllocationResponseInvoiceAvailableValueEntriesItemAmountCentsMin = 0;
@@ -16533,7 +16740,24 @@ export const ReverseInvoiceAllocationResponse = zod.object({
 })).max(reverseInvoiceAllocationResponseInvoiceDocumentLineItemsMax),
   "taxCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceDocumentTaxCentsMin).max(reverseInvoiceAllocationResponseInvoiceDocumentTaxCentsMax),
   "subtotalCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceDocumentSubtotalCentsMin).max(reverseInvoiceAllocationResponseInvoiceDocumentSubtotalCentsMax),
-  "totalCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceDocumentTotalCentsMin).max(reverseInvoiceAllocationResponseInvoiceDocumentTotalCentsMax)
+  "totalCents": zod.int().min(reverseInvoiceAllocationResponseInvoiceDocumentTotalCentsMin).max(reverseInvoiceAllocationResponseInvoiceDocumentTotalCentsMax),
+  "equipment": zod.object({
+  "items": zod.array(zod.object({
+  "assetId": zod.uuid(),
+  "assetVersion": zod.int().min(1),
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string(),
+  "manufacturer": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "serial": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "installedOn": zod.coerce.date().nullable(),
+  "warrantyStartsOn": zod.coerce.date().nullable(),
+  "warrantyEndsOn": zod.coerce.date().nullable(),
+  "warrantySource": zod.string().nullable()
+})).max(reverseInvoiceAllocationResponseInvoiceDocumentEquipmentItemsMax),
+  "warrantyTerms": zod.string().max(reverseInvoiceAllocationResponseInvoiceDocumentEquipmentWarrantyTermsMax).nullable()
+}).optional().describe('Snapshot of staff-recorded property assets and staff-entered warranty terms. Absent when no equipment was attached. Recorded warranty dates are not a coverage decision.')
 }),
   "allocations": zod.array(zod.object({
   "id": zod.uuid(),
@@ -17970,6 +18194,11 @@ export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumen
 export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTotalCentsMin = 0;
 export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTotalCentsMax = 1000000000;
 
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentEquipmentItemsMax = 10;
+
+export const previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentEquipmentWarrantyTermsMax = 2000;
+
 export const previewFinancialMigrationResponseTwoReviewSourceInvoicesMax = 50;
 
 export const previewFinancialMigrationResponseTwoReviewSourceReceiptsItemAmountCentsMax = 1000000000;
@@ -18063,7 +18292,24 @@ export const PreviewFinancialMigrationResponse = zod.union([zod.object({
 })).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentLineItemsMax),
   "taxCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTaxCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTaxCentsMax),
   "subtotalCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentSubtotalCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentSubtotalCentsMax),
-  "totalCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTotalCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTotalCentsMax)
+  "totalCents": zod.int().min(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTotalCentsMin).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentTotalCentsMax),
+  "equipment": zod.object({
+  "items": zod.array(zod.object({
+  "assetId": zod.uuid(),
+  "assetVersion": zod.int().min(1),
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string(),
+  "manufacturer": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "serial": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "installedOn": zod.coerce.date().nullable(),
+  "warrantyStartsOn": zod.coerce.date().nullable(),
+  "warrantyEndsOn": zod.coerce.date().nullable(),
+  "warrantySource": zod.string().nullable()
+})).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentEquipmentItemsMax),
+  "warrantyTerms": zod.string().max(previewFinancialMigrationResponseTwoReviewSourceInvoicesItemDocumentEquipmentWarrantyTermsMax).nullable()
+}).optional().describe('Snapshot of staff-recorded property assets and staff-entered warranty terms. Absent when no equipment was attached. Recorded warranty dates are not a coverage decision.')
 })
 })).min(1).max(previewFinancialMigrationResponseTwoReviewSourceInvoicesMax),
   "receipts": zod.array(zod.object({
@@ -18155,6 +18401,11 @@ export const getFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalCent
 export const getFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMin = 0;
 export const getFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMax = 1000000000;
 
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentEquipmentItemsMax = 10;
+
+export const getFinancialMigrationResponseSourceInvoicesItemDocumentEquipmentWarrantyTermsMax = 2000;
+
 export const getFinancialMigrationResponseSourceInvoicesMax = 50;
 
 export const getFinancialMigrationResponseSourceReceiptsItemAmountCentsMax = 1000000000;
@@ -18240,7 +18491,24 @@ export const GetFinancialMigrationResponse = zod.object({
 })).max(getFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsMax),
   "taxCents": zod.int().min(getFinancialMigrationResponseSourceInvoicesItemDocumentTaxCentsMin).max(getFinancialMigrationResponseSourceInvoicesItemDocumentTaxCentsMax),
   "subtotalCents": zod.int().min(getFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalCentsMin).max(getFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalCentsMax),
-  "totalCents": zod.int().min(getFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMin).max(getFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMax)
+  "totalCents": zod.int().min(getFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMin).max(getFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMax),
+  "equipment": zod.object({
+  "items": zod.array(zod.object({
+  "assetId": zod.uuid(),
+  "assetVersion": zod.int().min(1),
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string(),
+  "manufacturer": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "serial": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "installedOn": zod.coerce.date().nullable(),
+  "warrantyStartsOn": zod.coerce.date().nullable(),
+  "warrantyEndsOn": zod.coerce.date().nullable(),
+  "warrantySource": zod.string().nullable()
+})).max(getFinancialMigrationResponseSourceInvoicesItemDocumentEquipmentItemsMax),
+  "warrantyTerms": zod.string().max(getFinancialMigrationResponseSourceInvoicesItemDocumentEquipmentWarrantyTermsMax).nullable()
+}).optional().describe('Snapshot of staff-recorded property assets and staff-entered warranty terms. Absent when no equipment was attached. Recorded warranty dates are not a coverage decision.')
 })
 })).min(1).max(getFinancialMigrationResponseSourceInvoicesMax),
   "receipts": zod.array(zod.object({
@@ -18340,6 +18608,11 @@ export const commitFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalC
 export const commitFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMin = 0;
 export const commitFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMax = 1000000000;
 
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentEquipmentItemsMax = 10;
+
+export const commitFinancialMigrationResponseSourceInvoicesItemDocumentEquipmentWarrantyTermsMax = 2000;
+
 export const commitFinancialMigrationResponseSourceInvoicesMax = 50;
 
 export const commitFinancialMigrationResponseSourceReceiptsItemAmountCentsMax = 1000000000;
@@ -18425,7 +18698,24 @@ export const CommitFinancialMigrationResponse = zod.object({
 })).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentLineItemsMax),
   "taxCents": zod.int().min(commitFinancialMigrationResponseSourceInvoicesItemDocumentTaxCentsMin).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentTaxCentsMax),
   "subtotalCents": zod.int().min(commitFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalCentsMin).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentSubtotalCentsMax),
-  "totalCents": zod.int().min(commitFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMin).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMax)
+  "totalCents": zod.int().min(commitFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMin).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentTotalCentsMax),
+  "equipment": zod.object({
+  "items": zod.array(zod.object({
+  "assetId": zod.uuid(),
+  "assetVersion": zod.int().min(1),
+  "category": zod.enum(['hvac_equipment', 'roof_system', 'other']),
+  "label": zod.string(),
+  "manufacturer": zod.string().nullable(),
+  "model": zod.string().nullable(),
+  "serial": zod.string().nullable(),
+  "location": zod.string().nullable(),
+  "installedOn": zod.coerce.date().nullable(),
+  "warrantyStartsOn": zod.coerce.date().nullable(),
+  "warrantyEndsOn": zod.coerce.date().nullable(),
+  "warrantySource": zod.string().nullable()
+})).max(commitFinancialMigrationResponseSourceInvoicesItemDocumentEquipmentItemsMax),
+  "warrantyTerms": zod.string().max(commitFinancialMigrationResponseSourceInvoicesItemDocumentEquipmentWarrantyTermsMax).nullable()
+}).optional().describe('Snapshot of staff-recorded property assets and staff-entered warranty terms. Absent when no equipment was attached. Recorded warranty dates are not a coverage decision.')
 })
 })).min(1).max(commitFinancialMigrationResponseSourceInvoicesMax),
   "receipts": zod.array(zod.object({

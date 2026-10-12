@@ -501,6 +501,29 @@ const invoiceDocument = z.object({
   subtotalCents: z.number().int(),
   taxCents: z.number().int(),
   totalCents: z.number().int(),
+  equipment: z
+    .object({
+      items: z
+        .array(
+          z.object({
+            assetId: z.string(),
+            assetVersion: z.number().int(),
+            category: z.string(),
+            label: z.string(),
+            manufacturer: z.string().nullable(),
+            model: z.string().nullable(),
+            serial: z.string().nullable(),
+            location: z.string().nullable(),
+            installedOn: z.iso.date().nullable(),
+            warrantyStartsOn: z.iso.date().nullable(),
+            warrantyEndsOn: z.iso.date().nullable(),
+            warrantySource: z.string().nullable(),
+          }),
+        )
+        .max(10),
+      warrantyTerms: z.string().nullable(),
+    })
+    .optional(),
 });
 const recurrence = z.object({
   mode: z.literal("calendar_months"),

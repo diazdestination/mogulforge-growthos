@@ -12782,6 +12782,52 @@ export const InvoiceDocumentCurrency = {
   USD: 'USD',
 } as const;
 
+export type InvoiceEquipmentSnapshotCategory = typeof InvoiceEquipmentSnapshotCategory[keyof typeof InvoiceEquipmentSnapshotCategory];
+
+
+export const InvoiceEquipmentSnapshotCategory = {
+  hvac_equipment: 'hvac_equipment',
+  roof_system: 'roof_system',
+  other: 'other',
+} as const;
+
+export interface InvoiceEquipmentSnapshot {
+  assetId: string;
+  /** @minimum 1 */
+  assetVersion: number;
+  category: InvoiceEquipmentSnapshotCategory;
+  label: string;
+  /** @nullable */
+  manufacturer: string | null;
+  /** @nullable */
+  model: string | null;
+  /** @nullable */
+  serial: string | null;
+  /** @nullable */
+  location: string | null;
+  /** @nullable */
+  installedOn: string | null;
+  /** @nullable */
+  warrantyStartsOn: string | null;
+  /** @nullable */
+  warrantyEndsOn: string | null;
+  /** @nullable */
+  warrantySource: string | null;
+}
+
+/**
+ * Snapshot of staff-recorded property assets and staff-entered warranty terms. Absent when no equipment was attached. Recorded warranty dates are not a coverage decision.
+ */
+export interface InvoiceEquipmentSection {
+  /** @maxItems 10 */
+  items: InvoiceEquipmentSnapshot[];
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  warrantyTerms: string | null;
+}
+
 export interface InvoiceDocument {
   /**
      * @minLength 1
@@ -12833,6 +12879,20 @@ export interface InvoiceDocument {
      * @maximum 1000000000
      */
   totalCents: number;
+  equipment?: InvoiceEquipmentSection;
+}
+
+/**
+ * Recorded property assets for this invoice's customer/property; the server copies their current facts into the draft.
+ */
+export interface InvoiceEquipmentSelection {
+  /** @maxItems 10 */
+  assetIds: string[];
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  warrantyTerms?: string | null;
 }
 
 export type ServiceWatchItemState = typeof ServiceWatchItemState[keyof typeof ServiceWatchItemState];
@@ -14114,6 +14174,15 @@ export type CreateInvoice = {
      */
   taxCents: number;
 };
+  equipment?: {
+  /**
+     * @maxItems 10
+     * @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  assetIds: string[];
+  /** @maxLength 2000 */
+  warrantyTerms?: string | null;
+};
 } | {
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   requestId: string;
@@ -14177,6 +14246,15 @@ export type CreateInvoice = {
      */
   taxCents: number;
 };
+  equipment?: {
+  /**
+     * @maxItems 10
+     * @items.pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+     */
+  assetIds: string[];
+  /** @maxLength 2000 */
+  warrantyTerms?: string | null;
+};
 };
 
 export interface UpdateInvoice {
@@ -14187,6 +14265,7 @@ export interface UpdateInvoice {
      */
   expectedVersion: number;
   document: InvoiceDocumentInput;
+  equipment?: InvoiceEquipmentSelection;
 }
 
 export interface IssueInvoice {
