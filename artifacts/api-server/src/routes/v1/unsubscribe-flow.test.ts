@@ -29,7 +29,9 @@ import {
   getSuppression,
 } from "../../services/send-gate";
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
+import { syntheticTwilioNumber, syntheticTwilioSidSequence } from "../../test-helpers/synthetic-twilio";
 
+const sender = syntheticTwilioNumber();
 let server: Server;
 let baseUrl: string;
 let org: { id: string };
@@ -46,7 +48,7 @@ beforeAll(async () => {
   vi.stubEnv("TWILIO_CLIENT_UNSUB_AUTH_TOKEN", "synthetic-token");
   await db.insert(twilioClientBindingsTable).values({
     organizationId: org.id, accountSid: "AC" + "8".repeat(32),
-    phoneNumber: "+15005550008", messagingServiceSid: "MG" + "9".repeat(32),
+    phoneNumber: sender, messagingServiceSid: "MG" + "9".repeat(32),
     authTokenSecretRef: "TWILIO_CLIENT_UNSUB_AUTH_TOKEN",
     publicOrigin: "https://growth.example", businessName: "Synthetic Unsub",
     smsDisclosureVersion: "synthetic-unsub-v1",
@@ -152,9 +154,9 @@ describe("email unsubscribe", () => {
 });
 
 describe("inbound SMS STOP/START", () => {
-  let sequence = 0;
+  const nextInboundSid = syntheticTwilioSidSequence("SM");
   async function inbound(from: string, body: string) {
-    const params = { From: from, Body: body, To: '+15005550008', AccountSid: 'AC'+'8'.repeat(32), MessagingServiceSid: 'MG'+'9'.repeat(32), MessageSid: 'SM'+(++sequence).toString(16).padStart(32, '0') };
+    const params = { From: from, Body: body, To: sender, AccountSid: 'AC'+'8'.repeat(32), MessagingServiceSid: 'MG'+'9'.repeat(32), MessageSid: nextInboundSid() };
     return fetch(`${baseUrl}/api/v1/public/sms/inbound`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded", 'x-twilio-signature': getExpectedTwilioSignature('synthetic-token', 'https://growth.example/api/v1/public/sms/inbound', params) },

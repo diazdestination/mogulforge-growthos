@@ -8,6 +8,7 @@ import {
   missedCallHandoffsTable as handoffs, crmTasksTable, customerLifecycleTable, leadsTable, staffPushDeliveriesTable,
 } from "@workspace/db";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+import { syntheticTwilioNumber } from "../test-helpers/synthetic-twilio";
 import { createSession, deleteSession } from "../lib/auth";
 import { registerStaffPush, saveStaffPushPolicy } from "./staff-push";
 import { SMS_DISCLOSURE_VERSION } from "./twilio-controls";
@@ -56,7 +57,7 @@ beforeEach(async () => {
   ]).returning()).map((item) => item.id);
   [contact] = (await db.insert(contactsTable).values({ organizationId: org, firstName: "Synthetic caller", phone }).returning()).map((item) => item.id);
   account = `AC${randomUUID().replaceAll("-", "")}`;
-  await db.insert(twilioClientBindingsTable).values({ organizationId: org, accountSid: account, phoneNumber: "+15005550009",
+  await db.insert(twilioClientBindingsTable).values({ organizationId: org, accountSid: account, phoneNumber: syntheticTwilioNumber(),
     messagingServiceSid: `MG${"2".repeat(32)}`, apiKeySid: `SK${"3".repeat(32)}`,
     authTokenSecretRef: "TWILIO_CLIENT_CARE_AUTH_TOKEN", apiKeySecretRef: "TWILIO_CLIENT_CARE_API_KEY_SECRET",
     publicOrigin: "https://growth.example", businessName: "Synthetic Contractor", smsDisclosureVersion: SMS_DISCLOSURE_VERSION,

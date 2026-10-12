@@ -13,6 +13,7 @@ import {
 import app from "../../app";
 import { decryptSecret } from "../../lib/token-encryption";
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
+import { syntheticTwilioNumber } from "../../test-helpers/synthetic-twilio";
 import { approveCalliePolicy, getCalliePolicy, previewCalliePolicy } from "../../services/callie-policy";
 import { callieChallengeHash, callieTriggerHash, DEFAULT_CALLIE_POLICY } from "../../services/callie-contract";
 import { transitionCustomerLifecycle } from "../../services/customer-lifecycle";
@@ -50,7 +51,7 @@ async function fixture(enabled = true): Promise<Fixture> {
   const ref = `TWILIO_CLIENT_CALLIE${n}_`;
   vi.stubEnv(`${ref}AUTH_TOKEN`, token); vi.stubEnv(`${ref}API_KEY_SECRET`, "synthetic-callie-key");
   const account = `AC${randomUUID().replaceAll("-", "")}`, service = `MG${randomUUID().replaceAll("-", "")}`;
-  const sender = `+1500555${String(n + 1000).padStart(4, "0")}`, phone = `+1202555${String(n + 1000).padStart(4, "0")}`;
+  const sender = syntheticTwilioNumber(), phone = `+1202555${String(n + 1000).padStart(4, "0")}`;
   const [binding] = await db.insert(twilioClientBindingsTable).values({ organizationId: org.id, accountSid: account, phoneNumber: sender,
     messagingServiceSid: service, apiKeySid: `SK${"1".repeat(32)}`, authTokenSecretRef: `${ref}AUTH_TOKEN`, apiKeySecretRef: `${ref}API_KEY_SECRET`,
     publicOrigin: "https://growth.example", businessName: "Synthetic Service Shop", staffPhone: "+12025550999", smsDisclosureVersion: "synthetic-callie.v1",

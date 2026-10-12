@@ -1,4 +1,4 @@
-import { randomInt, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, organizationsTable, usersTable, twilioClientBindingsTable, twilioCallsTable, callieReceptionSessionsTable } from "@workspace/db";
 import { DEFAULT_CALLIE_RECEPTION, buildReceptionSnapshot, buildReceptionAgentConfiguration, type CallieReceptionSettings } from "../services/callie-reception-contract";
@@ -7,6 +7,7 @@ import { approveCallieReception, previewCallieReception, saveCallieReceptionBind
 import { admitCallieIntake } from "../services/callie-intake";
 import { twilioForOrganization } from "../services/twilio-controls";
 import { ensureMissedCallHandoff } from "../services/missed-call-handoff";
+import { syntheticTwilioNumber } from "./synthetic-twilio";
 
 /** Real local synthetic rows and real approval/admission. Never installs credentials. */
 export async function callieReceptionFixture(options: { trade?: "roofing" | "hvac"; settings?: Partial<CallieReceptionSettings>; approve?: boolean } = {}) {
@@ -16,7 +17,7 @@ export async function callieReceptionFixture(options: { trade?: "roofing" | "hva
     { organizationId: org, role: "owner", isActive: true, emailVerifiedAt: new Date(), email: `${suffix}@example.invalid` },
     { organizationId: org, role: "office", isActive: true, emailVerifiedAt: new Date(), email: `${suffix}-after@example.invalid` },
   ]).returning();
-  const [voice] = await db.insert(twilioClientBindingsTable).values({ organizationId: org, accountSid: `AC${suffix}`, phoneNumber: `+1500${randomInt(1000000, 10000000)}`, staffPhone: "+12025550109",
+  const [voice] = await db.insert(twilioClientBindingsTable).values({ organizationId: org, accountSid: `AC${suffix}`, phoneNumber: syntheticTwilioNumber(), staffPhone: "+12025550109",
     apiKeySid: `SK${suffix}`, authTokenSecretRef: "TWILIO_CLIENT_RECEPTION_TEST_AUTH_TOKEN", apiKeySecretRef: "TWILIO_CLIENT_RECEPTION_TEST_API_KEY_SECRET",
     publicOrigin: "https://growth.example", businessName: options.trade === "hvac" ? "FICTIONAL HVAC" : "FICTIONAL Roofing", launchApproved: true, voiceEnabled: true,
     voiceApproved: true, geoPermissionsReviewed: true, dailyCallLimit: 20, smsEnabled: false, registrationApproved: false }).returning();

@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { db, organizationsTable, contactsTable, consentRecordsTable, twilioClientBindingsTable, twilioConsentProofsTable, twilioDispatchesTable } from "@workspace/db";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+import { syntheticTwilioNumber } from "../test-helpers/synthetic-twilio";
 import { sendTwilioSms } from "./twilio-delivery";
 import { SMS_DISCLOSURE_VERSION } from "./twilio-controls";
 
@@ -21,7 +22,7 @@ beforeEach(async () => {
   const [person] = await db.insert(contactsTable).values({ organizationId: org, firstName: "Synthetic", phone }).returning();
   contact = person.id;
   await db.insert(twilioClientBindingsTable).values({
-    organizationId: org, accountSid: `AC${randomUUID().replaceAll("-", "")}`, phoneNumber: "+15005550009",
+    organizationId: org, accountSid: `AC${randomUUID().replaceAll("-", "")}`, phoneNumber: syntheticTwilioNumber(),
     messagingServiceSid: `MG${"2".repeat(32)}`, apiKeySid: `SK${"3".repeat(32)}`,
     authTokenSecretRef: "TWILIO_CLIENT_DISPATCH_GUARD_AUTH_TOKEN", apiKeySecretRef: "TWILIO_CLIENT_DISPATCH_GUARD_API_KEY_SECRET",
     publicOrigin: "https://synthetic.example.invalid", businessName: "Synthetic Contractor",
