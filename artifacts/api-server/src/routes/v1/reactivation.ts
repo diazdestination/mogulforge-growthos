@@ -23,7 +23,7 @@ router.post(
   "/lead-imports",
   requireMember("crm.write"),
   async (req: Request, res: Response): Promise<void> => {
-    const { csv, mapping, fileName, hasHeader, defaultStatus, defaultSource, sourceKey, snapshotAsOf } =
+    const { csv, mapping, fileName, hasHeader, defaultStatus, defaultSource, sourceKey, snapshotAsOf, dryRun, mode } =
       req.body ?? {};
     if (typeof csv !== "string" || csv.length === 0 || csv.length > 5_000_000) {
       res.status(400).json({ error: "A CSV file (under 5MB) is required" });
@@ -38,6 +38,14 @@ router.post(
       res.status(400).json({ error: "Source account key and snapshot date must be strings" });
       return;
     }
+    if (dryRun !== undefined && typeof dryRun !== "boolean") {
+      res.status(400).json({ error: "dryRun must be true or false" });
+      return;
+    }
+    if (mode !== undefined && mode !== "leads" && mode !== "customers") {
+      res.status(400).json({ error: "mode must be leads or customers" });
+      return;
+    }
     const result = await importLeads(req.member!.organizationId, {
       csv,
       mapping,
@@ -48,12 +56,14 @@ router.post(
       sourceKey: typeof sourceKey === "string" ? sourceKey : undefined,
       snapshotAsOf: typeof snapshotAsOf === "string" ? snapshotAsOf : undefined,
       createdByUserId: req.member!.user.id,
+      dryRun: dryRun === true,
+      mode: mode === "customers" ? "customers" : "leads",
     });
     if ("error" in result) {
       res.status(400).json(result);
       return;
     }
-    res.status(201).json(result);
+    res.status("dryRun" in result ? 200 : 201).json(result);
   },
 );
 

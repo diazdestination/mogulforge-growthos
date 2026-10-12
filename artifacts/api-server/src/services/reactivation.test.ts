@@ -1,7 +1,9 @@
 import {
   appointmentsTable,
+  auditEventsTable,
   contactsTable,
   db,
+  leadImportsTable,
   leadsTable,
   organizationsTable,
   playbookEnrollmentsTable,
@@ -12,6 +14,7 @@ import {
   suppressionsTable,
 } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
+import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { vi } from "vitest";
@@ -26,6 +29,7 @@ vi.mock("./playbooks", async (importOriginal) => {
 import { enrollLead } from "./playbooks";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import {
+  CUSTOMER_IMPORTED_ACTION,
   createCampaign,
   drainReactivationCampaigns,
   getCampaignReport,
@@ -161,6 +165,95 @@ describe("importLeads", () => {
     expect(imported.leads.creationMethod).toBe("import");
     expect(imported.leads.status).toBe("lost");
     expect(imported.leads.source).toBe("csv-import");
+  });
+
+  it("previews exactly what an import would do, then saves nothing", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    await makeLead(orgId, { email: `known-${tag}@example.com` });
+    const csv = [
+      "First Name,Last Name,Email,Mobile Number",
+      `"Gale, Jr.",Green,gale-${tag}@example.com,`,
+      `Hank,Hill,known-${tag}@example.com,`, // already in GrowthOS
+      `Hal,Hill,gale-${tag}@example.com,`, // repeats an earlier row of this file
+      ",Nobody,nobody@example.com,",
+    ].join("\n");
+    const input = { csv, mapping: { firstName: 0, lastName: 1, email: 2, phone: 3 }, fileName: "customers.csv", sourceKey: "housecall-pro" };
+    const countRows = async () => ({
+      contacts: (await db.select({ id: contactsTable.id }).from(contactsTable).where(eq(contactsTable.organizationId, orgId))).length,
+      imports: (await db.select({ id: leadImportsTable.id }).from(leadImportsTable).where(eq(leadImportsTable.organizationId, orgId))).length,
+    });
+    const before = await countRows();
+
+    const preview = await importLeads(orgId, { ...input, dryRun: true });
+    if ("error" in preview) throw new Error(preview.error);
+    expect(preview).toMatchObject({ dryRun: true, totalRows: 4, imported: 1, duplicates: 2, skipped: 1, errorsTruncated: false });
+    expect(await countRows()).toEqual(before);
+
+    const saved = await importLeads(orgId, input);
+    if ("error" in saved) throw new Error(saved.error);
+    expect(saved).toMatchObject({ imported: preview.imported, duplicates: preview.duplicates, skipped: preview.skipped });
+    expect(await countRows()).toEqual({ contacts: before.contacts + 1, imports: before.imports + 1 });
+  });
+
+  it("ends a preview that waits on another import's lock without saving anything", async () => {
+    const holder = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await holder.connect();
+    try {
+      await holder.query("select pg_advisory_lock(hashtext($1))", [`lead-import:${orgId}`]);
+      const started = Date.now();
+      const result = await importLeads(orgId, {
+        csv: `First,Email\nIvy,ivy-${crypto.randomUUID()}@example.com`, mapping: { firstName: 0, email: 1 }, dryRun: true,
+      });
+      expect(result).toMatchObject({ error: expect.stringMatching(/could not finish in time.*Nothing was saved/) });
+      expect(Date.now() - started).toBeLessThan(15_000);
+    } finally {
+      await holder.end();
+    }
+  });
+
+  it("imports a customer list as existing customers: contacts with provenance and no leads", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const header = "ID,First Name,Last Name,Email,Mobile Number";
+    const rows = [`hcp-a-${tag},Ann,Able,ann-${tag}@example.com,`, `hcp-b-${tag},Ben,Baker,,404555${tag.replace(/\D/g, "0").slice(0, 4)}`];
+    const input = { mapping: { externalCustomerId: 0, firstName: 1, lastName: 2, email: 3, phone: 4 }, sourceKey: `housecall-pro-${tag}`, mode: "customers" as const, fileName: "customers.csv" };
+    const leadsBefore = (await db.select({ id: leadsTable.id }).from(leadsTable).where(eq(leadsTable.organizationId, orgId))).length;
+
+    const preview = await importLeads(orgId, { ...input, csv: [header, ...rows].join("\n"), dryRun: true });
+    expect(preview).toMatchObject({ dryRun: true, imported: 2, conflicts: 0 });
+    const saved = await importLeads(orgId, { ...input, csv: [header, ...rows].join("\n") });
+    if ("error" in saved) throw new Error(saved.error);
+    expect(saved).toMatchObject({ imported: 2, duplicates: 0, conflicts: 0 });
+    expect((await db.select({ id: leadsTable.id }).from(leadsTable).where(eq(leadsTable.organizationId, orgId))).length).toBe(leadsBefore);
+    const provenance = await db.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, orgId), eq(auditEventsTable.action, CUSTOMER_IMPORTED_ACTION), sql`${auditEventsTable.metadata}->>'sourceKey' = ${input.sourceKey}`));
+    expect(provenance.map((e) => (e.metadata as { externalCustomerId: string }).externalCustomerId).sort()).toEqual([`hcp-a-${tag}`, `hcp-b-${tag}`]);
+    expect(new Set(provenance.map((e) => (e.metadata as { batchId: string }).batchId)).size).toBe(1);
+
+    // Same file again: nothing new. Same customer ID with different details: flagged, not duplicated.
+    expect(await importLeads(orgId, { ...input, csv: [header, ...rows].join("\n") })).toMatchObject({ imported: 0, duplicates: 2 });
+    const changed = await importLeads(orgId, { ...input, csv: [header, `hcp-a-${tag},Ann,Able,ann-new-${tag}@example.com,`].join("\n") });
+    expect(changed).toMatchObject({ imported: 0, conflicts: 1 });
+  });
+
+  it("keeps one source customer ID per person across customer and opportunity imports", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const sourceKey = `housecall-pro-x-${tag}`;
+    const customer = (id: string, email: string) => importLeads(orgId, {
+      csv: `ID,First,Email\n${id},Dee,${email}`, mapping: { externalCustomerId: 0, firstName: 1, email: 2 }, sourceKey, mode: "customers",
+    });
+    expect(await customer(`c1-${tag}`, `dee-${tag}@example.com`)).toMatchObject({ imported: 1 });
+    // A different source customer with the same email is not folded into Dee.
+    expect(await customer(`c2-${tag}`, `dee-${tag}@example.com`)).toMatchObject({ imported: 0, duplicates: 0, conflicts: 1 });
+    // An opportunity import must not create a second person for Dee's source ID.
+    const opportunity = await importLeads(orgId, {
+      csv: `Opp,Customer,First,Email\nop-${tag},c1-${tag},Dee,dee-other-${tag}@example.com`,
+      mapping: { externalOpportunityId: 0, externalCustomerId: 1, firstName: 2, email: 3 }, sourceKey,
+    });
+    expect(opportunity).toMatchObject({ imported: 0, conflicts: 1 });
+  });
+
+  it("refuses pipeline fields in a customer import", async () => {
+    const result = await importLeads(orgId, { csv: "First,Email,Status\nAl,al@example.com,won", mapping: { firstName: 0, email: 1, status: 2 }, mode: "customers" });
+    expect(result).toMatchObject({ error: expect.stringMatching(/only uses name, email, phone and customer ID/) });
   });
 
   it("rejects a mapping without email or phone", async () => {

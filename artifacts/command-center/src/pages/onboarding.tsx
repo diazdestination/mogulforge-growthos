@@ -34,7 +34,9 @@ import {
   Users,
   Plus,
   X,
+  Upload,
 } from 'lucide-react';
+import { HousecallCustomerImport } from '@/components/housecall-customer-import';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -58,6 +60,7 @@ const STEP_DEFS: StepDef[] = [
   { key: 'domain', title: 'Authorized domains', description: 'Add the website domains that are allowed to send you leads.', icon: Globe, href: '/settings', linkLabel: 'Open settings' },
   { key: 'snippet', title: 'Install the snippet', description: 'Copy the capture snippet or connect your existing forms and outside systems.', icon: Code2, href: '/capture', linkLabel: 'Open lead capture' },
   { key: 'verify', title: 'Verify installation', description: 'Run the installation check to confirm your website is talking to the CRM.', icon: BadgeCheck, href: '/settings', linkLabel: 'Open settings' },
+  { key: 'import-customers', title: 'Bring your customers from Housecall Pro', description: 'Export your customer list from Housecall Pro, upload it here, check the columns and preview the result before anything is saved. Imported customers are never contacted automatically.', icon: Upload },
   { key: 'test-lead', title: 'Run a test lead', description: 'Create a sandboxed sample lead and watch the full journey — captured, scored, and enrolled in follow-up — without contacting anyone real.', icon: FlaskConical },
   { key: 'invite-team', title: 'Invite your team', description: 'Add the reps, managers, and admins who will work leads in this workspace. They\'ll get an email with a sign-in link.', icon: Users },
   { key: 'launch', title: 'Complete setup', description: 'Record your setup completion. Launch review is still required before serving real clients.', icon: Rocket },
@@ -223,6 +226,11 @@ export default function Onboarding() {
                     </Link>{' '}
                     to see the journey, then clean it up below.
                   </div>
+                )}
+                {step.key === 'import-customers' && (
+                  <HousecallCustomerImport
+                    onImported={() => update.mutate({ data: { completeSteps: ['import-customers'] } })}
+                  />
                 )}
                 {isInviteTeam && (
                   <div className="mt-3 space-y-3">
