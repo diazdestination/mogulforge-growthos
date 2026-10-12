@@ -54,6 +54,13 @@ export const contractorEvalRecordingSchema = z.object({
     evidence: z.array(evidenceOutputRecordSchema),
     assistant: z.array(assistantOutputRecordSchema),
   }),
+  /**
+   * Raw outputs are persisted before scoring. `pending` means scoring has not
+   * finished; `failed` keeps a sanitized reason and the outputs stay replayable.
+   */
+  scoring: z
+    .object({ status: z.enum(["pending", "scored", "failed"]), error: z.string().optional() })
+    .optional(),
   scores: z.unknown().optional(),
   report: z.unknown().optional(),
 });

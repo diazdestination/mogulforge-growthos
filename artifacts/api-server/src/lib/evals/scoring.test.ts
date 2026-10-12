@@ -170,12 +170,51 @@ describe("scoreDocumentExtraction", () => {
     const score = await scoreDocumentExtraction(labels, extraction, new FakeJudge());
     expect(score).toMatchObject({
       status: "scored",
-      lineItems: { expected: 2, matched: 2, componentsExpected: 3, componentsMatched: 2, inventedLineItems: 1, inventedComponentPrices: 1 },
+      lineItems: { expected: 2, matched: 2, quantitiesCorrect: 2, quantityMismatches: 0, inventedQuantities: 0, componentsExpected: 3, componentsMatched: 2, inventedLineItems: 1, inventedComponentPrices: 1 },
       totals: { checked: 3, correct: 3, invented: 1 },
       extractedTotalsReconcile: false,
       paymentTermsCorrect: true,
       warranty: { presenceCorrect: true, termsExpected: 0, termsMatched: 0 },
       flags: { expected: 2, detected: 1, missedIds: ["flag-two"] },
+    });
+  });
+});
+
+describe("scoreDocumentExtraction quantities", () => {
+  const base: DocumentLabels = {
+    documentType: "invoice",
+    lineItems: [{ title: "Standard Repair", qty: 1, amountCents: 115000, descriptionComponents: [] }],
+    totals: { subtotalCents: 115000, totalCents: 115000, amountPaidCents: null, balanceDueCents: 115000 },
+    paymentTerms: null,
+    warranty: { present: false, terms: [] },
+    flags: [],
+  };
+  const extraction = (qty: number | null): DocumentExtraction => ({
+    lineItems: [{ title: "Standard Repair", qty, amountCents: 115000, descriptionComponents: [], componentPricesCents: [] }],
+    totals: { subtotalCents: 115000, totalCents: 115000, amountPaidCents: null, balanceDueCents: 115000 },
+    paymentTerms: null,
+    warranty: { present: false, terms: [] },
+    flags: [],
+  });
+
+  it("does not match a line whose stated quantity disagrees", async () => {
+    const score = await scoreDocumentExtraction(base, extraction(999), new FakeJudge());
+    expect(score).toMatchObject({ lineItems: { matched: 0, quantitiesCorrect: 0, quantityMismatches: 1, inventedQuantities: 0 } });
+    const missing = await scoreDocumentExtraction(base, extraction(null), new FakeJudge());
+    expect(missing).toMatchObject({ lineItems: { matched: 0, quantityMismatches: 1 } });
+  });
+
+  it("flags a quantity extracted where the document states none, and accepts null for null", async () => {
+    const lumpSum: DocumentLabels = { ...base, lineItems: [{ ...base.lineItems[0], qty: null }] };
+    const invented = await scoreDocumentExtraction(lumpSum, extraction(32), new FakeJudge());
+    expect(invented).toMatchObject({ lineItems: { matched: 0, inventedQuantities: 1, quantityMismatches: 0 } });
+    const agreed = await scoreDocumentExtraction(lumpSum, extraction(null), new FakeJudge());
+    expect(agreed).toMatchObject({ lineItems: { matched: 1, quantitiesCorrect: 1, inventedQuantities: 0 } });
+  });
+
+  it("matches when the stated quantity agrees", async () => {
+    expect(await scoreDocumentExtraction(base, extraction(1), new FakeJudge())).toMatchObject({
+      lineItems: { matched: 1, quantitiesCorrect: 1, quantityMismatches: 0, inventedQuantities: 0 },
     });
   });
 });

@@ -41,7 +41,13 @@ export type DocumentScore =
       status: "scored";
       lineItems: {
         expected: number;
+        /** Title, amount and quantity all agree. */
         matched: number;
+        quantitiesCorrect: number;
+        /** Title and amount agree but a stated quantity differs (or is missing). */
+        quantityMismatches: number;
+        /** A quantity was extracted where the document states none. */
+        inventedQuantities: number;
         componentsExpected: number;
         componentsMatched: number;
         inventedLineItems: number;
@@ -67,6 +73,9 @@ export async function scoreDocumentExtraction(
 
   const remaining = extraction.lineItems.map((item, index) => ({ item, index }));
   let matched = 0;
+  let quantitiesCorrect = 0;
+  let quantityMismatches = 0;
+  let inventedQuantities = 0;
   let componentsExpected = 0;
   let componentsMatched = 0;
   for (const expected of labels.lineItems) {
@@ -79,7 +88,21 @@ export async function scoreDocumentExtraction(
     );
     if (position === -1) continue;
     const [{ item }] = remaining.splice(position, 1);
-    matched += 1;
+    // A line counts as matched only when its quantity also agrees. A quantity on a
+    // document that states none is invented; a different stated quantity is a mismatch.
+    if (expected.qty === null) {
+      if (item.qty === null) {
+        matched += 1;
+        quantitiesCorrect += 1;
+      } else {
+        inventedQuantities += 1;
+      }
+    } else if (item.qty === expected.qty) {
+      matched += 1;
+      quantitiesCorrect += 1;
+    } else {
+      quantityMismatches += 1;
+    }
     for (const component of expected.descriptionComponents) {
       if (item.descriptionComponents.some((candidate) => tokenCoverage(component, candidate) >= 0.6)) {
         componentsMatched += 1;
@@ -136,6 +159,9 @@ export async function scoreDocumentExtraction(
     lineItems: {
       expected: labels.lineItems.length,
       matched,
+      quantitiesCorrect,
+      quantityMismatches,
+      inventedQuantities,
       componentsExpected,
       componentsMatched,
       inventedLineItems: remaining.length,
@@ -399,6 +425,8 @@ export type DocumentSummary = {
   cases: number;
   notRun: number;
   lineItemRecall: number | null;
+  quantityMismatches: number;
+  inventedQuantities: number;
   componentRecall: number | null;
   inventedLineItems: number;
   inventedComponentPrices: number;
@@ -415,6 +443,8 @@ export function summarizeDocuments(scores: EvidenceCaseScore[]): DocumentSummary
     cases: documents.length,
     notRun: documents.length - scored.length,
     lineItemRecall: ratio(sum((s) => s.lineItems.matched), sum((s) => s.lineItems.expected)),
+    quantityMismatches: sum((s) => s.lineItems.quantityMismatches),
+    inventedQuantities: sum((s) => s.lineItems.inventedQuantities),
     componentRecall: ratio(sum((s) => s.lineItems.componentsMatched), sum((s) => s.lineItems.componentsExpected)),
     inventedLineItems: sum((s) => s.lineItems.inventedLineItems),
     inventedComponentPrices: sum((s) => s.lineItems.inventedComponentPrices),

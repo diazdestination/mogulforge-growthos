@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { applyLabelSheet, exportLabelSheet, LABEL_SHEET_COLUMNS } from "./labeling";
+import { applyLabelSheet, caseReviewFingerprint, exportLabelSheet, LABEL_SHEET_COLUMNS } from "./labeling";
+import type { EvidenceEvalCase } from "./schemas";
 import { parseCsv, toCsv } from "./text";
 import { makeEvidenceCase } from "./test-fixtures";
 
@@ -67,6 +68,69 @@ describe("contractor label workflow", () => {
     const result = applyLabelSheet(cases, filled, reviewer);
     expect(result.incompleteCaseIds).toEqual(["case-two"]);
     expect(result.cases.find((c) => c.id === "case-two")).toEqual(cases[1]);
+  });
+
+  describe("stale sheets cannot certify changed material", () => {
+    const documentCase = makeEvidenceCase({
+      id: "case-doc",
+      kind: "document-extraction",
+      labels: {
+        ...makeEvidenceCase().labels,
+        document: {
+          documentType: "invoice",
+          lineItems: [{ title: "Standard Repair", qty: 1, amountCents: 115000, descriptionComponents: ["New Filter Drier"] }],
+          totals: { subtotalCents: 115000, totalCents: 115000, amountPaidCents: null, balanceDueCents: 115000 },
+          paymentTerms: "Upon receipt",
+          warranty: { present: false, terms: [] },
+          flags: [{ id: "flag-warranty", description: "no warranty dates" }],
+        },
+      },
+    });
+    const all = [makeEvidenceCase(), documentCase];
+    const agreeAll = (caseId: string) =>
+      fillSheet(exportLabelSheet(all).csv, (row) => (row.caseId === caseId && row.itemId ? { decision: "agree" } : null));
+
+    it("binds every exported row to a case fingerprint and accepts an unchanged case", () => {
+      const [header, ...rows] = parseCsv(exportLabelSheet(all).csv);
+      const column = header.indexOf("caseFingerprint");
+      expect(column).toBeGreaterThan(-1);
+      expect(rows.every((row) => /^[0-9a-f]{64}$/.test(row[column]))).toBe(true);
+      expect(caseReviewFingerprint(all[0])).not.toBe(caseReviewFingerprint(documentCase));
+      expect(applyLabelSheet(all, agreeAll("case-doc"), reviewer).verifiedCaseIds).toEqual(["case-doc"]);
+    });
+
+    const drifts: Array<[string, string, (c: EvidenceEvalCase) => EvidenceEvalCase]> = [
+      ["observation statement", "case-one", (c) => ({ ...c, labels: { ...c.labels, expectedObservations: c.labels.expectedObservations.map((o) => (o.id === "obs-a" ? { ...o, statement: "west slope has 75 hits" } : o)) } })],
+      ["critical flag", "case-one", (c) => ({ ...c, labels: { ...c.labels, expectedObservations: c.labels.expectedObservations.map((o) => (o.id === "obs-c" ? { ...o, critical: true } : o)) } })],
+      ["supporting aliases", "case-one", (c) => ({ ...c, labels: { ...c.labels, expectedObservations: c.labels.expectedObservations.map((o) => (o.id === "obs-a" ? { ...o, supportingAliases: ["E2"] } : o)) } })],
+      ["added label", "case-one", (c) => ({ ...c, labels: { ...c.labels, expectedGaps: [...c.labels.expectedGaps, { id: "gap-new", description: "new gap" }] } })],
+      ["forbidden claim", "case-one", (c) => ({ ...c, labels: { ...c.labels, forbiddenClaims: [{ id: "forbid-a", description: "something else" }] } })],
+      ["document line quantity", "case-doc", (c) => ({ ...c, labels: { ...c.labels, document: { ...c.labels.document!, lineItems: [{ ...c.labels.document!.lineItems[0], qty: 2 }] } } })],
+      ["document warranty", "case-doc", (c) => ({ ...c, labels: { ...c.labels, document: { ...c.labels.document!, warranty: { present: true, terms: ["1 year parts"] } } } })],
+      ["source artifact text", "case-one", (c) => ({ ...c, artifacts: c.artifacts.map((a) => (a.alias === "E1" ? { ...a, text: "alpha, revised" } : a)) })],
+      ["source label", "case-one", (c) => ({ ...c, artifacts: c.artifacts.map((a) => (a.alias === "E2" ? { ...a, sourceLabel: "other source" } : a)) })],
+      ["case summary", "case-doc", (c) => ({ ...c, caseSummary: "A different summary." })],
+    ];
+    for (const [label, caseId, mutate] of drifts) {
+      it(`rejects a sheet after ${label} drift`, () => {
+        const sheet = agreeAll(caseId);
+        const current = all.map((c) => (c.id === caseId ? mutate(structuredClone(c)) : c));
+        expect(() => applyLabelSheet(current, sheet, reviewer)).toThrow(/changed since this sheet was exported/);
+      });
+    }
+
+    it("rejects label text altered inside the sheet without an edit decision", () => {
+      const tampered = fillSheet(exportLabelSheet(all).csv, (row) =>
+        row.caseId === "case-one" && row.itemId
+          ? { decision: "agree", ...(row.itemId === "obs-a" ? { statement: "west slope has 75 hits" } : {}) }
+          : null,
+      );
+      expect(() => applyLabelSheet(all, tampered, reviewer)).toThrow(/altered in the sheet/);
+      const flipped = fillSheet(exportLabelSheet(all).csv, (row) =>
+        row.caseId === "case-one" && row.itemId ? { decision: "agree", ...(row.itemId === "obs-c" ? { critical: "yes" } : {}) } : null,
+      );
+      expect(() => applyLabelSheet(all, flipped, reviewer)).toThrow(/altered in the sheet/);
+    });
   });
 
   it("rejects names, unknown items and malformed decisions", () => {

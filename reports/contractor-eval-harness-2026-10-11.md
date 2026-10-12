@@ -105,7 +105,7 @@ are contractor-verified.
 
 | Check | Result |
 | --- | --- |
-| `vitest run --config vitest.unit.config.ts src/lib/evals` | 5 files, 47/47 passed (includes PII scans of all 5 dataset files) |
+| `vitest run --config vitest.unit.config.ts src/lib/evals` | Originally 5 files, 47/47 passed. After the review fixes: 6 files, 70/70 passed, including the new CLI tests and PII scans of all 5 dataset files. |
 | `node scripts/local-dev.mjs test src/services/evidence-redaction.test.ts src/services/evidence-intelligence.test.ts src/services/assistant.test.ts` | 3 files, 42/42 passed |
 | `pnpm run typecheck` | passed (api-server, command-center, scripts) |
 | `pnpm --filter @workspace/api-server run build` | passed |
@@ -120,6 +120,52 @@ before and independently of this change, because they need `DATABASE_URL`:
 - `rate-limit-fail-open.test.ts`
 - `restore-app-readonly.test.ts`
 - `swarm-schema-upgrade.test.ts`
+
+## Review fixes — Codex push review of 2026-10-12
+
+Codex's review (`REVIEW.md` in the Forge workspace) required five changes. All
+five are fixed in a follow-up commit.
+
+1. **P1 — offline modes could reach the paid judge.**
+   - Command handling moved to `src/lib/evals/cli.ts` with injected
+     dependencies.
+   - The OpenAI judge is constructed only after live admission: a key is
+     present and the run is not under CI.
+   - `--check` and plain `--replay` reject `--judge openai` before
+     construction. Paid rescoring now requires `--live --replay <file>`.
+   - Tests assert zero `fetch` calls for both offline modes, including under
+     CI with a key set.
+2. **P1 — stale label sheets.**
+   - Every exported row carries `caseFingerprint`: a SHA-256 over the case
+     identity, summary, source artifacts (by content digest) and complete
+     labels.
+   - Import rejects any fingerprint mismatch, and any row whose statement,
+     critical flag or aliases were altered without an `edit` decision.
+   - Tests cover drift in the observation statement, critical flag,
+     supporting aliases, an added label, a forbidden claim, document line
+     quantity, document warranty, source text, source label and summary.
+3. **P2 — malformed judge responses.**
+   - Response decoding, the completion shape and the verdict shape are
+     validated with zod.
+   - Refusals and incomplete (non-`stop`) responses return fixed
+     `OpenAiJudgeError` messages.
+   - Tests cover a non-JSON 200, an unexpected shape, a refusal, a `length`
+     finish, invalid verdict JSON and a wrong verdict type. No error contains
+     the body or the key.
+4. **P2 — a judge failure lost generated outputs.**
+   - A live run persists the recording with `scoring: pending` before any
+     judge call, then rewrites it as `scored` or as `failed` with a sanitized
+     reason.
+   - Test: after a judge 503, the recording exists without the key or the
+     upstream body, and offline replay rescores it without calling the
+     generators.
+5. **P2 — line items ignored quantity.**
+   - A line counts as matched only when its title, amount and quantity all
+     agree.
+   - `quantityMismatches` and `inventedQuantities` (a quantity extracted where
+     the document states none) are scored and summarized.
+   - Tests cover 1 vs. 999, a missing quantity, null vs. an invented quantity,
+     and null vs. null.
 
 ## Limitations
 

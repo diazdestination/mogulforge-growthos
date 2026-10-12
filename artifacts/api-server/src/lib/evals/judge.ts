@@ -10,6 +10,8 @@
  *   output, `store: false`, and a versioned prompt. It never logs evidence or
  *   answer text, and its errors never include the API key or response bodies.
  */
+import { z } from "zod";
+
 import { keyTermsPresent, tokenCoverage } from "./text";
 
 export const LEXICAL_JUDGE_VERSION = "contractor-eval-lexical-v1";
@@ -92,9 +94,12 @@ Rules:
 - A required fact is present only if the text states it; implications do not count.
 - Answer only with the JSON schema requested. Keep rationales under 30 words and do not quote personal data.`;
 
-type JudgeSchema = { name: string; schema: Record<string, unknown> };
+type JudgeSchema<T> = { name: string; schema: Record<string, unknown>; parse: z.ZodType<T> };
 
-const MATCH_SCHEMA: JudgeSchema = {
+const matchVerdictSchema = z.object({ matchedIndex: z.number().int().nullable(), rationale: z.string() }).strict();
+const booleanVerdictSchema = z.object({ verdict: z.boolean(), rationale: z.string() }).strict();
+
+const MATCH_SCHEMA: JudgeSchema<z.infer<typeof matchVerdictSchema>> = {
   name: "judge_match",
   schema: {
     type: "object",
@@ -105,9 +110,10 @@ const MATCH_SCHEMA: JudgeSchema = {
       rationale: { type: "string" },
     },
   },
+  parse: matchVerdictSchema,
 };
 
-const BOOLEAN_SCHEMA: JudgeSchema = {
+const BOOLEAN_SCHEMA: JudgeSchema<z.infer<typeof booleanVerdictSchema>> = {
   name: "judge_boolean",
   schema: {
     type: "object",
@@ -115,9 +121,24 @@ const BOOLEAN_SCHEMA: JudgeSchema = {
     required: ["verdict", "rationale"],
     properties: { verdict: { type: "boolean" }, rationale: { type: "string" } },
   },
+  parse: booleanVerdictSchema,
 };
 
-export class OpenAiJudgeError extends Error {}
+const completionSchema = z.object({
+  choices: z
+    .array(
+      z.object({
+        finish_reason: z.string().nullable().optional(),
+        message: z.object({ content: z.string().nullable().optional(), refusal: z.string().nullable().optional() }),
+      }),
+    )
+    .min(1),
+});
+
+/** Judge failures carry fixed messages only: never the API key, a response body or evaluated text. */
+export class OpenAiJudgeError extends Error {
+  override name = "OpenAiJudgeError";
+}
 
 export class OpenAiJudge implements Judge {
   readonly kind = "openai" as const;
@@ -134,7 +155,7 @@ export class OpenAiJudge implements Judge {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  private async ask(prompt: string, schema: JudgeSchema): Promise<Record<string, unknown>> {
+  private async ask<T>(prompt: string, schema: JudgeSchema<T>): Promise<T> {
     let res: Response;
     try {
       res = await this.fetchImpl("https://api.openai.com/v1/chat/completions", {
@@ -147,21 +168,38 @@ export class OpenAiJudge implements Judge {
             { role: "system", content: JUDGE_INSTRUCTIONS },
             { role: "user", content: prompt },
           ],
-          response_format: { type: "json_schema", json_schema: { ...schema, strict: true } },
+          response_format: { type: "json_schema", json_schema: { name: schema.name, schema: schema.schema, strict: true } },
         }),
       });
     } catch {
       throw new OpenAiJudgeError("OpenAI judge request could not be sent.");
     }
     if (!res.ok) throw new OpenAiJudgeError(`OpenAI judge request failed with status ${res.status}.`);
-    const data = (await res.json()) as { choices?: { message?: { content?: string | null } }[] };
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) throw new OpenAiJudgeError("OpenAI judge returned no content.");
+
+    let decoded: unknown;
     try {
-      return JSON.parse(content) as Record<string, unknown>;
+      decoded = await res.json();
     } catch {
-      throw new OpenAiJudgeError("OpenAI judge returned invalid JSON.");
+      throw new OpenAiJudgeError("OpenAI judge response was not valid JSON.");
     }
+    const completion = completionSchema.safeParse(decoded);
+    if (!completion.success) throw new OpenAiJudgeError("OpenAI judge response had an unexpected shape.");
+    const [choice] = completion.data.choices;
+    if (choice.message.refusal) throw new OpenAiJudgeError("OpenAI judge refused to answer.");
+    if (choice.finish_reason && choice.finish_reason !== "stop") {
+      throw new OpenAiJudgeError("OpenAI judge response was incomplete.");
+    }
+    if (!choice.message.content) throw new OpenAiJudgeError("OpenAI judge returned no content.");
+
+    let verdict: unknown;
+    try {
+      verdict = JSON.parse(choice.message.content);
+    } catch {
+      throw new OpenAiJudgeError("OpenAI judge returned invalid verdict JSON.");
+    }
+    const parsed = schema.parse.safeParse(verdict);
+    if (!parsed.success) throw new OpenAiJudgeError("OpenAI judge verdict did not match the schema.");
+    return parsed.data;
   }
 
   async judgeMatch(expected: JudgeExpectation, candidates: JudgeCandidate[]) {
@@ -173,8 +211,8 @@ export class OpenAiJudge implements Judge {
       MATCH_SCHEMA,
     );
     const index = result.matchedIndex;
-    const valid = typeof index === "number" && candidates.some((candidate) => candidate.index === index);
-    return { matchedIndex: valid ? (index as number) : null, rationale: String(result.rationale ?? "") };
+    const valid = index !== null && candidates.some((candidate) => candidate.index === index);
+    return { matchedIndex: valid ? index : null, rationale: result.rationale };
   }
 
   async judgeForbidden(rule: JudgeRule, text: string) {
@@ -182,7 +220,7 @@ export class OpenAiJudge implements Judge {
       `FORBIDDEN RULE:\n${rule.description}\n\nOUTPUT TO CHECK:\n${text}\n\nverdict=true only if the output violates the rule.`,
       BOOLEAN_SCHEMA,
     );
-    return { violated: result.verdict === true, rationale: String(result.rationale ?? "") };
+    return { violated: result.verdict, rationale: result.rationale };
   }
 
   async judgeFactPresent(fact: JudgeExpectation, text: string) {
@@ -190,6 +228,6 @@ export class OpenAiJudge implements Judge {
       `REQUIRED FACT:\n${fact.statement}\n\nANSWER TO CHECK:\n${text}\n\nverdict=true only if the answer states the fact.`,
       BOOLEAN_SCHEMA,
     );
-    return { present: result.verdict === true, rationale: String(result.rationale ?? "") };
+    return { present: result.verdict, rationale: result.rationale };
   }
 }

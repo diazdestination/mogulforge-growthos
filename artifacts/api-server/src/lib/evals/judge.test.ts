@@ -106,6 +106,45 @@ describe("OpenAiJudge", () => {
     expect((await judge.judgeFactPresent({ statement: "three leads" }, "3 leads")).present).toBe(true);
   });
 
+  it("returns fixed errors for non-JSON, refused, incomplete and malformed responses", async () => {
+    const PRIVATE = "private evidence body prefix";
+    const cases: Array<[Response, string]> = [
+      [new Response(`${PRIVATE} <html>`, { status: 200 }), "OpenAI judge response was not valid JSON."],
+      [new Response(JSON.stringify({ unexpected: PRIVATE }), { status: 200 }), "OpenAI judge response had an unexpected shape."],
+      [
+        new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: null, refusal: PRIVATE } }] }), { status: 200 }),
+        "OpenAI judge refused to answer.",
+      ],
+      [
+        new Response(JSON.stringify({ choices: [{ finish_reason: "length", message: { content: `{"verdict":tr ${PRIVATE}` } }] }), { status: 200 }),
+        "OpenAI judge response was incomplete.",
+      ],
+      [
+        new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: `not json ${PRIVATE}` } }] }), { status: 200 }),
+        "OpenAI judge returned invalid verdict JSON.",
+      ],
+      [
+        new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ verdict: "yes", rationale: PRIVATE }) } }] }), {
+          status: 200,
+        }),
+        "OpenAI judge verdict did not match the schema.",
+      ],
+    ];
+    for (const [response, message] of cases) {
+      const judge = new OpenAiJudge({ apiKey: FAKE_KEY, fetchImpl: (async () => response) as unknown as typeof fetch });
+      const error = await judge.judgeForbidden({ description: "x" }, "text").catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(OpenAiJudgeError);
+      expect((error as Error).message).toBe(message);
+      expect((error as Error).message).not.toContain(PRIVATE);
+    }
+  });
+
+  it("rejects a match verdict with a non-integer index", async () => {
+    const fetchImpl = vi.fn(async () => chatResponse({ matchedIndex: "1", rationale: "r" }));
+    const judge = new OpenAiJudge({ apiKey: FAKE_KEY, fetchImpl: fetchImpl as unknown as typeof fetch });
+    await expect(judge.judgeMatch({ statement: "a" }, [{ index: 1, text: "b" }])).rejects.toThrow("OpenAI judge verdict did not match the schema.");
+  });
+
   it("never leaks the API key or response body in errors", async () => {
     const fetchImpl = vi.fn(async () => new Response(`bad key ${FAKE_KEY} evidence text`, { status: 401 }));
     const judge = new OpenAiJudge({ apiKey: FAKE_KEY, fetchImpl: fetchImpl as unknown as typeof fetch });

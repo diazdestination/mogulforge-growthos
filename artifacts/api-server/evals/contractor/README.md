@@ -100,7 +100,24 @@ pnpm --filter @workspace/api-server run eval:contractor -- --check
 pnpm --filter @workspace/api-server run eval:contractor -- --replay artifacts/api-server/evals/results/<file>.json
 # Live and paid: needs an approved OPENAI_API_KEY; refuses under CI
 pnpm --filter @workspace/api-server run eval:contractor -- --live --judge openai
+# Live and paid: rescore a recording with the OpenAI judge, no regeneration
+pnpm --filter @workspace/api-server run eval:contractor -- --live --replay <file> --judge openai
 ```
+
+The OpenAI judge only works in an admitted live mode, which needs a key and
+must not be running under CI. `--check` and plain `--replay` reject
+`--judge openai` before the judge is created, so offline modes cannot make a
+paid request.
+
+A live run writes its raw outputs to `evals/results/` before scoring starts.
+If the judge then fails, the recording is kept with
+`scoring: {status: "failed"}` and a sanitized reason, and `--replay` can
+rescore it without regenerating the outputs.
+
+Every row of an exported label sheet carries the case's `caseFingerprint`, a
+SHA-256 over the case identity, summary, source artifacts (by content digest)
+and complete labels. Import rejects a sheet if anything changed after export,
+or if a label was altered in the sheet without an `edit` decision.
 
 Optional flags are `--only evidence|assistant`, `--case <id>` and, with
 `--replay`, `--write` to save the rescored run.

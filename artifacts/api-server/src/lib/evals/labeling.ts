@@ -7,7 +7,10 @@
  * `applyLabelSheet` applies a completed sheet. A case becomes
  * `contractor-verified` only when every one of its label rows has a decision.
  * Reviewers are recorded by role and pseudonymous handle, never by name.
+ * Every row carries the case's review fingerprint, so a sheet cannot certify
+ * case material or labels that changed after it was exported.
  */
+import { sha256Hex } from "./dataset";
 import type { EvidenceEvalCase, ExpectedObservation } from "./schemas";
 import { evidenceCaseSchema } from "./schemas";
 import { parseCsv, toCsv } from "./text";
@@ -25,6 +28,7 @@ export const LABEL_SHEET_COLUMNS = [
   "editedCritical",
   "editedAliases",
   "reviewerNotes",
+  "caseFingerprint",
 ] as const;
 
 type LabelKind = "observation" | "conflict" | "gap" | "forbidden" | "document";
@@ -34,6 +38,83 @@ type Decision = (typeof DECISIONS)[number];
 
 const MISSING_TEMPLATE_ROWS = 2;
 
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value)
+      .filter((key) => (value as Record<string, unknown>)[key] !== undefined)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/**
+ * Stable fingerprint of everything a reviewer is shown: identity, summary, every
+ * source artifact (by content digest) and the complete label set. A sheet only
+ * applies to the exact case material it was exported from.
+ */
+export function caseReviewFingerprint(evalCase: EvidenceEvalCase): string {
+  return sha256Hex(
+    canonicalJson({
+      id: evalCase.id,
+      kind: evalCase.kind,
+      trade: evalCase.trade,
+      workflow: evalCase.workflow,
+      caseSummary: evalCase.caseSummary,
+      artifacts: evalCase.artifacts.map((artifact) => ({
+        alias: artifact.alias,
+        filename: artifact.filename,
+        mimeType: artifact.mimeType,
+        sourceLabel: artifact.sourceLabel,
+        textSha256: sha256Hex(artifact.text),
+      })),
+      labels: evalCase.labels,
+    }),
+  );
+}
+
+type ReviewRow = { labelKind: LabelKind; itemId: string; critical: string; statement: string; supportingAliases: string };
+
+function documentSummary(doc: NonNullable<EvidenceEvalCase["labels"]["document"]>): string {
+  return [
+    `${doc.lineItems.length} line item(s): ${doc.lineItems
+      .map((line) => `${line.title} qty ${line.qty ?? "not stated"} $${(line.amountCents / 100).toFixed(2)} [${line.descriptionComponents.join("; ")}]`)
+      .join(" | ")}`,
+    `total ${doc.totals.totalCents === null ? "absent" : `$${(doc.totals.totalCents / 100).toFixed(2)}`}`,
+    `terms ${doc.paymentTerms ?? "absent"}`,
+    `warranty ${doc.warranty.present ? doc.warranty.terms.join("; ") : "absent"}`,
+    `flags: ${doc.flags.map((flag) => flag.description).join(" | ")}`,
+  ].join(". ");
+}
+
+/** The exact label rows shown to a reviewer for one case. */
+function reviewRows(evalCase: EvidenceEvalCase): ReviewRow[] {
+  const { labels } = evalCase;
+  return [
+    ...labels.expectedObservations.map((item) => ({
+      labelKind: "observation" as const,
+      itemId: item.id,
+      critical: item.critical ? "yes" : "no",
+      statement: item.statement,
+      supportingAliases: item.supportingAliases.join(" "),
+    })),
+    ...labels.expectedConflicts.map((item) => ({
+      labelKind: "conflict" as const,
+      itemId: item.id,
+      critical: "",
+      statement: item.description,
+      supportingAliases: item.aliases.join(" "),
+    })),
+    ...labels.expectedGaps.map((item) => ({ labelKind: "gap" as const, itemId: item.id, critical: "", statement: item.description, supportingAliases: "" })),
+    ...labels.forbiddenClaims.map((item) => ({ labelKind: "forbidden" as const, itemId: item.id, critical: "", statement: item.description, supportingAliases: "" })),
+    ...(labels.document
+      ? [{ labelKind: "document" as const, itemId: "document-labels", critical: "", statement: documentSummary(labels.document), supportingAliases: "" }]
+      : []),
+  ];
+}
+
 export function exportLabelSheet(
   cases: EvidenceEvalCase[],
   options: { includeVerified?: boolean } = {},
@@ -42,31 +123,14 @@ export function exportLabelSheet(
     (evalCase) => options.includeVerified || evalCase.labelProvenance.status === "research-draft",
   );
   const rows: string[][] = [[...LABEL_SHEET_COLUMNS]];
-  const blank = (caseId: string, trade: string, kind: LabelKind, itemId: string, critical: string, statement: string, aliases: string) =>
-    [caseId, trade, kind, itemId, critical, statement, aliases, "", "", "", "", ""];
-
   for (const evalCase of selected) {
-    const { id, trade, labels } = evalCase;
-    for (const item of labels.expectedObservations) {
-      rows.push(blank(id, trade, "observation", item.id, item.critical ? "yes" : "no", item.statement, item.supportingAliases.join(" ")));
+    const fingerprint = caseReviewFingerprint(evalCase);
+    const line = (row: ReviewRow) =>
+      [evalCase.id, evalCase.trade, row.labelKind, row.itemId, row.critical, row.statement, row.supportingAliases, "", "", "", "", "", fingerprint];
+    for (const row of reviewRows(evalCase)) rows.push(line(row));
+    for (let i = 0; i < MISSING_TEMPLATE_ROWS; i++) {
+      rows.push(line({ labelKind: "observation", itemId: "", critical: "", statement: "", supportingAliases: "" }));
     }
-    for (const item of labels.expectedConflicts) {
-      rows.push(blank(id, trade, "conflict", item.id, "", item.description, item.aliases.join(" ")));
-    }
-    for (const item of labels.expectedGaps) rows.push(blank(id, trade, "gap", item.id, "", item.description, ""));
-    for (const item of labels.forbiddenClaims) rows.push(blank(id, trade, "forbidden", item.id, "", item.description, ""));
-    if (labels.document) {
-      const doc = labels.document;
-      const summary = [
-        `${doc.lineItems.length} line item(s): ${doc.lineItems.map((line) => `${line.title} $${(line.amountCents / 100).toFixed(2)} [${line.descriptionComponents.join("; ")}]`).join(" | ")}`,
-        `total ${doc.totals.totalCents === null ? "absent" : `$${(doc.totals.totalCents / 100).toFixed(2)}`}`,
-        `terms ${doc.paymentTerms ?? "absent"}`,
-        `warranty ${doc.warranty.present ? doc.warranty.terms.join("; ") : "absent"}`,
-        `flags: ${doc.flags.map((flag) => flag.description).join(" | ")}`,
-      ].join(". ");
-      rows.push(blank(id, trade, "document", "document-labels", "", summary, ""));
-    }
-    for (let i = 0; i < MISSING_TEMPLATE_ROWS; i++) rows.push(blank(id, trade, "observation", "", "", "", ""));
   }
 
   const markdown = [
@@ -172,6 +236,18 @@ export function applyLabelSheet(
       return evalCase;
     }
 
+    // Bind the decisions to the exact material the reviewer saw. Any change to the
+    // summary, source artifacts or any label since export invalidates the sheet.
+    const fingerprint = caseReviewFingerprint(evalCase);
+    for (const { row, rowNumber } of rows) {
+      if (row.caseFingerprint !== fingerprint) {
+        throw new Error(
+          `Row ${rowNumber}: ${evalCase.id} changed since this sheet was exported (fingerprint mismatch). Re-export and review again.`,
+        );
+      }
+    }
+    const shown = new Map(reviewRows(evalCase).map((item) => [`${item.labelKind}:${item.itemId}`, item]));
+
     const labels = structuredClone(evalCase.labels);
     const existingRows = labelRows.filter(({ row }) => row.itemId);
     const expectedIds = new Set([
@@ -189,6 +265,14 @@ export function applyLabelSheet(
       if (!expectedIds.has(key)) throw new Error(`Row ${rowNumber}: ${key} is not a label of ${evalCase.id}.`);
       if (seen.has(key)) throw new Error(`Row ${rowNumber}: ${key} appears more than once.`);
       seen.add(key);
+      const original = shown.get(key)!;
+      if (
+        row.statement !== original.statement.trim() ||
+        row.critical !== original.critical ||
+        row.supportingAliases !== original.supportingAliases
+      ) {
+        throw new Error(`Row ${rowNumber}: ${key} was altered in the sheet; record changes with decision "edit" instead.`);
+      }
       if (!row.decision) {
         complete = false;
         continue;
