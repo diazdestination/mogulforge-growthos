@@ -97,6 +97,49 @@ describe("/bie/specialists", () => {
     expect((await call("POST", `/bie/actions/${review.id}/approve`, sids.owner!, { expectedPayload: review.payload })).status).toBe(200);
   });
 
+  it("executed INVO tasks expose no private invoice text through task endpoints to invoice-denied readers", async () => {
+    const SECRETS = ["Private billing", "8765", "$", "Secret component", "4321", "Confidential note"];
+    const [owner] = await db.select().from(usersTable).where(and(eq(usersTable.organizationId, orgId), eq(usersTable.role, "owner")));
+    const [contact] = await db.insert(contactsTable).values({ organizationId: orgId, firstName: "Synthetic" }).returning();
+    const [lead] = await db.insert(leadsTable).values({ organizationId: orgId, contactId: contact!.id, status: "completed", source: "native_qa" }).returning();
+    const draft = (await createInvoice(orgId, owner!.id, { requestId: randomUUID(), leadId: lead!.id, document: {
+      title: "Private billing: $8765.43 estimate", currency: "USD", issuerName: "Synthetic", customerName: "Synthetic customer",
+      notes: "Confidential note: this estimate includes a warranty.",
+      lineItems: [{ description: "Secret component A $4321", quantity: "1", unitPriceCents: 432_100 }, { description: "Secret component B", quantity: "1", unitPriceCents: 444_443 }],
+      taxCents: 0 } })).invoice;
+    const run = await (await call("POST", "/bie/specialists/invo/run", sids.owner!, { warrantyDatesRequired: true })).json() as
+      { proposals: Array<{ id: string; payload: Record<string, unknown>; evidence: Record<string, unknown> }> };
+    const mine = run.proposals.filter((p) => p.evidence.invoiceId === draft.id);
+    expect(mine.map((p) => p.evidence.rule).sort()).toEqual(["estimate_wording_on_invoice", "multi_line_office_review", "warranty_dates_missing"]);
+    for (const proposal of mine) {
+      expect((await call("POST", `/bie/actions/${proposal.id}/approve`, sids.owner!, { expectedPayload: proposal.payload })).status).toBe(200);
+      const executed = await (await call("POST", `/bie/actions/${proposal.id}/execute`, sids.owner!, {})).json() as { status: string };
+      expect(executed.status).toBe("executed");
+    }
+    const cappedKey = (await createApiKey({ organizationId: orgId, name: "capped task reader", role: "sales_rep", createdByUserId: owner!.id })).key;
+    const readers: Array<(path: string) => Promise<Response>> = [
+      (path) => call("GET", path, sids.viewer!),
+      (path) => call("GET", path, sids.sales_rep!),
+      (path) => fetch(`${baseUrl}/api/v1${path}`, { headers: { "x-api-key": cappedKey } }),
+    ];
+    for (const read of readers) {
+      const listRes = await read("/tasks");
+      expect(listRes.status).toBe(200);
+      const tasks = (await listRes.json()) as Array<{ id: string; leadId: string | null; title: string }>;
+      const invoiceTasks = tasks.filter((t) => t.leadId === lead!.id);
+      expect(invoiceTasks).toHaveLength(3);
+      for (const task of invoiceTasks) {
+        const listed = JSON.stringify(task);
+        const detail = await (await read(`/tasks/${task.id}`)).text();
+        for (const secret of SECRETS) {
+          expect(listed).not.toContain(secret);
+          expect(detail).not.toContain(secret);
+        }
+        expect(task.title).toMatch(/draft invoice ref [0-9a-f]{8}/);
+      }
+    }
+  });
+
   it("enforces permissions: viewers cannot run; INVO also needs invoice access", async () => {
     expect((await call("POST", "/bie/specialists/scout/run", sids.viewer!, {})).status).toBe(403);
     expect((await call("POST", "/bie/specialists/scout/run", sids.sales_rep!, {})).status).toBe(201);

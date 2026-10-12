@@ -88,6 +88,37 @@ describe("INVO planner (synthetic invoices modeled on owner examples)", () => {
     expect(unavailable).toContainEqual(expect.objectContaining({ kind: "skip", reason: "balance_unavailable_or_reconciliation_required" }));
   });
 
+  it("never puts user-authored invoice text or amounts into task payloads (hostile title, notes and lines)", () => {
+    const PRIVATE = ["Private billing", "8765", "$", "Secret component", "4321", "Confidential note", "876"];
+    const hostileDoc = {
+      title: "Private billing: $8765.43 estimate", notes: "Confidential note: this estimate includes a warranty.", dueDate: null, totalCents: 876_543,
+      lineItems: [
+        { description: "Secret component A $4321", quantity: "1", unitPriceCents: 432_100, totalCents: 432_100 },
+        { description: "Secret component B", quantity: "1", unitPriceCents: 444_443, totalCents: 444_443 },
+      ],
+    };
+    const facts = [
+      hvacInvoice({ document: hostileDoc }), // draft: office review, warranty dates, estimate wording
+      roofingInvoice({ document: hostileDoc, deliveryAttemptCount: 0, invoiceNumber: "INV-000042" }), // issued: + overdue
+      roofingInvoice({ document: hostileDoc, invoiceNumber: "Private-ext-8765" }), // non-system number is not echoed
+    ];
+    let checked = 0;
+    for (const fact of facts) {
+      const drafts = planInvoice(fact, new Map(), NOW, { warrantyDatesRequired: true }).flatMap((d) => (d.kind === "draft" ? [d.draft] : []));
+      expect(drafts.length).toBeGreaterThan(0);
+      for (const draft of drafts) {
+        const text = JSON.stringify(draft.payload);
+        for (const secret of [...PRIVATE, "Private-ext"]) expect(text, `${String(draft.evidence.rule)} payload`).not.toContain(secret);
+        expect(Object.keys(draft.payload).sort()).toEqual(["description", "priority", "title"]);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(9);
+    // Private details remain available to invoice-authorized reviewers in evidence/rationale.
+    const wording = planInvoice(facts[0]!, new Map(), NOW, { warrantyDatesRequired: true }).find((d) => d.kind === "draft" && d.draft.evidence.rule === "estimate_wording_on_invoice");
+    expect(wording?.kind === "draft" && JSON.stringify(wording.draft.evidence)).toContain("Private billing");
+  });
+
   it("is idempotent against open and settled history, and skips void and customer-work invoices", () => {
     const first = planInvoice(roofingInvoice(), new Map(), NOW, { warrantyDatesRequired: false });
     const history = new Map(first.flatMap((d) => (d.kind === "draft" ? [[d.draft.subjectKey, [{ status: "proposed" as const }]]] : [])));

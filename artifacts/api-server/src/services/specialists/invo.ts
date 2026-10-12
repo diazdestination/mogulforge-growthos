@@ -87,7 +87,18 @@ const documentText = (doc: InvoFact["document"]) =>
 /** A proposal that was blocked/failed may be proposed again; anything else is settled or open. */
 const alreadyHandled = (history: History, key: string) =>
   (history.get(key) ?? []).some((row) => row.status !== "blocked" && row.status !== "failed");
+/** Rationale/evidence label (invoice-authorized proposal only). */
 const label = (fact: InvoFact) => fact.invoiceNumber ?? `draft ${fact.document.title}`;
+/**
+ * Label for task payloads. Executed tasks are readable by any crm.read role, so
+ * payload text is built only from system identifiers: a system-issued number
+ * (INV-000123) or a generic draft reference. Never user-authored titles, line
+ * text, notes or amounts; those stay in invoice-authorized evidence/rationale.
+ */
+export const publicInvoiceLabel = (fact: Pick<InvoFact, "invoiceNumber" | "invoiceId" | "status">) =>
+  fact.invoiceNumber && /^INV-\d{6,}$/.test(fact.invoiceNumber)
+    ? fact.invoiceNumber
+    : `${fact.status === "draft" ? "draft invoice" : "invoice"} ref ${fact.invoiceId.slice(0, 8)}`;
 
 /** Pure: every INVO exception for one invoice. Never invents dates or amounts. */
 export function planInvoice(fact: InvoFact, history: History, now: Date, options: InvoOptions): InvoDecision[] {
@@ -113,7 +124,7 @@ export function planInvoice(fact: InvoFact, history: History, now: Date, options
       title: "Office review: multi-repair invoice before sending",
       rationale: `Invoice ${label(fact)} has ${doc.lineItems.length} lines and has not been sent. Multi-repair invoices are reviewed by the office before sending.`,
       evidence: { ...common, rule: "multi_line_office_review", lineDescriptions: doc.lineItems.map((line) => line.description.slice(0, 160)) },
-      payload: { title: `Review invoice ${label(fact)} before sending`, description: `Confirm each of the ${doc.lineItems.length} repair lines, quantities and totals before the invoice is sent. Nothing has been sent.`, priority: "high" },
+      payload: { title: `Review ${publicInvoiceLabel(fact)} before sending`, description: `Confirm each of the ${doc.lineItems.length} repair lines, quantities and totals before the invoice is sent. Nothing has been sent.`, priority: "high" },
       estimatedValueCents: doc.totalCents,
     });
   }
@@ -127,7 +138,7 @@ export function planInvoice(fact: InvoFact, history: History, now: Date, options
         rationale: `Invoice ${label(fact)} ${mentionsWarranty ? "mentions a warranty" : "is for a company that requires warranty dates on invoices"} but shows no warranty start/end date. INVO does not invent dates; office staff should confirm them from the job and equipment records.`,
         evidence: { ...common, rule: "warranty_dates_missing", warrantyDatesRequired: options.warrantyDatesRequired, mentionsWarranty,
           knownWarrantyObligations: fact.warrantyReference.warrantyObligations, activeEquipmentRecords: fact.warrantyReference.activeAssetCount },
-        payload: { title: `Add warranty dates to invoice ${label(fact)}`, description: "Confirm warranty-validity (and equipment install) dates from the job/equipment records and add them to the invoice before sending.", priority: "high" },
+        payload: { title: `Add warranty dates to ${publicInvoiceLabel(fact)}`, description: "Confirm warranty-validity (and equipment install) dates from the job/equipment records and add them to the invoice before sending.", priority: "high" },
         estimatedValueCents: doc.totalCents,
       });
     }
@@ -152,7 +163,7 @@ export function planInvoice(fact: InvoFact, history: History, now: Date, options
           evidence: { ...common, rule: "overdue_unpaid_balance", balanceDueCents: fact.balanceDueCents, paymentState: fact.paymentState,
             dueBasis: explicitDue ? "due_date" : "due_on_receipt", dueAt: dueAt.toISOString(), issuedAt: fact.issuedAt.toISOString(), daysPastDue },
           // Task text stays free of amounts: CRM tasks are visible to roles without invoice access.
-          payload: { title: `Follow up on unpaid invoice ${label(fact)}`, description: "The invoice is past due with an open recorded balance. Open the invoice, call the customer, confirm whether payment was made elsewhere, and record any receipt.", priority: "high" },
+          payload: { title: `Follow up on unpaid ${publicInvoiceLabel(fact)}`, description: "The invoice is past due with an open recorded balance. Open the invoice, call the customer, confirm whether payment was made elsewhere, and record any receipt.", priority: "high" },
           estimatedValueCents: fact.balanceDueCents,
         });
       }
@@ -167,7 +178,7 @@ export function planInvoice(fact: InvoFact, history: History, now: Date, options
       title: "Review estimate wording on an invoice",
       rationale: `Invoice ${label(fact)} contains the word "estimate". Invoices should state billed work, not estimate terms.${unsent ? "" : " The issued document is immutable; correct the template for future invoices or void and reissue if needed."}`,
       evidence: { ...common, rule: "estimate_wording_on_invoice", matchingText: matches },
-      payload: { title: `Review wording on invoice ${label(fact)}`, description: "The invoice text uses estimate wording. Confirm the billed scope and warranty language are invoice-appropriate.", priority: "high" },
+      payload: { title: `Review wording on ${publicInvoiceLabel(fact)}`, description: "The invoice text uses estimate wording. Confirm the billed scope and warranty language are invoice-appropriate.", priority: "high" },
       estimatedValueCents: null,
     });
   }

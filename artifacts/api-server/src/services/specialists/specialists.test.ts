@@ -142,6 +142,6 @@ describe("INVO (proposal-only, synthetic invoices modeled on owner examples)", (
     const executed = await executeBieProposal(a.org, overdue.id, a.owner);
     expect(executed).toMatchObject({ status: "executed" });
     const [task] = await db.select().from(crmTasksTable).where(and(eq(crmTasksTable.organizationId, a.org), eq(crmTasksTable.leadId, roofLead.id)));
-    expect(task?.title).toMatch(/unpaid invoice/);
+    expect(task?.title).toMatch(/^Follow up on unpaid INV-\d{6}$/);
   });
 });

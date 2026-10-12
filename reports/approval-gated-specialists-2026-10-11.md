@@ -160,6 +160,14 @@ The guard test checks two things:
 4. **Clock.** The INVO DB test sets an explicit `issued_at` from one shared `NOW` and calls `runInvo(..., NOW)`.
    Facade coverage through `runSpecialist` is kept.
 
+5. **Private text in task payloads (re-review).** Every INVO task payload (`title`, `description`, `priority`)
+   is now built at proposal time from system identifiers only, so exact-payload approval is preserved. It uses a
+   system-issued `INV-nnnnnn` number, or `draft invoice ref <id prefix>` / `invoice ref <id prefix>`. User-authored
+   titles, notes, line text, external numbers and amounts stay in the invoice-authorized rationale and evidence.
+   A pure test uses hostile titles, notes and lines across all four rules. A DB test executes every draft-rule
+   task as owner and reads `/tasks` and `/tasks/:id` as a viewer, a `sales_rep` session and a `sales_rep`-capped
+   API key; no private text appears. Focused suites after this fix: 19 files, 179 tests passed.
+
 ## Limitations and open gates
 
 - **No live send verified.** SCOUT reminder emails are ordinary `send_email` drafts. They still need prepare,
