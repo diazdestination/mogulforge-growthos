@@ -78,36 +78,44 @@ export async function scoreDocumentExtraction(
   let inventedQuantities = 0;
   let componentsExpected = 0;
   let componentsMatched = 0;
-  for (const expected of labels.lineItems) {
-    componentsExpected += expected.descriptionComponents.length;
-    const position = remaining.findIndex(
-      ({ item }) =>
-        item.amountCents === expected.amountCents &&
-        (normalizeText(item.title) === normalizeText(expected.title) ||
-          tokenCoverage(expected.title, item.title) >= 0.6),
-    );
-    if (position === -1) continue;
-    const [{ item }] = remaining.splice(position, 1);
-    // A line counts as matched only when its quantity also agrees. A quantity on a
-    // document that states none is invented; a different stated quantity is a mismatch.
-    if (expected.qty === null) {
-      if (item.qty === null) {
-        matched += 1;
-        quantitiesCorrect += 1;
-      } else {
-        inventedQuantities += 1;
-      }
-    } else if (item.qty === expected.qty) {
-      matched += 1;
-      quantitiesCorrect += 1;
-    } else {
-      quantityMismatches += 1;
-    }
+  type ExtractedLine = DocumentExtraction["lineItems"][number];
+  const sameLine = (expected: DocumentLabels["lineItems"][number], item: ExtractedLine) =>
+    item.amountCents === expected.amountCents &&
+    (normalizeText(item.title) === normalizeText(expected.title) || tokenCoverage(expected.title, item.title) >= 0.6);
+  const scoreComponents = (expected: DocumentLabels["lineItems"][number], item: ExtractedLine) => {
     for (const component of expected.descriptionComponents) {
       if (item.descriptionComponents.some((candidate) => tokenCoverage(component, candidate) >= 0.6)) {
         componentsMatched += 1;
       }
     }
+  };
+
+  // Pass 1: reserve one-to-one pairs that agree on title, amount AND quantity, so
+  // repeated lines (same title and amount) are matched independent of order.
+  const unpaired: Array<DocumentLabels["lineItems"][number]> = [];
+  for (const expected of labels.lineItems) {
+    componentsExpected += expected.descriptionComponents.length;
+    const position = remaining.findIndex(({ item }) => sameLine(expected, item) && item.qty === expected.qty);
+    if (position === -1) {
+      unpaired.push(expected);
+      continue;
+    }
+    const [{ item }] = remaining.splice(position, 1);
+    matched += 1;
+    quantitiesCorrect += 1;
+    scoreComponents(expected, item);
+  }
+
+  // Pass 2: pair the leftovers on title and amount only, for quantity diagnostics.
+  // A quantity on a document that states none is invented; a different or missing
+  // stated quantity is a mismatch. Neither counts as a matched line.
+  for (const expected of unpaired) {
+    const position = remaining.findIndex(({ item }) => sameLine(expected, item));
+    if (position === -1) continue;
+    const [{ item }] = remaining.splice(position, 1);
+    if (expected.qty === null) inventedQuantities += 1;
+    else quantityMismatches += 1;
+    scoreComponents(expected, item);
   }
   const inventedComponentPrices = extraction.lineItems.reduce(
     (sum, item) => sum + item.componentPricesCents.length,

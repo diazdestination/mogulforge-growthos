@@ -212,6 +212,47 @@ describe("scoreDocumentExtraction quantities", () => {
     expect(agreed).toMatchObject({ lineItems: { matched: 1, quantitiesCorrect: 1, inventedQuantities: 0 } });
   });
 
+  const repeated = (qtys: Array<number | null>): DocumentExtraction => ({
+    ...extraction(null),
+    lineItems: qtys.map((qty) => ({ title: "Standard Repair", qty, amountCents: 115000, descriptionComponents: [], componentPricesCents: [] })),
+    totals: { subtotalCents: 230000, totalCents: 230000, amountPaidCents: null, balanceDueCents: 230000 },
+  });
+  const repeatedLabels = (qtys: Array<number | null>): DocumentLabels => ({
+    ...base,
+    lineItems: qtys.map((qty) => ({ title: "Standard Repair", qty, amountCents: 115000, descriptionComponents: [] })),
+    totals: { subtotalCents: 230000, totalCents: 230000, amountPaidCents: null, balanceDueCents: 230000 },
+  });
+
+  it("matches repeated title/amount lines independent of order (numeric quantities)", async () => {
+    for (const [want, got] of [
+      [[1, 2], [2, 1]],
+      [[1, 2], [1, 2]],
+      [[2, 1, 2], [2, 2, 1]],
+    ] as Array<[number[], number[]]>) {
+      expect(await scoreDocumentExtraction(repeatedLabels(want), repeated(got), new FakeJudge())).toMatchObject({
+        lineItems: { matched: want.length, quantitiesCorrect: want.length, quantityMismatches: 0, inventedQuantities: 0, inventedLineItems: 0 },
+      });
+    }
+  });
+
+  it("matches repeated lines independent of order (numeric and null quantities)", async () => {
+    expect(await scoreDocumentExtraction(repeatedLabels([1, null]), repeated([null, 1]), new FakeJudge())).toMatchObject({
+      lineItems: { matched: 2, quantitiesCorrect: 2, quantityMismatches: 0, inventedQuantities: 0 },
+    });
+  });
+
+  it("still reports true mismatches and invented quantities among repeated lines", async () => {
+    expect(await scoreDocumentExtraction(repeatedLabels([1, 2]), repeated([2, 3]), new FakeJudge())).toMatchObject({
+      lineItems: { matched: 1, quantitiesCorrect: 1, quantityMismatches: 1, inventedQuantities: 0, inventedLineItems: 0 },
+    });
+    expect(await scoreDocumentExtraction(repeatedLabels([1, null]), repeated([1, 4]), new FakeJudge())).toMatchObject({
+      lineItems: { matched: 1, quantityMismatches: 0, inventedQuantities: 1 },
+    });
+    expect(await scoreDocumentExtraction(repeatedLabels([1, 2]), repeated([null, 2]), new FakeJudge())).toMatchObject({
+      lineItems: { matched: 1, quantityMismatches: 1, inventedQuantities: 0 },
+    });
+  });
+
   it("matches when the stated quantity agrees", async () => {
     expect(await scoreDocumentExtraction(base, extraction(1), new FakeJudge())).toMatchObject({
       lineItems: { matched: 1, quantitiesCorrect: 1, quantityMismatches: 0, inventedQuantities: 0 },
