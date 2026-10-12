@@ -2,7 +2,7 @@
 // no inherited account/provider keys, and an HTTP listener on loopback only.
 // Prerequisite: build the API and Command Center. Closing this runner drops
 // ONLY its in-memory fixture; it never opens or changes an existing database.
-import { PGlite } from "@electric-sql/pglite";
+import { createVectorPGlite } from "./pglite-vector.mjs";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { spawn } from "node:child_process";
 import { randomBytes, scryptSync } from "node:crypto";
@@ -27,7 +27,7 @@ import { seedSyntheticReturningCustomer } from "../../../scripts/returning-custo
 
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const database = path.resolve(api, "../../lib/db");
-const storage = await PGlite.create();
+const storage = await createVectorPGlite();
 const socket = new PGLiteSocketServer({
   db: storage,
   host: "127.0.0.1",

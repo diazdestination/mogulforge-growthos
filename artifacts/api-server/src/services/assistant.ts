@@ -21,6 +21,7 @@ import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 
 import { logger } from "../lib/logger";
 import { validWorkReadScope } from "./customer-work-read-scope";
+import { searchCustomerHistory } from "./customer-history-tool";
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
@@ -398,6 +399,21 @@ export const TOOLS: Record<string, ToolDef> = {
       },
     },
     run: (org, a) => staleLeads(org, intArg(a.days, 14, 3650), intArg(a.limit, 10, 25)),
+  },
+  search_customer_history: {
+    description:
+      "Read-only search of ONE customer's history (memories, leads, activities, appointments, estimates, invoices) in this company. Identify the customer by contactId, or by name/email/phone (returns candidates when ambiguous). Text is redacted; never invent details beyond the returned snippets.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "What to look for, e.g. 'gate code' or 'last furnace repair'" },
+        contactId: { type: "string", description: "Exact customer (contact) id, when known" },
+        customer: { type: "string", description: "Customer name, email or phone to look up when contactId is unknown" },
+        limit: { type: "number", description: "Max snippets (default 5, max 10)" },
+      },
+      required: ["query"],
+    },
+    run: (org, a) => searchCustomerHistory(org, a),
   },
 };
 

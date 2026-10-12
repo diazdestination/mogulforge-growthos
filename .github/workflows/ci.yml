@@ -19,7 +19,9 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        # Pinned pgvector-enabled PostgreSQL 16; the db push scripts run
+        # CREATE EXTENSION IF NOT EXISTS vector before drizzle-kit.
+        image: pgvector/pgvector:0.8.0-pg16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres

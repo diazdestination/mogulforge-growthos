@@ -27,14 +27,14 @@ import { seedLeadAlertCoverage, assertLeadAlertCoverage, assertLeadAlertCoverage
 
 const requireApi = createRequire(new URL('../artifacts/api-server/package.json', import.meta.url));
 const requireDb = createRequire(new URL('../lib/db/package.json', import.meta.url));
-const { PGlite } = requireApi('@electric-sql/pglite');
+const { createVectorPGlite } = await import(new URL('../artifacts/api-server/scripts/pglite-vector.mjs', import.meta.url).href);
 const { PGLiteSocketServer } = requireApi('@electric-sql/pglite-socket');
 const { generateDrizzleJson } = requireDb('drizzle-kit/api');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const identifier = (name) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('contractor_identifier_invalid'); return `"${name}"`; };
 const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot', 'reasons', 'snapshot', 'settings', 'result', 'historical_source', 'policy', 'context_snapshot', 'recipients']);
-const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql', '0010_lead-replies.sql', '0011_invoice-recovery.sql', '0012_callie-intake.sql', '0013_standing-service.sql', '0014_source-nurture.sql', '0015_callie-conversation.sql', '0016_contractor-workday.sql', '0017_returning-customer-work.sql', '0018_lead-alert-coverage.sql'];
+const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql', '0010_lead-replies.sql', '0011_invoice-recovery.sql', '0012_callie-intake.sql', '0013_standing-service.sql', '0014_source-nurture.sql', '0015_callie-conversation.sql', '0016_contractor-workday.sql', '0017_returning-customer-work.sql', '0018_lead-alert-coverage.sql', '0019_pgvector-retrieval.sql'];
 
 async function insert(database, table, row) {
   const fields = Object.keys(row);
@@ -94,7 +94,7 @@ async function probeApp(database) {
 
 export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
   const startedAt = Date.now();
-  const source = await PGlite.create(); let restored;
+  const source = await createVectorPGlite(); let restored;
   try {
     const base = await reviewedSchema();
     await source.exec(base);
@@ -109,6 +109,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     const migrations = [];
     let returningPreviousTableCount = 0, returningLegacyFingerprint;
     let alertCoveragePreviousTableCount = 0, alertCoverageBefore;
+    let retrievalPreviousTableCount = 0, retrievalBefore;
     const legacyFingerprint = async () => {
       const rows = {};
       for (const table of ['estimates','projects','invoices','value_entries']) rows[table]=(await source.query(`SELECT count(*)::int AS count,
@@ -122,6 +123,11 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
         alertCoveragePreviousTableCount = Object.keys(alertCoverageBefore.tables).length;
         assert.equal(alertCoveragePreviousTableCount,141);
       }
+      if (file === '0019_pgvector-retrieval.sql') {
+        retrievalBefore = await fingerprints(source);
+        retrievalPreviousTableCount = Object.keys(retrievalBefore.tables).length;
+        assert.equal(retrievalPreviousTableCount,142);
+      }
       if (file === '0017_returning-customer-work.sql') {
         returningPreviousTableCount = Object.keys((await fingerprints(source)).tables).length;
         assert.equal(returningPreviousTableCount,139);
@@ -134,6 +140,13 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
         assert.equal(Object.keys(upgraded.tables).length,142);
         for (const [table,value] of Object.entries(alertCoverageBefore.tables)) assert.deepEqual(upgraded.tables[table],value);
         assert.equal(upgraded.tables.staff_lead_alert_coverage.count,0);
+      }
+      if (file === '0019_pgvector-retrieval.sql') {
+        const upgraded = await fingerprints(source);
+        assert.equal(Object.keys(upgraded.tables).length,144);
+        for (const [table,value] of Object.entries(retrievalBefore.tables)) assert.deepEqual(upgraded.tables[table],value);
+        assert.equal(upgraded.tables.retrieval_chunks.count,0);
+        assert.equal(upgraded.tables.customer_memories.count,0);
       }
       migrations.push({ file, sha256: sha(sql) });
     }
@@ -261,7 +274,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     // This marker is deliberately after the snapshot; it must not appear in restoration.
     await insert(source, 'organizations', { name: 'SYNTHETIC after snapshot', slug: 'restore-drill-after-snapshot' });
     const restoreStartedAt = Date.now();
-    restored = await PGlite.create({ loadDataDir: snapshot });
+    restored = await createVectorPGlite({ loadDataDir: snapshot });
     assert.deepEqual(await fingerprints(restored), baseline);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM organizations WHERE slug='restore-drill-after-snapshot'")).rows[0].n, 0);
     for (const slug of slugs) await assertFixtureRecords({ query: (sql, values) => restored.query(sql, values) }, { syntheticSlug: slug }, codec, { reviewedPausedServiceId: nativeFixtureIds(slug).nextService, reviewedPausedCareExecutionId: careFixtureIds(slug).execution, reviewedPausedInvoiceExecutionId: invoiceRecoveryIds(slug).secondExecution, reviewedPausedCallieExecutionId: callieFixtureIds(slug).execution, reviewedPausedStandingExecutionId: standingServiceIds(slug).execution, reviewedPausedNurtureExecutionId: sourceNurtureIds(slug).execution, reviewedPausedReturningInvoiceExecutionId:returningCustomerIds(slug).execution });
@@ -312,6 +325,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       workdayConstraintChecks: workdayConstraints, workdayCapturedHistoryPreserved: true,
       returningPreviousTableCount, returningLegacyRowsUnchanged: true, returningConstraintChecks: returningConstraints,
       alertCoveragePreviousTableCount, alertCoveragePriorRowsUnchanged: true, alertCoverageConstraintChecks,
+      retrievalPreviousTableCount, retrievalPriorRowsUnchanged: true,
       originalAlertCoveragePreserved: true, missingAlertEffectsRemainUnknown: true, legacyAlertCoverageRemainsUnknown: true,
       returningCustomerLineagePreserved: true, returningCommandResultsPreserved: true,
       returningWorkScopedReceiptsPreserved: true, returningV3UnknownOwnershipPreserved: true,

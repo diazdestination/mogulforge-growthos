@@ -28,7 +28,7 @@ Instant-access shortcut (no form): **http://localhost:5173/api/dev/login**.
 
 | Piece | Where | Port |
 |---|---|---|
-| Postgres 15 | Docker container `mogulforge-db` (user `postgres`, pass `mogulforge`, db `mogulforge`) | 5432 |
+| Postgres 16 + pgvector | Docker container `mogulforge-db` (user `postgres`, pass `mogulforge`, db `mogulforge`); image `pgvector/pgvector:0.8.0-pg16` — recreate an older PG15 container as described below | 5432 |
 | API server (Express + Drizzle) | `artifacts/api-server` → `dist/index.mjs` | 3001 |
 | Frontend (React + Vite) | `artifacts/command-center` | 5173 |
 
@@ -88,12 +88,46 @@ $env:PORT='5173'; $env:BASE_PATH='/'; $env:API_PORT='3001'; $env:NODE_ENV='devel
 pnpm run dev
 ```
 
+## PostgreSQL 16 + pgvector (2026-10-11)
+
+The retrieval layer stores embeddings in a pgvector `vector(1536)` column, so
+every local database must run the pinned `pgvector/pgvector:0.8.0-pg16` image
+(`docker-compose.yml`, `docker-compose.parity.yml`, CI and
+`scripts/local-dev.mjs` all use it). The db `push`/`push-force` scripts run
+`CREATE EXTENSION IF NOT EXISTS vector` first (`lib/db/ensure-extensions.mjs`).
+
+PostgreSQL 16 cannot open PostgreSQL 15 data files, so `docker-compose.yml` now
+mounts a NEW named volume (`pgdata16`); the old `pgdata` volume is left
+untouched. To carry existing local data across (dump, then restore):
+
+```powershell
+# 1. Dump from the old PG15 volume with a temporary PG15 container
+docker run -d --name mf-pg15-dump -e POSTGRES_PASSWORD=mogulforge -v <project>_pgdata:/var/lib/postgresql/data postgres:15
+docker exec mf-pg15-dump pg_dump -U postgres -d mogulforge -Fc -f /tmp/mogulforge.dump
+docker cp mf-pg15-dump:/tmp/mogulforge.dump ./mogulforge.dump
+docker rm -f mf-pg15-dump
+# 2. Start the PG16 + pgvector database (new volume) and restore into it
+docker compose up -d db
+docker compose cp ./mogulforge.dump db:/tmp/mogulforge.dump
+docker compose exec db psql -U postgres -d mogulforge -c "CREATE EXTENSION IF NOT EXISTS vector"
+docker compose exec db pg_restore -U postgres -d mogulforge --no-owner /tmp/mogulforge.dump
+# 3. Add the new tables
+$env:DATABASE_URL='postgresql://postgres:mogulforge@localhost:5433/mogulforge'
+pnpm --filter @workspace/db run push
+```
+
+`<project>` is the compose project name (`docker volume ls` shows the exact
+volume). Delete the old volume only after the restored data is verified. The
+standalone `mogulforge-db` container in the table above must be recreated from
+the pgvector image the same way (dump, new container, restore) before a push
+will succeed against it.
+
 ## Schema changes
 
 ```powershell
 cd lib/db
 $env:DATABASE_URL='postgresql://postgres:mogulforge@localhost:5432/mogulforge'
-pnpm exec drizzle-kit push --force
+pnpm run push-force   # enables pgvector, then drizzle-kit push --force
 ```
 
 ## Rebrand from "Painless Roofing" → MogulForge

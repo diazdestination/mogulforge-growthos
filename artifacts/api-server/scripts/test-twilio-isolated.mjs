@@ -1,5 +1,5 @@
 // Dedicated synthetic database: this runner never reads .env or accepts DATABASE_URL.
-import { PGlite } from "@electric-sql/pglite";
+import { createVectorPGlite } from "./pglite-vector.mjs";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -7,7 +7,7 @@ import path from "node:path";
 
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const database = path.resolve(api, "../../lib/db");
-const pg = await PGlite.create();
+const pg = await createVectorPGlite();
 const server = new PGLiteSocketServer({
   db: pg,
   host: "127.0.0.1",

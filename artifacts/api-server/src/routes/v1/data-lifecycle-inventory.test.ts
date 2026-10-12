@@ -115,7 +115,7 @@ describe("read-only lifecycle inventory tenant boundary", () => {
     expect(failures, JSON.stringify(failures)).toEqual([]);
     expect(inventory.status).toBe("bounded_preview");
     expect(readOnly).toBe("on");
-    expect(inventory.coverage).toMatchObject({ classifiedTables: 142, countedTables: 137, excludedTables: 5, deployedSchema: "matched", reasons: [] });
+    expect(inventory.coverage).toMatchObject({ classifiedTables: 144, countedTables: 139, excludedTables: 5, deployedSchema: "matched", reasons: [] });
     for (const table of ["property_assets", "work_checklist_templates", "work_checklist_revisions", "appointment_work_entries", "appointment_work_completions", "appointment_work_photos"]) {
       expect(inventory.tables.find((row: { table: string }) => row.table === table)).toMatchObject({ ownership: "direct_org", rowCount: 0, countStatus: "exact_in_snapshot" });
     }

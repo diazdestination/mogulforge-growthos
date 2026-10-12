@@ -4,7 +4,9 @@ import { runContractorRecoveryDrill } from './contractor-recovery-drill.mjs';
 it('upgrades the full prior schema, restores both synthetic companies, boots a read-only real app and preserves uncertainty/holds', async () => {
   const result = await runContractorRecoveryDrill({ emit: () => {} });
   expect(result.previousTableCount).toBe(90);
-  expect(result.tableCount).toBe(142);
+  expect(result.tableCount).toBe(144);
+  expect(result.retrievalPreviousTableCount).toBe(142);
+  expect(result.retrievalPriorRowsUnchanged).toBe(true);
   expect(result.alertCoveragePreviousTableCount).toBe(141);
   expect(result.alertCoveragePriorRowsUnchanged).toBe(true);
   expect(result.alertCoverageConstraintChecks).toBe(12);

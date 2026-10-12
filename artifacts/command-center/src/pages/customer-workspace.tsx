@@ -9,6 +9,7 @@ import { canReadInvoices, canManageInvoices, canWrite } from '@/lib/permissions'
 import { customerWorkPath, customerInvoicePath, newCustomerWorkPath } from '@/lib/customer-work-links';
 import CustomerAssetsPanel from '@/components/customer-assets-panel';
 import CustomerDetailCorrectionPanel from '@/components/customer-detail-correction-panel';
+import CustomerMemoryPanel from '@/components/customer-memory-panel';
 import { WorkdayDisclosure } from '@/components/workday-ui';
 import { customerWorkspaceLocation, customerWorkspacePath } from '@/lib/customer-workspace-links';
 import {
@@ -88,6 +89,7 @@ function Workspace({ authority, contactId, organizationId, organizationName, tim
       </div>
       <CustomerHeader data={data} organizationName={organizationName} timezone={timezone} />
       {detailReview && <CustomerDetailCorrectionPanel organizationId={organizationId} contactId={contactId} scopeKey={authority} onSaved={reload} />}
+      <WorkdayDisclosure title="Customer memory"><CustomerMemoryPanel organizationId={organizationId} contactId={contactId} scopeKey={authority} canWrite={workManage && data.permissions.canWrite} /></WorkdayDisclosure>
       <nav aria-label="Customer record sections" className="flex flex-wrap gap-2">
         {available.map(value => <Link key={value} href={customerWorkspacePath(contactId, organizationId, value)!}
           aria-current={section === value ? 'page' : undefined}
