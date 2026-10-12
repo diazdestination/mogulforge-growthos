@@ -51,7 +51,7 @@ export function consumeOperatorPermit(permit,kind,target){
 export function describeOperatorPermit(permit,kind){const p=permits.get(permit);check(p&&!p.consumed&&p.isUsable()&&p.kind===kind&&p.now()<p.until,'production75_custody_permit');return freeze({...clone(p.scope),target:p.target});}
 export function markOperatorPermitDispatched(permit){const p=permits.get(permit);check(p&&p.consumed&&!p.dispatched&&p.isUsable()&&p.now()<p.until,'production75_custody_permit');p.dispatched=true;}
 function construct({root,plan,evidence,now,resume,io}){
- let fd=null,unusable=false,closed=false,sequence=0,previous='0'.repeat(64),before=null,owned=null,ownership=null,cloneVerified=false,profileVerified=false,rollbackVerified=false,reconciling=resume;
+ let fd=null,lockFd=null,unusable=false,closed=false,sequence=0,previous='0'.repeat(64),before=null,owned=null,ownership=null,cloneVerified=false,profileVerified=false,rollbackVerified=false,reconciling=resume;
  const used=new Set(),digest=operatorPlanDigest(plan);let directory;
  const failFs=()=>{unusable=true;throw error('production75_custody_filesystem');};
  try{
@@ -61,6 +61,10 @@ function construct({root,plan,evidence,now,resume,io}){
   else check(io.lstatSync(directory).isDirectory()&&!io.lstatSync(directory).isSymbolicLink(),'production75_custody_journal');
  }catch(e){if(/^production75_custody_(root|replay|journal)$/.test(e?.safeCode??''))throw e;throw error('production75_custody_filesystem');}
  const audit=path.join(directory,'audit.jsonl');
+ const lock=path.join(directory,'active.lock');
+ // Never steal a stale lock. An unclean exit requires explicit recovery review.
+ // Exclusive creation works across processes, before any journal is read.
+ try{lockFd=io.openSync(lock,'wx',0o600);io.fsyncSync(lockFd);}catch(e){if(e.code==='EEXIST')throw error('production75_custody_busy');throw error('production75_custody_filesystem');}
  const owns=m=>{check(used.has('copy-create')&&before&&ID.test(m.id)&&!plan.protectedClusters.includes(m.id)&&!before.some(v=>v.id===m.id)&&m.name===plan.copyName&&m.organization===plan.organization&&m.attachedApps.length===0,'production75_custody_ownership');};
  function apply(event){
   switch(event.kind){
@@ -86,7 +90,9 @@ function construct({root,plan,evidence,now,resume,io}){
    for(const text of lines){const row=JSON.parse(text);check(keys(row,['sequence','previous','event','sha256'])&&Object.keys(row).length===4&&row.sequence===sequence&&row.previous===previous&&row.sha256===hash({sequence:row.sequence,previous:row.previous,event:row.event}),'production75_custody_journal');apply(row.event);sequence++;previous=row.sha256;}
    check(sequence>0,'production75_custody_journal');fd=io.openSync(audit,'a',0o600);
   }else{fd=io.openSync(audit,'wx',0o600);append({kind:'opened',plan,evidence});}
- }catch{if(fd!==null)try{io.closeSync(fd);}catch{}throw error('production75_custody_journal');}
+ }catch{if(fd!==null)try{io.closeSync(fd);}catch{}try{io.closeSync(lockFd);io.unlinkSync(lock);}catch{}throw error('production75_custody_journal');}
+ // A fsynced reservation file survives interruption before its journal row.
+ for(const kind of OPERATIONS)if(io.existsSync(path.join(directory,`reserved-${kind}`)))used.add(kind);
  const healthy=()=>check(!closed&&!unusable,'production75_custody_unusable');
  return Object.freeze({
   observeBefore(values){healthy();check(!used.has('copy-create')&&!before&&!reconciling,'production75_custody_phase');const list=inventoryShape(clone(values));check(plan.protectedClusters.every(id=>list.some(m=>m.id===id&&m.organization===plan.organization&&m.status==='ready'))&&!list.some(m=>m.name===plan.copyName),'production75_custody_ownership');append({kind:'inventory-before',inventory:list});},
@@ -106,6 +112,7 @@ function construct({root,plan,evidence,now,resume,io}){
    if(kind==='credentials-reader')check(cloneVerified&&used.has('reader-create'),'production75_custody_phase');
    if(kind==='upgrade-commit')check(rollbackVerified,'production75_custody_phase');
    const target=kind==='copy-create'||kind==='credentials-source'?plan.sourceCluster:owned.id;
+   let reservationFd;try{reservationFd=io.openSync(path.join(directory,`reserved-${kind}`),'wx',0o600);io.fsyncSync(reservationFd);}catch(e){if(e.code==='EEXIST')throw error('production75_custody_replay');failFs();}finally{if(reservationFd!==undefined)io.closeSync(reservationFd);}
    append({kind:'intent',operation:kind,target});const permit=Object.freeze({});permits.set(permit,{kind,target,until,now,consumed:false,dispatched:false,isUsable:()=>!closed&&!unusable,scope:{planSha256:digest,sourceCluster:plan.sourceCluster,backupId:plan.backupId,copyName:plan.copyName,copyId:owned?.id??null,readerName:plan.readerName,organization:plan.organization,until}});return permit;
   },
   recordUpgrade(outcome,status){healthy();check(['rollback','commit'].includes(outcome)&&used.has(`upgrade-${outcome}`)&&['verified-rollback','verified-commit','reconciled-commit-no-replay','verification-held-no-replay','failed-or-held'].includes(status),'production75_custody_phase');append({kind:'upgrade-result',outcome,status});},
@@ -118,7 +125,7 @@ function construct({root,plan,evidence,now,resume,io}){
   },
   recordDeleted(){healthy();check(owned&&used.has('copy-delete'),'production75_custody_phase');append({kind:'deleted',copyId:owned.id});},
   status(){return freeze({directory,planSha256:digest,reviewReceiptSha256:evidence.reviewReceiptSha256,copyId:owned?.id??null,ownership,used:[...used],reconciliationOnly:reconciling,unusable,closed});},
-  close(){if(closed)return;closed=true;try{io.closeSync(fd);}catch{throw error('production75_custody_filesystem');}}
+  close(){if(closed)return;closed=true;try{io.closeSync(fd);io.closeSync(lockFd);io.unlinkSync(lock);}catch{throw error('production75_custody_filesystem');}}
  });
 }
 export async function openOperatorCustody({root,plan,verifyOwnerApproval,verifyCapabilityReview,now=Date.now,io=fs}={}){const evidence=await authenticated(plan,verifyOwnerApproval,verifyCapabilityReview,now);return construct({root,plan,evidence,now,resume:false,io});}

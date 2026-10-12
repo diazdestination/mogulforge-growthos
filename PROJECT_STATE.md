@@ -1,5 +1,17 @@
 # GrowthOS project state
 
+## October12 supplied-client copy operator
+
+Separate tooling branch agent/growthos-bounded-operator-20261012 builds on
+PR45/283715f. PR44/8df64dc remains the fixed application candidate; its exact-head
+CI38271589412 passed. Full scripts519 tests, focused87 tests and workspace types
+pass after the five independent-review corrections. Native and publication proof
+are recorded in reports/bounded-operator-2026-10-12.md when complete.
+The operator supplies durable admission/custody, pinned V1 requests, exact Reader
+delta, bound rollback/commit baselines and terminal resource cleanup. Real
+authenticated drivers, provider profile/capability acceptance and a reviewed
+paid-copy packet remain open; all20 contractor gaps remain. No hosted action ran.
+
 ## October12 combined launch candidate — local gates passed
 
 PR35 plus39–43 are combined on agent/growthos-release-integration-20261012.

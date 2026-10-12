@@ -50,10 +50,10 @@ record(kind,fields), bindOwned(metadata,beforeInventory), close/status.
 Opaque branded permits bind exact operation, plan/target/deadline and one dispatch.
 Real exclusive directory/files/fsync enforce cross-process reuse refusal.
 
-- [ ] RED absent/foreign/expired approval, forged/reused permit, async mutation,
+- [x] RED absent/foreign/expired approval, forged/reused permit, async mutation,
       protected ID, durable restart/collision/torn journal and unknown outcome.
-- [ ] GREEN minimal immutable validation and exclusive append-only custody.
-- [ ] Record test command/result and commit exact files.
+- [x] GREEN minimal immutable validation and exclusive append-only custody.
+- [x] Record test command/result and commit exact files.
 
 ## Task2: Fixed V1 transport
 
@@ -63,10 +63,10 @@ limits}) with fixed list/detail/backup/users/credential reads and permit-bound
 restore/Reader-create/owned-delete methods. Origin https://api.fly.io; no override.
 Bound streaming, redirect rejection, abort, post-resolution deadlines and safe errors.
 
-- [ ] RED fixed request shapes, credential-free metadata, raw-error spoof, redirects,
+- [x] RED fixed request shapes, credential-free metadata, raw-error spoof, redirects,
       oversized/late/never-ending body, parameter mutation and one mutation dispatch.
-- [ ] GREEN pinned protocol and secret-in-memory handling; no raw response logging.
-- [ ] Record test command/result and commit.
+- [x] GREEN pinned protocol and secret-in-memory handling; no raw response logging.
+- [x] Record test command/result and commit.
 
 ## Task3: Exact role delta and operator composition
 
@@ -77,10 +77,10 @@ allowing only exact reserved login/edge/approved new-only settings. Operator val
 fresh source/copy observations, creates Reader once, binds review/target evidence,
 runs supplied real verifier, then confirms owned deletion and protected originals.
 
-- [ ] RED extra/missing/changed delta, name collision, wrong copy/Reader, lost create/
+- [x] RED extra/missing/changed delta, name collision, wrong copy/Reader, lost create/
       role/commit/delete ack, read-only reconciliation, source drift and cleanup errors.
-- [ ] GREEN full lifecycle and terminal holds; require durable intent before dispatch.
-- [ ] Record tests/result and commit.
+- [x] GREEN full lifecycle and terminal holds; require durable intent before dispatch.
+- [x] Record tests/result and commit.
 
 ## Task4: Owned native lifecycle and packet
 
@@ -90,16 +90,16 @@ Explicit --run-local creates owned synthetic PG16 source/copy fixtures, drives t
 actual V1 adapter/custody/delta/operator with fake HTTP and real SQL verification,
 then requires all client/socket/container closure. Source hashes bind the proof.
 
-- [ ] Run happy/uncertain/failure scenarios against source/copy with synthetic records.
-- [ ] Require complete original/non-target preservation and native Reader profiling.
-- [ ] Preserve no raw customer/provider credentials or restored row dumps in receipts.
+- [x] Run happy/uncertain/failure scenarios against source/copy with synthetic records.
+- [x] Require complete original/non-target preservation and native Reader profiling.
+- [x] Preserve no raw customer/provider credentials or restored row dumps in receipts.
 
 ## Task5: Source acceptance
 
-- [ ] Full scripts/types, unchanged app/core/SQL, exact selected-file secret scan.
-- [ ] One fresh independent whole-branch review; Important fixes RED->GREEN plus suite.
+- [x] Full scripts/types, unchanged app/core/SQL, exact selected-file secret scan.
+- [x] One fresh independent whole-branch review; Important fixes RED->GREEN plus suite.
 - [ ] Publish dependent source PR with exact-head CI and durable Forge state.
-- [ ] Keep real account/authentication/connection drivers, actual profile/scope/cost
+- [x] Keep real account/authentication/connection drivers, actual profile/scope/cost
       admission and hosted proof explicit until their own evidence is complete.
 
 The supplied-client lifecycle is working software on its own; it is not a claim that

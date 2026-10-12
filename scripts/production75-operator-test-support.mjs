@@ -1,6 +1,9 @@
 import {readFile} from 'node:fs/promises';
 import {legacyModel} from './production75-legacy-model.mjs';
 import {expectedProduction75ReaderProfile} from './production75-reader-delta.mjs';
+import {assertLegacyReaderCapabilities} from './production75-legacy-model.mjs';
+import {createHash} from 'node:crypto';
+export function verificationFixture(after,readerName){const a=structuredClone(after),target=a.databases.find(d=>d.name==='fly-db'),otherDatabases=a.databases.filter(d=>d.name!=='fly-db').map(({identity,...d})=>d),capabilities=assertLegacyReaderCapabilities(target.policy,{readerLogin:readerName,readerRole:readerName,writerRole:'schema_admin'}),sha=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');return {plan:{target:{database:'fly-db',writerLogin:'fly-user',writerRole:'schema_admin',readerLogin:readerName,readerRole:readerName,principals:['reader',readerName]},sourceCommit:'7091af816715cfd437925eb0af82fb47d3411e34',policies:{75:structuredClone(target.policy)},catalog75:structuredClone(target.catalog)},writer:{query:()=>{}},baseline:{state:{phase:75,catalog:target.catalog,fingerprints:target.fingerprints,policy:target.policy,identity:target.identity},extra:target.extra,capabilities,otherDatabases},expectedExtra:structuredClone(target.extra),capabilityReview:{receiptSha256:'c'.repeat(64),readerLogin:readerName,readerRole:readerName,extraSha256:sha(target.extra),capabilitiesSha256:sha(capabilities)},readFresh:async()=>({})};}
 const catalog=JSON.parse(await readFile(new URL('../reports/production75-recovery-2026-10-11/catalog75-fly-db.json',import.meta.url)));
 export function deltaFixture(readerName='growthos_reader_fixture'){ const READER=readerName,SOURCE='fly-user';
  const profile=expectedProduction75ReaderProfile(READER),global=structuredClone(legacyModel().roles),group=global.find(r=>r.name==='reader');

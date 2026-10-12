@@ -1,5 +1,16 @@
 # Next acceptance work
 
+## October12 next production boundary
+
+Accept the supplied-client operator source evidence in
+reports/bounded-operator-2026-10-12.md, separately from fixed PR44/8df64dc and
+PR45/283715f. Then wire/review real account/authentication/observation/connection
+drivers implementing terminal acquisition and SQL deadline guards. Authenticate
+owner/capability receipts; establish actual V1 Reader/profile/provider equivalence;
+prepare exact target/source/backup/cost/lifetime/deletion-reserve admission before
+requesting a fresh paid copy. Consumed grants stay consumed. Contractor gaps and
+both company acceptance cards remain independent requirements.
+
 ## October12 combined launch candidate — local gates passed
 
 PR35 plus39–43 are combined on agent/growthos-release-integration-20261012.
