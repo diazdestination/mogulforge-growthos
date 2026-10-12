@@ -845,6 +845,23 @@ describe("Invoice equipment and warranty", () => {
     expect(writes(api.requests)[0].body.equipment).toEqual({ assetIds: [assetId], warrantyTerms: "Fictional workmanship terms." });
   });
 
+  it("follows the asset cursor so older active equipment stays selectable", async () => {
+    let calls = 0;
+    const firstPage = assets({ propertyId: workdayProperty, items: [workdayAsset({ id: wid(71), label: "Newer retired unit", status: "retired" })], hasMore: true, nextCursor: "synthetic-cursor" });
+    const secondPage = assets({ propertyId: workdayProperty, items: [workdayAsset({ id: wid(72), label: "Older active condenser" })] });
+    server("office", scoped(), (request) => {
+      if (request.method === "GET" && request.path === `/api/v1/contacts/${workdayContact}/assets`) return json(++calls === 1 ? firstPage : secondPage);
+      return assetRoute(request);
+    });
+    renderInvoices();
+    fireEvent.click(await screen.findByRole("button", { name: "Edit draft" }));
+    const more = await screen.findByRole("button", { name: "Load more recorded equipment" });
+    expect(screen.queryByText(/No active equipment is recorded/)).toBeNull();
+    fireEvent.click(more);
+    expect(await screen.findByLabelText(/Older active condenser/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Load more recorded equipment" })).toBeNull();
+    expect(calls).toBe(2);
+  });
   it("shows the saved snapshot with recorded dates and no coverage claim", async () => {
     const snapshot = { assetId, assetVersion: 1, category: "hvac_equipment" as const, label: "Fictional heat pump", manufacturer: "Example Make", model: "EX-1", serial: "FIC-1", location: null, installedOn: null, warrantyStartsOn: "2024-01-01", warrantyEndsOn: "2034-01-01", warrantySource: "Fictional registration" };
     server("office", scoped({ status: "issued", invoiceNumber: "INV-000001", issuedAt: "2026-10-02T12:00:00Z", document: { ...sampleInvoice().document, equipment: { items: [snapshot], warrantyTerms: "Fictional workmanship terms." } } }), assetRoute);

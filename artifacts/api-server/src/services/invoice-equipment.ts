@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { propertyAssetsTable, type db, type InvoiceEquipmentSection } from "@workspace/db";
+import { propertiesTable, propertyAssetsTable, type db, type InvoiceEquipmentSection } from "@workspace/db";
 import { z } from "zod/v4";
 import { workdayAssetFields } from "./contractor-workday-contract";
 import { InvoiceError, type invoiceEquipmentSelectionSchema } from "./invoice-contract";
@@ -26,6 +26,17 @@ export async function invoiceEquipment(
         .where(and(eq(propertyAssetsTable.organizationId, org), inArray(propertyAssetsTable.id, selection.assetIds)))
         .for("share")
     : [];
+  // An asset row keeps the contact it was recorded under; its property may
+  // since belong to someone else. Lock and check the property's current owner.
+  const propertyIds = [...new Set(rows.map((row) => row.propertyId))];
+  const owners = propertyIds.length
+    ? await tx
+        .select({ id: propertiesTable.id, contactId: propertiesTable.contactId })
+        .from(propertiesTable)
+        .where(and(eq(propertiesTable.organizationId, org), inArray(propertiesTable.id, propertyIds)))
+        .for("share")
+    : [];
+  const ownerOf = new Map(owners.map((p) => [p.id, p.contactId]));
   const byId = new Map(rows.map((row) => [row.id, row]));
   const items = selection.assetIds.map((id) => {
     const row = byId.get(id);
@@ -33,6 +44,7 @@ export async function invoiceEquipment(
       !row ||
       row.status !== "active" ||
       row.contactId !== lineage.contact.id ||
+      ownerOf.get(row.propertyId) !== lineage.contact.id ||
       (lineage.property && row.propertyId !== lineage.property.id)
     )
       throw new InvoiceError(

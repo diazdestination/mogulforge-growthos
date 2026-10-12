@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { db, propertiesTable } from "@workspace/db";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import { workdayTestAsset } from "../test-helpers/contractor-workday-fixture";
@@ -69,6 +70,14 @@ describe("invoice equipment and warranty snapshot", () => {
     for (const id of [elsewhere.id, retired.id, foreign.id, randomUUID()])
       await expect(createInvoice(f.org, f.owner.id, draft(f, { assetIds: [id] }))).rejects.toMatchObject({ status: 409, code: "invoice_equipment_unavailable" });
     await expect(createInvoice(f.org, f.owner.id, draft(f, { assetIds: [elsewhere.id, elsewhere.id] }))).rejects.toThrow();
+  });
+
+  it("rejects an asset whose property now belongs to another customer, even without an invoice property", async () => {
+    const f = await fixture();
+    const moved = await asset(f);
+    await db.update(propertiesTable).set({ contactId: f.otherContact.id }).where(eq(propertiesTable.id, f.secondProperty.id));
+    const noProperty = { ...draft(f, { assetIds: [moved.id] }), source: { kind: "existing_customer" as const, contactId: f.contact.id, propertyId: null } };
+    await expect(createInvoice(f.org, f.owner.id, noProperty)).rejects.toMatchObject({ status: 409, code: "invoice_equipment_unavailable" });
   });
 
   it("refreshes or clears the snapshot on draft edits only", async () => {

@@ -1,8 +1,9 @@
 import { useId } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { assetPageFor } from "./workday-contract";
 import { workdayRequest } from "./workday-ui";
 import {
+  invoiceButton,
   invoiceControl,
   type InvoiceDocument,
   type InvoiceEquipmentSelection,
@@ -36,12 +37,22 @@ export function InvoiceEquipmentPicker({
   disabled: boolean;
 }) {
   const prefix = useId();
-  const path = `/contacts/${contactId}/assets${propertyId ? `?propertyId=${encodeURIComponent(propertyId)}` : ""}`;
-  const assets = useQuery({
+  const assets = useInfiniteQuery({
     queryKey: ["invoice-equipment", organizationId, contactId, propertyId],
-    queryFn: ({ signal }) => workdayRequest(assetPageFor(organizationId, contactId, propertyId), path, { signal }),
+    initialPageParam: null as string | null,
+    queryFn: ({ signal, pageParam }) => {
+      const query = new URLSearchParams();
+      if (propertyId) query.set("propertyId", propertyId);
+      if (pageParam) query.set("cursor", pageParam);
+      const search = query.toString();
+      return workdayRequest(assetPageFor(organizationId, contactId, propertyId), `/contacts/${contactId}/assets${search ? `?${search}` : ""}`, { signal });
+    },
+    // Stop rather than loop if the server ever repeats a cursor.
+    getNextPageParam: (last, _pages, _param, params) =>
+      last.hasMore && last.nextCursor && !params.includes(last.nextCursor) ? last.nextCursor : undefined,
   });
-  const active = (assets.data?.items ?? []).filter((asset) => asset.status === "active");
+  const listed = new Map((assets.data?.pages ?? []).flatMap((page) => page.items).map((asset) => [asset.id, asset]));
+  const active = [...listed.values()].filter((asset) => asset.status === "active");
   const loaded = new Set(active.map((asset) => asset.id));
   // Keep earlier attachments visible even when no longer listed, so removal is explicit.
   const earlier = attached.filter((item) => value.assetIds.includes(item.assetId) && !loaded.has(item.assetId));
@@ -64,7 +75,7 @@ export function InvoiceEquipmentPicker({
           Recorded equipment could not be loaded. The invoice can still be saved without it.
         </p>
       )}
-      {assets.isSuccess && active.length === 0 && earlier.length === 0 && (
+      {assets.isSuccess && !assets.hasNextPage && active.length === 0 && earlier.length === 0 && (
         <p className="text-sm">No active equipment is recorded for this customer{propertyId ? " at this property" : ""}.</p>
       )}
       <ul className="space-y-2">
@@ -109,8 +120,15 @@ export function InvoiceEquipmentPicker({
           </li>
         ))}
       </ul>
-      {assets.data?.hasMore && (
-        <p className="text-sm text-muted-foreground">Showing the 25 most recently recorded items.</p>
+      {assets.hasNextPage && (
+        <button
+          type="button"
+          className={invoiceButton}
+          disabled={assets.isFetchingNextPage}
+          onClick={() => void assets.fetchNextPage()}
+        >
+          {assets.isFetchingNextPage ? "Loading more equipment…" : "Load more recorded equipment"}
+        </button>
       )}
       {full && <p className="text-sm">Up to {MAX_EQUIPMENT} equipment records can be attached.</p>}
       <div>
