@@ -89,13 +89,14 @@ rebuilds `svix-timestamp` from a fresh `Date.now()`, so the request fails if a
 wall-clock second boundary passes between the two. This is a timing flake in
 the test. Neither that file nor `delivery-status.ts` differs from `87adc3e`,
 and it does not touch Twilio fixtures. It passed in 3 isolated reruns
-(32/32) and in full-suite run 2. It was not fixed here because it is outside
-scope.
+(32/32) and in full-suite run 2. Follow-up commit `bb24ffe` then fixed this
+test-only timing issue by reusing the signed timestamp and headers for every
+request in the signature-rotation case. Its focused rerun passed 32/32.
 
 ## Limitations
 
 - Uniqueness across workers is random (about 9 million values for numbers,
   UUID-based for SIDs), not coordinated. Given how few bindings exist at any
   moment, the chance of a collision is negligible.
-- The delivery-status timestamp flake above is still present. A fixture-only
-  fix would pin the timestamp passed to `headers()` in that test.
+- The delivery-status timestamp correction changes only test request headers;
+  it does not change production signature verification or freshness checks.
