@@ -198,7 +198,7 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
             <input type="checkbox" className="mt-1" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} disabled={busy} />
             <span>I reviewed this preview and want to import these customers.</span>
           </label>
-          <button type="button" className={primary} disabled={busy || !reviewed || preview.result.imported + preview.result.updated === 0} onClick={() => void run(false)}>
+          <button type="button" className={primary} disabled={busy || !reviewed || preview.result.imported + preview.result.updated + preview.result.duplicates === 0} onClick={() => void run(false)}>
             {busy ? "Importing…" : "Import customers"}
           </button>
         </section>

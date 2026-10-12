@@ -358,17 +358,41 @@ async function runLeadImport(
             (phone && contact.phone && normalizeAddress("sms", contact.phone) !== normalizeAddress("sms", phone)))) {
           return { kind: "conflict", reason: "a matched person has conflicting contact details; reconcile before linking this opportunity" } as const;
         }
-        if (customers) {
-          const externalCustomerId = history.externalCustomerId;
-          let known: { contactId: string | null }[] = [];
-          if (sourceKey && externalCustomerId) {
-            known = await tx.selectDistinct({ contactId: auditEventsTable.entityId }).from(auditEventsTable).where(and(
+        // A source customer ID is remembered on imported leads and, for customer
+        // imports, in customer.imported provenance. Both modes honor both.
+        const externalCustomerId = history.externalCustomerId;
+        let known: { contactId: string | null }[] = [];
+        if (sourceKey && externalCustomerId) {
+          known = await tx.selectDistinct({ contactId: auditEventsTable.entityId }).from(auditEventsTable).where(and(
+            eq(auditEventsTable.organizationId, organizationId), eq(auditEventsTable.action, CUSTOMER_IMPORTED_ACTION),
+            sql`${auditEventsTable.metadata}->>'sourceKey' = ${sourceKey}`,
+            sql`${auditEventsTable.metadata}->>'externalCustomerId' = ${externalCustomerId}`,
+          )).limit(2);
+          if (known.length && (!contact || known.some((k) => k.contactId !== contact.id))) {
+            return { kind: "conflict", reason: "this source customer ID was imported before as different contact details; reconcile before import" } as const;
+          }
+          if (contact) {
+            const [linkedElsewhere] = await tx.select({ id: auditEventsTable.id }).from(auditEventsTable).where(and(
               eq(auditEventsTable.organizationId, organizationId), eq(auditEventsTable.action, CUSTOMER_IMPORTED_ACTION),
-              sql`${auditEventsTable.metadata}->>'sourceKey' = ${sourceKey}`,
-              sql`${auditEventsTable.metadata}->>'externalCustomerId' = ${externalCustomerId}`,
-            )).limit(2);
-            if (known.length && (!contact || known.some((k) => k.contactId !== contact.id))) {
-              return { kind: "conflict", reason: "this source customer ID was imported before as different contact details; reconcile before import" } as const;
+              eq(auditEventsTable.entityId, contact.id), sql`${auditEventsTable.metadata}->>'sourceKey' = ${sourceKey}`,
+              sql`${auditEventsTable.metadata}->>'externalCustomerId' IS NOT NULL`,
+              sql`${auditEventsTable.metadata}->>'externalCustomerId' <> ${externalCustomerId}`,
+            )).limit(1);
+            if (linkedElsewhere) return { kind: "conflict", reason: "these contact details belong to a different source customer ID; reconcile before import" } as const;
+          }
+        }
+        if (customers) {
+          if (sourceKey && externalCustomerId) {
+            // Imported-lead history for the same source account is also binding.
+            const leadLinks = await tx.selectDistinct({ contactId: leadsTable.contactId, id: sql<string>`${leadsTable.importedHistory}->>'externalCustomerId'` }).from(leadsTable).where(and(
+              eq(leadsTable.organizationId, organizationId), eq(leadsTable.importSourceKey, sourceKey),
+              sql`${leadsTable.importedHistory}->>'externalCustomerId' IS NOT NULL`,
+              contact
+                ? or(eq(leadsTable.contactId, contact.id), sql`${leadsTable.importedHistory}->>'externalCustomerId' = ${externalCustomerId}`)
+                : sql`${leadsTable.importedHistory}->>'externalCustomerId' = ${externalCustomerId}`,
+            )).limit(5);
+            if (leadLinks.some((link) => link.contactId !== contact?.id || link.id !== externalCustomerId)) {
+              return { kind: "conflict", reason: "imported lead history links this customer ID or person differently; reconcile before import" } as const;
             }
           }
           const provenance = (contactId: string, matchedExisting: boolean) => tx.insert(auditEventsTable).values({

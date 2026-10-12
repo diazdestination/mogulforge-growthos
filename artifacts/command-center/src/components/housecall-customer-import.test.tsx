@@ -76,6 +76,15 @@ describe("Housecall Pro customer import", () => {
     expect(screen.queryByRole("button", { name: "Import customers" })).toBeNull();
   });
 
+  it("allows importing a file whose customers all already exist, so their source links are saved", async () => {
+    vi.mocked(importLeadsCsv).mockResolvedValue({ ...preview, imported: 0, duplicates: 1 });
+    render(<HousecallCustomerImport onImported={vi.fn()} />);
+    upload("customers.csv", csv);
+    fireEvent.click(await screen.findByRole("button", { name: "Preview import" }));
+    fireEvent.click(await screen.findByLabelText(/I reviewed this preview/));
+    expect((screen.getByRole("button", { name: "Import customers" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("explains how to convert an Excel export instead of uploading it", async () => {
     render(<HousecallCustomerImport onImported={vi.fn()} />);
     upload("customers.xlsx", "binary");

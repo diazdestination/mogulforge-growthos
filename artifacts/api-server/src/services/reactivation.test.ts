@@ -234,6 +234,23 @@ describe("importLeads", () => {
     expect(changed).toMatchObject({ imported: 0, conflicts: 1 });
   });
 
+  it("keeps one source customer ID per person across customer and opportunity imports", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const sourceKey = `housecall-pro-x-${tag}`;
+    const customer = (id: string, email: string) => importLeads(orgId, {
+      csv: `ID,First,Email\n${id},Dee,${email}`, mapping: { externalCustomerId: 0, firstName: 1, email: 2 }, sourceKey, mode: "customers",
+    });
+    expect(await customer(`c1-${tag}`, `dee-${tag}@example.com`)).toMatchObject({ imported: 1 });
+    // A different source customer with the same email is not folded into Dee.
+    expect(await customer(`c2-${tag}`, `dee-${tag}@example.com`)).toMatchObject({ imported: 0, duplicates: 0, conflicts: 1 });
+    // An opportunity import must not create a second person for Dee's source ID.
+    const opportunity = await importLeads(orgId, {
+      csv: `Opp,Customer,First,Email\nop-${tag},c1-${tag},Dee,dee-other-${tag}@example.com`,
+      mapping: { externalOpportunityId: 0, externalCustomerId: 1, firstName: 2, email: 3 }, sourceKey,
+    });
+    expect(opportunity).toMatchObject({ imported: 0, conflicts: 1 });
+  });
+
   it("refuses pipeline fields in a customer import", async () => {
     const result = await importLeads(orgId, { csv: "First,Email,Status\nAl,al@example.com,won", mapping: { firstName: 0, email: 1, status: 2 }, mode: "customers" });
     expect(result).toMatchObject({ error: expect.stringMatching(/only uses name, email, phone and customer ID/) });
