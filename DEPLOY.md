@@ -17,7 +17,7 @@ This file is the local / VPS self-host reference.
 cp .env.example .env          # set SESSION_SECRET + BETA_SIGNUP_ALLOWLIST
 docker compose up -d db
 docker compose run --rm app sh -lc \
-  "cd /app && pnpm --filter @workspace/db exec drizzle-kit push --force"   # one-time schema
+  "cd /app && pnpm --filter @workspace/db run push-force"   # one-time schema (enables pgvector first)
 docker compose up -d --build app
 # open http://localhost:8080 → register an email listed in BETA_SIGNUP_ALLOWLIST
 ```
@@ -54,6 +54,14 @@ docker compose up -d --build app
 - **HTTPS:** the session cookie is `Secure` in production — serve behind TLS on a
   real domain (Fly gives this automatically; on a VPS use Caddy/Cloudflare).
   `localhost` is exempt, so the compose demo works over http locally.
+- **pgvector (open gate):** the schema includes `retrieval_chunks.embedding vector(1536)`,
+  so Postgres must have the pgvector extension available and enabled
+  (`CREATE EXTENSION vector`) before the schema is applied. Local, compose, CI
+  and parity use the pinned `pgvector/pgvector:0.8.0-pg16` image. Do not assume
+  the hosted Fly Postgres cluster has it: confirming availability and enabling it
+  there is a separately approved owner/provider step, done before the reviewed
+  `0019_pgvector-retrieval.sql` is applied. Embedding spend
+  (`EMBEDDINGS_PROVIDER=openai`) is a separate owner approval.
 - **Migrations:** quick-start uses `drizzle-kit push --force` (fine for a fresh
   DB / early beta). Switch to generated migrations as the schema stabilizes.
 - **Secrets:** never commit `.env`. `SESSION_SECRET` must be stable across

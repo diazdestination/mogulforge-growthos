@@ -1,5 +1,5 @@
 // Never reads .env or accepts an existing database/provider configuration.
-import { PGlite } from "@electric-sql/pglite";
+import { createVectorPGlite } from "./pglite-vector.mjs";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -9,7 +9,7 @@ import { detectSchemaPushFailure } from "../../../scripts/release-schema.mjs";
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const database = path.resolve(api, "../../lib/db");
 const selectedTests = process.argv.slice(2);
-const pg = await PGlite.create();
+const pg = await createVectorPGlite();
 const server = new PGLiteSocketServer({
   db: pg,
   host: "127.0.0.1",

@@ -1,5 +1,5 @@
 /** Isolated local verification only. Never inherits provider keys or a production DB. */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -72,6 +72,11 @@ const args =
           path.resolve(apiRoot, "../../lib/db/drizzle.config.ts"),
         ]
       : ["node_modules/vitest/vitest.mjs", "run", ...tests];
+if (mode === "schema") {
+  // The retrieval schema needs pgvector; create it before drizzle-kit pushes.
+  const ensured = spawnSync(process.execPath, [path.resolve(apiRoot, "../../lib/db/ensure-extensions.mjs")], { cwd: apiRoot, env, stdio: "inherit", windowsHide: true });
+  if (ensured.status !== 0) throw new Error("pgvector extension is unavailable for the local smart-sites database.");
+}
 const child = spawn(process.execPath, args, {
   cwd: apiRoot,
   env,

@@ -46,7 +46,8 @@ import {
 import { insertInspectionIfAvailable } from "./inspection-booking";
 import { stopEnrollmentsForLead } from "./playbooks";
 import { recordLeadOutcome } from "./playbook-learning";
-import { buildKnowledgeFacts, findKnowledgeAnswer } from "./knowledge";
+import { buildKnowledgeFacts } from "./knowledge";
+import { answerFromKnowledge } from "./retrieval";
 import { isSafeMailbox, mockAiProvider, openAiProvider, providers, type AiProvider } from "./providers";
 import { emailAcceptanceEvidence } from "./user-email";
 import { getAiInstructions, getConciergeSettings, getInspectionAvailability, getLeadScoring, getOrgSettings } from "./settings";
@@ -666,7 +667,7 @@ export async function handleMessage(params: {
     QUESTION_LIKE.test(text) &&
     !["emergency_check", "consent", "scheduling"].includes(state.step)
   ) {
-    const entry = await findKnowledgeAnswer(params.organizationId, text);
+    const entry = await answerFromKnowledge(params.organizationId, text);
     if (entry) {
       out.push(entry.content);
       answeredQuestion = true;

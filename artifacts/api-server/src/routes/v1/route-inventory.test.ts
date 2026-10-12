@@ -73,6 +73,11 @@ const SESSION_ONLY_ROUTES = new Set([
  */
 const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /contacts/:id/detail-correction": "crm.read",
+  "GET /contacts/:id/memories": "crm.read",
+  "POST /contacts/:id/memories": "crm.write",
+  "POST /contacts/:id/memories/:memoryId/retire": "crm.write",
+  "GET /contacts/:id/context-search": "crm.read",
+  "POST /retrieval/reindex": "settings.manage",
   "POST /contacts/:id/detail-corrections": "crm.write",
   "GET /contacts/:id/detail-corrections/:requestId": "crm.read",
   "POST /customer-work/estimates": "crm.write",

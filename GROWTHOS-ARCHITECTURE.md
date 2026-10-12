@@ -116,6 +116,51 @@ credential, spend, or live target action is implied by this repository.
 The exact no-memory implementation and verification handoff is maintained in
 [GROWTHOS-RESUME.md](GROWTHOS-RESUME.md).
 
+## Retrieval layer and customer memory (pgvector)
+
+Implemented on `agent/growthos-pgvector-memory-20261011` (local only):
+
+- **Tables:** `retrieval_chunks` (derived, rebuildable: redacted text, SHA-256,
+  embedding model, `vector(1536)`, HNSW cosine index; tenant-composite contact FK;
+  CHECKs tie `scope=knowledge` to no contact and `scope=customer` to one) and
+  `customer_memories` (staff-authored facts/preferences/equipment/access notes
+  with verified same-customer provenance; retiring keeps the row).
+- **Providers** (`services/embeddings.ts`): explicit `EMBEDDINGS_PROVIDER`
+  opt-in. `openai` = `text-embedding-3-small` (or `OPENAI_EMBEDDING_MODEL`) at
+  1536 dims via raw fetch, batched, 15 s timeout, no text in errors. `hash` =
+  deterministic lexical hashing, labelled `lexical_hash`, never "semantic".
+  Unset = keyword matching only.
+- **Index** (`services/retrieval-index.ts`): text is redacted with the Evidence
+  Intelligence redaction helper (email/phone/SSN/policy ids) and built without
+  contact name/email/phone/address before storage or embedding. Only changed
+  content hashes are re-embedded. Knowledge create/update re-index best-effort;
+  deactivate/delete and memory retirement delete chunks in the same transaction.
+- **Coherence and concurrency:** customer history uses the customer-workspace
+  canonical graph (`customerRecordGraph`, `coherentCustomerActivity`), so a
+  record whose parents disagree about the customer is in nobody's history and
+  cannot be cited as memory provenance. Embedding runs outside transactions;
+  writes then take the source lock (knowledge row `FOR UPDATE`, or the
+  per-customer advisory lock that memory retirement also takes), re-read the
+  authoritative source and only store vectors whose content hash is current.
+- **Reads** (`services/retrieval.ts`): exact cosine scan over the tenant's (and,
+  for customers, the contact's) own rows, merged with the deterministic keyword
+  rule; falls back to keyword-only without a provider or when the query embed
+  fails. The final authoritative snapshot is taken only after the query
+  embedding and vector candidate selection finish, and every candidate is
+  re-validated against that snapshot and the
+  caller's visibility (`resolveCustomerReadAccess`: stored AND effective role,
+  so API-key caps apply; invoices and `invoice_event` activity need
+  `invoices.read`), and returned text comes from the current source. The shared
+  index is maintained independently of the caller. The concierge still answers
+  only by quoting a stored entry.
+- **Surfaces:** `GET/POST /contacts/:id/memories`, `POST .../:memoryId/retire`,
+  `GET /contacts/:id/context-search`, owner/admin `POST /retrieval/reindex`, the
+  read-only assistant tool `search_customer_history`, and a Customer memory panel
+  in the customer workspace.
+- **Open gates:** pgvector availability/enablement on hosted Postgres, embedding
+  spend approval, and backfill on real data. Review-only SQL:
+  `reports/staging-schema-preview-2026-10-01/0019_pgvector-retrieval.sql`.
+
 ## Non-negotiable safety rules
 
 - No raw tenant artifact is used by AI without explicit authorization.

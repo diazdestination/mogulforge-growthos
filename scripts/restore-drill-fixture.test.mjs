@@ -16,6 +16,10 @@ const requireFromDb = createRequire(
   new URL("../lib/db/package.json", import.meta.url),
 );
 const { PGlite } = requireFromApi("@electric-sql/pglite");
+// The current schema has a pgvector column; open working copies with it loaded.
+const { createVectorPGlite } = await import(
+  new URL("../artifacts/api-server/scripts/pglite-vector.mjs", import.meta.url).href,
+);
 const { generateDrizzleJson, generateMigration } =
   requireFromDb("drizzle-kit/api");
 const key = Buffer.alloc(32, 47).toString("base64");
@@ -67,7 +71,7 @@ describe("synthetic restore fixture against current PostgreSQL schema", () => {
     } finally {
       await bootstrap.close();
     }
-    pg = await PGlite.create({
+    pg = await createVectorPGlite({
       loadDataDir: initial,
       database: "growthos_staging",
     });
@@ -216,7 +220,7 @@ describe("synthetic restore fixture against current PostgreSQL schema", () => {
       environment("growthos-restore-reader"),
       options("growthos-restore-reader"),
     );
-    const restored = await PGlite.create({
+    const restored = await createVectorPGlite({
       loadDataDir: await pg.dumpDataDir(),
       database: "growthos_staging",
     });

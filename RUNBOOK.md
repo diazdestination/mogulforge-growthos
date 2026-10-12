@@ -14,7 +14,8 @@ preview on `http://127.0.0.1:4193`. This uses an in-memory database, excludes pr
 credentials and holds outbound effects. Stop the action's terminal to close it.
 
 Test requires a running local Docker Engine. It creates its own PostgreSQL 16
-container with a random loopback port, checks ownership before schema setup and
+(pinned `pgvector/pgvector:0.8.0-pg16`, the same image as CI, parity and
+docker-compose) container with a random loopback port, checks ownership before schema setup and
 cleanup, applies the schema only there, and runs the recursive suites and website
 adapter checks. API files use at most two test workers, matching the two-CPU
 database; explicit independent-client race tests still run inside those files.
@@ -46,6 +47,27 @@ Authenticated journey acceptance remains a separate scoped browser task.
 Local actions do not deploy, apply hosted migrations, activate providers or
 establish contractor/production acceptance. Current machine evidence is in
 `C:\Forge\bootstrap\local-dev-2026-10-10`.
+
+## Retrieval layer (pgvector) — October 11
+
+The schema needs the PostgreSQL `vector` extension. Every
+`pnpm --filter @workspace/db run push|push-force` first runs
+`lib/db/ensure-extensions.mjs` (`CREATE EXTENSION IF NOT EXISTS vector`); a
+restricted role passes only if the database owner already enabled it. Isolated
+PGlite runners load `@electric-sql/pglite-pgvector` through
+`artifacts/api-server/scripts/pglite-vector.mjs`. Hosted databases are NOT
+changed by any of this: `reports/staging-schema-preview-2026-10-01/0019_pgvector-retrieval.sql`
+is review-only, and enabling pgvector on Fly/managed Postgres is a separate
+owner/provider approval (open gate; availability on the current Fly cluster is
+unverified). Embeddings stay off unless `EMBEDDINGS_PROVIDER` is set; `openai`
+is an owner spend decision. After enabling, an owner/admin runs
+`POST /api/v1/retrieval/reindex` (paged by `afterContactId`; safe to repeat
+because unchanged records are skipped by content hash). The manual
+`test-customer-detail-corrections-isolated.mjs` runner now pins the pgvector
+image (index `sha256:a132765e…`, linux/amd64 manifest `sha256:c72df104…`), runs
+`ensure-extensions.mjs` with its isolated env before the push, and uses the
+Forge WSL Docker bridge (with an owned WSL session) when Docker Desktop is not
+installed.
 
 Read `AGENTS.md`, `PROJECT_STATE.md` and `PAID-BETA-READINESS-P0.md` first.
 Use an isolated branch, verify identity/target and preserve other agents' work.

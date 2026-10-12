@@ -58,7 +58,10 @@ router.post(
       res.status(400).json({ error: "Invalid knowledge entry" });
       return;
     }
-    const entry = await createKnowledgeEntry(req.member!.organizationId, parsed.data);
+    let retrievalIndex: string | null = null;
+    const entry = await createKnowledgeEntry(req.member!.organizationId, parsed.data, {
+      onIndexStatus: (status) => { retrievalIndex = status; },
+    });
     if (!entry) {
       res.status(400).json({ error: "Invalid category or empty title/content" });
       return;
@@ -69,7 +72,7 @@ router.post(
       action: "knowledge.created",
       entityType: "knowledge_entry",
       entityId: entry.id,
-      metadata: { category: entry.category, title: entry.title },
+      metadata: { category: entry.category, title: entry.title, retrievalIndex },
     });
     res.status(201).json(toDto(entry));
   },
@@ -89,7 +92,10 @@ router.patch(
       res.status(400).json({ error: "Invalid knowledge entry" });
       return;
     }
-    const result = await updateKnowledgeEntry(req.member!.organizationId, id, parsed.data);
+    let retrievalIndex: string | null = null;
+    const result = await updateKnowledgeEntry(req.member!.organizationId, id, parsed.data, {
+      onIndexStatus: (status) => { retrievalIndex = status; },
+    });
     if (result === "invalid") {
       res.status(400).json({ error: "Invalid category or empty title/content" });
       return;
@@ -104,7 +110,7 @@ router.patch(
       action: "knowledge.updated",
       entityType: "knowledge_entry",
       entityId: id,
-      metadata: { fields: Object.keys(parsed.data) },
+      metadata: { fields: Object.keys(parsed.data), retrievalIndex },
     });
     res.json(toDto(result));
   },

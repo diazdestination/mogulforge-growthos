@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
+// One pinned pgvector-enabled PostgreSQL 16 image for local, CI and parity runs.
+export const POSTGRES_IMAGE = 'pgvector/pgvector:0.8.0-pg16';
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export function localEnvironment(source = process.env) {
   const env = Object.fromEntries(Object.entries(source).filter(([key]) =>
@@ -103,7 +105,7 @@ async function databaseTests(files = []) {
   const name = `forge-growthos-test-${process.pid}-${runId.slice(0, 8)}`;
   let created = false;
   try {
-    await command('docker', ['run', '--detach', '--rm', '--name', name, '--label', `com.forge.local-test=${runId}`, '--memory', '2g', '--cpus', '2', '--publish', '127.0.0.1::5432', '--env', 'POSTGRES_USER=postgres', '--env', 'POSTGRES_PASSWORD=forge-local-test-only', '--env', 'POSTGRES_DB=mogulforge_test', 'postgres:16-alpine'], { capture: true });
+    await command('docker', ['run', '--detach', '--rm', '--name', name, '--label', `com.forge.local-test=${runId}`, '--memory', '2g', '--cpus', '2', '--publish', '127.0.0.1::5432', '--env', 'POSTGRES_USER=postgres', '--env', 'POSTGRES_PASSWORD=forge-local-test-only', '--env', 'POSTGRES_DB=mogulforge_test', POSTGRES_IMAGE], { capture: true });
     created = true;
     const inspect = async () => JSON.parse(await command('docker', ['inspect', name], { capture: true }))[0];
     assertOwnedContainer(await inspect(), runId);

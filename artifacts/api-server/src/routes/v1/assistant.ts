@@ -119,6 +119,7 @@ router.post(
     try {
       await runAssistantChat({
         organizationId: req.member!.organizationId,
+        principal: { userId: req.member!.user.id, role: req.member!.role },
         messages: parsed.data.messages as AssistantChatMessage[],
         onDelta: (content) => send({ content }),
         onToolCall: (tool) => send({ tool }),

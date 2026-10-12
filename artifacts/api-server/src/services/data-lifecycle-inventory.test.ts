@@ -38,8 +38,8 @@ afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("explicit lifecycle schema coverage", () => {
   it("classifies every current source table without automatically adopting new tables", () => {
-    expect(source).toHaveLength(142);
-    expect(DATA_LIFECYCLE_CATALOG).toHaveLength(142);
+    expect(source).toHaveLength(144);
+    expect(DATA_LIFECYCLE_CATALOG).toHaveLength(144);
     expect(DATA_LIFECYCLE_CATALOG.find(e => e.table === "staff_lead_alert_coverage")).toEqual({
       table: "staff_lead_alert_coverage", category: "communications", ownership: "direct_org", selector: "organization_id",
     });
@@ -47,7 +47,7 @@ describe("explicit lifecycle schema coverage", () => {
       ["customer_work_roots","crm","organization_id"], ["customer_work_commands","audit","organization_id"],
     ]);
     expect(validateDataLifecycleSchema(source)).toEqual({ matched: true, reasons: [], providerMetadataExclusions: [] });
-    expect(DATA_LIFECYCLE_CATALOG.filter((e) => e.ownership === "direct_org")).toHaveLength(136);
+    expect(DATA_LIFECYCLE_CATALOG.filter((e) => e.ownership === "direct_org")).toHaveLength(138);
     expect(DATA_LIFECYCLE_CATALOG.filter((e) => e.ownership === "indirect_org").map((e) => e.table)).toEqual(["identity_tokens"]);
     expect(DATA_LIFECYCLE_CATALOG.filter((e) => e.ownership === "shared_exception").map((e) => e.table)).toEqual(["platform_email_dispatches", "platform_email_events", "rate_limit_counters", "scheduler_runtime", "sessions"]);
     expect(validateDataLifecycleSchema(source, [...source, { ...source[0]!, name: "new_source_table" }]).matched).toBe(false);
@@ -87,8 +87,8 @@ describe("explicit provider metadata fixture exception", () => {
     const { read, queries } = fixture([...structuredClone(source), provider]);
     const result = await read(randomUUID());
     expect(result).toMatchObject({ status: "bounded_preview", complete: false, exportReady: false, deletionReady: false });
-    expect(result.coverage).toMatchObject({ classifiedTables: 142, countedTables: 137, excludedTables: 5, providerMetadataExclusions: [REVIEWED_PROVIDER_METADATA.contract] });
-    expect(result.tables).toHaveLength(142);
+    expect(result.coverage).toMatchObject({ classifiedTables: 144, countedTables: 139, excludedTables: 5, providerMetadataExclusions: [REVIEWED_PROVIDER_METADATA.contract] });
+    expect(result.tables).toHaveLength(144);
     expect(result.blockers.map((b) => b.code)).toContain("reviewed_provider_metadata_excluded");
     expect(queries.find((q) => q.text.includes("UNION ALL"))!.text).not.toContain("pg_stat_monitor");
   });
@@ -153,8 +153,8 @@ describe("separately pinned Fly provider metadata", () => {
     const { read, queries } = fixture([...structuredClone(source), provider]);
     const result = await read(randomUUID());
     expect(result).toMatchObject({ status: "bounded_preview", complete: false, exportReady: false, deletionReady: false });
-    expect(result.coverage).toMatchObject({ classifiedTables: 142, countedTables: 137, excludedTables: 5, providerMetadataExclusions: ["fly_mpg_pg_stat_monitor_2_3_v1"] });
-    expect(result.tables).toHaveLength(142);
+    expect(result.coverage).toMatchObject({ classifiedTables: 144, countedTables: 139, excludedTables: 5, providerMetadataExclusions: ["fly_mpg_pg_stat_monitor_2_3_v1"] });
+    expect(result.tables).toHaveLength(144);
     const counts = queries.find((q) => q.text.includes("UNION ALL"))!.text;
     expect(counts).not.toContain("pg_stat_monitor");
     expect(counts).not.toContain("pg_stat_monitor_internal");
@@ -202,13 +202,13 @@ describe("bounded read-only inventory", () => {
     expect(queries.every((q) => /^(BEGIN|SET LOCAL|SELECT|ROLLBACK)/.test(q.text.trim()))).toBe(true);
     const counts = queries.find((q) => q.text.includes("UNION ALL"))!;
     expect(counts.values).toEqual([org]);
-    expect(counts.text.match(/LIMIT 10001/g)).toHaveLength(137);
-    expect(counts.text.match(/\$1::uuid/g)).toHaveLength(137);
+    expect(counts.text.match(/LIMIT 10001/g)).toHaveLength(139);
+    expect(counts.text.match(/\$1::uuid/g)).toHaveLength(139);
     expect(counts.text).toContain('FROM "public"."users" u WHERE u."id" = t."user_id" AND u."organization_id" = $1::uuid');
     for (const table of ["sessions", "rate_limit_counters", "scheduler_runtime"]) expect(counts.text).not.toContain(`"public"."${table}"`);
     expect(counts.text).not.toMatch(/SELECT\s+\*|encrypted_raw_text|password_hash|data\b|sess\b/);
-    expect(result.tables).toHaveLength(142);
-    expect(result.coverage.countedTables).toBe(137);
+    expect(result.tables).toHaveLength(144);
+    expect(result.coverage.countedTables).toBe(139);
     expect(result.coverage.excludedTables).toBe(5);
     expect(result.tables.find((e) => e.table === "contacts")).toMatchObject({ rowCount: 10_000, countStatus: "at_least_limit" });
     expect(result.tables.find((e) => e.table === "sessions")).toMatchObject({ rowCount: null, countStatus: "excluded" });

@@ -9,10 +9,18 @@ import { performance } from "node:perf_hooks";
 import pg from "pg";
 import { detectSchemaPushFailure } from "../../../scripts/release-schema.mjs";
 
-const DOCKER = "C:/Program Files/Docker/Docker/resources/bin/docker.exe";
-const HOST = "npipe:////./pipe/dockerDesktopLinuxEngine";
-const IMAGE = "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea";
-const PLATFORM_IMAGE = "sha256:1a66d744c1b459e13b05a8fca341da84cb63383e99ce262210efee5a319d4551";
+const DESKTOP_DOCKER = "C:/Program Files/Docker/Docker/resources/bin/docker.exe";
+const DESKTOP_HOST = "npipe:////./pipe/dockerDesktopLinuxEngine";
+const WSL_BRIDGE = "C:/Forge/tools/local-dev/docker-wsl.mjs";
+// Docker Desktop when installed; otherwise the Forge WSL Ubuntu engine bridge
+// (no TCP daemon), kept alive by an owned WSL session for the whole run.
+const DOCKER_TRANSPORT = existsSync(DESKTOP_DOCKER)
+  ? { file: DESKTOP_DOCKER, prefix: ["-H", DESKTOP_HOST], host: DESKTOP_HOST, wsl: false }
+  : { file: process.execPath, prefix: [WSL_BRIDGE], host: "wsl:Ubuntu-24.04:/var/run/docker.sock", wsl: true };
+const HOST = DOCKER_TRANSPORT.host;
+// pgvector/pgvector:0.8.0-pg16 (PostgreSQL 16 + pgvector): OCI index digest and its linux/amd64 manifest.
+const IMAGE = "sha256:a132765ec351c65111b5b675928a3a0515a466a40f97277329db8b8209ad8bc9";
+const PLATFORM_IMAGE = "sha256:c72df104202409108a1660ecccd2b7ffac6b17e44c31b2636d10e983f410f8eb";
 const runtimeImageAllowed = value => value === IMAGE || value === PLATFORM_IMAGE;
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repo = path.resolve(api, "../..");
@@ -60,7 +68,7 @@ export async function main() {
       } catch { clearTimeout(timer); if (child) children.delete(child); reject(new QaError("CHILD_START_UNKNOWN")); }
     });
   }
-  const docker = (args, options) => command(DOCKER, ["-H", HOST, ...args], { cap: 262144, ...options });
+  const docker = (args, options) => command(DOCKER_TRANSPORT.file, [...DOCKER_TRANSPORT.prefix, ...args], { cap: 262144, ...options });
   const inspectFormat = '{{json .Id}}|{{json .Name}}|{{json .Image}}|{{json .Config.Labels}}|{{json .NetworkSettings.Ports}}|{{json .HostConfig.PortBindings}}|{{json .HostConfig.Tmpfs}}|{{json .Mounts}}|{{json .Config.Image}}';
   async function inspect({ running = false, cleanup = false } = {}) {
     need(typeof id === "string" && /^[a-f0-9]{64}$/.test(id), "CONTAINER_ID_UNKNOWN");
@@ -122,6 +130,9 @@ export async function main() {
     need(ready && performance.now() < readyEnds, "NATIVE_PG_READINESS_UNKNOWN");
     await inspect({ running: true });
     const env = { ...osEnv(), NODE_ENV: "test", DATABASE_URL: `postgresql://detail_synthetic:${password}@127.0.0.1:${port}/detail_synthetic`, SESSION_SECRET: "synthetic-detail-test-session-never-deploy", APP_ORIGIN: "https://growth.example", OBJECT_STORAGE_PROVIDER: "postgres", DETAIL_CORRECTION_TEST_BACKEND: "native-postgresql", LOG_LEVEL: "silent", NO_COLOR: "1" };
+    // The schema has a pgvector column: enable the extension with the same isolated env first.
+    await command(process.execPath, [path.join(database, "ensure-extensions.mjs")], { cwd: database, env, timeout: 60000, output: true });
+    const extension = await pgQuery("SELECT count(*)::int AS n FROM pg_extension WHERE extname = 'vector'"); need(extension.rows[0]?.n === 1, "VECTOR_EXTENSION_MISSING");
     const schema = await command(process.execPath, [path.join(database, "node_modules/drizzle-kit/bin.cjs"), "push", "--force", "--config", "drizzle.config.ts"], { cwd: database, env, timeout: 180000, output: true });
     need(!detectSchemaPushFailure(schema.stdout + schema.stderr) && (schema.stdout + schema.stderr).includes("Changes applied"), "SCHEMA_PUSH_UNCONFIRMED");
     const core = await pgQuery("SELECT to_regclass('public.contacts') IS NOT NULL AND to_regclass('public.properties') IS NOT NULL AND to_regclass('public.users') IS NOT NULL AND to_regclass('public.audit_events') IS NOT NULL AS ready"); need(core.rows[0]?.ready === true, "SCHEMA_TABLES_MISSING"); receipt.schemaPrepared = true;
@@ -157,4 +168,9 @@ export async function main() {
   }
   return Object.freeze(receipt);
 }
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (DOCKER_TRANSPORT.wsl) {
+    const { withWslDockerSession } = await import("../../../scripts/local-dev.mjs");
+    await withWslDockerSession(() => main(), { enabled: existsSync(WSL_BRIDGE) });
+  } else await main();
+}
