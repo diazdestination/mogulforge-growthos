@@ -28,7 +28,7 @@ describe("Housecall Pro customer import", () => {
     fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
     await screen.findByTestId("hcp-import-preview");
     expect(vi.mocked(importLeadsCsv).mock.calls[0][0]).toMatchObject({
-      dryRun: true, sourceKey: "housecall-pro", mapping: { externalCustomerId: 0, firstName: 1, lastName: 2, email: 3, phone: 4 },
+      dryRun: true, mode: "customers", sourceKey: "housecall-pro", mapping: { externalCustomerId: 0, firstName: 1, lastName: 2, email: 3, phone: 4 },
     });
     const importButton = screen.getByRole("button", { name: "Import customers" }) as HTMLButtonElement;
     expect(importButton.disabled).toBe(true);
@@ -45,7 +45,7 @@ describe("Housecall Pro customer import", () => {
     upload("customers.csv", csv);
     fireEvent.click(await screen.findByRole("button", { name: "Preview import" }));
     await screen.findByTestId("hcp-import-preview");
-    fireEvent.change(screen.getByLabelText(/Notes/), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText(/Last name/), { target: { value: "" } });
     await waitFor(() => expect(screen.queryByTestId("hcp-import-preview")).toBeNull());
   });
 
@@ -55,7 +55,7 @@ describe("Housecall Pro customer import", () => {
     upload("customers.csv", csv);
     fireEvent.click(await screen.findByRole("button", { name: "Preview import" }));
     fireEvent.click(await screen.findByLabelText(/I reviewed this preview/));
-    fireEvent.change(screen.getByLabelText(/Notes/), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText(/Last name/), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Preview import" }));
     await screen.findByTestId("hcp-import-preview");
     expect((screen.getByLabelText(/I reviewed this preview/) as HTMLInputElement).checked).toBe(false);

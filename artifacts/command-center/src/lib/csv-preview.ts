@@ -31,7 +31,7 @@ export function parseCsvPreview(text: string, maxRows = 6): string[][] {
   return rows;
 }
 
-export type CustomerImportField = "firstName" | "lastName" | "email" | "phone" | "notes" | "externalCustomerId";
+export type CustomerImportField = "firstName" | "lastName" | "email" | "phone" | "externalCustomerId";
 
 // Generic header names only. These are suggestions staff must confirm; they are
 // not an approved Housecall Pro layout.
@@ -40,7 +40,6 @@ const SYNONYMS: Record<CustomerImportField, RegExp> = {
   lastName: /^(last[\s_-]*name|last|surname|family[\s_-]*name)$/i,
   email: /^(e-?mail|e-?mail[\s_-]*address)$/i,
   phone: /^(mobile[\s_-]*(number|phone)?|cell[\s_-]*(number|phone)?|phone[\s_-]*(number)?)$/i,
-  notes: /^(customer[\s_-]*)?notes?$/i,
   externalCustomerId: /^(customer[\s_-]*)?id$/i,
 };
 

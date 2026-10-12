@@ -425,6 +425,7 @@ export * from './leadImport';
 export * from './leadImportPreview';
 export * from './leadImportRequest';
 export * from './leadImportRequestMapping';
+export * from './leadImportRequestMode';
 export * from './leadInput';
 export * from './leadMailboxReply';
 export * from './leadMailboxReplyContent';

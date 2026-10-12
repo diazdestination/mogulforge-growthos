@@ -1,5 +1,6 @@
 import {
   appointmentsTable,
+  auditEventsTable,
   contactsTable,
   db,
   leadImportsTable,
@@ -28,6 +29,7 @@ vi.mock("./playbooks", async (importOriginal) => {
 import { enrollLead } from "./playbooks";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import {
+  CUSTOMER_IMPORTED_ACTION,
   createCampaign,
   drainReactivationCampaigns,
   getCampaignReport,
@@ -207,6 +209,34 @@ describe("importLeads", () => {
     } finally {
       await holder.end();
     }
+  });
+
+  it("imports a customer list as existing customers: contacts with provenance and no leads", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const header = "ID,First Name,Last Name,Email,Mobile Number";
+    const rows = [`hcp-a-${tag},Ann,Able,ann-${tag}@example.com,`, `hcp-b-${tag},Ben,Baker,,404555${tag.replace(/\D/g, "0").slice(0, 4)}`];
+    const input = { mapping: { externalCustomerId: 0, firstName: 1, lastName: 2, email: 3, phone: 4 }, sourceKey: `housecall-pro-${tag}`, mode: "customers" as const, fileName: "customers.csv" };
+    const leadsBefore = (await db.select({ id: leadsTable.id }).from(leadsTable).where(eq(leadsTable.organizationId, orgId))).length;
+
+    const preview = await importLeads(orgId, { ...input, csv: [header, ...rows].join("\n"), dryRun: true });
+    expect(preview).toMatchObject({ dryRun: true, imported: 2, conflicts: 0 });
+    const saved = await importLeads(orgId, { ...input, csv: [header, ...rows].join("\n") });
+    if ("error" in saved) throw new Error(saved.error);
+    expect(saved).toMatchObject({ imported: 2, duplicates: 0, conflicts: 0 });
+    expect((await db.select({ id: leadsTable.id }).from(leadsTable).where(eq(leadsTable.organizationId, orgId))).length).toBe(leadsBefore);
+    const provenance = await db.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, orgId), eq(auditEventsTable.action, CUSTOMER_IMPORTED_ACTION), sql`${auditEventsTable.metadata}->>'sourceKey' = ${input.sourceKey}`));
+    expect(provenance.map((e) => (e.metadata as { externalCustomerId: string }).externalCustomerId).sort()).toEqual([`hcp-a-${tag}`, `hcp-b-${tag}`]);
+    expect(new Set(provenance.map((e) => (e.metadata as { batchId: string }).batchId)).size).toBe(1);
+
+    // Same file again: nothing new. Same customer ID with different details: flagged, not duplicated.
+    expect(await importLeads(orgId, { ...input, csv: [header, ...rows].join("\n") })).toMatchObject({ imported: 0, duplicates: 2 });
+    const changed = await importLeads(orgId, { ...input, csv: [header, `hcp-a-${tag},Ann,Able,ann-new-${tag}@example.com,`].join("\n") });
+    expect(changed).toMatchObject({ imported: 0, conflicts: 1 });
+  });
+
+  it("refuses pipeline fields in a customer import", async () => {
+    const result = await importLeads(orgId, { csv: "First,Email,Status\nAl,al@example.com,won", mapping: { firstName: 0, email: 1, status: 2 }, mode: "customers" });
+    expect(result).toMatchObject({ error: expect.stringMatching(/only uses name, email, phone and customer ID/) });
   });
 
   it("rejects a mapping without email or phone", async () => {

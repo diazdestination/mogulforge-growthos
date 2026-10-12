@@ -7797,6 +7797,10 @@ components:
         snapshotAsOf:
           type: string
           description: Original export snapshot date (ISO date or timestamp with timezone). Omit when unknown; upload time is never source freshness.
+        mode:
+          type: string
+          enum: [leads, customers]
+          description: customers imports existing customers as contacts only (no lead, pipeline stage or nurture); only name, email, phone and customer ID columns may be mapped. Defaults to leads.
         dryRun:
           type: boolean
           description: Check and match every row inside one rolled-back transaction and return a preview. Nothing is saved and no import record is created.

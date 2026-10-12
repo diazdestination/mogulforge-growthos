@@ -1,6 +1,7 @@
 import {
   activitiesTable,
   appointmentsTable,
+  auditEventsTable,
   contactsTable,
   db,
   importedOpportunityHistorySchema,
@@ -18,7 +19,7 @@ import {
   type ReactivationSegment,
   type SendingHoursSettings,
 } from "@workspace/db";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, notInArray, or, sql } from "drizzle-orm";
 
 import { recordAudit } from "./audit";
@@ -174,7 +175,16 @@ interface ImportLeadsParams {
     createdByUserId?: string | null;
     /** Run every row check and match in one transaction, then roll it back. */
     dryRun?: boolean;
+    /**
+     * "customers" brings in existing customers (e.g. a Housecall Pro customer
+     * list) as contacts only: no lead, so no pipeline stage, lead count or
+     * nurture. Each created contact gets a provenance audit event.
+     */
+    mode?: "leads" | "customers";
 }
+const CUSTOMER_IMPORT_FIELDS = new Set<ImportField>(["firstName", "lastName", "email", "phone", "externalCustomerId"]);
+/** Per-contact provenance for customer-mode imports (contacts have no source columns). */
+export const CUSTOMER_IMPORTED_ACTION = "customer.imported";
 async function runLeadImport(
   organizationId: string,
   params: ImportLeadsParams,
@@ -210,6 +220,15 @@ async function runLeadImport(
   if (m.externalOpportunityId !== undefined && !sourceKey) {
     return { error: "A stable source key is required when mapping external opportunity IDs" };
   }
+  const customers = params.mode === "customers";
+  if (customers && Object.keys(m).some((key) => !CUSTOMER_IMPORT_FIELDS.has(key as ImportField))) {
+    return { error: "A customer import only uses name, email, phone and customer ID columns" };
+  }
+  if (customers && m.externalCustomerId !== undefined && !sourceKey) {
+    return { error: "A stable source key is required when mapping customer IDs" };
+  }
+  // Links every contact a customer import creates, for review or later correction.
+  const batchId = randomUUID();
   const receivedAt = new Date();
   let snapshotAsOf: string | null;
   try { snapshotAsOf = parseSourceDate(params.snapshotAsOf, "Snapshot date", receivedAt); }
@@ -338,6 +357,36 @@ async function runLeadImport(
         if (contact && ((email && contact.email && normalizeAddress("email", contact.email) !== email) ||
             (phone && contact.phone && normalizeAddress("sms", contact.phone) !== normalizeAddress("sms", phone)))) {
           return { kind: "conflict", reason: "a matched person has conflicting contact details; reconcile before linking this opportunity" } as const;
+        }
+        if (customers) {
+          const externalCustomerId = history.externalCustomerId;
+          let known: { contactId: string | null }[] = [];
+          if (sourceKey && externalCustomerId) {
+            known = await tx.selectDistinct({ contactId: auditEventsTable.entityId }).from(auditEventsTable).where(and(
+              eq(auditEventsTable.organizationId, organizationId), eq(auditEventsTable.action, CUSTOMER_IMPORTED_ACTION),
+              sql`${auditEventsTable.metadata}->>'sourceKey' = ${sourceKey}`,
+              sql`${auditEventsTable.metadata}->>'externalCustomerId' = ${externalCustomerId}`,
+            )).limit(2);
+            if (known.length && (!contact || known.some((k) => k.contactId !== contact.id))) {
+              return { kind: "conflict", reason: "this source customer ID was imported before as different contact details; reconcile before import" } as const;
+            }
+          }
+          const provenance = (contactId: string, matchedExisting: boolean) => tx.insert(auditEventsTable).values({
+            organizationId, actorUserId: params.createdByUserId ?? null, action: CUSTOMER_IMPORTED_ACTION,
+            entityType: "contact", entityId: contactId,
+            metadata: { batchId, sourceKey, externalCustomerId, snapshotAsOf, fileName: clean(params.fileName, 200), matchedExisting },
+          });
+          if (contact) {
+            // Remember which existing person this source ID is, so a later
+            // re-import with changed details is flagged rather than duplicated.
+            if (sourceKey && externalCustomerId && !known.length) await provenance(contact.id, true);
+            return { kind: "duplicate" } as const;
+          }
+          const [created] = await tx.insert(contactsTable).values({
+            organizationId, firstName, lastName: clean(get("lastName"), 100), email, phone,
+          }).returning({ id: contactsTable.id });
+          await provenance(created.id, false);
+          return { kind: "imported" } as const;
         }
         if (sourceKey && history.externalCustomerId) {
           const knownCustomers = await tx.selectDistinct({ contactId: leadsTable.contactId }).from(leadsTable).where(and(
@@ -495,10 +544,10 @@ async function runLeadImport(
   await recordAudit({
     organizationId,
     actorUserId: params.createdByUserId ?? null,
-    action: "leads.imported",
+    action: customers ? "customers.imported" : "leads.imported",
     entityType: "lead_import",
     entityId: record.id,
-    metadata: { imported, updated, duplicates, conflicts, skipped, sourceKey, snapshotAsOf },
+    metadata: { imported, updated, duplicates, conflicts, skipped, sourceKey, snapshotAsOf, ...(customers ? { mode: "customers", batchId } : {}) },
   });
   return record;
 }

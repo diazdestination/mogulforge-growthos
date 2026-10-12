@@ -18,7 +18,7 @@ describe("parseCsvPreview", () => {
 describe("suggestCustomerMapping", () => {
   it("suggests only clear generic header matches and never reuses a column", () => {
     expect(suggestCustomerMapping(["ID", "First Name", "Last Name", "Mobile Number", "Email", "Company", "Notes"])).toEqual({
-      externalCustomerId: 0, firstName: 1, lastName: 2, phone: 3, email: 4, notes: 6,
+      externalCustomerId: 0, firstName: 1, lastName: 2, phone: 3, email: 4,
     });
     expect(suggestCustomerMapping(["Customer", "Contact info"])).toEqual({});
   });

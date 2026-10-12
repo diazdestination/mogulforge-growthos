@@ -7,7 +7,6 @@ const FIELDS: { key: CustomerImportField; label: string; required?: boolean }[] 
   { key: "lastName", label: "Last name" },
   { key: "email", label: "Email" },
   { key: "phone", label: "Phone" },
-  { key: "notes", label: "Notes" },
   { key: "externalCustomerId", label: "Housecall Pro customer ID" },
 ];
 const SOURCE_KEY = "housecall-pro";
@@ -59,7 +58,7 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
     hasHeader: true,
     mapping,
     sourceKey: SOURCE_KEY,
-    defaultSource: SOURCE_KEY,
+    mode: "customers" as const,
     ...(exportedOn ? { snapshotAsOf: exportedOn } : {}),
   };
   // A preview only authorizes the import of exactly what it checked.
@@ -193,7 +192,7 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
             </details>
           )}
           <p className="text-muted-foreground">
-            Imported customers are not contacted automatically. Matching people are never merged by guess; rows that need review are left out.
+            Customers are added as existing customers, not sales leads, and are not contacted automatically. Matching people are never merged by guess; rows that need review are left out.
           </p>
           <label className="flex items-start gap-2">
             <input type="checkbox" className="mt-1" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} disabled={busy} />
