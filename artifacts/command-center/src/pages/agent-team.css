@@ -33,6 +33,9 @@
 .agent-team__card-name { font-size:10px; font-weight:700; color:var(--agent-green); letter-spacing:.08em; }
 .agent-team__card-role { font-size:17px; font-weight:700; line-height:1.25; margin-top:5px; }
 .agent-team__card-promise { font-size:12px; line-height:1.55; color:var(--agent-muted); margin-top:9px; }
+.agent-team__pending { display:inline-flex; width:fit-content; margin-top:10px; padding:3px 8px; border:1px solid var(--agent-green); border-radius:999px; font-size:10px; font-weight:600; color:var(--agent-green); }
+.agent-team__pending-detail { margin:-8px 0 20px; font-size:12px; line-height:1.5; color:var(--agent-muted); }
+.agent-team__pending-detail a { color:var(--agent-green); font-weight:600; text-decoration:underline; text-underline-offset:2px; }
 .agent-team__specialties { display:flex; flex-direction:column; gap:7px; margin-top:16px; font-size:11px; line-height:1.4; }
 .agent-team__specialties strong { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--agent-muted); font-weight:600; }
 .agent-team__card-footer { position:absolute; left:16px; right:16px; bottom:0; min-height:42px; border-top:1px solid var(--agent-line); display:flex; align-items:center; justify-content:space-between; font-size:11px; font-weight:600; color:var(--agent-text); }

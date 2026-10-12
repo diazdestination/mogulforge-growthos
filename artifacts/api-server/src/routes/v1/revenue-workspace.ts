@@ -18,6 +18,7 @@ import {
 import { and, desc, eq, isNull, inArray } from "drizzle-orm";
 import { requireMember } from "../../middlewares/requireMember";
 import { parseReportingPeriod } from "../../services/reporting-period";
+import { canReadInvoiceProposals } from "../../services/specialists/invo";
 import { requirePlatformAdmin } from "./orgs";
 import { rateLimit } from "../../lib/rateLimit";
 import { getSchedulerHealth } from "../../services/scheduler-runtime";
@@ -78,7 +79,7 @@ router.get(
   "/revenue/desk",
   requireMember("crm.read"),
   safe(async (req, res) =>
-    res.json(await revenueDesk(req.member!.organizationId)),
+    res.json(await revenueDesk(req.member!.organizationId, { includeInvoiceProposals: canReadInvoiceProposals(req.member!.user.role, req.member!.role) })),
   ),
 );
 router.post(

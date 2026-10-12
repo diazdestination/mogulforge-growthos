@@ -82,7 +82,17 @@ export const bieAutopilotPoliciesTable = pgTable(
   (table) => [uniqueIndex("bie_autopilot_policies_org_uniq").on(table.organizationId)],
 );
 
-export type BieAgentRunKind = "revenue_recovery_briefing" | "proposal_generation";
+/**
+ * `kind` is plain text in the reviewed schema (no CHECK constraint), so adding
+ * the proposal-only specialist kinds needs no migration. Specialist runs may
+ * only insert `proposed` rows; see services/specialists/contract.ts.
+ */
+export type BieAgentRunKind =
+  | "revenue_recovery_briefing"
+  | "proposal_generation"
+  | "specialist_scout"
+  | "specialist_invo"
+  | "assistant_proposal";
 export type BieAgentRunStatus = "running" | "completed" | "failed";
 
 /** Immutable, evidence-backed BIE run snapshots. */

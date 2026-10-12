@@ -21,6 +21,12 @@ import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 
 import { logger } from "../lib/logger";
 import { validWorkReadScope } from "./customer-work-read-scope";
+import {
+  ASSISTANT_STAGE_TARGETS,
+  proposeFollowUpTask,
+  proposeStageChange,
+  type AssistantProposalResult,
+} from "./specialists/assistant-proposals";
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
@@ -333,10 +339,25 @@ async function staleLeads(organizationId: string, days: number, limit: number) {
 
 /* --------------------------------------------------------- tool registry */
 
+/**
+ * Every tool declares its effect. `read` tools aggregate tenant data;
+ * `propose` tools may only append a `proposed` Revenue Desk row. No tool may
+ * execute, send, approve or change CRM records directly; the loop refuses any
+ * other effect even if one is registered by mistake.
+ */
+export type ToolEffect = "read" | "propose";
+export const EXECUTABLE_TOOL_EFFECTS: ReadonlySet<string> = new Set<ToolEffect>(["read", "propose"]);
+
+export interface ToolContext {
+  userId: string | null;
+  canPropose: boolean;
+}
+
 interface ToolDef {
+  effect: ToolEffect;
   description: string;
   parameters: Record<string, unknown>;
-  run: (organizationId: string, args: Record<string, unknown>) => Promise<unknown>;
+  run: (organizationId: string, args: Record<string, unknown>, context?: ToolContext) => Promise<unknown>;
 }
 
 const intArg = (v: unknown, fallback: number, max: number) => {
@@ -346,6 +367,7 @@ const intArg = (v: unknown, fallback: number, max: number) => {
 
 export const TOOLS: Record<string, ToolDef> = {
   get_pipeline_snapshot: {
+    effect: "read",
     description:
       "Current lead pipeline: lead counts by status and by source, plus how many new leads arrived in the last N days.",
     parameters: {
@@ -355,6 +377,7 @@ export const TOOLS: Record<string, ToolDef> = {
     run: (org, a) => pipelineSnapshot(org, intArg(a.days, 30, 3650)),
   },
   get_conversion_insights: {
+    effect: "read",
     description:
       "Won vs lost breakdown over the last N days, grouped by lead source and service type. Use for close rates, what's working vs not, and missed opportunities.",
     parameters: {
@@ -364,6 +387,7 @@ export const TOOLS: Record<string, ToolDef> = {
     run: (org, a) => conversionInsights(org, intArg(a.days, 90, 3650)),
   },
   get_appointments_stats: {
+    effect: "read",
     description:
       "Appointment counts by status (completed, cancelled, no_show...) and type over the last N days, plus upcoming scheduled count.",
     parameters: {
@@ -373,12 +397,14 @@ export const TOOLS: Record<string, ToolDef> = {
     run: (org, a) => appointmentsStats(org, intArg(a.days, 30, 3650)),
   },
   get_team_workload: {
+    effect: "read",
     description:
       "Per-teammate workload: open and overdue tasks, active leads, and upcoming appointments. Use for workload balance and employee engagement questions.",
     parameters: { type: "object", properties: {} },
     run: (org) => teamWorkload(org),
   },
   get_revenue_summary: {
+    effect: "read",
     description:
       "Estimate totals by status (draft/sent/accepted/declined) in dollars, project counts by status, and booked project value over the last N days.",
     parameters: {
@@ -388,6 +414,7 @@ export const TOOLS: Record<string, ToolDef> = {
     run: (org, a) => revenueSummary(org, intArg(a.days, 90, 3650)),
   },
   get_stale_leads: {
+    effect: "read",
     description:
       "Open leads with no activity in N days, highest score first — likely missed opportunities worth chasing.",
     parameters: {
@@ -399,7 +426,56 @@ export const TOOLS: Record<string, ToolDef> = {
     },
     run: (org, a) => staleLeads(org, intArg(a.days, 14, 3650), intArg(a.limit, 10, 25)),
   },
+  propose_follow_up_task: {
+    effect: "propose",
+    description:
+      "Propose (not create) a staff follow-up task for one lead. It is queued in Revenue Desk for a human to approve; nothing happens until then. Use a lead id returned by another tool.",
+    parameters: {
+      type: "object",
+      properties: {
+        leadId: { type: "string", description: "Lead id (uuid) from a previous tool result" },
+        title: { type: "string", description: "Short task title (3-120 characters)" },
+        reason: { type: "string", description: "Why this follow-up is needed, citing the data" },
+        priority: { type: "string", enum: ["normal", "high"] },
+      },
+      required: ["leadId", "title", "reason"],
+      additionalProperties: false,
+    },
+    run: (org, a, ctx) => ctx?.userId ? proposeFollowUpTask(org, ctx.userId, a) : Promise.resolve({ ok: false, message: "A signed-in staff member is required." }),
+  },
+  propose_stage_change: {
+    effect: "propose",
+    description:
+      `Propose (not perform) moving one lead to another pipeline stage (${ASSISTANT_STAGE_TARGETS.join(", ")}). It is queued in Revenue Desk for a human to approve.`,
+    parameters: {
+      type: "object",
+      properties: {
+        leadId: { type: "string", description: "Lead id (uuid) from a previous tool result" },
+        status: { type: "string", enum: [...ASSISTANT_STAGE_TARGETS] },
+        reason: { type: "string", description: "Why the stage should change, citing the data" },
+      },
+      required: ["leadId", "status", "reason"],
+      additionalProperties: false,
+    },
+    run: (org, a, ctx) => ctx?.userId ? proposeStageChange(org, ctx.userId, a) : Promise.resolve({ ok: false, message: "A signed-in staff member is required." }),
+  },
 };
+
+/** Tools offered to the model for this caller. Propose tools need a crm.write user. */
+export function offeredTools(canPropose: boolean): string[] {
+  return Object.entries(TOOLS)
+    .filter(([, tool]) => EXECUTABLE_TOOL_EFFECTS.has(tool.effect) && (tool.effect === "read" || canPropose))
+    .map(([name]) => name);
+}
+
+/** The single gate between a model tool call and code. Returns a refusal instead of running. */
+export function resolveToolCall(name: string, canPropose: boolean): { tool: ToolDef } | { refusal: string } {
+  const tool = Object.prototype.hasOwnProperty.call(TOOLS, name) ? TOOLS[name] : undefined;
+  if (!tool) return { refusal: `Unknown tool: ${name}` };
+  if (!EXECUTABLE_TOOL_EFFECTS.has(tool.effect)) return { refusal: `Tool ${name} is not permitted: the assistant can only read data or propose actions.` };
+  if (tool.effect === "propose" && !canPropose) return { refusal: `Tool ${name} is not available to this user; you can only answer with data.` };
+  return { tool };
+}
 
 /* ------------------------------------------------------------ chat loop */
 
@@ -408,7 +484,7 @@ export const TOOLS: Record<string, ToolDef> = {
  * Falls back to a neutral description when the org record is not found or has
  * no name, so the assistant never claims a hardcoded company identity.
  */
-export function buildSystemPrompt(orgName: string | null | undefined): string {
+export function buildSystemPrompt(orgName: string | null | undefined, canPropose = false): string {
   const identity = orgName?.trim() ? `${orgName.trim()}'s CRM` : "this organization's CRM";
   return `You are the built-in business analyst for ${identity}. You answer questions from the company's own team about THEIR live CRM data using the provided tools.
 
@@ -420,7 +496,10 @@ Guidelines:
 - Proactively flag one useful insight or next step when it's clearly supported by the data (e.g. stale high-score leads, overloaded teammates, high no-show rates).
 - Material orders for jobs are not tracked in this CRM yet — say so honestly if asked, and suggest what is trackable (estimates, project statuses).
 - If a question is about a specific person's performance, stick to neutral workload/pipeline facts; don't speculate about attitude or engagement beyond the numbers.
-- Dates: "today" is the server date. Default lookback windows are fine unless the user asks for a period.`;
+- Dates: "today" is the server date. Default lookback windows are fine unless the user asks for a period.
+- You cannot execute, send, approve, schedule or change anything. ${canPropose
+    ? "You may only PROPOSE a follow-up task or a stage change with the propose_* tools; each proposal waits for a staff member to approve it in Revenue Desk. Say so plainly, and never claim an action was taken."
+    : "This user can only read data, so do not offer to propose or perform changes."}`;
 }
 
 type OpenAiMessage =
@@ -436,7 +515,7 @@ interface OpenAiToolCall {
 
 async function callOpenAi(
   messages: OpenAiMessage[],
-  options: { stream: boolean; tools: boolean },
+  options: { stream: boolean; tools: boolean; toolNames?: string[] },
 ): Promise<Response> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
@@ -453,7 +532,7 @@ async function callOpenAi(
       stream: options.stream,
       ...(options.tools
         ? {
-            tools: Object.entries(TOOLS).map(([name, t]) => ({
+            tools: (options.toolNames ?? offeredTools(false)).map((name) => [name, TOOLS[name]!] as const).map(([name, t]) => ({
               type: "function",
               function: { name, description: t.description, parameters: t.parameters },
             })),
@@ -476,7 +555,16 @@ export async function runAssistantChat(params: {
   messages: AssistantChatMessage[];
   onDelta: (text: string) => void;
   onToolCall?: (toolName: string) => void;
+  /** The requesting staff member; proposals are attributed to them. */
+  userId?: string | null;
+  /** True only when the route verified crm.write for this user. Defaults to read-only. */
+  canPropose?: boolean;
+  /** A proposal was queued (never executed). The UI renders an approval marker. */
+  onProposal?: (proposal: AssistantProposalResult) => void;
 }): Promise<string> {
+  const canPropose = params.canPropose === true && Boolean(params.userId);
+  const toolNames = offeredTools(canPropose);
+  const context: ToolContext = { userId: params.userId ?? null, canPropose };
   const [org] = await db
     .select({ name: organizationsTable.name })
     .from(organizationsTable)
@@ -484,12 +572,12 @@ export async function runAssistantChat(params: {
     .limit(1);
 
   const history: OpenAiMessage[] = [
-    { role: "system", content: buildSystemPrompt(org?.name) },
+    { role: "system", content: buildSystemPrompt(org?.name, canPropose) },
     ...params.messages.slice(-20).map((m) => ({ role: m.role, content: m.content })),
   ];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const res = await callOpenAi(history, { stream: false, tools: true });
+    const res = await callOpenAi(history, { stream: false, tools: true, toolNames });
     const data = (await res.json()) as {
       choices?: {
         message?: { content?: string | null; tool_calls?: OpenAiToolCall[] };
@@ -512,15 +600,20 @@ export async function runAssistantChat(params: {
       tool_calls: toolCalls,
     });
     for (const call of toolCalls) {
-      const tool = TOOLS[call.function.name];
+      const resolved = resolveToolCall(call.function.name, canPropose);
       params.onToolCall?.(call.function.name);
       let result: unknown;
-      if (!tool) {
-        result = { error: `Unknown tool: ${call.function.name}` };
+      if ("refusal" in resolved) {
+        result = { error: resolved.refusal };
       } else {
+        const tool = resolved.tool;
         try {
           const args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
-          result = await tool.run(params.organizationId, args);
+          result = await tool.run(params.organizationId, args, context);
+          if (tool.effect === "propose") {
+            const proposal = result as AssistantProposalResult;
+            if (proposal?.ok) params.onProposal?.(proposal);
+          }
         } catch (err) {
           logger.error({ err, tool: call.function.name }, "assistant tool failed");
           result = { error: "This data lookup failed; answer with what you have and mention the gap." };

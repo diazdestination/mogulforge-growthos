@@ -165,11 +165,12 @@ export async function saveOperatingProfile(
   });
 }
 
-export async function revenueDesk(org: string) {
+/** INVO proposals carry invoice evidence; they appear only for callers who may read invoices. */
+export async function revenueDesk(org: string, visibility: { includeInvoiceProposals: boolean }) {
   const [nextActions, proposals, records, staff, attempts, profile, followup] =
     await Promise.all([
       listTodayActions(org, { limit: 50 }),
-      listBieProposals(org),
+      listBieProposals(org, visibility),
       db
         .select({
           id: leadsTable.id,
