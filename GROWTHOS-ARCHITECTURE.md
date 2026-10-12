@@ -145,7 +145,9 @@ Implemented on `agent/growthos-pgvector-memory-20261011` (local only):
 - **Reads** (`services/retrieval.ts`): exact cosine scan over the tenant's (and,
   for customers, the contact's) own rows, merged with the deterministic keyword
   rule; falls back to keyword-only without a provider or when the query embed
-  fails. Every candidate is re-validated against the current source and the
+  fails. The final authoritative snapshot is taken only after the query
+  embedding and vector candidate selection finish, and every candidate is
+  re-validated against that snapshot and the
   caller's visibility (`resolveCustomerReadAccess`: stored AND effective role,
   so API-key caps apply; invoices and `invoice_event` activity need
   `invoices.read`), and returned text comes from the current source. The shared

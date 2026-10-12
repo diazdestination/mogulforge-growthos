@@ -193,6 +193,39 @@ collision on a shared `+15005550009` number already exists at base `87adc3e`.
 It is not caused by this branch, and it means the full suite cannot be claimed
 reliably green.
 
+## Codex re-review fix (2026-10-12)
+
+The re-review (`RE-REVIEW.md` in the same directory) found one remaining P1.
+Read paths took their source snapshot BEFORE awaiting the query embedding, so a
+retirement, deactivation, deletion or edit completed during that wait could be
+bypassed (keyword fallback or vector merge, including old text scored with
+similarity 1).
+
+Fix (`services/retrieval.ts`): `searchKnowledge` and `retrieveCustomerContext`
+now (1) finish the query embedding and vector candidate selection, then (2) take
+the final authoritative snapshot. For customers that snapshot is the visible
+coherent history, read in one repeatable-read, read-only transaction. Keyword
+results are recomputed from it. Every vector candidate is validated against it
+for identity, current state and coherence, caller visibility and content hash,
+in the semantic, merged and failed-query-embedding fallback paths. Returned text
+always comes from that snapshot.
+
+Tests: ten deferred QUERY-embedding tests use an embedder that blocks only the
+query call. They cover memory retirement, knowledge deactivation, knowledge
+deletion, customer source edit and knowledge edit, each in semantic and
+failed-query fallback modes. The edit cases make index embeddings fail so the
+old-hash chunk deliberately survives into candidate selection. They assert no
+retired/deactivated/deleted result, no old text and no old-hash similarity.
+Negative control: against the previous `retrieval.ts` all 10 fail; with the fix
+all pass.
+
+| Command | Result |
+| --- | --- |
+| Focused DB tests (same 12 files) | 195/195 passed |
+| `scripts` vitest | 28 files, 351/351 passed |
+| `pnpm run typecheck`; api-server build | pass; pass |
+| `node scripts/local-dev.mjs parity` | `DOCKER_STAGING_PARITY_PASSED` |
+
 ## Open gates (owner input)
 
 1. **Hosted pgvector.** Confirm that the Fly/managed Postgres cluster offers

@@ -28,6 +28,7 @@ import { createKnowledgeEntry, deleteKnowledgeEntry, updateKnowledgeEntry } from
 import { answerFromKnowledge, retrieveCustomerContext, searchKnowledge } from "./retrieval";
 import {
   knowledgeDocument,
+  redactForRetrieval,
   reindexOrganization,
   syncCustomerHistoryIndex,
   syncKnowledgeEntryIndex,
@@ -79,6 +80,35 @@ function gatedProvider() {
         entered();
         await gate;
       }
+      return hashEmbeddingProvider.embed(texts);
+    },
+  };
+  return { provider, release, started };
+}
+
+/**
+ * A provider whose QUERY embedding (the single text equal to `query`) blocks
+ * until released, then returns a vector ("semantic") or throws ("fallback").
+ * Index embeddings use the hash embedder, or fail when `indexFails` so an old
+ * chunk deliberately survives an edit.
+ */
+function queryGatedProvider(query: string, outcome: "semantic" | "fallback", indexFails = false) {
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const started = new Promise<void>((resolve) => (entered = resolve));
+  const target = redactForRetrieval(query);
+  const provider: EmbeddingProvider = {
+    model: hashEmbeddingProvider.model,
+    quality: "lexical_hash",
+    async embed(texts) {
+      if (texts.length === 1 && texts[0] === target) {
+        entered();
+        await gate;
+        if (outcome === "fallback") throw Object.assign(new Error("query embed failed"), { code: "embedding_request_failed" });
+        return hashEmbeddingProvider.embed(texts);
+      }
+      if (indexFails) throw Object.assign(new Error("index embed failed"), { code: "embedding_request_failed" });
       return hashEmbeddingProvider.embed(texts);
     },
   };
@@ -374,6 +404,120 @@ describe("in-flight index writes never resurrect or overwrite", () => {
     expect(text(found)).not.toContain("brass");
     expect(await chunkCount(orgA, eq(retrievalChunksTable.sourceId, memory.id))).toBe(0);
   });
+});
+
+describe("changes completed while the QUERY embedding is in flight", () => {
+  for (const outcome of ["semantic", "fallback"] as const) {
+    it(`a memory retired mid-query is not returned (${outcome})`, async () => {
+      const marker = `kestrel${outcome}`;
+      setEmbeddingProviderForTests(hashEmbeddingProvider);
+      const { memory } = await createCustomerMemory(orgA, alice, userA, { kind: "access_note", content: `Spare key under the ${marker} planter.` }, ALL);
+      expect(await chunkCount(orgA, eq(retrievalChunksTable.sourceId, memory.id))).toBe(1);
+      const query = `spare key ${marker} planter`;
+      const gated = queryGatedProvider(query, outcome);
+      setEmbeddingProviderForTests(gated.provider);
+      const pending = retrieveCustomerContext(orgA, alice, query, 10, ALL);
+      await gated.started;
+      await retireCustomerMemory(orgA, alice, memory.id, userA);
+      gated.release();
+      const result = await pending;
+      expect(result!.mode).toBe(outcome === "semantic" ? "lexical_hash" : "keyword");
+      expect(result!.results.some((r) => r.sourceId === memory.id)).toBe(false);
+      expect(text(result)).not.toContain(marker);
+    });
+
+    it(`a knowledge entry deactivated mid-query is not returned (${outcome})`, async () => {
+      const marker = `ospreyd${outcome}`;
+      setEmbeddingProviderForTests(hashEmbeddingProvider);
+      const entry = await createKnowledgeEntry(orgA, { category: "faq", title: `Attic fans ${marker}`, content: `Solar attic fans ${marker} installed in a day.` });
+      expect(await chunkCount(orgA, eq(retrievalChunksTable.sourceId, entry!.id))).toBe(1);
+      const query = `solar attic fans ${marker}`;
+      const gated = queryGatedProvider(query, outcome);
+      setEmbeddingProviderForTests(gated.provider);
+      const pending = searchKnowledge(orgA, query, 5);
+      await gated.started;
+      await updateKnowledgeEntry(orgA, entry!.id, { isActive: false });
+      gated.release();
+      const result = await pending;
+      expect(result.mode).toBe(outcome === "semantic" ? "lexical_hash" : "keyword");
+      expect(result.results.some((r) => r.entry.id === entry!.id)).toBe(false);
+    });
+
+    it(`a knowledge entry deleted mid-query is not returned (${outcome})`, async () => {
+      const marker = `ospreyx${outcome}`;
+      setEmbeddingProviderForTests(hashEmbeddingProvider);
+      const entry = await createKnowledgeEntry(orgA, { category: "faq", title: `Ridge vents ${marker}`, content: `Ridge vents ${marker} improve airflow.` });
+      const query = `ridge vents ${marker} airflow`;
+      const gated = queryGatedProvider(query, outcome);
+      setEmbeddingProviderForTests(gated.provider);
+      const pending = searchKnowledge(orgA, query, 5);
+      await gated.started;
+      expect(await deleteKnowledgeEntry(orgA, entry!.id)).toBe(true);
+      gated.release();
+      const result = await pending;
+      expect(result.results.some((r) => r.entry.id === entry!.id)).toBe(false);
+    });
+
+    it(`a customer source edited mid-query never returns its old text or hash (${outcome})`, async () => {
+      const marker = `heron${outcome}`;
+      setEmbeddingProviderForTests(hashEmbeddingProvider);
+      const [activity] = await db
+        .insert(activitiesTable)
+        .values({ organizationId: orgA, contactId: alice, type: "note", title: "Valve note", body: `Old ${marker} valve reading recorded.` })
+        .returning();
+      await syncCustomerHistoryIndex(hashEmbeddingProvider, orgA, alice);
+      const [oldChunk] = await db
+        .select({ sha: retrievalChunksTable.contentSha256 })
+        .from(retrievalChunksTable)
+        .where(and(eq(retrievalChunksTable.organizationId, orgA), eq(retrievalChunksTable.sourceId, activity!.id)));
+      expect(oldChunk).toBeDefined();
+      const query = `old ${marker} valve reading`;
+      // Index embeddings fail, so the OLD chunk (old hash) is still stored when candidates are read.
+      const gated = queryGatedProvider(query, outcome, true);
+      setEmbeddingProviderForTests(gated.provider);
+      const pending = retrieveCustomerContext(orgA, alice, query, 10, ALL);
+      await gated.started;
+      await db.update(activitiesTable).set({ body: "Pressure normal after replacement." }).where(eq(activitiesTable.id, activity!.id));
+      gated.release();
+      const result = await pending;
+      expect(text(result)).not.toContain(marker);
+      for (const r of result!.results.filter((x) => x.sourceId === activity!.id)) {
+        expect(r.content).toContain("Pressure normal");
+        expect(r.similarity).toBeNull(); // the old vector never scores the new text
+      }
+      const [stillOld] = await db
+        .select({ sha: retrievalChunksTable.contentSha256 })
+        .from(retrievalChunksTable)
+        .where(and(eq(retrievalChunksTable.organizationId, orgA), eq(retrievalChunksTable.sourceId, activity!.id)));
+      expect(stillOld?.sha).toBe(oldChunk!.sha); // the stale chunk existed during the read
+    });
+
+    it(`a knowledge entry edited mid-query never returns old text or an old-hash score (${outcome})`, async () => {
+      const marker = `marmot${outcome}`;
+      setEmbeddingProviderForTests(hashEmbeddingProvider);
+      const entry = await createKnowledgeEntry(orgA, { category: "faq", title: `Gutters ${marker}`, content: `Copper gutters ${marker} only.` });
+      const oldSha = knowledgeDocument(entry!)!.contentSha256;
+      const query = `copper gutters ${marker}`;
+      const gated = queryGatedProvider(query, outcome, true);
+      setEmbeddingProviderForTests(gated.provider);
+      const pending = searchKnowledge(orgA, query, 5);
+      await gated.started;
+      // Re-index of the edit fails, so the old-hash chunk survives into candidate selection.
+      const updated = await updateKnowledgeEntry(orgA, entry!.id, { title: "Gutters", content: "Aluminum seamless gutters now standard." });
+      gated.release();
+      const result = await pending;
+      const [chunk] = await db
+        .select({ sha: retrievalChunksTable.contentSha256 })
+        .from(retrievalChunksTable)
+        .where(and(eq(retrievalChunksTable.organizationId, orgA), eq(retrievalChunksTable.sourceId, entry!.id)));
+      expect(chunk?.sha).toBe(oldSha);
+      for (const r of result.results.filter((x) => x.entry.id === entry!.id)) {
+        expect(r.entry.content).toBe((updated as { content: string }).content);
+        expect(r.similarity).toBeNull();
+      }
+      expect(result.results.map((r) => `${r.entry.title} ${r.entry.content}`).join(" ")).not.toContain(marker);
+    });
+  }
 });
 
 describe("customer context retrieval", () => {

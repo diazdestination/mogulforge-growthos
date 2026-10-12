@@ -98,42 +98,31 @@ export async function searchKnowledge(
   k = 3,
 ): Promise<{ mode: RetrievalMode; results: KnowledgeSearchResult[] }> {
   const limit = clampK(k, 3);
+  const provider = providerFor(organizationId);
+  // 1. Query embedding (may take seconds) and vector candidates come FIRST.
+  const queryVector = await embedQuery(provider, organizationId, query, "knowledge_query");
+  const rows = provider && queryVector ? await knowledgeCandidates(organizationId, provider, queryVector) : null;
+  // 2. Only then the final authoritative snapshot: every result (vector or
+  //    keyword) is validated against entries as they are NOW, so an edit,
+  //    deactivation or deletion completed during the wait is respected.
   const entries = await listActiveKnowledgeEntries(organizationId);
   const keyword = scoreKnowledgeKeywords(entries, query);
-  const provider = providerFor(organizationId);
-  const queryVector = await embedQuery(provider, organizationId, query, "knowledge_query");
-  if (!provider || !queryVector) {
+  if (!provider || !rows) {
     return {
       mode: "keyword",
       results: keyword.slice(0, limit).map((m) => ({ entry: m.entry, score: m.score, similarity: null, keywordScore: m.score })),
     };
   }
   const mode = modeOf(provider);
-  const literal = vectorLiteral(queryVector);
-  const rows = await db.execute<{ source_id: string; content_sha256: string; similarity: number }>(sql`
-    WITH candidates AS MATERIALIZED (
-      SELECT c.source_id, c.content_sha256, c.embedding
-      FROM retrieval_chunks c
-      JOIN ${knowledgeEntriesTable} k
-        ON k.id = c.source_id AND k.organization_id = c.organization_id AND k.is_active
-      WHERE c.organization_id = ${organizationId}
-        AND c.scope = 'knowledge'
-        AND c.embedding_model = ${provider.model}
-    )
-    SELECT source_id, content_sha256, 1 - (embedding <=> ${literal}::vector) AS similarity
-    FROM candidates
-    ORDER BY embedding <=> ${literal}::vector, source_id
-    LIMIT ${MAX_RETRIEVAL_RESULTS * 2}
-  `);
   const threshold = KNOWLEDGE_MIN_SIMILARITY[mode];
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
   const keywordById = new Map(keyword.map((m) => [m.entry.id, m.score]));
   const merged = new Map<string, KnowledgeSearchResult>();
-  for (const row of rows.rows) {
+  for (const row of rows) {
     const similarity = Number(row.similarity);
     const entry = byId.get(row.source_id);
     if (!entry || !(similarity >= threshold)) continue;
-    // A vector embedded from older text must not rank the current entry.
+    // A vector embedded from other text must not rank the current entry.
     if (knowledgeDocument(entry)?.contentSha256 !== row.content_sha256) continue;
     const keywordScore = keywordById.get(entry.id) ?? 0;
     merged.set(entry.id, { entry, similarity, keywordScore, score: similarity + (keywordScore ? KEYWORD_BONUS : 0) });
@@ -152,6 +141,26 @@ export async function searchKnowledge(
     )
     .slice(0, limit);
   return { mode, results };
+}
+
+async function knowledgeCandidates(organizationId: string, provider: EmbeddingProvider, queryVector: number[]) {
+  const literal = vectorLiteral(queryVector);
+  const rows = await db.execute<{ source_id: string; content_sha256: string; similarity: number }>(sql`
+    WITH candidates AS MATERIALIZED (
+      SELECT c.source_id, c.content_sha256, c.embedding
+      FROM retrieval_chunks c
+      JOIN ${knowledgeEntriesTable} k
+        ON k.id = c.source_id AND k.organization_id = c.organization_id AND k.is_active
+      WHERE c.organization_id = ${organizationId}
+        AND c.scope = 'knowledge'
+        AND c.embedding_model = ${provider.model}
+    )
+    SELECT source_id, content_sha256, 1 - (embedding <=> ${literal}::vector) AS similarity
+    FROM candidates
+    ORDER BY embedding <=> ${literal}::vector, source_id
+    LIMIT ${MAX_RETRIEVAL_RESULTS * 2}
+  `);
+  return rows.rows;
 }
 
 /**
@@ -222,16 +231,23 @@ export async function retrieveCustomerContext(
       logIndexFailure(organizationId, "customer_history", error);
     }
   }
-  // Authoritative, caller-visible current history (read after the sync).
-  const visible = (await currentCustomerDocuments(organizationId, contactId)).filter(
-    (d) => !d.restricted || access.canReadInvoices,
+  // 1. Query embedding (may take seconds) and vector candidates come FIRST.
+  const queryVector = await embedQuery(provider, organizationId, query, "customer_query");
+  const rows = provider && queryVector ? await customerCandidates(organizationId, contactId, provider, queryVector) : null;
+  // 2. Only then the final authoritative, caller-visible snapshot. Keyword
+  //    results and every vector candidate are validated against it (identity,
+  //    current coherence/state, visibility and content hash), so a retirement,
+  //    removal or edit completed during the wait is always respected.
+  const snapshot = await db.transaction(
+    (tx) => currentCustomerDocuments(organizationId, contactId, tx),
+    { isolationLevel: "repeatable read", accessMode: "read only" },
   );
+  const visible = snapshot.filter((d) => !d.restricted || access.canReadInvoices);
   const visibleByKey = new Map(visible.map((d) => [documentKey(d), d]));
   const terms = keywordTerms(redactForRetrieval(query));
   const keywordResults = visible.map((d) => ({ d, score: keywordScore(terms, d.content) })).filter((r) => r.score > 0);
 
-  const queryVector = await embedQuery(provider, organizationId, query, "customer_query");
-  if (!provider || !queryVector) {
+  if (!provider || !rows) {
     return {
       mode: "keyword",
       results: keywordResults
@@ -241,25 +257,10 @@ export async function retrieveCustomerContext(
     };
   }
   const mode = modeOf(provider);
-  const literal = vectorLiteral(queryVector);
-  const rows = await db.execute<{ source_type: CustomerContextResult["sourceType"]; source_id: string; content_sha256: string; similarity: number }>(sql`
-    WITH candidates AS MATERIALIZED (
-      SELECT source_type, source_id, content_sha256, embedding
-      FROM retrieval_chunks
-      WHERE organization_id = ${organizationId}
-        AND scope = 'customer'
-        AND contact_id = ${contactId}
-        AND embedding_model = ${provider.model}
-    )
-    SELECT source_type, source_id, content_sha256, 1 - (embedding <=> ${literal}::vector) AS similarity
-    FROM candidates
-    ORDER BY embedding <=> ${literal}::vector, source_id
-    LIMIT ${CUSTOMER_VECTOR_CANDIDATES}
-  `);
   const threshold = CUSTOMER_MIN_SIMILARITY[mode];
   const keywordById = new Map(keywordResults.map((r) => [documentKey(r.d), r.score]));
   const merged = new Map<string, CustomerContextResult>();
-  for (const row of rows.rows) {
+  for (const row of rows) {
     const similarity = Number(row.similarity);
     if (!(similarity >= threshold)) continue;
     const key = documentKey({ sourceType: row.source_type, sourceId: row.source_id });
@@ -284,4 +285,23 @@ export async function retrieveCustomerContext(
     .sort((a, b) => b.score - a.score || a.sourceId.localeCompare(b.sourceId))
     .slice(0, limit);
   return { mode, results };
+}
+
+async function customerCandidates(organizationId: string, contactId: string, provider: EmbeddingProvider, queryVector: number[]) {
+  const literal = vectorLiteral(queryVector);
+  const rows = await db.execute<{ source_type: CustomerContextResult["sourceType"]; source_id: string; content_sha256: string; similarity: number }>(sql`
+    WITH candidates AS MATERIALIZED (
+      SELECT source_type, source_id, content_sha256, embedding
+      FROM retrieval_chunks
+      WHERE organization_id = ${organizationId}
+        AND scope = 'customer'
+        AND contact_id = ${contactId}
+        AND embedding_model = ${provider.model}
+    )
+    SELECT source_type, source_id, content_sha256, 1 - (embedding <=> ${literal}::vector) AS similarity
+    FROM candidates
+    ORDER BY embedding <=> ${literal}::vector, source_id
+    LIMIT ${CUSTOMER_VECTOR_CANDIDATES}
+  `);
+  return rows.rows;
 }
