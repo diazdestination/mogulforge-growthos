@@ -15,7 +15,9 @@ const PHYSICAL_PAIRS=new Map([
  ['2a56e08b2bd331d0eaedea2d504d3fff568bf4e6aaab2279467cf997648d2009','2ed9500b5fb077a19aa16003bd346f8369a1b1cb3da8ea8f9a396265b6410f7b'],
 ]);
 const MAX=Object.freeze({metadataRows:20000,metadataBytes:8000000,operationMs:240000,queryMs:15000});
-const check=(ok,code)=>{if(!ok)throw Object.assign(new Error(code),{safeCode:code});};
+const internalErrors=new WeakMap();
+const safeError=code=>{const error=Object.assign(new Error(code),{safeCode:code});internalErrors.set(error,code);return error;};
+const check=(ok,code)=>{if(!ok)throw safeError(code);};
 const name=v=>typeof v==='string'&&/^[a-z_][a-z0-9_-]{0,62}$/.test(v);
 const q=v=>{check(typeof v==='string'&&/^[a-z_][a-z0-9_]*$/.test(v),'production75_observer_catalog');return `"${v}"`;};
 export function createProduction75Observer({client,principals,catalog75,catalog142,identity,limits={},now=Date.now}={}) {
@@ -38,13 +40,14 @@ export function createProduction75Observer({client,principals,catalog75,catalog1
  for(const table of catalog142.tables.filter(t=>!catalog75.tables.some(o=>o.name===t.name)))add(`SELECT count(*)::text AS rows FROM public.${q(table.name)}`);
  const until=now()+bound.operationMs;let pid=null,busy=false,unusable=false;
  const remaining=()=>{const ms=until-now();check(ms>0,'production75_observer_deadline');return Math.min(ms,bound.queryMs);};
- async function dispatch(sql,args){let timer;try{const ms=remaining();const r=await Promise.race([Promise.resolve().then(()=>client.query(sql,args)),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(new Error('production75_observer_deadline'),{safeCode:'production75_observer_deadline'})),ms);})]);remaining();check(r&&Array.isArray(r.rows)&&r.rows.length<=bound.metadataRows&&Buffer.byteLength(JSON.stringify(r.rows))<=bound.metadataBytes,'production75_observer_bound');return r;}catch(e){unusable=true;if(/^production75_observer_/.test(e?.safeCode??''))throw e;throw Object.assign(new Error('production75_observer_database'),{safeCode:'production75_observer_database'});}finally{clearTimeout(timer);}}
+ async function dispatch(sql,args){let timer;try{const ms=remaining(),queryUntil=now()+ms;const r=await Promise.race([Promise.resolve().then(()=>client.query(sql,args)),new Promise((_,reject)=>{timer=setTimeout(()=>reject(safeError('production75_observer_deadline')),ms);})]);check(now()<queryUntil,'production75_observer_deadline');remaining();check(r&&Array.isArray(r.rows)&&r.rows.length<=bound.metadataRows&&Buffer.byteLength(JSON.stringify(r.rows))<=bound.metadataBytes,'production75_observer_bound');return r;}catch(e){unusable=true;throw safeError(internalErrors.get(e)??'production75_observer_database');}finally{clearTimeout(timer);}}
  return Object.freeze({query:async(sql,args)=>{
-  check((args===undefined||Array.isArray(args))&&typeof sql==='string'&&registry.has(sql)&&isDeepStrictEqual(Array.isArray(args)&&args.length===0?undefined:args,registry.get(sql)),'production75_observer_query');
+  check(args===undefined||Array.isArray(args),'production75_observer_query');let parameters;try{parameters=args===undefined||args.length===0?undefined:structuredClone(args);}catch{throw safeError('production75_observer_query');}
+  check(typeof sql==='string'&&registry.has(sql)&&isDeepStrictEqual(parameters,registry.get(sql)),'production75_observer_query');
   check(!busy&&!unusable,'production75_observer_unusable');remaining();busy=true;
   try{
    const id=await dispatch(IDENTITY_SQL);const row=id.rows[0];check(id.rows.length===1&&Object.entries(expected).every(([k,v])=>row?.[k]===v)&&row.read_only==='on'&&row.isolation==='repeatable read'&&Number.isInteger(row.version)&&row.version>=160000&&row.version<170000&&Number.isInteger(row.pid)&&row.pid>0&&(pid===null||row.pid===pid),'production75_observer_identity');pid=row.pid;
-   return sql===IDENTITY_SQL?id:await dispatch(sql,args===undefined?undefined:structuredClone(args));
+   return sql===IDENTITY_SQL?id:await dispatch(sql,parameters);
   }catch(e){unusable=true;throw e;}finally{busy=false;}
  }});
 }

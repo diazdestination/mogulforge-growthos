@@ -475,16 +475,29 @@ const dangerous=new Set(['schema_admin','writer','pg_write_all_data','pg_signal_
 export function assertLegacyReaderCapabilities(policy,{readerLogin,readerRole,writerRole}={}){
  check([readerLogin,readerRole,writerRole].every(v=>typeof v==='string')&&readerRole!==writerRole,'production75_legacy_reader_authority');
  const p=policy?.privileges;check(p&&['roles','memberships','tables','columns','namespaces','database','functions'].every(k=>Array.isArray(p[k])),'production75_legacy_reader_coverage');
- const own=k=>p[k].filter(r=>r.principal===readerLogin);const roles=own('roles'),tables=own('tables'),columns=own('columns'),spaces=own('namespaces'),db=own('database'),functions=own('functions');
- check(roles.some(r=>r.name===readerLogin)&&tables.length>0&&columns.length>0&&spaces.some(r=>r.name==='public')&&db.length===1,'production75_legacy_reader_coverage');
- check(roles.some(r=>r.name===readerRole&&(r.name===readerLogin||r.usable===true&&r.can_set===true)),'production75_legacy_reader_authority');
- const reachable=new Set(roles.filter(r=>r.name===readerLogin||r.usable||r.can_set).map(r=>r.name));
+ const own=(k,principal)=>p[k].filter(r=>r.principal===principal),loginRoles=own('roles',readerLogin);
+ check(loginRoles.some(r=>r.name===readerRole&&(r.name===readerLogin||r.usable===true&&r.can_set===true)),'production75_legacy_reader_authority');
+ const queue=[readerLogin,readerRole],assessed=new Set(),reachable=new Set(),keys={tables:r=>r.name,columns:r=>`${r.table_name}.${r.name}`,namespaces:r=>r.name,database:r=>r.name,functions:r=>`${r.schema??''}.${r.name}(${r.arguments??''})`};
+ for(const principal of queue){
+  if(assessed.has(principal))continue;assessed.add(principal);check(assessed.size<=8,'production75_legacy_reader_coverage');
+  const roles=own('roles',principal),tables=own('tables',principal),columns=own('columns',principal),spaces=own('namespaces',principal),db=own('database',principal),functions=own('functions',principal);
+  check(roles.some(r=>r.name===principal)&&tables.length>0&&columns.length>0&&spaces.some(r=>r.name==='public')&&db.length===1,'production75_legacy_reader_coverage');
+  for(const [section,key] of Object.entries(keys))check(JSON.stringify(own(section,principal).map(key).sort())===JSON.stringify(own(section,readerLogin).map(key).sort()),'production75_legacy_reader_coverage');
+  for(const r of roles){
+   check(['superuser','create_role','create_database','replication','bypass_rls','usable','can_set'].every(k=>typeof r[k]==='boolean'),'production75_legacy_reader_authority');
+   check(!['superuser','create_role','create_database','replication','bypass_rls'].some(k=>r[k])&&!((dangerous.has(r.name)||r.name===writerRole)&&(r.usable||r.can_set)),'production75_legacy_reader_authority');
+   if(r.name===principal||r.usable||r.can_set)reachable.add(r.name);
+   // An inherited capability is measured on this principal. A SET-only path
+   // needs its own complete effective-role measurements; names are insufficient.
+   if(r.can_set&&!r.usable)queue.push(r.name);
+  }
+  for(const r of tables)check(r.select===true&&['insert','update','delete','truncate','references','trigger'].every(k=>r[k]===false),'production75_legacy_reader_authority');
+  for(const r of columns)check(r.select===true&&['insert','update','references'].every(k=>r[k]===false),'production75_legacy_reader_authority');
+  for(const r of spaces)check(r.create===false&&typeof r.usage==='boolean','production75_legacy_reader_authority');
+  check(db[0].create===false&&db[0].connect===true&&typeof db[0].temporary==='boolean','production75_legacy_reader_authority');
+  for(const r of functions)check(typeof r.execute==='boolean'&&typeof r.security_definer==='boolean'&&['v','s','i'].includes(r.volatility),'production75_legacy_reader_authority');
+ }
  for(const edge of p.memberships){check(['admin_option','inherit_option','set_option'].every(k=>typeof edge[k]==='boolean'),'production75_legacy_reader_authority');check(!(reachable.has(edge.member)&&edge.admin_option),'production75_legacy_reader_authority');}
- for(const r of roles){check(['superuser','create_role','create_database','replication','bypass_rls','usable','can_set'].every(k=>typeof r[k]==='boolean'),'production75_legacy_reader_authority');check(!['superuser','create_role','create_database','replication','bypass_rls'].some(k=>r[k])&&!((dangerous.has(r.name)||r.name===writerRole)&&(r.usable||r.can_set)),'production75_legacy_reader_authority');}
- for(const r of tables)check(r.select===true&&['insert','update','delete','truncate','references','trigger'].every(k=>r[k]===false),'production75_legacy_reader_authority');
- for(const r of columns)check(r.select===true&&['insert','update','references'].every(k=>r[k]===false),'production75_legacy_reader_authority');
- for(const r of spaces)check(r.create===false&&typeof r.usage==='boolean','production75_legacy_reader_authority');
- check(db[0].create===false&&db[0].connect===true&&typeof db[0].temporary==='boolean','production75_legacy_reader_authority');
- for(const r of functions)check(typeof r.execute==='boolean'&&typeof r.security_definer==='boolean'&&['v','s','i'].includes(r.volatility),'production75_legacy_reader_authority');
- return freeze({directApplicationWritesDenied:true,applicationDatabaseTemporary:db[0].temporary,callableVolatileFunctions:functions.filter(r=>r.execute&&r.volatility==='v').length,callableSecurityDefinerFunctions:functions.filter(r=>r.execute&&r.security_definer).length,zeroDdlClusterWideVerified:false,capabilityScopeReviewRequired:true,readerLogin,readerRole});
+ const functions=own('functions',readerRole),db=own('database',readerRole);
+ return freeze({directApplicationWritesDenied:true,assessedEffectiveRoles:[...assessed].sort(),applicationDatabaseTemporary:db[0].temporary,callableVolatileFunctions:functions.filter(r=>r.execute&&r.volatility==='v').length,callableSecurityDefinerFunctions:functions.filter(r=>r.execute&&r.security_definer).length,zeroDdlClusterWideVerified:false,capabilityScopeReviewRequired:true,readerLogin,readerRole});
 }

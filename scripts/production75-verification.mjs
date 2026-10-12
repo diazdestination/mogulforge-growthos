@@ -11,7 +11,8 @@ function readerIdentity(state,plan,writerPid){
  const i=state?.identity,t=plan?.target;
  check(t&&t.readerLogin!==t.writerLogin&&t.readerRole!==t.writerRole&&i?.database===t.database&&i.login===t.readerLogin&&i.role===t.readerRole&&Number.isInteger(i.version)&&i.version>=160000&&i.version<170000&&Number.isInteger(i.pid)&&i.pid>0&&i.read_only==='on'&&i.isolation==='repeatable read'&&(writerPid===undefined||Number.isInteger(writerPid)&&writerPid>0&&i.pid!==writerPid),'production75_verification_reader_identity');
 }
-async function callback(operation,ms=240000){let timer;try{return await Promise.race([Promise.resolve().then(operation),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('deadline')),ms);})]);}catch{throw Object.assign(new Error('production75_verification_callback'),{safeCode:'production75_verification_callback'});}finally{clearTimeout(timer);}}
+async function callback(operation,ms=240000){let timer;const until=Date.now()+ms;try{const value=await Promise.race([Promise.resolve().then(operation),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('deadline')),ms);})]);check(Date.now()<until,'production75_verification_callback');return value;}catch{throw Object.assign(new Error('production75_verification_callback'),{safeCode:'production75_verification_callback'});}finally{clearTimeout(timer);}}
+function capabilityIdentity(evidence,review,plan){const c=evidence?.capabilities,i=evidence?.state?.identity,t=plan?.target;check(t&&c?.readerLogin===t.readerLogin&&c.readerRole===t.readerRole&&review?.readerLogin===t.readerLogin&&review.readerRole===t.readerRole&&c.readerLogin===i?.login&&c.readerRole===i?.role,'production75_verification_capability_identity');}
 export function verifyProduction75Evidence({baseline,observed,expectedExtra,capabilityReview}={}){
  check(shape(baseline?.extra)&&shape(observed?.extra)&&shape(expectedExtra)&&isDeepStrictEqual(baseline.extra,expectedExtra)&&isDeepStrictEqual(observed.extra,expectedExtra),'production75_verification_extra');
  const r=capabilityReview,c=observed?.capabilities;
@@ -23,18 +24,19 @@ export function verifyProduction75Evidence({baseline,observed,expectedExtra,capa
 export async function runProduction75Verification({writer,plan,baseline,expectedExtra,capabilityReview,outcome,attemptId,reserve,persist,readFresh}={}){
  // This is evidence binding only: caller authenticates the independent review,
  // exact copy/identity, cost/admission and durable reserve before supplying it.
- verifyProduction75Evidence({baseline,observed:baseline,expectedExtra,capabilityReview});
+ try{baseline=structuredClone(baseline);expectedExtra=structuredClone(expectedExtra);capabilityReview=structuredClone(capabilityReview);}catch{check(false,'production75_verification_input');}
+ verifyProduction75Evidence({baseline,observed:baseline,expectedExtra,capabilityReview});capabilityIdentity(baseline,capabilityReview,plan);
  check(['commit','rollback'].includes(outcome)&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(attemptId??'')&&typeof reserve==='function'&&typeof persist==='function'&&typeof readFresh==='function','production75_verification_input');
  check(!attempts.has(attemptId),'production75_verification_replay');attempts.add(attemptId);
  readerIdentity(baseline.state,plan);
- const before=await callback(()=>readFresh(plan));readerIdentity(before?.state,plan);verifyProduction75Evidence({baseline,observed:before,expectedExtra,capabilityReview});
+ const before=await callback(()=>readFresh(plan));readerIdentity(before?.state,plan);capabilityIdentity(before,capabilityReview,plan);verifyProduction75Evidence({baseline,observed:before,expectedExtra,capabilityReview});
  check(isDeepStrictEqual(before.state?.catalog,baseline.state?.catalog)&&isDeepStrictEqual(before.state?.fingerprints,baseline.state?.fingerprints)&&isDeepStrictEqual(before.state?.policy,baseline.state?.policy),'production75_verification_baseline');
  const intent=Object.freeze({kind:'PRODUCTION75_TRANSACTION_RESERVATION',attemptId,database:plan?.target?.database,sourceCommit:plan?.sourceCommit,outcome});
  check(await callback(()=>reserve(intent),5000)===true,'production75_verification_reservation');
  const result=await executeProduction75(writer,{plan,expectedBefore:baseline.state,outcome,persist});
  if(!['rehearsed-rolled-back','committed-awaiting-reader','commit-unknown','committed-journal-unconfirmed'].includes(result.status))return {status:'failed-or-held',mechanism:result};
  try{
-  const observed=await callback(()=>readFresh(plan));readerIdentity(observed?.state,plan,result.before?.identity?.pid);const extraProof=verifyProduction75Evidence({baseline,observed,expectedExtra,capabilityReview});
+  const observed=await callback(()=>readFresh(plan));readerIdentity(observed?.state,plan,result.before?.identity?.pid);capabilityIdentity(observed,capabilityReview,plan);const extraProof=verifyProduction75Evidence({baseline,observed,expectedExtra,capabilityReview});
   if(result.status==='rehearsed-rolled-back'){
    check(observed.state?.phase===75&&isDeepStrictEqual(observed.state.catalog,baseline.state.catalog)&&isDeepStrictEqual(observed.state.fingerprints,baseline.state.fingerprints)&&isDeepStrictEqual(observed.state.policy,baseline.state.policy),'production75_verification_rollback');
    return {status:'verified-rollback',mechanism:result,proof:extraProof};
