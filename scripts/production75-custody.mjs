@@ -9,6 +9,9 @@ const SOURCE='kzpwm0j18eg04nv3',STAGING='zp2wjrejd2zodn4q';
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const HASH=/^[a-f0-9]{64}$/,ID=/^[a-z0-9]{16}$/;
 const plans=new WeakSet(),permits=new WeakMap();
+// The exact-byte selector is independently exercised by production75-source tests.
+// Its generated step differs from the hash of the full initial source file.
+const SQL_JOURNAL_PINS=[{path:'production75-selected-0000',sha256:'0240348d564b0d88860c4dde838949db8cdee81f13221a6dbf31841feb405a51'},...PINNED_FILES.slice(1)];
 const freeze=v=>{if(v&&typeof v==='object'){Object.values(v).forEach(freeze);Object.freeze(v);}return v;};
 const hash=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const error=code=>Object.assign(new Error(code),{safeCode:code});
@@ -42,9 +45,11 @@ async function authenticated(plan,verifyOwnerApproval,verifyCapabilityReview,now
 }
 
 const OPERATIONS=new Set(['copy-create','reader-create','upgrade-rollback','upgrade-commit','copy-delete','credentials-source','credentials-writer','credentials-reader']);
-export function consumeOperatorPermit(permit,kind,target,now=Date.now){
- const p=permits.get(permit);check(p&&!p.consumed&&p.isUsable()&&p.kind===kind&&p.target===target&&typeof now==='function'&&now()<p.until,'production75_custody_permit');p.consumed=true;return freeze(clone(p.scope));
+export function consumeOperatorPermit(permit,kind,target){
+ const p=permits.get(permit);check(p&&!p.consumed&&p.isUsable()&&p.kind===kind&&p.target===target&&p.now()<p.until,'production75_custody_permit');p.consumed=true;return freeze(clone(p.scope));
 }
+export function describeOperatorPermit(permit,kind){const p=permits.get(permit);check(p&&!p.consumed&&p.isUsable()&&p.kind===kind&&p.now()<p.until,'production75_custody_permit');return freeze({...clone(p.scope),target:p.target});}
+export function markOperatorPermitDispatched(permit){const p=permits.get(permit);check(p&&p.consumed&&!p.dispatched&&p.isUsable()&&p.now()<p.until,'production75_custody_permit');p.dispatched=true;}
 function construct({root,plan,evidence,now,resume,io}){
  let fd=null,unusable=false,closed=false,sequence=0,previous='0'.repeat(64),before=null,owned=null,ownership=null,cloneVerified=false,profileVerified=false,rollbackVerified=false,reconciling=resume;
  const used=new Set(),digest=operatorPlanDigest(plan);let directory;
@@ -56,12 +61,13 @@ function construct({root,plan,evidence,now,resume,io}){
   else check(io.lstatSync(directory).isDirectory()&&!io.lstatSync(directory).isSymbolicLink(),'production75_custody_journal');
  }catch(e){if(/^production75_custody_(root|replay|journal)$/.test(e?.safeCode??''))throw e;throw error('production75_custody_filesystem');}
  const audit=path.join(directory,'audit.jsonl');
+ const owns=m=>{check(used.has('copy-create')&&before&&ID.test(m.id)&&!plan.protectedClusters.includes(m.id)&&!before.some(v=>v.id===m.id)&&m.name===plan.copyName&&m.organization===plan.organization&&m.attachedApps.length===0,'production75_custody_ownership');};
  function apply(event){
   switch(event.kind){
-   case 'opened':check(isDeepStrictEqual(event.plan,plan)&&isDeepStrictEqual(event.evidence,evidence),'production75_custody_journal');break;
-   case 'inventory-before':before=inventoryShape(event.inventory);break;
-   case 'intent':check(OPERATIONS.has(event.operation)&&!used.has(event.operation),'production75_custody_journal');used.add(event.operation);break;
-   case 'owned':owned=validateOperatorMetadata(event.copy);ownership=event.ownership;reconciling||=ownership==='reconciled-clone';break;
+   case 'opened':check(sequence===0&&isDeepStrictEqual(event.plan,plan)&&isDeepStrictEqual(event.evidence,evidence),'production75_custody_journal');break;
+   case 'inventory-before':check(!before&&!used.has('copy-create'),'production75_custody_journal');before=inventoryShape(event.inventory);check(plan.protectedClusters.every(id=>before.some(m=>m.id===id&&m.organization===plan.organization&&m.status==='ready'))&&!before.some(m=>m.name===plan.copyName),'production75_custody_journal');break;
+   case 'intent':check(OPERATIONS.has(event.operation)&&!used.has(event.operation)&&before&&event.target===(['copy-create','credentials-source'].includes(event.operation)?plan.sourceCluster:owned?.id),'production75_custody_journal');used.add(event.operation);break;
+   case 'owned':{check(!owned&&['acknowledged','reconciled-clone'].includes(event.ownership),'production75_custody_journal');const m=validateOperatorMetadata(event.copy);owns(m);owned=m;ownership=event.ownership;reconciling||=ownership==='reconciled-clone';break;}
    case 'clone-verified':check(event.sha256===plan.sourceSnapshotSha256,'production75_custody_journal');cloneVerified=true;break;
    case 'profile-verified':check(event.sha256===plan.profileSha256,'production75_custody_journal');profileVerified=true;break;
    case 'upgrade-result':if(event.outcome==='rollback'&&event.status==='verified-rollback')rollbackVerified=true;break;
@@ -72,7 +78,7 @@ function construct({root,plan,evidence,now,resume,io}){
  }
  function append(event){
   check(!closed&&!unusable,'production75_custody_unusable');const row={sequence,previous,event};row.sha256=hash(row);
-  try{const bytes=Buffer.from(JSON.stringify(row)+'\n');check(bytes.length<=1000000,'production75_custody_shape');let offset=0;while(offset<bytes.length){const written=io.writeSync(fd,bytes,offset,bytes.length-offset);check(written>0,'production75_custody_filesystem');offset+=written;}io.fsyncSync(fd);sequence++;previous=row.sha256;apply(event);}catch{failFs();}
+  try{const bytes=Buffer.from(JSON.stringify(row)+'\n');check(bytes.length<=1000000,'production75_custody_shape');let offset=0;while(offset<bytes.length){const written=io.writeSync(fd,bytes,offset,bytes.length-offset);check(written>0,'production75_custody_filesystem');offset+=written;}io.fsyncSync(fd);apply(event);sequence++;previous=row.sha256;}catch{failFs();}
  }
  try{
   if(resume){
@@ -82,7 +88,6 @@ function construct({root,plan,evidence,now,resume,io}){
   }else{fd=io.openSync(audit,'wx',0o600);append({kind:'opened',plan,evidence});}
  }catch{if(fd!==null)try{io.closeSync(fd);}catch{}throw error('production75_custody_journal');}
  const healthy=()=>check(!closed&&!unusable,'production75_custody_unusable');
- const owns=m=>{check(used.has('copy-create')&&before&&ID.test(m.id)&&!plan.protectedClusters.includes(m.id)&&!before.some(v=>v.id===m.id)&&m.name===plan.copyName&&m.organization===plan.organization&&m.region===plan.region&&m.plan===plan.plan&&m.version===plan.providerVersion&&m.attachedApps.length===0,'production75_custody_ownership');};
  return Object.freeze({
   observeBefore(values){healthy();check(!used.has('copy-create')&&!before&&!reconciling,'production75_custody_phase');const list=inventoryShape(clone(values));check(plan.protectedClusters.every(id=>list.some(m=>m.id===id&&m.organization===plan.organization&&m.status==='ready'))&&!list.some(m=>m.name===plan.copyName),'production75_custody_ownership');append({kind:'inventory-before',inventory:list});},
   bindOwned(value){healthy();check(!owned&&!reconciling,'production75_custody_phase');const m=validateOperatorMetadata(value);owns(m);append({kind:'owned',copy:m,ownership:'acknowledged'});},
@@ -95,23 +100,24 @@ function construct({root,plan,evidence,now,resume,io}){
    if(kind==='copy-create')check(before&&!owned,'production75_custody_phase');
    else if(kind==='credentials-source')check(before,'production75_custody_phase');
    else check(owned,'production75_custody_phase');
+   if(owned&&kind!=='copy-delete')check(owned.region===plan.region&&owned.plan===plan.plan&&owned.version===plan.providerVersion,'production75_custody_suitability');
    if(kind==='reader-create')check(cloneVerified,'production75_custody_phase');
    if(kind==='upgrade-rollback'||kind==='upgrade-commit')check(profileVerified,'production75_custody_phase');
    if(kind==='credentials-reader')check(cloneVerified&&used.has('reader-create'),'production75_custody_phase');
    if(kind==='upgrade-commit')check(rollbackVerified,'production75_custody_phase');
    const target=kind==='copy-create'||kind==='credentials-source'?plan.sourceCluster:owned.id;
-   append({kind:'intent',operation:kind,target});const permit=Object.freeze({});permits.set(permit,{kind,target,until,consumed:false,isUsable:()=>!closed&&!unusable,scope:{planSha256:digest,sourceCluster:plan.sourceCluster,backupId:plan.backupId,copyName:plan.copyName,copyId:owned?.id??null,readerName:plan.readerName,organization:plan.organization,until}});return permit;
+   append({kind:'intent',operation:kind,target});const permit=Object.freeze({});permits.set(permit,{kind,target,until,now,consumed:false,dispatched:false,isUsable:()=>!closed&&!unusable,scope:{planSha256:digest,sourceCluster:plan.sourceCluster,backupId:plan.backupId,copyName:plan.copyName,copyId:owned?.id??null,readerName:plan.readerName,organization:plan.organization,until}});return permit;
   },
   recordUpgrade(outcome,status){healthy();check(['rollback','commit'].includes(outcome)&&used.has(`upgrade-${outcome}`)&&['verified-rollback','verified-commit','reconciled-commit-no-replay','verification-held-no-replay','failed-or-held'].includes(status),'production75_custody_phase');append({kind:'upgrade-result',outcome,status});},
   persistSQL(outcome,value){
    healthy();const event=clone(value),allowed=['phase','pid','path','sha256','proof','afterFailure'];check(['rollback','commit'].includes(outcome)&&used.has(`upgrade-${outcome}`)&&keys(event,allowed)&&['begin-intent','begin-ack','step-intent','step-ack','bridge-verified','precommit-verified','rollback-intent','commit-intent','rollback-ack','commit-ack'].includes(event.phase),'production75_custody_shape');
    if('pid'in event)check(Number.isInteger(event.pid)&&event.pid>0,'production75_custody_shape');
-   if('path'in event)check(PINNED_FILES.some(f=>f.path===event.path&&(!('sha256'in event)||f.sha256===event.sha256)),'production75_custody_shape');
+   if('path'in event)check(SQL_JOURNAL_PINS.some(f=>f.path===event.path&&(!('sha256'in event)||f.sha256===event.sha256)),'production75_custody_shape');
    if('proof'in event)check(keys(event.proof,['originalTables','originalColumns','newTablesEmpty','defaultsVerified'])&&Object.keys(event.proof).length===4&&Object.values(event.proof).every(v=>Number.isSafeInteger(v)&&v>=0&&v<=2000),'production75_custody_shape');
    if('afterFailure'in event)check(typeof event.afterFailure==='boolean','production75_custody_shape');append({kind:'sql',outcome,event});
   },
   recordDeleted(){healthy();check(owned&&used.has('copy-delete'),'production75_custody_phase');append({kind:'deleted',copyId:owned.id});},
-  status(){return freeze({directory,planSha256:digest,copyId:owned?.id??null,ownership,used:[...used],reconciliationOnly:reconciling,unusable,closed});},
+  status(){return freeze({directory,planSha256:digest,reviewReceiptSha256:evidence.reviewReceiptSha256,copyId:owned?.id??null,ownership,used:[...used],reconciliationOnly:reconciling,unusable,closed});},
   close(){if(closed)return;closed=true;try{io.closeSync(fd);}catch{throw error('production75_custody_filesystem');}}
  });
 }
