@@ -71,6 +71,31 @@ export function deliveryFingerprint(value: unknown): string {
   return createHash("sha256").update(canonical(value)).digest("hex");
 }
 
+/** Recorded equipment and staff-entered terms only; never a coverage decision. */
+export function invoiceEquipmentText(section: InvoiceDocument["equipment"]): string[] {
+  if (!section) return [];
+  const lines = section.items.flatMap((item, i) => {
+    const identity = [item.manufacturer, item.model].filter(Boolean).join(" ");
+    const warranty = item.warrantyStartsOn || item.warrantyEndsOn
+      ? [`   Recorded warranty: ${item.warrantyStartsOn ?? "start not recorded"} to ${item.warrantyEndsOn ?? "end not recorded"}${item.warrantySource ? ` (source: ${item.warrantySource})` : ""}`]
+      : [];
+    return [
+      `${i + 1}. ${item.label}${identity ? ` - ${identity}` : ""}`,
+      ...(item.serial ? [`   Serial: ${item.serial}`] : []),
+      ...(item.location ? [`   Location: ${item.location}`] : []),
+      ...(item.installedOn ? [`   Installed: ${item.installedOn}`] : []),
+      ...warranty,
+    ];
+  });
+  return [
+    ...(lines.length ? ["", "Equipment serviced:", ...lines] : []),
+    ...(section.warrantyTerms ? ["", "Warranty terms:", section.warrantyTerms] : []),
+    ...(section.items.some((item) => item.warrantyStartsOn || item.warrantyEndsOn)
+      ? ["Recorded warranty dates are listed for reference; the warranty provider determines coverage."]
+      : []),
+  ];
+}
+
 /** Text is the existing adapters' canonical format. Every issued field is
  * included, without links, attachments, live balances or invented payment terms. */
 export function renderInvoiceEmail(input: {
@@ -111,6 +136,7 @@ export function renderInvoiceEmail(input: {
       `Tax: ${dollars(doc.taxCents)}`,
       `Invoice total: ${dollars(doc.totalCents)}`,
       ...(doc.notes ? ["", "Invoice notes:", doc.notes] : []),
+      ...invoiceEquipmentText(doc.equipment),
       "",
       "This is the document as issued, not a live account balance or payment receipt.",
       "For questions or payment arrangements, reply to this email. This message does not collect an online payment.",

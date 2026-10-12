@@ -40,6 +40,28 @@ export interface InvoiceDocument {
   subtotalCents: number;
   taxCents: number;
   totalCents: number;
+  /** Absent on documents without equipment so earlier fingerprints stay exact. */
+  equipment?: InvoiceEquipmentSection;
+}
+/** Copied from staff-recorded property assets; never inferred warranty entitlement. */
+export interface InvoiceEquipmentSnapshot {
+  assetId: string;
+  assetVersion: number;
+  category: "hvac_equipment" | "roof_system" | "other";
+  label: string;
+  manufacturer: string | null;
+  model: string | null;
+  serial: string | null;
+  location: string | null;
+  installedOn: string | null;
+  warrantyStartsOn: string | null;
+  warrantyEndsOn: string | null;
+  warrantySource: string | null;
+}
+export interface InvoiceEquipmentSection {
+  items: InvoiceEquipmentSnapshot[];
+  /** Staff-entered terms printed verbatim, e.g. the contractor's workmanship warranty. */
+  warrantyTerms: string | null;
 }
 export type InvoiceState = "draft" | "issued" | "void";
 export interface HistoricalInvoiceSource {
