@@ -436,7 +436,7 @@ export async function assertEstimateEmailDispatch(
   c: EstimateEmailClaim,
 ): Promise<void> {
   const s = validateClaim(c);
-  await db.transaction(async (tx) => {
+  const checked = await db.transaction(async (tx) => {
     await lockCustomerWork(tx, s.organizationId);
     await effectLock(tx, s.organizationId, s.estimateId);
     const { execution, review, events } = await retained(tx, c);
@@ -463,7 +463,16 @@ export async function assertEstimateEmailDispatch(
         "estimate_review_changed",
         "The reviewed saved quote, original participants, staff or sender changed.",
       );
+    return { review, executionExpiresAt: execution.expiresAt.getTime() };
   });
+  // Source-row waits, eligibility reads and even commit may cross a deadline.
+  // These final checks have no awaits between them and successful guard return.
+  validateReview(checked.review, s, c.payloadSha256, true);
+  if (checked.executionExpiresAt <= Date.now())
+    fail(
+      "estimate_delivery_reserved",
+      "This estimate execution cannot dispatch.",
+    );
 }
 function validateReceipt(receipt: UserEmailResult, s: EstimateEmailSnapshot) {
   const r = parse(receiptSchema, receipt);

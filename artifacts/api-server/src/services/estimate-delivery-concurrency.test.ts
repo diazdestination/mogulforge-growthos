@@ -66,9 +66,70 @@ beforeEach(() => {
 });
 afterEach(() => {
   hooks.afterRead = null;
+  vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
+it.each(
+  [false, true].flatMap((returning) =>
+    ["preview", "execution"].map((deadline) => ({ returning, deadline })),
+  ),
+)(
+  "rejects $deadline expiry crossed behind unchanged source row lock returning=$returning with zero POSTs",
+  async ({ returning, deadline }) => {
+    const f = await fixture(returning),
+      p = await review(f),
+      c = await claimEstimateEmail(f.org, f.actor, f.estimate.id, p);
+    const [reviewRow] = await db
+      .select()
+      .from(auditEventsTable)
+      .where(eq(auditEventsTable.id, p.previewId));
+    const expiresAt =
+      reviewRow.createdAt.getTime() +
+      (deadline === "preview" ? 600000 : 500000);
+    if (deadline === "execution")
+      await db
+        .update(revenueExecutionsTable)
+        .set({ expiresAt: new Date(expiresAt) })
+        .where(eq(revenueExecutionsTable.id, c.executionId));
+    let currentTime = expiresAt - 1,
+      posts = 0;
+    vi.spyOn(Date, "now").mockImplementation(() => currentTime);
+    const writer = await pool.connect();
+    let dispatch: Promise<{ code: string | null }> | undefined;
+    try {
+      await writer.query("BEGIN");
+      const backend = await writer.query("SELECT pg_backend_pid() AS pid");
+      // Ordinary same-value UPDATE holds a real source-row lock but changes no
+      // fingerprint field. Only the elapsed deadline can reject this callback.
+      await writer.query("UPDATE estimates SET notes=notes WHERE id=$1", [
+        f.estimate.id,
+      ]);
+      dispatch = assertEstimateEmailDispatch(c).then(
+        () => {
+          posts++;
+          return { code: null };
+        },
+        (error) => ({ code: error.code as string }),
+      );
+      const waiter = await blocked(Number(backend.rows[0].pid));
+      expect(waiter).not.toBe(Number(backend.rows[0].pid));
+      currentTime = expiresAt;
+      await writer.query("COMMIT");
+      const result = await dispatch;
+      expect(result.code).toBe(
+        deadline === "preview"
+          ? "estimate_review_expired"
+          : "estimate_delivery_reserved",
+      );
+      expect(posts).toBe(0);
+    } finally {
+      await writer.query("ROLLBACK");
+      writer.release();
+      await dispatch;
+    }
+  },
+);
 afterAll(async () => deleteTestOrgs(...orgs));
 async function fixture(returning = false) {
   const f = await returningCustomerFixture();
