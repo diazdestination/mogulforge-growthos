@@ -504,6 +504,7 @@ export async function sendMicrosoftForUser(
     subject: string;
     body: string;
     beforeDispatch?: EmailDispatchGuard;
+    beforeFinalDispatch?: EmailDispatchGuard;
     outboundParentId?: string;
   },
 ) {
@@ -660,6 +661,12 @@ export async function sendMicrosoftForUser(
       }
     }
     const clientRequestId = randomUUID();
+    // Opt-in approval follows every awaited identity, lifecycle and parent check.
+    if (input.beforeFinalDispatch)
+      await runEmailDispatchGuard(input.beforeFinalDispatch, {
+        provider: "microsoft",
+        senderEmail: selected.email,
+      });
     dispatched = true;
     const response = await request(`${GRAPH}/me/sendMail`, {
       method: "POST",
