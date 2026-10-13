@@ -1,5 +1,5 @@
 import path from "node:path";
-import express, { type Express } from "express";
+import express, { type Express, type ErrorRequestHandler } from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import pinoHttp from "pino-http";
@@ -34,6 +34,16 @@ app.use(
     },
   }),
 );
+const isEstimateDeliveryPath = (path: string) =>
+  /^\/api\/v1\/estimates\/[^/]+\/delivery(?:\/(?:preview|send))?\/?$/.test(path);
+// Parser/auth failures precede the route; retain this boundary's privacy there too.
+app.use((req, res, next) => {
+  if (isEstimateDeliveryPath(req.path)) {
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Referrer-Policy", "no-referrer");
+  }
+  next();
+});
 app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
 app.use(restoreReadOnlyRequests);
@@ -71,6 +81,17 @@ app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 
 app.use("/api", router);
+
+const estimateDeliveryErrors: ErrorRequestHandler = (error: unknown, req, res, next) => {
+  if (!isEstimateDeliveryPath(req.path) || res.headersSent) { next(error); return; }
+  const type = typeof error === "object" && error !== null && "type" in error ? error.type : undefined;
+  if (type === "entity.parse.failed" || type === "entity.too.large") {
+    res.status(type === "entity.too.large" ? 413 : 400).json({ error: "Invalid estimate delivery request.", code: "estimate_invalid_request" });
+    return;
+  }
+  res.status(500).json({ error: "Estimate delivery is unavailable. Check the original retained evidence before further action.", code: "estimate_delivery_unavailable" });
+};
+app.use(estimateDeliveryErrors);
 
 // Single-container production: serve the built SPA from the same origin as the
 // API, so relative /api/* calls just work with no proxy. In dev the SPA is

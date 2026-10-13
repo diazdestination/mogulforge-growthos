@@ -12206,6 +12206,177 @@ export interface CustomerReplyDecision {
   releaseNote: string | null;
 }
 
+export interface EstimateEmailLineItem {
+  description: string;
+  /** @exclusiveMinimum 0 */
+  quantity: number;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  unitPriceCents: number;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  totalCents: number;
+}
+
+/**
+ * Exact saved customer-facing quote and complete notes. Server validates saved line arithmetic and totals; no generated terms.
+ */
+export interface EstimateEmailDocument {
+  estimateId: string;
+  /**
+     * @minLength 1
+     * @pattern ^[^\u0000-\u001f\u007f\u2028\u2029]+$
+     */
+  businessName: string;
+  /** @minLength 1 */
+  customerLabel: string;
+  /** @nullable */
+  propertyLabel: string | null;
+  /**
+     * @minLength 1
+     * @pattern ^[^\u0000-\u001f\u007f\u2028\u2029]+$
+     */
+  title: string;
+  lineItems: EstimateEmailLineItem[];
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  subtotalCents: number;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  taxCents: number;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  totalCents: number;
+  /** @nullable */
+  notes: string | null;
+}
+
+export interface EstimateEmailMessage {
+  recipient: string;
+  /**
+     * @minLength 1
+     * @pattern ^[^\u0000-\u001f\u007f\u2028\u2029]+$
+     */
+  subject: string;
+  body: string;
+}
+
+export interface EstimateDeliveryPreviewRequest {
+  expectedUpdatedAt: string;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  expectedWorkVersion: number | null;
+}
+
+export interface EstimateDeliverySendRequest {
+  previewId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  confirmed: true;
+}
+
+export type EstimateDeliveryPreviewSenderProvider = typeof EstimateDeliveryPreviewSenderProvider[keyof typeof EstimateDeliveryPreviewSenderProvider];
+
+
+export const EstimateDeliveryPreviewSenderProvider = {
+  gmail: 'gmail',
+  microsoft: 'microsoft',
+} as const;
+
+export type EstimateDeliveryPreviewSenderSource = typeof EstimateDeliveryPreviewSenderSource[keyof typeof EstimateDeliveryPreviewSenderSource];
+
+
+export const EstimateDeliveryPreviewSenderSource = {
+  lead_assignee: 'lead_assignee',
+  company_default: 'company_default',
+} as const;
+
+export type EstimateDeliveryPreviewSender = {
+  provider: EstimateDeliveryPreviewSenderProvider;
+  senderEmail: string;
+  source: EstimateDeliveryPreviewSenderSource;
+};
+
+export interface EstimateDeliveryPreview {
+  estimateId: string;
+  previewId: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  expiresAt: string;
+  document: EstimateEmailDocument;
+  message: EstimateEmailMessage;
+  sender: EstimateDeliveryPreviewSender;
+}
+
+export type EstimateDeliveryEvidenceIntegrity = typeof EstimateDeliveryEvidenceIntegrity[keyof typeof EstimateDeliveryEvidenceIntegrity];
+
+
+export const EstimateDeliveryEvidenceIntegrity = {
+  valid: 'valid',
+  unavailable: 'unavailable',
+} as const;
+
+export type EstimateDeliveryEvidenceState = typeof EstimateDeliveryEvidenceState[keyof typeof EstimateDeliveryEvidenceState];
+
+
+export const EstimateDeliveryEvidenceState = {
+  not_sent: 'not_sent',
+  processing: 'processing',
+  accepted: 'accepted',
+  held: 'held',
+  uncertain: 'uncertain',
+  reconciled: 'reconciled',
+} as const;
+
+/**
+ * @nullable
+ */
+export type EstimateDeliveryEvidenceProvider = typeof EstimateDeliveryEvidenceProvider[keyof typeof EstimateDeliveryEvidenceProvider] | null;
+
+
+export const EstimateDeliveryEvidenceProvider = {
+  gmail: 'gmail',
+  microsoft: 'microsoft',
+} as const;
+
+export interface EstimateDeliveryEvidence {
+  estimateId: string;
+  integrity: EstimateDeliveryEvidenceIntegrity;
+  state: EstimateDeliveryEvidenceState;
+  /** @nullable */
+  executionId: string | null;
+  canPrepare: boolean;
+  detail: string;
+  document: EstimateEmailDocument | null;
+  message: EstimateEmailMessage | null;
+  /** @nullable */
+  provider: EstimateDeliveryEvidenceProvider;
+  /** @nullable */
+  providerMessageId: string | null;
+  /** @nullable */
+  providerRequestId: string | null;
+  /** @nullable */
+  acceptedAt: string | null;
+  deliveryConfirmed: false;
+}
+
+export interface EstimateDeliveryError {
+  error: string;
+  code?: string;
+}
+
 export type InvoiceDeliveryEvidenceState = typeof InvoiceDeliveryEvidenceState[keyof typeof InvoiceDeliveryEvidenceState];
 
 
