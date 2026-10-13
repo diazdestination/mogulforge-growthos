@@ -18992,6 +18992,244 @@ export const ListInvoiceDeliveryWorklistResponse = zod.object({
 
 
 /**
+ * Requires crm.read. Closed retained evidence contains no approval capabilities or mailbox user/connection identities. Provider acceptance does not establish inbox delivery, customer acceptance or signature.
+ * @summary getEstimateDelivery
+ */
+export const GetEstimateDeliveryParams = zod.object({
+  "id": zod.uuid()
+}).strict()
+
+
+
+export const getEstimateDeliveryResponseDocumentOneBusinessNameRegExp = new RegExp('^[^\\u0000-\\u001f\\u007f\\u2028\\u2029]+$');
+
+
+
+export const getEstimateDeliveryResponseDocumentOneTitleRegExp = new RegExp('^[^\\u0000-\\u001f\\u007f\\u2028\\u2029]+$');
+export const getEstimateDeliveryResponseDocumentOneLineItemsItemQuantityExclusiveMin = 0;
+
+export const getEstimateDeliveryResponseDocumentOneLineItemsItemUnitPriceCentsMin = 0;
+export const getEstimateDeliveryResponseDocumentOneLineItemsItemUnitPriceCentsMax = 9007199254740991;
+
+export const getEstimateDeliveryResponseDocumentOneLineItemsItemTotalCentsMin = 0;
+export const getEstimateDeliveryResponseDocumentOneLineItemsItemTotalCentsMax = 9007199254740991;
+
+export const getEstimateDeliveryResponseDocumentOneSubtotalCentsMin = 0;
+export const getEstimateDeliveryResponseDocumentOneSubtotalCentsMax = 9007199254740991;
+
+export const getEstimateDeliveryResponseDocumentOneTaxCentsMin = 0;
+export const getEstimateDeliveryResponseDocumentOneTaxCentsMax = 9007199254740991;
+
+export const getEstimateDeliveryResponseDocumentOneTotalCentsMin = 0;
+export const getEstimateDeliveryResponseDocumentOneTotalCentsMax = 9007199254740991;
+
+
+
+export const getEstimateDeliveryResponseMessageOneSubjectRegExp = new RegExp('^[^\\u0000-\\u001f\\u007f\\u2028\\u2029]+$');
+
+
+export const GetEstimateDeliveryResponse = zod.object({
+  "estimateId": zod.uuid(),
+  "integrity": zod.enum(['valid', 'unavailable']),
+  "state": zod.enum(['not_sent', 'processing', 'accepted', 'held', 'uncertain', 'reconciled']),
+  "executionId": zod.uuid().nullable(),
+  "canPrepare": zod.boolean(),
+  "detail": zod.string(),
+  "document": zod.union([zod.object({
+  "estimateId": zod.uuid(),
+  "businessName": zod.string().min(1).regex(getEstimateDeliveryResponseDocumentOneBusinessNameRegExp),
+  "customerLabel": zod.string().min(1),
+  "propertyLabel": zod.string().nullable(),
+  "title": zod.string().min(1).regex(getEstimateDeliveryResponseDocumentOneTitleRegExp),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string(),
+  "quantity": zod.number().gt(getEstimateDeliveryResponseDocumentOneLineItemsItemQuantityExclusiveMin),
+  "unitPriceCents": zod.int().min(getEstimateDeliveryResponseDocumentOneLineItemsItemUnitPriceCentsMin).max(getEstimateDeliveryResponseDocumentOneLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(getEstimateDeliveryResponseDocumentOneLineItemsItemTotalCentsMin).max(getEstimateDeliveryResponseDocumentOneLineItemsItemTotalCentsMax)
+}).strict()),
+  "subtotalCents": zod.int().min(getEstimateDeliveryResponseDocumentOneSubtotalCentsMin).max(getEstimateDeliveryResponseDocumentOneSubtotalCentsMax),
+  "taxCents": zod.int().min(getEstimateDeliveryResponseDocumentOneTaxCentsMin).max(getEstimateDeliveryResponseDocumentOneTaxCentsMax),
+  "totalCents": zod.int().min(getEstimateDeliveryResponseDocumentOneTotalCentsMin).max(getEstimateDeliveryResponseDocumentOneTotalCentsMax),
+  "notes": zod.string().nullable()
+}).strict().describe('Exact saved customer-facing quote and complete notes. Server validates saved line arithmetic and totals; no generated terms.'),zod.null()]),
+  "message": zod.union([zod.object({
+  "recipient": zod.email(),
+  "subject": zod.string().min(1).regex(getEstimateDeliveryResponseMessageOneSubjectRegExp),
+  "body": zod.string()
+}).strict(),zod.null()]),
+  "provider": zod.union([zod.literal('gmail'),zod.literal('microsoft'),zod.literal(null)]).nullable(),
+  "providerMessageId": zod.string().nullable(),
+  "providerRequestId": zod.string().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "deliveryConfirmed": zod.literal(false)
+}).strict()
+
+
+/**
+ * Accepted verified active session; actual and effective office/admin/owner crm.write. Explicit exact APP_ORIGIN required; API-key header presence rejected. Ten-minute actor-bound review of complete saved previously unsent estimate.
+ * @summary previewEstimateDelivery
+ */
+export const PreviewEstimateDeliveryParams = zod.object({
+  "id": zod.uuid()
+}).strict()
+
+
+
+
+export const PreviewEstimateDeliveryBody = zod.object({
+  "expectedUpdatedAt": zod.coerce.date(),
+  "expectedWorkVersion": zod.int().min(1).nullable()
+}).strict()
+
+export const previewEstimateDeliveryResponsePayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const previewEstimateDeliveryResponseDocumentBusinessNameRegExp = new RegExp('^[^\\u0000-\\u001f\\u007f\\u2028\\u2029]+$');
+
+
+
+export const previewEstimateDeliveryResponseDocumentTitleRegExp = new RegExp('^[^\\u0000-\\u001f\\u007f\\u2028\\u2029]+$');
+export const previewEstimateDeliveryResponseDocumentLineItemsItemQuantityExclusiveMin = 0;
+
+export const previewEstimateDeliveryResponseDocumentLineItemsItemUnitPriceCentsMin = 0;
+export const previewEstimateDeliveryResponseDocumentLineItemsItemUnitPriceCentsMax = 9007199254740991;
+
+export const previewEstimateDeliveryResponseDocumentLineItemsItemTotalCentsMin = 0;
+export const previewEstimateDeliveryResponseDocumentLineItemsItemTotalCentsMax = 9007199254740991;
+
+export const previewEstimateDeliveryResponseDocumentSubtotalCentsMin = 0;
+export const previewEstimateDeliveryResponseDocumentSubtotalCentsMax = 9007199254740991;
+
+export const previewEstimateDeliveryResponseDocumentTaxCentsMin = 0;
+export const previewEstimateDeliveryResponseDocumentTaxCentsMax = 9007199254740991;
+
+export const previewEstimateDeliveryResponseDocumentTotalCentsMin = 0;
+export const previewEstimateDeliveryResponseDocumentTotalCentsMax = 9007199254740991;
+
+
+
+export const previewEstimateDeliveryResponseMessageSubjectRegExp = new RegExp('^[^\\u0000-\\u001f\\u007f\\u2028\\u2029]+$');
+
+
+export const PreviewEstimateDeliveryResponse = zod.object({
+  "estimateId": zod.uuid(),
+  "previewId": zod.uuid(),
+  "payloadSha256": zod.string().regex(previewEstimateDeliveryResponsePayloadSha256RegExp),
+  "expiresAt": zod.coerce.date(),
+  "document": zod.object({
+  "estimateId": zod.uuid(),
+  "businessName": zod.string().min(1).regex(previewEstimateDeliveryResponseDocumentBusinessNameRegExp),
+  "customerLabel": zod.string().min(1),
+  "propertyLabel": zod.string().nullable(),
+  "title": zod.string().min(1).regex(previewEstimateDeliveryResponseDocumentTitleRegExp),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string(),
+  "quantity": zod.number().gt(previewEstimateDeliveryResponseDocumentLineItemsItemQuantityExclusiveMin),
+  "unitPriceCents": zod.int().min(previewEstimateDeliveryResponseDocumentLineItemsItemUnitPriceCentsMin).max(previewEstimateDeliveryResponseDocumentLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(previewEstimateDeliveryResponseDocumentLineItemsItemTotalCentsMin).max(previewEstimateDeliveryResponseDocumentLineItemsItemTotalCentsMax)
+}).strict()),
+  "subtotalCents": zod.int().min(previewEstimateDeliveryResponseDocumentSubtotalCentsMin).max(previewEstimateDeliveryResponseDocumentSubtotalCentsMax),
+  "taxCents": zod.int().min(previewEstimateDeliveryResponseDocumentTaxCentsMin).max(previewEstimateDeliveryResponseDocumentTaxCentsMax),
+  "totalCents": zod.int().min(previewEstimateDeliveryResponseDocumentTotalCentsMin).max(previewEstimateDeliveryResponseDocumentTotalCentsMax),
+  "notes": zod.string().nullable()
+}).strict().describe('Exact saved customer-facing quote and complete notes. Server validates saved line arithmetic and totals; no generated terms.'),
+  "message": zod.object({
+  "recipient": zod.email(),
+  "subject": zod.string().min(1).regex(previewEstimateDeliveryResponseMessageSubjectRegExp),
+  "body": zod.string()
+}).strict(),
+  "sender": zod.object({
+  "provider": zod.enum(['gmail', 'microsoft']),
+  "senderEmail": zod.email(),
+  "source": zod.enum(['lead_assignee', 'company_default'])
+}).strict()
+}).strict()
+
+
+/**
+ * Approve the exact actor-bound preview once. Server-owned permanent estimate-delivery effect key never permits another claim after failure, uncertainty, expiry, edits or reconciliation. No recipients, sender, document or action key accepted from the request. Check original evidence after a failed/lost HTTP result; never automatically submit again.
+ * @summary sendEstimateDelivery
+ */
+export const SendEstimateDeliveryParams = zod.object({
+  "id": zod.uuid()
+}).strict()
+
+export const sendEstimateDeliveryBodyPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const SendEstimateDeliveryBody = zod.object({
+  "previewId": zod.uuid(),
+  "payloadSha256": zod.string().regex(sendEstimateDeliveryBodyPayloadSha256RegExp),
+  "confirmed": zod.literal(true)
+}).strict()
+
+
+
+export const sendEstimateDeliveryResponseDocumentOneBusinessNameRegExp = new RegExp('^[^\\u0000-\\u001f\\u007f\\u2028\\u2029]+$');
+
+
+
+export const sendEstimateDeliveryResponseDocumentOneTitleRegExp = new RegExp('^[^\\u0000-\\u001f\\u007f\\u2028\\u2029]+$');
+export const sendEstimateDeliveryResponseDocumentOneLineItemsItemQuantityExclusiveMin = 0;
+
+export const sendEstimateDeliveryResponseDocumentOneLineItemsItemUnitPriceCentsMin = 0;
+export const sendEstimateDeliveryResponseDocumentOneLineItemsItemUnitPriceCentsMax = 9007199254740991;
+
+export const sendEstimateDeliveryResponseDocumentOneLineItemsItemTotalCentsMin = 0;
+export const sendEstimateDeliveryResponseDocumentOneLineItemsItemTotalCentsMax = 9007199254740991;
+
+export const sendEstimateDeliveryResponseDocumentOneSubtotalCentsMin = 0;
+export const sendEstimateDeliveryResponseDocumentOneSubtotalCentsMax = 9007199254740991;
+
+export const sendEstimateDeliveryResponseDocumentOneTaxCentsMin = 0;
+export const sendEstimateDeliveryResponseDocumentOneTaxCentsMax = 9007199254740991;
+
+export const sendEstimateDeliveryResponseDocumentOneTotalCentsMin = 0;
+export const sendEstimateDeliveryResponseDocumentOneTotalCentsMax = 9007199254740991;
+
+
+
+export const sendEstimateDeliveryResponseMessageOneSubjectRegExp = new RegExp('^[^\\u0000-\\u001f\\u007f\\u2028\\u2029]+$');
+
+
+export const SendEstimateDeliveryResponse = zod.object({
+  "estimateId": zod.uuid(),
+  "integrity": zod.enum(['valid', 'unavailable']),
+  "state": zod.enum(['not_sent', 'processing', 'accepted', 'held', 'uncertain', 'reconciled']),
+  "executionId": zod.uuid().nullable(),
+  "canPrepare": zod.boolean(),
+  "detail": zod.string(),
+  "document": zod.union([zod.object({
+  "estimateId": zod.uuid(),
+  "businessName": zod.string().min(1).regex(sendEstimateDeliveryResponseDocumentOneBusinessNameRegExp),
+  "customerLabel": zod.string().min(1),
+  "propertyLabel": zod.string().nullable(),
+  "title": zod.string().min(1).regex(sendEstimateDeliveryResponseDocumentOneTitleRegExp),
+  "lineItems": zod.array(zod.object({
+  "description": zod.string(),
+  "quantity": zod.number().gt(sendEstimateDeliveryResponseDocumentOneLineItemsItemQuantityExclusiveMin),
+  "unitPriceCents": zod.int().min(sendEstimateDeliveryResponseDocumentOneLineItemsItemUnitPriceCentsMin).max(sendEstimateDeliveryResponseDocumentOneLineItemsItemUnitPriceCentsMax),
+  "totalCents": zod.int().min(sendEstimateDeliveryResponseDocumentOneLineItemsItemTotalCentsMin).max(sendEstimateDeliveryResponseDocumentOneLineItemsItemTotalCentsMax)
+}).strict()),
+  "subtotalCents": zod.int().min(sendEstimateDeliveryResponseDocumentOneSubtotalCentsMin).max(sendEstimateDeliveryResponseDocumentOneSubtotalCentsMax),
+  "taxCents": zod.int().min(sendEstimateDeliveryResponseDocumentOneTaxCentsMin).max(sendEstimateDeliveryResponseDocumentOneTaxCentsMax),
+  "totalCents": zod.int().min(sendEstimateDeliveryResponseDocumentOneTotalCentsMin).max(sendEstimateDeliveryResponseDocumentOneTotalCentsMax),
+  "notes": zod.string().nullable()
+}).strict().describe('Exact saved customer-facing quote and complete notes. Server validates saved line arithmetic and totals; no generated terms.'),zod.null()]),
+  "message": zod.union([zod.object({
+  "recipient": zod.email(),
+  "subject": zod.string().min(1).regex(sendEstimateDeliveryResponseMessageOneSubjectRegExp),
+  "body": zod.string()
+}).strict(),zod.null()]),
+  "provider": zod.union([zod.literal('gmail'),zod.literal('microsoft'),zod.literal(null)]).nullable(),
+  "providerMessageId": zod.string().nullable(),
+  "providerRequestId": zod.string().nullable(),
+  "acceptedAt": zod.coerce.date().nullable(),
+  "deliveryConfirmed": zod.literal(false)
+}).strict()
+
+
+/**
  * Requires invoices.read. Provider acceptance does not establish delivery, customer receipt or payment.
  * @summary Read invoice email evidence
  */

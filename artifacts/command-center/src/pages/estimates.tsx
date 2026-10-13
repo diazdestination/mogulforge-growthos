@@ -19,6 +19,7 @@ import {
   type MemberProfile,
 } from '@workspace/api-client-react';
 import { Loader2, Plus, Trash2, Edit, FileText, Send, CheckCircle, XCircle, HardHat, X } from 'lucide-react';
+import { EstimateDelivery } from '@/components/estimate-delivery';
 import LeadSelect from '@/components/lead-select';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useToast, toast as globalToast } from '@/hooks/use-toast';
@@ -261,11 +262,13 @@ function EstimatesContent({ me, scopeKey }: { me: MemberProfile; scopeKey: strin
                     )}
                   </div>
                 </div>
+                <EstimateDelivery estimate={estimate} organizationId={me.organization!.id} authorityScope={scopeKey} canSend={canEdit && ["office", "admin", "owner"].includes(me.role)} />
+                <p className="mt-3 text-xs text-muted-foreground">External send records are staff-reported status, separate from provider evidence.</p>
                 {(canEdit || canDel) && (
                   <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-border">
                     {canEdit && !returningEstimate(estimate) && estimate.status === 'draft' && (
                       <button onClick={() => setStatus(estimate, 'sent')} className="text-xs font-bold flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 dark:text-blue-400 transition-colors flex-1 md:flex-none active:scale-95">
-                        <Send className="w-3.5 h-3.5" /> Mark Sent
+                        <Send className="w-3.5 h-3.5" /> Record external send
                       </button>
                     )}
                     {canEdit && !returningEstimate(estimate) && estimate.status === 'sent' && (

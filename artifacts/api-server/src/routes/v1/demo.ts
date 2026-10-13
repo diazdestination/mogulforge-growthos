@@ -1,3 +1,5 @@
+import { CustomerWorkError } from "../../services/returning-customer-contract";
+import type { ErrorRequestHandler } from "express";
 import { Router, type IRouter, type Request, type Response } from 'express';
 
 import { requireMember } from '../../middlewares/requireMember';
@@ -25,4 +27,6 @@ router.delete(
   },
 );
 
+const retainedHistoryError:ErrorRequestHandler=(error,_req,res,next)=>{if(error instanceof CustomerWorkError){res.status(error.status).json({error:error.message,code:error.code});return;}next(error);};
+router.use(retainedHistoryError);
 export default router;

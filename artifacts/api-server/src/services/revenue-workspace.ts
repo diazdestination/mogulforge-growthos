@@ -1,3 +1,4 @@
+import { projectEstimateDeliveryExecution } from "./estimate-delivery-projections";
 import { z } from "zod/v4";
 import { isDeepStrictEqual } from "node:util";
 import { and, desc, eq, getTableColumns, inArray, sql } from "drizzle-orm";
@@ -237,7 +238,7 @@ export async function revenueDesk(org: string) {
     }),
     proposals,
     staff,
-    executions: attempts,
+    executions: attempts.map(projectEstimateDeliveryExecution),
     records,
     limits: {
       recommendations: 50,

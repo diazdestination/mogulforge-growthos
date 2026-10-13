@@ -1,3 +1,5 @@
+import { lockCustomerWork, customerWorkFail } from "./customer-work-lineage";
+import { hasRetainedEstimateEmailParticipant, ESTIMATE_EMAIL_HISTORY_RETAINED } from "./estimate-delivery-history";
 import {
   activitiesTable,
   contactsTable,
@@ -169,7 +171,9 @@ export async function createTestLead(organizationId: string): Promise<{
 
 /** Remove every sandbox record the guided demo created. Returns count removed. */
 export async function deleteTestLeads(organizationId: string): Promise<number> {
-  const leads = await db
+  return db.transaction(async tx => {
+  await lockCustomerWork(tx,organizationId);
+  const leads = await tx
     .select({ id: leadsTable.id, contactId: leadsTable.contactId })
     .from(leadsTable)
     .where(
@@ -182,7 +186,8 @@ export async function deleteTestLeads(organizationId: string): Promise<number> {
   const leadIds = leads.map((l) => l.id);
   const contactIds = [...new Set(leads.map((l) => l.contactId).filter((c): c is string => !!c))];
 
-  await db.transaction(async (tx) => {
+  for(const id of leadIds) if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"leadId",id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"Test cleanup cannot remove retained estimate email history.");
+  for(const id of contactIds) if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"contactId",id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"Test cleanup cannot remove retained estimate email history.");
     await tx
       .delete(scheduledActionsTable)
       .where(
@@ -225,6 +230,6 @@ export async function deleteTestLeads(organizationId: string): Promise<number> {
           ),
         );
     }
-  });
   return leadIds.length;
+  });
 }

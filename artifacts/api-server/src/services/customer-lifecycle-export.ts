@@ -1,3 +1,11 @@
+import {
+  projectEstimateEmailExport,
+  type EstimateEmailRetainedLedger,
+  type RevenueExecution,
+  type RevenueExecutionEvent,
+} from "./estimate-delivery-projections";
+import { estimateEmailAdmissionMetadataSchema } from "./estimate-delivery-execution";
+import type { AuditEvent } from "@workspace/db";
 import { createHash, randomUUID } from "node:crypto";
 import pg from "pg";
 import { z } from "zod/v4";
@@ -447,6 +455,7 @@ export const CUSTOMER_EXPORT_DATASETS: readonly Dataset[] = [
   },
 ] as const;
 export const CUSTOMER_EXPORT_EXCLUSIONS = [
+  "Estimate email receipts include the original reviewed quote/message, original business participants and validated provider acceptance, not inbox delivery or customer acceptance. Preview capabilities, staff/sender connection identities, raw audit rows and permanent execution keys remain excluded and retained. Export does not authorize replay, removal or purge.",
   "Returning-customer immutable business lineage, native work versions and external receipt/refund references are included. Human command request IDs, payload hashes, actor identities and replay internals are excluded and retained in full inventory/backups. The archive is not a command replay, import mapping, payment processor or proof of acquisition revenue.",
   "Workday assets, reviewed checklist definitions, entry answers and projected completion/correction business records are included by closed allowlists. Staff identities, acting notes, raw parent/task/evidence snapshots, command/retry hashes, request IDs, preview tokens, upload reservations/capabilities and private object paths are excluded. Photo records are metadata only, not binary evidence or a re-import/activation grant. Recorded warranty dates and worker observations are not verified coverage or workmanship. The archive digest covers the projected export, not the original internal completion snapshot.",
   "Checklist definition_sha256 verifies the original canonical saved definition before export. exported_definition_sha256 covers its closed canonical export projection; these may differ when future/private fields are excluded. Neither digest is approval, compliance or permission to activate/import work.",
@@ -987,6 +996,156 @@ export function createCustomerLifecycleExporter({
               withheldInvalidLinks: result.rows.length - rows.length,
             });
           }
+          // Quote receipts are read only on THIS repeatable-read client. Private
+          // source metadata is validated internally and never added to export data.
+          const estimateIds = [
+            ...(included.get("estimates") ?? []),
+          ] as string[];
+          const keys = estimateIds.map((id) => `estimate-delivery:${id}:email`);
+          const bounded = async (text: string, values: unknown[]) => {
+            const result = await query(text, values);
+            if (result.rows.length > maxRows)
+              throw new CustomerLifecycleError(
+                413,
+                "customer_export_limit",
+                "This company exceeds the core export limit. No partial file was produced.",
+              );
+            return result.rows;
+          };
+          const executions = (await bounded(
+            `SELECT id, organization_id AS "organizationId", action_key AS "actionKey", kind, fingerprint, state, detail, actor_user_id AS "actorUserId", expires_at AS "expiresAt", created_at AS "createdAt", completed_at AS "completedAt" FROM public.revenue_executions WHERE (organization_id=$1 AND (kind='estimate_email' OR action_key ILIKE 'estimate-delivery:%')) OR lower(action_key)=ANY($2::text[]) ORDER BY id LIMIT $3`,
+            [organizationId, keys, maxRows + 1],
+          )) as unknown as RevenueExecution[];
+          const executionIds = executions.map((e) => e.id);
+          const auditFields =
+            'id, organization_id AS "organizationId", actor_user_id AS "actorUserId", action, entity_type AS "entityType", entity_id AS "entityId", metadata, created_at AS "createdAt"';
+          const audits = (await bounded(
+            `SELECT ${auditFields} FROM public.audit_events WHERE action IN ('estimate_delivery.admitted','estimate_delivery.provider_accepted') AND (organization_id=$1 OR lower(entity_id::text)=ANY($2::text[]) OR lower(metadata->'snapshot'->>'estimateId')=ANY($2::text[]) OR lower(metadata->>'actionKey')=ANY($3::text[]) OR metadata->>'executionId'=ANY($4::text[])) ORDER BY id LIMIT $5`,
+            [organizationId, estimateIds, keys, executionIds, maxRows + 1],
+          )) as unknown as AuditEvent[];
+          const parsed = audits
+            .filter((a) => a.action === "estimate_delivery.admitted")
+            .map((a) =>
+              estimateEmailAdmissionMetadataSchema.safeParse(a.metadata),
+            );
+          if (parsed.some((p) => !p.success)) throw unavailable();
+          const previewIds = parsed.flatMap((p) =>
+            p.success ? [p.data.previewId] : [],
+          );
+          const reviews = (await bounded(
+            `SELECT ${auditFields} FROM public.audit_events WHERE id=ANY($1::uuid[]) ORDER BY id LIMIT $2`,
+            [previewIds, maxRows + 1],
+          )) as unknown as AuditEvent[];
+          const events = (await bounded(
+            `SELECT id, organization_id AS "organizationId", execution_id AS "executionId", actor_user_id AS "actorUserId", state, detail, created_at AS "createdAt" FROM public.revenue_execution_events WHERE execution_id=ANY($1::uuid[]) ORDER BY id LIMIT $2`,
+            [executionIds, maxRows + 1],
+          )) as unknown as RevenueExecutionEvent[];
+          const memberIds = [
+            ...new Set([
+              ...events.flatMap((e) => (e.actorUserId ? [e.actorUserId] : [])),
+              ...parsed.flatMap((p) =>
+                p.success
+                  ? [p.data.snapshot.actorUserId, p.data.snapshot.sender.userId]
+                  : [],
+              ),
+            ]),
+          ];
+          const participants = (await bounded(
+            `SELECT id, organization_id AS org FROM public.users WHERE id=ANY($1::text[]) ORDER BY id LIMIT $2`,
+            [memberIds, maxRows + 1],
+          )) as unknown as EstimateEmailRetainedLedger["participants"];
+          const receipts: Record<string, unknown>[] = [];
+          const usedAudits = new Set<string>(),
+            usedExecutions = new Set<string>();
+          for (const id of estimateIds) {
+            const key = `estimate-delivery:${id}:email`;
+            const owned = executions.filter(
+              (e) => e.actionKey.toLowerCase() === key,
+            );
+            const linked = audits.filter(
+              (a) =>
+                a.entityId?.toLowerCase() === id ||
+                String(
+                  (a.metadata as any)?.snapshot?.estimateId ?? "",
+                ).toLowerCase() === id ||
+                String((a.metadata as any)?.actionKey ?? "").toLowerCase() ===
+                  key,
+            );
+            if (!owned.length && !linked.length) continue;
+            const admission = linked.find(
+              (a) => a.action === "estimate_delivery.admitted",
+            );
+            const meta = estimateEmailAdmissionMetadataSchema.safeParse(
+              admission?.metadata,
+            );
+            const ledger: EstimateEmailRetainedLedger = {
+              org: organizationId,
+              id,
+              executions: owned,
+              audits: linked,
+              linkedAudits: audits.filter(
+                (a) => (a.metadata as any)?.executionId === owned[0]?.id,
+              ),
+              review: meta.success
+                ? reviews.find((r) => r.id === meta.data.previewId)
+                : undefined,
+              events: events.filter((e) => e.executionId === owned[0]?.id),
+              participants,
+            };
+            const receipt = projectEstimateEmailExport(ledger);
+            if (
+              !receipt ||
+              !included.get("contacts")?.has(receipt.contactId) ||
+              (receipt.leadId !== null &&
+                !included.get("leads")?.has(receipt.leadId)) ||
+              (receipt.customerWorkId !== null &&
+                !included
+                  .get("customer_work_roots")
+                  ?.has(receipt.customerWorkId)) ||
+              (receipt.propertyId !== null &&
+                !included.get("properties")?.has(receipt.propertyId))
+            )
+              throw unavailable();
+            receipts.push(receipt);
+            linked.forEach((a) => usedAudits.add(a.id));
+            owned.forEach((e) => usedExecutions.add(e.id));
+          }
+          // Orphan or corrupt retained ownership is a hold, never a partial receipt archive.
+          if (
+            audits.some((a) => !usedAudits.has(a.id)) ||
+            executions.some((e) => !usedExecutions.has(e.id))
+          )
+            throw unavailable();
+          bytes += Buffer.byteLength(JSON.stringify(receipts));
+          if (bytes > maxBytes)
+            throw new CustomerLifecycleError(
+              413,
+              "customer_export_limit",
+              "This company exceeds the core export size. No partial file was produced.",
+            );
+          data.estimate_email_receipts = receipts;
+          coverage.push({
+            table: "estimate_email_receipts",
+            fields: [
+              "estimateId",
+              "integrity",
+              "state",
+              "executionId",
+              "document",
+              "message",
+              "provider",
+              "providerMessageId",
+              "providerRequestId",
+              "acceptedAt",
+              "deliveryConfirmed",
+              "leadId",
+              "customerWorkId",
+              "contactId",
+              "propertyId",
+            ],
+            count: receipts.length,
+            withheldInvalidLinks: 0,
+          });
           await query("ROLLBACK");
           const snapshot = { organization: org.rows[0], data, coverage };
           // Revalidate against current state on this same bounded connection, outside

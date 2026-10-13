@@ -1,5 +1,6 @@
+import { recordEstimateSavedState } from "./estimate-delivery-history";
 import { and, eq, sql } from "drizzle-orm";
-import { auditEventsTable, db, estimatesTable, projectsTable, type EstimateLineItem } from "@workspace/db";
+import { auditEventsTable, db, estimatesTable, projectsTable, type EstimateLineItem, type Estimate } from "@workspace/db";
 import { customerWorkCommandsTable as commands } from "../../../../lib/db/src/schema/customer-work";
 import { assertHistoricalStaff, assertOperationalStaff, assertResourceWindow, assertScheduleInterval, ensureInvoicePreparationTask } from "./contractor-scheduling";
 import { assertCustomerWorkActive, createCustomerWorkRoot, customerWorkActor, customerWorkFail, customerWorkHash, lockCustomerWork, nativeWorkLabels, readNativeWorkLineage, type CustomerWorkActor, type CustomerWorkReader, type CustomerWorkTx } from "./customer-work-lineage";
@@ -36,7 +37,7 @@ async function commandResponse(reader: CustomerWorkReader, org: string, command:
   if (!project || project.customerWorkId !== command.customerWorkId) customerWorkFail("customer_work_result_unavailable");
   return customerWorkProjectMutationSchema.parse({ ...common, project: dates(project) });
 }
-async function runCommand(org: string, actor: CustomerWorkActor, action: Command["action"], input: {requestId: string}, targetId: string | null, work: (tx: CustomerWorkTx) => Promise<{customerWorkId: string;estimateId?: string;projectId?: string;version: number}>) {
+async function runCommand(org: string, actor: CustomerWorkActor, action: Command["action"], input: {requestId: string}, targetId: string | null, work: (tx: CustomerWorkTx) => Promise<{customerWorkId: string;estimateId?: string;projectId?: string;version: number;previousEstimate?: Estimate}>) {
   const hash = customerWorkHash({ action, targetId, input, actorUserId: actor.userId });
   return db.transaction(async tx => {
     await lockCustomerWork(tx, org, true);
@@ -50,7 +51,12 @@ async function runCommand(org: string, actor: CustomerWorkActor, action: Command
     await assertCustomerWorkActive(tx, org);
     const result = await work(tx);
     const [command] = await tx.insert(commands).values({organizationId: org, requestId: input.requestId, action, actorUserId: actor.userId, payloadSha256: hash, customerWorkId: result.customerWorkId, estimateId: result.estimateId ?? null, projectId: result.projectId ?? null, resultVersion: result.version}).returning();
-    await tx.insert(auditEventsTable).values({organizationId: org, actorUserId: actor.userId, action: `customer_work.${action}`, entityType: result.estimateId ? "estimate" : "project", entityId: result.estimateId ?? result.projectId!, metadata: { requestId: input.requestId, customerWorkId: result.customerWorkId, workVersion: result.version, staffRecorded: true, providerEffect: false }});
+    if(result.estimateId){
+      const [estimate]=await tx.select().from(estimatesTable).where(and(eq(estimatesTable.organizationId,org),eq(estimatesTable.id,result.estimateId))).for("update");
+      if(!estimate || estimate.workVersion!==command!.resultVersion) customerWorkFail("customer_work_result_unavailable");
+      await recordEstimateSavedState(tx,org,estimate,actor.userId,command!.id,{creation:action==="estimate_created",previousEstimate:result.previousEstimate});
+    }
+    await tx.insert(auditEventsTable).values({organizationId: org, actorUserId: actor.userId, action: `customer_work.${action}`, entityType: result.estimateId ? "estimate" : "project", entityId: result.estimateId ?? result.projectId!, metadata: { requestId: input.requestId, customerWorkId: result.customerWorkId, workVersion: result.version, staffRecorded: true, providerEffect: false, ...(result.estimateId ? {savedStateVersion:1} : {}) }});
     return commandResponse(tx, org, command!, false);
   });
 }
@@ -76,7 +82,8 @@ export async function createCustomerWorkEstimate(org: string, actor: CustomerWor
 export async function updateCustomerWorkEstimate(org: string, actor: CustomerWorkActor, id: string, raw: unknown): Promise<CustomerWorkEstimateMutation> {
   const input = updateCustomerWorkEstimateSchema.parse(raw);
   return runCommand(org,actor,"estimate_updated",input,id,async tx => {
-    const current = await readNativeEstimate(tx,org,id,true);
+    const [locked] = await tx.select().from(estimatesTable).where(and(eq(estimatesTable.organizationId,org),eq(estimatesTable.id,id))).for("update");
+    const current = locked ? await readNativeEstimate(tx,org,id,true) : null;
     if (!current?.customerWorkId || current.leadId !== null) customerWorkFail("customer_work_not_found","Use the versioned returning estimate in this company.",404);
     version(current.workVersion,input.expectedWorkVersion);
     const [project] = await tx.select({id:projectsTable.id}).from(projectsTable).where(and(eq(projectsTable.organizationId,org),eq(projectsTable.customerWorkId,current.customerWorkId))).limit(1);
@@ -85,7 +92,7 @@ export async function updateCustomerWorkEstimate(org: string, actor: CustomerWor
     if (input.status === "accepted" && (!amounts.lineItems.length || amounts.totalCents < 1)) customerWorkFail("customer_work_invalid_amount","Review at least one positive priced line before recording acceptance.",400);
     const [row] = await tx.update(estimatesTable).set({...amounts,title:input.title,notes:input.notes,status:input.status,workVersion:current.workVersion!+1,updatedAt:new Date(),sentAt:input.status==="sent" && !current.sentAt ? new Date() : current.sentAt,acceptedAt:input.status==="accepted" && !current.acceptedAt ? new Date() : current.acceptedAt}).where(and(eq(estimatesTable.organizationId,org),eq(estimatesTable.id,id),eq(estimatesTable.workVersion,current.workVersion!))).returning();
     if (!row) customerWorkFail("customer_work_stale_version");
-    return {customerWorkId:current.customerWorkId,estimateId:id,version:row.workVersion!};
+    return {customerWorkId:current.customerWorkId,estimateId:id,version:row.workVersion!,previousEstimate:locked};
   }) as Promise<CustomerWorkEstimateMutation>;
 }
 async function schedule(tx: CustomerWorkTx, org: string, input: ReturnType<typeof createCustomerWorkProjectSchema.parse>, existing?: typeof projectsTable.$inferSelect) {

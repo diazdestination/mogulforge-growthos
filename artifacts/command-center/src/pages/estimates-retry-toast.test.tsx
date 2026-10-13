@@ -1,6 +1,6 @@
 /**
  * Covers the estimates page's error toast for the one-shot status-change
- * mutation ("Mark Sent" on a draft): a failed update must surface a toast
+ * mutation ("Record external send" on a draft): a failed update must surface a toast
  * with a Retry action; retry success dismisses the toast and refreshes the
  * estimate list, and a failed retry re-surfaces the toast. (Same pattern as
  * tasks-retry-toast.test.tsx.)
@@ -84,7 +84,7 @@ const listCalls = (fetchMock: ReturnType<typeof mockApi>) =>
 
 async function triggerMarkSent() {
   await screen.findByText(/roof replacement/i);
-  fireEvent.click(await screen.findByRole('button', { name: /mark sent/i }));
+  fireEvent.click(await screen.findByRole('button', { name: /record external send/i }));
 }
 
 describe('Estimates status-change retry toast', () => {

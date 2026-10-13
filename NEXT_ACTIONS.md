@@ -1,5 +1,22 @@
 # Next acceptance work
 
+## October13 estimate-email release evidence
+
+Publish the independently reviewed estimate-email branch as a dependent draft
+against PR56, then verify exact-head CI including Docker parity. Local source
+checks are complete at ac13692 (4,760 tests, 15 existing skips, types/builds/parity);
+final publication proof is retained in Forge state/artifacts. Preserve PR44 as
+the application candidate and its exact hosted/recovery boundaries.
+
+Continue the FlyReader support/rehearsal path from T-20107 using a fresh exact
+source/target/SQL/recovery packet when supported. Consumed paid grants cannot be
+reused. Real connected-mailbox/inbox and contractor estimate acceptance remain
+required before activating this email flow; SMS/PDF/photos/revised/resend scope
+and configurable capacity/travel rules remain open. Both contractor replacement
+cards require their complete acceptance evidence. This source milestone permits
+no hosted migration, real customer contact, provider activation or cutover.
+
+
 ## October13 contractor correctness and delivery work
 
 Publish the reviewed crew-end guard as a dependent draft against PR44 and verify
@@ -18,7 +35,7 @@ Independent review corrections cover strict CSV/address handling, source-only
 warranty rendering and preservation of provider-owned recovery metadata.
 4457 full-suite tests passed (15 skipped), types/both builds/Docker parity passed,
 and fictional browser import/preview checks passed. Source remains142 tables;
-all19 SQL pins are unchanged. The real Fly75 upgrade, supported credential
+all 19 SQL pins are unchanged. The real Fly75 upgrade, supported credential
 retirement and client/provider/device/payment/cutover gates remain open.
 See reports/release-integration-2026-10-12.md and its companion receipts.
 Exact publication-head GitHub CI is still required; no hosted actions occurred.

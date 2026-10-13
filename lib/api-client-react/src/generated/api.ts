@@ -109,6 +109,11 @@ import type {
   EmailProviderStatus,
   ErrorEnvelope,
   Estimate,
+  EstimateDeliveryError,
+  EstimateDeliveryEvidence,
+  EstimateDeliveryPreview,
+  EstimateDeliveryPreviewRequest,
+  EstimateDeliverySendRequest,
   EstimateInput,
   EstimateUpdate,
   ExportRoiReportParams,
@@ -23655,6 +23660,277 @@ export function useListInvoiceDeliveryWorklist<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+export const getGetEstimateDeliveryUrl = (id: string) => {
+  return `/api/v1/estimates/${id}/delivery`;
+};
+
+/**
+ * Requires crm.read. Closed retained evidence contains no approval capabilities or mailbox user/connection identities. Provider acceptance does not establish inbox delivery, customer acceptance or signature.
+ * @summary getEstimateDelivery
+ */
+export const getEstimateDelivery = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<EstimateDeliveryEvidence> => {
+  return customFetch<EstimateDeliveryEvidence>(getGetEstimateDeliveryUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEstimateDeliveryQueryKey = (id: string) => {
+  return [`/api/v1/estimates/${id}/delivery`] as const;
+};
+
+export const getGetEstimateDeliveryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEstimateDelivery>>,
+  TError = ErrorType<EstimateDeliveryError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimateDelivery>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetEstimateDeliveryQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEstimateDelivery>>
+  > = ({ signal }) => getEstimateDelivery(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEstimateDelivery>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEstimateDeliveryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEstimateDelivery>>
+>;
+export type GetEstimateDeliveryQueryError = ErrorType<EstimateDeliveryError>;
+
+/**
+ * @summary getEstimateDelivery
+ */
+
+export function useGetEstimateDelivery<
+  TData = Awaited<ReturnType<typeof getEstimateDelivery>>,
+  TError = ErrorType<EstimateDeliveryError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimateDelivery>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEstimateDeliveryQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getPreviewEstimateDeliveryUrl = (id: string) => {
+  return `/api/v1/estimates/${id}/delivery/preview`;
+};
+
+/**
+ * Accepted verified active session; actual and effective office/admin/owner crm.write. Explicit exact APP_ORIGIN required; API-key header presence rejected. Ten-minute actor-bound review of complete saved previously unsent estimate.
+ * @summary previewEstimateDelivery
+ */
+export const previewEstimateDelivery = async (
+  id: string,
+  estimateDeliveryPreviewRequest: EstimateDeliveryPreviewRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<EstimateDeliveryPreview> => {
+  return customFetch<EstimateDeliveryPreview>(
+    getPreviewEstimateDeliveryUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(estimateDeliveryPreviewRequest),
+    },
+  );
+};
+
+export const getPreviewEstimateDeliveryMutationOptions = <
+  TError = ErrorType<EstimateDeliveryError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewEstimateDelivery>>,
+    TError,
+    { id: string; data: BodyType<EstimateDeliveryPreviewRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof previewEstimateDelivery>>,
+  TError,
+  { id: string; data: BodyType<EstimateDeliveryPreviewRequest> },
+  TContext
+> => {
+  const mutationKey = ["previewEstimateDelivery"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof previewEstimateDelivery>>,
+    { id: string; data: BodyType<EstimateDeliveryPreviewRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return previewEstimateDelivery(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PreviewEstimateDeliveryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof previewEstimateDelivery>>
+>;
+export type PreviewEstimateDeliveryMutationBody =
+  BodyType<EstimateDeliveryPreviewRequest>;
+export type PreviewEstimateDeliveryMutationError =
+  ErrorType<EstimateDeliveryError>;
+
+/**
+ * @summary previewEstimateDelivery
+ */
+export const usePreviewEstimateDelivery = <
+  TError = ErrorType<EstimateDeliveryError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewEstimateDelivery>>,
+    TError,
+    { id: string; data: BodyType<EstimateDeliveryPreviewRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof previewEstimateDelivery>>,
+  TError,
+  { id: string; data: BodyType<EstimateDeliveryPreviewRequest> },
+  TContext
+> => {
+  return useMutation(getPreviewEstimateDeliveryMutationOptions(options));
+};
+
+export const getSendEstimateDeliveryUrl = (id: string) => {
+  return `/api/v1/estimates/${id}/delivery/send`;
+};
+
+/**
+ * Approve the exact actor-bound preview once. Server-owned permanent estimate-delivery effect key never permits another claim after failure, uncertainty, expiry, edits or reconciliation. No recipients, sender, document or action key accepted from the request. Check original evidence after a failed/lost HTTP result; never automatically submit again.
+ * @summary sendEstimateDelivery
+ */
+export const sendEstimateDelivery = async (
+  id: string,
+  estimateDeliverySendRequest: EstimateDeliverySendRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<EstimateDeliveryEvidence> => {
+  return customFetch<EstimateDeliveryEvidence>(getSendEstimateDeliveryUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(estimateDeliverySendRequest),
+  });
+};
+
+export const getSendEstimateDeliveryMutationOptions = <
+  TError = ErrorType<EstimateDeliveryError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendEstimateDelivery>>,
+    TError,
+    { id: string; data: BodyType<EstimateDeliverySendRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sendEstimateDelivery>>,
+  TError,
+  { id: string; data: BodyType<EstimateDeliverySendRequest> },
+  TContext
+> => {
+  const mutationKey = ["sendEstimateDelivery"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sendEstimateDelivery>>,
+    { id: string; data: BodyType<EstimateDeliverySendRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return sendEstimateDelivery(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SendEstimateDeliveryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendEstimateDelivery>>
+>;
+export type SendEstimateDeliveryMutationBody =
+  BodyType<EstimateDeliverySendRequest>;
+export type SendEstimateDeliveryMutationError =
+  ErrorType<EstimateDeliveryError>;
+
+/**
+ * @summary sendEstimateDelivery
+ */
+export const useSendEstimateDelivery = <
+  TError = ErrorType<EstimateDeliveryError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendEstimateDelivery>>,
+    TError,
+    { id: string; data: BodyType<EstimateDeliverySendRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof sendEstimateDelivery>>,
+  TError,
+  { id: string; data: BodyType<EstimateDeliverySendRequest> },
+  TContext
+> => {
+  return useMutation(getSendEstimateDeliveryMutationOptions(options));
+};
 
 export const getGetInvoiceDeliveryUrl = (id: string) => {
   return `/api/v1/invoices/${id}/delivery`;
