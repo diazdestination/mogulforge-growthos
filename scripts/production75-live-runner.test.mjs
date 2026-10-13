@@ -8,7 +8,13 @@ import {
   executeLivePacket,
   prepareLivePacket,
   validateLiveOracle,
+  validateLivePricing,
+  createGuardedLiveApi,
 } from "./production75-live-runner.mjs";
+import {
+  production75RuntimeHashes,
+  PRODUCTION75_RUNTIME_FILES,
+} from "./production75-live-manifest.mjs";
 const plan = prepareOperatorPlan({
   runId: "11111111-1111-4111-8111-111111111111",
   backupId: "backup",
@@ -59,4 +65,69 @@ test("unverified oracle and source candidate drift are refused", () => {
       {},
     ),
   ).toThrow("production75_live_oracle");
+});
+const price = {
+  status: "verified-applicable-legacy-v1",
+  evidenceSha256: "d".repeat(64),
+  account: plan.account,
+  organization: plan.organization,
+  providerVersion: 1,
+  plan: "basic",
+  region: "iad",
+  currency: "USD",
+  hourlyUsdMicros: 60000,
+  meteringQuantumMs: 3600000,
+  coveredMs: plan.workMs + plan.cleanupMs,
+  maximumUsdMicros: 60000,
+};
+test.each([-999, 0, 59999, 150001, NaN])(
+  "pricing %s is refused before provider access",
+  (value) => {
+    expect(() =>
+      validateLivePricing({ ...price, maximumUsdMicros: value }, plan),
+    ).toThrow("production75_live_pricing");
+  },
+);
+test("pricing calculation must cover work plus deletion reserve and actual scope", () => {
+  expect(validateLivePricing(price, plan)).toMatch(/^[a-f0-9]{64}$/);
+  expect(() =>
+    validateLivePricing({ ...price, coveredMs: plan.workMs }, plan),
+  ).toThrow("production75_live_pricing");
+  expect(() =>
+    validateLivePricing({ ...price, providerVersion: 2 }, plan),
+  ).toThrow("production75_live_pricing");
+});
+test.each(["state", "configuration", "secret-metadata"])(
+  "protected app %s drift stops before paid create",
+  async (change) => {
+    const api = { restoreCopy: vi.fn() },
+      transport = {
+        protectedApps: vi.fn(async () => ({ [change]: "changed" })),
+      },
+      guarded = createGuardedLiveApi({
+        api,
+        transport,
+        expectedApps: { [change]: "prepared" },
+      });
+    await expect(guarded.restoreCopy({})).rejects.toThrow(
+      "production75_live_protected",
+    );
+    expect(api.restoreCopy).not.toHaveBeenCalled();
+  },
+);
+test("all executable source dependencies are bound, including query/observer code", () => {
+  expect(PRODUCTION75_RUNTIME_FILES).toContain(
+    "scripts/staging-observation-core.mjs",
+  );
+  expect(PRODUCTION75_RUNTIME_FILES).toContain(
+    "reports/release-preparation-2026-10-09/schema-catalog.mjs",
+  );
+  const a = production75RuntimeHashes(() => "baseline");
+  for (const changed of PRODUCTION75_RUNTIME_FILES) {
+    const b = production75RuntimeHashes((p) =>
+      p === changed ? "changed" : "baseline",
+    );
+    expect(b[changed]).not.toBe(a[changed]);
+    expect(Object.keys(b)).toEqual(PRODUCTION75_RUNTIME_FILES);
+  }
 });

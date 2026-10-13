@@ -50,3 +50,4 @@ Future policies come from the local oracle, never exploratory hosted DDL.
 Production/source SQL writes, app starts, migrations, provider activation,
 credential rotation, merge, deployment and public launch are separate decisions.
 All 20 contractor gaps and each business's replacement acceptance stay open.
+Review correction: the shared runtime manifest also covers old operator/core/verifier and query/catalog implementations plus the dependency lock. Both protected attestations bind the canonical applicable-price calculation and protected-app snapshot; app drift is checked before copy creation and each writer transaction. Pricing must cover the complete work and deletion reserve. Source preparation remains UNADMITTED until these independent receipts exist.

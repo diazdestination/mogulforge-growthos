@@ -155,7 +155,8 @@ export function createLiveTransport({
       machine =
         /^\/v1\/apps\/(mogulforge-growthos|mogulforge-growthos-staging)\/machines$/;
     check(
-      (kind === "legacy" && path === sourcePath) ||
+      (kind === "legacy" &&
+        [sourcePath, `/api/v1/postgres/${SOURCE}/backups`].includes(path)) ||
         (kind === "machines" && machine.test(path)),
       "production75_live_read_scope",
     );
@@ -229,6 +230,30 @@ export function createLiveTransport({
     }
     return consumer(sourceCredential);
   }
+  async function sourceBackups() {
+    const raw = (await readonlyJson(`/api/v1/postgres/${SOURCE}/backups`)).data;
+    check(Array.isArray(raw) && raw.length <= 1000, "production75_live_backup");
+    return Object.freeze(
+      raw.map((b) => {
+        check(
+          b &&
+            /^[a-zA-Z0-9_.-]{1,128}$/.test(b.id ?? "") &&
+            ["full", "diff", "incr"].includes(b.type) &&
+            ["completed", "pending", "running", "failed"].includes(b.status) &&
+            Number.isFinite(Date.parse(b.start)) &&
+            (b.stop === null || Number.isFinite(Date.parse(b.stop))),
+          "production75_live_backup",
+        );
+        return Object.freeze({
+          id: b.id,
+          type: b.type,
+          status: b.status,
+          start: b.start,
+          stop: b.stop,
+        });
+      }),
+    );
+  }
   async function protectedApps() {
     const values = {};
     for (const app of ["mogulforge-growthos", "mogulforge-growthos-staging"]) {
@@ -301,6 +326,7 @@ export function createLiveTransport({
         );
         counts.proxies++;
         let exited = false,
+          exitedAt = null,
           closing = null;
         const agents = [];
         child.stdout?.resume();
@@ -310,6 +336,7 @@ export function createLiveTransport({
         });
         child.on("close", () => {
           exited = true;
+          exitedAt = now();
         });
         let initial;
         try {
@@ -335,11 +362,56 @@ export function createLiveTransport({
           counts.proxiesClosed++;
           throw fail(errors.get(e) ?? "production75_live_process");
         }
+        const discover = async () => {
+          const list = await safe(
+            () => inspect("children", child.pid),
+            "production75_live_process",
+            5000,
+          );
+          for (const agent of list) {
+            check(
+              Number.isInteger(agent.pid) &&
+                agent.pid > 0 &&
+                agent.pid !== child.pid &&
+                agent.parent === child.pid &&
+                agent.executable === initial.executable &&
+                typeof agent.created === "string" &&
+                agent.created.length > 0,
+              "production75_live_process",
+            );
+            const known = agents.find((a) => a.pid === agent.pid);
+            check(
+              !known || known.created === agent.created,
+              "production75_live_process",
+            );
+            if (!known) {
+              if (exited)
+                check(
+                  exitedAt !== null &&
+                    Number.isFinite(Date.parse(agent.created)) &&
+                    Date.parse(agent.created) <= exitedAt,
+                  "production75_live_process",
+                );
+              if (Number.isFinite(Date.parse(initial.created)))
+                check(
+                  Date.parse(agent.created) >= Date.parse(initial.created),
+                  "production75_live_process",
+                );
+              agents.push(agent);
+              counts.ownedAgents++;
+            }
+          }
+        };
         const close = () =>
           (closing ??= (async () => {
             try {
+              await discover();
               if (!exited) {
-                const p = await inspect("process", child.pid);
+                const p = await safe(
+                  () => inspect("process", child.pid),
+                  "production75_live_process",
+                  5000,
+                );
                 check(
                   p &&
                     p.created === initial.created &&
@@ -355,24 +427,61 @@ export function createLiveTransport({
                 5000,
                 now,
               );
+              await discover();
+              check(
+                (await safe(
+                  () => inspect("process", child.pid),
+                  "production75_live_proxy_cleanup",
+                  5000,
+                )) === null,
+                "production75_live_proxy_cleanup",
+              );
               for (const agent of agents) {
-                const live = await inspect("process", agent.pid);
+                const live = await safe(
+                  () => inspect("process", agent.pid),
+                  "production75_live_process",
+                  5000,
+                );
                 if (live) {
                   check(
                     live.created === agent.created &&
                       live.executable === agent.executable,
                     "production75_live_process",
                   );
-                  await inspect("terminate", agent);
+                  await safe(
+                    () => inspect("terminate", agent),
+                    "production75_live_agent_cleanup",
+                    5000,
+                  );
                 }
                 check(
-                  (await inspect("process", agent.pid)) === null,
+                  (await safe(
+                    () => inspect("process", agent.pid),
+                    "production75_live_agent_cleanup",
+                    5000,
+                  )) === null,
                   "production75_live_agent_cleanup",
                 );
                 counts.agentsClosed++;
               }
               check(
-                (await inspect("listener", port)).length === 0,
+                (
+                  await safe(
+                    () => inspect("children", child.pid),
+                    "production75_live_agent_cleanup",
+                    5000,
+                  )
+                ).length === 0,
+                "production75_live_agent_cleanup",
+              );
+              check(
+                (
+                  await safe(
+                    () => inspect("listener", port),
+                    "production75_live_proxy_cleanup",
+                    5000,
+                  )
+                ).length === 0,
                 "production75_live_proxy_cleanup",
               );
               counts.proxiesClosed++;
@@ -382,9 +491,11 @@ export function createLiveTransport({
           })());
         closers.add(close);
         try {
+          await discover();
           await bounded(
             async () => {
               while (!exited) {
+                await discover();
                 resources.assertActive();
                 const listeners = await inspect("listener", port);
                 if (listeners.length) {
@@ -394,15 +505,7 @@ export function createLiveTransport({
                       listeners[0].address === "127.0.0.1",
                     "production75_live_listener",
                   );
-                  for (const agent of await inspect("children", child.pid)) {
-                    check(
-                      agent.executable === initial.executable &&
-                        agent.parent === child.pid,
-                      "production75_live_process",
-                    );
-                    agents.push(agent);
-                    counts.ownedAgents++;
-                  }
+                  await discover();
                   const proxy = Object.freeze({
                     cluster,
                     port,
@@ -559,6 +662,7 @@ export function createLiveTransport({
     verifyIdentity,
     authorization,
     withSourceCredentials,
+    sourceBackups,
     protectedApps,
     openProxy,
     connect,

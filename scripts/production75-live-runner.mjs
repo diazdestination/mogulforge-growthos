@@ -46,6 +46,10 @@ import {
 import { assertLegacyReaderCapabilities } from "./production75-legacy-model.mjs";
 import { buildProduction75Source } from "./production75-source.mjs";
 import { PINNED_FILES } from "./production75-pins.mjs";
+import {
+  production75RuntimeHashes,
+  PRODUCTION75_RUNTIME_FILES,
+} from "./production75-live-manifest.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), ".."),
   BASE = "8df64dc72009832f93b2b491031acd1bb2afb903",
   SOURCE = "kzpwm0j18eg04nv3",
@@ -62,39 +66,8 @@ const freeze = (v) => {
   }
   return v;
 };
-const ORACLE_MODULES = [
-  "production75-live-transport.mjs",
-  "production75-live-observation.mjs",
-  "production75-live-policy.mjs",
-  "production75-live-local.mjs",
-  "production75-live-admission.mjs",
-  "production75-live-runner.mjs",
-];
-const LIVE_MODULES = [
-  ...ORACLE_MODULES,
-  "production75-operator.mjs",
-  "production75-custody.mjs",
-  "production75-reader-delta.mjs",
-  "production75-fly-v1.mjs",
-  "production75-observer.mjs",
-  "production75-verification.mjs",
-  "production75-core.mjs",
-  "production75-legacy-model.mjs",
-  "production75-source.mjs",
-  "production75-pins.mjs",
-];
 const moduleHashes = () =>
-  Object.fromEntries(
-    LIVE_MODULES.map((p) => [
-      p,
-      sha(
-        readFileSync(resolve(ROOT, "scripts", p), "utf8").replaceAll(
-          "\r\n",
-          "\n",
-        ),
-      ),
-    ]),
-  );
+  production75RuntimeHashes((p) => readFileSync(resolve(ROOT, p), "utf8"));
 const planInput = (p) =>
   Object.fromEntries(
     [
@@ -145,13 +118,16 @@ export function validateLiveOracle(oracle, proof, currentHashes = {}) {
       proof.status === "PASS" &&
       proof.sourceCandidate === BASE &&
       proof.liveProviderCalls === false &&
-      proof.cleanup?.clients === proof.cleanup?.expectedClients &&
+      proof.cleanup &&
+      proof.cleanup.clients === proof.cleanup.expectedClients &&
       proof.cleanup.sockets === proof.cleanup.expectedClients &&
       proof.cleanup.containers === 6 &&
       proof.cleanup.expectedContainers === 6 &&
       proof.oracleSha256 === digest(oracle) &&
+      Object.keys(proof.moduleHashesAfter ?? {}).join(",") ===
+        PRODUCTION75_RUNTIME_FILES.join(",") &&
       isDeepStrictEqual(proof.moduleHashesBefore, proof.moduleHashesAfter) &&
-      ORACLE_MODULES.every(
+      PRODUCTION75_RUNTIME_FILES.every(
         (p) => proof.moduleHashesAfter[p] === currentHashes[p],
       ),
     "production75_live_oracle",
@@ -222,6 +198,7 @@ export async function prepareLivePacket(
         }),
       ),
     );
+    await verifyLiveProtectedApps(transport, apps);
     const profile = expectedProduction75ReaderProfile(
         `growthos_reader_${runId.replaceAll("-", "")}`,
       ),
@@ -283,14 +260,61 @@ export async function prepareLivePacket(
     resourcesClosed: true,
   });
 }
-export async function executeLivePacket(deps, packet, attestations = {}) {
-  // Authenticate everything before identity, credential, SQL or provider access.
+export function validateLivePricing(pricing, plan) {
+  const p = pricing;
   check(
-    packet?.kind === "UNADMITTED_LIVE_PREPARATION" &&
-      packet.pricing?.status === "verified-applicable-legacy-v1" &&
-      /^[a-f0-9]{64}$/.test(packet.pricing.evidenceSha256 ?? "") &&
-      Number.isSafeInteger(packet.pricing.maximumUsdMicros) &&
-      packet.pricing.maximumUsdMicros <= packet.plan.maxCostUsdMicros,
+    p?.status === "verified-applicable-legacy-v1" &&
+      /^[a-f0-9]{64}$/.test(p.evidenceSha256 ?? "") &&
+      p.account === plan.account &&
+      p.organization === plan.organization &&
+      p.providerVersion === plan.providerVersion &&
+      p.plan === plan.plan &&
+      p.region === plan.region &&
+      p.currency === "USD" &&
+      Number.isSafeInteger(p.hourlyUsdMicros) &&
+      p.hourlyUsdMicros > 0 &&
+      Number.isSafeInteger(p.meteringQuantumMs) &&
+      p.meteringQuantumMs > 0 &&
+      p.meteringQuantumMs <= 3600000 &&
+      p.coveredMs === plan.workMs + plan.cleanupMs &&
+      Number.isSafeInteger(p.maximumUsdMicros) &&
+      p.maximumUsdMicros > 0 &&
+      p.maximumUsdMicros <= plan.maxCostUsdMicros,
+    "production75_live_pricing",
+  );
+  const quantum =
+    Math.ceil(p.coveredMs / p.meteringQuantumMs) * p.meteringQuantumMs;
+  check(
+    p.maximumUsdMicros >= Math.ceil((quantum * p.hourlyUsdMicros) / 3600000),
+    "production75_live_pricing",
+  );
+  return digest(p);
+}
+export async function verifyLiveProtectedApps(transport, expectedApps) {
+  check(
+    expectedApps &&
+      isDeepStrictEqual(await transport.protectedApps(), expectedApps),
+    "production75_live_protected",
+  );
+  return true;
+}
+export function createGuardedLiveApi({ api, transport, expectedApps }) {
+  const methods = Object.fromEntries(
+      Object.entries(api).map(([k, fn]) => [k, fn.bind(api)]),
+    ),
+    restore = methods.restoreCopy;
+  return Object.freeze({
+    ...methods,
+    restoreCopy: async (permit) => {
+      await verifyLiveProtectedApps(transport, expectedApps);
+      return restore(permit);
+    },
+  });
+}
+export async function executeLivePacket(deps, packet, attestations = {}) {
+  // Authenticate exact protected price/app bindings before any provider access.
+  check(
+    packet?.kind === "UNADMITTED_LIVE_PREPARATION",
     "production75_live_admission",
   );
   const plan = prepareOperatorPlan(planInput(packet.plan));
@@ -303,19 +327,30 @@ export async function executeLivePacket(deps, packet, attestations = {}) {
       digest(deps.oracle) === packet.oracleSha256,
     "production75_live_packet",
   );
+  const bindings = {
+    pricingSha256: validateLivePricing(packet.pricing, plan),
+    protectedAppsSha256: digest(packet.protectedApps),
+  };
   const owner = await authenticateAttestation({
       unprotect: deps.unprotect,
       blob: attestations.owner,
       plan,
       kind: "owner-approval",
+      bindings,
     }),
     review = await authenticateAttestation({
       unprotect: deps.unprotect,
       blob: attestations.review,
       plan,
       kind: "independent-capability-review",
+      bindings,
     });
-  const { transport, api } = deps,
+  const { transport } = deps,
+    api = createGuardedLiveApi({
+      api: deps.api,
+      transport,
+      expectedApps: packet.protectedApps,
+    }),
     writerCredentials = new Map(),
     readerCredentials = new Map(),
     proxies = new WeakMap();
@@ -341,6 +376,7 @@ export async function executeLivePacket(deps, packet, attestations = {}) {
     }
     return cache.get(copy.id);
   };
+  await verifyLiveProtectedApps(transport, packet.protectedApps);
   const snapshot = async (id, values, r, readerName = null, databases) =>
     captureLiveSnapshot({
       transport,
@@ -355,10 +391,12 @@ export async function executeLivePacket(deps, packet, attestations = {}) {
   const callbacks = {
     verifyIdentity: () => transport.verifyIdentity(),
     moduleManifestSha256: deps.manifestSha256,
-    observeOriginals: ({ resources }) =>
-      transport.withSourceCredentials((value) =>
+    observeOriginals: async ({ resources }) => {
+      await verifyLiveProtectedApps(transport, packet.protectedApps);
+      return transport.withSourceCredentials((value) =>
         snapshot(SOURCE, value, resources),
-      ),
+      );
+    },
     observeCopy: async (copy, { readerName, custody, resources }) =>
       snapshot(
         copy.id,
@@ -381,6 +419,7 @@ export async function executeLivePacket(deps, packet, attestations = {}) {
       custody,
       resources,
     }) => {
+      await verifyLiveProtectedApps(transport, packet.protectedApps);
       const corePlan = coreContext(deps, afterReader, readerName),
         p = await proxy(copy.id, resources),
         writer = await transport.connect(
@@ -395,6 +434,12 @@ export async function executeLivePacket(deps, packet, attestations = {}) {
           await credentials(copy, custody, "reader"),
           { readonly: true, resources },
         );
+      const writeQuery = writer.query.bind(writer);
+      writer.query = async (...args) => {
+        if (args[0] === "BEGIN")
+          await verifyLiveProtectedApps(transport, packet.protectedApps);
+        return writeQuery(...args);
+      };
       const readFresh = async () => {
         await reader.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
         try {
@@ -519,10 +564,16 @@ export function createNativeLiveDependencies(oracleDirectory) {
     catalogs,
     oracle,
     transport,
-    api: createProduction75V1Client({
-      fetchFn: globalThis.fetch,
-      getAuthorization: () => transport.authorization("legacy"),
-      organization: "adam-diaz",
+    api: Object.freeze({
+      ...createProduction75V1Client({
+        fetchFn: globalThis.fetch,
+        getAuthorization: () => transport.authorization("legacy"),
+        organization: "adam-diaz",
+      }),
+      listBackups: async (id) => {
+        check(id === SOURCE, "production75_live_read_scope");
+        return transport.sourceBackups();
+      },
     }),
     manifestSha256: async () =>
       digest({

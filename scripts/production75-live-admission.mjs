@@ -22,6 +22,7 @@ export async function authenticateAttestation({
   blob,
   plan,
   kind,
+  bindings,
   now = Date.now,
 } = {}) {
   try {
@@ -33,6 +34,12 @@ export async function authenticateAttestation({
         typeof now === "function",
     );
     const entropy = attestationEntropy(plan, kind);
+    check(
+      bindings &&
+        ["pricingSha256", "protectedAppsSha256"].every((k) =>
+          /^[a-f0-9]{64}$/.test(bindings[k] ?? ""),
+        ),
+    );
     let timer;
     const bytes = await Promise.race([
       unprotect(blob, entropy),
@@ -57,7 +64,9 @@ export async function authenticateAttestation({
         v.moduleManifestSha256 === plan.moduleManifestSha256 &&
         v.maxCostUsdMicros === plan.maxCostUsdMicros &&
         v.maxCopies === 1 &&
-        v.sourceWritesAuthorized === false,
+        v.sourceWritesAuthorized === false &&
+        v.pricingSha256 === bindings.pricingSha256 &&
+        v.protectedAppsSha256 === bindings.protectedAppsSha256,
     );
     check(
       v.provenance?.type ===

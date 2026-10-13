@@ -8,7 +8,7 @@ import {
 } from "./production75-live-transport.mjs";
 const credential = "fm1r_" + "A".repeat(40),
   config = `access_token: ${credential},${"B".repeat(40)}\n`;
-function fixture() {
+function fixture({ fetchFn } = {}) {
   let alive = false,
     closed = false;
   const child = new EventEmitter();
@@ -58,6 +58,7 @@ function fixture() {
     }
   }
   const transport = createLiveTransport({
+    fetchFn,
     runFile,
     spawnChild: () => {
       alive = true;
@@ -87,6 +88,35 @@ test("sanitized environment removes provider/PG overrides and isolates the agent
   expect(e.FLY_API_TOKEN).toBeUndefined();
   expect(e.PGPASSWORD).toBeUndefined();
   expect(e.FLY_AGENT_SOCKET_PATH).toBeUndefined();
+});
+test("source backup discovery preserves actual differential backup type", async () => {
+  const f = fixture({
+    fetchFn: async () =>
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: "backup_diff",
+              type: "diff",
+              status: "completed",
+              start: "2026-10-12T21:50:29Z",
+              stop: "2026-10-12T21:50:30Z",
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+  });
+  expect(await f.transport.sourceBackups()).toEqual([
+    {
+      id: "backup_diff",
+      type: "diff",
+      status: "completed",
+      start: "2026-10-12T21:50:29Z",
+      stop: "2026-10-12T21:50:30Z",
+    },
+  ]);
+  expect(f.transport.metadata().sourceCredentialsLoaded).toBe(false);
 });
 test("private token normalization is strict and errors contain no input", () => {
   expect(normalizeLiveAuthorization(config, "legacy")).toBe(
@@ -279,5 +309,45 @@ test("failed writer cannot kill independent Reader reconciliation", async () => 
     "production75_live_client",
   );
   expect(await reader.query("SELECT 1")).toEqual({ rows: [] });
+  expect(await r.drain()).toEqual({ closed: true });
+});
+test("failed readiness discovers and closes its private agent", async () => {
+  const f = fixture(),
+    r = createOperatorResources({ until: Date.now() + 10000 });
+  await f.transport.verifyIdentity();
+  let agentAlive = true,
+    spawned = false;
+  const original = f.inspect.getMockImplementation();
+  f.inspect.mockImplementation(async (kind, id) => {
+    if (kind === "children")
+      return spawned && agentAlive
+        ? [{ pid: 42, parent: 123, created: "agent", executable: "fly" }]
+        : [];
+    if (kind === "terminate") {
+      agentAlive = false;
+      return true;
+    }
+    if (kind === "process" && id === 42)
+      return agentAlive
+        ? { pid: 42, parent: 123, created: "agent", executable: "fly" }
+        : null;
+    if (kind === "listener") {
+      const rows = await original(kind, id);
+      if (rows.length) {
+        spawned = true;
+        return [{ pid: 999, address: "127.0.0.1" }];
+      }
+      return [];
+    }
+    return original(kind, id);
+  });
+  await expect(f.transport.openProxy("kzpwm0j18eg04nv3", r)).rejects.toThrow(
+    "production75_live_listener",
+  );
+  expect(agentAlive).toBe(false);
+  expect(f.transport.metadata()).toMatchObject({
+    ownedAgents: 1,
+    agentsClosed: 1,
+  });
   expect(await r.drain()).toEqual({ closed: true });
 });

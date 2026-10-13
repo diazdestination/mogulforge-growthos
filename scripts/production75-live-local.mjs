@@ -52,6 +52,7 @@ import { createLiveTransport } from "./production75-live-transport.mjs";
 import { captureLiveSnapshot } from "./production75-live-observation.mjs";
 import { deriveLivePolicies } from "./production75-live-policy.mjs";
 import { executeLivePacket } from "./production75-live-runner.mjs";
+import { production75RuntimeHashes } from "./production75-live-manifest.mjs";
 import { projectLiveReader } from "./production75-live-observation.mjs";
 import { assertProduction75ReaderDelta } from "./production75-reader-delta.mjs";
 import {
@@ -60,27 +61,9 @@ import {
 } from "./production75-operator.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), ".."),
   BASE = "8df64dc72009832f93b2b491031acd1bb2afb903";
-const MODULES = [
-  "production75-live-transport.mjs",
-  "production75-live-observation.mjs",
-  "production75-live-policy.mjs",
-  "production75-live-local.mjs",
-  "production75-live-admission.mjs",
-  "production75-live-runner.mjs",
-];
 const sha = (b) => createHash("sha256").update(b).digest("hex"),
   hashes = () =>
-    Object.fromEntries(
-      MODULES.map((p) => [
-        p,
-        sha(
-          readFileSync(resolve(ROOT, "scripts", p), "utf8").replaceAll(
-            "\r\n",
-            "\n",
-          ),
-        ),
-      ]),
-    );
+    production75RuntimeHashes((p) => readFileSync(resolve(ROOT, p), "utf8"));
 const check = (ok, code) => {
   if (!ok) throw Object.assign(new Error(code), { safeCode: code });
 };
@@ -858,7 +841,24 @@ async function run() {
           readerName,
           expectedProfile: profile,
         });
+      const protectedApps = { localProtected: "unchanged" },
+        pricing = {
+          status: "verified-applicable-legacy-v1",
+          evidenceSha256: "a".repeat(64),
+          account: plan.account,
+          organization: plan.organization,
+          providerVersion: 1,
+          plan: "basic",
+          region: "iad",
+          currency: "USD",
+          hourlyUsdMicros: 1,
+          meteringQuantumMs: 3600000,
+          coveredMs: plan.workMs + plan.cleanupMs,
+          maximumUsdMicros: 1,
+        };
       const admission = (kind) => ({
+        pricingSha256: sha(JSON.stringify(pricing)),
+        protectedAppsSha256: sha(JSON.stringify(protectedApps)),
         version: 1,
         kind,
         planSha256: digest,
@@ -910,14 +910,10 @@ async function run() {
           plan,
           planSha256: digest,
           sourceBefore: before,
-          protectedApps: { localProtected: "unchanged" },
+          protectedApps,
           oracleSha256: sha(JSON.stringify(oracle)),
           capabilities: delta.capabilities,
-          pricing: {
-            status: "verified-applicable-legacy-v1",
-            evidenceSha256: "a".repeat(64),
-            maximumUsdMicros: 1,
-          },
+          pricing,
         },
         { owner: Buffer.alloc(80, 1), review: Buffer.alloc(80, 2) },
       );

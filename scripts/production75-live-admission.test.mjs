@@ -18,8 +18,13 @@ const plan = prepareOperatorPlan({
   cleanupMs: 10000,
   maxCostUsdMicros: 150000,
 });
+const bindings = {
+  pricingSha256: "e".repeat(64),
+  protectedAppsSha256: "f".repeat(64),
+};
 const body = (kind) => ({
   version: 1,
+  ...bindings,
   kind,
   planSha256: operatorPlanDigest(plan),
   issuedAt: 1000,
@@ -48,6 +53,7 @@ test.each(["owner-approval", "independent-capability-review"])(
       unprotect,
       blob: Buffer.alloc(80, 1),
       plan,
+      bindings,
       kind,
       now: () => 1100,
     });
@@ -67,6 +73,7 @@ test("plaintext approval is refused before unprotect", async () => {
       unprotect,
       blob: body("owner-approval"),
       plan,
+      bindings,
       kind: "owner-approval",
       now: () => 1100,
     }),
@@ -84,6 +91,8 @@ test.each([
   "provenance",
   "expired",
   "future",
+  "pricing",
+  "apps",
 ])("refuses protected %s drift", async (field) => {
   const v = body("owner-approval");
   if (field === "kind") v.kind = "independent-capability-review";
@@ -95,12 +104,15 @@ test.each([
   if (field === "copies") v.maxCopies = 2;
   if (field === "provenance") v.provenance.type = "json-claim";
   if (field === "expired") v.expiresAt = 1099;
+  if (field === "pricing") v.pricingSha256 = "a".repeat(64);
+  if (field === "apps") v.protectedAppsSha256 = "a".repeat(64);
   if (field === "future") v.issuedAt = 1101;
   await expect(
     authenticateAttestation({
       unprotect: unprotectFor(v),
       blob: Buffer.alloc(80, 1),
       plan,
+      bindings,
       kind: "owner-approval",
       now: () => 1100,
     }),
@@ -114,6 +126,7 @@ test("unprotect errors never preserve private message or cause", async () => {
       },
       blob: Buffer.alloc(80, 1),
       plan,
+      bindings,
       kind: "owner-approval",
       now: () => 1100,
     }),
