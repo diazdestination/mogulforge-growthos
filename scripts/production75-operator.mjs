@@ -2,7 +2,7 @@
 import {randomUUID,createHash} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {openOperatorCustody,operatorPlanDigest,consumeOperatorPermit,markOperatorPermitDispatched} from './production75-custody.mjs';
-import {mergeV1OwnershipEvidence} from './production75-fly-v1.mjs';
+import {mergeV1OwnershipEvidence,production75V1FailureMetadata} from './production75-fly-v1.mjs';
 import {expectedProduction75ReaderProfile,production75ProfileDigest,production75SnapshotDigest,assertProduction75ReaderDelta} from './production75-reader-delta.mjs';
 import {runProduction75Verification} from './production75-verification.mjs';
 const error=code=>Object.assign(new Error(code),{safeCode:code});
@@ -44,7 +44,7 @@ export async function runProduction75Operator({plan,custodyRoot,verifyOwnerAppro
   api=Object.freeze(Object.fromEntries(API_KEYS.map(k=>[k,api[k].bind(api)])));
   callbacks=Object.freeze(Object.fromEntries(CALLBACK_KEYS.map(k=>[k,callbacks[k].bind(callbacks)])));
   workResources=createOperatorResources({now,until:plan.workUntil});cleanupResources=createOperatorResources({now,until:plan.cleanupUntil});
-  const call=async(fn,until=plan.workUntil)=>{let timer;const deadline=Math.min(until,now()+240000);try{check(now()<deadline,'production75_operator_deadline');const value=await Promise.race([Promise.resolve().then(()=>fn({resources:workResources,signal:workResources.signal,deadline})),new Promise((_,reject)=>{timer=setTimeout(()=>{workResources.abort();reject(error('production75_operator_deadline'));},Math.max(1,deadline-now()));})]);if(now()>=deadline)workResources.abort();check(now()<deadline,'production75_operator_deadline');return value;}catch{throw error('production75_operator_callback');}finally{clearTimeout(timer);}};
+  const call=async(fn,until=plan.workUntil)=>{let timer;const deadline=Math.min(until,now()+240000);try{check(now()<deadline,'production75_operator_deadline');const value=await Promise.race([Promise.resolve().then(()=>fn({resources:workResources,signal:workResources.signal,deadline})),new Promise((_,reject)=>{timer=setTimeout(()=>{workResources.abort();reject(error('production75_operator_deadline'));},Math.max(1,deadline-now()));})]);if(now()>=deadline)workResources.abort();check(now()<deadline,'production75_operator_deadline');return value;}catch(e){const diagnostic=production75V1FailureMetadata(e);if(diagnostic&&!result.providerFailure)result.providerFailure=diagnostic;throw error('production75_operator_callback');}finally{clearTimeout(timer);}};
   const ownedFresh=async(until=plan.workUntil)=>{const detail=await call(()=>api.getCluster(copy.id),until),inventory=await call(()=>api.listClusters(),until);check(detail&&detail.id===copy.id&&detail.name===plan.copyName&&detail.organization===plan.organization,'production75_operator_ownership');return mergeV1OwnershipEvidence(detail,inventory);};
   custody=await openOperatorCustody({root:custodyRoot,plan,verifyOwnerApproval,verifyCapabilityReview,now});
   const identity=await call(callbacks.verifyIdentity);check(identity?.account===plan.account&&identity.organization===plan.organization,'production75_operator_identity');
@@ -96,7 +96,7 @@ export async function runProduction75Operator({plan,custodyRoot,verifyOwnerAppro
   await shutdown();
   if(custody){
    const until=plan.cleanupUntil;
-   const bounded=async(fn,maxMs=30000)=>{let timer;const deadline=Math.min(until,now()+maxMs);try{check(now()<deadline,'production75_operator_cleanup_deadline');const value=await Promise.race([Promise.resolve().then(()=>fn({resources:cleanupResources,signal:cleanupResources.signal,deadline})),new Promise((_,reject)=>{timer=setTimeout(()=>{cleanupResources.abort();reject(error('production75_operator_cleanup_deadline'));},Math.max(1,deadline-now()));})]);if(now()>=deadline)cleanupResources.abort();check(now()<deadline,'production75_operator_cleanup_deadline');return value;}finally{clearTimeout(timer);}};
+   const bounded=async(fn,maxMs=30000)=>{let timer;const deadline=Math.min(until,now()+maxMs);try{check(now()<deadline,'production75_operator_cleanup_deadline');const value=await Promise.race([Promise.resolve().then(()=>fn({resources:cleanupResources,signal:cleanupResources.signal,deadline})),new Promise((_,reject)=>{timer=setTimeout(()=>{cleanupResources.abort();reject(error('production75_operator_cleanup_deadline'));},Math.max(1,deadline-now()));})]);if(now()>=deadline)cleanupResources.abort();check(now()<deadline,'production75_operator_cleanup_deadline');return value;}catch(e){const diagnostic=production75V1FailureMetadata(e);if(diagnostic&&!result.cleanupProviderFailure)result.cleanupProviderFailure=diagnostic;throw e;}finally{clearTimeout(timer);}};
    try{
     const id=custody.status().copyId;
     if(id){

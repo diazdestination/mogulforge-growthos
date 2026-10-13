@@ -7,6 +7,7 @@ import {deltaFixture,verificationFixture} from './production75-operator-test-sup
 import {prepareOperatorPlan,operatorPlanDigest} from './production75-custody.mjs';
 import {expectedProduction75ReaderProfile,production75ProfileDigest,production75SnapshotDigest} from './production75-reader-delta.mjs';
 import {runProduction75Operator,createOperatorResources} from './production75-operator.mjs';
+import {createProduction75V1Client} from './production75-fly-v1.mjs';
 const mocks=vi.hoisted(()=>({verify:vi.fn()}));
 vi.mock('./production75-verification.mjs',()=>({runProduction75Verification:mocks.verify}));
 beforeEach(()=>{mocks.verify.mockReset();});
@@ -19,6 +20,29 @@ function fixture(planChanges={}){
  return {root,p,copy,d,calls,api,callbacks,auth,args:{plan:p,custodyRoot:root,api,callbacks,...auth,pause:async()=>{}},cleanup(){const r=fs.realpathSync(root);if(path.dirname(r)!==fs.realpathSync(os.tmpdir())||!path.basename(r).startsWith('production75-operator-test-'))throw new Error('owned temp refused');fs.rmSync(r,{recursive:true});}};
 }
 test('one copy/Reader, rollback then commit and owned deletion pass in order',async()=>{const f=fixture();try{const result=await runProduction75Operator(f.args);expect(result).toMatchObject({status:'verified-and-cleaned',copyDeleted:true,originalsPreserved:true,readerProfileVerified:true});expect(f.calls).toEqual(['create','reader','delete']);expect(mocks.verify).toHaveBeenCalledTimes(2);}finally{f.cleanup();}});
+
+test.each([{httpStatus:503,safeCode:'production75_v1_status'},{httpStatus:200,safeCode:'production75_v1_response'}])('Reader failure $httpStatus survives callback normalization while owned cleanup remains',async({httpStatus,safeCode})=>{
+ const f=fixture();try{
+  const live=createProduction75V1Client({organization:'adam-diaz',getAuthorization:async()=> 'Bearer fixture',fetchFn:async()=>new Response(JSON.stringify({data:{name:'private-provider-body',role:'reader'}}),{status:httpStatus})});
+  f.api.createReader=async permit=>{f.calls.push('reader');return live.createReader(permit);};
+  const result=await runProduction75Operator(f.args);
+  expect(result).toMatchObject({status:'held-and-cleaned',errorCode:'production75_operator_callback',copyDeleted:true,originalsPreserved:true,resourcesClosed:true,providerFailure:{operation:'create-reader',method:'POST',httpStatus,safeCode}});
+  expect(f.calls).toEqual(['create','reader','delete']);expect(mocks.verify).not.toHaveBeenCalled();
+  expect(JSON.stringify(result)).not.toContain('private-provider-body');
+ }finally{f.cleanup();}
+});
+
+test('work and uncertain deletion retain separate diagnostics without replay',async()=>{
+ const f=fixture();try{
+  const live=createProduction75V1Client({organization:'adam-diaz',getAuthorization:async()=> 'Bearer fixture',fetchFn:async(_url,options)=>new Response('private-provider-body',{status:options.method==='DELETE'?500:503})});
+  f.api.createReader=async permit=>{f.calls.push('reader');return live.createReader(permit);};
+  const remove=f.api.deleteCopy;f.api.deleteCopy=async permit=>{await remove(permit);return live.deleteCopy(permit);};
+  const result=await runProduction75Operator(f.args);
+  expect(result).toMatchObject({status:'held-and-cleaned',copyDeleted:true,deleteAcknowledgmentUnknown:true,providerFailure:{operation:'create-reader',httpStatus:503},cleanupProviderFailure:{operation:'delete-copy',httpStatus:500}});
+  expect(f.calls).toEqual(['create','reader','delete']);expect(mocks.verify).not.toHaveBeenCalled();
+  expect(JSON.stringify(result)).not.toContain('private-provider-body');
+ }finally{f.cleanup();}
+});
 
 test.each([['version',2],['region','ord'],['plan','premium'],['attachedApps',['customer-app']]])('explicit restore acknowledgment %s conflicts hold before copy reads but retain owned deletion',async(field,value)=>{const f=fixture();try{const restore=f.api.restoreCopy;f.api.restoreCopy=async permit=>({...await restore(permit),[field]:value});const observe=f.callbacks.observeCopy;f.callbacks.observeCopy=vi.fn(observe);const r=await runProduction75Operator(f.args);expect(r).toMatchObject({status:'held-and-cleaned',copyDeleted:true,readerProfileVerified:false});expect(f.calls).toEqual(['create','delete']);expect(f.callbacks.observeCopy).not.toHaveBeenCalled();expect(mocks.verify).not.toHaveBeenCalled();}finally{f.cleanup();}});
 
