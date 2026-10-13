@@ -12,6 +12,7 @@ const RESPONSE_REASONS=new Set(['json','shape','id','name','organization','regio
 function responseFailure(reason){const e=fail('production75_v1_response');if(RESPONSE_REASONS.has(reason))responseReasons.set(e,reason==='json'?'production75_v1_json':`production75_v1_metadata_${reason}`);return e;}
 const responseCheck=(ok,reason)=>{if(!ok)throw responseFailure(reason);};
 const KNOWN_CLUSTER_STATUSES=new Set(['ready','creating','restoring','provisioning','deleting','deleted','failed','suspended']);
+const TRANSIENT_METADATA_STATUSES=new Set([500,502,503,504]);
 function normalizeClusterStatus(value){responseCheck(typeof value==='string'&&value.length>0&&value.length<=64,'status');return KNOWN_CLUSTER_STATUSES.has(value)?value:'not-ready';}
 function validated(response,parse){try{return parse();}catch(e){const failure=ownedErrors.has(e)?e:fail('production75_v1_response');failureMetadata.set(failure,freeze({...response.diagnosticContext,safeCode:responseReasons.get(failure)??ownedErrors.get(failure)}));throw failure;}}
 const diagnosticMatches=(pattern,value)=>{try{return pattern.test(value??'');}catch{return false;}};
@@ -76,7 +77,7 @@ export function createProduction75V1Client(input={}){
  check(typeof fetchFn==='function'&&typeof getAuthorization==='function'&&organization==='adam-diaz'&&typeof now==='function','production75_v1_input');
  const bound={requestMs:15000,bodyBytes:4000000,...limits};check(Object.keys(bound).every(k=>['requestMs','bodyBytes'].includes(k))&&Number.isSafeInteger(bound.requestMs)&&bound.requestMs>0&&bound.requestMs<=15000&&Number.isSafeInteger(bound.bodyBytes)&&bound.bodyBytes>0&&bound.bodyBytes<=4000000,'production75_v1_input');
  async function request(endpoint,{operation,method='GET',body,statuses=[200],until=Infinity,notFound=false,beforeDispatch}={}){
-  const startedAt=now(),controller=new AbortController(),deadline=Math.min(startedAt+bound.requestMs,until);let timer,reader,response,httpStatus=null,rejectedReader=false,rejectionHint=null;
+  const startedAt=now(),controller=new AbortController(),deadline=Math.min(startedAt+bound.requestMs,until);let timer,retryTimer,reader,response,httpStatus=null,rejectedReader=false,rejectionHint=null;
   const context=()=>{let elapsed=0;try{const delta=now()-startedAt;if(Number.isFinite(delta)&&delta>=0)elapsed=Math.min(86400000,Math.floor(delta));}catch{}return freeze({operation,method,httpStatus,elapsedMs:elapsed});};
   const expired=()=>check(now()<deadline,'production75_v1_deadline');
   const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(fail('production75_v1_deadline'));},Math.max(1,deadline-now()));});
@@ -85,8 +86,16 @@ export function createProduction75V1Client(input={}){
    check(['list-clusters','get-cluster','list-backups','list-users','restore-copy','create-reader','delete-copy','credentials'].includes(operation)&&['GET','POST','DELETE'].includes(method),'production75_v1_input');
    const authorization=await race(getAuthorization);check(typeof authorization==='string'&&authorization.length<=65536&&/^(Bearer|FlyV1) [^\r\n]+$/.test(authorization),'production75_v1_authorization');
    const url=ORIGIN+endpoint,options={method,headers:{Authorization:authorization,'Content-Type':'application/json'},redirect:'error',signal:controller.signal,...(body===undefined?{}:{body:JSON.stringify(body)})};
-   const pending=Promise.resolve().then(()=>{expired();beforeDispatch?.();return fetchFn(url,options);});pending.then(r=>{if(controller.signal.aborted)try{void r?.body?.cancel()?.catch(()=>{});}catch{}},()=>{});
-   response=await race(()=>pending);const status=response?.status;if(Number.isInteger(status)&&status>=100&&status<=599)httpStatus=status;check(response&&Number.isInteger(status)&&response.redirected===false&&(!response.url||response.url===url),'production75_v1_status');
+   for(let attempt=0;;attempt++){
+    const pending=Promise.resolve().then(()=>{expired();beforeDispatch?.();return fetchFn(url,options);});pending.then(r=>{if(controller.signal.aborted)try{void r?.body?.cancel()?.catch(()=>{});}catch{}},()=>{});
+    response=await race(()=>pending);const status=response?.status;if(Number.isInteger(status)&&status>=100&&status<=599)httpStatus=status;check(response&&Number.isInteger(status)&&response.redirected===false&&(!response.url||response.url===url),'production75_v1_status');
+    // Only read-only cluster metadata can retry; the original total deadline holds.
+    if(!(method==='GET'&&['list-clusters','get-cluster'].includes(operation)&&TRANSIENT_METADATA_STATUSES.has(status)&&attempt<2))break;
+    if(response.body){check(typeof response.body.cancel==='function','production75_v1_response');await race(()=>response.body.cancel());}
+    response=null;
+    await race(()=>new Promise(resolve=>{retryTimer=setTimeout(resolve,1000*(attempt+1));}));
+    clearTimeout(retryTimer);
+   }
    if(notFound&&response.status===404)return null;
    const accepted=statuses.includes(response.status);
    // Only the rejected Reader request needs additional bounded observation.
@@ -103,7 +112,7 @@ export function createProduction75V1Client(input={}){
    const rejection=ownCode==='production75_v1_bound'?'bound':ownCode==='production75_v1_deadline'?'deadline':rejectionHint??'unreadable';
    failureMetadata.set(failure,freeze({...context(),safeCode:rejectedReader?'production75_v1_rejected_'+rejection:responseReasons.get(e)??ownedErrors.get(failure)}));throw failure;
   }
-  finally{clearTimeout(timer);if(reader){try{void reader.cancel()?.catch(()=>{});}catch{}try{reader.releaseLock();}catch{}}else if(response?.body)try{void response.body.cancel()?.catch(()=>{});}catch{}}
+  finally{clearTimeout(timer);clearTimeout(retryTimer);if(reader){try{void reader.cancel()?.catch(()=>{});}catch{}try{reader.releaseLock();}catch{}}else if(response?.body)try{void response.body.cancel()?.catch(()=>{});}catch{}}
  }
  const scoped=(permit,kind)=>{const scope=describeOperatorPermit(permit,kind,now);check(scope.organization===organization,'production75_v1_input');consumeOperatorPermit(permit,kind,scope.target,now);return scope;};
  return Object.freeze({

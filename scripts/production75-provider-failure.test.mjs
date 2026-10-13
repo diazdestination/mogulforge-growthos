@@ -37,8 +37,8 @@ test('acknowledged response validation retains status and excludes provider body
 });
 
 test('concurrent failures keep each request status separate',async()=>{
- let release;
- const api=client({fetchFn:async url=>url.endsWith('abcdefghijklmnop')?new Promise(resolve=>{release=()=>resolve(new Response(fixtureSecret,{status:503}));}):new Response(fixtureSecret,{status:409})});
+ let release,firstResponseGated=false;
+ const api=client({fetchFn:async url=>{if(url.endsWith('abcdefghijklmnop')&&!firstResponseGated){firstResponseGated=true;return new Promise(resolve=>{release=()=>resolve(new Response(fixtureSecret,{status:503}));});}return new Response(fixtureSecret,{status:url.endsWith('abcdefghijklmnop')?503:409});}});
  const first=failure(api.getCluster('abcdefghijklmnop'));
  const second=await failure(api.getCluster('bcdefghijklmnopq'));
  release();const last=await first;
