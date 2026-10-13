@@ -50,10 +50,12 @@ Read the policy without incidental settings creation/normalization. Use a transa
 
 Policy save requires existing settings.manage authorization plus accepted active verified staff context, existing origin/session protections, exact organization, expected revision and reviewed canonical-zone context. The root-owned settings integration submits the dedicated scheduling-policy operation; generic settings writes cannot set/reset this new field.
 
-InspectionAvailability changes and company-timezone changes participate in the same schedule lock and advance the configured scheduling revision. Inspection offers/admissions also carry a server-computed digest of the effective inspection-availability configuration, including its legacy/unconfigured state. Compare that digest under the lock even when scheduling policy is null/revision0. These changes make a preceding affected availability/zone review stale. Existing inspection configuration remains a separate object and gate, rather than merging travel into its occupancy counts.
+InspectionAvailability changes and company-timezone changes participate in the same schedule lock and advance the configured scheduling revision. Inspection offers/admissions also carry a server-computed digest of the effective inspection-availability configuration, including its rule-source timezone and legacy/unconfigured state, alongside the reviewed company zone. Compare that digest and both applicable zone contexts under the lock even when scheduling policy is null/revision0. These changes make a preceding affected availability/zone review stale. Existing inspection configuration remains a separate object and gate, rather than merging travel into its occupancy counts.
 
 ## 4. Canonical timezone and interval rules
-organizations.timezone is the authoritative scheduling company zone. The policy stores the server's matching zone for provenance; it is not a separately editable second scheduling zone. The platform-admin org timezone PATCH writer must serialize with scheduling, update the configured policy's zone/revision/digest and audit the change. A mismatched stored policy/organization zone holds new admissions.
+organizations.timezone is the authoritative company zone for scheduling inputs, display and day-query bounds. The policy stores the server's matching company zone for provenance; it is not independently editable. The platform-admin org timezone PATCH writer must serialize with scheduling, update the configured policy's company zone/revision/digest and audit the change. A mismatched stored scheduling policy/organization zone holds new admissions.
+
+Existing InspectionAvailabilitySettings.timezone remains the rule-source zone for its windows, weekdays and blackout dates until an explicit reviewed inspection-configuration change. An org company-zone change must not reinterpret those recorded rules. When no inspection configuration was recorded, retain and identify the deterministic existing legacy effective rule configuration rather than invent owner approval. Inspection offers/admission evaluate these rules in their effective rule-source zone and return explicit UTC instants. Display those instants in the company zone; expose both named zones when different, without treating a valid difference as configuration corruption. Inspection settings editing must visibly review its rule-source zone. The availability digest and affected review context include that zone as well as the company zone, so changing either invalidates the review.
 
 The policy read and every native scheduling projection return the effective zone and revision. Schedule and Today scheduling inputs, displayed dates and day-query bounds use that same zone. Preserve existing nonscheduling financial/reporting timezone semantics; do not reinterpret stored UTC values.
 
@@ -67,6 +69,7 @@ Add nullable appointments.scheduling_reservation and projects.scheduling_reserva
 A valid version1 snapshot records:
 - reservation revision and source policy revision/digest;
 - canonical approved company zone;
+- effective inspection rule-source zone/digest when the admission uses inspection rules;
 - exact service start/end instants;
 - sorted admitted resource IDs;
 - minimumTravelGapMinutes;
@@ -119,11 +122,15 @@ All mutations preserve tenant and participant locks and accepted staff checks. N
 ## 8. API/consumer boundary
 Root owns OpenAPI, generated clients/Zod/types and API fixtures. Add dedicated read/save scheduling-policy contracts and expose active snapshot/provenance and scheduling review context in relevant appointment/project/Today/settings views.
 
-Review context includes current policy revision and canonical zone, plus existing target version for updates and effective inspection-availability digest for affected inspection offers/admissions; it is organization/source scoped. A stale context returns409 with a specific refresh-and-review reason. New UI always submits its reviewed context for material changes. All configured-policy admissions, including disabled policy, and admissions changing versioned reservations require that context. Release-only operations require the existing target version and authorization, preserve saved protection, and do not require adoption of current policy defaults.
+Review context includes current policy revision and canonical company zone, plus existing target version for updates and effective inspection-availability digest/rule-source zone for affected inspection offers/admissions; it is organization/source scoped. A stale context returns409 with a specific refresh-and-review reason. New UI always submits its reviewed context for material changes. All configured-policy admissions, including disabled policy, and admissions changing versioned reservations require that context. Release-only operations require the existing target version and authorization, preserve saved protection, and do not require adoption of current policy defaults.
 
 Existing internal booking workflows obtain and retain explicit source/offer review context or transaction-fresh authoritative context appropriate to their existing approval flow. They do not invent a human approval or omit their final policy recheck. Old unconfigured external DTO compatibility is preserved where no new policy or protected reservation is involved; configured enforcement cannot be bypassed by omitting new fields.
 
 A changed or uncertain policy save/booking never automatically retries a mutation. A GET refresh updates authoritative state for another explicit review. Uncertainty does not display confirmed success.
+
+An unknown booking CREATE retains the exact submitted operation identity and reviewed payload/context, scoped to actor, organization and source, across refresh/remount. It blocks a fresh equivalent booking until the original committed result or proven no-commit refusal is reconciled. A list match, missing row, expired request, generic HTTP error or timeout is not no-commit proof. Existing explicitly idempotent returning-customer commands retain their same durable request identity and established reconciliation; never replace it with a new UUID.
+
+Native CRM CREATE requires a dedicated manual scheduling receipt in the existing audit_events UUID/metadata substrate, keyed by the submitted operation UUID and bound to tenant, actor, action, source and exact payload/context hash. Serialize each operation and commit native booking plus receipt/evidence atomically. Exact authorized reconciliation returns the original committed target without repeating creation or booking side effects; changed payload/context/actor or conflicting receipt identity is refused. A proven no-commit result must be a retained terminal refusal under the same operation serialization, preventing a still-pending original request from later committing. Retain the receipt when its target changes or disappears and through cleanup/export/recovery. Do not borrow customer_work_commands for unrelated manual work, invent a returning root or infer failure from target absence. Freeze the typed acknowledgement/lookup/retention and exact lock/uniqueness details in the reviewed plan. Until this new path is verified, unknown-create remains held with no fresh submit. This is required new source acceptance, not a claim that existing CRM creates already have durable idempotency.
 
 Writer coverage: CRM appointments/projects; returning-customer project commands; service-care visits; CALLIE staff booking; concierge inspection offers/admission; policy/inspection settings; org timezone mutation. Apply shared gates instead of local approximations.
 
@@ -138,6 +145,8 @@ Appointment/job review shows exact company-zone service start/end, elapsed durat
 New presets require explicit selection; never map inspection/other into diagnostics or maintenance. Existing edits distinguish unchanged saved interval, deliberate new preset/range and start-only duration preservation. Cards show saved end/duration/property where available. Today job intervals and offset/zone labels remain consistent.
 
 Tenant/actor/source/version changes invalidate a pending review. Use accessible keyboard controls, readable mobile content, exact error recovery and stable UI request ownership. Root preserves the completed initial-email component; Wave2 is not implemented in this design.
+
+Retain the original unknown-operation fence during navigation/remount instead of replacing it with a blank fresh form. Expose reconciliation and confirmed original result/proven refusal without implying that an ordinary refresh makes another CREATE safe. A changed tenant/actor may only access its own authorized state and must not expose or reuse another context's pending payload.
 
 ## 10. Migration, retention and recovery
 Append reports/staging-schema-preview-2026-10-01/0019_saved-scheduling-policy.sql after0018. It adds the three nullable fields and strict version/bounded-value safeguards. Preserve the19 existing canonical SQL inputs,142 table identities, prior columns/constraints/data and old work intervals, alongside these explicit additive fields/safeguards. Implementation schema/manifests/fixtures must identify new column shape and SQL hash; prior recovery receipts remain historical evidence.
@@ -160,8 +169,10 @@ Meaningful source acceptance must cover:
 - same-staff/different-staff and cross-tenant isolation; accepted/revoked staff, terminal closure and reactivation;
 - concurrent booking/reschedule/policy/inspection-settings/timezone races and deterministic lock order;
 - stale review/row versions, settings read failure, partial/uncertain saves and no automatic POST retries;
+- unknown CREATE fences after manual resubmission/refresh/remount, exact original command identity, payload mismatch/cross-context refusal and committed-result/proven-no-commit reconciliation;
 - disabled configured admissions still require review; inspection changes invalidate affected review even with policy revision0;
 - browser/company-zone differences, DST nonexistent and explicitly ambiguous inputs, offset/day bounds and elapsed-versus-calendar duration;
+- inspection-rule/company-zone differences and org-zone changes preserve recorded rule interpretation while invalidating affected review;
 - forged snapshots/policy provenance, strict generated DTOs, corrupt evidence holds, exports/privacy and source-local recovery;
 - compatible rollback or verified complete scheduling-write hold plus forward recovery preserves enforcement and post-upgrade admissions/history;
 - integrated real local API plus desktop/mobile/keyboard UI and no leaks across tenant/actor switches.
