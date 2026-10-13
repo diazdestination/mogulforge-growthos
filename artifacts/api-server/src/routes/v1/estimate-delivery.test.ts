@@ -460,29 +460,32 @@ it("closes generated request/response objects and roundtrips generated dates ove
   }
 });
 
-it("keeps malformed and oversized JSON errors private before route admission", async () => {
-  const f = await fixture();
-  for (const [body, status] of [
-    ["{synthetic:", 400],
-    [JSON.stringify({ synthetic: "x".repeat(110000) }), 413],
-  ] as const) {
-    const res = await fetch(
-      `${origin}/api/v1/estimates/${f.estimate.id}/delivery/preview`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Origin: "https://growth.example",
-          cookie: `sid=${f.sid}`,
+it.each(["/api/v1/estimates", "/API/V1/EsTiMaTeS"])(
+  "keeps malformed and oversized JSON errors private before route admission: %s",
+  async (prefix) => {
+    const f = await fixture();
+    for (const [body, status] of [
+      ["{synthetic:", 400],
+      [JSON.stringify({ synthetic: "x".repeat(110000) }), 413],
+    ] as const) {
+      const res = await fetch(
+        `${origin}${prefix}/${f.estimate.id}/DeLiVeRy/PrEvIeW`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://growth.example",
+            cookie: `sid=${f.sid}`,
+          },
+          body,
         },
-        body,
-      },
-    );
-    expect(res.status).toBe(status);
-    privateHeaders(res);
-    expect(await res.json()).toEqual({
-      error: "Invalid estimate delivery request.",
-      code: "estimate_invalid_request",
-    });
-  }
-});
+      );
+      expect(res.status).toBe(status);
+      privateHeaders(res);
+      expect(await res.json()).toEqual({
+        error: "Invalid estimate delivery request.",
+        code: "estimate_invalid_request",
+      });
+    }
+  },
+);

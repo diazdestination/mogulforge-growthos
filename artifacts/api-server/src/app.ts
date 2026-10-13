@@ -35,7 +35,7 @@ app.use(
   }),
 );
 const isEstimateDeliveryPath = (path: string) =>
-  /^\/api\/v1\/estimates\/[^/]+\/delivery(?:\/(?:preview|send))?\/?$/.test(path);
+  /^\/api\/v1\/estimates\/[^/]+\/delivery(?:\/(?:preview|send))?\/?$/i.test(path);
 // Parser/auth failures precede the route; retain this boundary's privacy there too.
 app.use((req, res, next) => {
   if (isEstimateDeliveryPath(req.path)) {
