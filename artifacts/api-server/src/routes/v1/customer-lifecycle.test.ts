@@ -72,14 +72,14 @@ describe("normal-mode customer lifecycle ownership", () => {
       expect(encoded).toContain(own.marker);
       for (const canary of [foreign.marker, foreign.org, foreign.contact, foreign.lead, foreign.execution, own.secret, foreign.secret, "SYNTHETIC_SESSION_SECRET", "WITHHELD_"]) expect(encoded).not.toContain(canary);
       expect(result.manifest).toMatchObject({ completeAccountExport: false, deletionPerformed: false, scope: "core_customer_records" });
-      expect(result.manifest.tables).toHaveLength(27);
+      expect(result.manifest.tables).toHaveLength(28);
       expect(result.manifest.tables.map((table: {table:string})=>table.table)).toContain("customer_work_roots");
       expect(result.manifest.tables.map((table: {table:string})=>table.table)).not.toContain("customer_work_commands");
-      // This fixture has no visit work. The six explicit datasets still belong
+      // This fixture has no visit work or estimate email receipts. These datasets still belong
       // in the complete core manifest, but must not seed or leak any records.
       for (const table of [
         "property_assets", "work_checklist_templates", "work_checklist_revisions",
-        "appointment_work_entries", "appointment_work_completions", "appointment_work_photos",
+        "appointment_work_entries", "appointment_work_completions", "appointment_work_photos", "estimate_email_receipts",
       ] as const) {
         const included = result.manifest.tables.filter((entry) => entry.table === table);
         expect(included).toHaveLength(1);
