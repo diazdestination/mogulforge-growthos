@@ -48,6 +48,7 @@ import {
   deleteEstimate,
   deleteContact,
   updateLead,
+  updateContact,
   updateProperty,
   mergeLeads,
   updateEstimate,
@@ -68,6 +69,7 @@ import {
 
 const hooks = vi.hoisted(() => ({
   afterRead: null as null | ((pid: number) => Promise<void>),
+  afterRetention: null as null | ((kind: string, id: string) => Promise<void>),
 }));
 vi.mock("./estimate-delivery-authority", async (original) => {
   const real = await original<typeof import("./estimate-delivery-authority")>();
@@ -87,6 +89,19 @@ vi.mock("./estimate-delivery-authority", async (original) => {
     },
   };
 });
+vi.mock("./estimate-delivery-history", async (original) => {
+  const real = await original<typeof import("./estimate-delivery-history")>();
+  return {
+    ...real,
+    hasRetainedEstimateEmailParticipant: async (
+      ...args: Parameters<typeof real.hasRetainedEstimateEmailParticipant>
+    ) => {
+      const result = await real.hasRetainedEstimateEmailParticipant(...args);
+      await hooks.afterRetention?.(args[2], args[3]);
+      return result;
+    },
+  };
+});
 const orgs: string[] = [];
 beforeEach(() => {
   vi.stubEnv("GOOGLE_OAUTH_CLIENT_ID", "synthetic");
@@ -99,6 +114,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   hooks.afterRead = null;
+  hooks.afterRetention = null;
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -783,3 +799,104 @@ it("permanent ownership survives direct content loss and export refuses the orph
     createCustomerLifecycleExporter()(f.org, f.owner.id),
   ).rejects.toMatchObject({ code: "customer_export_unavailable" });
 });
+
+it.each(["email", "source"])(
+  "demo cleanup excludes orphan participant moved into %s scope by ordinary concurrent edit",
+  async (kind) => {
+    const f = await fixture();
+    const [target] =
+      kind === "email"
+        ? await db
+            .insert(contactsTable)
+            .values({
+              organizationId: f.org,
+              firstName: "Orphan retained participant",
+              email: "original@example.test",
+            })
+            .returning({ id: contactsTable.id })
+        : await db
+            .insert(leadsTable)
+            .values({
+              organizationId: f.org,
+              contactId: f.otherContact.id,
+              source: "manual",
+            })
+            .returning({ id: leadsTable.id });
+    const [checked] =
+      kind === "email"
+        ? await db
+            .insert(contactsTable)
+            .values({
+              organizationId: f.org,
+              firstName: "Checked demo record",
+              email: "checked@demo.mogulforge.dev",
+            })
+            .returning({ id: contactsTable.id })
+        : await db
+            .insert(leadsTable)
+            .values({
+              organizationId: f.org,
+              contactId: f.otherContact.id,
+              source: "demo-data",
+            })
+            .returning({ id: leadsTable.id });
+    const [orphan] = await db
+      .insert(auditEventsTable)
+      .values({
+        organizationId: f.org,
+        entityType: "estimate",
+        entityId: randomUUID(),
+        action: "estimate_delivery.admitted",
+        metadata: {
+          snapshot: { [kind === "email" ? "contactId" : "leadId"]: target.id },
+        },
+      })
+      .returning();
+    const entered = latch(),
+      release = latch();
+    hooks.afterRetention = async (_kind, id) => {
+      if (id === checked.id) {
+        entered.resolve();
+        await release.promise;
+      }
+    };
+    const cleaning = clearDemoData(f.org);
+    try {
+      await entered.promise;
+      const edited =
+        kind === "email"
+          ? await updateContact(f.org, target.id, {
+              email: "entered@demo.mogulforge.dev",
+            })
+          : await updateLead(f.org, target.id, { source: "demo-data" });
+      expect(edited?.id).toBe(target.id);
+    } finally {
+      release.resolve();
+      hooks.afterRetention = null;
+    }
+    const result = await cleaning;
+    const remaining =
+      kind === "email"
+        ? await db
+            .select({ id: contactsTable.id })
+            .from(contactsTable)
+            .where(eq(contactsTable.id, target.id))
+        : await db
+            .select({ id: leadsTable.id })
+            .from(leadsTable)
+            .where(eq(leadsTable.id, target.id));
+    expect(remaining.length).toBe(1);
+    expect(kind === "email" ? result.contacts : result.leads).toBe(1);
+    expect(
+      (
+        await db
+          .select({ id: auditEventsTable.id })
+          .from(auditEventsTable)
+          .where(eq(auditEventsTable.id, orphan.id))
+      ).length,
+    ).toBe(1);
+    await expect(clearDemoData(f.org)).rejects.toMatchObject({
+      code: "estimate_email_history_retained",
+    });
+  },
+);
