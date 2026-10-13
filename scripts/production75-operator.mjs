@@ -64,7 +64,10 @@ export async function runProduction75Operator({plan,custodyRoot,verifyOwnerAppro
    throw error('production75_operator_create_unknown_no_replay');
   }
   // A creation response is not authoritative empty-attachment evidence.
+  const creationEvidence=freeze(structuredClone(copy));
   result.possibleCopyId=copy.id;copy=await ownedFresh();custody.bindOwned(copy);result.copyId=copy.id;
+  // Keep explicit acknowledgment contradictions visible while retaining owned cleanup.
+  check(['id','name','organization','region','plan'].every(k=>isDeepStrictEqual(creationEvidence[k],copy[k]))&&(creationEvidence.version===null||isDeepStrictEqual(creationEvidence.version,copy.version))&&(creationEvidence.attachedApps===null||isDeepStrictEqual(creationEvidence.attachedApps,copy.attachedApps)),'production75_operator_creation_conflict');
   check(copy.version===plan.providerVersion&&copy.region===plan.region&&copy.plan===plan.plan,'production75_operator_suitability');
   while(copy.status!=='ready'){
    check(['creating','restoring','provisioning'].includes(copy.status)&&now()<plan.workUntil,'production75_operator_not_ready');await call(()=>pause(pollMs));copy=await ownedFresh();

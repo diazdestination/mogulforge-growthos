@@ -7,19 +7,22 @@ const freeze=v=>{if(v&&typeof v==='object'){Object.values(v).forEach(freeze);Obj
 const fail=code=>{const e=Object.assign(new Error(code),{safeCode:code});ownedErrors.set(e,code);return e;};
 const check=(ok,code)=>{if(!ok)throw fail(code);};
 const safeSelector=id=>check(typeof id==='string'&&ID.test(id),'production75_v1_input');
-function metadata(raw){
+function metadata(raw,allowOmittedVersion=false){
  check(raw&&typeof raw==='object'&&!Array.isArray(raw),'production75_v1_response');
  const organization=typeof raw.organization==='string'?raw.organization:raw.organization?.slug??raw.organization?.Slug;
  check(!(raw.organization?.slug&&raw.organization?.Slug&&raw.organization.slug!==raw.organization.Slug),'production75_v1_response');
  let attachedApps=null;
  if(raw.attached_apps!==undefined&&raw.attached_apps!==null){check(Array.isArray(raw.attached_apps),'production75_v1_response');attachedApps=raw.attached_apps.map(a=>typeof a==='string'?a:a?.name);}
- const result={id:raw.id,name:raw.name,organization,region:raw.region,plan:raw.plan,version:raw.version,status:raw.status,attachedApps};
- try{validateOperatorMetadata({...result,attachedApps:attachedApps??[]});}catch{throw fail('production75_v1_response');}return freeze(result);
+ const omittedVersion=!Object.hasOwn(raw,'version');
+ check(!omittedVersion||allowOmittedVersion,'production75_v1_response');
+ const result={id:raw.id,name:raw.name,organization,region:raw.region,plan:raw.plan,version:omittedVersion?null:raw.version,status:raw.status,attachedApps};
+ // The stand-in validates the other fields only; returned version stays unknown.
+ try{validateOperatorMetadata({...result,version:omittedVersion?1:result.version,attachedApps:attachedApps??[]});}catch{throw fail('production75_v1_response');}return freeze(result);
 }
 export function mergeV1OwnershipEvidence(detail,inventory){
  check(detail&&Array.isArray(inventory),'production75_v1_ownership');const rows=inventory.filter(m=>m?.id===detail.id);check(rows.length===1,'production75_v1_ownership');
- const live=rows[0];check(['id','name','organization','region','plan','version'].every(k=>isDeepStrictEqual(detail[k],live[k]))&&Array.isArray(live.attachedApps)&&live.attachedApps.length===0&&(detail.attachedApps===null||Array.isArray(detail.attachedApps)&&detail.attachedApps.length===0),'production75_v1_ownership');
- try{return validateOperatorMetadata({...detail,attachedApps:[]});}catch{throw fail('production75_v1_ownership');}
+ const live=rows[0];check(['id','name','organization','region','plan'].every(k=>isDeepStrictEqual(detail[k],live[k]))&&(detail.version===null||isDeepStrictEqual(detail.version,live.version))&&Array.isArray(live.attachedApps)&&live.attachedApps.length===0&&(detail.attachedApps===null||Array.isArray(detail.attachedApps)&&detail.attachedApps.length===0),'production75_v1_ownership');
+ try{return validateOperatorMetadata({...detail,version:live.version,attachedApps:[]});}catch{throw fail('production75_v1_ownership');}
 }
 export async function useProduction75Credentials(ticket,connect){
  const value=secrets.get(ticket);check(value&&typeof connect==='function','production75_v1_credentials');secrets.delete(ticket);
@@ -52,11 +55,11 @@ export function createProduction75V1Client(input={}){
  }
  const scoped=(permit,kind)=>{const scope=describeOperatorPermit(permit,kind,now);check(scope.organization===organization,'production75_v1_input');consumeOperatorPermit(permit,kind,scope.target,now);return scope;};
  return Object.freeze({
-  async listClusters(deleted=false){check(typeof deleted==='boolean','production75_v1_input');const r=await request(`/api/v1/organizations/${organization}/postgres${deleted?'/deleted':''}`);check(Array.isArray(r.body?.data)&&r.body.data.length<=1000,'production75_v1_response');return freeze(r.body.data.map(metadata));},
-  async getCluster(id){safeSelector(id);const r=await request(`/api/v1/organizations/${organization}/postgres/${id}`,{notFound:true});if(r===null)return null;const m=metadata(r.body?.data);check(m.id===id,'production75_v1_response');return m;},
+  async listClusters(deleted=false){check(typeof deleted==='boolean','production75_v1_input');const r=await request(`/api/v1/organizations/${organization}/postgres${deleted?'/deleted':''}`);check(Array.isArray(r.body?.data)&&r.body.data.length<=1000,'production75_v1_response');return freeze(r.body.data.map(value=>metadata(value)));},
+  async getCluster(id){safeSelector(id);const r=await request(`/api/v1/organizations/${organization}/postgres/${id}`,{notFound:true});if(r===null)return null;const m=metadata(r.body?.data,true);check(m.id===id,'production75_v1_response');return m;},
   async listBackups(id){safeSelector(id);const r=await request(`/api/v1/postgres/${id}/backups`);check(Array.isArray(r.body?.data)&&r.body.data.length<=1000,'production75_v1_response');return freeze(r.body.data.map(b=>{check(b&&typeof b.id==='string'&&/^[a-zA-Z0-9_.-]{1,128}$/.test(b.id)&&['completed','pending','running','failed'].includes(b.status)&&['full','incr'].includes(b.type)&&typeof b.start==='string'&&Number.isFinite(Date.parse(b.start))&&(b.stop===null||typeof b.stop==='string'&&Number.isFinite(Date.parse(b.stop))),'production75_v1_response');return {id:b.id,status:b.status,type:b.type,start:b.start,stop:b.stop};}));},
   async listUsers(id){safeSelector(id);const r=await request(`/api/v1/postgres/${id}/users`);check(Array.isArray(r.body?.data)&&r.body.data.length<=1000,'production75_v1_response');return freeze(r.body.data.map(u=>{check(u&&/^[a-z_][a-z0-9_-]{0,62}$/.test(u.name??'')&&['reader','writer','schema_admin'].includes(u.role),'production75_v1_response');return {name:u.name,role:u.role};}));},
-  async restoreCopy(permit){const s=scoped(permit,'copy-create');const r=await request(`/api/v1/postgres/${s.sourceCluster}/restore`,{method:'POST',body:{backup_id:s.backupId,name:s.copyName},statuses:[200,201],until:s.until,beforeDispatch:()=>markOperatorPermitDispatched(permit)});const m=metadata(r.body?.data);check(m.name===s.copyName&&m.id!==s.sourceCluster&&m.organization===organization,'production75_v1_response');return m;},
+  async restoreCopy(permit){const s=scoped(permit,'copy-create');const r=await request(`/api/v1/postgres/${s.sourceCluster}/restore`,{method:'POST',body:{backup_id:s.backupId,name:s.copyName},statuses:[200,201],until:s.until,beforeDispatch:()=>markOperatorPermitDispatched(permit)});const m=metadata(r.body?.data,true);check(m.name===s.copyName&&m.id!==s.sourceCluster&&m.organization===organization,'production75_v1_response');return m;},
   async createReader(permit){const s=scoped(permit,'reader-create');const r=await request(`/api/v1/postgres/${s.copyId}/users`,{method:'POST',body:{user_name:s.readerName,role:'reader'},statuses:[200,201],until:s.until,beforeDispatch:()=>markOperatorPermitDispatched(permit)});const u=r.body?.data;check(u?.name===s.readerName&&u.role==='reader','production75_v1_response');return freeze({name:u.name,role:u.role});},
   async deleteCopy(permit){const s=scoped(permit,'copy-delete');const r=await request(`/api/v1/organizations/${organization}/postgres/${s.copyId}`,{method:'DELETE',statuses:[200,202,204],until:s.until,beforeDispatch:()=>markOperatorPermitDispatched(permit)});return freeze({status:r.status,acknowledged:true});},
   async credentials(permit,kind){

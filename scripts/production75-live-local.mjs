@@ -571,6 +571,11 @@ async function run() {
           attached_apps: [],
         }),
         copyId = "abcdefghijklmnop";
+      // Observed legacy detail/restore omit version and attachment evidence.
+      const detailMeta = (id, name) => {
+        const { version, attached_apps, ...detail } = meta(id, name);
+        return detail;
+      };
       // Build the owned native clone before the bounded fake HTTP response.
       copyBox = await box();
       await roleBase(copyBox);
@@ -616,7 +621,7 @@ async function run() {
           counts.create++;
           check(counts.create === 1, "production75_operator_local_replay");
           copyVisible = true;
-          value = { data: meta(copyId, plan.copyName) };
+          value = { data: detailMeta(copyId, plan.copyName) };
         } else if (options.method === "POST" && endpoint.endsWith("/users")) {
           counts.reader++;
           check(counts.reader === 1, "production75_operator_local_replay");
@@ -653,7 +658,7 @@ async function run() {
           value = { data: [{ name: "fly-user", role: "schema_admin" }] };
         else if (endpoint.endsWith(`/${copyId}`)) {
           if (deleted) return new Response("", { status: 404 });
-          value = { data: meta(copyId, plan.copyName) };
+          value = { data: detailMeta(copyId, plan.copyName) };
         } else
           value = {
             data: [
