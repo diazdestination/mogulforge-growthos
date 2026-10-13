@@ -1,4 +1,9 @@
 import { test, expect, vi } from "vitest";
+const cleanupProbe = vi.hoisted(() => ({ capture: vi.fn() }));
+vi.mock("./production75-live-observation.mjs", async (original) => ({
+  ...(await original()),
+  captureLiveSnapshot: cleanupProbe.capture,
+}));
 import {
   prepareOperatorPlan,
   operatorPlanDigest,
@@ -57,6 +62,42 @@ test("failed preparation always closes owned transport and produces no paid muta
   );
   expect(transport.close).toHaveBeenCalledOnce();
   expect(api.restoreCopy).not.toHaveBeenCalled();
+});
+
+test("preparation waits for measured Windows closure beyond ten seconds", async () => {
+  vi.useFakeTimers();
+  let disposed = false;
+  const transport = {
+    verifyIdentity: vi.fn(async () => {}),
+    protectedApps: vi.fn(async () => ({})),
+    withSourceCredentials: vi.fn(async (consumer) => consumer({})),
+    close: vi.fn(async () => ({ closed: disposed })),
+  };
+  const api = {
+    listClusters: async () => [
+      { id: plan.sourceCluster, version: 1, region: "iad", plan: "basic", status: "ready" },
+      { id: plan.protectedClusters[1], status: "ready" },
+    ],
+    listBackups: async () => [{ id: "backup", status: "completed", stop: new Date(Date.now() - 60000).toISOString() }],
+    restoreCopy: vi.fn(),
+  };
+  cleanupProbe.capture.mockImplementationOnce(async ({ resources }) => {
+    await resources.acquire(async () => ({}), async () => {
+      await new Promise((resolve) => setTimeout(resolve, 15000));
+      disposed = true;
+    });
+    throw new Error("synthetic observation hold");
+  });
+  try {
+    const pending = expect(prepareLivePacket({ transport, api })).rejects.toThrow("production75_live_preparation");
+    await vi.advanceTimersByTimeAsync(11000);
+    expect(transport.close).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(5000);
+    await pending;
+    expect(disposed).toBe(true);
+    expect(transport.close).toHaveBeenCalledOnce();
+    expect(api.restoreCopy).not.toHaveBeenCalled();
+  } finally { vi.useRealTimers(); }
 });
 test("unverified oracle and source candidate drift are refused", () => {
   expect(() =>

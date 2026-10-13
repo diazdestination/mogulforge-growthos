@@ -244,7 +244,9 @@ export async function prepareLivePacket(
   } catch {
     failure = true;
   } finally {
-    const drained = await resources.drain(10000);
+    const drained = await resources.drain(
+      Math.max(1, Math.min(60000, resources.deadline - now())),
+    );
     let closed;
     try {
       closed = await transport.close();
