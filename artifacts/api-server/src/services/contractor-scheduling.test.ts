@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { appointmentsTable, contactsTable, crmTasksTable, db, organizationsTable, propertiesTable, scheduledActionsTable, serviceObligationsTable, usersTable } from "@workspace/db";
+import { appointmentsTable, contactsTable, crmTasksTable, db, organizationsTable, projectsTable, propertiesTable, scheduledActionsTable, serviceObligationsTable, usersTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import * as crm from "./crm";
@@ -43,6 +43,34 @@ describe("native schedule resources", () => {
     await crm.createProject(org, { leadId: lead, name: "Multi-day job", crewUserIds: [staff], scheduledStart: slot(2).scheduledStart, scheduledEnd: slot(4).scheduledEnd });
     await expect(appointment(3, { assignedUserId: staff })).rejects.toMatchObject({ code: "resource_conflict" });
     expect(await appointment(4, { assignedUserId: staff, scheduledStart: slot(4).scheduledEnd, scheduledEnd: new Date(slot(4).scheduledEnd.getTime() + 3_600_000) })).toBeTruthy();
+  });
+  it("rejects an end-only clear without releasing a multi-day crew booking", async () => {
+    const job = await crm.createProject(org, { leadId: lead, name: "Retained multi-day crew window", crewUserIds: [staff], scheduledStart: slot(50).scheduledStart, scheduledEnd: slot(53).scheduledEnd });
+    if (!job || job === crm.DUPLICATE_ESTIMATE) throw new Error("fixture");
+    await expect(crm.updateProject(org, job.id, { scheduledEnd: null })).rejects.toMatchObject({ code: "invalid_interval", status: 400 });
+    expect(await crm.getProject(org, job.id)).toMatchObject({ scheduledStart: slot(50).scheduledStart, scheduledEnd: slot(53).scheduledEnd, crewUserIds: [staff], updatedAt: job.updatedAt });
+    await expect(appointment(52, { assignedUserId: staff })).rejects.toMatchObject({ code: "resource_conflict" });
+  });
+  it("allows ordinary crew-note edits on legacy jobs with no saved end", async () => {
+    const [job] = await db.insert(projectsTable).values({ organizationId: org, leadId: lead, name: "Legacy crew window", crewUserIds: [staff], scheduledStart: slot(60).scheduledStart, scheduledEnd: null }).returning();
+    expect(await crm.updateProject(org, job.id, { crewNotes: "Office added access instructions" })).toMatchObject({ scheduledStart: slot(60).scheduledStart, scheduledEnd: null, crewUserIds: [staff], crewNotes: "Office added access instructions" });
+  });
+  it("allows an end-only clear when a job has no assigned crew", async () => {
+    const job = await crm.createProject(org, { leadId: lead, name: "Unassigned window", scheduledStart: slot(65).scheduledStart, scheduledEnd: slot(67).scheduledEnd });
+    if (!job || job === crm.DUPLICATE_ESTIMATE) throw new Error("fixture");
+    expect(await crm.updateProject(org, job.id, { scheduledEnd: null })).toMatchObject({ scheduledStart: slot(65).scheduledStart, scheduledEnd: null, crewUserIds: [] });
+  });
+  it("allows clearing the end while explicitly unassigning the crew", async () => {
+    const job = await crm.createProject(org, { leadId: lead, name: "Released crew window", crewUserIds: [staff], scheduledStart: slot(70).scheduledStart, scheduledEnd: slot(73).scheduledEnd });
+    if (!job || job === crm.DUPLICATE_ESTIMATE) throw new Error("fixture");
+    expect(await crm.updateProject(org, job.id, { scheduledEnd: null, crewUserIds: [] })).toMatchObject({ scheduledStart: slot(70).scheduledStart, scheduledEnd: null, crewUserIds: [] });
+    expect(await appointment(72, { assignedUserId: staff })).toMatchObject({ assignedUserId: staff });
+  });
+  it("allows clearing both dates while retaining the crew assignment", async () => {
+    const job = await crm.createProject(org, { leadId: lead, name: "Unscheduled crew job", crewUserIds: [staff], scheduledStart: slot(75).scheduledStart, scheduledEnd: slot(77).scheduledEnd });
+    if (!job || job === crm.DUPLICATE_ESTIMATE) throw new Error("fixture");
+    expect(await crm.updateProject(org, job.id, { scheduledStart: null, scheduledEnd: null })).toMatchObject({ scheduledStart: null, scheduledEnd: null, crewUserIds: [staff] });
+    expect(await appointment(76, { assignedUserId: staff })).toMatchObject({ assignedUserId: staff });
   });
   it("rejects negative windows and same-org estimates for a different opportunity", async () => {
     await expect(appointment(5, { scheduledEnd: slot(4).scheduledEnd })).rejects.toMatchObject({ code: "invalid_interval" });

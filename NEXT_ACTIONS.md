@@ -1,5 +1,16 @@
 # Next acceptance work
 
+## October13 contractor correctness and delivery work
+
+Publish the reviewed crew-end guard as a dependent draft against PR44 and verify
+its exact-head CI. Preserve the separate Fly support/rehearsal boundaries; local
+source checks do not prove hosted acceptance. Configurable capacity is still
+missing; PR43 integrated customer import. A separate staff-reviewed, initial-only
+estimate email design was approved for detailed implementation planning in durable
+Forge files; review that plan before implementation. Do not activate
+mail providers, send live messages, add schema or reduce SMS/payment requirements
+as part of the scheduling fix. Both contractor acceptance cards remain open.
+
 ## October12 combined launch candidate — local gates passed
 
 PR35 plus39–43 are combined on agent/growthos-release-integration-20261012.
