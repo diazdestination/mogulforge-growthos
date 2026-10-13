@@ -19,6 +19,7 @@ import {
   emailIntelligenceSourcesTable,
 } from "@workspace/db";
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { encryptSecret } from "../lib/token-encryption";
 import {
   returningCustomerFixture,
@@ -43,6 +44,7 @@ let posts = 0,
   afterRefresh: (() => Promise<void>) | undefined,
   beforeAck: (() => Promise<void>) | undefined,
   lostAck = false;
+let gmailWire: string | undefined, microsoftWire: unknown;
 const json = (data: unknown) =>
   new Response(JSON.stringify(data), {
     headers: { "content-type": "application/json" },
@@ -53,6 +55,8 @@ beforeEach(() => {
   afterRefresh = undefined;
   beforeAck = undefined;
   lostAck = false;
+  gmailWire = undefined;
+  microsoftWire = undefined;
   vi.stubEnv("OAUTH_TOKEN_ENCRYPTION_KEY", "ab".repeat(32));
   vi.stubEnv("GOOGLE_OAUTH_CLIENT_ID", "synthetic");
   vi.stubEnv("GOOGLE_OAUTH_CLIENT_SECRET", "synthetic");
@@ -75,6 +79,7 @@ beforeEach(() => {
     )
       throw Error("Unexpected Gmail operation");
     posts++;
+    gmailWire = Buffer.from(input.data.raw, "base64url").toString("utf8");
     expect(input.retry).toBe(false);
     expect(input.maxRedirects).toBe(0);
     expect(input.headers.Authorization).toBe("Bearer synthetic-frozen-access");
@@ -107,6 +112,7 @@ beforeEach(() => {
         init?.method === "POST"
       ) {
         posts++;
+        microsoftWire = JSON.parse(String(init.body));
         expect(
           JSON.parse(String(init.body)).message.internetMessageHeaders,
         ).toBeUndefined();
@@ -127,7 +133,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 afterAll(async () => deleteTestOrgs(...orgs));
-async function fixture(provider: "gmail" | "microsoft", returning: boolean) {
+async function fixture(
+  provider: "gmail" | "microsoft",
+  returning: boolean,
+  completeQuote = false,
+) {
   const f = await returningCustomerFixture();
   orgs.push(f.org);
   await db
@@ -167,6 +177,19 @@ async function fixture(provider: "gmail" | "microsoft", returning: boolean) {
     })
     .returning();
   const draft = returningEstimateDraft(f);
+  if (completeQuote) {
+    draft.title = "Réparation chauffage — revisión 🛠️";
+    draft.lineItems = [
+      {
+        description: "Joint étanche — pièce spéciale",
+        quantity: 2.125,
+        unitPriceCents: 1234,
+      },
+    ];
+    draft.taxCents = 137;
+    draft.notes =
+      "Customer scope: réparer le joint; conservar las piezas.\nAccess: side door after office confirmation.\nFinal note: café, mañana, 完了 ✅ — keep this entire final line.";
+  }
   const estimate = returning
     ? (await createCustomerWorkEstimate(f.org, f.actor, draft)).estimate
     : (await createEstimate(
@@ -174,7 +197,11 @@ async function fixture(provider: "gmail" | "microsoft", returning: boolean) {
         {
           leadId: lead.id,
           title: draft.title,
-          lineItems: draft.lineItems.map((x) => ({ ...x, totalCents: 10000 })),
+          lineItems: draft.lineItems.map((x) => ({
+            ...x,
+            totalCents: Math.round(x.quantity * x.unitPriceCents),
+          })),
+          taxCents: draft.taxCents,
           notes: draft.notes,
         },
         f.actor,
@@ -195,6 +222,91 @@ async function review(f: Fixture) {
 }
 const matrix = (["gmail", "microsoft"] as const).flatMap((provider) =>
   [false, true].map((returning) => ({ provider, returning })),
+);
+it.each(matrix)(
+  "preserves complete original reviewed $provider wire payload returning=$returning",
+  async ({ provider, returning }) => {
+    const f = await fixture(provider, returning, true);
+    const original = await previewEstimateEmail(f.org, f.actor, f.estimate.id, {
+      expectedUpdatedAt: new Date(f.estimate.updatedAt).toISOString(),
+      expectedWorkVersion: f.estimate.workVersion,
+    });
+    expect(original.document.lineItems[0].quantity).toBe(2.125);
+    expect(original.document.lineItems[0].totalCents).toBe(2622);
+    expect(original.document.totalCents).toBe(2759);
+    // Check the reviewed baseline itself contains the complete customer notes and
+    // Unicode/fractional amount; wire equality alone cannot detect renderer omissions.
+    expect(original.message.body.includes(original.document.notes!)).toBe(true);
+    expect(
+      original.message.body.includes(
+        "Quantity: 2.125 | Unit price: USD 12.34 | Line total: USD 26.22",
+      ),
+    ).toBe(true);
+    expect(original.message.body.includes("Estimate total: USD 27.59")).toBe(
+      true,
+    );
+    expect(original.message.subject.includes(f.estimate.title)).toBe(true);
+    const raw = {
+      previewId: original.previewId,
+      payloadSha256: original.payloadSha256,
+      confirmed: true as const,
+    };
+    const evidence = await sendEstimateEmail(
+      f.org,
+      f.actor,
+      f.estimate.id,
+      raw,
+    );
+    expect(evidence.state).toBe("accepted");
+    expect(posts).toBe(1);
+    if (provider === "gmail") {
+      const expectedMime = [
+        `From: ${original.sender.senderEmail}`,
+        `To: ${original.message.recipient}`,
+        `Subject: =?UTF-8?B?${Buffer.from(original.message.subject, "utf8").toString("base64")}?=`,
+        "MIME-Version: 1.0",
+        'Content-Type: text/plain; charset="UTF-8"',
+        "Content-Transfer-Encoding: 8bit",
+        "",
+        original.message.body,
+      ].join("\r\n");
+      expect(
+        gmailWire === expectedMime,
+        "Gmail complete decoded MIME must equal original review",
+      ).toBe(true);
+      const [headers, ...bodyParts] = gmailWire!.split("\r\n\r\n");
+      const encodedSubject = headers
+        .split("\r\n")
+        .find((line) => line.startsWith("Subject: "))!
+        .slice("Subject: =?UTF-8?B?".length, -2);
+      expect(
+        Buffer.from(encodedSubject, "base64").toString("utf8") ===
+          original.message.subject,
+        "Gmail Unicode subject must decode exactly",
+      ).toBe(true);
+      expect(
+        bodyParts.join("\r\n\r\n") === original.message.body,
+        "Gmail complete customer-facing body must be unchanged",
+      ).toBe(true);
+    } else {
+      const expectedJson = {
+        message: {
+          subject: original.message.subject,
+          body: { contentType: "Text", content: original.message.body },
+          toRecipients: [
+            { emailAddress: { address: original.message.recipient } },
+          ],
+        },
+        saveToSentItems: true,
+      };
+      expect(
+        isDeepStrictEqual(microsoftWire, expectedJson),
+        "Microsoft exact sendMail JSON must equal original review",
+      ).toBe(true);
+    }
+    // Closed retained evidence must describe the same message that reached POST.
+    expect(isDeepStrictEqual(evidence.message, original.message)).toBe(true);
+  },
 );
 it.each(matrix)(
   "uses actual $provider POST once for returning=$returning",
