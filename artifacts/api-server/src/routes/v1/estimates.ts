@@ -45,18 +45,12 @@ router.post(
     const estimate = await crm.createEstimate(
       req.member!.organizationId,
       parsed.data,
+      { userId: req.member!.user.id },
     );
     if (!estimate) {
       res.status(400).json({ error: "Lead not found in your organization" });
       return;
     }
-    await recordAudit({
-      organizationId: req.member!.organizationId,
-      actorUserId: req.member!.user.id,
-      action: "estimate.created",
-      entityType: "estimate",
-      entityId: estimate.id,
-    });
     res.status(201).json(estimate);
   },
 );
@@ -90,20 +84,11 @@ router.patch(
       req.member!.organizationId,
       String(req.params.id),
       parsed.data,
+      { userId: req.member!.user.id },
     );
     if (!estimate) {
       res.status(404).json({ error: "Estimate not found" });
       return;
-    }
-    if (parsed.data.status) {
-      await recordAudit({
-        organizationId: req.member!.organizationId,
-        actorUserId: req.member!.user.id,
-        action: "estimate.status_changed",
-        entityType: "estimate",
-        entityId: estimate.id,
-        metadata: { status: parsed.data.status },
-      });
     }
     res.json(estimate);
   },

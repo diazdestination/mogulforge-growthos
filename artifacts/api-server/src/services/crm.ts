@@ -36,7 +36,8 @@ import { reconcileServiceAppointment } from "./service-obligations";
 import { guardWorkdayAppointment, retainsWorkdayLeadHistory } from "./workday-guards";
 import { lockReplyLead } from "./response-correlation";
 import { customerWorkRootsTable } from "../../../../lib/db/src/schema/customer-work";
-import { customerWorkFail } from "./customer-work-lineage";
+import { customerWorkFail, lockCustomerWork, type CustomerWorkActor } from "./customer-work-lineage";
+import { recordEstimateSavedState } from "./estimate-delivery-history";
 import { readNativeEstimate, readNativeProject } from "./returning-customer";
 
 /**
@@ -1859,41 +1860,50 @@ export async function updateEstimate(
     taxCents?: number;
     notes?: string | null;
   },
+  actor?: CustomerWorkActor,
 ) {
-  const existing = await getEstimate(organizationId, id);
-  if (!existing) return null;
-  if (existing.customerWorkId) customerWorkFail("customer_work_versioned_command_required","Use the saved returning-estimate version and original request identity.");
+  return db.transaction(async tx => {
+    await lockCustomerWork(tx, organizationId);
+    const [existing] = await tx.select().from(estimatesTable).where(and(eq(estimatesTable.organizationId, organizationId),eq(estimatesTable.id,id))).for("update");
+    if (!existing) return null;
+    await readNativeEstimate(tx, organizationId, id, true);
+    if (existing.customerWorkId) customerWorkFail("customer_work_versioned_command_required","Use the saved returning-estimate version and original request identity.");
 
-  const patch: Record<string, unknown> = {};
-  if (input.title !== undefined) patch.title = input.title;
-  if (input.notes !== undefined) patch.notes = input.notes;
-  if (input.lineItems !== undefined || input.taxCents !== undefined) {
-    const rawLineItems = input.lineItems ?? existing.lineItems;
-    const taxCents = input.taxCents ?? existing.taxCents;
-    if (!validateEstimateAmounts(rawLineItems, taxCents)) return null;
-    const lineItems = normalizeLineItems(rawLineItems);
-    const totals = computeEstimateTotals(lineItems, taxCents);
-    patch.lineItems = lineItems;
-    patch.subtotalCents = totals.subtotalCents;
-    patch.taxCents = totals.taxCents;
-    patch.totalCents = totals.totalCents;
-  }
-  if (input.status !== undefined && input.status !== existing.status) {
-    patch.status = input.status;
-    if (input.status === "sent" && !existing.sentAt) patch.sentAt = new Date();
-    if (input.status === "accepted" && !existing.acceptedAt) {
-      patch.acceptedAt = new Date();
+    const patch: Record<string, unknown> = {};
+    if (input.title !== undefined) patch.title = input.title;
+    if (input.notes !== undefined) patch.notes = input.notes;
+    if (input.lineItems !== undefined || input.taxCents !== undefined) {
+      const rawLineItems = input.lineItems ?? existing.lineItems;
+      const taxCents = input.taxCents ?? existing.taxCents;
+      if (!validateEstimateAmounts(rawLineItems, taxCents)) return null;
+      const lineItems = normalizeLineItems(rawLineItems);
+      const totals = computeEstimateTotals(lineItems, taxCents);
+      patch.lineItems = lineItems;
+      patch.subtotalCents = totals.subtotalCents;
+      patch.taxCents = totals.taxCents;
+      patch.totalCents = totals.totalCents;
     }
-  }
+    if (input.status !== undefined && input.status !== existing.status) {
+      patch.status = input.status;
+      if (input.status === "sent" && !existing.sentAt) patch.sentAt = new Date();
+      if (input.status === "accepted" && !existing.acceptedAt) {
+        patch.acceptedAt = new Date();
+      }
+    }
 
-  const [row] = await db
-    .update(estimatesTable)
-    .set(patch)
-    .where(
-      and(eq(estimatesTable.id, id), eq(estimatesTable.organizationId, organizationId)),
-    )
-    .returning();
-  return row ?? null;
+    const [row] = await tx
+      .update(estimatesTable)
+      .set(patch)
+      .where(
+        and(eq(estimatesTable.id, id), eq(estimatesTable.organizationId, organizationId)),
+      )
+      .returning();
+    if (row) {
+      await recordEstimateSavedState(tx, organizationId, row, actor?.userId ?? null, null, {previousEstimate: existing});
+      if(input.status !== undefined) await tx.insert(auditEventsTable).values({organizationId,actorUserId:actor?.userId??null,action:"estimate.status_changed",entityType:"estimate",entityId:row.id,metadata:{status:input.status}});
+    }
+    return row ?? null;
+  });
 }
 
 async function validateProjectRefs(
@@ -1962,31 +1972,39 @@ export async function createEstimate(
     taxCents?: number;
     notes?: string | null;
   },
+  actor?: CustomerWorkActor,
 ) {
-  if (!(await validateOrgRefs(organizationId, { leadId: input.leadId }))) {
-    return null;
-  }
-  if (!validateEstimateAmounts(input.lineItems ?? [], input.taxCents ?? 0)) {
-    return null;
-  }
-  const lineItems = normalizeLineItems(input.lineItems ?? []);
-  const totals = computeEstimateTotals(lineItems, input.taxCents ?? 0);
-  const status = input.status ?? "draft";
-  const [row] = await db
-    .insert(estimatesTable)
-    .values({
-      organizationId,
-      leadId: input.leadId,
-      title: input.title,
-      status,
-      lineItems,
-      ...totals,
-      notes: input.notes ?? null,
-      sentAt: status === "sent" ? new Date() : null,
-      acceptedAt: status === "accepted" ? new Date() : null,
-    })
-    .returning();
-  return row;
+  return db.transaction(async tx => {
+    await lockCustomerWork(tx, organizationId);
+    if (!(await validateOrgRefs(organizationId, { leadId: input.leadId }, tx))) {
+      return null;
+    }
+    if (!validateEstimateAmounts(input.lineItems ?? [], input.taxCents ?? 0)) {
+      return null;
+    }
+    const lineItems = normalizeLineItems(input.lineItems ?? []);
+    const totals = computeEstimateTotals(lineItems, input.taxCents ?? 0);
+    const status = input.status ?? "draft";
+    const [row] = await tx
+      .insert(estimatesTable)
+      .values({
+        organizationId,
+        leadId: input.leadId,
+        title: input.title,
+        status,
+        lineItems,
+        ...totals,
+        notes: input.notes ?? null,
+        sentAt: status === "sent" ? new Date() : null,
+        acceptedAt: status === "accepted" ? new Date() : null,
+      })
+      .returning();
+    if(row) {
+      await recordEstimateSavedState(tx,organizationId,row,actor?.userId??null,null,{creation:true});
+      await tx.insert(auditEventsTable).values({organizationId,actorUserId:actor?.userId??null,action:"estimate.created",entityType:"estimate",entityId:row.id});
+    }
+    return row;
+  });
 }
 
 export async function getProject(organizationId: string, id: string) {
