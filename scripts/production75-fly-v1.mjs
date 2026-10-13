@@ -15,6 +15,27 @@ const KNOWN_CLUSTER_STATUSES=new Set(['ready','creating','restoring','provisioni
 function normalizeClusterStatus(value){responseCheck(typeof value==='string'&&value.length>0&&value.length<=64,'status');return KNOWN_CLUSTER_STATUSES.has(value)?value:'not-ready';}
 function validated(response,parse){try{return parse();}catch(e){const failure=ownedErrors.has(e)?e:fail('production75_v1_response');failureMetadata.set(failure,freeze({...response.diagnosticContext,safeCode:responseReasons.get(failure)??ownedErrors.get(failure)}));throw failure;}}
 const diagnosticMatches=(pattern,value)=>{try{return pattern.test(value??'');}catch{return false;}};
+/** Untrusted hints only. Never retain arbitrary provider text or infer success. */
+function readerRejectionHint(body){
+ if(!body||typeof body!=='object'||Array.isArray(body))return 'unexpected_shape';
+ const hints=new Set(),short=value=>typeof value==='string'&&value.length<=1024?value.trim().toLowerCase():null;
+ const field=(value,invalid,conflict)=>{
+  const values=typeof value==='string'?[value]:Array.isArray(value)&&value.length<=8&&value.every(x=>typeof x==='string')?value:[];
+  for(const value of values){const text=short(value);if(['is invalid','has invalid format','is too long','is too short','is reserved'].includes(text))hints.add(invalid);if(conflict&&['has already been taken','already exists','is already taken'].includes(text))hints.add(conflict);}
+ };
+ const errors=body.errors&&typeof body.errors==='object'&&!Array.isArray(body.errors)?body.errors:null;
+ if(errors){field(errors.user_name,'user_name_invalid','user_name_conflict');field(errors.username,'user_name_invalid','user_name_conflict');field(errors.role,'role_invalid');}
+ for(const value of [errors?.detail,body.error,body.message]){
+  const text=short(value);if(text===null)continue;
+  if(/^(?:the )?role system (?:is |has )?(?:not (?:been )?enabled|disabled)(?: for (?:this|the) cluster)?[.!]?$/.test(text))hints.add('role_system_disabled');
+  if(/^(?:the )?cluster (?:is )?not ready[.!]?$/.test(text))hints.add('cluster_not_ready');
+  if(/^(?:permission|access) denied[.!]?$/.test(text))hints.add('permission_denied');
+  if(/^(?:invalid (?:user_name|username|user name)|(?:user_name|username|user name) is invalid)[.!]?$/.test(text))hints.add('user_name_invalid');
+  if(/^(?:user|username|user name) already exists[.!]?$/.test(text))hints.add('user_name_conflict');
+  if(/^(?:invalid role|role is invalid)[.!]?$/.test(text))hints.add('role_invalid');
+ }
+ return hints.size>1?'multiple':hints.values().next().value??'unknown';
+}
 function metadataReason(m){
  if(!diagnosticMatches(ID,m.id))return 'id';
  if(!diagnosticMatches(/^[a-z0-9][a-z0-9-]{0,62}$/,m.name))return 'name';
@@ -55,7 +76,7 @@ export function createProduction75V1Client(input={}){
  check(typeof fetchFn==='function'&&typeof getAuthorization==='function'&&organization==='adam-diaz'&&typeof now==='function','production75_v1_input');
  const bound={requestMs:15000,bodyBytes:4000000,...limits};check(Object.keys(bound).every(k=>['requestMs','bodyBytes'].includes(k))&&Number.isSafeInteger(bound.requestMs)&&bound.requestMs>0&&bound.requestMs<=15000&&Number.isSafeInteger(bound.bodyBytes)&&bound.bodyBytes>0&&bound.bodyBytes<=4000000,'production75_v1_input');
  async function request(endpoint,{operation,method='GET',body,statuses=[200],until=Infinity,notFound=false,beforeDispatch}={}){
-  const startedAt=now(),controller=new AbortController(),deadline=Math.min(startedAt+bound.requestMs,until);let timer,reader,response,httpStatus=null;
+  const startedAt=now(),controller=new AbortController(),deadline=Math.min(startedAt+bound.requestMs,until);let timer,reader,response,httpStatus=null,rejectedReader=false,rejectionHint=null;
   const context=()=>{let elapsed=0;try{const delta=now()-startedAt;if(Number.isFinite(delta)&&delta>=0)elapsed=Math.min(86400000,Math.floor(delta));}catch{}return freeze({operation,method,httpStatus,elapsedMs:elapsed});};
   const expired=()=>check(now()<deadline,'production75_v1_deadline');
   const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(fail('production75_v1_deadline'));},Math.max(1,deadline-now()));});
@@ -67,13 +88,21 @@ export function createProduction75V1Client(input={}){
    const pending=Promise.resolve().then(()=>{expired();beforeDispatch?.();return fetchFn(url,options);});pending.then(r=>{if(controller.signal.aborted)try{void r?.body?.cancel()?.catch(()=>{});}catch{}},()=>{});
    response=await race(()=>pending);const status=response?.status;if(Number.isInteger(status)&&status>=100&&status<=599)httpStatus=status;check(response&&Number.isInteger(status)&&response.redirected===false&&(!response.url||response.url===url),'production75_v1_status');
    if(notFound&&response.status===404)return null;
-   check(statuses.includes(response.status),'production75_v1_status');
-   if(response.status===204)return {status:204,body:null,diagnosticContext:context()};
+   const accepted=statuses.includes(response.status);
+   // Only the rejected Reader request needs additional bounded observation.
+   if(!accepted){check(operation==='create-reader','production75_v1_status');rejectedReader=true;}
+   if(accepted&&response.status===204)return {status:204,body:null,diagnosticContext:context()};
    const declared=response.headers?.get('content-length');if(declared!==null&&declared!==undefined)check(/^\d+$/.test(declared)&&Number(declared)<=bound.bodyBytes,'production75_v1_bound');
    const chunks=[];let size=0;
    if(response.body){check(typeof response.body.getReader==='function','production75_v1_response');reader=response.body.getReader();for(;;){const {done,value}=await race(()=>reader.read());if(done)break;check(value instanceof Uint8Array,'production75_v1_response');size+=value.byteLength;check(size<=bound.bodyBytes,'production75_v1_bound');chunks.push(Buffer.from(value));}}
-   const text=Buffer.concat(chunks).toString('utf8');let parsed=null;try{parsed=text?JSON.parse(text):null;}catch{throw responseFailure('json');}expired();return {status:response.status,body:parsed,diagnosticContext:context()};
-  }catch(e){controller.abort();const failure=fail(ownedErrors.get(e)??'production75_v1_request');failureMetadata.set(failure,freeze({...context(),safeCode:responseReasons.get(e)??ownedErrors.get(failure)}));throw failure;}
+   const text=Buffer.concat(chunks).toString('utf8');let parsed=null;try{parsed=text?JSON.parse(text):null;}catch{if(rejectedReader){rejectionHint='malformed_json';throw fail('production75_v1_status');}throw responseFailure('json');}
+   expired();if(rejectedReader){rejectionHint=text.length===0?'empty':readerRejectionHint(parsed);throw fail('production75_v1_status');}
+   return {status:response.status,body:parsed,diagnosticContext:context()};
+  }catch(e){
+   controller.abort();const ownCode=ownedErrors.get(e),failure=fail(rejectedReader?'production75_v1_status':ownCode??'production75_v1_request');
+   const rejection=ownCode==='production75_v1_bound'?'bound':ownCode==='production75_v1_deadline'?'deadline':rejectionHint??'unreadable';
+   failureMetadata.set(failure,freeze({...context(),safeCode:rejectedReader?'production75_v1_rejected_'+rejection:responseReasons.get(e)??ownedErrors.get(failure)}));throw failure;
+  }
   finally{clearTimeout(timer);if(reader){try{void reader.cancel()?.catch(()=>{});}catch{}try{reader.releaseLock();}catch{}}else if(response?.body)try{void response.body.cancel()?.catch(()=>{});}catch{}}
  }
  const scoped=(permit,kind)=>{const scope=describeOperatorPermit(permit,kind,now);check(scope.organization===organization,'production75_v1_input');consumeOperatorPermit(permit,kind,scope.target,now);return scope;};

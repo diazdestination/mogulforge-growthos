@@ -59,9 +59,9 @@ test.each(['version','region','plan'])('readiness progression cannot admit %s dr
  }finally{f.cleanup();}
 });
 
-test.each([{httpStatus:503,safeCode:'production75_v1_status'},{httpStatus:200,safeCode:'production75_v1_response'}])('Reader failure $httpStatus survives callback normalization while owned cleanup remains',async({httpStatus,safeCode})=>{
+test.each([{httpStatus:503,safeCode:'production75_v1_rejected_unknown'},{httpStatus:200,safeCode:'production75_v1_response'},{httpStatus:422,safeCode:'production75_v1_rejected_user_name_invalid',errors:{user_name:['has invalid format']}}])('Reader failure $httpStatus survives callback normalization while owned cleanup remains',async({httpStatus,safeCode,errors})=>{
  const f=fixture();try{
-  const live=createProduction75V1Client({organization:'adam-diaz',getAuthorization:async()=> 'Bearer fixture',fetchFn:async()=>new Response(JSON.stringify({data:{name:'private-provider-body',role:'reader'}}),{status:httpStatus})});
+  const live=createProduction75V1Client({organization:'adam-diaz',getAuthorization:async()=> 'Bearer fixture',fetchFn:async()=>new Response(JSON.stringify({data:{name:'private-provider-body',role:'reader'},...(errors?{errors}:{})}),{status:httpStatus})});
   f.api.createReader=async permit=>{f.calls.push('reader');return live.createReader(permit);};
   const result=await runProduction75Operator(f.args);
   expect(result).toMatchObject({status:'held-and-cleaned',errorCode:'production75_operator_callback',copyDeleted:true,originalsPreserved:true,resourcesClosed:true,providerFailure:{operation:'create-reader',method:'POST',httpStatus,safeCode}});
