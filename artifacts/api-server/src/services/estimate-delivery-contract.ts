@@ -131,6 +131,16 @@ export type EstimateEmailSnapshot = Omit<
   z.infer<typeof estimateEmailSnapshotSchema>,
   "sender"
 > & { sender: CustomerEmailSender };
+export const ESTIMATE_EMAIL_REVIEW_ACTION = "estimate_delivery.previewed";
+export const ESTIMATE_EMAIL_PREVIEW_MS = 600_000;
+export const estimateEmailReviewMetadataSchema = z
+  .object({
+    version: z.literal(1),
+    payloadSha256: sha,
+    expiresAt: timestamp,
+    snapshot: estimateEmailSnapshotSchema,
+  })
+  .strict();
 export const estimateEmailPreviewSchema = z
   .object({
     estimateId: z.uuid(),

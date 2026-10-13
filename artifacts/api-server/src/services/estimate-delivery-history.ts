@@ -5,6 +5,8 @@ import {
   customerWorkCommandsTable,
   db,
   estimatesTable,
+  customerWorkRootsTable,
+  usersTable,
   type Estimate,
 } from "@workspace/db";
 import type {
@@ -14,6 +16,9 @@ import type {
 import {
   EstimateDeliveryError,
   estimateDeliveryFingerprint,
+  estimateEmailReviewMetadataSchema,
+  ESTIMATE_EMAIL_REVIEW_ACTION,
+  ESTIMATE_EMAIL_PREVIEW_MS,
 } from "./estimate-delivery-contract";
 
 const time = z.iso.datetime({ offset: true }).nullable();
@@ -166,16 +171,77 @@ async function legacyAnchor(
     !(await commandMatches(reader, org, e, cs[0]!.id, 1, "estimate_created"))
   )
     return null;
-  if (
-    rows.some(
-      (r) =>
-        r.action !== "customer_work.estimate_created" ||
-        r.metadata.savedStateVersion !== undefined ||
-        r.metadata.customerWorkId !== e.customerWorkId ||
-        r.metadata.workVersion !== 1,
+  for (const r of rows) {
+    if (r.action === ESTIMATE_EMAIL_REVIEW_ACTION) {
+      // A strictly actor/target-bound read-only review is not evidence of a send.
+      // Expired reviews remain non-effects; claim enforces their lifetime.
+      const parsed = estimateEmailReviewMetadataSchema.safeParse(r.metadata);
+      if (!parsed.success) return null;
+      const m = parsed.data,
+        s = m.snapshot;
+      if (
+        r.organizationId !== org ||
+        r.entityType !== "estimate" ||
+        r.entityId !== e.id ||
+        r.actorUserId !== s.actorUserId ||
+        s.organizationId !== org ||
+        s.estimateId !== e.id ||
+        s.leadId !== null ||
+        s.customerWorkId !== e.customerWorkId ||
+        s.workVersion !== 1 ||
+        s.estimateUpdatedAt !== e.updatedAt.toISOString() ||
+        estimateDeliveryFingerprint(s) !== m.payloadSha256 ||
+        Date.parse(m.expiresAt) !==
+          r.createdAt.getTime() + ESTIMATE_EMAIL_PREVIEW_MS
+      )
+        return null;
+      const [root] = await reader
+        .select()
+        .from(customerWorkRootsTable)
+        .where(
+          and(
+            eq(customerWorkRootsTable.organizationId, org),
+            eq(customerWorkRootsTable.id, e.customerWorkId),
+          ),
+        );
+      const [actor] = await reader
+        .select({ organizationId: usersTable.organizationId })
+        .from(usersTable)
+        .where(eq(usersTable.id, s.actorUserId));
+      if (
+        !root ||
+        root.contactId !== s.contactId ||
+        root.propertyId !== s.propertyId ||
+        actor?.organizationId !== org
+      )
+        return null;
+      if (
+        estimateDeliveryFingerprint({
+          title: e.title,
+          lineItems: e.lineItems,
+          subtotalCents: e.subtotalCents,
+          taxCents: e.taxCents,
+          totalCents: e.totalCents,
+          notes: e.notes,
+        }) !==
+        estimateDeliveryFingerprint({
+          title: s.document.title,
+          lineItems: s.document.lineItems,
+          subtotalCents: s.document.subtotalCents,
+          taxCents: s.document.taxCents,
+          totalCents: s.document.totalCents,
+          notes: s.document.notes,
+        })
+      )
+        return null;
+    } else if (
+      r.action !== "customer_work.estimate_created" ||
+      r.metadata.savedStateVersion !== undefined ||
+      r.metadata.customerWorkId !== e.customerWorkId ||
+      r.metadata.workVersion !== 1
     )
-  )
-    return null;
+      return null;
+  }
   return cs[0]!.id;
 }
 function metadata(
@@ -275,23 +341,21 @@ export async function recordEstimateSavedState(
   }
   if (ordered.some((r) => !r.state.intact)) intact = false;
   const last = ordered.at(-1);
-  await tx
-    .insert(auditEventsTable)
-    .values({
-      organizationId: org,
-      actorUserId,
-      action: "estimate.saved_state",
-      entityType: "estimate",
-      entityId: e.id,
-      metadata: metadata(
-        e,
-        last?.id ?? null,
-        (last?.state.sequence ?? 0) + 1,
-        commandId,
-        anchor,
-        intact,
-      ),
-    });
+  await tx.insert(auditEventsTable).values({
+    organizationId: org,
+    actorUserId,
+    action: "estimate.saved_state",
+    entityType: "estimate",
+    entityId: e.id,
+    metadata: metadata(
+      e,
+      last?.id ?? null,
+      (last?.state.sequence ?? 0) + 1,
+      commandId,
+      anchor,
+      intact,
+    ),
+  });
 }
 export async function assertEstimateCleanHistory(
   reader: CustomerWorkReader,
