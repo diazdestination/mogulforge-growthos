@@ -80,6 +80,8 @@ The snapshot on a row is the current reservation revision. An explicitly reviewe
 
 Legacy null snapshots retain fixed source compatibility: two hours for an appointment missing an end; one day for a project with a start but no end. Legacy travel is zero because no travel protection was recorded. Do not backfill or infer prior approved travel. If such a record is explicitly rescheduled under configured policy, including disabled configuration, it gets a new reviewed snapshot without changing its earlier history.
 
+Unconfigured legacy writes retain null snapshot behavior. Work without a capacity-consuming state and usable interval does not invent service endpoints or a reservation snapshot; existing source/assignment checks remain. Its first effective capacity-consuming admission uses the then-current applicable rules. A transition out of active capacity preserves any existing snapshot/history, as a release.
+
 Terminal transitions retain the snapshot/history but release active capacity. Reactivation is a new material admission using current rules. A later booking edit never resurrects an earlier snapshot as new admission authority.
 
 Invalid versioned evidence holds new conflicting admissions, not ordinary historical notes, cancellation or completion. Existing same-org historical staff/customer rules continue to permit closure after staff access is revoked.
@@ -138,7 +140,7 @@ New presets require explicit selection; never map inspection/other into diagnost
 Tenant/actor/source/version changes invalidate a pending review. Use accessible keyboard controls, readable mobile content, exact error recovery and stable UI request ownership. Root preserves the completed initial-email component; Wave2 is not implemented in this design.
 
 ## 10. Migration, retention and recovery
-Append reports/staging-schema-preview-2026-10-01/0019_saved-scheduling-policy.sql after0018. It adds the three nullable fields and strict version/bounded-value safeguards without modifying the19 existing canonical SQL inputs,142 prior tables, old rows or work intervals. Implementation schema/manifests/fixtures must identify new column shape and SQL hash; prior recovery receipts remain historical evidence.
+Append reports/staging-schema-preview-2026-10-01/0019_saved-scheduling-policy.sql after0018. It adds the three nullable fields and strict version/bounded-value safeguards. Preserve the19 existing canonical SQL inputs,142 table identities, prior columns/constraints/data and old work intervals, alongside these explicit additive fields/safeguards. Implementation schema/manifests/fixtures must identify new column shape and SQL hash; prior recovery receipts remain historical evidence.
 
 No hosted migration, schema push, backfill, cluster/copy or production rollback is authorized by this spec. The later exact-candidate release packet must include the new SQL, unchanged predecessor hashes, restore/upgrade/rollback and audit/export/snapshot proof. Source-local disposable recovery must preserve snapshots, versions and legacy nulls.
 
