@@ -1,5 +1,23 @@
 # GrowthOS project state
 
+## October13 reviewed initial estimate email candidate
+
+Office/admin/owner staff can review the complete saved lead or returning-customer
+quote and approve one initial email through the existing selected Gmail/Microsoft
+sender. Permanent ownership prevents duplicate/replayed attempts; original proof,
+uncertainty and customer history survive ordinary edits and cleanup. Manual status
+is labeled Record external send and remains separate from provider acceptance.
+
+Source ac13692 passed 4,760 full local tests (15 existing skips), types/both builds,
+Docker parity, source/SQL preservation and independent whole-branch review.
+The 142-table catalog and all 19 SQL inputs are unchanged relative to PR44;
+receipt export adds a dataset, not a table. This depends on PR56/3f3c524 and
+PR44/8df64dc. Exact publication-head CI must pass; its receipt is maintained in
+Forge's current state/artifacts. No merge, hosted migration, real send or deployment
+occurred. G-04, full G-06, FlyReader rehearsal and contractor acceptance stay open.
+Read reports/estimate-email-integration-2026-10-13.md.
+
+
 ## October13 assigned crew end validation candidate
 
 Based on PR44/8df64dc, explicit end-only clears now reject before project writes
@@ -18,7 +36,7 @@ Independent review corrections cover strict CSV/address handling, source-only
 warranty rendering and preservation of provider-owned recovery metadata.
 4457 full-suite tests passed (15 skipped), types/both builds/Docker parity passed,
 and fictional browser import/preview checks passed. Source remains142 tables;
-all19 SQL pins are unchanged. The real Fly75 upgrade, supported credential
+all 19 SQL pins are unchanged. The real Fly75 upgrade, supported credential
 retirement and client/provider/device/payment/cutover gates remain open.
 See reports/release-integration-2026-10-12.md and its companion receipts.
 Exact publication-head GitHub CI is still required; no hosted actions occurred.
