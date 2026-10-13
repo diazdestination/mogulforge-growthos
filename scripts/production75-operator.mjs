@@ -93,7 +93,7 @@ export async function runProduction75Operator({plan,custodyRoot,verifyOwnerAppro
   await shutdown();
   if(custody){
    const until=plan.cleanupUntil;
-   const bounded=async fn=>{let timer;const deadline=Math.min(until,now()+30000);try{check(now()<deadline,'production75_operator_cleanup_deadline');const value=await Promise.race([Promise.resolve().then(()=>fn({resources:cleanupResources,signal:cleanupResources.signal,deadline})),new Promise((_,reject)=>{timer=setTimeout(()=>{cleanupResources.abort();reject(error('production75_operator_cleanup_deadline'));},Math.max(1,deadline-now()));})]);if(now()>=deadline)cleanupResources.abort();check(now()<deadline,'production75_operator_cleanup_deadline');return value;}finally{clearTimeout(timer);}};
+   const bounded=async(fn,maxMs=30000)=>{let timer;const deadline=Math.min(until,now()+maxMs);try{check(now()<deadline,'production75_operator_cleanup_deadline');const value=await Promise.race([Promise.resolve().then(()=>fn({resources:cleanupResources,signal:cleanupResources.signal,deadline})),new Promise((_,reject)=>{timer=setTimeout(()=>{cleanupResources.abort();reject(error('production75_operator_cleanup_deadline'));},Math.max(1,deadline-now()));})]);if(now()>=deadline)cleanupResources.abort();check(now()<deadline,'production75_operator_cleanup_deadline');return value;}finally{clearTimeout(timer);}};
    try{
     const id=custody.status().copyId;
     if(id){
@@ -108,7 +108,9 @@ export async function runProduction75Operator({plan,custodyRoot,verifyOwnerAppro
      }
      check(result.copyDeleted,'production75_operator_cleanup_unconfirmed');
     }
-    try{check((await bounded(scope=>callbacks.verifyProtected({before,plan,...scope})))?.unchanged===true,'production75_operator_protected');if(before)check(production75SnapshotDigest(await bounded(scope=>callbacks.observeOriginals({custody,plan,...scope})))===plan.sourceSnapshotSha256,'production75_operator_protected');result.originalsPreserved=true;}catch{result.originalsPreserved=false;}
+    // A full fixed-query original proof can take longer than a provider request.
+    // It follows owned deletion and remains inside the admitted cleanup deadline.
+    try{check((await bounded(scope=>callbacks.verifyProtected({before,plan,...scope})))?.unchanged===true,'production75_operator_protected');if(before)check(production75SnapshotDigest(await bounded(scope=>callbacks.observeOriginals({custody,plan,...scope}),240000))===plan.sourceSnapshotSha256,'production75_operator_protected');result.originalsPreserved=true;}catch{result.originalsPreserved=false;}
    }catch(e){result.cleanupErrorCode=safeCode(e);}
    finally{result.custody=custody.status();try{custody.close();}catch{result.cleanupErrorCode='production75_operator_custody_close';}}
   }
