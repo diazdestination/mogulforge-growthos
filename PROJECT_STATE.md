@@ -1,5 +1,16 @@
 # GrowthOS project state
 
+## October13 assigned crew end validation candidate
+
+Based on PR44/8df64dc, explicit end-only clears now reject before project writes
+when a start and assigned crew remain. The saved multi-day reservation cannot
+collapse to the legacy one-day fallback. Six regressions/compatibility checks;
+RED2fails thenGREEN32/32 realPG, full local4463pass/15existingAPI skips, types/both
+builds and independent reviewPASS. Exact publication CI remains a separate gate.
+No schema/SQL/provider changes or deployment. G-04 configurable capacity, G-06
+estimate delivery and both company acceptance cards remain open. Read
+reports/crew-schedule-end-validation-2026-10-13.md.
+
 ## October12 combined launch candidate — local gates passed
 
 PR35 plus39–43 are combined on agent/growthos-release-integration-20261012.

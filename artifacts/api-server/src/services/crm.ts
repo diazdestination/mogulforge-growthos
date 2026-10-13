@@ -1672,7 +1672,7 @@ export async function updateProject(
   const start = input.scheduledStart === undefined ? existing.scheduledStart : input.scheduledStart;
   const end = input.scheduledEnd === undefined ? existing.scheduledEnd : input.scheduledEnd;
   assertScheduleInterval(start, end);
-  if (start && staff.length && !end && (input.scheduledStart !== undefined || input.crewUserIds !== undefined)) throw new ScheduleError("invalid_interval", 400);
+  if (start && staff.length && !end && (input.scheduledStart !== undefined || input.scheduledEnd !== undefined || input.crewUserIds !== undefined)) throw new ScheduleError("invalid_interval", 400);
   if (start && ["scheduled", "in_progress"].includes(input.status ?? existing.status)) await assertResourceWindow(tx, organizationId, staff, start, end ?? new Date(start.getTime() + 86_400_000), { projectId: id });
   const estimateId = input.estimateId === undefined ? existing.estimateId : input.estimateId;
   if (estimateId) {
