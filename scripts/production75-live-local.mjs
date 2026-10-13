@@ -417,7 +417,7 @@ async function run() {
             `REVOKE ALL ON DATABASE ${q(name)} FROM PUBLIC; GRANT ALL ON DATABASE ${q(name)} TO schema_admin; GRANT CONNECT ON DATABASE ${q(name)} TO _crunchypgbouncer,_crunchyrepl,writer,reader${name === "fly-db" ? `; GRANT ALL ON DATABASE ${q(name)} TO "fly-user"` : ""}`,
           );
           await c.query(
-            "ALTER SCHEMA public OWNER TO pg_database_owner; REVOKE CREATE ON SCHEMA public FROM PUBLIC; GRANT USAGE,CREATE ON SCHEMA public TO schema_admin; GRANT USAGE ON SCHEMA public TO PUBLIC",
+            "CREATE SCHEMA pgbouncer AUTHORIZATION postgres; GRANT USAGE ON SCHEMA pgbouncer TO PUBLIC; ALTER SCHEMA public OWNER TO pg_database_owner; REVOKE CREATE ON SCHEMA public FROM PUBLIC; GRANT USAGE,CREATE ON SCHEMA public TO schema_admin; GRANT USAGE ON SCHEMA public TO PUBLIC",
           );
           if (name === "fly-db")
             await c.query(
