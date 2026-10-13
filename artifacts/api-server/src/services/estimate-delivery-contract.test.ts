@@ -38,8 +38,125 @@ const doc: EstimateEmailDocument = {
   totalCents: 700,
   notes: "Full recorded note\n" + "x".repeat(5000),
 };
-const draft = { status: "draft", sentAt: null, acceptedAt: null } as Estimate;
+const draft = {
+  ...doc,
+  id,
+  organizationId: id,
+  leadId: id,
+  customerWorkId: null,
+  workVersion: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  status: "draft",
+  sentAt: null,
+  acceptedAt: null,
+} as Estimate;
 describe("initial estimate contract", () => {
+  it("formats_large_saved_cents_exactly", () => {
+    const large = {
+      ...doc,
+      lineItems: [
+        {
+          description: "Large JSON price",
+          quantity: 1e-9,
+          unitPriceCents: 9007199254740990,
+          totalCents: 9007199,
+        },
+      ],
+      subtotalCents: 9007199,
+      taxCents: 0,
+      totalCents: 9007199,
+    };
+    expect(renderEstimateEmail(large, "customer@example.test").body).toContain(
+      "Unit price: USD 90071992547409.90",
+    );
+  });
+  it("preserves_both_saved_fractional_rounding_rules", () => {
+    for (const totalCents of [100, 101]) {
+      const saved = {
+        ...doc,
+        lineItems: [
+          {
+            description: "Fractional item",
+            quantity: 1.005,
+            unitPriceCents: 100,
+            totalCents,
+          },
+        ],
+        subtotalCents: totalCents,
+        taxCents: 0,
+        totalCents,
+      };
+      expect(
+        renderEstimateEmail(saved, "customer@example.test").body,
+      ).toContain(`Line total: USD 1.${totalCents === 100 ? "00" : "01"}`);
+    }
+    const invalid = {
+      ...doc,
+      lineItems: [
+        {
+          description: "Fractional item",
+          quantity: 1.005,
+          unitPriceCents: 100,
+          totalCents: 102,
+        },
+      ],
+      subtotalCents: 102,
+      taxCents: 0,
+      totalCents: 102,
+    };
+    expect(() =>
+      renderEstimateEmail(invalid, "customer@example.test"),
+    ).toThrow();
+  });
+  it("enforces_saved_rounding_for_exact_estimate_lineage", () => {
+    const saved = {
+      ...draft,
+      ...doc,
+      id,
+      leadId: id,
+      customerWorkId: null,
+      workVersion: null,
+      lineItems: [
+        {
+          description: "Fractional item",
+          quantity: 1.005,
+          unitPriceCents: 100,
+          totalCents: 100,
+        },
+      ],
+      subtotalCents: 100,
+      taxCents: 0,
+      totalCents: 100,
+    } as Estimate;
+    expect(() => assertEstimateInitialDraft(saved)).not.toThrow();
+    expect(() =>
+      assertEstimateInitialDraft({
+        ...saved,
+        lineItems: [{ ...saved.lineItems[0], totalCents: 101 }],
+        subtotalCents: 101,
+        totalCents: 101,
+      }),
+    ).toThrow();
+    const returning = {
+      ...saved,
+      leadId: null,
+      customerWorkId: id,
+      workVersion: 1,
+      lineItems: [{ ...saved.lineItems[0], totalCents: 101 }],
+      subtotalCents: 101,
+      totalCents: 101,
+    };
+    expect(() => assertEstimateInitialDraft(returning)).not.toThrow();
+    expect(() =>
+      assertEstimateInitialDraft({
+        ...returning,
+        lineItems: saved.lineItems,
+        subtotalCents: 100,
+        totalCents: 100,
+      }),
+    ).toThrow();
+  });
   it("complete_saved_quote", () => {
     const m = renderEstimateEmail(doc, "customer@example.test");
     expect(m.recipient).toBe("customer@example.test");

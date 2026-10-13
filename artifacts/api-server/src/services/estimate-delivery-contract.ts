@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod/v4";
-import type { Estimate, UserRole } from "@workspace/db";
+import type { Estimate, EstimateLineItem, UserRole } from "@workspace/db";
 import type { CustomerEmailSender } from "./customer-email";
 import type { UserEmailProvider } from "./user-email";
 export type EstimateDeliveryActor = {
@@ -27,6 +27,19 @@ const header = z
 const mailbox = header.refine((v) => v === v.trim()).pipe(z.email());
 const provider = z.enum(["gmail", "microsoft"]);
 const source = z.enum(["lead_assignee", "company_default"]);
+/** Matches returning-customer.ts's thousandths arithmetic, without changing saved cents. */
+function returningLineTotal(
+  line: Pick<EstimateLineItem, "quantity" | "unitPriceCents">,
+): number | null {
+  if (!/^\d+(?:\.\d{1,3})?$/.test(String(line.quantity))) return null;
+  const [whole, fraction = ""] = String(line.quantity).split(".");
+  const total =
+    ((BigInt(whole) * 1000n + BigInt(fraction.padEnd(3, "0"))) *
+      BigInt(line.unitPriceCents) +
+      500n) /
+    1000n;
+  return total <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(total) : null;
+}
 const lineItemSchema = z
   .object({
     description: z.string(),
@@ -36,7 +49,9 @@ const lineItemSchema = z
   })
   .strict()
   .refine(
-    (v) => Math.round(v.quantity * v.unitPriceCents) === v.totalCents,
+    (v) =>
+      Math.round(v.quantity * v.unitPriceCents) === v.totalCents ||
+      returningLineTotal(v) === v.totalCents,
     "Saved line total is invalid.",
   );
 export const estimateEmailDocumentSchema = z
@@ -164,6 +179,54 @@ export function assertEstimateInitialDraft(estimate: Estimate): void {
       "estimate_not_initial_draft",
       "Only an initial unsent draft estimate can be prepared.",
     );
+  assertEstimateSavedAmounts(estimate);
+}
+/** Full source records must satisfy their own writer's arithmetic, not the union
+ * used by the source-neutral frozen document. Admission invokes this via the draft guard. */
+export function assertEstimateSavedAmounts(estimate: Estimate): void {
+  const amounts = z
+    .object({
+      lineItems: z.array(lineItemSchema),
+      subtotalCents: cents,
+      taxCents: cents,
+      totalCents: cents,
+    })
+    .safeParse(estimate);
+  const leadSource =
+    estimate.leadId !== null &&
+    estimate.customerWorkId === null &&
+    estimate.workVersion === null;
+  const returningSource =
+    estimate.leadId === null &&
+    estimate.customerWorkId !== null &&
+    Number.isInteger(estimate.workVersion) &&
+    (estimate.workVersion ?? 0) > 0;
+  if (!amounts.success || (!leadSource && !returningSource))
+    throw new EstimateDeliveryError(
+      422,
+      "invalid_estimate_amounts",
+      "Saved estimate amounts or source are invalid.",
+    );
+  const validLines = amounts.data.lineItems.every((line) =>
+    leadSource
+      ? Math.round(line.quantity * line.unitPriceCents) === line.totalCents
+      : line.quantity <= 999999 &&
+        line.unitPriceCents <= 1_000_000_000 &&
+        line.totalCents <= 1_000_000_000 &&
+        returningLineTotal(line) === line.totalCents,
+  );
+  if (
+    !validLines ||
+    amounts.data.lineItems.reduce((sum, line) => sum + line.totalCents, 0) !==
+      estimate.subtotalCents ||
+    estimate.subtotalCents + estimate.taxCents !== estimate.totalCents ||
+    (returningSource && estimate.totalCents > 1_000_000_000)
+  )
+    throw new EstimateDeliveryError(
+      422,
+      "invalid_estimate_amounts",
+      "Saved estimate amounts do not match the source's rounding rule.",
+    );
 }
 export function renderEstimateEmail(
   document: EstimateEmailDocument,
@@ -176,7 +239,10 @@ export function renderEstimateEmail(
       "invalid_estimate_email",
       "Saved quote or recipient is invalid.",
     );
-  const money = (value: number) => `USD ${(value / 100).toFixed(2)}`;
+  const money = (value: number) => {
+    const saved = BigInt(value);
+    return `USD ${saved / 100n}.${String(saved % 100n).padStart(2, "0")}`;
+  };
   return {
     recipient,
     subject: `Estimate: ${document.title} from ${document.businessName}`,
