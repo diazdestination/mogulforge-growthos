@@ -95,3 +95,9 @@ export const estimateDeliveryLabels = {
   uncertain: "Uncertain — check the original mailbox",
   reconciled: "Reconciliation recorded — no new send",
 };
+
+/** Format validated integer cents without floating-point currency division. */
+export function formatEstimateDeliveryCents(cents: number): string {
+  const exact = BigInt(cents);
+  return `${exact / 100n}.${String(exact % 100n).padStart(2, "0")}`;
+}

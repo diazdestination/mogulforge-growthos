@@ -11,6 +11,7 @@ import {
   estimateEmailEvidenceSchema,
   estimateEmailPreviewSchema,
   estimateDeliveryLabels,
+  formatEstimateDeliveryCents,
   type EstimateEmailPreview,
 } from "@/lib/estimate-delivery-ui";
 // Session-local ownership survives page/member/target remounts. A lost result
@@ -318,15 +319,16 @@ export function EstimateDelivery({
             {preview.document.lineItems.map((item, index) => (
               <li className="break-words text-sm" key={index}>
                 {item.description} · {item.quantity} × $
-                {(item.unitPriceCents / 100).toFixed(2)} = $
-                {(item.totalCents / 100).toFixed(2)}
+                {formatEstimateDeliveryCents(item.unitPriceCents)} = $
+                {formatEstimateDeliveryCents(item.totalCents)}
               </li>
             ))}
           </ul>
           <p>
-            Subtotal ${(preview.document.subtotalCents / 100).toFixed(2)} · Tax
-            ${(preview.document.taxCents / 100).toFixed(2)} · Total $
-            {(preview.document.totalCents / 100).toFixed(2)}
+            Subtotal $
+            {formatEstimateDeliveryCents(preview.document.subtotalCents)} · Tax
+            ${formatEstimateDeliveryCents(preview.document.taxCents)} · Total $
+            {formatEstimateDeliveryCents(preview.document.totalCents)}
           </p>
           <h4 className="font-semibold">Customer-facing notes</h4>
           <p className="whitespace-pre-wrap break-words">
@@ -374,15 +376,16 @@ export function EstimateDelivery({
             {retained.document.lineItems.map((item, index) => (
               <li key={index}>
                 {item.description} · {item.quantity} × $
-                {(item.unitPriceCents / 100).toFixed(2)} = $
-                {(item.totalCents / 100).toFixed(2)}
+                {formatEstimateDeliveryCents(item.unitPriceCents)} = $
+                {formatEstimateDeliveryCents(item.totalCents)}
               </li>
             ))}
           </ul>
           <p>
-            Subtotal ${(retained.document.subtotalCents / 100).toFixed(2)} · Tax
-            ${(retained.document.taxCents / 100).toFixed(2)} · Total $
-            {(retained.document.totalCents / 100).toFixed(2)}
+            Subtotal $
+            {formatEstimateDeliveryCents(retained.document.subtotalCents)} · Tax
+            ${formatEstimateDeliveryCents(retained.document.taxCents)} · Total $
+            {formatEstimateDeliveryCents(retained.document.totalCents)}
           </p>
           <p className="whitespace-pre-wrap break-words">
             {retained.document.notes}

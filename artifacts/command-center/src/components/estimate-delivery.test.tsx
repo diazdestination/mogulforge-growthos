@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import { getGetMeQueryKey } from "@workspace/api-client-react";
@@ -72,7 +78,10 @@ const evidence = {
   acceptedAt: null,
   deliveryConfirmed: false,
 };
-function mount(handler?: (path: string, init?: RequestInit) => unknown) {
+function mount(
+  handler?: (path: string, init?: RequestInit) => unknown,
+  initialEstimate = estimate,
+) {
   const fetch = vi.fn(async (path: string, init?: RequestInit) => {
     const result = await handler?.(path, init);
     return new Response(
@@ -86,7 +95,7 @@ function mount(handler?: (path: string, init?: RequestInit) => unknown) {
   const cache = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  const ui = (record = estimate, scope = "member") => (
+  const ui = (record = initialEstimate, scope = "member") => (
     <QueryClientProvider client={cache}>
       <EstimateDelivery
         estimate={record}
@@ -110,6 +119,128 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("Estimate email review", () => {
+  it.each([
+    {
+      quantity: 1,
+      line: 9007199254740990,
+      tax: 0,
+      total: 9007199254740990,
+      expectedLine: "90071992547409.90",
+      expectedTax: "0.00",
+      expectedTotal: "90071992547409.90",
+    },
+    {
+      quantity: 1e-9,
+      line: 9007199,
+      tax: 9007199245733790,
+      total: 9007199254740989,
+      expectedLine: "90071.99",
+      expectedTax: "90071992457337.90",
+      expectedTotal: "90071992547409.89",
+    },
+  ])(
+    "preserves exact large saved cents in approved and retained amounts: $quantity",
+    async ({
+      quantity,
+      line,
+      tax,
+      total,
+      expectedLine,
+      expectedTax,
+      expectedTotal,
+    }) => {
+      const record = {
+        ...estimate,
+        lineItems: [
+          {
+            description: "Exact large-cent item",
+            quantity,
+            unitPriceCents: 9007199254740990,
+            totalCents: line,
+          },
+        ],
+        subtotalCents: line,
+        taxCents: tax,
+        totalCents: total,
+      };
+      const exactDocument = {
+        ...document,
+        lineItems: record.lineItems,
+        subtotalCents: line,
+        taxCents: tax,
+        totalCents: total,
+      };
+      const exactPreview = { ...preview, document: exactDocument };
+      const retained = {
+        ...evidence,
+        state: "accepted",
+        canPrepare: false,
+        document: exactDocument,
+        message,
+      };
+      const { fetch } = mount(
+        (path) =>
+          path.endsWith("/preview")
+            ? exactPreview
+            : path.endsWith("/send")
+              ? retained
+              : undefined,
+        record,
+      );
+      await review();
+      const reviewRegion = screen.getByLabelText("Complete email review");
+      expect(
+        within(reviewRegion).getByText(
+          `Exact large-cent item · ${quantity} × $90071992547409.90 = $${expectedLine}`,
+        ),
+      ).toBeTruthy();
+      expect(
+        within(reviewRegion).getByText(
+          `Subtotal $${expectedLine} · Tax $${expectedTax} · Total $${expectedTotal}`,
+        ),
+      ).toBeTruthy();
+      expect(within(reviewRegion).getByText("All original notes")).toBeTruthy();
+      expect(
+        within(reviewRegion).getByText(
+          (_, element) =>
+            element?.tagName === "PRE" && element.textContent === message.body,
+        ),
+      ).toBeTruthy();
+      fireEvent.click(within(reviewRegion).getByRole("checkbox"));
+      fireEvent.click(
+        within(reviewRegion).getByRole("button", {
+          name: "Send reviewed email",
+        }),
+      );
+      await screen.findByText("Provider accepted");
+      const details = screen
+        .getByText("Retained original email evidence")
+        .closest("details")!;
+      fireEvent.click(
+        within(details).getByText("Retained original email evidence"),
+      );
+      expect(
+        within(details).getByText(
+          `Exact large-cent item · ${quantity} × $90071992547409.90 = $${expectedLine}`,
+        ),
+      ).toBeTruthy();
+      expect(
+        within(details).getByText(
+          `Subtotal $${expectedLine} · Tax $${expectedTax} · Total $${expectedTotal}`,
+        ),
+      ).toBeTruthy();
+      expect(within(details).getByText("All original notes")).toBeTruthy();
+      expect(
+        within(details).getByText(
+          (_, element) =>
+            element?.tagName === "PRE" && element.textContent === message.body,
+        ),
+      ).toBeTruthy();
+      expect(
+        fetch.mock.calls.filter(([path]) => path.endsWith("/send")),
+      ).toHaveLength(1);
+    },
+  );
   it("accepted send releases the spinner for evidence refresh", async () => {
     mount((path) =>
       path.endsWith("/send")
