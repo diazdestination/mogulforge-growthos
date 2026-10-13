@@ -231,7 +231,7 @@ describe("returning-work core export", () => {
     const result = await createCustomerLifecycleExporter({
       createClient: () => client as never,
     })(id(1), "fictional-owner");
-    expect(result.manifest.tables).toHaveLength(27);
+    expect(result.manifest.tables).toHaveLength(28);
     expect(result.data.customer_work_roots.map((row) => row.id)).toEqual([
       id(6),
       id(7),

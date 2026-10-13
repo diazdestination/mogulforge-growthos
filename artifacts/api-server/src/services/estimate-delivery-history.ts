@@ -1,7 +1,10 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   auditEventsTable,
+  revenueExecutionsTable,
+  leadsTable,
+  propertiesTable,
   customerWorkCommandsTable,
   db,
   estimatesTable,
@@ -447,4 +450,103 @@ export async function assertEstimateCleanHistory(
   } catch {
     held();
   }
+}
+
+/** Permanent ownership is retained even when its evidence is orphaned or malformed. */
+export async function hasRetainedEstimateEmail(
+  reader: CustomerWorkReader,
+  org: string,
+  estimateId: string,
+): Promise<boolean> {
+  const id = estimateId.toLowerCase(),
+    key = `estimate-delivery:${id}:email`;
+  const [execution] = await reader
+    .select({ id: revenueExecutionsTable.id })
+    .from(revenueExecutionsTable)
+    .where(sql`lower(${revenueExecutionsTable.actionKey}) = ${key}`)
+    .limit(1);
+  if (execution) return true;
+  const [audit] = await reader
+    .select({ id: auditEventsTable.id })
+    .from(auditEventsTable)
+    .where(
+      and(
+        sql`${auditEventsTable.action} in ('estimate_delivery.admitted','estimate_delivery.provider_accepted')`,
+        or(
+          sql`lower(${auditEventsTable.entityId}::text) = ${id}`,
+          sql`lower(${auditEventsTable.metadata}->'snapshot'->>'estimateId') = ${id}`,
+          sql`lower(${auditEventsTable.metadata}->>'actionKey') = ${key}`,
+        ),
+      ),
+    )
+    .limit(1);
+  return !!audit;
+}
+export const ESTIMATE_EMAIL_HISTORY_RETAINED =
+  "estimate_email_history_retained";
+/** The caller holds the existing lifecycle/schedule locks or the property writer row lock. */
+export async function hasRetainedEstimateEmailParticipant(
+  reader: CustomerWorkReader,
+  org: string,
+  kind: "leadId" | "contactId" | "propertyId",
+  id: string,
+): Promise<boolean> {
+  const canonical = id.toLowerCase();
+  // Original participants remain protected even if a current link has been corrupted.
+  const [original] = await reader
+    .select({ id: auditEventsTable.id })
+    .from(auditEventsTable)
+    .where(
+      and(
+        eq(auditEventsTable.organizationId, org),
+        sql`${auditEventsTable.action} in ('estimate_delivery.admitted','estimate_delivery.provider_accepted')`,
+        sql`lower(${auditEventsTable.metadata}->'snapshot'->>${kind}) = ${canonical}`,
+      ),
+    )
+    .limit(1);
+  if (original) return true;
+  const targets = await reader
+    .select({ id: estimatesTable.id })
+    .from(estimatesTable)
+    .leftJoin(
+      leadsTable,
+      and(
+        eq(leadsTable.id, estimatesTable.leadId),
+        eq(leadsTable.organizationId, org),
+      ),
+    )
+    .leftJoin(
+      customerWorkRootsTable,
+      and(
+        eq(customerWorkRootsTable.id, estimatesTable.customerWorkId),
+        eq(customerWorkRootsTable.organizationId, org),
+      ),
+    )
+    .leftJoin(
+      propertiesTable,
+      and(
+        eq(propertiesTable.id, leadsTable.propertyId),
+        eq(propertiesTable.organizationId, org),
+      ),
+    )
+    .where(
+      and(
+        eq(estimatesTable.organizationId, org),
+        kind === "leadId"
+          ? eq(estimatesTable.leadId, canonical)
+          : kind === "propertyId"
+            ? or(
+                eq(leadsTable.propertyId, canonical),
+                eq(customerWorkRootsTable.propertyId, canonical),
+              )
+            : or(
+                eq(leadsTable.contactId, canonical),
+                eq(customerWorkRootsTable.contactId, canonical),
+                eq(propertiesTable.contactId, canonical),
+              ),
+      ),
+    );
+  for (const target of targets)
+    if (await hasRetainedEstimateEmail(reader, org, target.id)) return true;
+  return false;
 }

@@ -1,3 +1,4 @@
+import { projectEstimateDeliveryAudit } from "./estimate-delivery-projections";
 import { dispatchWebhookEvent } from "./webhooks";
 import { enqueueStaffLeadPush } from "./staff-push";
 import {
@@ -37,7 +38,7 @@ import { guardWorkdayAppointment, retainsWorkdayLeadHistory } from "./workday-gu
 import { lockReplyLead } from "./response-correlation";
 import { customerWorkRootsTable } from "../../../../lib/db/src/schema/customer-work";
 import { customerWorkFail, lockCustomerWork, type CustomerWorkActor } from "./customer-work-lineage";
-import { recordEstimateSavedState } from "./estimate-delivery-history";
+import { recordEstimateSavedState, hasRetainedEstimateEmail, hasRetainedEstimateEmailParticipant, ESTIMATE_EMAIL_HISTORY_RETAINED } from "./estimate-delivery-history";
 import { readNativeEstimate, readNativeProject } from "./returning-customer";
 
 /**
@@ -212,13 +213,17 @@ export async function updateContact(
 }
 
 export async function deleteContact(organizationId: string, id: string) {
-  const rows = await db
+  return db.transaction(async tx => {
+  await lockCustomerWork(tx,organizationId);
+  if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"contactId",id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"This customer retains original estimate email history and cannot be deleted.");
+  const rows = await tx
     .delete(contactsTable)
     .where(
       and(eq(contactsTable.id, id), eq(contactsTable.organizationId, organizationId)),
     )
     .returning({ id: contactsTable.id });
   return rows.length > 0;
+  });
 }
 
 // ---------- properties ----------
@@ -275,6 +280,7 @@ export async function updateProperty(
   const [current] = await tx.select().from(propertiesTable).where(and(eq(propertiesTable.id,id),eq(propertiesTable.organizationId,organizationId))).for("update");
   if (!current) return null;
   if (input.contactId !== undefined && input.contactId !== current.contactId) {
+    if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"propertyId",id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"This property retains its original estimate email customer.");
     const [retained] = await tx.select({id:customerWorkRootsTable.id}).from(customerWorkRootsTable).where(and(eq(customerWorkRootsTable.organizationId,organizationId),eq(customerWorkRootsTable.propertyId,id))).limit(1);
     if (retained) customerWorkFail("customer_work_parent_locked","This property has retained customer work. Its customer cannot be changed; create a separate property for different ownership.");
     const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).innerJoin(leadsTable, and(
@@ -456,6 +462,7 @@ export async function updateLead(
       )).for("update");
       if (!existing) return null;
       if (input.propertyId !== existing.propertyId) {
+        if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"leadId",id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"This opportunity retains its original estimate email property.");
         const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(
           eq(invoicesTable.organizationId, organizationId), eq(invoicesTable.leadId, id),
         )).limit(1);
@@ -740,6 +747,7 @@ export async function mergeLeads(
     const survivor = leads.find((lead) => lead.id === survivorId);
     const source = leads.find((lead) => lead.id === sourceId);
     if (!survivor || !source) return { ok: false as const, error: "not_found" as const };
+    for(const id of [survivor.id,source.id]) if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"leadId",id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"Both opportunities must retain their original estimate email history; they cannot be merged.");
     // Work evidence is retained on its original opportunity. Reuse the existing
     // history-retention refusal rather than bulk-moving prepared/sealed parents.
     if (await retainsWorkdayLeadHistory(tx, organizationId, sourceId)) return { ok: false as const, error: OUTREACH_HISTORY_RETAINED };
@@ -1382,19 +1390,20 @@ export async function listAuditEvents(
   organizationId: string,
   filters: { action?: string; since?: Date } = {},
 ) {
-  const conditions = [eq(auditEventsTable.organizationId, organizationId)];
+  const conditions = [eq(auditEventsTable.organizationId, organizationId), ne(auditEventsTable.action,"estimate_delivery.previewed")];
   if (filters.action) {
     conditions.push(eq(auditEventsTable.action, filters.action));
   }
   if (filters.since) {
     conditions.push(gte(auditEventsTable.createdAt, filters.since));
   }
-  return db
+  const rows = await db
     .select()
     .from(auditEventsTable)
     .where(and(...conditions))
     .orderBy(desc(auditEventsTable.createdAt))
     .limit(200);
+  return rows.map(projectEstimateDeliveryAudit).filter((e): e is NonNullable<typeof e> => e !== null);
 }
 
 const AI_REFERRER_HOSTS = [
@@ -1579,6 +1588,8 @@ export async function deleteEstimate(organizationId: string, id: string) {
   return db.transaction(async tx => {
   await lockContractorSchedule(tx, organizationId);
   const [native] = await tx.select({work:estimatesTable.customerWorkId}).from(estimatesTable).where(and(eq(estimatesTable.organizationId,organizationId),eq(estimatesTable.id,id)));
+  if (!native) return false;
+  if(await hasRetainedEstimateEmail(tx,organizationId,id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"This estimate retains permanent email history and cannot be deleted.");
   if (native?.work) customerWorkFail("customer_work_history_retained","Returning-customer estimates retain their original command and work history and cannot be deleted.");
   const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(
     eq(invoicesTable.organizationId, organizationId), eq(invoicesTable.estimateId, id),

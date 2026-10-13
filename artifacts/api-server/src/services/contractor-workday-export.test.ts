@@ -34,7 +34,7 @@ describe("closed workday business export",()=>{
   it("retains usable linked business history and drops raw internal identities/capabilities recursively",async()=>{
     const {client}=fixture();
     const result=await createCustomerLifecycleExporter({createClient:()=>client as never})(id(1),"synthetic-owner");
-    expect(result.manifest.tables).toHaveLength(27);
+    expect(result.manifest.tables).toHaveLength(28);
     expect(result.manifest.tables.map(row=>row.table)).toContain("customer_work_roots");
     expect(result.manifest.tables.map(row=>row.table)).not.toContain("customer_work_commands");
     expect(result.data.property_assets).toHaveLength(1);

@@ -1,3 +1,5 @@
+import { lockCustomerWork, customerWorkFail } from "./customer-work-lineage";
+import { hasRetainedEstimateEmailParticipant, ESTIMATE_EMAIL_HISTORY_RETAINED } from "./estimate-delivery-history";
 import { db, contactsTable, leadsTable } from '@workspace/db';
 import { and, eq, like } from 'drizzle-orm';
 
@@ -92,8 +94,13 @@ export async function seedDemoData(organizationId: string): Promise<SeedResult> 
 }
 
 export async function clearDemoData(organizationId: string): Promise<SeedResult> {
-  // Delete demo leads first (they FK to contacts), then the demo contacts.
-  const demoLeads = await db
+  return db.transaction(async tx => {
+  await lockCustomerWork(tx,organizationId);
+  const leads=await tx.select({id:leadsTable.id}).from(leadsTable).where(and(eq(leadsTable.organizationId,organizationId),eq(leadsTable.source,DEMO_SOURCE)));
+  const contacts=await tx.select({id:contactsTable.id}).from(contactsTable).where(and(eq(contactsTable.organizationId,organizationId),like(contactsTable.email,`%@${DEMO_EMAIL_DOMAIN}`)));
+  for(const row of leads) if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"leadId",row.id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"Demo cleanup cannot remove retained estimate email history.");
+  for(const row of contacts) if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"contactId",row.id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"Demo cleanup cannot remove retained estimate email history.");
+  const demoLeads = await tx
     .delete(leadsTable)
     .where(
       and(
@@ -103,7 +110,7 @@ export async function clearDemoData(organizationId: string): Promise<SeedResult>
     )
     .returning({ id: leadsTable.id });
 
-  const demoContacts = await db
+  const demoContacts = await tx
     .delete(contactsTable)
     .where(
       and(
@@ -114,4 +121,5 @@ export async function clearDemoData(organizationId: string): Promise<SeedResult>
     .returning({ id: contactsTable.id });
 
   return { contacts: demoContacts.length, leads: demoLeads.length };
+  });
 }
