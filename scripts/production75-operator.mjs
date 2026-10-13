@@ -32,7 +32,7 @@ function bindVerificationContext(ctx,approved,delta,readerName){
 }
 export async function runProduction75Operator({plan,custodyRoot,verifyOwnerApproval,verifyCapabilityReview,api,callbacks,now=Date.now,pause=wait,pollMs=1000}={}){
  const result={kind:'SUPPLIED_CLIENT_PRODUCTION75_OPERATOR',status:'held-before-create',creationAttempted:false,copyId:null,possibleCopyId:null,copyDeleted:false,readerProfileVerified:false,originalsPreserved:false,resourcesClosed:false,outcomes:{},sourceWritesAuthorized:false};
- let custody,copy,before,cloneBefore,workResources,cleanupResources,complete=false,creationAcknowledged=false;
+ let custody,copy,before,cloneBefore,workResources,cleanupResources,complete=false,creationAcknowledged=false,latestOwnedInventory;
  const shutdown=async(final=false)=>{let timer;const ms=Math.max(1,Math.min(60000,Math.floor((plan?.cleanupUntil-now())/4)));try{workResources?.abort();if(final)cleanupResources?.abort();const closed=await Promise.race([Promise.resolve().then(()=>callbacks?.closeResources?.()),new Promise((_,reject)=>{timer=setTimeout(()=>reject(error('production75_operator_resources')),ms);})]);const work=await workResources?.drain(ms),cleanup=final?await cleanupResources?.drain(ms):{closed:true};check(closed?.closed===true&&work?.closed!==false&&cleanup?.closed!==false,'production75_operator_resources');result.resourcesClosed=true;}catch{result.resourcesClosed=false;result.cleanupErrorCode='production75_operator_resources';}finally{clearTimeout(timer);}};
  try{
   operatorPlanDigest(plan);check(typeof now==='function'&&typeof pause==='function'&&Number.isInteger(pollMs)&&pollMs>=0&&pollMs<=15000,'production75_operator_input');
@@ -45,7 +45,8 @@ export async function runProduction75Operator({plan,custodyRoot,verifyOwnerAppro
   callbacks=Object.freeze(Object.fromEntries(CALLBACK_KEYS.map(k=>[k,callbacks[k].bind(callbacks)])));
   workResources=createOperatorResources({now,until:plan.workUntil});cleanupResources=createOperatorResources({now,until:plan.cleanupUntil});
   const call=async(fn,until=plan.workUntil)=>{let timer;const deadline=Math.min(until,now()+240000);try{check(now()<deadline,'production75_operator_deadline');const value=await Promise.race([Promise.resolve().then(()=>fn({resources:workResources,signal:workResources.signal,deadline})),new Promise((_,reject)=>{timer=setTimeout(()=>{workResources.abort();reject(error('production75_operator_deadline'));},Math.max(1,deadline-now()));})]);if(now()>=deadline)workResources.abort();check(now()<deadline,'production75_operator_deadline');return value;}catch(e){const diagnostic=production75V1FailureMetadata(e);if(diagnostic&&!result.providerFailure)result.providerFailure=diagnostic;throw error('production75_operator_callback');}finally{clearTimeout(timer);}};
-  const ownedFresh=async(until=plan.workUntil)=>{const detail=await call(()=>api.getCluster(copy.id),until),inventory=await call(()=>api.listClusters(),until);check(detail&&detail.id===copy.id&&detail.name===plan.copyName&&detail.organization===plan.organization,'production75_operator_ownership');return mergeV1OwnershipEvidence(detail,inventory);};
+  const ownedFresh=async(until=plan.workUntil)=>{const detail=await call(()=>api.getCluster(copy.id),until),inventory=await call(()=>api.listClusters(),until);check(detail&&detail.id===copy.id&&detail.name===plan.copyName&&detail.organization===plan.organization,'production75_operator_ownership');const value=mergeV1OwnershipEvidence(detail,inventory);latestOwnedInventory=freeze(structuredClone(inventory));return value;};
+  const waitOwnedReady=async()=>{for(;;){check(copy.version===plan.providerVersion&&copy.region===plan.region&&copy.plan===plan.plan,'production75_operator_suitability');if(copy.status==='ready')return copy;check(['creating','restoring','provisioning','not-ready'].includes(copy.status)&&now()<plan.workUntil,'production75_operator_not_ready');await call(()=>pause(pollMs));copy=await ownedFresh();}};
   custody=await openOperatorCustody({root:custodyRoot,plan,verifyOwnerApproval,verifyCapabilityReview,now});
   const identity=await call(callbacks.verifyIdentity);check(identity?.account===plan.account&&identity.organization===plan.organization,'production75_operator_identity');
   check(await call(callbacks.moduleManifestSha256)===plan.moduleManifestSha256,'production75_operator_source');
@@ -59,8 +60,8 @@ export async function runProduction75Operator({plan,custodyRoot,verifyOwnerAppro
   try{copy=await call(()=>api.restoreCopy(creationPermit));creationAcknowledged=true;}
   catch{
    const after=await call(()=>api.listClusters()),matches=after.filter(m=>m.name===plan.copyName&&!inventory.some(old=>old.id===m.id));check(matches.length===1,'production75_operator_create_unknown');copy=matches[0];result.possibleCopyId=copy.id;
-   copy=await ownedFresh();cloneBefore=await call(scope=>callbacks.observeCopy(copy,{readerName:null,custody,plan,...scope}));
-   custody.reconcileOwned(copy,{inventoryAfter:after,copySourceSnapshotSha256:production75SnapshotDigest(cloneBefore)});result.copyId=copy.id;
+   copy=await ownedFresh();await waitOwnedReady();cloneBefore=await call(scope=>callbacks.observeCopy(copy,{readerName:null,custody,plan,...scope}));
+   custody.reconcileOwned(copy,{inventoryAfter:latestOwnedInventory,copySourceSnapshotSha256:production75SnapshotDigest(cloneBefore)});result.copyId=copy.id;
    throw error('production75_operator_create_unknown_no_replay');
   }
   // A creation response is not authoritative empty-attachment evidence.
@@ -69,9 +70,7 @@ export async function runProduction75Operator({plan,custodyRoot,verifyOwnerAppro
   // Keep explicit acknowledgment contradictions visible while retaining owned cleanup.
   check(['id','name','organization','region','plan'].every(k=>isDeepStrictEqual(creationEvidence[k],copy[k]))&&(creationEvidence.version===null||isDeepStrictEqual(creationEvidence.version,copy.version))&&(creationEvidence.attachedApps===null||isDeepStrictEqual(creationEvidence.attachedApps,copy.attachedApps)),'production75_operator_creation_conflict');
   check(copy.version===plan.providerVersion&&copy.region===plan.region&&copy.plan===plan.plan,'production75_operator_suitability');
-  while(copy.status!=='ready'){
-   check(['creating','restoring','provisioning'].includes(copy.status)&&now()<plan.workUntil,'production75_operator_not_ready');await call(()=>pause(pollMs));copy=await ownedFresh();
-  }
+  await waitOwnedReady();
   cloneBefore=freeze(structuredClone(await call(scope=>callbacks.observeCopy(copy,{readerName:null,custody,plan,...scope}))));check(production75SnapshotDigest(cloneBefore)===plan.sourceSnapshotSha256,'production75_operator_clone');custody.verifyClone(plan.sourceSnapshotSha256);
   const users=await call(()=>api.listUsers(copy.id));check(!users.some(u=>u.name===plan.readerName),'production75_operator_reader_collision');
   const readerPermit=custody.reserve('reader-create');await call(()=>api.createReader(readerPermit));

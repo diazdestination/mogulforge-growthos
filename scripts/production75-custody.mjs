@@ -30,7 +30,7 @@ export function prepareOperatorPlan(input={}){
 
 export function validateOperatorMetadata(value){
  const m=clone(value),allowed=['id','name','organization','region','plan','version','status','attachedApps'];
- check(keys(m,allowed)&&Object.keys(m).length===allowed.length&&ID.test(m.id??'')&&/^[a-z0-9][a-z0-9-]{0,62}$/.test(m.name??'')&&/^[a-z0-9-]{1,63}$/.test(m.organization??'')&&/^[a-z]{3}$/.test(m.region??'')&&/^[a-z][a-z0-9-]{0,31}$/.test(m.plan??'')&&[1,2].includes(m.version)&&['ready','creating','restoring','provisioning','deleting','deleted','failed','suspended'].includes(m.status)&&Array.isArray(m.attachedApps)&&m.attachedApps.length<=100&&m.attachedApps.every(a=>typeof a==='string'&&/^[a-z0-9-]{1,63}$/.test(a)),'production75_custody_ownership');return freeze(m);
+ check(keys(m,allowed)&&Object.keys(m).length===allowed.length&&ID.test(m.id??'')&&/^[a-z0-9][a-z0-9-]{0,62}$/.test(m.name??'')&&/^[a-z0-9-]{1,63}$/.test(m.organization??'')&&/^[a-z]{3}$/.test(m.region??'')&&/^[a-z][a-z0-9-]{0,31}$/.test(m.plan??'')&&[1,2].includes(m.version)&&['ready','creating','restoring','provisioning','deleting','deleted','failed','suspended','not-ready'].includes(m.status)&&Array.isArray(m.attachedApps)&&m.attachedApps.length<=100&&m.attachedApps.every(a=>typeof a==='string'&&/^[a-z0-9-]{1,63}$/.test(a)),'production75_custody_ownership');return freeze(m);
 }
 function inventoryShape(values){check(Array.isArray(values)&&values.length<=1000,'production75_custody_ownership');const list=values.map(validateOperatorMetadata);check(new Set(list.map(m=>m.id)).size===list.length,'production75_custody_ownership');return freeze(list);}
 async function authenticated(plan,verifyOwnerApproval,verifyCapabilityReview,now,resume=false){

@@ -21,6 +21,44 @@ function fixture(planChanges={}){
 }
 test('one copy/Reader, rollback then commit and owned deletion pass in order',async()=>{const f=fixture();try{const result=await runProduction75Operator(f.args);expect(result).toMatchObject({status:'verified-and-cleaned',copyDeleted:true,originalsPreserved:true,readerProfileVerified:true});expect(f.calls).toEqual(['create','reader','delete']);expect(mocks.verify).toHaveBeenCalledTimes(2);}finally{f.cleanup();}});
 
+test('opaque non-ready waits before clone/Reader/SQL then progresses to ready',async()=>{
+ const f=fixture();try{
+  let reads=0,readySeen=false;const get=f.api.getCluster,observe=f.callbacks.observeCopy,reader=f.api.createReader;
+  f.api.getCluster=async id=>{const m=await get(id);if(!m||id!==f.copy.id)return m;if(++reads<3)return {...m,status:'not-ready'};readySeen=true;return m;};
+  f.callbacks.observeCopy=async(...args)=>{expect(readySeen).toBe(true);return observe(...args);};
+  f.api.createReader=async(...args)=>{expect(readySeen).toBe(true);return reader(...args);};
+  const result=await runProduction75Operator(f.args);expect(result).toMatchObject({status:'verified-and-cleaned',copyDeleted:true,readerProfileVerified:true});expect(reads).toBeGreaterThanOrEqual(3);
+ }finally{f.cleanup();}
+});
+test('permanent opaque non-ready reaches deadline and uses only owned cleanup',async()=>{
+ const f=fixture();try{
+  let clock=f.p.preparedAt;f.args.now=()=>clock;f.args.pause=async()=>{clock=f.p.workUntil;};
+  const get=f.api.getCluster;f.api.getCluster=async id=>{const m=await get(id);return m&&id===f.copy.id?{...m,status:'not-ready'}:m;};
+  const observe=vi.fn();f.callbacks.observeCopy=observe;
+  const result=await runProduction75Operator(f.args);expect(result).toMatchObject({copyDeleted:true,resourcesClosed:true,status:'held-and-cleaned'});expect(f.calls).toEqual(['create','delete']);expect(observe).not.toHaveBeenCalled();expect(mocks.verify).not.toHaveBeenCalled();
+ }finally{f.cleanup();}
+});
+test('ambiguous creation never observes non-ready clone before reconciliation',async()=>{
+ const f=fixture();try{
+  let readySeen=false,reads=0;const restore=f.api.restoreCopy,get=f.api.getCluster,list=f.api.listClusters,observe=f.callbacks.observeCopy;
+  f.api.restoreCopy=async permit=>{await restore(permit);throw Error('lost create acknowledgment');};
+  f.api.getCluster=async id=>{const m=await get(id);if(!m||id!==f.copy.id)return m;if(++reads<3)return {...m,status:'not-ready'};readySeen=true;return m;};
+  f.api.listClusters=async()=>(await list()).map(m=>m.id===f.copy.id&&!readySeen?{...m,status:'not-ready'}:m);
+  f.callbacks.observeCopy=async(...args)=>{expect(readySeen).toBe(true);return observe(...args);};
+  const result=await runProduction75Operator(f.args);expect(result).toMatchObject({copyDeleted:true,errorCode:'production75_operator_create_unknown_no_replay'});expect(f.calls).toEqual(['create','delete']);expect(reads).toBeGreaterThanOrEqual(3);expect(mocks.verify).not.toHaveBeenCalled();
+ }finally{f.cleanup();}
+});
+test.each(['version','region','plan'])('readiness progression cannot admit %s drift',async field=>{
+ const f=fixture();try{
+  let reads=0;const get=f.api.getCluster,list=f.api.listClusters;
+  const changed=m=>reads>=2?{...m,[field]:field==='version'?2:field==='region'?'ord':'large'}:{...m,status:'not-ready'};
+  f.api.getCluster=async id=>{const m=await get(id);if(m&&id===f.copy.id){reads++;return changed(m);}return m;};
+  f.api.listClusters=async()=>(await list()).map(m=>m.id===f.copy.id?changed(m):m);
+  const observe=vi.fn(async()=>structuredClone(f.d.before));f.callbacks.observeCopy=observe;
+  const result=await runProduction75Operator(f.args);expect(result).toMatchObject({copyDeleted:true,status:'held-and-cleaned'});expect(observe).not.toHaveBeenCalled();expect(f.calls).toEqual(['create','delete']);expect(mocks.verify).not.toHaveBeenCalled();
+ }finally{f.cleanup();}
+});
+
 test.each([{httpStatus:503,safeCode:'production75_v1_status'},{httpStatus:200,safeCode:'production75_v1_response'}])('Reader failure $httpStatus survives callback normalization while owned cleanup remains',async({httpStatus,safeCode})=>{
  const f=fixture();try{
   const live=createProduction75V1Client({organization:'adam-diaz',getAuthorization:async()=> 'Bearer fixture',fetchFn:async()=>new Response(JSON.stringify({data:{name:'private-provider-body',role:'reader'}}),{status:httpStatus})});

@@ -11,6 +11,8 @@ export function production75V1FailureMetadata(error){return failureMetadata.get(
 const RESPONSE_REASONS=new Set(['json','shape','id','name','organization','region','plan','version','status','attachments','selector','validation']);
 function responseFailure(reason){const e=fail('production75_v1_response');if(RESPONSE_REASONS.has(reason))responseReasons.set(e,reason==='json'?'production75_v1_json':`production75_v1_metadata_${reason}`);return e;}
 const responseCheck=(ok,reason)=>{if(!ok)throw responseFailure(reason);};
+const KNOWN_CLUSTER_STATUSES=new Set(['ready','creating','restoring','provisioning','deleting','deleted','failed','suspended']);
+function normalizeClusterStatus(value){responseCheck(typeof value==='string'&&value.length>0&&value.length<=64,'status');return KNOWN_CLUSTER_STATUSES.has(value)?value:'not-ready';}
 function validated(response,parse){try{return parse();}catch(e){const failure=ownedErrors.has(e)?e:fail('production75_v1_response');failureMetadata.set(failure,freeze({...response.diagnosticContext,safeCode:responseReasons.get(failure)??ownedErrors.get(failure)}));throw failure;}}
 const diagnosticMatches=(pattern,value)=>{try{return pattern.test(value??'');}catch{return false;}};
 function metadataReason(m){
@@ -20,7 +22,7 @@ function metadataReason(m){
  if(!diagnosticMatches(/^[a-z]{3}$/,m.region))return 'region';
  if(!diagnosticMatches(/^[a-z][a-z0-9-]{0,31}$/,m.plan))return 'plan';
  if(![1,2].includes(m.version))return 'version';
- if(!['ready','creating','restoring','provisioning','deleting','deleted','failed','suspended'].includes(m.status))return 'status';
+ if(![...KNOWN_CLUSTER_STATUSES,'not-ready'].includes(m.status))return 'status';
  if(!Array.isArray(m.attachedApps)||m.attachedApps.length>100||!m.attachedApps.every(a=>typeof a==='string'&&/^[a-z0-9-]{1,63}$/.test(a)))return 'attachments';
  return 'validation';
 }
@@ -33,7 +35,7 @@ function metadata(raw,allowOmittedVersion=false){
  if(raw.attached_apps!==undefined&&raw.attached_apps!==null){responseCheck(Array.isArray(raw.attached_apps),'attachments');attachedApps=raw.attached_apps.map(a=>typeof a==='string'?a:a?.name);}
  const omittedVersion=!Object.hasOwn(raw,'version');
  responseCheck(!omittedVersion||allowOmittedVersion,'version');
- const result={id:raw.id,name:raw.name,organization,region:raw.region,plan:raw.plan,version:omittedVersion?null:raw.version,status:raw.status,attachedApps};
+ const result={id:raw.id,name:raw.name,organization,region:raw.region,plan:raw.plan,version:omittedVersion?null:raw.version,status:normalizeClusterStatus(raw.status),attachedApps};
  // The stand-in validates the other fields only; returned version stays unknown.
  const standIn={...result,version:omittedVersion?1:result.version,attachedApps:attachedApps??[]};
  try{validateOperatorMetadata(standIn);}catch{throw responseFailure(metadataReason(standIn));}return freeze(result);

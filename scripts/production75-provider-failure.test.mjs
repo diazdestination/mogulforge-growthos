@@ -56,7 +56,7 @@ test.each([
  ['region',r=>({...r,region:fixtureSecret})],
  ['plan',r=>({...r,plan:null})],
  ['version',r=>({...r,version:0})],
- ['status',r=>({...r,status:fixtureSecret})],
+ ['status',r=>({...r,status:null})],
  ['attachments',r=>({...r,attached_apps:{password:fixtureSecret}})],
  ['attachments',r=>({...r,attached_apps:[{name:fixtureSecret.toUpperCase(),password:fixtureSecret}]})],
  ['selector',r=>({...r,id:'bcdefghijklmnopq'})],
@@ -87,4 +87,18 @@ test.each(['id','name','organization','region','plan'])('non-coercible JSON in %
  expect(e.safeCode).toBe('production75_v1_response');
  expect(proof(e)).toMatchObject({safeCode:'production75_v1_metadata_'+field});
  expect(JSON.stringify(proof(e))).not.toContain(fixtureSecret);
+});
+
+test.each(['unlisted-provider-phase',fixtureSecret,'not-ready'])('unknown bounded status is opaque non-ready and excludes its raw value',async status=>{
+ const api=client({fetchFn:async()=>new Response(JSON.stringify({data:{...metadataFixture(),status}}),{status:200})});
+ const result=await api.getCluster('abcdefghijklmnop');
+ expect(result.status).toBe('not-ready');
+ expect(result.id).toBe('abcdefghijklmnop');
+ if(status!=='not-ready')expect(JSON.stringify(result)).not.toContain(status);
+});
+test.each([null,0,true,[],{},'','x'.repeat(65)])('malformed status %j remains rejected',async status=>{
+ const api=client({fetchFn:async()=>new Response(JSON.stringify({data:{...metadataFixture(),status}}),{status:200})});
+ const e=await failure(api.getCluster('abcdefghijklmnop'));
+ expect(e.safeCode).toBe('production75_v1_response');
+ expect(proof(e)).toMatchObject({safeCode:'production75_v1_metadata_status'});
 });
