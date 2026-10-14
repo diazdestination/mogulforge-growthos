@@ -1390,7 +1390,12 @@ export async function listAuditEvents(
   organizationId: string,
   filters: { action?: string; since?: Date } = {},
 ) {
-  const conditions = [eq(auditEventsTable.organizationId, organizationId), ne(auditEventsTable.action,"estimate_delivery.previewed")];
+  // Exclude private operation IDs before LIMIT, including explicit action filters.
+  const conditions = [
+    eq(auditEventsTable.organizationId, organizationId),
+    ne(auditEventsTable.action, "estimate_delivery.previewed"),
+    ne(auditEventsTable.action, "scheduling.manual_operation.v1"),
+  ];
   if (filters.action) {
     conditions.push(eq(auditEventsTable.action, filters.action));
   }

@@ -1,6 +1,8 @@
 import { Router, type Response } from "express";
 import { z } from "zod/v4";
 import { requireMember } from "../../middlewares/requireMember";
+import { contractorMutation } from "../../middlewares/contractor-mutation";
+import { reconcileManualScheduling } from "../../services/manual-scheduling-receipt";
 import { CustomerLifecycleHoldError } from "../../services/customer-lifecycle";
 import {
   getSchedulingReviewContext,
@@ -20,12 +22,10 @@ export function schedulingError(error: unknown, res: Response): boolean {
     return true;
   }
   if (error instanceof z.ZodError) {
-    res
-      .status(400)
-      .json({
-        error: "Choose a valid scheduling source, target and booking scope.",
-        code: "invalid_scheduling_context",
-      });
+    res.status(400).json({
+      error: "Choose a valid scheduling source, target and booking scope.",
+      code: "invalid_scheduling_context",
+    });
     return true;
   }
   return false;
@@ -87,6 +87,30 @@ router.get(
     }
   },
 );
-// POST /scheduling/operations/reconcile is frozen in OpenAPI; Task4 owns its
-// retained receipt implementation. No GET or temporary handler asserts no-commit.
+router.post(
+  "/scheduling/operations/reconcile",
+  requireMember("crm.write"),
+  contractorMutation,
+  async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      res.json(
+        await reconcileManualScheduling(
+          {
+            organizationId: req.member!.organizationId,
+            userId: req.member!.user.id,
+          },
+          req.body,
+        ),
+      );
+    } catch (error) {
+      if (!schedulingError(error, res))
+        res.status(500).json({
+          error:
+            "The original scheduling outcome is unavailable. Keep the original command for reconciliation.",
+          code: "scheduling_outcome_unknown",
+        });
+    }
+  },
+);
 export default router;

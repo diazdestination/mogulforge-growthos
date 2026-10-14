@@ -29,6 +29,20 @@ beforeAll(async () => {
   // One week-old security event, one stale security event, and 250 routine
   // events that would push the security event out of an unfiltered top-200.
   await db.insert(auditEventsTable).values([
+    ...Array.from({ length: 205 }, () => ({
+      organizationId: orgId,
+      action: "scheduling.manual_operation.v1",
+      entityType: "appointment",
+      metadata: { syntheticPrivate: true },
+      createdAt: new Date(Date.now() + 1000),
+    })),
+    ...Array.from({ length: 205 }, () => ({
+      organizationId: orgId,
+      action: "estimate_delivery.previewed",
+      entityType: "estimate",
+      metadata: { syntheticPrivate: true },
+      createdAt: new Date(Date.now() + 1000),
+    })),
     {
       organizationId: orgId,
       action: "api_key.brute_force_blocked",
@@ -61,13 +75,42 @@ describe("listAuditEvents filters", () => {
   it("unfiltered top-200 crowds out the older security event (the bug being guarded against)", async () => {
     const rows = await listAuditEvents(orgId);
     expect(rows).toHaveLength(200);
-    expect(rows.some((r) => r.action === "api_key.brute_force_blocked")).toBe(false);
+    expect(rows.every((r) => r.action === "lead.updated")).toBe(true);
+    expect(rows.some((r) => r.action === "api_key.brute_force_blocked")).toBe(
+      false,
+    );
+  });
+
+  it("never exposes raw manual receipts even with an explicit action/since filter", async () => {
+    expect(
+      await listAuditEvents(orgId, {
+        action: "scheduling.manual_operation.v1",
+      }),
+    ).toEqual([]);
+    expect(
+      await listAuditEvents(orgId, {
+        action: "scheduling.manual_operation.v1",
+        since: tenDaysAgo,
+      }),
+    ).toEqual([]);
+    expect(
+      (await listAuditEvents(orgId, { since: tenDaysAgo })).some(
+        (row) => row.action === "scheduling.manual_operation.v1",
+      ),
+    ).toBe(false);
+    expect(
+      await listAuditEvents(orgId, { action: "estimate_delivery.previewed" }),
+    ).toEqual([]);
   });
 
   it("action filter returns only matching events regardless of noise", async () => {
-    const rows = await listAuditEvents(orgId, { action: "api_key.brute_force_blocked" });
+    const rows = await listAuditEvents(orgId, {
+      action: "api_key.brute_force_blocked",
+    });
     expect(rows).toHaveLength(2);
-    expect(rows.every((r) => r.action === "api_key.brute_force_blocked")).toBe(true);
+    expect(rows.every((r) => r.action === "api_key.brute_force_blocked")).toBe(
+      true,
+    );
   });
 
   it("action + since keeps the 7-day window event and drops the stale one", async () => {
