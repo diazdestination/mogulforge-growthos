@@ -254,8 +254,10 @@ const conciergeAuditSchema = z.strictObject({
   leadId: uuidSchema.nullable(),
   offer: conciergeOfferSchema,
 });
+// The original returning-command contract accepts and preserves UUID casing.
+const returningRequestIdSchema = z.uuid();
 const returningAuditSchema = z.strictObject({
-  requestId: uuidSchema,
+  requestId: returningRequestIdSchema,
   customerWorkId: uuidSchema,
   workVersion: z.number().int().positive(),
   staffRecorded: z.literal(true),
@@ -614,15 +616,18 @@ function originalProof(
       !uuidSchema.safeParse(event.entityId).success
     )
       return null;
+    // Canonicalize only this internal UUID join key, never original metadata/body
+    // or case-sensitive actor IDs. PostgreSQL stores request_id in UUID form.
+    const requestId = p.data.requestId.toLowerCase();
     const matches = (evidence?.commands ?? [])
-      .filter((c) => c.requestId === p.data.requestId)
+      .filter((c) => c.requestId === requestId)
       .map((c) => returningCommandSchema.safeParse(c))
       .filter(
         (c) =>
           c.success &&
           c.data.organizationId === event.organizationId &&
           c.data.actorUserId === event.actorUserId &&
-          c.data.requestId === p.data.requestId &&
+          c.data.requestId === requestId &&
           `customer_work.${c.data.action}` === event.action &&
           c.data.projectId === event.entityId &&
           c.data.customerWorkId === p.data.customerWorkId &&
@@ -634,7 +639,7 @@ function originalProof(
       event: "operation_committed",
       target: { kind: "project", id: event.entityId! },
       origin: "returning_command",
-      sourceId: p.data.requestId,
+      sourceId: requestId,
     };
   }
   return null;
@@ -848,9 +853,12 @@ export async function readSchedulingHistoryEvidence(
         'SELECT organization_id AS "organizationId", actor_user_id AS "actorUserId", request_id AS "requestId", action, payload_sha256 AS "payloadSha256", customer_work_id AS "customerWorkId", project_id AS "projectId", estimate_id AS "estimateId", result_version AS "resultVersion" FROM public.customer_work_commands WHERE organization_id=$1 AND request_id::text=ANY($2::text[]) ORDER BY id LIMIT $3',
         [
           organizationId,
-          events
-            .map((e) => raw(e.metadata).requestId)
-            .filter((id) => typeof id === "string"),
+          events.flatMap((e) => {
+            const id = returningRequestIdSchema.safeParse(
+              raw(e.metadata).requestId,
+            );
+            return id.success ? [id.data.toLowerCase()] : [];
+          }),
           maxRows + 1,
         ],
       )

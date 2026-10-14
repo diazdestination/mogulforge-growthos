@@ -13,6 +13,7 @@ import {
   orgSettingsTable,
   crmTasksTable,
   invoicesTable,
+  customerWorkCommandsTable,
   pool,
   type AuditEvent,
 } from "@workspace/db";
@@ -27,7 +28,16 @@ import { deleteContact, deleteProject, listAuditEvents } from "./crm";
 import { createCustomerLifecycleExporter } from "./customer-lifecycle-export";
 import { clearDemoData } from "./demo-data";
 import { deleteTestLeads } from "./onboarding";
-import { saveSchedulingPolicy } from "./scheduling-policy";
+import {
+  getSchedulingReviewContext,
+  saveSchedulingPolicy,
+} from "./scheduling-policy";
+import {
+  returningCustomerFixture,
+  returningProjectDraft,
+} from "../test-helpers/returning-customer-fixture";
+import { createCustomerWorkProject } from "./returning-customer";
+import { customerWorkHash } from "./customer-work-lineage";
 import {
   careFingerprint,
   serviceCareBookingSchema,
@@ -628,6 +638,180 @@ it.each(["service", "callie", "concierge", "returning"])(
         commands,
       }).summaries[0].after,
     ).toBeNull();
+  },
+);
+
+it.each([
+  "ABCDEFAB-1234-4ABC-8ABC-ABCDEFABCDEF",
+  "AbCdEfAb-1234-4aBc-8aBc-AbCdEfAbCdEf",
+])(
+  "projects a retained mixed-case returning request %s through actual source replay without rewriting evidence",
+  async (requestId) => {
+    const f = await returningCustomerFixture();
+    orgs.push(f.org);
+    await saveSchedulingPolicy(
+      { organizationId: f.org, userId: f.owner.id },
+      {
+        expectedRevision: 0,
+        expectedCompanyTimeZone: f.company.timezone,
+        enabled: true,
+        minimumTravelGapMinutes: 60,
+        maxConcurrentReservations: 2,
+        durationPresets: [],
+      },
+    );
+    const original = {
+      ...returningProjectDraft(f),
+      requestId,
+      scheduledStart: stamp,
+      scheduledEnd: "2035-01-01T11:00:00.000Z",
+      crewUserIds: [f.owner.id],
+      schedulingReview: {
+        context: await getSchedulingReviewContext(
+          { organizationId: f.org, userId: f.owner.id },
+          {
+            sourceKind: "direct_customer",
+            sourceId: f.contact.id,
+            propertyId: f.secondProperty.id,
+            reservationKind: "project",
+          },
+        ),
+        duration: { kind: "explicit" as const, preset: null },
+        startWallTime: null,
+        endWallTime: null,
+      },
+    };
+    // Current new-write transition admission requires lowercase. Seed retained original
+    // source evidence, as a historical writer could, then exercise its real replay path.
+    const canonical = { ...original, requestId: requestId.toLowerCase() };
+    const originalHash = customerWorkHash({
+      action: "project_created",
+      targetId: null,
+      input: original,
+      actorUserId: f.owner.id,
+    });
+    const canonicalHash = customerWorkHash({
+      action: "project_created",
+      targetId: null,
+      input: canonical,
+      actorUserId: f.owner.id,
+    });
+    const created = await createCustomerWorkProject(f.org, f.actor, canonical);
+    const [audit] = await db
+      .select()
+      .from(auditEventsTable)
+      .where(
+        and(
+          eq(auditEventsTable.organizationId, f.org),
+          eq(auditEventsTable.action, "customer_work.project_created"),
+        ),
+      );
+    await db
+      .update(customerWorkCommandsTable)
+      .set({ payloadSha256: originalHash })
+      .where(
+        and(
+          eq(customerWorkCommandsTable.organizationId, f.org),
+          eq(customerWorkCommandsTable.requestId, requestId),
+        ),
+      );
+    await db
+      .update(auditEventsTable)
+      .set({ metadata: { ...audit.metadata, requestId } })
+      .where(eq(auditEventsTable.id, audit.id));
+    const privateEvidence = async () => ({
+      commands: (
+        await pool.query(
+          "SELECT to_jsonb(c)::text AS original FROM customer_work_commands c WHERE organization_id=$1 ORDER BY id",
+          [f.org],
+        )
+      ).rows,
+      audits: (
+        await pool.query(
+          "SELECT id, metadata::text AS original FROM audit_events WHERE organization_id=$1 AND action IN ('customer_work.project_created','scheduling.reservation_transition.v1') ORDER BY id",
+          [f.org],
+        )
+      ).rows,
+      snapshot: (
+        await pool.query(
+          "SELECT scheduling_reservation::text AS original FROM projects WHERE id=$1",
+          [created.project.id],
+        )
+      ).rows,
+    });
+    const before = await privateEvidence(),
+      body = JSON.stringify(original);
+    const [command] = await db
+      .select()
+      .from(customerWorkCommandsTable)
+      .where(eq(customerWorkCommandsTable.organizationId, f.org));
+    expect(command.requestId).toBe(requestId.toLowerCase());
+    expect(command.payloadSha256).toBe(originalHash);
+    expect(command.payloadSha256).not.toBe(canonicalHash);
+    const replay = await createCustomerWorkProject(f.org, f.actor, original);
+    expect(replay.command.duplicate).toBe(true);
+    expect(replay.project.id).toBe(created.project.id);
+    const ordinary = await listAuditEvents(f.org, {
+      action: "customer_work.project_created",
+    });
+    expect.soft(ordinary).toHaveLength(1);
+    expect.soft(ordinary[0]?.metadata).toMatchObject({
+      event: "operation_committed",
+      target: { kind: "project", id: created.project.id, available: true },
+      source: { contactId: f.contact.id },
+      after: { target: { kind: "project", id: created.project.id } },
+    });
+    const out = await createCustomerLifecycleExporter()(f.org, f.owner.id);
+    expect
+      .soft(
+        out.organization.schedulingHistory.find(
+          (row) => row.event === "operation_committed",
+        ),
+      )
+      .toMatchObject({
+        target: { kind: "project", id: created.project.id, available: true },
+        source: { contactId: f.contact.id },
+        after: { target: { kind: "project", id: created.project.id } },
+      });
+    expect.soft(out.manifest.schedulingHistory).toEqual({
+      count: 3,
+      withheldInvalidLinks: 0,
+      withheldInvalidRecords: 0,
+    });
+    for (const output of [ordinary, out.organization.schedulingHistory]) {
+      expect(JSON.stringify(output)).not.toContain(requestId);
+      expect(JSON.stringify(output)).not.toContain(requestId.toLowerCase());
+      expect(JSON.stringify(output)).not.toContain(command.payloadSha256);
+    }
+    const originalEvents = await db
+      .select()
+      .from(auditEventsTable)
+      .where(
+        and(
+          eq(auditEventsTable.organizationId, f.org),
+          eq(auditEventsTable.action, "customer_work.project_created"),
+        ),
+      );
+    const evidence = await db.transaction((tx) =>
+      history.readSchedulingAuditEvidence(tx, f.org, originalEvents),
+    );
+    const wrongActor = {
+      ...originalEvents[0],
+      actorUserId: f.owner.id.toUpperCase(),
+    };
+    expect(wrongActor.actorUserId).not.toBe(f.owner.id);
+    expect(
+      history.projectSchedulingHistory({ ...evidence, events: [wrongActor] })
+        .coverage.withheldInvalidRecords,
+    ).toBe(1);
+    expect(await privateEvidence()).toEqual(before);
+    expect(JSON.stringify(original)).toBe(body);
+    expect(
+      await db
+        .select()
+        .from(projectsTable)
+        .where(eq(projectsTable.organizationId, f.org)),
+    ).toHaveLength(1);
   },
 );
 
