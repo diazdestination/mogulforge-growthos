@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { addElapsedMinutes, formatSchedulingWallTime, resolveWallTime, schedulingMutationReviewSchema, shiftElapsedInterval, timeZoneSchema, validateWallTime, type DurationChoice, type WallTimeEvidence } from '@workspace/scheduling-core';
+import { addElapsedMinutes, formatSchedulingWallTime, resolveWallTime, schedulingMutationReviewSchema, schedulingReviewContextSchema, shiftElapsedInterval, timeZoneSchema, validateWallTime, type DurationChoice, type WallTimeEvidence } from '@workspace/scheduling-core';
 import type { SchedulingDraft, SchedulingIntervalFieldsProps, SchedulingMutationReview } from '@/lib/scheduling-ui-contract';
 
 const field = 'mt-1 block min-h-11 w-full min-w-0 rounded-lg border bg-background p-2 text-base';
@@ -21,7 +21,9 @@ function evidence(instant: string | null, local: string, zone: string | null): W
 }
 
 export function SchedulingIntervalFields(props: SchedulingIntervalFieldsProps) {
-  const contextKey = JSON.stringify([props.context, props.companyTimeZone]);
+  // Closed schema output orders known fields consistently; callbacks keep original context.
+  const parsedContext = schedulingReviewContextSchema.safeParse(props.context);
+  const contextKey = JSON.stringify([props.context === null ? null : parsedContext.success ? parsedContext.data : 'invalid_context', props.companyTimeZone]);
   const previousContext = useRef(contextKey);
   useEffect(() => {
     if (previousContext.current !== contextKey) {
@@ -46,6 +48,8 @@ function IntervalFields(props: SchedulingIntervalFieldsProps) {
   const pendingInterval = useRef<{ startAt: string; endAt: string; nullEnd: boolean } | null>(null);
   const incomingDraft = JSON.stringify(draft);
   useEffect(() => {
+    // A different draft in the same context is neither acknowledgement nor reset.
+    if (awaitingDraft !== null && awaitingDraft !== incomingDraft) return;
     if (lastDraft.current !== incomingDraft) {
       lastDraft.current = incomingDraft;
       setStartLocal(wallDisplay(draft.startAt, zone));
@@ -53,9 +57,8 @@ function IntervalFields(props: SchedulingIntervalFieldsProps) {
       setDuration({ kind: 'explicit', preset: null });
       pendingInterval.current = null;
       setShiftError('');
-      setAwaitingDraft(null);
     }
-  }, [incomingDraft, draft, zone]);
+  }, [incomingDraft, draft, zone, awaitingDraft]);
   useEffect(() => { if (awaitingDraft === incomingDraft) setAwaitingDraft(null); }, [awaitingDraft, incomingDraft]);
   const authorityHeld = disabled || !context || !zone || context.companyTimeZone !== zone || interval.evidence === 'invalid' || !timeZoneSchema.safeParse(zone).success;
   const legacyNull = interval.evidence === 'legacy' && interval.endAt === null && interval.legacyEffectiveEnd !== null && !endEdited;
