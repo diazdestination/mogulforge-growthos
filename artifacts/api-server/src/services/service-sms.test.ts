@@ -224,8 +224,9 @@ describe("typed service SMS safety", () => {
     const [reply] = await db.select().from(replies).where(eq(replies.organizationId, f.org)); await reviewServiceSmsReply(f.org, f.staff, f.service.id, reply.id, review("handled"));
     const before = await getServiceCare(f.org, f.service.id, "sms");
     const response = await recordServiceCareResponse(f.org, f.staff, f.service.id, { requestId: randomUUID(), expectedUpdatedAt: before.expectedUpdatedAt, channel: "phone", outcome: "ready_to_book", respondedAt: new Date().toISOString(), note: "Office separately called the customer and confirmed the actual future visit window.", staffAttested: true });
-    const after = await getServiceCare(f.org, f.service.id, "sms");
-    await bookServiceCareVisit(f.org, f.staff, f.service.id, { requestId: randomUUID(), expectedUpdatedAt: after.expectedUpdatedAt, responseId: response.responseId, assignedUserId: f.staff, scheduledStart: "2030-01-05T15:00:00.000Z", scheduledEnd: "2030-01-05T16:00:00.000Z", type: "other", customerConfirmed: true });
+    const after = await getServiceCare(f.org, f.service.id, "sms", { actorUserId: f.staff, appointmentType: "other" });
+    if (after.scheduling.review.state !== "ready") throw new Error("Expected actual staff-reviewed service scheduling context");
+    await bookServiceCareVisit(f.org, f.staff, f.service.id, { requestId: randomUUID(), expectedUpdatedAt: after.expectedUpdatedAt, responseId: response.responseId, assignedUserId: f.staff, scheduledStart: "2030-01-05T15:00:00.000Z", scheduledEnd: "2030-01-05T16:00:00.000Z", type: "other", customerConfirmed: true, schedulingReview: { context: after.scheduling.review.context, duration: { kind: "explicit", preset: null }, startWallTime: null, endWallTime: null } });
     const [booked] = await db.select().from(serviceObligationsTable).where(eq(serviceObligationsTable.id, f.service.id));
     const completed = await updateServiceObligation(f.org, f.staff, f.service.id, { status: "completed", expectedUpdatedAt: booked.updatedAt.toISOString(), completionNote: "Synthetic technician explicitly recorded completed maintenance, not warranty eligibility." });
     if ("error" in completed) throw new Error(completed.error);
