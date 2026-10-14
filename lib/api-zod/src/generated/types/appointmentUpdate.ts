@@ -7,6 +7,7 @@
  */
 import type { AppointmentStatus } from './appointmentStatus';
 import type { AppointmentType } from './appointmentType';
+import type { SchedulingMutationReview } from './schedulingMutationReview';
 
 export interface AppointmentUpdate {
   /** @nullable */
@@ -26,4 +27,7 @@ export interface AppointmentUpdate {
   notes?: string | null;
   /** Last observed update token; stale edits return 409. */
   expectedUpdatedAt?: Date;
+  schedulingReview?: SchedulingMutationReview;
+  /** @pattern ^[a-f0-9]{64}$ */
+  expectedTargetFingerprint?: string;
 }

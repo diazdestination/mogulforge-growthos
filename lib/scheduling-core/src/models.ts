@@ -74,7 +74,7 @@ export type ManualSourceRef = z.infer<typeof manualSourceRefSchema>;
 export const schedulingReviewContextSchema = z.strictObject({
   organizationId: uuidSchema, policyRevision: zeroRevisionSchema, policyDigest: digestSchema.nullable(),
   companyTimeZone: timeZoneSchema, inspection: inspectionContextSchema.nullable(),
-  applicableRules: z.strictObject({ newTravelGapMinutes: gapSchema, companyCeiling: ceilingSchema, inspectionCeiling: ceilingSchema }),
+  applicableRules: z.strictObject({ newTravelGapMinutes: gapSchema, companyCeiling: ceilingSchema, inspectionCeiling: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).nullable() }),
   source: manualSourceRefSchema.nullable(), targetVersion: isoSchema.nullable(), targetFingerprint: digestSchema.nullable(),
 }).superRefine((value, ctx) => {
   if ((value.policyRevision === 0) !== (value.policyDigest === null)) ctx.addIssue({ code: 'custom', message: 'Policy revision/digest must agree' });

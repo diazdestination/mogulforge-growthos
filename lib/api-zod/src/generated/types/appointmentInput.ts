@@ -7,6 +7,7 @@
  */
 import type { AppointmentStatus } from './appointmentStatus';
 import type { AppointmentType } from './appointmentType';
+import type { SchedulingMutationReview } from './schedulingMutationReview';
 
 export interface AppointmentInput {
   leadId?: string;
@@ -19,4 +20,6 @@ export interface AppointmentInput {
   scheduledStart: Date;
   scheduledEnd?: Date;
   notes?: string;
+  operationId?: string;
+  schedulingReview?: SchedulingMutationReview;
 }

@@ -7,6 +7,7 @@
  */
 import type { ContractorTodayAppointments } from './contractorTodayAppointments';
 import type { ContractorTodayProjects } from './contractorTodayProjects';
+import type { ContractorTodaySchedulingPolicyState } from './contractorTodaySchedulingPolicyState';
 import type { ContractorTodayScope } from './contractorTodayScope';
 import type { ContractorTodayServices } from './contractorTodayServices';
 import type { ContractorTodayTasks } from './contractorTodayTasks';
@@ -25,4 +26,11 @@ export interface ContractorToday {
   appointments: ContractorTodayAppointments;
   projects: ContractorTodayProjects;
   services: ContractorTodayServices;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @nullable
+     */
+  schedulingPolicyRevision?: number | null;
+  schedulingPolicyState?: ContractorTodaySchedulingPolicyState;
 }

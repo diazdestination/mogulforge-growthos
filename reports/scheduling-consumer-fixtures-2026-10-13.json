@@ -1,0 +1,275 @@
+{
+  "source": {
+    "sourceKind": "unlinked_manual",
+    "leadId": null,
+    "contactId": null,
+    "propertyId": null,
+    "estimateId": null
+  },
+  "enabledContext": {
+    "organizationId": "11111111-1111-4111-8111-111111111111",
+    "policyRevision": 1,
+    "policyDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "companyTimeZone": "America/Los_Angeles",
+    "inspection": {
+      "ruleTimeZone": "America/New_York",
+      "availabilityDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceState": "recorded"
+    },
+    "applicableRules": {
+      "newTravelGapMinutes": 60,
+      "companyCeiling": 3,
+      "inspectionCeiling": 2
+    },
+    "source": {
+      "sourceKind": "unlinked_manual",
+      "leadId": null,
+      "contactId": null,
+      "propertyId": null,
+      "estimateId": null
+    },
+    "targetVersion": null,
+    "targetFingerprint": null
+  },
+  "disabledContext": {
+    "organizationId": "11111111-1111-4111-8111-111111111111",
+    "policyRevision": 2,
+    "policyDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "companyTimeZone": "America/Los_Angeles",
+    "inspection": {
+      "ruleTimeZone": "America/New_York",
+      "availabilityDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceState": "recorded"
+    },
+    "applicableRules": {
+      "newTravelGapMinutes": 0,
+      "companyCeiling": null,
+      "inspectionCeiling": 2
+    },
+    "source": {
+      "sourceKind": "unlinked_manual",
+      "leadId": null,
+      "contactId": null,
+      "propertyId": null,
+      "estimateId": null
+    },
+    "targetVersion": null,
+    "targetFingerprint": null
+  },
+  "projectContext": {
+    "organizationId": "11111111-1111-4111-8111-111111111111",
+    "policyRevision": 1,
+    "policyDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "companyTimeZone": "America/Los_Angeles",
+    "inspection": null,
+    "applicableRules": {
+      "newTravelGapMinutes": 60,
+      "companyCeiling": 3,
+      "inspectionCeiling": null
+    },
+    "source": {
+      "sourceKind": "lead",
+      "leadId": "22222222-2222-4222-8222-222222222222",
+      "contactId": "11111111-1111-4111-8111-111111111111",
+      "propertyId": null,
+      "estimateId": null
+    },
+    "targetVersion": null,
+    "targetFingerprint": null
+  },
+  "legacy101Context": {
+    "organizationId": "11111111-1111-4111-8111-111111111111",
+    "policyRevision": 0,
+    "policyDigest": null,
+    "companyTimeZone": "America/Los_Angeles",
+    "inspection": {
+      "ruleTimeZone": "America/New_York",
+      "availabilityDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceState": "recorded"
+    },
+    "applicableRules": {
+      "newTravelGapMinutes": 0,
+      "companyCeiling": null,
+      "inspectionCeiling": 101
+    },
+    "source": {
+      "sourceKind": "unlinked_manual",
+      "leadId": null,
+      "contactId": null,
+      "propertyId": null,
+      "estimateId": null
+    },
+    "targetVersion": null,
+    "targetFingerprint": null
+  },
+  "newInspectionQuery": {
+    "sourceKind": "unlinked_manual",
+    "reservationKind": "appointment"
+  },
+  "projectQuery": {
+    "sourceKind": "lead",
+    "sourceId": "22222222-2222-4222-8222-222222222222",
+    "reservationKind": "project"
+  },
+  "editNoninspectionQuery": {
+    "sourceKind": "unlinked_manual",
+    "reservationKind": "appointment",
+    "targetKind": "appointment",
+    "targetId": "22222222-2222-4222-8222-222222222222",
+    "appointmentType": "production"
+  },
+  "appointmentCommand": {
+    "operationId": "22222222-2222-4222-8222-222222222222",
+    "kind": "appointment_create",
+    "body": {
+      "scheduledStart": "2035-01-01T17:00:00.000Z",
+      "scheduledEnd": "2035-01-01T18:30:00.000Z",
+      "type": "inspection"
+    },
+    "review": {
+      "context": {
+        "organizationId": "11111111-1111-4111-8111-111111111111",
+        "policyRevision": 1,
+        "policyDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "companyTimeZone": "America/Los_Angeles",
+        "inspection": {
+          "ruleTimeZone": "America/New_York",
+          "availabilityDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sourceState": "recorded"
+        },
+        "applicableRules": {
+          "newTravelGapMinutes": 60,
+          "companyCeiling": 3,
+          "inspectionCeiling": 2
+        },
+        "source": {
+          "sourceKind": "unlinked_manual",
+          "leadId": null,
+          "contactId": null,
+          "propertyId": null,
+          "estimateId": null
+        },
+        "targetVersion": null,
+        "targetFingerprint": null
+      },
+      "duration": {
+        "kind": "explicit",
+        "preset": null
+      },
+      "startWallTime": {
+        "localDateTime": "2035-01-01T09:00",
+        "offset": "-08:00",
+        "timeZone": "America/Los_Angeles"
+      },
+      "endWallTime": {
+        "localDateTime": "2035-01-01T10:30",
+        "offset": "-08:00",
+        "timeZone": "America/Los_Angeles"
+      }
+    }
+  },
+  "projectCommand": {
+    "operationId": "22222222-2222-4222-8222-222222222222",
+    "kind": "project_create",
+    "body": {
+      "leadId": "22222222-2222-4222-8222-222222222222",
+      "name": "Synthetic job",
+      "scheduledStart": "2035-01-01T17:00:00.000Z",
+      "scheduledEnd": "2035-01-01T18:30:00.000Z"
+    },
+    "review": {
+      "context": {
+        "organizationId": "11111111-1111-4111-8111-111111111111",
+        "policyRevision": 1,
+        "policyDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "companyTimeZone": "America/Los_Angeles",
+        "inspection": null,
+        "applicableRules": {
+          "newTravelGapMinutes": 60,
+          "companyCeiling": 3,
+          "inspectionCeiling": null
+        },
+        "source": {
+          "sourceKind": "lead",
+          "leadId": "22222222-2222-4222-8222-222222222222",
+          "contactId": "11111111-1111-4111-8111-111111111111",
+          "propertyId": null,
+          "estimateId": null
+        },
+        "targetVersion": null,
+        "targetFingerprint": null
+      },
+      "duration": {
+        "kind": "explicit",
+        "preset": null
+      },
+      "startWallTime": {
+        "localDateTime": "2035-01-01T09:00",
+        "offset": "-08:00",
+        "timeZone": "America/Los_Angeles"
+      },
+      "endWallTime": {
+        "localDateTime": "2035-01-01T10:30",
+        "offset": "-08:00",
+        "timeZone": "America/Los_Angeles"
+      }
+    }
+  },
+  "acknowledgement": {
+    "operationId": "22222222-2222-4222-8222-222222222222",
+    "organizationId": "11111111-1111-4111-8111-111111111111",
+    "actorUserId": "staff-synthetic",
+    "kind": "appointment_create",
+    "source": {
+      "sourceKind": "unlinked_manual",
+      "leadId": null,
+      "contactId": null,
+      "propertyId": null,
+      "estimateId": null
+    },
+    "payloadSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "outcome": "committed",
+    "target": {
+      "kind": "appointment",
+      "id": "22222222-2222-4222-8222-222222222222",
+      "available": true
+    },
+    "refusalCode": null
+  },
+  "saveInput": {
+    "expectedRevision": 0,
+    "expectedCompanyTimeZone": "America/Los_Angeles",
+    "enabled": true,
+    "minimumTravelGapMinutes": 60,
+    "maxConcurrentReservations": 3,
+    "durationPresets": [
+      {
+        "id": null,
+        "label": "Synthetic visit",
+        "elapsedMinutes": 90
+      }
+    ]
+  },
+  "draft": {
+    "startAt": "2035-01-01T17:00:00.000Z",
+    "endAt": "2035-01-01T18:30:00.000Z",
+    "resourceUserIds": []
+  },
+  "proposal": {
+    "basis": "new_admission",
+    "startAt": "2035-01-01T17:00:00.000Z",
+    "endAt": "2035-01-01T18:30:00.000Z",
+    "resourceUserIds": [],
+    "appliedTravelGapMinutes": 60,
+    "companyCeiling": 3,
+    "inspectionCeiling": 2,
+    "inspectionGate": {
+      "kind": "held",
+      "message": "Rechecked when saving"
+    },
+    "companyGate": {
+      "kind": "held",
+      "message": "Rechecked when saving"
+    }
+  }
+}

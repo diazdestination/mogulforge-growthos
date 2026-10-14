@@ -9,4 +9,6 @@
 export interface UpdatePlatformOrgInput {
   name?: string;
   timezone?: string;
+  /** Required with timezone; exact company zone the platform operator reviewed. */
+  expectedTimeZone?: string;
 }

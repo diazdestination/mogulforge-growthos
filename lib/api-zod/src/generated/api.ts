@@ -11383,6 +11383,48 @@ export const ListProjectsQueryParams = zod.object({
 
 export const listProjectsResponseWorkVersionMax = 2147483646;
 
+export const listProjectsResponseSchedulingReservationOneReservationRevisionMax = 9007199254740991;
+
+export const listProjectsResponseSchedulingReservationOneSourcePolicyRevisionMax = 9007199254740991;
+
+export const listProjectsResponseSchedulingReservationOneSourcePolicyDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const listProjectsResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const listProjectsResponseSchedulingReservationOneStartAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const listProjectsResponseSchedulingReservationOneEndAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const listProjectsResponseSchedulingReservationOneResourceUserIdsItemMax = 200;
+
+export const listProjectsResponseSchedulingReservationOneMinimumTravelGapMinutesMin = 0;
+export const listProjectsResponseSchedulingReservationOneMinimumTravelGapMinutesMax = 1440;
+
+export const listProjectsResponseSchedulingReservationOneDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listProjectsResponseSchedulingReservationOneDurationPresetOneLabelMax = 80;
+
+export const listProjectsResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax = 1440;
+
+export const listProjectsResponseSchedulingReservationOneAdmittedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const listProjectsResponseSchedulingReservationOneAdmittedByUserIdOneMax = 200;
+
+export const listProjectsResponseSchedulingReservationOneTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listProjectsResponseSchedulingReservationOneLastTransitionActorUserIdOneMax = 200;
+
+export const listProjectsResponseSchedulingReservationOneLastTransitionAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const listProjectsResponseSchedulingTargetFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const listProjectsResponseSchedulingPolicyRevisionMin = 0;
+export const listProjectsResponseSchedulingPolicyRevisionMax = 9007199254740991;
+
+export const listProjectsResponseSchedulingOperationOperationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listProjectsResponseSchedulingOperationOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listProjectsResponseSchedulingOperationActorUserIdMax = 200;
+
+export const listProjectsResponseSchedulingOperationSourceLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listProjectsResponseSchedulingOperationSourceContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listProjectsResponseSchedulingOperationSourcePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listProjectsResponseSchedulingOperationSourceEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listProjectsResponseSchedulingOperationPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const listProjectsResponseSchedulingOperationTargetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
 
 
 export const ListProjectsResponseItem = zod.object({
@@ -11406,11 +11448,103 @@ export const ListProjectsResponseItem = zod.object({
   "sourceKind": zod.enum(['lead', 'customer_work']).optional(),
   "workVersion": zod.int().min(1).max(listProjectsResponseWorkVersionMax).nullish(),
   "customerLabel": zod.string().optional(),
-  "propertyLabel": zod.string().nullish()
-})
+  "propertyLabel": zod.string().nullish(),
+  "schedulingReservation": zod.union([zod.object({
+  "formatVersion": zod.literal(1),
+  "reservationRevision": zod.int().min(1).max(listProjectsResponseSchedulingReservationOneReservationRevisionMax),
+  "sourcePolicyRevision": zod.int().min(1).max(listProjectsResponseSchedulingReservationOneSourcePolicyRevisionMax),
+  "sourcePolicyDigest": zod.string().regex(listProjectsResponseSchedulingReservationOneSourcePolicyDigestRegExp),
+  "approvedTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(listProjectsResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "startAt": zod.string().regex(listProjectsResponseSchedulingReservationOneStartAtRegExp),
+  "endAt": zod.string().regex(listProjectsResponseSchedulingReservationOneEndAtRegExp),
+  "resourceUserIds": zod.array(zod.string().min(1).max(listProjectsResponseSchedulingReservationOneResourceUserIdsItemMax)),
+  "minimumTravelGapMinutes": zod.int().min(listProjectsResponseSchedulingReservationOneMinimumTravelGapMinutesMin).max(listProjectsResponseSchedulingReservationOneMinimumTravelGapMinutesMax),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(listProjectsResponseSchedulingReservationOneDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(listProjectsResponseSchedulingReservationOneDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(listProjectsResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "admittedAt": zod.string().regex(listProjectsResponseSchedulingReservationOneAdmittedAtRegExp),
+  "admittedByUserId": zod.union([zod.string().min(1).max(listProjectsResponseSchedulingReservationOneAdmittedByUserIdOneMax),zod.null()]),
+  "target": zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(listProjectsResponseSchedulingReservationOneTargetIdRegExp)
+}).strict(),
+  "lastTransition": zod.object({
+  "kind": zod.enum(['admission', 'release']),
+  "actorUserId": zod.union([zod.string().min(1).max(listProjectsResponseSchedulingReservationOneLastTransitionActorUserIdOneMax),zod.null()]),
+  "at": zod.string().regex(listProjectsResponseSchedulingReservationOneLastTransitionAtRegExp)
+}).strict()
+}).strict(),zod.null()]).optional(),
+  "schedulingEvidence": zod.enum(['legacy', 'versioned', 'invalid']).optional(),
+  "schedulingTargetFingerprint": zod.string().regex(listProjectsResponseSchedulingTargetFingerprintRegExp).optional(),
+  "schedulingCompanyTimeZone": zod.string().optional(),
+  "schedulingPolicyRevision": zod.int().min(listProjectsResponseSchedulingPolicyRevisionMin).max(listProjectsResponseSchedulingPolicyRevisionMax).nullish(),
+  "schedulingOperation": zod.object({
+  "operationId": zod.uuid().regex(listProjectsResponseSchedulingOperationOperationIdRegExp),
+  "organizationId": zod.uuid().regex(listProjectsResponseSchedulingOperationOrganizationIdRegExp),
+  "actorUserId": zod.string().min(1).max(listProjectsResponseSchedulingOperationActorUserIdMax),
+  "kind": zod.enum(['appointment_create', 'project_create']),
+  "source": zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(listProjectsResponseSchedulingOperationSourceLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(listProjectsResponseSchedulingOperationSourceContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(listProjectsResponseSchedulingOperationSourcePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(listProjectsResponseSchedulingOperationSourceEstimateIdOneRegExp),zod.null()])
+}).strict(),
+  "payloadSha256": zod.string().regex(listProjectsResponseSchedulingOperationPayloadSha256RegExp),
+  "outcome": zod.enum(['committed', 'no_commit_refused']),
+  "target": zod.union([zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(listProjectsResponseSchedulingOperationTargetOneIdRegExp),
+  "available": zod.boolean()
+}).strict(),zod.null()]),
+  "refusalCode": zod.union([zod.string().min(1),zod.null()])
+}).strict().optional()
+}).strict()
 export const ListProjectsResponse = zod.array(ListProjectsResponseItem)
 
 
+
+export const createProjectBodySchedulingReviewContextOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectBodySchedulingReviewContextPolicyRevisionMin = 0;
+export const createProjectBodySchedulingReviewContextPolicyRevisionMax = 9007199254740991;
+
+export const createProjectBodySchedulingReviewContextPolicyDigestOneRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const createProjectBodySchedulingReviewContextInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const createProjectBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMin = 0;
+export const createProjectBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMax = 1440;
+
+export const createProjectBodySchedulingReviewContextApplicableRulesCompanyCeilingOneMax = 100;
+
+export const createProjectBodySchedulingReviewContextApplicableRulesInspectionCeilingOneMax = 9007199254740991;
+
+export const createProjectBodySchedulingReviewContextSourceOneLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectBodySchedulingReviewContextSourceOneContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectBodySchedulingReviewContextSourceOnePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectBodySchedulingReviewContextSourceOneEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectBodySchedulingReviewContextTargetVersionOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const createProjectBodySchedulingReviewContextTargetFingerprintOneRegExp = new RegExp('^[a-f0-9]{64}$');
+export const createProjectBodySchedulingReviewDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectBodySchedulingReviewDurationPresetOneLabelMax = 80;
+
+export const createProjectBodySchedulingReviewDurationPresetOneElapsedMinutesMax = 1440;
+
+export const createProjectBodySchedulingReviewStartWallTimeOneLocalDateTimeRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::[0-5]\\d(?:\\.\\d{1,3})?)?$');
+export const createProjectBodySchedulingReviewStartWallTimeOneOffsetRegExp = new RegExp('^[+-](?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$');
+
+export const createProjectBodySchedulingReviewEndWallTimeOneLocalDateTimeRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::[0-5]\\d(?:\\.\\d{1,3})?)?$');
+export const createProjectBodySchedulingReviewEndWallTimeOneOffsetRegExp = new RegExp('^[+-](?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$');
 
 
 
@@ -11422,10 +11556,98 @@ export const CreateProjectBody = zod.object({
   "scheduledStart": zod.coerce.date().optional(),
   "scheduledEnd": zod.coerce.date().optional(),
   "crewUserIds": zod.array(zod.string()).optional(),
-  "crewNotes": zod.string().optional()
-})
+  "crewNotes": zod.string().optional(),
+  "operationId": zod.uuid().optional(),
+  "schedulingReview": zod.object({
+  "context": zod.object({
+  "organizationId": zod.uuid().regex(createProjectBodySchedulingReviewContextOrganizationIdRegExp),
+  "policyRevision": zod.int().min(createProjectBodySchedulingReviewContextPolicyRevisionMin).max(createProjectBodySchedulingReviewContextPolicyRevisionMax),
+  "policyDigest": zod.union([zod.string().regex(createProjectBodySchedulingReviewContextPolicyDigestOneRegExp),zod.null()]),
+  "companyTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(createProjectBodySchedulingReviewContextInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "applicableRules": zod.object({
+  "newTravelGapMinutes": zod.int().min(createProjectBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMin).max(createProjectBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMax),
+  "companyCeiling": zod.union([zod.int().min(1).max(createProjectBodySchedulingReviewContextApplicableRulesCompanyCeilingOneMax),zod.null()]),
+  "inspectionCeiling": zod.union([zod.int().min(1).max(createProjectBodySchedulingReviewContextApplicableRulesInspectionCeilingOneMax),zod.null()])
+}).strict(),
+  "source": zod.union([zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(createProjectBodySchedulingReviewContextSourceOneLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(createProjectBodySchedulingReviewContextSourceOneContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(createProjectBodySchedulingReviewContextSourceOnePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(createProjectBodySchedulingReviewContextSourceOneEstimateIdOneRegExp),zod.null()])
+}).strict(),zod.null()]),
+  "targetVersion": zod.union([zod.string().regex(createProjectBodySchedulingReviewContextTargetVersionOneRegExp),zod.null()]),
+  "targetFingerprint": zod.union([zod.string().regex(createProjectBodySchedulingReviewContextTargetFingerprintOneRegExp),zod.null()])
+}).strict(),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(createProjectBodySchedulingReviewDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(createProjectBodySchedulingReviewDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(createProjectBodySchedulingReviewDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "startWallTime": zod.union([zod.object({
+  "localDateTime": zod.string().regex(createProjectBodySchedulingReviewStartWallTimeOneLocalDateTimeRegExp),
+  "offset": zod.string().regex(createProjectBodySchedulingReviewStartWallTimeOneOffsetRegExp),
+  "timeZone": zod.string().min(1)
+}).strict(),zod.null()]),
+  "endWallTime": zod.union([zod.object({
+  "localDateTime": zod.string().regex(createProjectBodySchedulingReviewEndWallTimeOneLocalDateTimeRegExp),
+  "offset": zod.string().regex(createProjectBodySchedulingReviewEndWallTimeOneOffsetRegExp),
+  "timeZone": zod.string().min(1)
+}).strict(),zod.null()])
+}).strict().optional()
+}).strict()
 
 export const createProjectResponseWorkVersionMax = 2147483646;
+
+export const createProjectResponseSchedulingReservationOneReservationRevisionMax = 9007199254740991;
+
+export const createProjectResponseSchedulingReservationOneSourcePolicyRevisionMax = 9007199254740991;
+
+export const createProjectResponseSchedulingReservationOneSourcePolicyDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const createProjectResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const createProjectResponseSchedulingReservationOneStartAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const createProjectResponseSchedulingReservationOneEndAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const createProjectResponseSchedulingReservationOneResourceUserIdsItemMax = 200;
+
+export const createProjectResponseSchedulingReservationOneMinimumTravelGapMinutesMin = 0;
+export const createProjectResponseSchedulingReservationOneMinimumTravelGapMinutesMax = 1440;
+
+export const createProjectResponseSchedulingReservationOneDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectResponseSchedulingReservationOneDurationPresetOneLabelMax = 80;
+
+export const createProjectResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax = 1440;
+
+export const createProjectResponseSchedulingReservationOneAdmittedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const createProjectResponseSchedulingReservationOneAdmittedByUserIdOneMax = 200;
+
+export const createProjectResponseSchedulingReservationOneTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectResponseSchedulingReservationOneLastTransitionActorUserIdOneMax = 200;
+
+export const createProjectResponseSchedulingReservationOneLastTransitionAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const createProjectResponseSchedulingTargetFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const createProjectResponseSchedulingPolicyRevisionMin = 0;
+export const createProjectResponseSchedulingPolicyRevisionMax = 9007199254740991;
+
+export const createProjectResponseSchedulingOperationOperationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectResponseSchedulingOperationOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectResponseSchedulingOperationActorUserIdMax = 200;
+
+export const createProjectResponseSchedulingOperationSourceLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectResponseSchedulingOperationSourceContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectResponseSchedulingOperationSourcePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectResponseSchedulingOperationSourceEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createProjectResponseSchedulingOperationPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const createProjectResponseSchedulingOperationTargetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
 
 
 
@@ -11450,8 +11672,68 @@ export const CreateProjectResponse = zod.object({
   "sourceKind": zod.enum(['lead', 'customer_work']).optional(),
   "workVersion": zod.int().min(1).max(createProjectResponseWorkVersionMax).nullish(),
   "customerLabel": zod.string().optional(),
-  "propertyLabel": zod.string().nullish()
-})
+  "propertyLabel": zod.string().nullish(),
+  "schedulingReservation": zod.union([zod.object({
+  "formatVersion": zod.literal(1),
+  "reservationRevision": zod.int().min(1).max(createProjectResponseSchedulingReservationOneReservationRevisionMax),
+  "sourcePolicyRevision": zod.int().min(1).max(createProjectResponseSchedulingReservationOneSourcePolicyRevisionMax),
+  "sourcePolicyDigest": zod.string().regex(createProjectResponseSchedulingReservationOneSourcePolicyDigestRegExp),
+  "approvedTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(createProjectResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "startAt": zod.string().regex(createProjectResponseSchedulingReservationOneStartAtRegExp),
+  "endAt": zod.string().regex(createProjectResponseSchedulingReservationOneEndAtRegExp),
+  "resourceUserIds": zod.array(zod.string().min(1).max(createProjectResponseSchedulingReservationOneResourceUserIdsItemMax)),
+  "minimumTravelGapMinutes": zod.int().min(createProjectResponseSchedulingReservationOneMinimumTravelGapMinutesMin).max(createProjectResponseSchedulingReservationOneMinimumTravelGapMinutesMax),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(createProjectResponseSchedulingReservationOneDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(createProjectResponseSchedulingReservationOneDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(createProjectResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "admittedAt": zod.string().regex(createProjectResponseSchedulingReservationOneAdmittedAtRegExp),
+  "admittedByUserId": zod.union([zod.string().min(1).max(createProjectResponseSchedulingReservationOneAdmittedByUserIdOneMax),zod.null()]),
+  "target": zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(createProjectResponseSchedulingReservationOneTargetIdRegExp)
+}).strict(),
+  "lastTransition": zod.object({
+  "kind": zod.enum(['admission', 'release']),
+  "actorUserId": zod.union([zod.string().min(1).max(createProjectResponseSchedulingReservationOneLastTransitionActorUserIdOneMax),zod.null()]),
+  "at": zod.string().regex(createProjectResponseSchedulingReservationOneLastTransitionAtRegExp)
+}).strict()
+}).strict(),zod.null()]).optional(),
+  "schedulingEvidence": zod.enum(['legacy', 'versioned', 'invalid']).optional(),
+  "schedulingTargetFingerprint": zod.string().regex(createProjectResponseSchedulingTargetFingerprintRegExp).optional(),
+  "schedulingCompanyTimeZone": zod.string().optional(),
+  "schedulingPolicyRevision": zod.int().min(createProjectResponseSchedulingPolicyRevisionMin).max(createProjectResponseSchedulingPolicyRevisionMax).nullish(),
+  "schedulingOperation": zod.object({
+  "operationId": zod.uuid().regex(createProjectResponseSchedulingOperationOperationIdRegExp),
+  "organizationId": zod.uuid().regex(createProjectResponseSchedulingOperationOrganizationIdRegExp),
+  "actorUserId": zod.string().min(1).max(createProjectResponseSchedulingOperationActorUserIdMax),
+  "kind": zod.enum(['appointment_create', 'project_create']),
+  "source": zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(createProjectResponseSchedulingOperationSourceLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(createProjectResponseSchedulingOperationSourceContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(createProjectResponseSchedulingOperationSourcePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(createProjectResponseSchedulingOperationSourceEstimateIdOneRegExp),zod.null()])
+}).strict(),
+  "payloadSha256": zod.string().regex(createProjectResponseSchedulingOperationPayloadSha256RegExp),
+  "outcome": zod.enum(['committed', 'no_commit_refused']),
+  "target": zod.union([zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(createProjectResponseSchedulingOperationTargetOneIdRegExp),
+  "available": zod.boolean()
+}).strict(),zod.null()]),
+  "refusalCode": zod.union([zod.string().min(1),zod.null()])
+}).strict().optional()
+}).strict()
 
 
 export const GetProjectParams = zod.object({
@@ -11459,6 +11741,48 @@ export const GetProjectParams = zod.object({
 })
 
 export const getProjectResponseWorkVersionMax = 2147483646;
+
+export const getProjectResponseSchedulingReservationOneReservationRevisionMax = 9007199254740991;
+
+export const getProjectResponseSchedulingReservationOneSourcePolicyRevisionMax = 9007199254740991;
+
+export const getProjectResponseSchedulingReservationOneSourcePolicyDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const getProjectResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getProjectResponseSchedulingReservationOneStartAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getProjectResponseSchedulingReservationOneEndAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getProjectResponseSchedulingReservationOneResourceUserIdsItemMax = 200;
+
+export const getProjectResponseSchedulingReservationOneMinimumTravelGapMinutesMin = 0;
+export const getProjectResponseSchedulingReservationOneMinimumTravelGapMinutesMax = 1440;
+
+export const getProjectResponseSchedulingReservationOneDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getProjectResponseSchedulingReservationOneDurationPresetOneLabelMax = 80;
+
+export const getProjectResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax = 1440;
+
+export const getProjectResponseSchedulingReservationOneAdmittedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getProjectResponseSchedulingReservationOneAdmittedByUserIdOneMax = 200;
+
+export const getProjectResponseSchedulingReservationOneTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getProjectResponseSchedulingReservationOneLastTransitionActorUserIdOneMax = 200;
+
+export const getProjectResponseSchedulingReservationOneLastTransitionAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getProjectResponseSchedulingTargetFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getProjectResponseSchedulingPolicyRevisionMin = 0;
+export const getProjectResponseSchedulingPolicyRevisionMax = 9007199254740991;
+
+export const getProjectResponseSchedulingOperationOperationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getProjectResponseSchedulingOperationOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getProjectResponseSchedulingOperationActorUserIdMax = 200;
+
+export const getProjectResponseSchedulingOperationSourceLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getProjectResponseSchedulingOperationSourceContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getProjectResponseSchedulingOperationSourcePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getProjectResponseSchedulingOperationSourceEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getProjectResponseSchedulingOperationPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const getProjectResponseSchedulingOperationTargetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
 
 
 
@@ -11483,7 +11807,67 @@ export const GetProjectResponse = zod.object({
   "sourceKind": zod.enum(['lead', 'customer_work']).optional(),
   "workVersion": zod.int().min(1).max(getProjectResponseWorkVersionMax).nullish(),
   "customerLabel": zod.string().optional(),
-  "propertyLabel": zod.string().nullish()
+  "propertyLabel": zod.string().nullish(),
+  "schedulingReservation": zod.union([zod.object({
+  "formatVersion": zod.literal(1),
+  "reservationRevision": zod.int().min(1).max(getProjectResponseSchedulingReservationOneReservationRevisionMax),
+  "sourcePolicyRevision": zod.int().min(1).max(getProjectResponseSchedulingReservationOneSourcePolicyRevisionMax),
+  "sourcePolicyDigest": zod.string().regex(getProjectResponseSchedulingReservationOneSourcePolicyDigestRegExp),
+  "approvedTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(getProjectResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}),zod.null()]),
+  "startAt": zod.string().regex(getProjectResponseSchedulingReservationOneStartAtRegExp),
+  "endAt": zod.string().regex(getProjectResponseSchedulingReservationOneEndAtRegExp),
+  "resourceUserIds": zod.array(zod.string().min(1).max(getProjectResponseSchedulingReservationOneResourceUserIdsItemMax)),
+  "minimumTravelGapMinutes": zod.int().min(getProjectResponseSchedulingReservationOneMinimumTravelGapMinutesMin).max(getProjectResponseSchedulingReservationOneMinimumTravelGapMinutesMax),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(getProjectResponseSchedulingReservationOneDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(getProjectResponseSchedulingReservationOneDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(getProjectResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax)
+}),zod.null()])
+}),
+  "admittedAt": zod.string().regex(getProjectResponseSchedulingReservationOneAdmittedAtRegExp),
+  "admittedByUserId": zod.union([zod.string().min(1).max(getProjectResponseSchedulingReservationOneAdmittedByUserIdOneMax),zod.null()]),
+  "target": zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(getProjectResponseSchedulingReservationOneTargetIdRegExp)
+}),
+  "lastTransition": zod.object({
+  "kind": zod.enum(['admission', 'release']),
+  "actorUserId": zod.union([zod.string().min(1).max(getProjectResponseSchedulingReservationOneLastTransitionActorUserIdOneMax),zod.null()]),
+  "at": zod.string().regex(getProjectResponseSchedulingReservationOneLastTransitionAtRegExp)
+})
+}),zod.null()]).optional(),
+  "schedulingEvidence": zod.enum(['legacy', 'versioned', 'invalid']).optional(),
+  "schedulingTargetFingerprint": zod.string().regex(getProjectResponseSchedulingTargetFingerprintRegExp).optional(),
+  "schedulingCompanyTimeZone": zod.string().optional(),
+  "schedulingPolicyRevision": zod.int().min(getProjectResponseSchedulingPolicyRevisionMin).max(getProjectResponseSchedulingPolicyRevisionMax).nullish(),
+  "schedulingOperation": zod.object({
+  "operationId": zod.uuid().regex(getProjectResponseSchedulingOperationOperationIdRegExp),
+  "organizationId": zod.uuid().regex(getProjectResponseSchedulingOperationOrganizationIdRegExp),
+  "actorUserId": zod.string().min(1).max(getProjectResponseSchedulingOperationActorUserIdMax),
+  "kind": zod.enum(['appointment_create', 'project_create']),
+  "source": zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(getProjectResponseSchedulingOperationSourceLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(getProjectResponseSchedulingOperationSourceContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(getProjectResponseSchedulingOperationSourcePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(getProjectResponseSchedulingOperationSourceEstimateIdOneRegExp),zod.null()])
+}),
+  "payloadSha256": zod.string().regex(getProjectResponseSchedulingOperationPayloadSha256RegExp),
+  "outcome": zod.enum(['committed', 'no_commit_refused']),
+  "target": zod.union([zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(getProjectResponseSchedulingOperationTargetOneIdRegExp),
+  "available": zod.boolean()
+}),zod.null()]),
+  "refusalCode": zod.union([zod.string().min(1),zod.null()])
+}).optional()
 })
 
 
@@ -11492,6 +11876,39 @@ export const UpdateProjectParams = zod.object({
 })
 
 
+export const updateProjectBodySchedulingReviewContextOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectBodySchedulingReviewContextPolicyRevisionMin = 0;
+export const updateProjectBodySchedulingReviewContextPolicyRevisionMax = 9007199254740991;
+
+export const updateProjectBodySchedulingReviewContextPolicyDigestOneRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const updateProjectBodySchedulingReviewContextInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateProjectBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMin = 0;
+export const updateProjectBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMax = 1440;
+
+export const updateProjectBodySchedulingReviewContextApplicableRulesCompanyCeilingOneMax = 100;
+
+export const updateProjectBodySchedulingReviewContextApplicableRulesInspectionCeilingOneMax = 9007199254740991;
+
+export const updateProjectBodySchedulingReviewContextSourceOneLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectBodySchedulingReviewContextSourceOneContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectBodySchedulingReviewContextSourceOnePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectBodySchedulingReviewContextSourceOneEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectBodySchedulingReviewContextTargetVersionOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const updateProjectBodySchedulingReviewContextTargetFingerprintOneRegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateProjectBodySchedulingReviewDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectBodySchedulingReviewDurationPresetOneLabelMax = 80;
+
+export const updateProjectBodySchedulingReviewDurationPresetOneElapsedMinutesMax = 1440;
+
+export const updateProjectBodySchedulingReviewStartWallTimeOneLocalDateTimeRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::[0-5]\\d(?:\\.\\d{1,3})?)?$');
+export const updateProjectBodySchedulingReviewStartWallTimeOneOffsetRegExp = new RegExp('^[+-](?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$');
+
+export const updateProjectBodySchedulingReviewEndWallTimeOneLocalDateTimeRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::[0-5]\\d(?:\\.\\d{1,3})?)?$');
+export const updateProjectBodySchedulingReviewEndWallTimeOneOffsetRegExp = new RegExp('^[+-](?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$');
+
+export const updateProjectBodyExpectedTargetFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
 
 
 export const UpdateProjectBody = zod.object({
@@ -11502,10 +11919,98 @@ export const UpdateProjectBody = zod.object({
   "scheduledEnd": zod.coerce.date().nullish(),
   "crewUserIds": zod.array(zod.string()).optional(),
   "crewNotes": zod.string().nullish(),
-  "expectedUpdatedAt": zod.coerce.date().optional().describe('Last observed update token; stale edits return 409.')
-})
+  "expectedUpdatedAt": zod.coerce.date().optional().describe('Last observed update token; stale edits return 409.'),
+  "schedulingReview": zod.object({
+  "context": zod.object({
+  "organizationId": zod.uuid().regex(updateProjectBodySchedulingReviewContextOrganizationIdRegExp),
+  "policyRevision": zod.int().min(updateProjectBodySchedulingReviewContextPolicyRevisionMin).max(updateProjectBodySchedulingReviewContextPolicyRevisionMax),
+  "policyDigest": zod.union([zod.string().regex(updateProjectBodySchedulingReviewContextPolicyDigestOneRegExp),zod.null()]),
+  "companyTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(updateProjectBodySchedulingReviewContextInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "applicableRules": zod.object({
+  "newTravelGapMinutes": zod.int().min(updateProjectBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMin).max(updateProjectBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMax),
+  "companyCeiling": zod.union([zod.int().min(1).max(updateProjectBodySchedulingReviewContextApplicableRulesCompanyCeilingOneMax),zod.null()]),
+  "inspectionCeiling": zod.union([zod.int().min(1).max(updateProjectBodySchedulingReviewContextApplicableRulesInspectionCeilingOneMax),zod.null()])
+}).strict(),
+  "source": zod.union([zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(updateProjectBodySchedulingReviewContextSourceOneLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(updateProjectBodySchedulingReviewContextSourceOneContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(updateProjectBodySchedulingReviewContextSourceOnePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(updateProjectBodySchedulingReviewContextSourceOneEstimateIdOneRegExp),zod.null()])
+}).strict(),zod.null()]),
+  "targetVersion": zod.union([zod.string().regex(updateProjectBodySchedulingReviewContextTargetVersionOneRegExp),zod.null()]),
+  "targetFingerprint": zod.union([zod.string().regex(updateProjectBodySchedulingReviewContextTargetFingerprintOneRegExp),zod.null()])
+}).strict(),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(updateProjectBodySchedulingReviewDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(updateProjectBodySchedulingReviewDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(updateProjectBodySchedulingReviewDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "startWallTime": zod.union([zod.object({
+  "localDateTime": zod.string().regex(updateProjectBodySchedulingReviewStartWallTimeOneLocalDateTimeRegExp),
+  "offset": zod.string().regex(updateProjectBodySchedulingReviewStartWallTimeOneOffsetRegExp),
+  "timeZone": zod.string().min(1)
+}).strict(),zod.null()]),
+  "endWallTime": zod.union([zod.object({
+  "localDateTime": zod.string().regex(updateProjectBodySchedulingReviewEndWallTimeOneLocalDateTimeRegExp),
+  "offset": zod.string().regex(updateProjectBodySchedulingReviewEndWallTimeOneOffsetRegExp),
+  "timeZone": zod.string().min(1)
+}).strict(),zod.null()])
+}).strict().optional(),
+  "expectedTargetFingerprint": zod.string().regex(updateProjectBodyExpectedTargetFingerprintRegExp).optional()
+}).strict()
 
 export const updateProjectResponseWorkVersionMax = 2147483646;
+
+export const updateProjectResponseSchedulingReservationOneReservationRevisionMax = 9007199254740991;
+
+export const updateProjectResponseSchedulingReservationOneSourcePolicyRevisionMax = 9007199254740991;
+
+export const updateProjectResponseSchedulingReservationOneSourcePolicyDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const updateProjectResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateProjectResponseSchedulingReservationOneStartAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const updateProjectResponseSchedulingReservationOneEndAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const updateProjectResponseSchedulingReservationOneResourceUserIdsItemMax = 200;
+
+export const updateProjectResponseSchedulingReservationOneMinimumTravelGapMinutesMin = 0;
+export const updateProjectResponseSchedulingReservationOneMinimumTravelGapMinutesMax = 1440;
+
+export const updateProjectResponseSchedulingReservationOneDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectResponseSchedulingReservationOneDurationPresetOneLabelMax = 80;
+
+export const updateProjectResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax = 1440;
+
+export const updateProjectResponseSchedulingReservationOneAdmittedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const updateProjectResponseSchedulingReservationOneAdmittedByUserIdOneMax = 200;
+
+export const updateProjectResponseSchedulingReservationOneTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectResponseSchedulingReservationOneLastTransitionActorUserIdOneMax = 200;
+
+export const updateProjectResponseSchedulingReservationOneLastTransitionAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const updateProjectResponseSchedulingTargetFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateProjectResponseSchedulingPolicyRevisionMin = 0;
+export const updateProjectResponseSchedulingPolicyRevisionMax = 9007199254740991;
+
+export const updateProjectResponseSchedulingOperationOperationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectResponseSchedulingOperationOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectResponseSchedulingOperationActorUserIdMax = 200;
+
+export const updateProjectResponseSchedulingOperationSourceLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectResponseSchedulingOperationSourceContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectResponseSchedulingOperationSourcePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectResponseSchedulingOperationSourceEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateProjectResponseSchedulingOperationPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateProjectResponseSchedulingOperationTargetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
 
 
 
@@ -11530,8 +12035,68 @@ export const UpdateProjectResponse = zod.object({
   "sourceKind": zod.enum(['lead', 'customer_work']).optional(),
   "workVersion": zod.int().min(1).max(updateProjectResponseWorkVersionMax).nullish(),
   "customerLabel": zod.string().optional(),
-  "propertyLabel": zod.string().nullish()
-})
+  "propertyLabel": zod.string().nullish(),
+  "schedulingReservation": zod.union([zod.object({
+  "formatVersion": zod.literal(1),
+  "reservationRevision": zod.int().min(1).max(updateProjectResponseSchedulingReservationOneReservationRevisionMax),
+  "sourcePolicyRevision": zod.int().min(1).max(updateProjectResponseSchedulingReservationOneSourcePolicyRevisionMax),
+  "sourcePolicyDigest": zod.string().regex(updateProjectResponseSchedulingReservationOneSourcePolicyDigestRegExp),
+  "approvedTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(updateProjectResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "startAt": zod.string().regex(updateProjectResponseSchedulingReservationOneStartAtRegExp),
+  "endAt": zod.string().regex(updateProjectResponseSchedulingReservationOneEndAtRegExp),
+  "resourceUserIds": zod.array(zod.string().min(1).max(updateProjectResponseSchedulingReservationOneResourceUserIdsItemMax)),
+  "minimumTravelGapMinutes": zod.int().min(updateProjectResponseSchedulingReservationOneMinimumTravelGapMinutesMin).max(updateProjectResponseSchedulingReservationOneMinimumTravelGapMinutesMax),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(updateProjectResponseSchedulingReservationOneDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(updateProjectResponseSchedulingReservationOneDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(updateProjectResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "admittedAt": zod.string().regex(updateProjectResponseSchedulingReservationOneAdmittedAtRegExp),
+  "admittedByUserId": zod.union([zod.string().min(1).max(updateProjectResponseSchedulingReservationOneAdmittedByUserIdOneMax),zod.null()]),
+  "target": zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(updateProjectResponseSchedulingReservationOneTargetIdRegExp)
+}).strict(),
+  "lastTransition": zod.object({
+  "kind": zod.enum(['admission', 'release']),
+  "actorUserId": zod.union([zod.string().min(1).max(updateProjectResponseSchedulingReservationOneLastTransitionActorUserIdOneMax),zod.null()]),
+  "at": zod.string().regex(updateProjectResponseSchedulingReservationOneLastTransitionAtRegExp)
+}).strict()
+}).strict(),zod.null()]).optional(),
+  "schedulingEvidence": zod.enum(['legacy', 'versioned', 'invalid']).optional(),
+  "schedulingTargetFingerprint": zod.string().regex(updateProjectResponseSchedulingTargetFingerprintRegExp).optional(),
+  "schedulingCompanyTimeZone": zod.string().optional(),
+  "schedulingPolicyRevision": zod.int().min(updateProjectResponseSchedulingPolicyRevisionMin).max(updateProjectResponseSchedulingPolicyRevisionMax).nullish(),
+  "schedulingOperation": zod.object({
+  "operationId": zod.uuid().regex(updateProjectResponseSchedulingOperationOperationIdRegExp),
+  "organizationId": zod.uuid().regex(updateProjectResponseSchedulingOperationOrganizationIdRegExp),
+  "actorUserId": zod.string().min(1).max(updateProjectResponseSchedulingOperationActorUserIdMax),
+  "kind": zod.enum(['appointment_create', 'project_create']),
+  "source": zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(updateProjectResponseSchedulingOperationSourceLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(updateProjectResponseSchedulingOperationSourceContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(updateProjectResponseSchedulingOperationSourcePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(updateProjectResponseSchedulingOperationSourceEstimateIdOneRegExp),zod.null()])
+}).strict(),
+  "payloadSha256": zod.string().regex(updateProjectResponseSchedulingOperationPayloadSha256RegExp),
+  "outcome": zod.enum(['committed', 'no_commit_refused']),
+  "target": zod.union([zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(updateProjectResponseSchedulingOperationTargetOneIdRegExp),
+  "available": zod.boolean()
+}).strict(),zod.null()]),
+  "refusalCode": zod.union([zod.string().min(1),zod.null()])
+}).strict().optional()
+}).strict()
 
 
 export const DeleteProjectParams = zod.object({
@@ -11822,6 +12387,50 @@ export const ListAppointmentsQueryParams = zod.object({
   "contactId": zod.uuid().optional().describe('Filter appointments for an existing customer.')
 })
 
+export const listAppointmentsResponseSchedulingReservationOneReservationRevisionMax = 9007199254740991;
+
+export const listAppointmentsResponseSchedulingReservationOneSourcePolicyRevisionMax = 9007199254740991;
+
+export const listAppointmentsResponseSchedulingReservationOneSourcePolicyDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const listAppointmentsResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const listAppointmentsResponseSchedulingReservationOneStartAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const listAppointmentsResponseSchedulingReservationOneEndAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const listAppointmentsResponseSchedulingReservationOneResourceUserIdsItemMax = 200;
+
+export const listAppointmentsResponseSchedulingReservationOneMinimumTravelGapMinutesMin = 0;
+export const listAppointmentsResponseSchedulingReservationOneMinimumTravelGapMinutesMax = 1440;
+
+export const listAppointmentsResponseSchedulingReservationOneDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listAppointmentsResponseSchedulingReservationOneDurationPresetOneLabelMax = 80;
+
+export const listAppointmentsResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax = 1440;
+
+export const listAppointmentsResponseSchedulingReservationOneAdmittedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const listAppointmentsResponseSchedulingReservationOneAdmittedByUserIdOneMax = 200;
+
+export const listAppointmentsResponseSchedulingReservationOneTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listAppointmentsResponseSchedulingReservationOneLastTransitionActorUserIdOneMax = 200;
+
+export const listAppointmentsResponseSchedulingReservationOneLastTransitionAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const listAppointmentsResponseSchedulingTargetFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const listAppointmentsResponseSchedulingPolicyRevisionMin = 0;
+export const listAppointmentsResponseSchedulingPolicyRevisionMax = 9007199254740991;
+
+export const listAppointmentsResponseSchedulingOperationOperationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listAppointmentsResponseSchedulingOperationOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listAppointmentsResponseSchedulingOperationActorUserIdMax = 200;
+
+export const listAppointmentsResponseSchedulingOperationSourceLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listAppointmentsResponseSchedulingOperationSourceContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listAppointmentsResponseSchedulingOperationSourcePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listAppointmentsResponseSchedulingOperationSourceEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const listAppointmentsResponseSchedulingOperationPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const listAppointmentsResponseSchedulingOperationTargetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+
 export const ListAppointmentsResponseItem = zod.object({
   "id": zod.uuid(),
   "organizationId": zod.uuid(),
@@ -11836,9 +12445,103 @@ export const ListAppointmentsResponseItem = zod.object({
   "scheduledEnd": zod.coerce.date().nullish(),
   "notes": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date().optional()
-})
+  "updatedAt": zod.coerce.date().optional(),
+  "schedulingReservation": zod.union([zod.object({
+  "formatVersion": zod.literal(1),
+  "reservationRevision": zod.int().min(1).max(listAppointmentsResponseSchedulingReservationOneReservationRevisionMax),
+  "sourcePolicyRevision": zod.int().min(1).max(listAppointmentsResponseSchedulingReservationOneSourcePolicyRevisionMax),
+  "sourcePolicyDigest": zod.string().regex(listAppointmentsResponseSchedulingReservationOneSourcePolicyDigestRegExp),
+  "approvedTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(listAppointmentsResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "startAt": zod.string().regex(listAppointmentsResponseSchedulingReservationOneStartAtRegExp),
+  "endAt": zod.string().regex(listAppointmentsResponseSchedulingReservationOneEndAtRegExp),
+  "resourceUserIds": zod.array(zod.string().min(1).max(listAppointmentsResponseSchedulingReservationOneResourceUserIdsItemMax)),
+  "minimumTravelGapMinutes": zod.int().min(listAppointmentsResponseSchedulingReservationOneMinimumTravelGapMinutesMin).max(listAppointmentsResponseSchedulingReservationOneMinimumTravelGapMinutesMax),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(listAppointmentsResponseSchedulingReservationOneDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(listAppointmentsResponseSchedulingReservationOneDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(listAppointmentsResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "admittedAt": zod.string().regex(listAppointmentsResponseSchedulingReservationOneAdmittedAtRegExp),
+  "admittedByUserId": zod.union([zod.string().min(1).max(listAppointmentsResponseSchedulingReservationOneAdmittedByUserIdOneMax),zod.null()]),
+  "target": zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(listAppointmentsResponseSchedulingReservationOneTargetIdRegExp)
+}).strict(),
+  "lastTransition": zod.object({
+  "kind": zod.enum(['admission', 'release']),
+  "actorUserId": zod.union([zod.string().min(1).max(listAppointmentsResponseSchedulingReservationOneLastTransitionActorUserIdOneMax),zod.null()]),
+  "at": zod.string().regex(listAppointmentsResponseSchedulingReservationOneLastTransitionAtRegExp)
+}).strict()
+}).strict(),zod.null()]).optional(),
+  "schedulingEvidence": zod.enum(['legacy', 'versioned', 'invalid']).optional(),
+  "schedulingTargetFingerprint": zod.string().regex(listAppointmentsResponseSchedulingTargetFingerprintRegExp).optional(),
+  "schedulingCompanyTimeZone": zod.string().optional(),
+  "schedulingPolicyRevision": zod.int().min(listAppointmentsResponseSchedulingPolicyRevisionMin).max(listAppointmentsResponseSchedulingPolicyRevisionMax).nullish(),
+  "schedulingOperation": zod.object({
+  "operationId": zod.uuid().regex(listAppointmentsResponseSchedulingOperationOperationIdRegExp),
+  "organizationId": zod.uuid().regex(listAppointmentsResponseSchedulingOperationOrganizationIdRegExp),
+  "actorUserId": zod.string().min(1).max(listAppointmentsResponseSchedulingOperationActorUserIdMax),
+  "kind": zod.enum(['appointment_create', 'project_create']),
+  "source": zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(listAppointmentsResponseSchedulingOperationSourceLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(listAppointmentsResponseSchedulingOperationSourceContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(listAppointmentsResponseSchedulingOperationSourcePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(listAppointmentsResponseSchedulingOperationSourceEstimateIdOneRegExp),zod.null()])
+}).strict(),
+  "payloadSha256": zod.string().regex(listAppointmentsResponseSchedulingOperationPayloadSha256RegExp),
+  "outcome": zod.enum(['committed', 'no_commit_refused']),
+  "target": zod.union([zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(listAppointmentsResponseSchedulingOperationTargetOneIdRegExp),
+  "available": zod.boolean()
+}).strict(),zod.null()]),
+  "refusalCode": zod.union([zod.string().min(1),zod.null()])
+}).strict().optional()
+}).strict()
 export const ListAppointmentsResponse = zod.array(ListAppointmentsResponseItem)
+
+
+export const createAppointmentBodySchedulingReviewContextOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentBodySchedulingReviewContextPolicyRevisionMin = 0;
+export const createAppointmentBodySchedulingReviewContextPolicyRevisionMax = 9007199254740991;
+
+export const createAppointmentBodySchedulingReviewContextPolicyDigestOneRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const createAppointmentBodySchedulingReviewContextInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const createAppointmentBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMin = 0;
+export const createAppointmentBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMax = 1440;
+
+export const createAppointmentBodySchedulingReviewContextApplicableRulesCompanyCeilingOneMax = 100;
+
+export const createAppointmentBodySchedulingReviewContextApplicableRulesInspectionCeilingOneMax = 9007199254740991;
+
+export const createAppointmentBodySchedulingReviewContextSourceOneLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentBodySchedulingReviewContextSourceOneContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentBodySchedulingReviewContextSourceOnePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentBodySchedulingReviewContextSourceOneEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentBodySchedulingReviewContextTargetVersionOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const createAppointmentBodySchedulingReviewContextTargetFingerprintOneRegExp = new RegExp('^[a-f0-9]{64}$');
+export const createAppointmentBodySchedulingReviewDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentBodySchedulingReviewDurationPresetOneLabelMax = 80;
+
+export const createAppointmentBodySchedulingReviewDurationPresetOneElapsedMinutesMax = 1440;
+
+export const createAppointmentBodySchedulingReviewStartWallTimeOneLocalDateTimeRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::[0-5]\\d(?:\\.\\d{1,3})?)?$');
+export const createAppointmentBodySchedulingReviewStartWallTimeOneOffsetRegExp = new RegExp('^[+-](?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$');
+
+export const createAppointmentBodySchedulingReviewEndWallTimeOneLocalDateTimeRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::[0-5]\\d(?:\\.\\d{1,3})?)?$');
+export const createAppointmentBodySchedulingReviewEndWallTimeOneOffsetRegExp = new RegExp('^[+-](?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$');
+
 
 
 export const CreateAppointmentBody = zod.object({
@@ -11850,8 +12553,98 @@ export const CreateAppointmentBody = zod.object({
   "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']).optional(),
   "scheduledStart": zod.coerce.date(),
   "scheduledEnd": zod.coerce.date().optional(),
-  "notes": zod.string().optional()
-})
+  "notes": zod.string().optional(),
+  "operationId": zod.uuid().optional(),
+  "schedulingReview": zod.object({
+  "context": zod.object({
+  "organizationId": zod.uuid().regex(createAppointmentBodySchedulingReviewContextOrganizationIdRegExp),
+  "policyRevision": zod.int().min(createAppointmentBodySchedulingReviewContextPolicyRevisionMin).max(createAppointmentBodySchedulingReviewContextPolicyRevisionMax),
+  "policyDigest": zod.union([zod.string().regex(createAppointmentBodySchedulingReviewContextPolicyDigestOneRegExp),zod.null()]),
+  "companyTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(createAppointmentBodySchedulingReviewContextInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "applicableRules": zod.object({
+  "newTravelGapMinutes": zod.int().min(createAppointmentBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMin).max(createAppointmentBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMax),
+  "companyCeiling": zod.union([zod.int().min(1).max(createAppointmentBodySchedulingReviewContextApplicableRulesCompanyCeilingOneMax),zod.null()]),
+  "inspectionCeiling": zod.union([zod.int().min(1).max(createAppointmentBodySchedulingReviewContextApplicableRulesInspectionCeilingOneMax),zod.null()])
+}).strict(),
+  "source": zod.union([zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(createAppointmentBodySchedulingReviewContextSourceOneLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(createAppointmentBodySchedulingReviewContextSourceOneContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(createAppointmentBodySchedulingReviewContextSourceOnePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(createAppointmentBodySchedulingReviewContextSourceOneEstimateIdOneRegExp),zod.null()])
+}).strict(),zod.null()]),
+  "targetVersion": zod.union([zod.string().regex(createAppointmentBodySchedulingReviewContextTargetVersionOneRegExp),zod.null()]),
+  "targetFingerprint": zod.union([zod.string().regex(createAppointmentBodySchedulingReviewContextTargetFingerprintOneRegExp),zod.null()])
+}).strict(),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(createAppointmentBodySchedulingReviewDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(createAppointmentBodySchedulingReviewDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(createAppointmentBodySchedulingReviewDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "startWallTime": zod.union([zod.object({
+  "localDateTime": zod.string().regex(createAppointmentBodySchedulingReviewStartWallTimeOneLocalDateTimeRegExp),
+  "offset": zod.string().regex(createAppointmentBodySchedulingReviewStartWallTimeOneOffsetRegExp),
+  "timeZone": zod.string().min(1)
+}).strict(),zod.null()]),
+  "endWallTime": zod.union([zod.object({
+  "localDateTime": zod.string().regex(createAppointmentBodySchedulingReviewEndWallTimeOneLocalDateTimeRegExp),
+  "offset": zod.string().regex(createAppointmentBodySchedulingReviewEndWallTimeOneOffsetRegExp),
+  "timeZone": zod.string().min(1)
+}).strict(),zod.null()])
+}).strict().optional()
+}).strict()
+
+export const createAppointmentResponseSchedulingReservationOneReservationRevisionMax = 9007199254740991;
+
+export const createAppointmentResponseSchedulingReservationOneSourcePolicyRevisionMax = 9007199254740991;
+
+export const createAppointmentResponseSchedulingReservationOneSourcePolicyDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const createAppointmentResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const createAppointmentResponseSchedulingReservationOneStartAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const createAppointmentResponseSchedulingReservationOneEndAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const createAppointmentResponseSchedulingReservationOneResourceUserIdsItemMax = 200;
+
+export const createAppointmentResponseSchedulingReservationOneMinimumTravelGapMinutesMin = 0;
+export const createAppointmentResponseSchedulingReservationOneMinimumTravelGapMinutesMax = 1440;
+
+export const createAppointmentResponseSchedulingReservationOneDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentResponseSchedulingReservationOneDurationPresetOneLabelMax = 80;
+
+export const createAppointmentResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax = 1440;
+
+export const createAppointmentResponseSchedulingReservationOneAdmittedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const createAppointmentResponseSchedulingReservationOneAdmittedByUserIdOneMax = 200;
+
+export const createAppointmentResponseSchedulingReservationOneTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentResponseSchedulingReservationOneLastTransitionActorUserIdOneMax = 200;
+
+export const createAppointmentResponseSchedulingReservationOneLastTransitionAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const createAppointmentResponseSchedulingTargetFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const createAppointmentResponseSchedulingPolicyRevisionMin = 0;
+export const createAppointmentResponseSchedulingPolicyRevisionMax = 9007199254740991;
+
+export const createAppointmentResponseSchedulingOperationOperationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentResponseSchedulingOperationOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentResponseSchedulingOperationActorUserIdMax = 200;
+
+export const createAppointmentResponseSchedulingOperationSourceLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentResponseSchedulingOperationSourceContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentResponseSchedulingOperationSourcePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentResponseSchedulingOperationSourceEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const createAppointmentResponseSchedulingOperationPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const createAppointmentResponseSchedulingOperationTargetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
 
 export const CreateAppointmentResponse = zod.object({
   "id": zod.uuid(),
@@ -11867,8 +12660,68 @@ export const CreateAppointmentResponse = zod.object({
   "scheduledEnd": zod.coerce.date().nullish(),
   "notes": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date().optional()
-})
+  "updatedAt": zod.coerce.date().optional(),
+  "schedulingReservation": zod.union([zod.object({
+  "formatVersion": zod.literal(1),
+  "reservationRevision": zod.int().min(1).max(createAppointmentResponseSchedulingReservationOneReservationRevisionMax),
+  "sourcePolicyRevision": zod.int().min(1).max(createAppointmentResponseSchedulingReservationOneSourcePolicyRevisionMax),
+  "sourcePolicyDigest": zod.string().regex(createAppointmentResponseSchedulingReservationOneSourcePolicyDigestRegExp),
+  "approvedTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(createAppointmentResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "startAt": zod.string().regex(createAppointmentResponseSchedulingReservationOneStartAtRegExp),
+  "endAt": zod.string().regex(createAppointmentResponseSchedulingReservationOneEndAtRegExp),
+  "resourceUserIds": zod.array(zod.string().min(1).max(createAppointmentResponseSchedulingReservationOneResourceUserIdsItemMax)),
+  "minimumTravelGapMinutes": zod.int().min(createAppointmentResponseSchedulingReservationOneMinimumTravelGapMinutesMin).max(createAppointmentResponseSchedulingReservationOneMinimumTravelGapMinutesMax),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(createAppointmentResponseSchedulingReservationOneDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(createAppointmentResponseSchedulingReservationOneDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(createAppointmentResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "admittedAt": zod.string().regex(createAppointmentResponseSchedulingReservationOneAdmittedAtRegExp),
+  "admittedByUserId": zod.union([zod.string().min(1).max(createAppointmentResponseSchedulingReservationOneAdmittedByUserIdOneMax),zod.null()]),
+  "target": zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(createAppointmentResponseSchedulingReservationOneTargetIdRegExp)
+}).strict(),
+  "lastTransition": zod.object({
+  "kind": zod.enum(['admission', 'release']),
+  "actorUserId": zod.union([zod.string().min(1).max(createAppointmentResponseSchedulingReservationOneLastTransitionActorUserIdOneMax),zod.null()]),
+  "at": zod.string().regex(createAppointmentResponseSchedulingReservationOneLastTransitionAtRegExp)
+}).strict()
+}).strict(),zod.null()]).optional(),
+  "schedulingEvidence": zod.enum(['legacy', 'versioned', 'invalid']).optional(),
+  "schedulingTargetFingerprint": zod.string().regex(createAppointmentResponseSchedulingTargetFingerprintRegExp).optional(),
+  "schedulingCompanyTimeZone": zod.string().optional(),
+  "schedulingPolicyRevision": zod.int().min(createAppointmentResponseSchedulingPolicyRevisionMin).max(createAppointmentResponseSchedulingPolicyRevisionMax).nullish(),
+  "schedulingOperation": zod.object({
+  "operationId": zod.uuid().regex(createAppointmentResponseSchedulingOperationOperationIdRegExp),
+  "organizationId": zod.uuid().regex(createAppointmentResponseSchedulingOperationOrganizationIdRegExp),
+  "actorUserId": zod.string().min(1).max(createAppointmentResponseSchedulingOperationActorUserIdMax),
+  "kind": zod.enum(['appointment_create', 'project_create']),
+  "source": zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(createAppointmentResponseSchedulingOperationSourceLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(createAppointmentResponseSchedulingOperationSourceContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(createAppointmentResponseSchedulingOperationSourcePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(createAppointmentResponseSchedulingOperationSourceEstimateIdOneRegExp),zod.null()])
+}).strict(),
+  "payloadSha256": zod.string().regex(createAppointmentResponseSchedulingOperationPayloadSha256RegExp),
+  "outcome": zod.enum(['committed', 'no_commit_refused']),
+  "target": zod.union([zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(createAppointmentResponseSchedulingOperationTargetOneIdRegExp),
+  "available": zod.boolean()
+}).strict(),zod.null()]),
+  "refusalCode": zod.union([zod.string().min(1),zod.null()])
+}).strict().optional()
+}).strict()
 
 
 /**
@@ -11925,6 +12778,41 @@ export const UpdateAppointmentParams = zod.object({
   "id": zod.uuid()
 })
 
+export const updateAppointmentBodySchedulingReviewContextOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentBodySchedulingReviewContextPolicyRevisionMin = 0;
+export const updateAppointmentBodySchedulingReviewContextPolicyRevisionMax = 9007199254740991;
+
+export const updateAppointmentBodySchedulingReviewContextPolicyDigestOneRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const updateAppointmentBodySchedulingReviewContextInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateAppointmentBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMin = 0;
+export const updateAppointmentBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMax = 1440;
+
+export const updateAppointmentBodySchedulingReviewContextApplicableRulesCompanyCeilingOneMax = 100;
+
+export const updateAppointmentBodySchedulingReviewContextApplicableRulesInspectionCeilingOneMax = 9007199254740991;
+
+export const updateAppointmentBodySchedulingReviewContextSourceOneLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentBodySchedulingReviewContextSourceOneContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentBodySchedulingReviewContextSourceOnePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentBodySchedulingReviewContextSourceOneEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentBodySchedulingReviewContextTargetVersionOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const updateAppointmentBodySchedulingReviewContextTargetFingerprintOneRegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateAppointmentBodySchedulingReviewDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentBodySchedulingReviewDurationPresetOneLabelMax = 80;
+
+export const updateAppointmentBodySchedulingReviewDurationPresetOneElapsedMinutesMax = 1440;
+
+export const updateAppointmentBodySchedulingReviewStartWallTimeOneLocalDateTimeRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::[0-5]\\d(?:\\.\\d{1,3})?)?$');
+export const updateAppointmentBodySchedulingReviewStartWallTimeOneOffsetRegExp = new RegExp('^[+-](?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$');
+
+export const updateAppointmentBodySchedulingReviewEndWallTimeOneLocalDateTimeRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::[0-5]\\d(?:\\.\\d{1,3})?)?$');
+export const updateAppointmentBodySchedulingReviewEndWallTimeOneOffsetRegExp = new RegExp('^[+-](?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$');
+
+export const updateAppointmentBodyExpectedTargetFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
 export const UpdateAppointmentBody = zod.object({
   "leadId": zod.uuid().nullish(),
   "contactId": zod.uuid().nullish(),
@@ -11935,8 +12823,98 @@ export const UpdateAppointmentBody = zod.object({
   "scheduledStart": zod.coerce.date().optional(),
   "scheduledEnd": zod.coerce.date().nullish(),
   "notes": zod.string().nullish(),
-  "expectedUpdatedAt": zod.coerce.date().optional().describe('Last observed update token; stale edits return 409.')
-})
+  "expectedUpdatedAt": zod.coerce.date().optional().describe('Last observed update token; stale edits return 409.'),
+  "schedulingReview": zod.object({
+  "context": zod.object({
+  "organizationId": zod.uuid().regex(updateAppointmentBodySchedulingReviewContextOrganizationIdRegExp),
+  "policyRevision": zod.int().min(updateAppointmentBodySchedulingReviewContextPolicyRevisionMin).max(updateAppointmentBodySchedulingReviewContextPolicyRevisionMax),
+  "policyDigest": zod.union([zod.string().regex(updateAppointmentBodySchedulingReviewContextPolicyDigestOneRegExp),zod.null()]),
+  "companyTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(updateAppointmentBodySchedulingReviewContextInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "applicableRules": zod.object({
+  "newTravelGapMinutes": zod.int().min(updateAppointmentBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMin).max(updateAppointmentBodySchedulingReviewContextApplicableRulesNewTravelGapMinutesMax),
+  "companyCeiling": zod.union([zod.int().min(1).max(updateAppointmentBodySchedulingReviewContextApplicableRulesCompanyCeilingOneMax),zod.null()]),
+  "inspectionCeiling": zod.union([zod.int().min(1).max(updateAppointmentBodySchedulingReviewContextApplicableRulesInspectionCeilingOneMax),zod.null()])
+}).strict(),
+  "source": zod.union([zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(updateAppointmentBodySchedulingReviewContextSourceOneLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(updateAppointmentBodySchedulingReviewContextSourceOneContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(updateAppointmentBodySchedulingReviewContextSourceOnePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(updateAppointmentBodySchedulingReviewContextSourceOneEstimateIdOneRegExp),zod.null()])
+}).strict(),zod.null()]),
+  "targetVersion": zod.union([zod.string().regex(updateAppointmentBodySchedulingReviewContextTargetVersionOneRegExp),zod.null()]),
+  "targetFingerprint": zod.union([zod.string().regex(updateAppointmentBodySchedulingReviewContextTargetFingerprintOneRegExp),zod.null()])
+}).strict(),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(updateAppointmentBodySchedulingReviewDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(updateAppointmentBodySchedulingReviewDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(updateAppointmentBodySchedulingReviewDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "startWallTime": zod.union([zod.object({
+  "localDateTime": zod.string().regex(updateAppointmentBodySchedulingReviewStartWallTimeOneLocalDateTimeRegExp),
+  "offset": zod.string().regex(updateAppointmentBodySchedulingReviewStartWallTimeOneOffsetRegExp),
+  "timeZone": zod.string().min(1)
+}).strict(),zod.null()]),
+  "endWallTime": zod.union([zod.object({
+  "localDateTime": zod.string().regex(updateAppointmentBodySchedulingReviewEndWallTimeOneLocalDateTimeRegExp),
+  "offset": zod.string().regex(updateAppointmentBodySchedulingReviewEndWallTimeOneOffsetRegExp),
+  "timeZone": zod.string().min(1)
+}).strict(),zod.null()])
+}).strict().optional(),
+  "expectedTargetFingerprint": zod.string().regex(updateAppointmentBodyExpectedTargetFingerprintRegExp).optional()
+}).strict()
+
+export const updateAppointmentResponseSchedulingReservationOneReservationRevisionMax = 9007199254740991;
+
+export const updateAppointmentResponseSchedulingReservationOneSourcePolicyRevisionMax = 9007199254740991;
+
+export const updateAppointmentResponseSchedulingReservationOneSourcePolicyDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const updateAppointmentResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateAppointmentResponseSchedulingReservationOneStartAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const updateAppointmentResponseSchedulingReservationOneEndAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const updateAppointmentResponseSchedulingReservationOneResourceUserIdsItemMax = 200;
+
+export const updateAppointmentResponseSchedulingReservationOneMinimumTravelGapMinutesMin = 0;
+export const updateAppointmentResponseSchedulingReservationOneMinimumTravelGapMinutesMax = 1440;
+
+export const updateAppointmentResponseSchedulingReservationOneDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentResponseSchedulingReservationOneDurationPresetOneLabelMax = 80;
+
+export const updateAppointmentResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax = 1440;
+
+export const updateAppointmentResponseSchedulingReservationOneAdmittedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const updateAppointmentResponseSchedulingReservationOneAdmittedByUserIdOneMax = 200;
+
+export const updateAppointmentResponseSchedulingReservationOneTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentResponseSchedulingReservationOneLastTransitionActorUserIdOneMax = 200;
+
+export const updateAppointmentResponseSchedulingReservationOneLastTransitionAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const updateAppointmentResponseSchedulingTargetFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateAppointmentResponseSchedulingPolicyRevisionMin = 0;
+export const updateAppointmentResponseSchedulingPolicyRevisionMax = 9007199254740991;
+
+export const updateAppointmentResponseSchedulingOperationOperationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentResponseSchedulingOperationOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentResponseSchedulingOperationActorUserIdMax = 200;
+
+export const updateAppointmentResponseSchedulingOperationSourceLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentResponseSchedulingOperationSourceContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentResponseSchedulingOperationSourcePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentResponseSchedulingOperationSourceEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const updateAppointmentResponseSchedulingOperationPayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const updateAppointmentResponseSchedulingOperationTargetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
 
 export const UpdateAppointmentResponse = zod.object({
   "id": zod.uuid(),
@@ -11952,8 +12930,68 @@ export const UpdateAppointmentResponse = zod.object({
   "scheduledEnd": zod.coerce.date().nullish(),
   "notes": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date().optional()
-})
+  "updatedAt": zod.coerce.date().optional(),
+  "schedulingReservation": zod.union([zod.object({
+  "formatVersion": zod.literal(1),
+  "reservationRevision": zod.int().min(1).max(updateAppointmentResponseSchedulingReservationOneReservationRevisionMax),
+  "sourcePolicyRevision": zod.int().min(1).max(updateAppointmentResponseSchedulingReservationOneSourcePolicyRevisionMax),
+  "sourcePolicyDigest": zod.string().regex(updateAppointmentResponseSchedulingReservationOneSourcePolicyDigestRegExp),
+  "approvedTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(updateAppointmentResponseSchedulingReservationOneInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "startAt": zod.string().regex(updateAppointmentResponseSchedulingReservationOneStartAtRegExp),
+  "endAt": zod.string().regex(updateAppointmentResponseSchedulingReservationOneEndAtRegExp),
+  "resourceUserIds": zod.array(zod.string().min(1).max(updateAppointmentResponseSchedulingReservationOneResourceUserIdsItemMax)),
+  "minimumTravelGapMinutes": zod.int().min(updateAppointmentResponseSchedulingReservationOneMinimumTravelGapMinutesMin).max(updateAppointmentResponseSchedulingReservationOneMinimumTravelGapMinutesMax),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(updateAppointmentResponseSchedulingReservationOneDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(updateAppointmentResponseSchedulingReservationOneDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(updateAppointmentResponseSchedulingReservationOneDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "admittedAt": zod.string().regex(updateAppointmentResponseSchedulingReservationOneAdmittedAtRegExp),
+  "admittedByUserId": zod.union([zod.string().min(1).max(updateAppointmentResponseSchedulingReservationOneAdmittedByUserIdOneMax),zod.null()]),
+  "target": zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(updateAppointmentResponseSchedulingReservationOneTargetIdRegExp)
+}).strict(),
+  "lastTransition": zod.object({
+  "kind": zod.enum(['admission', 'release']),
+  "actorUserId": zod.union([zod.string().min(1).max(updateAppointmentResponseSchedulingReservationOneLastTransitionActorUserIdOneMax),zod.null()]),
+  "at": zod.string().regex(updateAppointmentResponseSchedulingReservationOneLastTransitionAtRegExp)
+}).strict()
+}).strict(),zod.null()]).optional(),
+  "schedulingEvidence": zod.enum(['legacy', 'versioned', 'invalid']).optional(),
+  "schedulingTargetFingerprint": zod.string().regex(updateAppointmentResponseSchedulingTargetFingerprintRegExp).optional(),
+  "schedulingCompanyTimeZone": zod.string().optional(),
+  "schedulingPolicyRevision": zod.int().min(updateAppointmentResponseSchedulingPolicyRevisionMin).max(updateAppointmentResponseSchedulingPolicyRevisionMax).nullish(),
+  "schedulingOperation": zod.object({
+  "operationId": zod.uuid().regex(updateAppointmentResponseSchedulingOperationOperationIdRegExp),
+  "organizationId": zod.uuid().regex(updateAppointmentResponseSchedulingOperationOrganizationIdRegExp),
+  "actorUserId": zod.string().min(1).max(updateAppointmentResponseSchedulingOperationActorUserIdMax),
+  "kind": zod.enum(['appointment_create', 'project_create']),
+  "source": zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(updateAppointmentResponseSchedulingOperationSourceLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(updateAppointmentResponseSchedulingOperationSourceContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(updateAppointmentResponseSchedulingOperationSourcePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(updateAppointmentResponseSchedulingOperationSourceEstimateIdOneRegExp),zod.null()])
+}).strict(),
+  "payloadSha256": zod.string().regex(updateAppointmentResponseSchedulingOperationPayloadSha256RegExp),
+  "outcome": zod.enum(['committed', 'no_commit_refused']),
+  "target": zod.union([zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(updateAppointmentResponseSchedulingOperationTargetOneIdRegExp),
+  "available": zod.boolean()
+}).strict(),zod.null()]),
+  "refusalCode": zod.union([zod.string().min(1),zod.null()])
+}).strict().optional()
+}).strict()
 
 
 /**
@@ -12757,19 +13795,19 @@ export const UpdateSettingsBody = zod.object({
   "website": zod.string().optional(),
   "facebookUrl": zod.string().optional(),
   "googleBusinessUrl": zod.string().optional()
-}).optional(),
+}).strict().optional(),
   "services": zod.array(zod.object({
   "slug": zod.string(),
   "name": zod.string(),
   "description": zod.string().optional(),
   "isActive": zod.boolean()
-})).optional(),
+}).strict()).optional(),
   "serviceAreas": zod.array(zod.object({
   "slug": zod.string(),
   "name": zod.string(),
   "state": zod.string().optional(),
   "isActive": zod.boolean()
-})).optional(),
+}).strict()).optional(),
   "leadScoring": zod.object({
   "intentPoints": zod.record(zod.string(), zod.number()),
   "emergencyUrgencyBonus": zod.number(),
@@ -12779,23 +13817,23 @@ export const UpdateSettingsBody = zod.object({
   "detailedDescriptionBonus": zod.number(),
   "completeAddressBonus": zod.number(),
   "contactMethodBonus": zod.number()
-}).optional(),
+}).strict().optional(),
   "inspectionAvailability": zod.object({
   "timezone": zod.string().describe('IANA timezone the windows are expressed in.'),
   "days": zod.array(zod.enum(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])),
   "windows": zod.array(zod.object({
   "startHour": zod.int().describe('Local start hour, 0-23. Out-of-range values are sanitized server-side.'),
   "endHour": zod.int().describe('Local end hour, 1-24 (must be greater than startHour). Sanitized server-side.')
-})),
+}).strict()),
   "maxBookingsPerWindow": zod.int().describe('Minimum 1; invalid values are sanitized server-side.'),
   "blackoutDates": zod.array(zod.string().describe('YYYY-MM-DD dates; invalid entries are ignored server-side.'))
-}).optional(),
+}).strict().optional(),
   "appointmentReminder": zod.object({
   "leadTimeHours": zod.number().describe('Hours before the inspection window to send the reminder (1-336; invalid values are sanitized server-side).'),
   "smsBody": zod.string().describe('SMS template. Supports {{contact.firstName}}, {{business.name}}, {{business.phone}}, {{appointment.window}}, {{reschedule.line}}.'),
   "emailSubject": zod.string().describe('Email subject template (same placeholders as smsBody).'),
   "emailBody": zod.string().describe('Email body template (same placeholders as smsBody).')
-}).optional(),
+}).strict().optional(),
   "aiInstructions": zod.string().max(updateSettingsBodyAiInstructionsMax).optional(),
   "securityAlertsAcknowledgedAt": zod.string().optional().describe('ISO timestamp; acknowledges (dismisses) brute-force security alerts recorded at or before this instant.'),
   "fallbackNotificationInbox": zod.string().nullish().describe('Fallback email address for portal message notifications when the assigned rep has no valid email.'),
@@ -12803,7 +13841,7 @@ export const UpdateSettingsBody = zod.object({
   "googleReviews": zod.object({
   "placeId": zod.string().optional().describe('Google Place ID for the business listing (e.g. ChIJ...).'),
   "apiKey": zod.string().optional().describe('Google Places API key with Places Details access.')
-}).optional().describe('Google Business Profile connection for the public reviews widget.'),
+}).strict().optional().describe('Google Business Profile connection for the public reviews widget.'),
   "widget": zod.object({
   "leadCaptureEnabled": zod.boolean().describe('Master switch for the lead-capture launcher module.'),
   "primaryColor": zod.string().optional().describe('CSS color for the launcher & accents.'),
@@ -12812,7 +13850,7 @@ export const UpdateSettingsBody = zod.object({
   "buttonLabel": zod.string().optional().describe('Label on the launcher button.'),
   "testMode": zod.boolean().optional().describe('When true the widget is hidden from normal visitors and only renders for pages loaded with the mf_preview=1 flag.'),
   "conciergeEnabled": zod.boolean().optional().describe('AI concierge chat module (uses the org knowledge base + intake flow).')
-}).optional().describe('Embeddable website widget (closer.js) modules & appearance. All values are public.'),
+}).strict().optional().describe('Embeddable website widget (closer.js) modules & appearance. All values are public.'),
   "concierge": zod.object({
   "assistantName": zod.string().optional(),
   "greeting": zod.string().optional(),
@@ -12825,13 +13863,13 @@ export const UpdateSettingsBody = zod.object({
   "urgency": zod.enum(['normal', 'high', 'emergency']),
   "triage": zod.boolean().describe('Whether this intent runs the emergency triage question first.'),
   "keywords": zod.array(zod.string()).describe('Case-insensitive substrings that detect this intent in free text.')
-}).describe('One selectable concierge intent. Array order controls keyword-match priority and quick-reply order.')).optional(),
+}).strict().describe('One selectable concierge intent. Array order controls keyword-match priority and quick-reply order.')).optional(),
   "intakeDisclaimer": zod.string().optional().describe('Guardrail line sent when pricing\/insurance\/safety conclusions are asked.'),
   "emergencySafety": zod.string().optional(),
   "emergencyEscalation": zod.string().optional(),
   "unknownAnswerFallback": zod.string().optional().describe('Reply when a visitor asks something the knowledge base cannot answer.'),
   "wrapUpNote": zod.string().optional()
-}).optional().describe('Org-configurable AI concierge behavior. Defaults preserve the original roofing behavior.'),
+}).strict().optional().describe('Org-configurable AI concierge behavior. Defaults preserve the original roofing behavior.'),
   "sendingHours": zod.object({
   "quietHoursEnabled": zod.boolean().describe('Master switch. Off means historical behavior (send any time).'),
   "timezone": zod.string().describe('IANA timezone the sending window is evaluated in.'),
@@ -12839,12 +13877,12 @@ export const UpdateSettingsBody = zod.object({
   "endHour": zod.int().describe('Exclusive end hour (1-24) of the allowed sending window.'),
   "days": zod.array(zod.string()).describe('Days sends are allowed (Mon..Sun).'),
   "maxTouchesPerDay": zod.int().describe('Max automated touches per contact per rolling 24h (0 = unlimited).')
-}).optional().describe('Quiet hours and frequency caps for automated outreach (playbooks + automation email\/SMS). Quiet hours defer sends into the next allowed window; they never drop them.'),
+}).strict().optional().describe('Quiet hours and frequency caps for automated outreach (playbooks + automation email\/SMS). Quiet hours defer sends into the next allowed window; they never drop them.'),
   "playbookStageBehaviors": zod.record(zod.string(), zod.object({
   "action": zod.enum(['continue', 'pause', 'complete', 'cancel', 'enroll']),
   "enrollPlaybookId": zod.string().nullish().describe('Target playbook to hand the lead to (only for action \"enroll\").')
-})).optional().describe('Lead pipeline stage → what happens to the lead\'s live acquisition playbook enrollment when it enters that stage. Missing stages use the built-in defaults (outreach stages continue; everything else completes).')
-})
+}).strict()).optional().describe('Lead pipeline stage → what happens to the lead\'s live acquisition playbook enrollment when it enters that stage. Missing stages use the built-in defaults (outreach stages continue; everything else completes).')
+}).strict()
 
 export const UpdateSettingsResponse = zod.object({
   "id": zod.uuid(),
@@ -14474,8 +15512,9 @@ export const UpdatePlatformOrgParams = zod.object({
 
 export const UpdatePlatformOrgBody = zod.object({
   "name": zod.string().optional(),
-  "timezone": zod.string().optional()
-})
+  "timezone": zod.string().optional(),
+  "expectedTimeZone": zod.string().optional().describe('Required with timezone; exact company zone the platform operator reviewed.')
+}).strict()
 
 export const UpdatePlatformOrgResponse = zod.object({
   "organization": zod.object({
@@ -14863,7 +15902,7 @@ export const ResolveCustomerReplyResponse = zod.object({
 
 
 /**
- * Read-only snapshot in the configured inspection timezone, falling back to UTC explicitly. Each queue is capped at 50 with exact total/truncated indicators. Tasks include overdue, due today and undated work; company scope requires existing CRM read access. No provider calls or settings initialization.
+ * Read-only snapshot in the authoritative organization timezone; invalid timezone is an actionable hold. Each queue is capped at 50 with exact total/truncated indicators. Tasks include overdue, due today and undated work; company scope requires existing CRM read access. No provider calls or settings initialization.
  * @summary Read the company-local workday snapshot
  */
 export const GetContractorTodayQueryParams = zod.object({
@@ -14875,9 +15914,71 @@ export const getContractorTodayResponseTasksItemsMax = 50;
 
 export const getContractorTodayResponseTasksTotalMin = 0;
 
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneReservationRevisionMax = 9007199254740991;
+
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneSourcePolicyRevisionMax = 9007199254740991;
+
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneSourcePolicyDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneStartAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneEndAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneResourceUserIdsItemMax = 200;
+
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneMinimumTravelGapMinutesMin = 0;
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneMinimumTravelGapMinutesMax = 1440;
+
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneDurationPresetOneLabelMax = 80;
+
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneDurationPresetOneElapsedMinutesMax = 1440;
+
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneAdmittedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneAdmittedByUserIdOneMax = 200;
+
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneLastTransitionActorUserIdOneMax = 200;
+
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneLastTransitionAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingTargetFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingPolicyRevisionMin = 0;
+export const getContractorTodayResponseAppointmentsItemsItemSchedulingPolicyRevisionMax = 9007199254740991;
+
 export const getContractorTodayResponseAppointmentsItemsMax = 50;
 
 export const getContractorTodayResponseAppointmentsTotalMin = 0;
+
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneReservationRevisionMax = 9007199254740991;
+
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneSourcePolicyRevisionMax = 9007199254740991;
+
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneSourcePolicyDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneStartAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneEndAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneResourceUserIdsItemMax = 200;
+
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneMinimumTravelGapMinutesMin = 0;
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneMinimumTravelGapMinutesMax = 1440;
+
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneDurationPresetOneLabelMax = 80;
+
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneDurationPresetOneElapsedMinutesMax = 1440;
+
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneAdmittedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneAdmittedByUserIdOneMax = 200;
+
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneLastTransitionActorUserIdOneMax = 200;
+
+export const getContractorTodayResponseProjectsItemsItemSchedulingReservationOneLastTransitionAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getContractorTodayResponseProjectsItemsItemSchedulingTargetFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getContractorTodayResponseProjectsItemsItemSchedulingPolicyRevisionMin = 0;
+export const getContractorTodayResponseProjectsItemsItemSchedulingPolicyRevisionMax = 9007199254740991;
 
 export const getContractorTodayResponseProjectsItemsMax = 50;
 
@@ -14886,6 +15987,9 @@ export const getContractorTodayResponseProjectsTotalMin = 0;
 export const getContractorTodayResponseServicesItemsMax = 50;
 
 export const getContractorTodayResponseServicesTotalMin = 0;
+
+export const getContractorTodayResponseSchedulingPolicyRevisionMin = 0;
+export const getContractorTodayResponseSchedulingPolicyRevisionMax = 9007199254740991;
 
 
 
@@ -14910,10 +16014,10 @@ export const GetContractorTodayResponse = zod.object({
   "assignedUserId": zod.string().nullable(),
   "assigneeName": zod.string().nullable(),
   "actionPath": zod.string()
-})).max(getContractorTodayResponseTasksItemsMax),
+}).strict()).max(getContractorTodayResponseTasksItemsMax),
   "total": zod.int().min(getContractorTodayResponseTasksTotalMin),
   "truncated": zod.boolean()
-}),
+}).strict(),
   "appointments": zod.object({
   "items": zod.array(zod.object({
   "id": zod.uuid(),
@@ -14926,11 +16030,50 @@ export const GetContractorTodayResponse = zod.object({
   "assignedUserId": zod.string().nullable(),
   "assigneeName": zod.string().nullable(),
   "scheduledStart": zod.coerce.date(),
-  "scheduledEnd": zod.coerce.date().nullable()
-})).max(getContractorTodayResponseAppointmentsItemsMax),
+  "scheduledEnd": zod.coerce.date().nullable(),
+  "schedulingReservation": zod.union([zod.object({
+  "formatVersion": zod.literal(1),
+  "reservationRevision": zod.int().min(1).max(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneReservationRevisionMax),
+  "sourcePolicyRevision": zod.int().min(1).max(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneSourcePolicyRevisionMax),
+  "sourcePolicyDigest": zod.string().regex(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneSourcePolicyDigestRegExp),
+  "approvedTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "startAt": zod.string().regex(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneStartAtRegExp),
+  "endAt": zod.string().regex(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneEndAtRegExp),
+  "resourceUserIds": zod.array(zod.string().min(1).max(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneResourceUserIdsItemMax)),
+  "minimumTravelGapMinutes": zod.int().min(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneMinimumTravelGapMinutesMin).max(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneMinimumTravelGapMinutesMax),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "admittedAt": zod.string().regex(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneAdmittedAtRegExp),
+  "admittedByUserId": zod.union([zod.string().min(1).max(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneAdmittedByUserIdOneMax),zod.null()]),
+  "target": zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneTargetIdRegExp)
+}).strict(),
+  "lastTransition": zod.object({
+  "kind": zod.enum(['admission', 'release']),
+  "actorUserId": zod.union([zod.string().min(1).max(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneLastTransitionActorUserIdOneMax),zod.null()]),
+  "at": zod.string().regex(getContractorTodayResponseAppointmentsItemsItemSchedulingReservationOneLastTransitionAtRegExp)
+}).strict()
+}).strict(),zod.null()]).optional(),
+  "schedulingEvidence": zod.enum(['legacy', 'versioned', 'invalid']).optional(),
+  "schedulingTargetFingerprint": zod.string().regex(getContractorTodayResponseAppointmentsItemsItemSchedulingTargetFingerprintRegExp).optional(),
+  "schedulingCompanyTimeZone": zod.string().optional(),
+  "schedulingPolicyRevision": zod.int().min(getContractorTodayResponseAppointmentsItemsItemSchedulingPolicyRevisionMin).max(getContractorTodayResponseAppointmentsItemsItemSchedulingPolicyRevisionMax).nullish()
+}).strict()).max(getContractorTodayResponseAppointmentsItemsMax),
   "total": zod.int().min(getContractorTodayResponseAppointmentsTotalMin),
   "truncated": zod.boolean()
-}),
+}).strict(),
   "projects": zod.object({
   "items": zod.array(zod.object({
   "id": zod.uuid(),
@@ -14942,11 +16085,50 @@ export const GetContractorTodayResponse = zod.object({
   "scheduledStart": zod.coerce.date().nullable(),
   "scheduledEnd": zod.coerce.date().nullable(),
   "customerWorkId": zod.uuid().nullish(),
-  "contactId": zod.uuid().optional()
-})).max(getContractorTodayResponseProjectsItemsMax),
+  "contactId": zod.uuid().optional(),
+  "schedulingReservation": zod.union([zod.object({
+  "formatVersion": zod.literal(1),
+  "reservationRevision": zod.int().min(1).max(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneReservationRevisionMax),
+  "sourcePolicyRevision": zod.int().min(1).max(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneSourcePolicyRevisionMax),
+  "sourcePolicyDigest": zod.string().regex(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneSourcePolicyDigestRegExp),
+  "approvedTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "startAt": zod.string().regex(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneStartAtRegExp),
+  "endAt": zod.string().regex(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneEndAtRegExp),
+  "resourceUserIds": zod.array(zod.string().min(1).max(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneResourceUserIdsItemMax)),
+  "minimumTravelGapMinutes": zod.int().min(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneMinimumTravelGapMinutesMin).max(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneMinimumTravelGapMinutesMax),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "admittedAt": zod.string().regex(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneAdmittedAtRegExp),
+  "admittedByUserId": zod.union([zod.string().min(1).max(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneAdmittedByUserIdOneMax),zod.null()]),
+  "target": zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneTargetIdRegExp)
+}).strict(),
+  "lastTransition": zod.object({
+  "kind": zod.enum(['admission', 'release']),
+  "actorUserId": zod.union([zod.string().min(1).max(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneLastTransitionActorUserIdOneMax),zod.null()]),
+  "at": zod.string().regex(getContractorTodayResponseProjectsItemsItemSchedulingReservationOneLastTransitionAtRegExp)
+}).strict()
+}).strict(),zod.null()]).optional(),
+  "schedulingEvidence": zod.enum(['legacy', 'versioned', 'invalid']).optional(),
+  "schedulingTargetFingerprint": zod.string().regex(getContractorTodayResponseProjectsItemsItemSchedulingTargetFingerprintRegExp).optional(),
+  "schedulingCompanyTimeZone": zod.string().optional(),
+  "schedulingPolicyRevision": zod.int().min(getContractorTodayResponseProjectsItemsItemSchedulingPolicyRevisionMin).max(getContractorTodayResponseProjectsItemsItemSchedulingPolicyRevisionMax).nullish()
+}).strict()).max(getContractorTodayResponseProjectsItemsMax),
   "total": zod.int().min(getContractorTodayResponseProjectsTotalMin),
   "truncated": zod.boolean()
-}),
+}).strict(),
   "services": zod.object({
   "items": zod.array(zod.object({
   "id": zod.uuid(),
@@ -14959,11 +16141,13 @@ export const GetContractorTodayResponse = zod.object({
   "assignedUserId": zod.string().nullable(),
   "assigneeName": zod.string().nullable(),
   "taskId": zod.uuid()
-})).max(getContractorTodayResponseServicesItemsMax),
+}).strict()).max(getContractorTodayResponseServicesItemsMax),
   "total": zod.int().min(getContractorTodayResponseServicesTotalMin),
   "truncated": zod.boolean()
-})
-})
+}).strict(),
+  "schedulingPolicyRevision": zod.int().min(getContractorTodayResponseSchedulingPolicyRevisionMin).max(getContractorTodayResponseSchedulingPolicyRevisionMax).nullish(),
+  "schedulingPolicyState": zod.enum(['unconfigured', 'configured', 'invalid']).optional()
+}).strict()
 
 
 /**
@@ -20142,5 +21326,520 @@ export const PrepareBieLeadEmailResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary Read saved scheduling policy without initializing settings
+ */
+export const getSchedulingPolicyResponsePolicyOneRevisionMax = 9007199254740991;
+
+
+export const getSchedulingPolicyResponsePolicyOneMinimumTravelGapMinutesMin = 0;
+export const getSchedulingPolicyResponsePolicyOneMinimumTravelGapMinutesMax = 1440;
+
+export const getSchedulingPolicyResponsePolicyOneMaxConcurrentReservationsOneMax = 100;
+
+export const getSchedulingPolicyResponsePolicyOneDurationPresetsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSchedulingPolicyResponsePolicyOneDurationPresetsItemLabelMax = 80;
+
+export const getSchedulingPolicyResponsePolicyOneDurationPresetsItemElapsedMinutesMax = 1440;
+
+export const getSchedulingPolicyResponsePolicyOneDurationPresetsMax = 50;
+
+export const getSchedulingPolicyResponsePolicyOneDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSchedulingPolicyResponsePolicyOneUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getSchedulingPolicyResponsePolicyOneUpdatedByUserIdMax = 200;
+
+export const getSchedulingPolicyResponseContextOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSchedulingPolicyResponseContextPolicyRevisionMin = 0;
+export const getSchedulingPolicyResponseContextPolicyRevisionMax = 9007199254740991;
+
+export const getSchedulingPolicyResponseContextPolicyDigestOneRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const getSchedulingPolicyResponseContextInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSchedulingPolicyResponseContextApplicableRulesNewTravelGapMinutesMin = 0;
+export const getSchedulingPolicyResponseContextApplicableRulesNewTravelGapMinutesMax = 1440;
+
+export const getSchedulingPolicyResponseContextApplicableRulesCompanyCeilingOneMax = 100;
+
+export const getSchedulingPolicyResponseContextApplicableRulesInspectionCeilingOneMax = 9007199254740991;
+
+export const getSchedulingPolicyResponseContextSourceOneLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSchedulingPolicyResponseContextSourceOneContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSchedulingPolicyResponseContextSourceOnePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSchedulingPolicyResponseContextSourceOneEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSchedulingPolicyResponseContextTargetVersionOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getSchedulingPolicyResponseContextTargetFingerprintOneRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const GetSchedulingPolicyResponse = zod.object({
+  "policy": zod.union([zod.object({
+  "formatVersion": zod.literal(1),
+  "revision": zod.int().min(1).max(getSchedulingPolicyResponsePolicyOneRevisionMax),
+  "enabled": zod.boolean(),
+  "timeZone": zod.string().min(1),
+  "minimumTravelGapMinutes": zod.int().min(getSchedulingPolicyResponsePolicyOneMinimumTravelGapMinutesMin).max(getSchedulingPolicyResponsePolicyOneMinimumTravelGapMinutesMax),
+  "maxConcurrentReservations": zod.union([zod.int().min(1).max(getSchedulingPolicyResponsePolicyOneMaxConcurrentReservationsOneMax),zod.null()]),
+  "durationPresets": zod.array(zod.object({
+  "id": zod.uuid().regex(getSchedulingPolicyResponsePolicyOneDurationPresetsItemIdRegExp),
+  "label": zod.string().min(1).max(getSchedulingPolicyResponsePolicyOneDurationPresetsItemLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(getSchedulingPolicyResponsePolicyOneDurationPresetsItemElapsedMinutesMax)
+}).strict()).max(getSchedulingPolicyResponsePolicyOneDurationPresetsMax),
+  "digest": zod.string().regex(getSchedulingPolicyResponsePolicyOneDigestRegExp),
+  "updatedAt": zod.string().regex(getSchedulingPolicyResponsePolicyOneUpdatedAtRegExp),
+  "updatedByUserId": zod.string().min(1).max(getSchedulingPolicyResponsePolicyOneUpdatedByUserIdMax)
+}).strict(),zod.null()]),
+  "context": zod.object({
+  "organizationId": zod.uuid().regex(getSchedulingPolicyResponseContextOrganizationIdRegExp),
+  "policyRevision": zod.int().min(getSchedulingPolicyResponseContextPolicyRevisionMin).max(getSchedulingPolicyResponseContextPolicyRevisionMax),
+  "policyDigest": zod.union([zod.string().regex(getSchedulingPolicyResponseContextPolicyDigestOneRegExp),zod.null()]),
+  "companyTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(getSchedulingPolicyResponseContextInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "applicableRules": zod.object({
+  "newTravelGapMinutes": zod.int().min(getSchedulingPolicyResponseContextApplicableRulesNewTravelGapMinutesMin).max(getSchedulingPolicyResponseContextApplicableRulesNewTravelGapMinutesMax),
+  "companyCeiling": zod.union([zod.int().min(1).max(getSchedulingPolicyResponseContextApplicableRulesCompanyCeilingOneMax),zod.null()]),
+  "inspectionCeiling": zod.union([zod.int().min(1).max(getSchedulingPolicyResponseContextApplicableRulesInspectionCeilingOneMax),zod.null()])
+}).strict(),
+  "source": zod.union([zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(getSchedulingPolicyResponseContextSourceOneLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(getSchedulingPolicyResponseContextSourceOneContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(getSchedulingPolicyResponseContextSourceOnePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(getSchedulingPolicyResponseContextSourceOneEstimateIdOneRegExp),zod.null()])
+}).strict(),zod.null()]),
+  "targetVersion": zod.union([zod.string().regex(getSchedulingPolicyResponseContextTargetVersionOneRegExp),zod.null()]),
+  "targetFingerprint": zod.union([zod.string().regex(getSchedulingPolicyResponseContextTargetFingerprintOneRegExp),zod.null()])
+}).strict()
+}).strict()
+
+
+/**
+ * @summary Save explicitly reviewed scheduling policy
+ */
+export const saveSchedulingPolicyBodyExpectedRevisionMin = 0;
+export const saveSchedulingPolicyBodyExpectedRevisionMax = 9007199254740991;
+
+
+export const saveSchedulingPolicyBodyMinimumTravelGapMinutesMin = 0;
+export const saveSchedulingPolicyBodyMinimumTravelGapMinutesMax = 1440;
+
+export const saveSchedulingPolicyBodyMaxConcurrentReservationsOneMax = 100;
+
+export const saveSchedulingPolicyBodyDurationPresetsItemLabelMax = 80;
+
+export const saveSchedulingPolicyBodyDurationPresetsItemElapsedMinutesMax = 1440;
+
+export const saveSchedulingPolicyBodyDurationPresetsMax = 50;
+
+
+
+export const SaveSchedulingPolicyBody = zod.object({
+  "expectedRevision": zod.int().min(saveSchedulingPolicyBodyExpectedRevisionMin).max(saveSchedulingPolicyBodyExpectedRevisionMax),
+  "expectedCompanyTimeZone": zod.string().min(1),
+  "enabled": zod.boolean(),
+  "minimumTravelGapMinutes": zod.int().min(saveSchedulingPolicyBodyMinimumTravelGapMinutesMin).max(saveSchedulingPolicyBodyMinimumTravelGapMinutesMax),
+  "maxConcurrentReservations": zod.union([zod.int().min(1).max(saveSchedulingPolicyBodyMaxConcurrentReservationsOneMax),zod.null()]),
+  "durationPresets": zod.array(zod.object({
+  "id": zod.union([zod.uuid(),zod.null()]),
+  "label": zod.string().min(1).max(saveSchedulingPolicyBodyDurationPresetsItemLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(saveSchedulingPolicyBodyDurationPresetsItemElapsedMinutesMax)
+}).strict()).max(saveSchedulingPolicyBodyDurationPresetsMax)
+}).strict()
+
+export const saveSchedulingPolicyResponsePolicyOneRevisionMax = 9007199254740991;
+
+
+export const saveSchedulingPolicyResponsePolicyOneMinimumTravelGapMinutesMin = 0;
+export const saveSchedulingPolicyResponsePolicyOneMinimumTravelGapMinutesMax = 1440;
+
+export const saveSchedulingPolicyResponsePolicyOneMaxConcurrentReservationsOneMax = 100;
+
+export const saveSchedulingPolicyResponsePolicyOneDurationPresetsItemIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveSchedulingPolicyResponsePolicyOneDurationPresetsItemLabelMax = 80;
+
+export const saveSchedulingPolicyResponsePolicyOneDurationPresetsItemElapsedMinutesMax = 1440;
+
+export const saveSchedulingPolicyResponsePolicyOneDurationPresetsMax = 50;
+
+export const saveSchedulingPolicyResponsePolicyOneDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const saveSchedulingPolicyResponsePolicyOneUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const saveSchedulingPolicyResponsePolicyOneUpdatedByUserIdMax = 200;
+
+export const saveSchedulingPolicyResponseContextOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveSchedulingPolicyResponseContextPolicyRevisionMin = 0;
+export const saveSchedulingPolicyResponseContextPolicyRevisionMax = 9007199254740991;
+
+export const saveSchedulingPolicyResponseContextPolicyDigestOneRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const saveSchedulingPolicyResponseContextInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const saveSchedulingPolicyResponseContextApplicableRulesNewTravelGapMinutesMin = 0;
+export const saveSchedulingPolicyResponseContextApplicableRulesNewTravelGapMinutesMax = 1440;
+
+export const saveSchedulingPolicyResponseContextApplicableRulesCompanyCeilingOneMax = 100;
+
+export const saveSchedulingPolicyResponseContextApplicableRulesInspectionCeilingOneMax = 9007199254740991;
+
+export const saveSchedulingPolicyResponseContextSourceOneLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveSchedulingPolicyResponseContextSourceOneContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveSchedulingPolicyResponseContextSourceOnePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveSchedulingPolicyResponseContextSourceOneEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const saveSchedulingPolicyResponseContextTargetVersionOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const saveSchedulingPolicyResponseContextTargetFingerprintOneRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const SaveSchedulingPolicyResponse = zod.object({
+  "policy": zod.union([zod.object({
+  "formatVersion": zod.literal(1),
+  "revision": zod.int().min(1).max(saveSchedulingPolicyResponsePolicyOneRevisionMax),
+  "enabled": zod.boolean(),
+  "timeZone": zod.string().min(1),
+  "minimumTravelGapMinutes": zod.int().min(saveSchedulingPolicyResponsePolicyOneMinimumTravelGapMinutesMin).max(saveSchedulingPolicyResponsePolicyOneMinimumTravelGapMinutesMax),
+  "maxConcurrentReservations": zod.union([zod.int().min(1).max(saveSchedulingPolicyResponsePolicyOneMaxConcurrentReservationsOneMax),zod.null()]),
+  "durationPresets": zod.array(zod.object({
+  "id": zod.uuid().regex(saveSchedulingPolicyResponsePolicyOneDurationPresetsItemIdRegExp),
+  "label": zod.string().min(1).max(saveSchedulingPolicyResponsePolicyOneDurationPresetsItemLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(saveSchedulingPolicyResponsePolicyOneDurationPresetsItemElapsedMinutesMax)
+}).strict()).max(saveSchedulingPolicyResponsePolicyOneDurationPresetsMax),
+  "digest": zod.string().regex(saveSchedulingPolicyResponsePolicyOneDigestRegExp),
+  "updatedAt": zod.string().regex(saveSchedulingPolicyResponsePolicyOneUpdatedAtRegExp),
+  "updatedByUserId": zod.string().min(1).max(saveSchedulingPolicyResponsePolicyOneUpdatedByUserIdMax)
+}).strict(),zod.null()]),
+  "context": zod.object({
+  "organizationId": zod.uuid().regex(saveSchedulingPolicyResponseContextOrganizationIdRegExp),
+  "policyRevision": zod.int().min(saveSchedulingPolicyResponseContextPolicyRevisionMin).max(saveSchedulingPolicyResponseContextPolicyRevisionMax),
+  "policyDigest": zod.union([zod.string().regex(saveSchedulingPolicyResponseContextPolicyDigestOneRegExp),zod.null()]),
+  "companyTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(saveSchedulingPolicyResponseContextInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "applicableRules": zod.object({
+  "newTravelGapMinutes": zod.int().min(saveSchedulingPolicyResponseContextApplicableRulesNewTravelGapMinutesMin).max(saveSchedulingPolicyResponseContextApplicableRulesNewTravelGapMinutesMax),
+  "companyCeiling": zod.union([zod.int().min(1).max(saveSchedulingPolicyResponseContextApplicableRulesCompanyCeilingOneMax),zod.null()]),
+  "inspectionCeiling": zod.union([zod.int().min(1).max(saveSchedulingPolicyResponseContextApplicableRulesInspectionCeilingOneMax),zod.null()])
+}).strict(),
+  "source": zod.union([zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(saveSchedulingPolicyResponseContextSourceOneLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(saveSchedulingPolicyResponseContextSourceOneContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(saveSchedulingPolicyResponseContextSourceOnePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(saveSchedulingPolicyResponseContextSourceOneEstimateIdOneRegExp),zod.null()])
+}).strict(),zod.null()]),
+  "targetVersion": zod.union([zod.string().regex(saveSchedulingPolicyResponseContextTargetVersionOneRegExp),zod.null()]),
+  "targetFingerprint": zod.union([zod.string().regex(saveSchedulingPolicyResponseContextTargetFingerprintOneRegExp),zod.null()])
+}).strict()
+}).strict()
+
+
+/**
+ * @summary Review source-scoped scheduling rules and target version
+ */
+export const GetSchedulingReviewContextQueryParams = zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "sourceId": zod.uuid().optional(),
+  "propertyId": zod.uuid().optional(),
+  "estimateId": zod.uuid().optional(),
+  "reservationKind": zod.enum(['appointment', 'project']),
+  "appointmentType": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']).optional(),
+  "targetKind": zod.enum(['appointment', 'project']).optional(),
+  "targetId": zod.uuid().optional()
+}).strict()
+
+export const getSchedulingReviewContextResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSchedulingReviewContextResponsePolicyRevisionMin = 0;
+export const getSchedulingReviewContextResponsePolicyRevisionMax = 9007199254740991;
+
+export const getSchedulingReviewContextResponsePolicyDigestOneRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const getSchedulingReviewContextResponseInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const getSchedulingReviewContextResponseApplicableRulesNewTravelGapMinutesMin = 0;
+export const getSchedulingReviewContextResponseApplicableRulesNewTravelGapMinutesMax = 1440;
+
+export const getSchedulingReviewContextResponseApplicableRulesCompanyCeilingOneMax = 100;
+
+export const getSchedulingReviewContextResponseApplicableRulesInspectionCeilingOneMax = 9007199254740991;
+
+export const getSchedulingReviewContextResponseSourceOneLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSchedulingReviewContextResponseSourceOneContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSchedulingReviewContextResponseSourceOnePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSchedulingReviewContextResponseSourceOneEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const getSchedulingReviewContextResponseTargetVersionOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const getSchedulingReviewContextResponseTargetFingerprintOneRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const GetSchedulingReviewContextResponse = zod.object({
+  "organizationId": zod.uuid().regex(getSchedulingReviewContextResponseOrganizationIdRegExp),
+  "policyRevision": zod.int().min(getSchedulingReviewContextResponsePolicyRevisionMin).max(getSchedulingReviewContextResponsePolicyRevisionMax),
+  "policyDigest": zod.union([zod.string().regex(getSchedulingReviewContextResponsePolicyDigestOneRegExp),zod.null()]),
+  "companyTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(getSchedulingReviewContextResponseInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "applicableRules": zod.object({
+  "newTravelGapMinutes": zod.int().min(getSchedulingReviewContextResponseApplicableRulesNewTravelGapMinutesMin).max(getSchedulingReviewContextResponseApplicableRulesNewTravelGapMinutesMax),
+  "companyCeiling": zod.union([zod.int().min(1).max(getSchedulingReviewContextResponseApplicableRulesCompanyCeilingOneMax),zod.null()]),
+  "inspectionCeiling": zod.union([zod.int().min(1).max(getSchedulingReviewContextResponseApplicableRulesInspectionCeilingOneMax),zod.null()])
+}).strict(),
+  "source": zod.union([zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(getSchedulingReviewContextResponseSourceOneLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(getSchedulingReviewContextResponseSourceOneContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(getSchedulingReviewContextResponseSourceOnePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(getSchedulingReviewContextResponseSourceOneEstimateIdOneRegExp),zod.null()])
+}).strict(),zod.null()]),
+  "targetVersion": zod.union([zod.string().regex(getSchedulingReviewContextResponseTargetVersionOneRegExp),zod.null()]),
+  "targetFingerprint": zod.union([zod.string().regex(getSchedulingReviewContextResponseTargetFingerprintOneRegExp),zod.null()])
+}).strict()
+
+
+/**
+ * Receipt implementation is owned by Task4. Never books or retries CREATE. A missing target, list match, GET or transport error is not no-commit proof. A no_commit_refused acknowledgement is permanent.
+ * @summary Reconcile the exact retained original manual command
+ */
+export const reconcileSchedulingOperationBodyOneOperationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyOneReviewContextOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyOneReviewContextPolicyRevisionMin = 0;
+export const reconcileSchedulingOperationBodyOneReviewContextPolicyRevisionMax = 9007199254740991;
+
+export const reconcileSchedulingOperationBodyOneReviewContextPolicyDigestOneRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const reconcileSchedulingOperationBodyOneReviewContextInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const reconcileSchedulingOperationBodyOneReviewContextApplicableRulesNewTravelGapMinutesMin = 0;
+export const reconcileSchedulingOperationBodyOneReviewContextApplicableRulesNewTravelGapMinutesMax = 1440;
+
+export const reconcileSchedulingOperationBodyOneReviewContextApplicableRulesCompanyCeilingOneMax = 100;
+
+export const reconcileSchedulingOperationBodyOneReviewContextApplicableRulesInspectionCeilingOneMax = 9007199254740991;
+
+export const reconcileSchedulingOperationBodyOneReviewContextSourceOneLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyOneReviewContextSourceOneContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyOneReviewContextSourceOnePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyOneReviewContextSourceOneEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyOneReviewContextTargetVersionOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const reconcileSchedulingOperationBodyOneReviewContextTargetFingerprintOneRegExp = new RegExp('^[a-f0-9]{64}$');
+export const reconcileSchedulingOperationBodyOneReviewDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyOneReviewDurationPresetOneLabelMax = 80;
+
+export const reconcileSchedulingOperationBodyOneReviewDurationPresetOneElapsedMinutesMax = 1440;
+
+export const reconcileSchedulingOperationBodyOneReviewStartWallTimeOneLocalDateTimeRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::[0-5]\\d(?:\\.\\d{1,3})?)?$');
+export const reconcileSchedulingOperationBodyOneReviewStartWallTimeOneOffsetRegExp = new RegExp('^[+-](?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$');
+
+export const reconcileSchedulingOperationBodyOneReviewEndWallTimeOneLocalDateTimeRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::[0-5]\\d(?:\\.\\d{1,3})?)?$');
+export const reconcileSchedulingOperationBodyOneReviewEndWallTimeOneOffsetRegExp = new RegExp('^[+-](?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$');
+
+export const reconcileSchedulingOperationBodyOneBodyScheduledStartRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const reconcileSchedulingOperationBodyOneBodyScheduledEndRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const reconcileSchedulingOperationBodyOneBodyLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyOneBodyContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyOneBodyPropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyOneBodyAssignedUserIdMax = 200;
+
+export const reconcileSchedulingOperationBodyTwoOperationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyTwoReviewContextOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyTwoReviewContextPolicyRevisionMin = 0;
+export const reconcileSchedulingOperationBodyTwoReviewContextPolicyRevisionMax = 9007199254740991;
+
+export const reconcileSchedulingOperationBodyTwoReviewContextPolicyDigestOneRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const reconcileSchedulingOperationBodyTwoReviewContextInspectionOneAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const reconcileSchedulingOperationBodyTwoReviewContextApplicableRulesNewTravelGapMinutesMin = 0;
+export const reconcileSchedulingOperationBodyTwoReviewContextApplicableRulesNewTravelGapMinutesMax = 1440;
+
+export const reconcileSchedulingOperationBodyTwoReviewContextApplicableRulesCompanyCeilingOneMax = 100;
+
+export const reconcileSchedulingOperationBodyTwoReviewContextApplicableRulesInspectionCeilingOneMax = 9007199254740991;
+
+export const reconcileSchedulingOperationBodyTwoReviewContextSourceOneLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyTwoReviewContextSourceOneContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyTwoReviewContextSourceOnePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyTwoReviewContextSourceOneEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyTwoReviewContextTargetVersionOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const reconcileSchedulingOperationBodyTwoReviewContextTargetFingerprintOneRegExp = new RegExp('^[a-f0-9]{64}$');
+export const reconcileSchedulingOperationBodyTwoReviewDurationPresetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyTwoReviewDurationPresetOneLabelMax = 80;
+
+export const reconcileSchedulingOperationBodyTwoReviewDurationPresetOneElapsedMinutesMax = 1440;
+
+export const reconcileSchedulingOperationBodyTwoReviewStartWallTimeOneLocalDateTimeRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::[0-5]\\d(?:\\.\\d{1,3})?)?$');
+export const reconcileSchedulingOperationBodyTwoReviewStartWallTimeOneOffsetRegExp = new RegExp('^[+-](?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$');
+
+export const reconcileSchedulingOperationBodyTwoReviewEndWallTimeOneLocalDateTimeRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(?::[0-5]\\d(?:\\.\\d{1,3})?)?$');
+export const reconcileSchedulingOperationBodyTwoReviewEndWallTimeOneOffsetRegExp = new RegExp('^[+-](?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$');
+
+export const reconcileSchedulingOperationBodyTwoBodyLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+export const reconcileSchedulingOperationBodyTwoBodyEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationBodyTwoBodyScheduledStartRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const reconcileSchedulingOperationBodyTwoBodyScheduledEndRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const reconcileSchedulingOperationBodyTwoBodyCrewUserIdsItemMax = 200;
+
+
+
+export const ReconcileSchedulingOperationBody = zod.union([zod.object({
+  "operationId": zod.uuid().regex(reconcileSchedulingOperationBodyOneOperationIdRegExp),
+  "review": zod.object({
+  "context": zod.object({
+  "organizationId": zod.uuid().regex(reconcileSchedulingOperationBodyOneReviewContextOrganizationIdRegExp),
+  "policyRevision": zod.int().min(reconcileSchedulingOperationBodyOneReviewContextPolicyRevisionMin).max(reconcileSchedulingOperationBodyOneReviewContextPolicyRevisionMax),
+  "policyDigest": zod.union([zod.string().regex(reconcileSchedulingOperationBodyOneReviewContextPolicyDigestOneRegExp),zod.null()]),
+  "companyTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(reconcileSchedulingOperationBodyOneReviewContextInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "applicableRules": zod.object({
+  "newTravelGapMinutes": zod.int().min(reconcileSchedulingOperationBodyOneReviewContextApplicableRulesNewTravelGapMinutesMin).max(reconcileSchedulingOperationBodyOneReviewContextApplicableRulesNewTravelGapMinutesMax),
+  "companyCeiling": zod.union([zod.int().min(1).max(reconcileSchedulingOperationBodyOneReviewContextApplicableRulesCompanyCeilingOneMax),zod.null()]),
+  "inspectionCeiling": zod.union([zod.int().min(1).max(reconcileSchedulingOperationBodyOneReviewContextApplicableRulesInspectionCeilingOneMax),zod.null()])
+}).strict(),
+  "source": zod.union([zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(reconcileSchedulingOperationBodyOneReviewContextSourceOneLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(reconcileSchedulingOperationBodyOneReviewContextSourceOneContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(reconcileSchedulingOperationBodyOneReviewContextSourceOnePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(reconcileSchedulingOperationBodyOneReviewContextSourceOneEstimateIdOneRegExp),zod.null()])
+}).strict(),zod.null()]),
+  "targetVersion": zod.union([zod.string().regex(reconcileSchedulingOperationBodyOneReviewContextTargetVersionOneRegExp),zod.null()]),
+  "targetFingerprint": zod.union([zod.string().regex(reconcileSchedulingOperationBodyOneReviewContextTargetFingerprintOneRegExp),zod.null()])
+}).strict(),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(reconcileSchedulingOperationBodyOneReviewDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(reconcileSchedulingOperationBodyOneReviewDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(reconcileSchedulingOperationBodyOneReviewDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "startWallTime": zod.union([zod.object({
+  "localDateTime": zod.string().regex(reconcileSchedulingOperationBodyOneReviewStartWallTimeOneLocalDateTimeRegExp),
+  "offset": zod.string().regex(reconcileSchedulingOperationBodyOneReviewStartWallTimeOneOffsetRegExp),
+  "timeZone": zod.string().min(1)
+}).strict(),zod.null()]),
+  "endWallTime": zod.union([zod.object({
+  "localDateTime": zod.string().regex(reconcileSchedulingOperationBodyOneReviewEndWallTimeOneLocalDateTimeRegExp),
+  "offset": zod.string().regex(reconcileSchedulingOperationBodyOneReviewEndWallTimeOneOffsetRegExp),
+  "timeZone": zod.string().min(1)
+}).strict(),zod.null()])
+}).strict(),
+  "kind": zod.literal("appointment_create"),
+  "body": zod.object({
+  "scheduledStart": zod.string().regex(reconcileSchedulingOperationBodyOneBodyScheduledStartRegExp),
+  "scheduledEnd": zod.string().regex(reconcileSchedulingOperationBodyOneBodyScheduledEndRegExp).optional(),
+  "leadId": zod.uuid().regex(reconcileSchedulingOperationBodyOneBodyLeadIdRegExp).optional(),
+  "contactId": zod.uuid().regex(reconcileSchedulingOperationBodyOneBodyContactIdRegExp).optional(),
+  "propertyId": zod.union([zod.uuid().regex(reconcileSchedulingOperationBodyOneBodyPropertyIdOneRegExp),zod.null()]).optional(),
+  "assignedUserId": zod.string().min(1).max(reconcileSchedulingOperationBodyOneBodyAssignedUserIdMax).optional(),
+  "type": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']).optional(),
+  "status": zod.enum(['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show']).optional(),
+  "notes": zod.string().optional()
+}).strict()
+}).strict(),zod.object({
+  "operationId": zod.uuid().regex(reconcileSchedulingOperationBodyTwoOperationIdRegExp),
+  "review": zod.object({
+  "context": zod.object({
+  "organizationId": zod.uuid().regex(reconcileSchedulingOperationBodyTwoReviewContextOrganizationIdRegExp),
+  "policyRevision": zod.int().min(reconcileSchedulingOperationBodyTwoReviewContextPolicyRevisionMin).max(reconcileSchedulingOperationBodyTwoReviewContextPolicyRevisionMax),
+  "policyDigest": zod.union([zod.string().regex(reconcileSchedulingOperationBodyTwoReviewContextPolicyDigestOneRegExp),zod.null()]),
+  "companyTimeZone": zod.string().min(1),
+  "inspection": zod.union([zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(reconcileSchedulingOperationBodyTwoReviewContextInspectionOneAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict(),zod.null()]),
+  "applicableRules": zod.object({
+  "newTravelGapMinutes": zod.int().min(reconcileSchedulingOperationBodyTwoReviewContextApplicableRulesNewTravelGapMinutesMin).max(reconcileSchedulingOperationBodyTwoReviewContextApplicableRulesNewTravelGapMinutesMax),
+  "companyCeiling": zod.union([zod.int().min(1).max(reconcileSchedulingOperationBodyTwoReviewContextApplicableRulesCompanyCeilingOneMax),zod.null()]),
+  "inspectionCeiling": zod.union([zod.int().min(1).max(reconcileSchedulingOperationBodyTwoReviewContextApplicableRulesInspectionCeilingOneMax),zod.null()])
+}).strict(),
+  "source": zod.union([zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(reconcileSchedulingOperationBodyTwoReviewContextSourceOneLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(reconcileSchedulingOperationBodyTwoReviewContextSourceOneContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(reconcileSchedulingOperationBodyTwoReviewContextSourceOnePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(reconcileSchedulingOperationBodyTwoReviewContextSourceOneEstimateIdOneRegExp),zod.null()])
+}).strict(),zod.null()]),
+  "targetVersion": zod.union([zod.string().regex(reconcileSchedulingOperationBodyTwoReviewContextTargetVersionOneRegExp),zod.null()]),
+  "targetFingerprint": zod.union([zod.string().regex(reconcileSchedulingOperationBodyTwoReviewContextTargetFingerprintOneRegExp),zod.null()])
+}).strict(),
+  "duration": zod.object({
+  "kind": zod.enum(['explicit', 'preserved_interval', 'inspection_interval', 'preset']),
+  "preset": zod.union([zod.object({
+  "id": zod.uuid().regex(reconcileSchedulingOperationBodyTwoReviewDurationPresetOneIdRegExp),
+  "label": zod.string().min(1).max(reconcileSchedulingOperationBodyTwoReviewDurationPresetOneLabelMax),
+  "elapsedMinutes": zod.int().min(1).max(reconcileSchedulingOperationBodyTwoReviewDurationPresetOneElapsedMinutesMax)
+}).strict(),zod.null()])
+}).strict(),
+  "startWallTime": zod.union([zod.object({
+  "localDateTime": zod.string().regex(reconcileSchedulingOperationBodyTwoReviewStartWallTimeOneLocalDateTimeRegExp),
+  "offset": zod.string().regex(reconcileSchedulingOperationBodyTwoReviewStartWallTimeOneOffsetRegExp),
+  "timeZone": zod.string().min(1)
+}).strict(),zod.null()]),
+  "endWallTime": zod.union([zod.object({
+  "localDateTime": zod.string().regex(reconcileSchedulingOperationBodyTwoReviewEndWallTimeOneLocalDateTimeRegExp),
+  "offset": zod.string().regex(reconcileSchedulingOperationBodyTwoReviewEndWallTimeOneOffsetRegExp),
+  "timeZone": zod.string().min(1)
+}).strict(),zod.null()])
+}).strict(),
+  "kind": zod.literal("project_create"),
+  "body": zod.object({
+  "leadId": zod.uuid().regex(reconcileSchedulingOperationBodyTwoBodyLeadIdRegExp),
+  "name": zod.string().min(1),
+  "estimateId": zod.uuid().regex(reconcileSchedulingOperationBodyTwoBodyEstimateIdRegExp).optional(),
+  "status": zod.enum(['scheduled', 'in_progress', 'on_hold', 'completed', 'cancelled']).optional(),
+  "scheduledStart": zod.string().regex(reconcileSchedulingOperationBodyTwoBodyScheduledStartRegExp).optional(),
+  "scheduledEnd": zod.string().regex(reconcileSchedulingOperationBodyTwoBodyScheduledEndRegExp).optional(),
+  "crewUserIds": zod.array(zod.string().min(1).max(reconcileSchedulingOperationBodyTwoBodyCrewUserIdsItemMax)).optional(),
+  "crewNotes": zod.string().optional()
+}).strict()
+}).strict()])
+
+export const reconcileSchedulingOperationResponseOperationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationResponseOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationResponseActorUserIdMax = 200;
+
+export const reconcileSchedulingOperationResponseSourceLeadIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationResponseSourceContactIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationResponseSourcePropertyIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationResponseSourceEstimateIdOneRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const reconcileSchedulingOperationResponsePayloadSha256RegExp = new RegExp('^[a-f0-9]{64}$');
+export const reconcileSchedulingOperationResponseTargetOneIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+
+
+
+export const ReconcileSchedulingOperationResponse = zod.object({
+  "operationId": zod.uuid().regex(reconcileSchedulingOperationResponseOperationIdRegExp),
+  "organizationId": zod.uuid().regex(reconcileSchedulingOperationResponseOrganizationIdRegExp),
+  "actorUserId": zod.string().min(1).max(reconcileSchedulingOperationResponseActorUserIdMax),
+  "kind": zod.enum(['appointment_create', 'project_create']),
+  "source": zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.union([zod.uuid().regex(reconcileSchedulingOperationResponseSourceLeadIdOneRegExp),zod.null()]),
+  "contactId": zod.union([zod.uuid().regex(reconcileSchedulingOperationResponseSourceContactIdOneRegExp),zod.null()]),
+  "propertyId": zod.union([zod.uuid().regex(reconcileSchedulingOperationResponseSourcePropertyIdOneRegExp),zod.null()]),
+  "estimateId": zod.union([zod.uuid().regex(reconcileSchedulingOperationResponseSourceEstimateIdOneRegExp),zod.null()])
+}).strict(),
+  "payloadSha256": zod.string().regex(reconcileSchedulingOperationResponsePayloadSha256RegExp),
+  "outcome": zod.enum(['committed', 'no_commit_refused']),
+  "target": zod.union([zod.object({
+  "kind": zod.enum(['appointment', 'project']),
+  "id": zod.uuid().regex(reconcileSchedulingOperationResponseTargetOneIdRegExp),
+  "available": zod.boolean()
+}).strict(),zod.null()]),
+  "refusalCode": zod.union([zod.string().min(1),zod.null()])
+}).strict()
 
 

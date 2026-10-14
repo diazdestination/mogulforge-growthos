@@ -5,6 +5,564 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+export interface DurationPreset {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minimum 1
+     * @maximum 1440
+     */
+  elapsedMinutes: number;
+}
+
+export interface SchedulingPolicy {
+  formatVersion: 1;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  revision: number;
+  enabled: boolean;
+  /** @minLength 1 */
+  timeZone: string;
+  /**
+     * @minimum 0
+     * @maximum 1440
+     */
+  minimumTravelGapMinutes: number;
+  maxConcurrentReservations: number | null;
+  /** @maxItems 50 */
+  durationPresets: DurationPreset[];
+  /** @pattern ^[a-f0-9]{64}$ */
+  digest: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  updatedAt: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  updatedByUserId: string;
+}
+
+export type InspectionContextSourceState = typeof InspectionContextSourceState[keyof typeof InspectionContextSourceState];
+
+
+export const InspectionContextSourceState = {
+  recorded: 'recorded',
+  legacy_default: 'legacy_default',
+  legacy_normalized: 'legacy_normalized',
+} as const;
+
+export interface InspectionContext {
+  /** @minLength 1 */
+  ruleTimeZone: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  availabilityDigest: string;
+  sourceState: InspectionContextSourceState;
+}
+
+export type ManualSourceRefSourceKind = typeof ManualSourceRefSourceKind[keyof typeof ManualSourceRefSourceKind];
+
+
+export const ManualSourceRefSourceKind = {
+  lead: 'lead',
+  direct_customer: 'direct_customer',
+  unlinked_manual: 'unlinked_manual',
+} as const;
+
+export interface ManualSourceRef {
+  sourceKind: ManualSourceRefSourceKind;
+  leadId: string | null;
+  contactId: string | null;
+  propertyId: string | null;
+  estimateId: string | null;
+}
+
+export type SchedulingReviewContextApplicableRules = {
+  /**
+     * @minimum 0
+     * @maximum 1440
+     */
+  newTravelGapMinutes: number;
+  companyCeiling: number | null;
+  inspectionCeiling: number | null;
+};
+
+export interface SchedulingReviewContext {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  policyRevision: number;
+  policyDigest: string | null;
+  /** @minLength 1 */
+  companyTimeZone: string;
+  inspection: InspectionContext | null;
+  applicableRules: SchedulingReviewContextApplicableRules;
+  source: ManualSourceRef | null;
+  targetVersion: string | null;
+  targetFingerprint: string | null;
+}
+
+export interface PolicyReadResult {
+  policy: SchedulingPolicy | null;
+  context: SchedulingReviewContext;
+}
+
+export type PolicySaveInputDurationPresetsItem = {
+  id: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minimum 1
+     * @maximum 1440
+     */
+  elapsedMinutes: number;
+};
+
+export interface PolicySaveInput {
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  expectedRevision: number;
+  /** @minLength 1 */
+  expectedCompanyTimeZone: string;
+  enabled: boolean;
+  /**
+     * @minimum 0
+     * @maximum 1440
+     */
+  minimumTravelGapMinutes: number;
+  maxConcurrentReservations: number | null;
+  /** @maxItems 50 */
+  durationPresets: PolicySaveInputDurationPresetsItem[];
+}
+
+export type ManualSchedulingAckKind = typeof ManualSchedulingAckKind[keyof typeof ManualSchedulingAckKind];
+
+
+export const ManualSchedulingAckKind = {
+  appointment_create: 'appointment_create',
+  project_create: 'project_create',
+} as const;
+
+export type ManualSchedulingAckOutcome = typeof ManualSchedulingAckOutcome[keyof typeof ManualSchedulingAckOutcome];
+
+
+export const ManualSchedulingAckOutcome = {
+  committed: 'committed',
+  no_commit_refused: 'no_commit_refused',
+} as const;
+
+export type ManualSchedulingAckTargetKind = typeof ManualSchedulingAckTargetKind[keyof typeof ManualSchedulingAckTargetKind];
+
+
+export const ManualSchedulingAckTargetKind = {
+  appointment: 'appointment',
+  project: 'project',
+} as const;
+
+export type ManualSchedulingAckTarget = {
+  kind: ManualSchedulingAckTargetKind;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  available: boolean;
+} | null;
+
+export interface ManualSchedulingAck {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  operationId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  actorUserId: string;
+  kind: ManualSchedulingAckKind;
+  source: ManualSourceRef;
+  /** @pattern ^[a-f0-9]{64}$ */
+  payloadSha256: string;
+  outcome: ManualSchedulingAckOutcome;
+  target: ManualSchedulingAckTarget;
+  refusalCode: string | null;
+}
+
+export type ManualSchedulingCommand = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  operationId: string;
+  review: {
+  context: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  policyRevision: number;
+  policyDigest: string | null;
+  /** @minLength 1 */
+  companyTimeZone: string;
+  inspection: {
+  /** @minLength 1 */
+  ruleTimeZone: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  availabilityDigest: string;
+  sourceState: 'recorded' | 'legacy_default' | 'legacy_normalized';
+} | null;
+  applicableRules: {
+  /**
+     * @minimum 0
+     * @maximum 1440
+     */
+  newTravelGapMinutes: number;
+  companyCeiling: number | null;
+  inspectionCeiling: number | null;
+};
+  source: {
+  sourceKind: 'lead' | 'direct_customer' | 'unlinked_manual';
+  leadId: string | null;
+  contactId: string | null;
+  propertyId: string | null;
+  estimateId: string | null;
+} | null;
+  targetVersion: string | null;
+  targetFingerprint: string | null;
+};
+  duration: {
+  kind: 'explicit' | 'preserved_interval' | 'inspection_interval' | 'preset';
+  preset: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minimum 1
+     * @maximum 1440
+     */
+  elapsedMinutes: number;
+} | null;
+};
+  startWallTime: {
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::[0-5]\d(?:\.\d{1,3})?)?$ */
+  localDateTime: string;
+  /** @pattern ^[+-](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$ */
+  offset: string;
+  /** @minLength 1 */
+  timeZone: string;
+} | null;
+  endWallTime: {
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::[0-5]\d(?:\.\d{1,3})?)?$ */
+  localDateTime: string;
+  /** @pattern ^[+-](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$ */
+  offset: string;
+  /** @minLength 1 */
+  timeZone: string;
+} | null;
+};
+  kind: 'appointment_create';
+  body: {
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  scheduledStart: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  scheduledEnd?: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId?: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId?: string;
+  propertyId?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  assignedUserId?: string;
+  type?: 'inspection' | 'estimate_review' | 'production' | 'final_walkthrough' | 'other';
+  status?: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
+  notes?: string;
+};
+} | {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  operationId: string;
+  review: {
+  context: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  policyRevision: number;
+  policyDigest: string | null;
+  /** @minLength 1 */
+  companyTimeZone: string;
+  inspection: {
+  /** @minLength 1 */
+  ruleTimeZone: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  availabilityDigest: string;
+  sourceState: 'recorded' | 'legacy_default' | 'legacy_normalized';
+} | null;
+  applicableRules: {
+  /**
+     * @minimum 0
+     * @maximum 1440
+     */
+  newTravelGapMinutes: number;
+  companyCeiling: number | null;
+  inspectionCeiling: number | null;
+};
+  source: {
+  sourceKind: 'lead' | 'direct_customer' | 'unlinked_manual';
+  leadId: string | null;
+  contactId: string | null;
+  propertyId: string | null;
+  estimateId: string | null;
+} | null;
+  targetVersion: string | null;
+  targetFingerprint: string | null;
+};
+  duration: {
+  kind: 'explicit' | 'preserved_interval' | 'inspection_interval' | 'preset';
+  preset: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  label: string;
+  /**
+     * @minimum 1
+     * @maximum 1440
+     */
+  elapsedMinutes: number;
+} | null;
+};
+  startWallTime: {
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::[0-5]\d(?:\.\d{1,3})?)?$ */
+  localDateTime: string;
+  /** @pattern ^[+-](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$ */
+  offset: string;
+  /** @minLength 1 */
+  timeZone: string;
+} | null;
+  endWallTime: {
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::[0-5]\d(?:\.\d{1,3})?)?$ */
+  localDateTime: string;
+  /** @pattern ^[+-](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$ */
+  offset: string;
+  /** @minLength 1 */
+  timeZone: string;
+} | null;
+};
+  kind: 'project_create';
+  body: {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string;
+  /** @minLength 1 */
+  name: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId?: string;
+  status?: 'scheduled' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  scheduledStart?: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  scheduledEnd?: string;
+  /**
+     * @items.minLength 1
+     * @items.maxLength 200
+     */
+  crewUserIds?: string[];
+  crewNotes?: string;
+};
+};
+
+export type NativeProjectCreateInputStatus = typeof NativeProjectCreateInputStatus[keyof typeof NativeProjectCreateInputStatus];
+
+
+export const NativeProjectCreateInputStatus = {
+  scheduled: 'scheduled',
+  in_progress: 'in_progress',
+  on_hold: 'on_hold',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface NativeProjectCreateInput {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string;
+  /** @minLength 1 */
+  name: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId?: string;
+  status?: NativeProjectCreateInputStatus;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  scheduledStart?: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  scheduledEnd?: string;
+  /**
+     * @items.minLength 1
+     * @items.maxLength 200
+     */
+  crewUserIds?: string[];
+  crewNotes?: string;
+}
+
+export type NativeAppointmentCreateInputType = typeof NativeAppointmentCreateInputType[keyof typeof NativeAppointmentCreateInputType];
+
+
+export const NativeAppointmentCreateInputType = {
+  inspection: 'inspection',
+  estimate_review: 'estimate_review',
+  production: 'production',
+  final_walkthrough: 'final_walkthrough',
+  other: 'other',
+} as const;
+
+export type NativeAppointmentCreateInputStatus = typeof NativeAppointmentCreateInputStatus[keyof typeof NativeAppointmentCreateInputStatus];
+
+
+export const NativeAppointmentCreateInputStatus = {
+  scheduled: 'scheduled',
+  confirmed: 'confirmed',
+  completed: 'completed',
+  cancelled: 'cancelled',
+  no_show: 'no_show',
+} as const;
+
+export interface NativeAppointmentCreateInput {
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  scheduledStart: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  scheduledEnd?: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId?: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId?: string;
+  propertyId?: string | null;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  assignedUserId?: string;
+  type?: NativeAppointmentCreateInputType;
+  status?: NativeAppointmentCreateInputStatus;
+  notes?: string;
+}
+
+export type DurationChoiceKind = typeof DurationChoiceKind[keyof typeof DurationChoiceKind];
+
+
+export const DurationChoiceKind = {
+  explicit: 'explicit',
+  preserved_interval: 'preserved_interval',
+  inspection_interval: 'inspection_interval',
+  preset: 'preset',
+} as const;
+
+export interface DurationChoice {
+  kind: DurationChoiceKind;
+  preset: DurationPreset | null;
+}
+
+export interface WallTimeEvidence {
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::[0-5]\d(?:\.\d{1,3})?)?$ */
+  localDateTime: string;
+  /** @pattern ^[+-](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$ */
+  offset: string;
+  /** @minLength 1 */
+  timeZone: string;
+}
+
+export interface SchedulingMutationReview {
+  context: SchedulingReviewContext;
+  duration: DurationChoice;
+  startWallTime: WallTimeEvidence | null;
+  endWallTime: WallTimeEvidence | null;
+}
+
+export type ReservationSnapshotTargetKind = typeof ReservationSnapshotTargetKind[keyof typeof ReservationSnapshotTargetKind];
+
+
+export const ReservationSnapshotTargetKind = {
+  appointment: 'appointment',
+  project: 'project',
+} as const;
+
+export type ReservationSnapshotTarget = {
+  kind: ReservationSnapshotTargetKind;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  id: string;
+};
+
+export type ReservationSnapshotLastTransitionKind = typeof ReservationSnapshotLastTransitionKind[keyof typeof ReservationSnapshotLastTransitionKind];
+
+
+export const ReservationSnapshotLastTransitionKind = {
+  admission: 'admission',
+  release: 'release',
+} as const;
+
+export type ReservationSnapshotLastTransition = {
+  kind: ReservationSnapshotLastTransitionKind;
+  actorUserId: string | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  at: string;
+};
+
+export interface ReservationSnapshot {
+  formatVersion: 1;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  reservationRevision: number;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  sourcePolicyRevision: number;
+  /** @pattern ^[a-f0-9]{64}$ */
+  sourcePolicyDigest: string;
+  /** @minLength 1 */
+  approvedTimeZone: string;
+  inspection: InspectionContext | null;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  startAt: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  endAt: string;
+  /**
+     * @items.minLength 1
+     * @items.maxLength 200
+     */
+  resourceUserIds: string[];
+  /**
+     * @minimum 0
+     * @maximum 1440
+     */
+  minimumTravelGapMinutes: number;
+  duration: DurationChoice;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  admittedAt: string;
+  admittedByUserId: string | null;
+  target: ReservationSnapshotTarget;
+  lastTransition: ReservationSnapshotLastTransition;
+}
+
 export type StaffLeadAlertCoverageStatus = typeof StaffLeadAlertCoverageStatus[keyof typeof StaffLeadAlertCoverageStatus];
 
 
@@ -9747,6 +10305,15 @@ export const ProjectSourceKind = {
   customer_work: 'customer_work',
 } as const;
 
+export type ProjectSchedulingEvidence = typeof ProjectSchedulingEvidence[keyof typeof ProjectSchedulingEvidence];
+
+
+export const ProjectSchedulingEvidence = {
+  legacy: 'legacy',
+  versioned: 'versioned',
+  invalid: 'invalid',
+} as const;
+
 export interface Project {
   id: string;
   organizationId: string;
@@ -9782,6 +10349,18 @@ export interface Project {
   workVersion?: number | null;
   customerLabel?: string;
   propertyLabel?: string | null;
+  schedulingReservation?: ReservationSnapshot | null;
+  schedulingEvidence?: ProjectSchedulingEvidence;
+  /** @pattern ^[a-f0-9]{64}$ */
+  schedulingTargetFingerprint?: string;
+  schedulingCompanyTimeZone?: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @nullable
+     */
+  schedulingPolicyRevision?: number | null;
+  schedulingOperation?: ManualSchedulingAck;
 }
 
 export interface ProjectInput {
@@ -9794,6 +10373,8 @@ export interface ProjectInput {
   scheduledEnd?: string;
   crewUserIds?: string[];
   crewNotes?: string;
+  operationId?: string;
+  schedulingReview?: SchedulingMutationReview;
 }
 
 export interface ProjectUpdate {
@@ -9811,6 +10392,9 @@ export interface ProjectUpdate {
   crewNotes?: string | null;
   /** Last observed update token; stale edits return 409. */
   expectedUpdatedAt?: string;
+  schedulingReview?: SchedulingMutationReview;
+  /** @pattern ^[a-f0-9]{64}$ */
+  expectedTargetFingerprint?: string;
 }
 
 export type ActivityMetadata = { [key: string]: unknown };
@@ -9911,6 +10495,15 @@ export interface CrmTaskUpdate {
   dueAt?: string | null;
 }
 
+export type AppointmentSchedulingEvidence = typeof AppointmentSchedulingEvidence[keyof typeof AppointmentSchedulingEvidence];
+
+
+export const AppointmentSchedulingEvidence = {
+  legacy: 'legacy',
+  versioned: 'versioned',
+  invalid: 'invalid',
+} as const;
+
 export interface Appointment {
   id: string;
   organizationId: string;
@@ -9936,6 +10529,18 @@ export interface Appointment {
   notes?: string | null;
   createdAt: string;
   updatedAt?: string;
+  schedulingReservation?: ReservationSnapshot | null;
+  schedulingEvidence?: AppointmentSchedulingEvidence;
+  /** @pattern ^[a-f0-9]{64}$ */
+  schedulingTargetFingerprint?: string;
+  schedulingCompanyTimeZone?: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @nullable
+     */
+  schedulingPolicyRevision?: number | null;
+  schedulingOperation?: ManualSchedulingAck;
 }
 
 export interface AppointmentInput {
@@ -9949,6 +10554,8 @@ export interface AppointmentInput {
   scheduledStart: string;
   scheduledEnd?: string;
   notes?: string;
+  operationId?: string;
+  schedulingReview?: SchedulingMutationReview;
 }
 
 export interface AppointmentUpdate {
@@ -9969,6 +10576,9 @@ export interface AppointmentUpdate {
   notes?: string | null;
   /** Last observed update token; stale edits return 409. */
   expectedUpdatedAt?: string;
+  schedulingReview?: SchedulingMutationReview;
+  /** @pattern ^[a-f0-9]{64}$ */
+  expectedTargetFingerprint?: string;
 }
 
 export type DashboardSummaryLeadsByStatusItem = {
@@ -11929,6 +12539,8 @@ export interface CreateOrgInput {
 export interface UpdatePlatformOrgInput {
   name?: string;
   timezone?: string;
+  /** Required with timezone; exact company zone the platform operator reviewed. */
+  expectedTimeZone?: string;
 }
 
 export interface OrgEnvelope {
@@ -14568,6 +15180,15 @@ export interface ContractorDayTask {
   actionPath: string;
 }
 
+export type ContractorDayAppointmentSchedulingEvidence = typeof ContractorDayAppointmentSchedulingEvidence[keyof typeof ContractorDayAppointmentSchedulingEvidence];
+
+
+export const ContractorDayAppointmentSchedulingEvidence = {
+  legacy: 'legacy',
+  versioned: 'versioned',
+  invalid: 'invalid',
+} as const;
+
 export interface ContractorDayAppointment {
   id: string;
   title: string;
@@ -14586,7 +15207,27 @@ export interface ContractorDayAppointment {
   scheduledStart: string;
   /** @nullable */
   scheduledEnd: string | null;
+  schedulingReservation?: ReservationSnapshot | null;
+  schedulingEvidence?: ContractorDayAppointmentSchedulingEvidence;
+  /** @pattern ^[a-f0-9]{64}$ */
+  schedulingTargetFingerprint?: string;
+  schedulingCompanyTimeZone?: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @nullable
+     */
+  schedulingPolicyRevision?: number | null;
 }
+
+export type ContractorDayProjectSchedulingEvidence = typeof ContractorDayProjectSchedulingEvidence[keyof typeof ContractorDayProjectSchedulingEvidence];
+
+
+export const ContractorDayProjectSchedulingEvidence = {
+  legacy: 'legacy',
+  versioned: 'versioned',
+  invalid: 'invalid',
+} as const;
 
 export interface ContractorDayProject {
   id: string;
@@ -14602,6 +15243,17 @@ export interface ContractorDayProject {
   scheduledEnd: string | null;
   customerWorkId?: string | null;
   contactId?: string;
+  schedulingReservation?: ReservationSnapshot | null;
+  schedulingEvidence?: ContractorDayProjectSchedulingEvidence;
+  /** @pattern ^[a-f0-9]{64}$ */
+  schedulingTargetFingerprint?: string;
+  schedulingCompanyTimeZone?: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @nullable
+     */
+  schedulingPolicyRevision?: number | null;
 }
 
 export interface ContractorDayService {
@@ -14668,6 +15320,15 @@ export type ContractorTodayServices = {
   truncated: boolean;
 };
 
+export type ContractorTodaySchedulingPolicyState = typeof ContractorTodaySchedulingPolicyState[keyof typeof ContractorTodaySchedulingPolicyState];
+
+
+export const ContractorTodaySchedulingPolicyState = {
+  unconfigured: 'unconfigured',
+  configured: 'configured',
+  invalid: 'invalid',
+} as const;
+
 export interface ContractorToday {
   organizationId: string;
   generatedAt: string;
@@ -14681,6 +15342,13 @@ export interface ContractorToday {
   appointments: ContractorTodayAppointments;
   projects: ContractorTodayProjects;
   services: ContractorTodayServices;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @nullable
+     */
+  schedulingPolicyRevision?: number | null;
+  schedulingPolicyState?: ContractorTodaySchedulingPolicyState;
 }
 
 export interface ServiceRecurrenceCommand {
@@ -15223,4 +15891,40 @@ export type ListLeadMailboxRepliesParams = {
  */
 offset?: number;
 };
+
+export type GetSchedulingReviewContextParams = {
+sourceKind: GetSchedulingReviewContextSourceKind;
+sourceId?: string;
+propertyId?: string;
+estimateId?: string;
+reservationKind: GetSchedulingReviewContextReservationKind;
+appointmentType?: AppointmentType;
+targetKind?: GetSchedulingReviewContextTargetKind;
+targetId?: string;
+};
+
+export type GetSchedulingReviewContextSourceKind = typeof GetSchedulingReviewContextSourceKind[keyof typeof GetSchedulingReviewContextSourceKind];
+
+
+export const GetSchedulingReviewContextSourceKind = {
+  lead: 'lead',
+  direct_customer: 'direct_customer',
+  unlinked_manual: 'unlinked_manual',
+} as const;
+
+export type GetSchedulingReviewContextReservationKind = typeof GetSchedulingReviewContextReservationKind[keyof typeof GetSchedulingReviewContextReservationKind];
+
+
+export const GetSchedulingReviewContextReservationKind = {
+  appointment: 'appointment',
+  project: 'project',
+} as const;
+
+export type GetSchedulingReviewContextTargetKind = typeof GetSchedulingReviewContextTargetKind[keyof typeof GetSchedulingReviewContextTargetKind];
+
+
+export const GetSchedulingReviewContextTargetKind = {
+  appointment: 'appointment',
+  project: 'project',
+} as const;
 

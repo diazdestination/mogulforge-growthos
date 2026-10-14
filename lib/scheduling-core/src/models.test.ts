@@ -56,6 +56,14 @@ describe('policy validation', () => {
 });
 
 describe('closed scheduling DTOs', () => {
+  it('preserves a legacy inspection ceiling above 100 without widening the company ceiling', () => {
+    const rules = { newTravelGapMinutes: 0, companyCeiling: null, inspectionCeiling: 101 };
+    expect(schedulingReviewContextSchema.safeParse({ ...context, applicableRules: rules }).success).toBe(true);
+    expect(schedulingReviewContextSchema.safeParse({ ...context, applicableRules: { ...rules, companyCeiling: 101 } }).success).toBe(false);
+    for (const inspectionCeiling of [0, 1.5, Number.MAX_SAFE_INTEGER + 1, Infinity]) {
+      expect(schedulingReviewContextSchema.safeParse({ ...context, applicableRules: { ...rules, inspectionCeiling } }).success).toBe(false);
+    }
+  });
   it('refuses unknown keys and missing required keys at every model boundary', () => {
     for (const [schema, value] of [[schedulingPolicySchema, policy], [reservationSnapshotSchema, snapshot], [schedulingReviewContextSchema, context], [schedulingMutationReviewSchema, review]] as const) {
       expect(schema.safeParse(value).success).toBe(true);
