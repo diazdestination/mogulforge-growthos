@@ -1,4 +1,5 @@
 import { isNotNull, sql } from "drizzle-orm";
+import type { ReservationSnapshot } from "@workspace/scheduling-core";
 import {
   check,
   foreignKey,
@@ -36,6 +37,7 @@ export const projectsTable = pgTable(
     status: projectStatusEnum("status").notNull().default("scheduled"),
     scheduledStart: timestamp("scheduled_start", { withTimezone: true }),
     scheduledEnd: timestamp("scheduled_end", { withTimezone: true }),
+    schedulingReservation: jsonb("scheduling_reservation").$type<ReservationSnapshot>(),
     crewUserIds: jsonb("crew_user_ids")
       .$type<string[]>()
       .notNull()
@@ -51,6 +53,30 @@ export const projectsTable = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
+    check("projects_scheduling_reservation_ck", sql`${table.schedulingReservation} is null or coalesce((
+      jsonb_typeof(${table.schedulingReservation}) = 'object'
+      and ${table.schedulingReservation}->'formatVersion' = '1'::jsonb
+      and case when jsonb_typeof(${table.schedulingReservation}->'reservationRevision') = 'number' then
+        (${table.schedulingReservation}->>'reservationRevision')::numeric between 1 and 9007199254740991
+        and trunc((${table.schedulingReservation}->>'reservationRevision')::numeric) = (${table.schedulingReservation}->>'reservationRevision')::numeric else false end
+      and case when jsonb_typeof(${table.schedulingReservation}->'sourcePolicyRevision') = 'number' then
+        (${table.schedulingReservation}->>'sourcePolicyRevision')::numeric between 1 and 9007199254740991
+        and trunc((${table.schedulingReservation}->>'sourcePolicyRevision')::numeric) = (${table.schedulingReservation}->>'sourcePolicyRevision')::numeric else false end
+      and jsonb_typeof(${table.schedulingReservation}->'sourcePolicyDigest') = 'string'
+      and jsonb_typeof(${table.schedulingReservation}->'approvedTimeZone') = 'string'
+      and jsonb_typeof(${table.schedulingReservation}->'inspection') in ('null', 'object')
+      and jsonb_typeof(${table.schedulingReservation}->'startAt') = 'string'
+      and jsonb_typeof(${table.schedulingReservation}->'endAt') = 'string'
+      and jsonb_typeof(${table.schedulingReservation}->'resourceUserIds') = 'array'
+      and case when jsonb_typeof(${table.schedulingReservation}->'minimumTravelGapMinutes') = 'number' then
+        (${table.schedulingReservation}->>'minimumTravelGapMinutes')::numeric between 0 and 1440
+        and trunc((${table.schedulingReservation}->>'minimumTravelGapMinutes')::numeric) = (${table.schedulingReservation}->>'minimumTravelGapMinutes')::numeric else false end
+      and jsonb_typeof(${table.schedulingReservation}->'duration') = 'object'
+      and jsonb_typeof(${table.schedulingReservation}->'admittedAt') = 'string'
+      and jsonb_typeof(${table.schedulingReservation}->'admittedByUserId') in ('null', 'string')
+      and jsonb_typeof(${table.schedulingReservation}->'target') = 'object'
+      and jsonb_typeof(${table.schedulingReservation}->'lastTransition') = 'object'
+    ), false)`),
     unique("projects_org_work_id_uq").on(table.organizationId, table.id, table.customerWorkId),
     uniqueIndex("projects_work_root_uq").on(table.customerWorkId).where(sql`${table.customerWorkId} is not null`),
     foreignKey({ columns: [table.organizationId, table.customerWorkId], foreignColumns: [customerWorkRootsTable.organizationId, customerWorkRootsTable.id], name: "projects_customer_work_fk" }),
@@ -70,6 +96,7 @@ export const insertProjectSchema = createInsertSchema(projectsTable).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  schedulingReservation: true,
 });
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projectsTable.$inferSelect;
