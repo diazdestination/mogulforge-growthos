@@ -807,11 +807,12 @@ it("rejects same-version resource drift and protected active end clearing while 
     .update(projectsTable)
     .set({ schedulingReservation: malformed })
     .where(eq(projectsTable.id, result.project.id));
+  const closureInput = { ...edit(input, 1), status: "completed" as const };
   const closed = await updateCustomerWorkProject(
     f.org,
     f.actor,
     result.project.id,
-    { ...edit(input, 1), status: "completed" },
+    closureInput,
   );
   expect(closed.project).toMatchObject({
     schedulingReservation: null,
@@ -826,7 +827,17 @@ it("rejects same-version resource drift and protected active end clearing while 
         .where(eq(projectsTable.id, result.project.id))
     )[0].schedulingReservation,
   ).toEqual(malformed);
-  expect((await events(f)).at(-1)?.metadata).toMatchObject({
+  const closureTransition = (await events(f)).find((event) => {
+    const target = event.metadata.target as
+      | { kind?: string; id?: string }
+      | undefined;
+    return (
+      event.metadata.sourceId === closureInput.requestId.toLowerCase() &&
+      target?.kind === "project" &&
+      target.id === closed.project.id
+    );
+  });
+  expect(closureTransition?.metadata).toMatchObject({
     before: null,
     after: null,
     invalidHistoricalEvidenceRetained: true,

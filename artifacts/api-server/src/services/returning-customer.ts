@@ -485,7 +485,7 @@ function returningAuthority(
     organizationId: org,
     actorUserId: actor.userId,
     origin: "returning_command",
-    sourceId: requestId,
+    sourceId: requestId.toLowerCase(),
     reviewMode: "reviewed",
   };
 }
