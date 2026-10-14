@@ -40,3 +40,31 @@ export function addElapsedMinutes(start: ISO, minutes: number): ISO {
   if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) throw new RangeError('Elapsed minutes must be an integer from 1 to 1440');
   return Temporal.Instant.from(start).add({ minutes }).toString({ fractionalSecondDigits: 3 });
 }
+
+/** Build a shifted draft from an existing range without applying preset limits. */
+export function shiftElapsedInterval(existingStart: ISO, existingEnd: ISO, newStart: ISO): { startAt: ISO; endAt: ISO } {
+  isoSchema.parse(existingStart);
+  isoSchema.parse(existingEnd);
+  isoSchema.parse(newStart);
+  const start = Temporal.Instant.from(existingStart);
+  const end = Temporal.Instant.from(existingEnd);
+  const shiftedStart = Temporal.Instant.from(newStart);
+  const elapsedMilliseconds = end.epochMilliseconds - start.epochMilliseconds;
+  if (!Number.isSafeInteger(elapsedMilliseconds) || elapsedMilliseconds <= 0) throw new RangeError('Existing interval must have positive safe elapsed milliseconds');
+  if (Temporal.Instant.compare(start, shiftedStart) === 0) return { startAt: existingStart, endAt: existingEnd };
+  const endAt = shiftedStart.add({ milliseconds: elapsedMilliseconds }).toString({ fractionalSecondDigits: 3 });
+  isoSchema.parse(endAt);
+  return { startAt: newStart, endAt };
+}
+
+/** Describe an actual instant in the supplied company zone, including its occurrence. */
+export function formatSchedulingWallTime(instant: ISO, companyTimeZone: string): WallTimeEvidence {
+  isoSchema.parse(instant);
+  timeZoneSchema.parse(companyTimeZone);
+  const zoned = Temporal.Instant.from(instant).toZonedDateTimeISO(companyTimeZone);
+  return wallTimeEvidenceSchema.parse({
+    localDateTime: zoned.toPlainDateTime().toString({ fractionalSecondDigits: 3 }),
+    offset: zoned.offset,
+    timeZone: companyTimeZone,
+  });
+}
