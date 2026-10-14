@@ -49,8 +49,12 @@ export function deriveLivePolicies({
       oracle?.[75] &&
       oracle[95] &&
       oracle[142] &&
-      /^growthos_reader_[a-z0-9_]{1,32}$/.test(readerName ?? "") &&
-      /^growthos_reader_[a-z0-9_]{1,32}$/.test(templateReader ?? ""),
+      typeof readerName === "string" &&
+      /^growthos-reader-[a-f0-9]{32}$/.test(readerName) &&
+      typeof templateReader === "string" &&
+      // Legacy oracle templates retain their original private grammar only here.
+      (/^growthos_reader_[a-z0-9_]{1,32}$/.test(templateReader) ||
+        /^growthos-reader-[a-f0-9]{32}$/.test(templateReader)),
     "production75_live_policy_input",
   );
   const templates = rename(structuredClone(oracle), templateReader, readerName),

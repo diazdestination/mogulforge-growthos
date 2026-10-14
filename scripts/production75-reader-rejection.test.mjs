@@ -74,3 +74,7 @@ test('Reader success still requires exact identity and role; error-shaped 200 ne
  const f=await fixture({response:()=>new Response(JSON.stringify({errors:{role:['is invalid']},password:secret}),{status:200})});
  try{await expect(f.api.createReader(f.permit)).rejects.toMatchObject({safeCode:'production75_v1_response'});expect(f.dispatches()).toBe(1);}finally{f.close();}
 });
+test.each(['wrong-name','legacy-name','wrong-role'])('successful HTTP status refuses Reader identity mismatch %s with one consumed dispatch',async kind=>{
+ let expected;const f=await fixture({response:()=>new Response(JSON.stringify({data:{name:kind==='wrong-name'?'growthos-reader-00000000000000000000000000000000':kind==='legacy-name'?expected.replace('growthos-reader-','growthos_reader_'):expected,role:kind==='wrong-role'?'writer':'reader'}}),{status:200})});expected=f.plan.readerName;
+ try{await expect(f.api.createReader(f.permit)).rejects.toMatchObject({safeCode:'production75_v1_response'});await expect(f.api.createReader(f.permit)).rejects.toMatchObject({safeCode:'production75_custody_permit'});expect(f.dispatches()).toBe(1);}finally{f.close();}
+});

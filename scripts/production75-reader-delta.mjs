@@ -13,7 +13,7 @@ const equalRows=(a,b,code)=>check(isDeepStrictEqual(ordered(a),ordered(b)),code)
 const SECTION_KEYS=['roles','roleSettings','extensions','extensionObjects','databases'];
 const NAMES=['fly-db','growthos_staging','mogulforge-growthos-db'];
 export function expectedProduction75ReaderProfile(readerName){
- check(typeof readerName==='string'&&/^growthos_reader_[a-z0-9_]{1,32}$/.test(readerName),'production75_delta_profile');
+ check(typeof readerName==='string'&&/^growthos-reader-[a-f0-9]{32}$/.test(readerName),'production75_delta_profile');
  const p=freeze({role:{name:readerName,superuser:false,inherit:true,create_role:false,create_database:false,login:true,replication:false,bypass_rls:false,connection_limit:-1},membership:{role:'reader',member:readerName,grantor:'postgres',admin_option:false,inherit_option:true,set_option:true},roleSettings:[],readerLogin:readerName,readerRole:readerName});profiles.add(p);return p;
 }
 export function production75ProfileDigest(profile){check(profiles.has(profile),'production75_delta_profile');return sha(profile);}

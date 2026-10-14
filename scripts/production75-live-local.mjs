@@ -37,6 +37,7 @@ import {
 import {
   prepareOperatorPlan,
   operatorPlanDigest,
+  production75ReaderName,
 } from "./production75-custody.mjs";
 import {
   createProduction75V1Client,
@@ -541,7 +542,7 @@ async function run() {
       await initialize(sourceBox);
       const before = await capture(sourceBox),
         caseId = randomUUID(),
-        readerName = `growthos_reader_${caseId.replaceAll("-", "")}`,
+        readerName = production75ReaderName(caseId),
         profile = expectedProduction75ReaderProfile(readerName),
         manifest = sha(JSON.stringify(receipt.moduleHashesBefore));
       const plan = prepareOperatorPlan({

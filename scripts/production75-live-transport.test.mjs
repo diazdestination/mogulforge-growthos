@@ -301,7 +301,7 @@ test("failed writer cannot kill independent Reader reconciliation", async () => 
     reader = await f.transport.connect(
       p,
       "fly-db",
-      { user: "growthos_reader_fixture", password: "fixture" },
+      { user: "growthos-reader-abcdef01234546789abcdef012345678", password: "fixture" },
       { readonly: true, resources: r },
     );
   writer.emit("error", new Error("synthetic connection loss"));

@@ -19,12 +19,16 @@ const check=(ok,code)=>{if(!ok)throw error(code);};
 const keys=(o,allowed)=>o&&typeof o==='object'&&!Array.isArray(o)&&Object.keys(o).every(k=>allowed.includes(k));
 const clone=v=>{try{return structuredClone(v);}catch{throw error('production75_custody_shape');}};
 export const operatorPlanDigest=plan=>{check(plans.has(plan),'production75_custody_plan');return hash(plan);};
+export function production75ReaderName(runId){
+ check(typeof runId==='string'&&UUID.test(runId),'production75_custody_plan');
+ return `growthos-reader-${runId.replaceAll('-','')}`;
+}
 
 export function prepareOperatorPlan(input={}){
  const p=clone(input),allowed=['runId','backupId','sourceSnapshotSha256','profileSha256','moduleManifestSha256','preparedAt','workMs','cleanupMs','maxCostUsdMicros'];
  check(keys(p,allowed)&&Object.keys(p).length===allowed.length&&UUID.test(p.runId??'')&&/^[a-zA-Z0-9_.-]{1,128}$/.test(p.backupId??'')&&['sourceSnapshotSha256','profileSha256','moduleManifestSha256'].every(k=>HASH.test(p[k]??'')),'production75_custody_plan');
  check(Number.isSafeInteger(p.preparedAt)&&p.preparedAt>0&&Number.isSafeInteger(p.workMs)&&p.workMs>=1000&&p.workMs<=5400000&&Number.isSafeInteger(p.cleanupMs)&&p.cleanupMs>=10000&&p.cleanupMs<=1800000&&p.workMs+p.cleanupMs<=7200000&&Number.isSafeInteger(p.maxCostUsdMicros)&&p.maxCostUsdMicros>0&&p.maxCostUsdMicros<=1000000,'production75_custody_limits');
- const plan=freeze({...p,kind:'PRODUCTION75_ONE_COPY_OPERATOR',account:'diazdestination@gmail.com',organization:'adam-diaz',sourceCluster:SOURCE,protectedClusters:[SOURCE,STAGING],region:'iad',providerVersion:1,plan:'basic',sourceCandidate:'8df64dc72009832f93b2b491031acd1bb2afb903',copyName:`growthos-drill-${p.runId}`,readerName:`growthos_reader_${p.runId.replaceAll('-','')}`,workUntil:p.preparedAt+p.workMs,cleanupUntil:p.preparedAt+p.workMs+p.cleanupMs});
+ const plan=freeze({...p,kind:'PRODUCTION75_ONE_COPY_OPERATOR',account:'diazdestination@gmail.com',organization:'adam-diaz',sourceCluster:SOURCE,protectedClusters:[SOURCE,STAGING],region:'iad',providerVersion:1,plan:'basic',sourceCandidate:'8df64dc72009832f93b2b491031acd1bb2afb903',copyName:`growthos-drill-${p.runId}`,readerName:production75ReaderName(p.runId),workUntil:p.preparedAt+p.workMs,cleanupUntil:p.preparedAt+p.workMs+p.cleanupMs});
  plans.add(plan);return plan;
 }
 

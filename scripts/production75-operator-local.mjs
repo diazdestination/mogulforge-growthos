@@ -15,7 +15,7 @@ import {prepareProduction75,deriveProduction75Catalogs,captureProduction75Policy
 import {PINNED_FILES} from './production75-pins.mjs';
 import {buildProduction75Source} from './production75-source.mjs';
 import {collectSchemaCatalog,catalogDigest} from '../reports/release-preparation-2026-10-09/schema-catalog.mjs';
-import {prepareOperatorPlan,operatorPlanDigest} from './production75-custody.mjs';
+import {prepareOperatorPlan,operatorPlanDigest,production75ReaderName} from './production75-custody.mjs';
 import {createProduction75V1Client,useProduction75Credentials} from './production75-fly-v1.mjs';
 import {expectedProduction75ReaderProfile,production75ProfileDigest,production75SnapshotDigest} from './production75-reader-delta.mjs';
 import {runProduction75Operator} from './production75-operator.mjs';
@@ -64,7 +64,7 @@ async function run(){
  }
  try{
   for(const scenario of ['normal','lost-commit','idle-client-error']){
-   const sourceBox=await box();await initialize(sourceBox);const before=await capture(sourceBox),caseId=randomUUID(),readerName=`growthos_reader_${caseId.replaceAll('-','')}`,profile=expectedProduction75ReaderProfile(readerName),manifest=sha(JSON.stringify(receipt.moduleHashesBefore));
+   const sourceBox=await box();await initialize(sourceBox);const before=await capture(sourceBox),caseId=randomUUID(),readerName=production75ReaderName(caseId),profile=expectedProduction75ReaderProfile(readerName),manifest=sha(JSON.stringify(receipt.moduleHashesBefore));
    const plan=prepareOperatorPlan({runId:caseId,backupId:'backup_local_fixture',sourceSnapshotSha256:production75SnapshotDigest(before),profileSha256:production75ProfileDigest(profile),moduleManifestSha256:manifest,preparedAt:Date.now(),workMs:600000,cleanupMs:300000,maxCostUsdMicros:150000}),digest=operatorPlanDigest(plan);let copyBox=null,deleted=false,policies=null;const counts={create:0,reader:0,delete:0},meta=(id,name,version=1)=>({id,name,region:'iad',plan:'basic',version,status:'ready',organization:{Slug:'adam-diaz'},attached_apps:[]}),copyId='abcdefghijklmnop';
    const fetchFn=async(url,options)=>{
     check(new URL(url).origin==='https://api.fly.io','production75_operator_local_origin');const endpoint=new URL(url).pathname;let value;

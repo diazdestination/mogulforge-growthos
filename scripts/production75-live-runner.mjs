@@ -17,6 +17,7 @@ import {
 import {
   prepareOperatorPlan,
   operatorPlanDigest,
+  production75ReaderName,
 } from "./production75-custody.mjs";
 import {
   expectedProduction75ReaderProfile,
@@ -164,6 +165,7 @@ export async function prepareLivePacket(
     resources = createOperatorResources({ now, until: now() + 900000 });
   let packet, failure;
   try {
+    const readerName = production75ReaderName(runId);
     await transport.verifyIdentity();
     const inventory = await api.listClusters();
     check(
@@ -200,7 +202,7 @@ export async function prepareLivePacket(
     );
     await verifyLiveProtectedApps(transport, apps);
     const profile = expectedProduction75ReaderProfile(
-        `growthos_reader_${runId.replaceAll("-", "")}`,
+        readerName,
       ),
       projected = projectLiveReader(before, profile),
       delta = assertProduction75ReaderDelta({
