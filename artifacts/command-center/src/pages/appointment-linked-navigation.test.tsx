@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import Appointments from './appointments';
 import { mockApi, sampleMe } from '@/test/mock-api';
 import { localDateTime } from '@/lib/contractor-schedule';
+import { companyDayBounds } from '@workspace/scheduling-core';
+import { makeReservationSnapshot } from '@/test/scheduling-ui-fixtures';
 import { work as workdayWork, entry as workdayEntry, completion as workdayCompletion } from '@/test/workday-fixtures';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -14,8 +16,8 @@ const time = '2035-07-01T14:00:00.000Z';
 const appointment = () => ({ kind: 'appointment', id: appointmentId, createdAt: '2026-10-03T00:00:00.000Z', updatedAt: '2026-10-03T01:00:00.000Z', type: 'inspection', status: 'confirmed', scheduledStart: time, scheduledEnd: '2035-07-01T15:00:00.000Z', contactId, leadId: null, property: null, owner: { id: 'staff', name: 'Synthetic Technician' } });
 const detail = () => ({ organizationId: org, appointment: appointment(), permissions: { canWrite: true } });
 const path = `/appointments?appointmentId=${appointmentId}&organizationId=${org}`;
-function setup({ location = path, read, write }: { location?: string; read?: (url: string) => Response | Promise<Response> | undefined; write?: (url: string, init?: RequestInit) => Response | Promise<Response> | undefined } = {}) {
-  let profile = { ...sampleMe('admin'), organization: { id: org, name: 'Synthetic HVAC', slug: 'synthetic', timezone: 'UTC' } };
+function setup({ location = path, read, write, zone = 'UTC' }: { location?: string; zone?: string; read?: (url: string) => Response | Promise<Response> | undefined; write?: (url: string, init?: RequestInit) => Response | Promise<Response> | undefined } = {}) {
+  let profile = { ...sampleMe('admin'), organization: { id: org, name: 'Synthetic HVAC', slug: 'synthetic', timezone: zone } };
   let failed = false;
   const fetch = mockApi('admin'); const fallback = fetch.getMockImplementation()!;
   fetch.mockImplementation(async (input, init) => {
@@ -33,8 +35,34 @@ function setup({ location = path, read, write }: { location?: string; read?: (ur
   render(<QueryClientProvider client={client}><Router><Appointments /></Router></QueryClientProvider>);
   return { fetch, client, setProfile: (next: Partial<typeof profile>) => { profile = { ...profile, ...next }; }, fail: () => { failed = true; }, recover: () => { failed = false; } };
 }
-afterEach(() => { cleanup(); window.history.replaceState(null, '', '/'); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); sessionStorage.clear(); window.history.replaceState(null, '', '/'); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 describe('exact selected appointments', () => {
+  it('supplies the exact same-row native reservation projection to the independently validated linked detail', async () => {
+    const saved = makeReservationSnapshot({ target: { kind: 'appointment', id: appointmentId }, startAt: time, endAt: appointment().scheduledEnd, resourceUserIds: ['staff'] });
+    setup({ zone: 'America/Los_Angeles', read: url => url.includes('?') ? Response.json([{ ...appointment(), organizationId: org, schedulingReservation: saved, schedulingEvidence: 'versioned', assignedUserId: 'staff' }]) : undefined });
+    const selected = await screen.findByRole('region', { name: 'Selected appointment' });
+    expect(await within(selected).findByRole('group', { name: 'Scheduling reservation' })).toBeTruthy();
+    expect(within(selected).getByText('Saved travel gap: 60 minutes. Retained independently of current policy changes.')).toBeTruthy();
+    expect(within(selected).getByText('2035-07-01 07:00:00.000 -07:00 (America/Los_Angeles)')).toBeTruthy();
+  });
+  it('holds a stale native list projection instead of treating it as the exact selected detail', async () => {
+    setup({ read: url => url.includes('?') ? Response.json([{ ...appointment(), organizationId: org, updatedAt: '2026-10-03T02:00:00.000Z', schedulingReservation: null, schedulingEvidence: 'legacy' }]) : undefined });
+    const selected = await screen.findByRole('region', { name: 'Selected appointment' });
+    expect(await within(selected).findByText('Scheduling evidence does not match the validated appointment or is invalid. Display is held; saved protection cannot be assumed.')).toBeTruthy();
+    expect(within(selected).queryByText(/Legacy travel gap: 0/)).toBeNull();
+  });
+  it('shows the exact selected visit on its company calendar day across UTC midnight', async () => {
+    const start = '2035-07-02T01:00:00.000Z', zone = 'America/Los_Angeles';
+    const { fetch } = setup({ zone, read: url => url === `/api/v1/appointments/${appointmentId}` ? Response.json({ ...detail(), appointment: { ...appointment(), scheduledStart: start, scheduledEnd: '2035-07-02T02:00:00.000Z' } }) : undefined });
+    fireEvent.click(await screen.findByRole('button', { name: 'Show this day in schedule' }));
+    expect(screen.getByLabelText('Start date')).toHaveProperty('value', '2035-07-01');
+    const bounds = companyDayBounds('2035-07-01', zone);
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => {
+      const query = new URL(String(url), 'http://localhost');
+      return query.pathname === '/api/v1/appointments' && query.searchParams.get('from') === bounds.from && query.searchParams.get('to') === bounds.to;
+    })).toBe(true));
+    expect(screen.getByRole('region', { name: 'Selected appointment' })).toBeTruthy();
+  });
   it('propagates confirmed two-entry completion to the enclosing exact summary and read-back schedule without unmounting work', async () => {
     let savedStatus: 'scheduled' | 'completed' = 'scheduled';
     let native = workdayWork(); native.organizationId = org; native.appointment = { ...native.appointment, id: appointmentId, contactId, propertyId: null, status: 'scheduled', updatedAt: appointment().updatedAt };

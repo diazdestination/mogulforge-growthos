@@ -1,9 +1,11 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { getGetMeQueryKey } from '@workspace/api-client-react';
 import { Router } from 'wouter';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Appointments from './appointments';
+import { makePolicyReadResult } from '@/test/scheduling-ui-fixtures';
 import { mockApi, sampleMe } from '@/test/mock-api';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -23,6 +25,12 @@ function setup({ properties, existing = false, create }: { properties?: (url: st
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const path = url.split('?')[0], method = init?.method ?? 'GET';
     if (path === '/api/v1/me') return accessFailed ? Response.json({ error: 'Unavailable' }, { status: 403 }) : Response.json(profile);
+    if (path === '/api/v1/settings/scheduling-policy' || path === '/api/v1/scheduling/review-context') {
+      const params = new URL(url, 'http://localhost').searchParams, sourceKind = params.get('sourceKind') ?? 'unlinked_manual';
+      const value = makePolicyReadResult(); value.policy!.timeZone = 'UTC';
+      value.context = { ...value.context, organizationId, companyTimeZone: 'UTC', source: { sourceKind: sourceKind as 'lead'|'direct_customer'|'unlinked_manual', leadId: sourceKind === 'lead' ? params.get('sourceId') : null, contactId: sourceKind === 'lead' ? contactId : sourceKind === 'direct_customer' ? params.get('sourceId') : null, propertyId: params.get('propertyId'), estimateId: null }, targetVersion: existing ? nativeAppointment().updatedAt : null, targetFingerprint: existing ? 'b'.repeat(64) : null };
+      return Response.json(path.endsWith('review-context') ? value.context : value);
+    }
     if (path === '/api/v1/contacts') return Response.json([{ id: contactId, firstName: 'Service-only', lastName: 'Customer', email: null }, { id: otherContactId, firstName: 'Other', lastName: 'Customer', email: null }]);
     if (path === '/api/v1/leads') return Response.json([{ id: leadId, contactId, contactName: 'Optional opportunity', summary: 'Existing opportunity', serviceType: 'HVAC', status: 'new' }]);
     if (path === '/api/v1/settings/inspection-availability') return Response.json({ timezone: 'UTC', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], windows: [{ startHour: 0, endHour: 24 }], blackoutDates: [], slotCapacity: 10 });
@@ -37,19 +45,24 @@ function setup({ properties, existing = false, create }: { properties?: (url: st
 }
 async function openCreate() {
   fireEvent.click(await screen.findByRole('button', { name: 'Schedule appointment' }));
-  fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '2035-07-01T10:00' } });
+  await waitFor(() => expect(screen.getByLabelText('Service start')).toHaveProperty('disabled', false));
+  fireEvent.change(screen.getByLabelText('Service start'), { target: { value: '2035-07-01T10:00' } });
+  fireEvent.change(screen.getByLabelText('Service end'), { target: { value: '2035-07-01T12:00' } });
   await screen.findByRole('option', { name: 'Service-only Customer' });
 }
 function chooseCustomer(contact = contactId) { fireEvent.change(screen.getByTestId('appointment-contact'), { target: { value: contact } }); }
 function chooseProperty(n: number) { fireEvent.change(picker(), { target: { value: id(n) } }); }
 async function save(fetch: ReturnType<typeof mockApi>) {
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Review interval' })).toHaveProperty('disabled', false));
+  await userEvent.click(screen.getByRole('button', { name: 'Review interval' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', false));
   fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
   await waitFor(() => expect(fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true));
   const call = fetch.mock.calls.find(([, init]) => init?.method === 'POST')!;
   expect(String(call[0])).toBe('/api/v1/appointments');
   return JSON.parse(String(call[1]?.body));
 }
-afterEach(() => { cleanup(); window.history.replaceState(null, '', '/'); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); sessionStorage.clear(); window.history.replaceState(null, '', '/'); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('explicit properties on new manual appointments', () => {
   it.each([1, 2])('keeps %i customer properties unselected and creates a service-only visit with explicit null', async count => {
@@ -81,9 +94,11 @@ describe('explicit properties on new manual appointments', () => {
     await screen.findByRole('option', { name: /11 Fictional Lane/ }); chooseProperty(11);
     fireEvent.change(screen.getByRole('combobox', { name: 'Lead' }), { target: { value: leadId } });
     expect(picker()).toHaveProperty('value', ''); await screen.findByRole('option', { name: /10 Fictional Lane/ });
-    const body = await save(fetch);
-    // The server must reject this contradictory optional lead, not silently relink.
-    expect(body).toMatchObject({ contactId: otherContactId, leadId, propertyId: null });
+    await screen.findByText('Current scheduling review is unavailable. Refresh before changing the schedule.');
+    // Server-resolved source lineage rejects the contradictory selected customer
+    // before a command can acquire custody; no source is silently relinked.
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true);
+    expect(fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
     expect(fetch.mock.calls.filter(([url]) => String(url) === propertyPath(otherContactId))).toHaveLength(2);
   });
 
@@ -138,7 +153,7 @@ describe('explicit properties on new manual appointments', () => {
     let failed = true;
     const { fetch } = setup({ properties: () => !failed ? Response.json(page()) : mode === 'error' ? Response.json({ error: 'Unavailable' }, { status: 503 }) : Response.json({ ...page(), ...(mode === 'foreign-company' ? { organizationId: id(99) } : { contactId: id(99) }) }) });
     await openCreate(); chooseCustomer();
-    expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('not an empty-property result'));
+    expect(await screen.findByText(/not an empty-property result/)).toHaveProperty('textContent', expect.stringContaining('not an empty-property result'));
     expect(picker()).toHaveProperty('disabled', true); expect(screen.queryByRole('option', { name: /Fictional Lane/ })).toBeNull();
     expect(screen.queryByText('No linked properties were found for this customer.')).toBeNull();
     failed = false; fireEvent.click(screen.getByRole('button', { name: 'Retry customer properties' }));
