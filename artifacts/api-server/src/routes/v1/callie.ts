@@ -5,8 +5,8 @@ import { callieHuman } from "../../middlewares/callie-human";
 import { rateLimit } from "../../lib/rateLimit";
 import { contractorScheduleError } from "../../middlewares/contractor-mutation";
 import { approveCalliePolicy, CallieError, calliePolicyApprovalInputSchema, calliePolicyPreviewInputSchema, getCalliePolicy, previewCalliePolicy } from "../../services/callie-policy";
-import { assertCallieStaff, bookCallieVisit, CallieOfficeError, getCallieOfficeDetail, listCallieOffice, reviewCallieCaller, updateCallieOffice } from "../../services/callie-office";
-import { callieBookingSchema, callieCallerReviewSchema, callieListQuery, callieOfficeActionSchema } from "../../services/callie-office-contract";
+import { assertCallieStaff, bookCallieVisit, CallieOfficeError, getCallieOfficeDetail, getCallieSchedulingContext, listCallieOffice, reviewCallieCaller, updateCallieOffice } from "../../services/callie-office";
+import { callieBookingSchema, callieCallerReviewSchema, callieListQuery, callieOfficeActionSchema, callieSchedulingContextQuerySchema } from "../../services/callie-office-contract";
 import { CallieReceptionError, callieReceptionApprovalInputSchema, callieReceptionBindingInputSchema, callieReceptionPreviewInputSchema } from "../../services/callie-reception-contract";
 import { approveCallieReception, getCallieReception, previewCallieReception, saveCallieReceptionBinding } from "../../services/callie-reception-policy";
 import { receiveReceptionPostCall, runCallieReceptionTool } from "../../services/callie-reception-runtime";
@@ -62,6 +62,11 @@ router.get(base, requireMember("crm.read"), async (req, res) => {
   const query = callieListQuery.safeParse(req.query);
   if (!query.success) { res.status(400).json({ error: "Choose a valid CALLIE scope and page." }); return; }
   res.set("Cache-Control", "no-store").json(await listCallieOffice(req.member!.organizationId, req.member!.user.id, query.data));
+});
+router.get(`${base}/:id/scheduling-context`, requireMember("crm.read"), async (req, res) => {
+  const id = z.uuid().safeParse(req.params.id), query = callieSchedulingContextQuerySchema.safeParse(req.query);
+  if (!id.success || !query.success) { res.status(400).json({ error: "Choose the actual visit type and explicit customer property." }); return; }
+  res.set("Cache-Control", "no-store").json(await getCallieSchedulingContext(req.member!.organizationId, req.member!.user.id, id.data, query.data));
 });
 router.get(`${base}/:id`, requireMember("crm.read"), async (req, res) => {
   const id = z.uuid().safeParse(req.params.id);
