@@ -7,6 +7,9 @@
  * insurance approval, pricing, damage conclusions, or structural safety, and
  * emits emergency safety language when danger is indicated.
  */
+import { createHash, randomUUID } from "node:crypto";
+import { z } from "zod/v4";
+import { isoSchema, uuidSchema, digestSchema, manualSourceRefSchema, schedulingMutationReviewSchema, resolveWallTime, type ManualSourceRef, type SchedulingCandidate } from "@workspace/scheduling-core";
 import { dispatchWebhookEvent } from "./webhooks";
 import {
   DEFAULT_CONCIERGE_SETTINGS,
@@ -43,13 +46,17 @@ import {
   clampScore,
   leadAttributionColumns,
 } from "./attribution";
-import { insertInspectionIfAvailable } from "./inspection-booking";
+import { insertInspectionInTransaction, prepareInspectionInTransaction } from "./inspection-booking";
+import { appointmentCustomer, ScheduleError, type ScheduleTransaction } from "./contractor-scheduling";
+import { lockSchedulingConfiguration, readSchedulingContext, SchedulingPolicyError } from "./scheduling-policy";
+import { appendSchedulingTransition, unlinkedSchedulingSource, type ServerSchedulingAuthority } from "./scheduling-admission";
+import { CustomerLifecycleHoldError, getCustomerLifecycleStatus } from "./customer-lifecycle";
 import { stopEnrollmentsForLead } from "./playbooks";
 import { recordLeadOutcome } from "./playbook-learning";
 import { buildKnowledgeFacts, findKnowledgeAnswer } from "./knowledge";
 import { isSafeMailbox, mockAiProvider, openAiProvider, providers, type AiProvider } from "./providers";
 import { emailAcceptanceEvidence } from "./user-email";
-import { getAiInstructions, getConciergeSettings, getInspectionAvailability, getLeadScoring, getOrgSettings } from "./settings";
+import { getAiInstructions, getConciergeSettings, getLeadScoring, getOrgSettings } from "./settings";
 
 /** Concierge-scoped provider selection: real OpenAI when a key is present. */
 function conciergeAi(): AiProvider {
@@ -127,6 +134,22 @@ interface OfferedSlot {
   start: string; // ISO
   end: string; // ISO
 }
+export const conciergeInspectionOfferSchema = z.strictObject({
+  formatVersion: z.literal(1), organizationId: uuidSchema, conversationId: uuidSchema,
+  appointmentId: uuidSchema, label: z.string().min(1).max(500), start: isoSchema, end: isoSchema,
+  source: manualSourceRefSchema, sourceFingerprint: digestSchema, review: schedulingMutationReviewSchema,
+});
+export type ConciergeInspectionOffer = z.infer<typeof conciergeInspectionOfferSchema>;
+const conciergeBookingProofSchema = z.strictObject({
+  formatVersion: z.literal(1), appointmentId: uuidSchema, auditId: uuidSchema, offerFingerprint: digestSchema,
+  start: isoSchema, end: isoSchema, label: z.string().min(1).max(500),
+});
+function offerCanonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(offerCanonical).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.entries(value).filter(([,v]) => v !== undefined).sort(([a],[b]) => a.localeCompare(b)).map(([key,v]) => `${JSON.stringify(key)}:${offerCanonical(v)}`).join(",")}}`;
+  return JSON.stringify(value) ?? "null";
+}
+const offerFingerprint = (value: unknown) => createHash("sha256").update(offerCanonical(value)).digest("hex");
 function detectIntent(text: string, cfg: ConciergeConfig): string | undefined {
   const trimmed = text.trim().toLowerCase();
   const byLabel = cfg.intents.find((i) => i.label.toLowerCase() === trimmed);
@@ -806,7 +829,7 @@ export async function handleMessage(params: {
         break;
       }
       // Consent granted — offer real inspection windows before wrapping up.
-      const slots = await generateInspectionSlots(params.organizationId);
+      const slots = await generateInspectionSlots(params.organizationId, { conversationId: conversation.id });
       if (slots.length === 0) {
         state.step = "done";
         break;
@@ -815,7 +838,7 @@ export async function handleMessage(params: {
       state.step = "scheduling";
       out.push(
         [
-          "Great — I can actually get your inspection on the calendar right now. Here are the next open windows:",
+          "Here are the next company inspection windows. Technician assignment is pending:",
           ...slots.map((s, i) => `${i + 1}. ${s.label}`),
           "Pick one, or skip and our team will call to arrange a time.",
         ].join("\n"),
@@ -839,6 +862,7 @@ export async function handleMessage(params: {
       }
       const appointment = await bookInspectionSlot({
         organizationId: params.organizationId,
+        conversationId: conversation.id,
         slot,
         leadId: state.leadId ?? null,
         contactId: state.contactId ?? null,
@@ -846,13 +870,13 @@ export async function handleMessage(params: {
         notes: `Booked by ${cfg.assistantName} during chat${state.intent ? ` (${intents[state.intent]?.label ?? state.intent})` : ""}.`,
       });
       if (!appointment) {
-        // Someone else grabbed this window between offer and booking — re-offer.
-        const fresh = await generateInspectionSlots(params.organizationId);
+        // The original offer no longer matches current source or scheduling evidence.
+        const fresh = await generateInspectionSlots(params.organizationId, { conversationId: conversation.id });
         if (fresh.length === 0) {
           state.offeredSlots = [];
           state.slotDeclined = true;
           out.push(
-            "I'm sorry — that window was just taken by another homeowner, and I don't see any other open windows right now. Our team will call you to find a time that works.",
+            "That window or its scheduling details changed, and no current window is available. Our team will call you to arrange a time.",
           );
           state.step = "done";
           break;
@@ -860,7 +884,7 @@ export async function handleMessage(params: {
         state.offeredSlots = fresh;
         out.push(
           [
-            "I'm sorry — that window was just booked by someone else. Here are the windows still open:",
+            "That window or its scheduling details changed. Here are the current company inspection windows; technician assignment is pending:",
             ...fresh.map((s, i) => `${i + 1}. ${s.label}`),
             "Pick one, or skip and our team will call to arrange a time.",
           ].join("\n"),
@@ -871,40 +895,7 @@ export async function handleMessage(params: {
       state.appointmentId = appointment.id;
       state.appointmentStart = slot.start;
       state.appointmentLabel = slot.label;
-      // Queue the ~24h no-show reminder via the homeowner's preferred channel.
-      try {
-        await scheduleAppointmentReminder(
-          params.organizationId,
-          {
-            id: appointment.id,
-            leadId: state.leadId ?? null,
-            contactId: state.contactId ?? null,
-            scheduledStart: new Date(slot.start),
-          },
-          state.contactMethod,
-        );
-      } catch (err) {
-        console.error("[concierge] reminder scheduling failed:", err);
-      }
-      if (state.leadId) {
-        await db.insert(activitiesTable).values({
-          organizationId: params.organizationId,
-          leadId: state.leadId,
-          contactId: state.contactId ?? null,
-          type: "appointment_scheduled",
-          title: `Inspection booked via AI Concierge — ${slot.label}`,
-          body: `Homeowner selected this window in chat. Appointment ${appointment.id}.`,
-          metadata: { conversationId: conversation.id, appointmentId: appointment.id, scheduledStart: slot.start },
-        });
-      }
-      await db.insert(auditEventsTable).values({
-        organizationId: params.organizationId,
-        actorUserId: null,
-        action: "appointment.booked_concierge",
-        entityType: "appointment",
-        entityId: appointment.id,
-        metadata: { conversationId: conversation.id, leadId: state.leadId ?? null },
-      });
+      if (appointment.replayed) return { conversationId: conversation.id, messages: [`Your original inspection window is booked: ${slot.label}. Technician assignment is pending.`], quickReplies: [], emergency: state.urgency === "emergency", done: true, leadId: state.leadId ?? null, urgency: state.urgency };
       // Run the org's appointment.booked automations for chat bookings too
       // (same event the CRM API emits). The direct chat confirmation below is
       // separate and sent exactly once (guarded by confirmationSentVia); any
@@ -921,7 +912,7 @@ export async function handleMessage(params: {
         },
       });
       out.push(
-        `📅 You're booked: ${slot.label}. A licensed inspector will come to ${state.addressLine1 ?? "your property"} — if that time stops working, just call us and we'll move it.`,
+        `📅 Your inspection window is booked: ${slot.label}. Technician assignment is pending. Call us if you need to change the time.`,
       );
       state.step = "done";
       break;
@@ -1037,20 +1028,26 @@ export async function handleMessage(params: {
     );
   }
 
-  await db
-    .update(conversationsTable)
-    .set({
-      state: state as Record<string, unknown>,
-      intent: state.intent ?? null,
-      urgency: state.urgency,
-      status: finishing ? "completed" : resumed ? "active" : conversation.status,
-      // On resume, clear the abandoned-chat partial summary so the CRM does
-      // not show a stale "in progress" snapshot on an active conversation.
-      salesSummary: salesSummary ?? (resumed ? null : conversation.salesSummary),
-      leadId: state.leadId ?? conversation.leadId,
-      contactId: state.contactId ?? conversation.contactId,
-    })
-    .where(eq(conversationsTable.id, conversation.id));
+  // A handler may have started before another message committed a booking.
+  // Merge under the conversation lock so an old outer save cannot erase custody.
+  await db.transaction(async tx => {
+    const where = and(eq(conversationsTable.organizationId, params.organizationId), eq(conversationsTable.id, conversation.id));
+    const [current] = await tx.select().from(conversationsTable).where(where).for("update");
+    if (!current) return;
+    const saved = current.state as Partial<ConciergeState>;
+    if (saved.inspectionBooking !== undefined) {
+      conciergeBookingProofSchema.parse(saved.inspectionBooking);
+      for (const key of ["inspectionBooking", "appointmentId", "appointmentStart", "appointmentLabel", "offeredSlots", "leadId", "contactId", "propertyId", "consentGranted"] as const) (state as Record<string, unknown>)[key] = saved[key];
+      state.step = "done";
+      if (saved.confirmationSentVia) state.confirmationSentVia = saved.confirmationSentVia;
+    }
+    await tx.update(conversationsTable).set({
+      state: state as Record<string, unknown>, intent: state.intent ?? null, urgency: state.urgency,
+      status: saved.inspectionBooking !== undefined || finishing ? "completed" : resumed ? "active" : current.status,
+      salesSummary: salesSummary ?? (resumed ? null : current.salesSummary),
+      leadId: state.leadId ?? current.leadId, contactId: state.contactId ?? current.contactId,
+    }).where(where);
+  });
 
   await db.insert(conversationMessagesTable).values(
     out.map((content) => ({
@@ -1317,25 +1314,6 @@ function slotLabel(start: Date, end: Date, tz: string): string {
   return `${day}, ${time(start)}–${time(end)}`;
 }
 
-/** Build a Date for a local wall-clock hour on the given UTC-midnight day in the scheduling TZ. */
-function atLocalHour(dayUtc: Date, hour: number, tz: string): Date {
-  // Target wall-clock instant expressed as if the zone were UTC, then correct
-  // by probing the real local time. The correction must ITERATE: around DST
-  // transitions the UTC offset at the guess can differ from the offset at the
-  // corrected time, and a single-pass probe lands one hour off (homeowner told
-  // 9 AM, calendar says 10 AM).
-  const want = Date.UTC(dayUtc.getUTCFullYear(), dayUtc.getUTCMonth(), dayUtc.getUTCDate(), hour, 0, 0);
-  let ts = want;
-  for (let i = 0; i < 3; i++) {
-    const got = tzParts(new Date(ts), tz);
-    const gotWall = Date.UTC(got.y, got.m - 1, got.day, got.hour, got.minute, 0);
-    const diff = want - gotWall;
-    if (diff === 0) break;
-    ts += diff;
-  }
-  return new Date(ts);
-}
-
 /** Local calendar parts of a Date in the scheduling timezone. */
 function tzParts(d: Date, tz: string): { y: number; m: number; day: number; hour: number; minute: number; weekday: string } {
   const fmt = new Intl.DateTimeFormat("en-US", {
@@ -1366,93 +1344,140 @@ const SLOT_SKIP_LABEL = "Skip — have the team call me";
  * blackout dates, and per-window booking capacity). Windows at capacity are
  * skipped.
  */
-export async function generateInspectionSlots(organizationId: string): Promise<OfferedSlot[]> {
-  const avail = await getInspectionAvailability(organizationId);
-  const tz = avail.timezone;
-  const now = new Date();
-  const horizon = new Date(now.getTime() + 14 * 86_400_000);
-  const existing = await db
-    .select({ start: appointmentsTable.scheduledStart, end: appointmentsTable.scheduledEnd })
-    .from(appointmentsTable)
-    .where(
-      and(
-        eq(appointmentsTable.organizationId, organizationId),
-        inArray(appointmentsTable.status, ["scheduled", "confirmed"]),
-        gte(appointmentsTable.scheduledStart, now),
-        lte(appointmentsTable.scheduledStart, horizon),
-      ),
-    );
-
-  const blackouts = new Set(avail.blackoutDates);
-  const slots: OfferedSlot[] = [];
-  for (let offset = 1; offset <= 14 && slots.length < 3; offset++) {
-    const day = new Date(now.getTime() + offset * 86_400_000);
-    const dayUtc = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate()));
-    const noonLocal = tzParts(atLocalHour(dayUtc, 12, tz), tz);
-    if (!avail.days.includes(noonLocal.weekday)) continue;
-    const localDate = `${noonLocal.y}-${String(noonLocal.m).padStart(2, "0")}-${String(noonLocal.day).padStart(2, "0")}`;
-    if (blackouts.has(localDate)) continue;
-    for (const w of avail.windows) {
-      if (slots.length >= 3) break;
-      const start = atLocalHour(dayUtc, w.startHour, tz);
-      const end = atLocalHour(dayUtc, w.endHour, tz);
-      if (start.getTime() <= now.getTime()) continue;
-      const overlapping = existing.filter((a) => {
-        const aEnd = a.end ?? new Date(a.start.getTime() + 2 * 3_600_000);
-        return a.start < end && aEnd > start;
-      }).length;
-      if (overlapping >= avail.maxBookingsPerWindow) continue;
-      slots.push({ label: slotLabel(start, end, tz), start: start.toISOString(), end: end.toISOString() });
-    }
-  }
-  return slots;
+async function conversationSource(tx: ScheduleTransaction, org: string, conversation: Conversation) {
+  const state = conversation.state as Partial<ConciergeState>;
+  if (!state.leadId || !state.contactId || state.leadId !== conversation.leadId || state.contactId !== conversation.contactId) throw new SchedulingPolicyError("stale_scheduling_review", "The conversation customer changed.");
+  await appointmentCustomer(tx, org, { leadId: state.leadId, contactId: state.contactId, propertyId: state.propertyId ?? null }, { requireCoherentLeadProperty: true });
+  const [lead] = await tx.select().from(leadsTable).where(and(eq(leadsTable.organizationId, org), eq(leadsTable.id, state.leadId))).for("share");
+  const [contact] = await tx.select().from(contactsTable).where(and(eq(contactsTable.organizationId, org), eq(contactsTable.id, state.contactId))).for("share");
+  const property = state.propertyId ? (await tx.select().from(propertiesTable).where(and(eq(propertiesTable.organizationId, org), eq(propertiesTable.id, state.propertyId))).for("share"))[0] : null;
+  if (!lead || !contact || (state.propertyId && !property) || lead.propertyId !== (state.propertyId ?? null)) throw new SchedulingPolicyError("stale_scheduling_review", "The conversation property changed.");
+  const source: ManualSourceRef = { sourceKind: "lead", leadId: lead.id, contactId: contact.id, propertyId: property?.id ?? null, estimateId: null };
+  // Material facts, not updatedAt touched by progressive sync.
+  const fingerprint = offerFingerprint({ conversationId: conversation.id, source,
+    contact: { firstName: contact.firstName, lastName: contact.lastName, phone: contact.phone, email: contact.email },
+    property: property ? { contactId: property.contactId, addressLine1: property.addressLine1, city: property.city, state: property.state, postalCode: property.postalCode, propertyType: property.propertyType } : null });
+  return { source, fingerprint };
 }
-/**
- * Race-safe booking: takes a per-org/slot advisory transaction lock, re-checks
- * how many scheduled/confirmed appointments overlap the window, then inserts
- * while the org's configured per-window capacity allows it.
- * Returns null if the window is at capacity (caller should re-offer slots).
- */
+function conciergeAuthority(org: string, conversationId: string): ServerSchedulingAuthority {
+  return { organizationId: org, actorUserId: null, origin: "concierge", sourceId: conversationId, reviewMode: "existing_workflow_transaction" };
+}
+function inspectionCandidate(id: string, start: string, end: string, source: ManualSourceRef): SchedulingCandidate {
+  return { kind: "appointment", id, startAt: start, endAt: end, type: "inspection", status: "scheduled", resourceUserIds: [], source, reservation: null };
+}
+function addCalendarDays(date: string, days: number) {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0,10);
+}
+function ruleDate(now: Date, zone: string) {
+  const p = tzParts(now, zone);
+  return `${p.y}-${String(p.m).padStart(2,"0")}-${String(p.day).padStart(2,"0")}`;
+}
+function ruleWindow(date: string, startHour: number, endHour: number, zone: string) {
+  const start = resolveWallTime(`${date}T${String(startHour).padStart(2,"0")}:00:00.000`, zone);
+  const end = resolveWallTime(`${endHour === 24 ? addCalendarDays(date,1) : date}T${String(endHour % 24).padStart(2,"0")}:00:00.000`, zone);
+  // Chat has no occurrence selector: hold rather than choose silently.
+  return start.kind === "unique" && end.kind === "unique" && Date.parse(end.choices[0].instant) > Date.parse(start.choices[0].instant)
+    ? { start: start.choices[0].instant, end: end.choices[0].instant } : null;
+}
+function matchesRuleWindow(slot: {start:string;end:string}, avail: Awaited<ReturnType<typeof readSchedulingContext>>["effectiveInspection"]) {
+  if (!isoSchema.safeParse(slot.start).success || !isoSchema.safeParse(slot.end).success || Date.parse(slot.start) <= Date.now()) return false;
+  const start = new Date(slot.start), date = ruleDate(start, avail.timezone);
+  if (!avail.days.includes(tzParts(start, avail.timezone).weekday) || avail.blackoutDates.includes(date)) return false;
+  return avail.windows.some(w => { const exact = ruleWindow(date,w.startHour,w.endHour,avail.timezone); return exact?.start === start.toISOString() && exact.end === new Date(slot.end).toISOString(); });
+}
+function staleConversationSource(error: unknown) {
+  return error instanceof ScheduleError && error.code === "customer_reference_mismatch" || error instanceof SchedulingPolicyError && error.code === "stale_scheduling_review";
+}
+function ordinaryOfferHold(error: unknown) {
+  return error instanceof SchedulingPolicyError && ["inspection_capacity_conflict", "company_capacity_conflict", "resource_conflict", "travel_conflict", "stale_scheduling_review"].includes(error.code);
+}
+
+/** Org-only previews cannot mint configured source authority. */
+export async function generateInspectionSlots(organizationId: string, options: { conversationId?: string } = {}): Promise<OfferedSlot[]> {
+  return db.transaction(async tx => {
+    await lockSchedulingConfiguration(tx, organizationId);
+    const current = await readSchedulingContext(tx, organizationId, undefined, { reservationKind: "appointment", appointmentType: "inspection" });
+    const conversation = options.conversationId ? (await tx.select().from(conversationsTable).where(and(eq(conversationsTable.organizationId, organizationId),eq(conversationsTable.id,options.conversationId))).for("update"))[0] : undefined;
+    if (options.conversationId && !conversation) throw new SchedulingPolicyError("scheduling_source_missing", "Conversation unavailable.",404);
+    if (conversation && (conversation.state as ConciergeState).inspectionBooking) return [];
+    let binding: Awaited<ReturnType<typeof conversationSource>> | null = null;
+    try { binding = conversation ? await conversationSource(tx,organizationId,conversation) : null; }
+    catch(error) { if(staleConversationSource(error)) return []; throw error; }
+    if (!conversation && current.policy) return [];
+    const source = binding?.source ?? unlinkedSchedulingSource;
+    const review = schedulingMutationReviewSchema.parse({ context: {...current.context,source}, duration: {kind:"inspection_interval",preset:null}, startWallTime:null,endWallTime:null });
+    const avail = current.effectiveInspection, now = new Date(), today = ruleDate(now,avail.timezone);
+    const slots: OfferedSlot[] = [];
+    for (let offset=1; offset<=14 && slots.length<3; offset++) {
+      const date=addCalendarDays(today,offset);
+      const noon=resolveWallTime(`${date}T12:00:00.000`,avail.timezone);
+      if(noon.kind!=="unique" || !avail.days.includes(tzParts(new Date(noon.choices[0].instant),avail.timezone).weekday) || avail.blackoutDates.includes(date)) continue;
+      for(const w of avail.windows) {
+        if(slots.length===3) break;
+        const window=ruleWindow(date,w.startHour,w.endHour,avail.timezone);
+        if(!window || Date.parse(window.start)<=now.getTime()) continue;
+        const id=randomUUID(), candidate=inspectionCandidate(id,window.start,window.end,source);
+        try { await prepareInspectionInTransaction(tx,{organizationId,candidate,authority:conversation?conciergeAuthority(organizationId,conversation.id):undefined,review:conversation?review:null}); }
+        catch(error) { if(ordinaryOfferHold(error)) continue; throw error; }
+        const label=`${slotLabel(new Date(window.start),new Date(window.end),current.context.companyTimeZone)} (${current.context.companyTimeZone}${avail.timezone!==current.context.companyTimeZone?`; inspection rules: ${avail.timezone}`:""})`;
+        slots.push(conversation ? conciergeInspectionOfferSchema.parse({formatVersion:1,organizationId,conversationId:conversation.id,appointmentId:id,label,...window,source,sourceFingerprint:binding!.fingerprint,review}) : {label,...window});
+      }
+    }
+    if(conversation) await tx.update(conversationsTable).set({state:{...conversation.state,offeredSlots:slots}}).where(and(eq(conversationsTable.organizationId,organizationId),eq(conversationsTable.id,conversation.id)));
+    return slots;
+  });
+}
+
+/** Final source admission, replay proof and local effects share the conversation transaction. */
 export async function bookInspectionSlot(params: {
-  organizationId: string;
-  slot: { start: string; end: string };
-  leadId?: string | null;
-  contactId?: string | null;
-  propertyId?: string | null;
-  notes?: string;
-}): Promise<{ id: string } | null> {
-  const start = new Date(params.slot.start);
-  const end = new Date(params.slot.end);
-  const avail = await getInspectionAvailability(params.organizationId);
-  const { maxBookingsPerWindow } = avail;
-  // Policy check against *current* availability: a slot offered under older
-  // settings must not be bookable after admins tighten day/window/blackout rules.
-  const startLocal = tzParts(start, avail.timezone);
-  const endLocal = tzParts(end, avail.timezone);
-  if (!avail.days.includes(startLocal.weekday)) return null;
-  const localDate = `${startLocal.y}-${String(startLocal.m).padStart(2, "0")}-${String(startLocal.day).padStart(2, "0")}`;
-  if (avail.blackoutDates.includes(localDate)) return null;
-  // Compare minutes too: in fractional-offset timezones (e.g. Asia/Kolkata
-  // +5:30) a UTC instant on a whole or half hour can land on :30 local, and an
-  // hour-only comparison would accept a slot 30 minutes off the configured
-  // window. Offered slots are always minute-0 wall-clock (atLocalHour).
-  const matchesWindow =
-    startLocal.minute === 0 &&
-    endLocal.minute === 0 &&
-    avail.windows.some(
-      (w) => w.startHour === startLocal.hour && (w.endHour % 24) === endLocal.hour,
-    );
-  if (!matchesWindow) return null;
-  return insertInspectionIfAvailable({
-    organizationId: params.organizationId,
-    leadId: params.leadId ?? null,
-    contactId: params.contactId ?? null,
-    propertyId: params.propertyId ?? null,
-    type: "inspection",
-    status: "scheduled",
-    scheduledStart: start,
-    scheduledEnd: end,
-    notes: params.notes ?? null,
+  organizationId: string; conversationId?: string; slot: {start:string;end:string};
+  leadId?: string|null; contactId?:string|null; propertyId?:string|null; notes?:string;
+}): Promise<{id:string;replayed?:boolean}|null> {
+  return db.transaction(async tx => {
+    const org=params.organizationId;
+    await lockSchedulingConfiguration(tx,org,false);
+    const where=params.conversationId?and(eq(conversationsTable.organizationId,org),eq(conversationsTable.id,params.conversationId)):undefined;
+    const conversation=where?(await tx.select().from(conversationsTable).where(where).for("update"))[0]:undefined;
+    if(params.conversationId&&!conversation) return null;
+    const state=conversation?.state as ConciergeState|undefined;
+    const submitted=conciergeInspectionOfferSchema.safeParse(params.slot);
+    if(state?.inspectionBooking!==undefined) {
+      const proof=conciergeBookingProofSchema.parse(state.inspectionBooking);
+      if(!submitted.success || offerFingerprint(submitted.data)!==proof.offerFingerprint) return null;
+      const [audit]=await tx.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId,org),eq(auditEventsTable.id,proof.auditId),eq(auditEventsTable.action,"appointment.booked_concierge"),eq(auditEventsTable.entityId,proof.appointmentId)));
+      if(!audit || audit.actorUserId!==null || audit.metadata.conversationId!==conversation!.id || offerFingerprint(audit.metadata.offer)!==proof.offerFingerprint || state.appointmentId!==proof.appointmentId) throw new SchedulingPolicyError("invalid_booking_receipt","The original conversation booking proof requires review.");
+      return {id:proof.appointmentId,replayed:true};
+    }
+    if(!(await getCustomerLifecycleStatus(org,tx)).automationAllowed) throw new CustomerLifecycleHoldError();
+    const current=await readSchedulingContext(tx,org,undefined,{reservationKind:"appointment",appointmentType:"inspection"});
+    if(!matchesRuleWindow(params.slot,current.effectiveInspection)) return null;
+    if(!conversation) {
+      if(current.policy || submitted.success) return null;
+      return insertInspectionInTransaction(tx,{organizationId:org,leadId:params.leadId??null,contactId:params.contactId??null,propertyId:params.propertyId??null,type:"inspection",status:"scheduled",scheduledStart:new Date(params.slot.start),scheduledEnd:new Date(params.slot.end),notes:params.notes??null});
+    }
+    if(!submitted.success || state!.appointmentId || state!.step!=="scheduling" || state!.consentGranted!==true) return null;
+    const offer=submitted.data;
+    if(offer.organizationId!==org||offer.conversationId!==conversation.id) return null;
+    const stored=(state!.offeredSlots??[]).find(slot=>{const parsed=conciergeInspectionOfferSchema.safeParse(slot);return parsed.success&&offerFingerprint(parsed.data)===offerFingerprint(offer);});
+    if(!stored) return null;
+    let binding: Awaited<ReturnType<typeof conversationSource>>;
+    try { binding=await conversationSource(tx,org,conversation); }
+    catch(error) { if(staleConversationSource(error)) return null; throw error; }
+    if(binding.fingerprint!==offer.sourceFingerprint || offerCanonical(binding.source)!==offerCanonical(offer.source)) return null;
+    if(params.leadId!==undefined&&params.leadId!==binding.source.leadId||params.contactId!==undefined&&params.contactId!==binding.source.contactId||params.propertyId!==undefined&&params.propertyId!==binding.source.propertyId) return null;
+    const authority=conciergeAuthority(org,conversation.id), candidate=inspectionCandidate(offer.appointmentId,offer.start,offer.end,binding.source);
+    let admission;
+    try { admission=await prepareInspectionInTransaction(tx,{organizationId:org,candidate,authority,review:offer.review}); }
+    catch(error) { if(ordinaryOfferHold(error)) return null; throw error; }
+    const [appointment]=await tx.insert(appointmentsTable).values({id:offer.appointmentId,organizationId:org,leadId:binding.source.leadId,contactId:binding.source.contactId,propertyId:binding.source.propertyId,type:"inspection",status:"scheduled",scheduledStart:new Date(offer.start),scheduledEnd:new Date(offer.end),schedulingReservation:admission.snapshot,notes:params.notes??null}).returning();
+    await appendSchedulingTransition(tx,authority,null,admission.snapshot,{kind:"appointment",id:appointment.id},{transition:admission.transition,source:binding.source,invalidHistoricalEvidenceRetained:false});
+    await scheduleAppointmentReminder(org,appointment,state!.contactMethod,tx);
+    if(binding.source.leadId) await tx.insert(activitiesTable).values({organizationId:org,leadId:binding.source.leadId,contactId:binding.source.contactId,type:"appointment_scheduled",title:`Inspection booked via AI Concierge — ${offer.label}`,body:`Homeowner selected this company window in chat. Appointment ${appointment.id}; technician assignment pending.`,metadata:{conversationId:conversation.id,appointmentId:appointment.id,scheduledStart:offer.start}});
+    const [audit]=await tx.insert(auditEventsTable).values({organizationId:org,actorUserId:null,action:"appointment.booked_concierge",entityType:"appointment",entityId:appointment.id,metadata:{conversationId:conversation.id,leadId:binding.source.leadId,offer}}).returning();
+    const proof=conciergeBookingProofSchema.parse({formatVersion:1,appointmentId:appointment.id,auditId:audit.id,offerFingerprint:offerFingerprint(offer),start:offer.start,end:offer.end,label:offer.label});
+    await tx.update(conversationsTable).set({status:"completed",state:{...state!,step:"done",appointmentId:appointment.id,appointmentStart:offer.start,appointmentLabel:offer.label,inspectionBooking:proof}}).where(where!);
+    return {id:appointment.id,replayed:false};
   });
 }
 

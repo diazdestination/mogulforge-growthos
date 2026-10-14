@@ -10,6 +10,7 @@ import type { ServiceCareReviewBooking } from './serviceCareReviewBooking';
 import type { ServiceCareReviewPreview } from './serviceCareReviewPreview';
 import type { ServiceCareReviewReminder } from './serviceCareReviewReminder';
 import type { ServiceCareReviewResponse } from './serviceCareReviewResponse';
+import type { ServiceCareSchedulingRead } from './serviceCareSchedulingRead';
 
 export interface ServiceCareReview {
   obligationId: string;
@@ -24,5 +25,6 @@ export interface ServiceCareReview {
   response: ServiceCareReviewResponse;
   booking: ServiceCareReviewBooking;
   appointment: ServiceCareReviewAppointment;
+  scheduling: ServiceCareSchedulingRead;
   [key: string]: unknown;
  }

@@ -437,11 +437,51 @@ describe("native existing-customer work", () => {
     expect(write.url.pathname).toContain("/customer-work/");
   });
   it("creates a direct job from existing customer with explicit null property, no estimate or lead stage effect", async () => {
-    const api = setup("projects", fresh, (request) =>
+    const api = setup("projects", fresh, async (request) =>
       request.url.pathname === "/api/v1/customer-work/projects"
         ? json({
             organizationId: org,
             project: workProject({ name: request.body.name }),
+            commandOutcome: {
+              formatVersion: 1,
+              organizationId: org,
+              actorUserId: workMember.id,
+              requestId: request.body.requestId,
+              action: "project_created",
+              payloadSha256: (await import("node:crypto"))
+                .createHash("sha256")
+                .update(
+                  JSON.stringify(
+                    {
+                      action: "project_created",
+                      actorUserId: workMember.id,
+                      targetId: null,
+                      input: (
+                        await import("../../../api-server/src/services/returning-customer-contract")
+                      ).createCustomerWorkProjectSchema.parse(request.body),
+                    },
+                    (_key, value) =>
+                      value &&
+                      typeof value === "object" &&
+                      !Array.isArray(value)
+                        ? Object.fromEntries(
+                            Object.entries(value)
+                              .filter(([, item]) => item !== undefined)
+                              .sort(([a], [b]) => a.localeCompare(b)),
+                          )
+                        : value,
+                  ),
+                )
+                .digest("hex"),
+              customerWorkId: root,
+              target: {
+                kind: "project",
+                id: workProject().id,
+                available: true,
+              },
+              resultWorkVersion: 1,
+              outcome: "committed",
+            },
             command: {
               requestId: request.body.requestId,
               action: "project_created",
@@ -614,6 +654,46 @@ describe("native existing-customer work", () => {
           return json({
             organizationId: org,
             project: workProject({ estimateId: accepted.id }),
+            commandOutcome: {
+              formatVersion: 1,
+              organizationId: org,
+              actorUserId: workMember.id,
+              requestId: body.requestId,
+              action: "project_created",
+              payloadSha256: (await import("node:crypto"))
+                .createHash("sha256")
+                .update(
+                  JSON.stringify(
+                    {
+                      action: "project_created",
+                      actorUserId: workMember.id,
+                      targetId: null,
+                      input: (
+                        await import("../../../api-server/src/services/returning-customer-contract")
+                      ).createCustomerWorkProjectSchema.parse(body),
+                    },
+                    (_key, value) =>
+                      value &&
+                      typeof value === "object" &&
+                      !Array.isArray(value)
+                        ? Object.fromEntries(
+                            Object.entries(value)
+                              .filter(([, item]) => item !== undefined)
+                              .sort(([a], [b]) => a.localeCompare(b)),
+                          )
+                        : value,
+                  ),
+                )
+                .digest("hex"),
+              customerWorkId: root,
+              target: {
+                kind: "project",
+                id: workProject().id,
+                available: true,
+              },
+              resultWorkVersion: 1,
+              outcome: "committed",
+            },
             command: {
               requestId: body.requestId,
               action: "project_created",
@@ -679,6 +759,40 @@ describe("native existing-customer work", () => {
         return json({
           organizationId: org,
           project: workProject({ estimateId: accepted.id, workVersion: 3 }),
+          commandOutcome: {
+            formatVersion: 1,
+            organizationId: org,
+            actorUserId: workMember.id,
+            requestId: body.requestId,
+            action: "project_created",
+            payloadSha256: (await import("node:crypto"))
+              .createHash("sha256")
+              .update(
+                JSON.stringify(
+                  {
+                    action: "project_created",
+                    actorUserId: workMember.id,
+                    targetId: null,
+                    input: (
+                      await import("../../../api-server/src/services/returning-customer-contract")
+                    ).createCustomerWorkProjectSchema.parse(body),
+                  },
+                  (_key, value) =>
+                    value && typeof value === "object" && !Array.isArray(value)
+                      ? Object.fromEntries(
+                          Object.entries(value)
+                            .filter(([, item]) => item !== undefined)
+                            .sort(([a], [b]) => a.localeCompare(b)),
+                        )
+                      : value,
+                ),
+              )
+              .digest("hex"),
+            customerWorkId: root,
+            target: { kind: "project", id: workProject().id, available: true },
+            resultWorkVersion: 1,
+            outcome: "committed",
+          },
           command: {
             requestId: body.requestId,
             action: "project_created",
@@ -798,6 +912,46 @@ describe("explicit stale accepted-estimate conversion recovery", () => {
           return json({
             organizationId: org,
             project: workProject({ estimateId: accepted().id }),
+            commandOutcome: {
+              formatVersion: 1,
+              organizationId: org,
+              actorUserId: workMember.id,
+              requestId: request.body.requestId,
+              action: "project_created",
+              payloadSha256: (await import("node:crypto"))
+                .createHash("sha256")
+                .update(
+                  JSON.stringify(
+                    {
+                      action: "project_created",
+                      actorUserId: workMember.id,
+                      targetId: null,
+                      input: (
+                        await import("../../../api-server/src/services/returning-customer-contract")
+                      ).createCustomerWorkProjectSchema.parse(request.body),
+                    },
+                    (_key, value) =>
+                      value &&
+                      typeof value === "object" &&
+                      !Array.isArray(value)
+                        ? Object.fromEntries(
+                            Object.entries(value)
+                              .filter(([, item]) => item !== undefined)
+                              .sort(([a], [b]) => a.localeCompare(b)),
+                          )
+                        : value,
+                  ),
+                )
+                .digest("hex"),
+              customerWorkId: root,
+              target: {
+                kind: "project",
+                id: workProject().id,
+                available: true,
+              },
+              resultWorkVersion: 1,
+              outcome: "committed",
+            },
             command: {
               requestId: request.body.requestId,
               action: "project_created",

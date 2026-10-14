@@ -28,11 +28,30 @@ const counts = {
   ListAppointmentsResponseItem: 10,
   ListProjectsResponseItem: 10,
 };
+// Independent Task6 source boundaries; do not change the twenty native counts.
+const sourceCounts = {
+  CreateCustomerWorkProjectBody: 12,
+  CreateCustomerWorkProjectResponse: 11,
+  UpdateCustomerWorkProjectBody: 10,
+  UpdateCustomerWorkProjectResponse: 11,
+  GetServiceCareQueryParams: 1,
+  "GetServiceCareResponse.scheduling": 10,
+  BookServiceCareVisitBody: 10,
+  BookServiceCareVisitResponse: 2,
+  GetCallieSchedulingContextQueryParams: 1,
+  GetCallieSchedulingContextResponse: 10,
+  BookCallieVisitBody: 10,
+  BookCallieVisitResponse: 18,
+};
 export function closeSchedulingSchemas(text) {
   // Orval emits validators for successful operations only. This additional
   // named error validator reuses the already closed acknowledgement boundary.
   const manualError = `export const ManualSchedulingErrorSchema = zod.object({ error: zod.string(), code: zod.enum(['manual_scheduling_refused', 'manual_scheduling_target_unavailable']), schedulingOperation: ReconcileSchedulingOperationResponse }).strict();`;
-  if (!/export const ManualSchedulingErrorSchema\s*=/.test(text)) text += `\n${manualError}\n`;
+  if (!/export const ManualSchedulingErrorSchema\s*=/.test(text))
+    text += `\n${manualError}\n`;
+  const sourceError = `export const CustomerWorkProjectUnavailableSchema = zod.object({ error: zod.string(), code: zod.literal('customer_work_result_unavailable'), commandOutcome: CreateCustomerWorkProjectResponse.shape.commandOutcome }).strict().refine(value => value.commandOutcome.target.available === false);`;
+  if (!/export const CustomerWorkProjectUnavailableSchema\s*=/.test(text))
+    text += `\n${sourceError}\n`;
   const tree = ts.createSourceFile(
     "api.ts",
     text,
@@ -41,26 +60,69 @@ export function closeSchedulingSchemas(text) {
   );
   if (tree.parseDiagnostics.length)
     throw Error("Scheduling codegen parse failed; no file modified.");
+  const seen = new Set();
   const declarations = new Map(),
     insertions = [];
   function collect(node) {
     if (
       ts.isVariableDeclaration(node) &&
-      Object.hasOwn(counts, node.name.getText(tree))
+      (Object.hasOwn(counts, node.name.getText(tree)) ||
+        Object.hasOwn(sourceCounts, node.name.getText(tree)) ||
+        node.name.getText(tree) === "GetServiceCareResponse")
     ) {
       const name = node.name.getText(tree);
-      if (declarations.has(name) || !node.initializer)
+      if (seen.has(name) || !node.initializer)
         throw Error(
           "Scheduling codegen boundary duplicated or missing; no file modified.",
         );
-      declarations.set(name, node.initializer);
+      seen.add(name);
+      if (name === "GetServiceCareResponse") {
+        const matches = [];
+        function scheduling(child) {
+          if (
+            ts.isPropertyAssignment(child) &&
+            child.name.getText(tree).replaceAll('"', "").replaceAll("'", "") ===
+              "scheduling"
+          )
+            matches.push(child.initializer);
+          ts.forEachChild(child, scheduling);
+        }
+        scheduling(node.initializer);
+        if (matches.length !== 1)
+          throw Error("Source scheduling member changed; no file modified.");
+        declarations.set("GetServiceCareResponse.scheduling", matches[0]);
+      } else declarations.set(name, node.initializer);
     }
     ts.forEachChild(node, collect);
   }
   collect(tree);
-  const errors = tree.statements.filter(node => ts.isVariableStatement(node) && node.declarationList.declarations.some(d => d.name.getText(tree) === 'ManualSchedulingErrorSchema'));
-  if (errors.length !== 1 || errors[0].getText(tree) !== manualError) throw Error('Scheduling manual error boundary changed; no file modified.');
-  for (const [name, expected] of Object.entries(counts)) {
+  const errors = tree.statements.filter(
+    (node) =>
+      ts.isVariableStatement(node) &&
+      node.declarationList.declarations.some(
+        (d) => d.name.getText(tree) === "ManualSchedulingErrorSchema",
+      ),
+  );
+  if (errors.length !== 1 || errors[0].getText(tree) !== manualError)
+    throw Error("Scheduling manual error boundary changed; no file modified.");
+  const sourceErrors = tree.statements.filter(
+    (node) =>
+      ts.isVariableStatement(node) &&
+      node.declarationList.declarations.some(
+        (d) => d.name.getText(tree) === "CustomerWorkProjectUnavailableSchema",
+      ),
+  );
+  if (
+    sourceErrors.length !== 1 ||
+    sourceErrors[0].getText(tree) !== sourceError
+  )
+    throw Error(
+      "Scheduling source committed error boundary changed; no file modified.",
+    );
+  for (const [name, expected] of Object.entries({
+    ...counts,
+    ...sourceCounts,
+  })) {
     const node = declarations.get(name);
     if (!node)
       throw Error(`Scheduling codegen missing ${name}; no file modified.`);
@@ -112,6 +174,6 @@ if (
   if (after !== before) fs.writeFileSync(file, after);
   if (clientAfter !== clientBefore) fs.writeFileSync(clientFile, clientAfter);
   console.log(
-    `Verified ${Object.keys(counts).length} closed scheduling schema boundaries.`,
+    `Verified ${Object.keys(counts).length} existing and ${Object.keys(sourceCounts).length} source scheduling schema boundaries.`,
   );
 }

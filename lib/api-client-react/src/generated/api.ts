@@ -47,6 +47,7 @@ import type {
   BulkLeadActionRequest,
   BulkLeadActionResult,
   CallieBookingRequest,
+  CallieBookingResult,
   CallieCallerReviewRequest,
   CallieIntakeDetail,
   CallieIntakePage,
@@ -61,6 +62,7 @@ import type {
   CallieReceptionPreview,
   CallieReceptionPreviewRequest,
   CallieReceptionView,
+  CallieSchedulingContextRead,
   CaptureDelivery,
   CaptureEndpoint,
   CaptureEndpointInput,
@@ -90,6 +92,7 @@ import type {
   CreateClientStaffInvitation,
   CreateCustomerWorkEstimate,
   CreateCustomerWorkProject,
+  CreateCustomerWorkProject409,
   CreateInvoice,
   CreateOrgInput,
   CrmTask,
@@ -124,6 +127,7 @@ import type {
   FinancialMigrationReview,
   FormShareAssets,
   FormSubmissionRecord,
+  GetCallieSchedulingContextParams,
   GetContractorTodayParams,
   GetCustomerWorkspaceSectionParams,
   GetMarketingSummaryParams,
@@ -274,6 +278,7 @@ import type {
   SavedFilter,
   SavedFilterInput,
   SchedulingReviewContext,
+  ServiceCareBookingResult,
   ServiceCareCommandResult,
   ServiceCareReview,
   ServiceMailboxReplyPage,
@@ -328,6 +333,7 @@ import type {
   UpdateApiKeyInput,
   UpdateCustomerWorkEstimate,
   UpdateCustomerWorkProject,
+  UpdateCustomerWorkProject409,
   UpdateInvoice,
   UpdatePlatformOrgInput,
   UpdateUserInput,
@@ -396,6 +402,126 @@ const withQueryKey = <T extends object, K>(
   }
   return result;
 };
+
+export const getGetCallieSchedulingContextUrl = (
+  id: string,
+  params: GetCallieSchedulingContextParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/communications/callie/${id}/scheduling-context?${stringifiedParams}`
+    : `/api/v1/communications/callie/${id}/scheduling-context`;
+};
+
+/**
+ * @summary Review the actual CALLIE customer, selected visit type and property against current scheduling
+ */
+export const getCallieSchedulingContext = async (
+  id: string,
+  params: GetCallieSchedulingContextParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<CallieSchedulingContextRead> => {
+  return customFetch<CallieSchedulingContextRead>(
+    getGetCallieSchedulingContextUrl(id, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetCallieSchedulingContextQueryKey = (
+  id: string,
+  params?: GetCallieSchedulingContextParams,
+) => {
+  return [
+    `/api/v1/communications/callie/${id}/scheduling-context`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetCallieSchedulingContextQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCallieSchedulingContext>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  params: GetCallieSchedulingContextParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCallieSchedulingContext>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetCallieSchedulingContextQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCallieSchedulingContext>>
+  > = ({ signal }) =>
+    getCallieSchedulingContext(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCallieSchedulingContext>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCallieSchedulingContextQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCallieSchedulingContext>>
+>;
+export type GetCallieSchedulingContextQueryError = ErrorType<void>;
+
+/**
+ * @summary Review the actual CALLIE customer, selected visit type and property against current scheduling
+ */
+
+export function useGetCallieSchedulingContext<
+  TData = Awaited<ReturnType<typeof getCallieSchedulingContext>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  params: GetCallieSchedulingContextParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCallieSchedulingContext>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCallieSchedulingContextQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 export const getGetStaffLeadAlertCoverageUrl = (leadId: string) => {
   return `/api/v1/staff-push/leads/${leadId}/coverage`;
@@ -699,7 +825,7 @@ export const updateCustomerWorkProject = async (
 };
 
 export const getUpdateCustomerWorkProjectMutationOptions = <
-  TError = ErrorType<void>,
+  TError = ErrorType<void | UpdateCustomerWorkProject409>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -741,13 +867,14 @@ export type UpdateCustomerWorkProjectMutationResult = NonNullable<
 >;
 export type UpdateCustomerWorkProjectMutationBody =
   BodyType<UpdateCustomerWorkProject>;
-export type UpdateCustomerWorkProjectMutationError = ErrorType<void>;
+export type UpdateCustomerWorkProjectMutationError =
+  ErrorType<void | UpdateCustomerWorkProject409>;
 
 /**
  * @summary updateCustomerWorkProject
  */
 export const useUpdateCustomerWorkProject = <
-  TError = ErrorType<void>,
+  TError = ErrorType<void | UpdateCustomerWorkProject409>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -790,7 +917,7 @@ export const createCustomerWorkProject = async (
 };
 
 export const getCreateCustomerWorkProjectMutationOptions = <
-  TError = ErrorType<void>,
+  TError = ErrorType<void | CreateCustomerWorkProject409>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -832,13 +959,14 @@ export type CreateCustomerWorkProjectMutationResult = NonNullable<
 >;
 export type CreateCustomerWorkProjectMutationBody =
   BodyType<CreateCustomerWorkProject>;
-export type CreateCustomerWorkProjectMutationError = ErrorType<void>;
+export type CreateCustomerWorkProjectMutationError =
+  ErrorType<void | CreateCustomerWorkProject409>;
 
 /**
  * @summary createCustomerWorkProject
  */
 export const useCreateCustomerWorkProject = <
-  TError = ErrorType<void>,
+  TError = ErrorType<void | CreateCustomerWorkProject409>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -5524,8 +5652,8 @@ export const bookCallieVisit = async (
   id: string,
   callieBookingRequest: CallieBookingRequest,
   options?: Parameters<typeof customFetch>[1],
-): Promise<CallieOfficeCommandResult> => {
-  return customFetch<CallieOfficeCommandResult>(getBookCallieVisitUrl(id), {
+): Promise<CallieBookingResult> => {
+  return customFetch<CallieBookingResult>(getBookCallieVisitUrl(id), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
@@ -24514,8 +24642,8 @@ export const bookServiceCareVisit = async (
   id: string,
   bookServiceCareVisit: BookServiceCareVisit,
   options?: Parameters<typeof customFetch>[1],
-): Promise<ServiceCareCommandResult> => {
-  return customFetch<ServiceCareCommandResult>(getBookServiceCareVisitUrl(id), {
+): Promise<ServiceCareBookingResult> => {
+  return customFetch<ServiceCareBookingResult>(getBookServiceCareVisitUrl(id), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
