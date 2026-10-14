@@ -26,7 +26,7 @@ function evidence(instant: string | null, local: string, zone: string | null): W
 export function SchedulingIntervalFields(props: SchedulingIntervalFieldsProps) {
   // Closed schema output orders known fields consistently; callbacks keep original context.
   const parsedContext = schedulingReviewContextSchema.safeParse(props.context);
-  const contextKey = JSON.stringify([props.context === null ? null : parsedContext.success ? parsedContext.data : 'invalid_context', props.companyTimeZone]);
+  const contextKey = JSON.stringify([props.context === null ? null : parsedContext.success ? parsedContext.data : 'invalid_context', props.companyTimeZone, props.startOnlyBehavior ?? 'preserve_elapsed']);
   const previousContext = useRef(contextKey);
   useEffect(() => {
     if (previousContext.current !== contextKey) {
@@ -40,6 +40,7 @@ export function SchedulingIntervalFields(props: SchedulingIntervalFieldsProps) {
 
 function IntervalFields(props: SchedulingIntervalFieldsProps) {
   const { context, companyTimeZone: zone, interval, draft, resources, presets, disabled } = props;
+  const preserveAbsoluteEnd = props.startOnlyBehavior === 'preserve_absolute_end';
   const id = useId();
   const [startLocal, setStartLocal] = useState(() => wallDisplay(draft.startAt, zone));
   const [endLocal, setEndLocal] = useState(() => wallDisplay(draft.endAt, zone));
@@ -48,7 +49,7 @@ function IntervalFields(props: SchedulingIntervalFieldsProps) {
   const [shiftError, setShiftError] = useState('');
   const [awaitingDraft, setAwaitingDraft] = useState<string | null>(null);
   const lastDraft = useRef(controlledDraftKey(draft));
-  const pendingInterval = useRef<{ startAt: string; endAt: string; nullEnd: boolean } | null>(null);
+  const pendingInterval = useRef<{ startAt: string; endAt: string } | null>(null);
   const incomingDraft = controlledDraftKey(draft);
   useEffect(() => {
     // A different draft in the same context is neither acknowledgement nor reset.
@@ -65,7 +66,8 @@ function IntervalFields(props: SchedulingIntervalFieldsProps) {
   useEffect(() => { if (awaitingDraft === incomingDraft) setAwaitingDraft(null); }, [awaitingDraft, incomingDraft]);
   const authorityHeld = disabled || !context || !zone || context.companyTimeZone !== zone || interval.evidence === 'invalid' || !timeZoneSchema.safeParse(zone).success;
   const legacyNull = interval.evidence === 'legacy' && interval.endAt === null && interval.legacyEffectiveEnd !== null && !endEdited;
-  function reviewFor(next: SchedulingDraft, start: string, end: string, choice: DurationChoice, allowLegacyNull = legacyNull): SchedulingMutationReview | null {
+  const unchangedLegacyStart = legacyNull && !!draft.startAt && !!interval.startAt && new Date(draft.startAt).getTime() === new Date(interval.startAt).getTime();
+  function reviewFor(next: SchedulingDraft, start: string, end: string, choice: DurationChoice, allowLegacyNull = unchangedLegacyStart): SchedulingMutationReview | null {
     if (authorityHeld || !context || !next.startAt) return null;
     const startWallTime = evidence(next.startAt, start, zone);
     const endWallTime = evidence(next.endAt, end, zone);
@@ -83,26 +85,26 @@ function IntervalFields(props: SchedulingIntervalFieldsProps) {
     if (authorityHeld) return;
     setStartLocal(local);
     if (selectedInstant === undefined && (draft.startAt || !pendingInterval.current)) {
-      const end = draft.endAt ?? (legacyNull ? interval.legacyEffectiveEnd : null);
-      const start = legacyNull && draft.endAt === null ? interval.startAt : draft.startAt;
-      pendingInterval.current = start && end ? { startAt: start, endAt: end, nullEnd: draft.endAt === null } : null;
+      const end = draft.endAt;
+      const start = draft.startAt;
+      pendingInterval.current = start && end ? { startAt: start, endAt: end } : null;
     }
     const resolved = resolve(local, zone);
     let start = selectedInstant ? resolved?.choices.find(choice => choice.instant === selectedInstant)?.instant ?? null : resolved?.kind === 'unique' ? resolved.choices[0].instant : null;
     let end = draft.endAt, error = '';
     const preserved = pendingInterval.current;
-    if (start && (duration.preset || preserved)) {
+    if (!preserveAbsoluteEnd && start && (duration.preset || preserved)) {
       try {
         if (duration.preset) { end = addElapsedMinutes(start, duration.preset.elapsedMinutes); setEndLocal(wallDisplay(end, zone)); }
         else if (preserved) {
           const shifted = shiftElapsedInterval(preserved.startAt, preserved.endAt, start);
           start = shifted.startAt;
-          if (!preserved.nullEnd) { end = shifted.endAt; setEndLocal(wallDisplay(end, zone)); }
+          end = shifted.endAt; setEndLocal(wallDisplay(end, zone));
         }
       } catch { error = 'This interval could not be shifted. Enter valid endpoints for review.'; }
     }
     setShiftError(error);
-    const choice: DurationChoice = duration.kind === 'preset' ? duration : { kind: preserved ? 'preserved_interval' : 'explicit', preset: null };
+    const choice: DurationChoice = preserveAbsoluteEnd ? { kind: 'explicit', preset: null } : duration.kind === 'preset' ? duration : { kind: preserved ? 'preserved_interval' : 'explicit', preset: null };
     setDuration(choice);
     publish({ ...draft, startAt: start, endAt: end });
   }
@@ -135,7 +137,7 @@ function IntervalFields(props: SchedulingIntervalFieldsProps) {
     if (resolved.kind === 'ambiguous' && !evidence(instant, local, zone)) return `${name}: Choose an explicit occurrence and offset.`;
     return '';
   }
-  const error = interval.evidence === 'invalid' ? 'Saved scheduling evidence is invalid. Review held for recovery.' : authorityHeld ? 'Scheduling held: Current company time zone and matching review context are required.' : shiftError || timeError(startLocal, draft.startAt, 'Start') || timeError(endLocal, draft.endAt, 'End', legacyNull) || (draft.startAt && draft.endAt && new Date(draft.endAt).getTime() <= new Date(draft.startAt).getTime() ? 'End must follow start.' : '');
+  const error = interval.evidence === 'invalid' ? 'Saved scheduling evidence is invalid. Review held for recovery.' : authorityHeld ? 'Scheduling held: Current company time zone and matching review context are required.' : shiftError || timeError(startLocal, draft.startAt, 'Start') || (legacyNull && draft.endAt === null && !unchangedLegacyStart ? 'Choose a duration preset or enter a valid end after changing a legacy empty-end start.' : '') || timeError(endLocal, draft.endAt, 'End', legacyNull) || (draft.startAt && draft.endAt && new Date(draft.endAt).getTime() <= new Date(draft.startAt).getTime() ? 'End must follow start.' : '');
   const readyReview = !error && (awaitingDraft === null || awaitingDraft === incomingDraft) ? reviewFor(draft, startLocal, endLocal, duration) : null;
   function occurrence(name: string, local: string, instant: string | null, edit: (local: string, instant: string) => void) {
     const resolved = resolve(local, zone);
@@ -155,7 +157,7 @@ function IntervalFields(props: SchedulingIntervalFieldsProps) {
       <div className="min-w-0"><label htmlFor={`${id}-end`} className="block text-sm">Service end</label><input id={`${id}-end`} className={field} type="datetime-local" step="0.001" value={endLocal} disabled={authorityHeld} onChange={event => editEnd(event.target.value)} />{occurrence('Service end', endLocal, draft.endAt, editEnd)}</div>
     </div>
     <label className="block text-sm">Duration preset<select className={field} disabled={authorityHeld} value={duration.preset?.id ?? ''} onChange={event => selectPreset(event.target.value)}><option value="">Manual / preserved interval — no preset selected</option>{presets.map(preset => <option key={preset.id} value={preset.id}>{preset.label} · {preset.elapsedMinutes} elapsed minutes</option>)}</select></label>
-    <p className="text-sm text-muted-foreground">Manual endpoints may span multiple days. A start-only change preserves elapsed duration. Travel does not extend the service interval.</p>
+    <p className="text-sm text-muted-foreground">Manual endpoints may span multiple days. {preserveAbsoluteEnd ? 'A start-only change keeps the absolute end and clears the selected duration preset.' : 'A start-only change preserves elapsed duration.'} Travel does not extend the service interval.</p>
     {legacyNull && <p className="text-sm">Legacy stored end remains empty. Its supplied effective interval is compatibility evidence.</p>}
     <fieldset disabled={authorityHeld} className="space-y-2"><legend className="text-sm font-medium">Assigned resources</legend>{resources.map(resource => <label key={resource.id} className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={draft.resourceUserIds.includes(resource.id)} onChange={event => publish({ ...draft, resourceUserIds: event.target.checked ? [...draft.resourceUserIds, resource.id] : draft.resourceUserIds.filter(id => id !== resource.id) })} />{resource.label}</label>)}{unknownResources.map(resource => <p key={resource} className="break-all text-sm">Assigned resource not in current choices: {resource}</p>)}</fieldset>
     {!draft.resourceUserIds.length && <p className="text-sm">Unassigned. This does not establish availability.</p>}

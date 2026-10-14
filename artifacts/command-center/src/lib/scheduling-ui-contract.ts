@@ -85,10 +85,12 @@ export type SchedulingPolicyPanelProps = {
   onSave: (draft: PolicySaveInput) => Promise<PolicySaveResult>;
   onRefresh: () => void;
 };
-/** Before every draft/preset/resource/context edit call onReviewChange(null), then
+/** Before every draft/preset/resource/context/effective-mode edit call onReviewChange(null), then
  * onDraftChange with the exact changed draft. Root discards callbacks from old
- * draft/context closures. Only a complete unambiguous draft may emit a review. */
+ * draft/context/mode closures. Only a complete unambiguous draft may emit a review. */
 export type SchedulingIntervalFieldsProps = {
+  /** Omitted and preserve_elapsed retain appointment elapsed-duration semantics. */
+  startOnlyBehavior?: 'preserve_elapsed' | 'preserve_absolute_end';
   context: SchedulingReviewContext | null;
   companyTimeZone: string | null;
   interval: IntervalInput;
