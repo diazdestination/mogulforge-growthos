@@ -1463,7 +1463,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
-  "/v1/projects": {"get":{"operationId":"listProjects","tags":["projects"],"parameters":[{"name":"leadId","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"status","in":"query","required":false,"schema":{"$ref":"#/components/schemas/ProjectStatus"}},{"name":"contactId","in":"query","schema":{"type":"string","format":"uuid"}},{"name":"customerWorkId","in":"query","schema":{"type":"string","format":"uuid"}},{"name":"propertyId","in":"query","schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Projects","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Project"}}}}}}},"post":{"operationId":"createProject","tags":["projects"],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProjectInput"}}}},"responses":{"201":{"description":"Created","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Project"}}}},"400":{"description":"Invalid input","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ErrorEnvelope"}}}},"409":{"description":"Original manual scheduling refusal or unavailable committed target, or ordinary scheduling conflict.","content":{"application/json":{"schema":{"anyOf":[{"$ref":"#/components/schemas/ManualSchedulingError"},{"$ref":"#/components/schemas/ErrorEnvelope"}]}}}}}}}
+  "/v1/projects": {"get":{"operationId":"listProjects","tags":["projects"],"parameters":[{"name":"leadId","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"status","in":"query","required":false,"schema":{"$ref":"#/components/schemas/ProjectStatus"}},{"name":"contactId","in":"query","schema":{"type":"string","format":"uuid"}},{"name":"customerWorkId","in":"query","schema":{"type":"string","format":"uuid"}},{"name":"propertyId","in":"query","schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Projects","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Project"}}}}}}},"post":{"operationId":"createProject","tags":["projects"],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProjectInput"}}}},"responses":{"200":{"description":"Exact replay of the original committed project while its target is available.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Project"}}}},"201":{"description":"Created","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Project"}}}},"400":{"description":"Invalid input","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ErrorEnvelope"}}}},"409":{"description":"Original manual scheduling refusal or unavailable committed target, or ordinary scheduling conflict.","content":{"application/json":{"schema":{"anyOf":[{"$ref":"#/components/schemas/ManualSchedulingError"},{"$ref":"#/components/schemas/ErrorEnvelope"}]}}}}}}}
   /v1/projects/{id}:
     get:
       operationId: getProject
@@ -1854,6 +1854,12 @@ paths:
             schema:
               $ref: "#/components/schemas/AppointmentInput"
       responses:
+        "200":
+          description: Exact replay of the original committed appointment while its target is available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
         "201":
           description: Created
           content:

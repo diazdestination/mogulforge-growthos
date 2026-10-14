@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as generated from "../lib/api-zod/src/generated/api";
@@ -40,6 +41,23 @@ const body = {
   review,
 };
 describe("closed scheduling generation", () => {
+  it.each([
+    ["/v1/appointments", "Appointment"],
+    ["/v1/projects", "Project"],
+  ])("declares original replay and fresh creation with the same native DTO for %s", (path, name) => {
+    // Use the generator's existing YAML parser, as the other contract scripts do.
+    const specRequire = createRequire(new URL("../lib/api-spec/package.json", import.meta.url));
+    const { parse } = createRequire(specRequire.resolve("orval"))("yaml");
+    const spec = parse(readFileSync(resolve(import.meta.dirname, "../lib/api-spec/openapi.yaml"), "utf8"));
+    const responses = spec.paths[path].post.responses;
+    expect(responses["200"]).toBeDefined();
+    expect(responses["200"].description).toMatch(/replay.*original.*available/i);
+    const native = { $ref: `#/components/schemas/${name}` };
+    expect(responses["200"].content["application/json"].schema).toEqual(native);
+    expect(responses["201"].content["application/json"].schema).toEqual(native);
+    expect(spec.components.schemas[name].properties.schedulingOperation).toEqual({ $ref: "#/components/schemas/ManualSchedulingAck" });
+    expect(responses["409"].content["application/json"].schema.anyOf).toContainEqual({ $ref: "#/components/schemas/ManualSchedulingError" });
+  });
   it('closes the native409 envelope and every acknowledgement object',()=>{
     const ack={operationId:id,organizationId:id,actorUserId:'synthetic',kind:'appointment_create',source:context.source,payloadSha256:'a'.repeat(64),outcome:'no_commit_refused',target:null,refusalCode:'original_create_fenced'};
     const value={error:'Original refused',code:'manual_scheduling_refused',schedulingOperation:ack};
