@@ -4,6 +4,9 @@ import type { SchedulingDraft, SchedulingIntervalFieldsProps, SchedulingMutation
 
 const field = 'mt-1 block min-h-11 w-full min-w-0 rounded-lg border bg-background p-2 text-base';
 const button = 'min-h-11 rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-50';
+function controlledDraftKey(draft: SchedulingDraft) {
+  return JSON.stringify([draft.startAt, draft.endAt, draft.resourceUserIds]);
+}
 function wallDisplay(instant: string | null, zone: string | null) {
   if (!instant || !zone) return '';
   try { return formatSchedulingWallTime(instant, zone).localDateTime; } catch { return ''; }
@@ -44,9 +47,9 @@ function IntervalFields(props: SchedulingIntervalFieldsProps) {
   const [duration, setDuration] = useState<DurationChoice>(() => ({ kind: draft.startAt === interval.startAt && draft.endAt === interval.endAt ? 'preserved_interval' : 'explicit', preset: null }));
   const [shiftError, setShiftError] = useState('');
   const [awaitingDraft, setAwaitingDraft] = useState<string | null>(null);
-  const lastDraft = useRef(JSON.stringify(draft));
+  const lastDraft = useRef(controlledDraftKey(draft));
   const pendingInterval = useRef<{ startAt: string; endAt: string; nullEnd: boolean } | null>(null);
-  const incomingDraft = JSON.stringify(draft);
+  const incomingDraft = controlledDraftKey(draft);
   useEffect(() => {
     // A different draft in the same context is neither acknowledgement nor reset.
     if (awaitingDraft !== null && awaitingDraft !== incomingDraft) return;
@@ -72,7 +75,7 @@ function IntervalFields(props: SchedulingIntervalFieldsProps) {
   }
   function publish(next: SchedulingDraft) {
     props.onReviewChange(null);
-    lastDraft.current = JSON.stringify(next);
+    lastDraft.current = controlledDraftKey(next);
     setAwaitingDraft(lastDraft.current);
     props.onDraftChange(next);
   }

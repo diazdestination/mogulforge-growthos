@@ -12,7 +12,7 @@ export function SchedulingIntervalReview({ companyTimeZone: zone, interval, prop
   const saved = interval.reservation;
   const start = proposal?.startAt ?? interval.startAt;
   const end = proposal?.endAt ?? interval.endAt;
-  const assigned = proposal?.resourceUserIds ?? saved?.resourceUserIds ?? [];
+  const assigned = proposal?.resourceUserIds ?? saved?.resourceUserIds ?? null;
   function endpoint(value: string | null) { return time(value, zone!); }
   function gate(cap: number | null, name: string) {
     const retained = proposal?.basis === 'saved_release' || proposal?.basis === 'saved_preservation';
@@ -26,7 +26,7 @@ export function SchedulingIntervalReview({ companyTimeZone: zone, interval, prop
       <p className="text-muted-foreground">Service endpoints exclude travel. Travel is a required gap between adjacent assigned work.</p>
       {!proposal && <p role="status">Review pending. Final checks run when saving.</p>}
       {proposal && <><p>{proposal.basis === 'saved_release' ? 'Resource release; surviving saved protection retained.' : proposal.basis === 'saved_preservation' ? 'Saved protection preserved.' : 'New admission proposal.'}</p><p>Travel gap: {proposal.appliedTravelGapMinutes} minutes</p><div className="grid gap-3 sm:grid-cols-2">{gate(proposal.companyCeiling, 'Company')}{gate(proposal.inspectionCeiling, 'Inspection')}</div></>}
-      <p className="break-words">Assigned resources: {assigned.length ? assigned.map(id => resources.find(resource => resource.id === id)?.label ?? `Assigned staff (${id})`).join(', ') : 'Unassigned'}. This does not establish availability.</p>
+      <p className="break-words">{assigned === null ? 'Assigned resources: Unknown. Assignment and availability are unchecked.' : <>Assigned resources: {assigned.length ? assigned.map(id => resources.find(resource => resource.id === id)?.label ?? `Assigned staff (${id})`).join(', ') : 'Unassigned'}. This does not establish availability.</>}</p>
       {conflict && <div role="alert" className="space-y-1 rounded-lg border border-destructive p-3"><p>Staff resource conflict: {conflict.resourceLabel}</p><p>{conflict.reason}</p><p className="break-all">Authorized adjacent reference: {conflict.reservationKind} {conflict.reservationId}</p><p>{endpoint(conflict.startAt)} – {endpoint(conflict.endAt)}</p></div>}
       {saved ? <div className="space-y-1 border-t pt-3"><p>Historical approved zone: {saved.approvedTimeZone}</p><p>Saved service end: {endpoint(saved.endAt)}</p><p>Saved travel gap: {saved.minimumTravelGapMinutes} minutes</p><p>Source policy revision: {saved.sourcePolicyRevision} · Reservation revision: {saved.reservationRevision}</p><p className="break-all">Source policy digest: {saved.sourcePolicyDigest}</p><p>Saved duration: {saved.duration.preset ? `${saved.duration.preset.label} · ${saved.duration.preset.elapsedMinutes} elapsed minutes` : saved.duration.kind.replaceAll('_', ' ')}</p>{saved.inspection && <><p className="break-words">Inspection rule time zone: {saved.inspection.ruleTimeZone} · Source: {saved.inspection.sourceState}</p><p className="break-all">Inspection availability digest: {saved.inspection.availabilityDigest}</p></>}</div> : interval.startAt !== null ? <div className="border-t pt-3"><p>Legacy travel gap: 0 minutes</p>{interval.endAt === null && <><p>Stored end: Empty</p><p>Legacy effective end: {endpoint(interval.legacyEffectiveEnd)}</p></>}</div> : <p className="border-t pt-3">No saved reservation snapshot.</p>}
     </>}
