@@ -794,7 +794,7 @@ describe('native appointment scheduling consumer', () => {
     expect(s.commands).toHaveLength(1);
   });
   it.each(['corrupt', 'missing'])(
-    'holds %s original custody on remount',
+    'holds %s original custody during in-session reconciliation readback',
     async (mode) => {
       const s = setup({
         post: async () => {
@@ -1272,4 +1272,133 @@ describe('native appointment scheduling consumer', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(launch);
   });
+
+  it.each(['new', 'material edit'] as const)(
+    'offers no disabled-policy presets for %s while explicit intervals remain reviewable',
+    async (mode) => {
+      const saved = makeReservationSnapshot({
+        target: { kind: 'appointment', id: target },
+        startAt: row().scheduledStart,
+        endAt: row().scheduledEnd,
+        resourceUserIds: [],
+      });
+      const s = setup({
+        disabledPolicy: true,
+        existing:
+          mode === 'material edit'
+            ? {
+                ...row(),
+                schedulingEvidence: 'versioned',
+                schedulingReservation: saved,
+              }
+            : undefined,
+      });
+      if (mode === 'new') await open();
+      else {
+        fireEvent.click(
+          await screen.findByRole('button', { name: 'Edit appointment' }),
+        );
+        await waitFor(() =>
+          expect(screen.getByLabelText('Service start')).toHaveProperty(
+            'disabled',
+            false,
+          ),
+        );
+      }
+      const preset = screen.getByRole('combobox', { name: 'Duration preset' });
+      expect(
+        within(preset).queryByRole('option', { name: /Synthetic visit/ }),
+      ).toBeNull();
+      expect((preset as HTMLSelectElement).options).toHaveLength(1);
+      if (mode === 'material edit')
+        expect(
+          screen.getAllByText(/Saved travel gap: 60 minutes/).length,
+        ).toBeGreaterThan(0);
+      await review();
+      fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+      if (mode === 'new') {
+        await waitFor(() => expect(s.commands).toHaveLength(1));
+        expect(s.commands[0].review.duration).toEqual({
+          kind: 'explicit',
+          preset: null,
+        });
+      } else {
+        await waitFor(() => expect(s.writes).toHaveLength(1));
+        expect(s.writes[0]).toHaveProperty('schedulingReview.duration', {
+          kind: 'explicit',
+          preset: null,
+        });
+      }
+    },
+  );
+  it.each(['addition', 'replacement'] as const)(
+    'requires fresh review for terminal status plus staff %s',
+    async (mode) => {
+      const originalResources =
+        mode === 'replacement' ? ['original-staff'] : [];
+      const saved = makeReservationSnapshot({
+        target: { kind: 'appointment', id: target },
+        startAt: row().scheduledStart,
+        endAt: row().scheduledEnd,
+        resourceUserIds: originalResources,
+      });
+      const s = setup({
+        existing: {
+          ...row(),
+          assignedUserId: originalResources[0] ?? null,
+          schedulingEvidence: 'versioned',
+          schedulingReservation: saved,
+        },
+      });
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Edit appointment' }),
+      );
+      await waitFor(() =>
+        expect(screen.getByLabelText('Service start')).toHaveProperty(
+          'disabled',
+          false,
+        ),
+      );
+      if (mode === 'replacement')
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Remove assigned resource' }),
+        );
+      fireEvent.click(
+        screen.getByRole('checkbox', { name: 'Synthetic Staff' }),
+      );
+      fireEvent.change(
+        within(screen.getByRole('dialog')).getByRole('combobox', {
+          name: 'Appointment status',
+        }),
+        { target: { value: 'cancelled' } },
+      );
+      expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty(
+        'disabled',
+        true,
+      );
+      expect(s.writes).toHaveLength(0);
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Review interval' }),
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Save Appt' }),
+        ).toHaveProperty('disabled', false),
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+      await waitFor(() => expect(s.writes).toHaveLength(1));
+      expect(s.writes[0]).toMatchObject({
+        status: 'cancelled',
+        assignedUserId: actor,
+        scheduledStart: row().scheduledStart,
+        scheduledEnd: row().scheduledEnd,
+        expectedUpdatedAt: row().updatedAt,
+        expectedTargetFingerprint: row().schedulingTargetFingerprint,
+      });
+      expect(s.writes[0]).toHaveProperty(
+        'schedulingReview.context.targetFingerprint',
+        row().schedulingTargetFingerprint,
+      );
+    },
+  );
 });
