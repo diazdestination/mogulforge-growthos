@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Server } from "node:http";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   db,
   pool,
@@ -618,18 +618,66 @@ async function replayUnchanged(
 ) {
   const before = await effects(f),
     events = eventCalls(f);
-  expect((await create(f, c)).ack).toEqual(ack);
+  const replay = await create(f, c);
+  expect(replay.status).toBe(ack.outcome === "committed" ? 200 : 409);
+  expect(replay.ack).toEqual(ack);
   expect(await reconcile(f, c)).toEqual(ack);
   expect(await effects(f)).toEqual(before);
   expect(eventCalls(f)).toEqual(events);
 }
 
-async function blockedBy(pid: number) {
-  for (let i = 0; i < 200; i++) {
-    const result = await pool.query(
-      "SELECT pid FROM pg_stat_activity WHERE datname=current_database() AND $1::int=ANY(pg_blocking_pids(pid))",
-      [pid],
+type OrganizationLock = {
+  database: string;
+  classid: string;
+  objid: string;
+  objsubid: number;
+  mode: string;
+};
+async function organizationLocks(f: F): Promise<OrganizationLock[]> {
+  // Observe actual production lock identities in a short transaction. Do not
+  // duplicate PostgreSQL's advisory-key bit layout or infer scope from SQL text.
+  return db.transaction(async (tx) => {
+    await policy.lockSchedulingConfiguration(tx, f.org, false);
+    const result = await tx.execute<OrganizationLock>(sql`
+      SELECT database::text, classid::text, objid::text, objsubid, mode
+      FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='advisory' AND granted
+      ORDER BY classid, objid, objsubid
+    `);
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows.every((lock) => lock.mode === "ExclusiveLock")).toBe(
+      true,
     );
+    return result.rows;
+  });
+}
+async function blockedBy(
+  pid: number,
+  locks: OrganizationLock[],
+  granted: boolean,
+  attempts = 200,
+) {
+  for (let i = 0; i < attempts; i++) {
+    const result = await pool.query(
+      `SELECT DISTINCT activity.pid
+       FROM pg_stat_activity activity JOIN pg_locks scoped ON scoped.pid=activity.pid
+       WHERE activity.datname=current_database()
+         AND $1::int=ANY(pg_blocking_pids(activity.pid))
+         AND scoped.locktype='advisory' AND scoped.granted=$2::boolean
+         AND $3::jsonb @> jsonb_build_array(jsonb_build_object(
+           'database',scoped.database::text,'classid',scoped.classid::text,
+           'objid',scoped.objid::text,'objsubid',scoped.objsubid,'mode',scoped.mode))
+         AND ($2::boolean OR EXISTS (
+           SELECT 1 FROM pg_locks holder WHERE holder.pid=$1::int
+             AND holder.locktype='advisory' AND holder.granted
+             AND holder.database=scoped.database AND holder.classid=scoped.classid
+             AND holder.objid=scoped.objid AND holder.objsubid=scoped.objsubid
+             AND holder.mode=scoped.mode))`,
+      [pid, granted, JSON.stringify(locks)],
+    );
+    if (result.rows.length > 1)
+      throw Error(
+        "Ambiguous organization-scoped PostgreSQL acceptance barrier",
+      );
     if (result.rows[0]) return Number(result.rows[0].pid);
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
@@ -641,6 +689,7 @@ async function barrier(
   operation = "INSERT",
   condition = "true",
 ) {
+  const locks = await organizationLocks(f);
   const hook = `qa_acceptance_${randomUUID().replaceAll("-", "")}`,
     keeper = await pool.connect();
   await pool.query(
@@ -653,6 +702,7 @@ async function barrier(
   await keeper.query("SELECT pg_advisory_xact_lock(hashtext($1))", [hook]);
   return {
     keeper,
+    organizationLocks: locks,
     pid: Number(
       (await keeper.query("SELECT pg_backend_pid() AS pid")).rows[0].pid,
     ),
@@ -663,6 +713,7 @@ async function barrier(
   };
 }
 async function contactBarrier(f: F) {
+  const locks = await organizationLocks(f);
   const keeper = await pool.connect();
   await keeper.query("BEGIN");
   await keeper.query(
@@ -671,6 +722,7 @@ async function contactBarrier(f: F) {
   );
   return {
     keeper,
+    organizationLocks: locks,
     pid: Number(
       (await keeper.query("SELECT pg_backend_pid() AS pid")).rows[0].pid,
     ),
@@ -691,9 +743,9 @@ async function race<A, B>(
   };
   try {
     const a = observe(first()),
-      firstPid = await blockedBy(hold.pid);
+      firstPid = await blockedBy(hold.pid, hold.organizationLocks, true);
     const b = observe(second()),
-      secondPid = await blockedBy(firstPid);
+      secondPid = await blockedBy(firstPid, hold.organizationLocks, false);
     expect(new Set([hold.pid, firstPid, secondPid]).size).toBe(3);
     console.info(
       "SAVED_SCHEDULING_ACCEPTANCE_PG_BARRIER",
@@ -702,6 +754,7 @@ async function race<A, B>(
         keeper: hold.pid,
         first: firstPid,
         second: secondPid,
+        organizationLocks: hold.organizationLocks,
       }),
     );
     await hold.keeper.query("COMMIT");
@@ -720,6 +773,86 @@ const configurationCases = (["policy", "inspection", "zone"] as const).flatMap(
       [false, true].map((changeFirst) => ({ kind, configured, changeFirst })),
     ),
 );
+it("does not mistake an unrelated contact-row waiter for the second native operation", async () => {
+  const f = await fixture(),
+    c = await command(f),
+    before = await effects(f);
+  const hold = await barrier("appointments", f),
+    challenger = await pool.connect();
+  const pending: Promise<unknown>[] = [];
+  const observe = <T>(promise: Promise<T>) => {
+    pending.push(promise);
+    void promise.catch(() => {});
+    return promise;
+  };
+  try {
+    const original = observe(create(f, c)),
+      firstPid = await blockedBy(hold.pid, hold.organizationLocks, true);
+    await challenger.query("BEGIN");
+    const challengerPid = Number(
+      (await challenger.query("SELECT pg_backend_pid() AS pid")).rows[0].pid,
+    );
+    // Native admission holds this contact FOR SHARE. This unrelated row-lock
+    // waiter is a real independent session but is not the second native request.
+    const unrelated = observe(
+      challenger.query(
+        "SELECT id FROM contacts WHERE organization_id=$1 AND id=$2 FOR UPDATE",
+        [f.org, f.contact],
+      ),
+    );
+    let seen = false;
+    for (let i = 0; i < 200; i++) {
+      const result = await pool.query(
+        "SELECT $1::int=ANY(pg_blocking_pids($2)) AS blocked",
+        [firstPid, challengerPid],
+      );
+      if (result.rows[0].blocked) {
+        seen = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(seen).toBe(true);
+    // Before the real second operation starts, the only waiter is unrelated.
+    await expect(
+      blockedBy(firstPid, hold.organizationLocks, false, 10),
+    ).rejects.toThrow(
+      "Independent PostgreSQL acceptance barrier was not observed",
+    );
+    const duplicate = observe(create(f, c)),
+      secondPid = await blockedBy(firstPid, hold.organizationLocks, false);
+    expect(new Set([hold.pid, firstPid, secondPid, challengerPid]).size).toBe(
+      4,
+    );
+    console.info(
+      "SAVED_SCHEDULING_ACCEPTANCE_PG_BARRIER",
+      JSON.stringify({
+        label: "reject-unrelated-row-waiter",
+        keeper: hold.pid,
+        first: firstPid,
+        second: secondPid,
+        rejectedChallenger: challengerPid,
+        organizationLocks: hold.organizationLocks,
+      }),
+    );
+    await hold.keeper.query("COMMIT");
+    const [first, second] = await Promise.all([original, duplicate]);
+    await unrelated;
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(200);
+    expect(second.ack).toEqual(first.ack);
+    const after = await effects(f);
+    nativeEffects(f, c, first.ack!, before, after);
+    exactAudits(before, after, admitted);
+  } finally {
+    await hold.keeper.query("ROLLBACK");
+    hold.keeper.release();
+    await Promise.allSettled(pending);
+    await challenger.query("ROLLBACK");
+    challenger.release();
+    await hold.drop();
+  }
+}, 30000);
 it.each(configurationCases)(
   "native HTTP $kind configured=$configured changeFirst=$changeFirst retains exact effects",
   async ({ kind, configured, changeFirst }) => {
