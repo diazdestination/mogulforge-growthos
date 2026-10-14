@@ -467,7 +467,7 @@ describe("exact independent rule-zone calendar windows",()=>{
     await db.update(organizationsTable).set({timezone:"America/Los_Angeles"}).where(eq(organizationsTable.id,org));
     const [slot]=await generateInspectionSlots(org);
     expect(slot).toMatchObject({start:"2035-01-02T16:30:00.000Z",end:"2035-01-02T18:30:00.000Z"});
-    expect(slot.label).toContain("America/Los_Angeles; inspection rules: Asia/Kolkata");
+    expect(slot.label).toBe("Tue, Jan 2, 8:30 AM–10:30 AM (America/Los_Angeles; inspection rules: Asia/Kolkata)");
     expect(await bookInspectionSlot({organizationId:org,slot})).not.toBeNull();
     for(const delta of [1,1000,60000])expect(await bookInspectionSlot({organizationId:org,slot:{start:new Date(Date.parse(slot.start)+delta).toISOString(),end:new Date(Date.parse(slot.end)+delta).toISOString()}})).toBeNull();
   });

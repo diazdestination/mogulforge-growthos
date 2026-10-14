@@ -470,3 +470,127 @@ it("preserves each actual historical source hash through generated parsing and w
   ).toBe(careFingerprint(c));
   expect(wireC).toEqual(c);
 });
+
+// These literal expected hashes and exact vectors are frozen in the accepted
+// A/B/C source suites, not derived from the current helper under test.
+it("transports the frozen returning-customer A hash vector unchanged", () => {
+  const parsed = createCustomerWorkProjectSchema.parse({
+    requestId: "10000000-0000-4000-8000-000000000001",
+    confirmed: true,
+    source: {
+      kind: "existing_customer",
+      contactId: "20000000-0000-4000-8000-000000000002",
+      propertyId: null,
+    },
+    name: "  Repair  ",
+    status: "scheduled",
+    scheduledStart: null,
+    scheduledEnd: null,
+    crewUserIds: ["tech-b", "tech-a"],
+    crewNotes: null,
+  });
+  const wire = JSON.parse(
+    JSON.stringify(generated.CreateCustomerWorkProjectBody.parse(parsed)),
+  );
+  expect(wire).toEqual(parsed);
+  expect(wire.name).toBe("Repair");
+  expect(Object.hasOwn(wire, "schedulingReview")).toBe(false);
+  expect(
+    customerWorkHash({
+      action: "project_created",
+      targetId: null,
+      input: wire,
+      actorUserId: "staff-original",
+    }),
+  ).toBe("33ee6a9b1cda35c6228ddf59d68fbaa62e38d1278743dcfdcb2c1b0306bef4a9");
+});
+const frozenCareLegacy = {
+  requestId: "11111111-1111-4111-8111-111111111111",
+  expectedUpdatedAt: "2035-01-01T00:00:00.000Z",
+  responseId: "22222222-2222-4222-8222-222222222222",
+  assignedUserId: "staff_original",
+  scheduledStart: "2035-01-02T15:00:00.000Z",
+  scheduledEnd: "2035-01-02T16:00:00.000Z",
+  type: "other",
+  customerConfirmed: true,
+};
+const frozenCareContext = {
+  organizationId: "33333333-3333-4333-8333-333333333333",
+  policyRevision: 0,
+  policyDigest: null,
+  companyTimeZone: "UTC",
+  inspection: null,
+  applicableRules: {
+    newTravelGapMinutes: 0,
+    companyCeiling: null,
+    inspectionCeiling: null,
+  },
+  source: {
+    sourceKind: "direct_customer",
+    leadId: null,
+    contactId: "44444444-4444-4444-8444-444444444444",
+    propertyId: null,
+    estimateId: null,
+  },
+  targetVersion: null,
+  targetFingerprint: null,
+};
+it.each([
+  {
+    name: "B legacy",
+    input: frozenCareLegacy,
+    hash: "e29febeb749f7845406e3a06ec0b41c79d0f77fb77849f88efb408ad9efd0785",
+  },
+  {
+    name: "B reviewed",
+    input: {
+      ...frozenCareLegacy,
+      schedulingReview: {
+        context: frozenCareContext,
+        duration: { kind: "explicit", preset: null },
+        startWallTime: null,
+        endWallTime: null,
+      },
+    },
+    hash: "1fc0cef9f16c12614302654ed91035d324378851f42dffff4ce58e2928306a2a",
+  },
+])(
+  "transports the frozen service-care $name hash vector unchanged",
+  ({ input, hash }) => {
+    const parsed = serviceCareBookingSchema.parse(input),
+      wire = JSON.parse(
+        JSON.stringify(generated.BookServiceCareVisitBody.parse(parsed)),
+      );
+    expect(wire).toEqual(parsed);
+    expect(careFingerprint(wire)).toBe(hash);
+  },
+);
+it("transports the frozen CALLIE C hash vector unchanged", () => {
+  const parsed = callieBookingSchema.parse({
+    assignedUserId: "staff-fixture",
+    confirmationNote: "Customer agreed to the exact visit.",
+    contactId: "22222222-2222-4222-8222-222222222222",
+    customerConfirmed: true,
+    expectedFingerprint: "a".repeat(64),
+    expectedVersion: 3,
+    leadId: null,
+    propertyId: null,
+    requestId: "11111111-1111-4111-8111-111111111111",
+    scheduledEnd: "2035-01-02T16:00:00.000Z",
+    scheduledStart: "2035-01-02T15:00:00.000Z",
+    type: "other",
+  });
+  const wire = JSON.parse(
+    JSON.stringify(generated.BookCallieVisitBody.parse(parsed)),
+  );
+  expect(wire).toEqual(parsed);
+  expect(Object.hasOwn(wire, "schedulingReview")).toBe(false);
+  const frozenHash =
+    "91cf8407917bd2d9077b4baba14eb614c17bb908503fca4024892ea6b65ffc22";
+  expect(careFingerprint(wire)).toBe(frozenHash);
+  expect(
+    createHash("sha256")
+      .update(canonicalCallieBookingInput(wire))
+      .digest("hex"),
+  ).toBe(frozenHash);
+});

@@ -755,3 +755,82 @@ describe("accepted source contract closure and wire custody", () => {
     ).toThrow();
   });
 });
+
+describe("source projection required component anchors", () => {
+  const spec = readFileSync(
+    resolve(import.meta.dirname, "../lib/api-spec/openapi.yaml"),
+    "utf8",
+  );
+  const required = [
+    "CreateCustomerWorkProject",
+    "UpdateCustomerWorkProject",
+    "CustomerWorkProject",
+    "CustomerWorkProjectMutation",
+    "BookServiceCareVisit",
+    "CallieBookingRequest",
+    "ServiceCareReview",
+  ];
+  const added = [
+    "CustomerWorkProjectOutcome",
+    "CustomerWorkProjectUnavailable",
+    "ServiceCareSchedulingSource",
+    "ServiceCareSchedulingRead",
+    "ServiceCareBookingOutcome",
+    "ServiceCareBookingResult",
+    "CallieSchedulingContextQuery",
+    "CallieSchedulingContextRead",
+    "CallieBookingOutcome",
+    "CallieBookingResult",
+  ];
+  function changed(name, transform) {
+    return spec.replace(
+      new RegExp(`^    ${name}: (.+)$`, "m"),
+      (_line, json) => {
+        const value = transform(JSON.parse(json));
+        return value === undefined
+          ? ""
+          : `    ${name}: ${JSON.stringify(value)}`;
+      },
+    );
+  }
+  it.each(required)(
+    "rejects missing required existing %s before projection",
+    (name) => {
+      expect(() =>
+        projectSchedulingSourceSpec(changed(name, () => undefined)),
+      ).toThrow();
+    },
+  );
+  it.each([...required, ...added])(
+    "rejects altered existing %s instead of repairing authority",
+    (name) => {
+      expect(() =>
+        projectSchedulingSourceSpec(changed(name, () => ({ type: "string" }))),
+      ).toThrow();
+      expect(() =>
+        projectSchedulingSourceSpec(
+          changed(name, (value) => ({ ...value, additionalProperties: value.additionalProperties !== true })),
+        ),
+      ).toThrow();
+    },
+  );
+  it.each(added)(
+    "allows an absent newly authorized %s, and only its authoritative shape when present",
+    (name) => {
+      expect(
+        projectSchedulingSourceSpec(changed(name, () => undefined)),
+      ).toContain(`    ${name}: `);
+      expect(projectSchedulingSourceSpec(spec)).toBe(spec);
+    },
+  );
+  it("rejects altered historical service-care members alongside the new review", () => {
+    expect(() =>
+      projectSchedulingSourceSpec(
+        changed("ServiceCareReview", (value) => ({
+          ...value,
+          properties: { ...value.properties, booking: { type: "string" } },
+        })),
+      ),
+    ).toThrow();
+  });
+});

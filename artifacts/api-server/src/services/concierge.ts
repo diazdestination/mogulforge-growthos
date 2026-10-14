@@ -1310,7 +1310,7 @@ function slotLabel(start: Date, end: Date, tz: string): string {
     day: "numeric",
   }).format(start);
   const time = (d: Date) =>
-    new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: true }).format(d);
+    new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }).format(d);
   return `${day}, ${time(start)}–${time(end)}`;
 }
 
