@@ -6,6 +6,8 @@ import ServiceDesk from '@/pages/service-desk';
 import { renderWithQuery } from '@/test/render';
 import { mockApi, sampleMe } from '@/test/mock-api';
 import { approvedView, contactId, orgId, serviceId, smsPage, smsReply, standingPreview, standingView, versionTime } from '@/test/service-standing-fixtures';
+import { makeSchedulingContext } from '@/test/scheduling-ui-fixtures';
+import { serviceCareSchedulingReadSchema } from '../../../api-server/src/services/service-care-booking-contract';
 const emptyWatch = () => Response.json({ items: [], hasMore: false, unmonitoredCount: 0, held: false });
 
 describe('customer service desk status', () => {
@@ -75,7 +77,21 @@ describe('customer service desk status', () => {
 });
 
 const row = () => ({ obligation: { id: serviceId, contactId, kind: 'maintenance', equipmentLabel: 'Fictional heat pump', dueAt: '2035-01-01T12:00:00.000Z', status: 'active', source: 'manual', appointmentId: null, updatedAt: versionTime, recurrence: standingView().sourceSummary.recurrence, coverageStartsOn: null, coverageEndsOn: null, coverageEvidence: null }, contact: { id: contactId, firstName: 'Fictional', lastName: 'Customer', phone: '+15005550006', email: 'customer@example.invalid' }, task: { status: 'open', dueAt: null, assignedUserId: 'staff' } });
-const care = () => ({ expectedUpdatedAt: versionTime, active: true, preview: null, blockReason: null, deferredReason: null, reminder: null, response: { id: 'response', outcome: 'ready_to_book', note: 'Synthetic actual service conversation.', respondedAt: versionTime, channel: 'phone' }, appointment: null, booking: null });
+const care = () => {
+  const source = { sourceKind: 'direct_customer' as const, leadId: null, contactId, propertyId: null, estimateId: null };
+  return {
+    expectedUpdatedAt: versionTime, active: true, preview: null, blockReason: null, deferredReason: null, reminder: null,
+    response: { id: '99999999-9999-4999-8999-999999999999', outcome: 'ready_to_book', note: 'Synthetic actual service conversation.', respondedAt: versionTime, channel: 'phone' }, appointment: null, booking: null,
+    // Source booking review is available independently of any reminder provider.
+    scheduling: serviceCareSchedulingReadSchema.parse({
+      organizationId: orgId, actorUserId: 'u1', obligationId: serviceId, expectedUpdatedAt: versionTime, appointmentType: 'inspection', source,
+      review: { state: 'ready', policy: null, context: makeSchedulingContext({
+        organizationId: orgId, companyTimeZone: 'UTC', policyRevision: 0, policyDigest: null, source,
+        applicableRules: { newTravelGapMinutes: 0, companyCeiling: null, inspectionCeiling: 2 },
+      }) },
+    }),
+  };
+};
 function authoritySetup() {
   let profile = { ...sampleMe('admin'), organization: { id: orgId, name: 'Fictional HVAC', slug: 'fictional', timezone: 'UTC' } };
   let failed = false;
@@ -98,12 +114,21 @@ function authoritySetup() {
 }
 async function openCareDraft() {
   fireEvent.click(await screen.findByRole('button', { name: 'Customer care & booking' })); await screen.findByText('Latest staff-recorded response');
+  const posts = () => vi.mocked(globalThis.fetch).mock.calls.filter(([, init]) => init?.method === 'POST');
+  expect(posts()).toHaveLength(0);
   fireEvent.change(screen.getByLabelText(/Conversation and agreed next step/), { target: { value: 'Unfinished actual customer conversation note.' } });
   fireEvent.click(screen.getByLabelText(/I reviewed the actual customer response/));
-  fireEvent.change(screen.getByLabelText(/Visit starts/), { target: { value: '2035-01-02T10:00' } });
-  fireEvent.change(screen.getByLabelText(/Visit ends/), { target: { value: '2035-01-02T11:00' } });
+  await waitFor(() => expect(screen.getByLabelText('Service start').matches(':disabled')).toBe(false));
+  fireEvent.change(screen.getByLabelText('Service start'), { target: { value: '2035-01-02T10:00' } });
+  fireEvent.change(screen.getByLabelText('Service end'), { target: { value: '2035-01-02T11:00' } });
   fireEvent.change(screen.getByLabelText('Assigned team member'), { target: { value: 'staff' } });
+  expect(screen.getByRole('button', { name: 'Book confirmed visit' })).toHaveProperty('disabled', true);
+  expect(screen.getByLabelText(/The customer confirmed this exact time/).matches(':disabled')).toBe(true);
+  expect(posts()).toHaveLength(0);
+  fireEvent.click(screen.getByRole('button', { name: 'Review interval' }));
   fireEvent.click(screen.getByLabelText(/The customer confirmed this exact time/));
+  expect(screen.getByRole('button', { name: 'Book confirmed visit' })).toHaveProperty('disabled', false);
+  expect(posts()).toHaveLength(0);
 }
 async function prepareStandingReview() {
   fireEvent.click(screen.getByRole('button', { name: 'Review automatic series reminders' })); await screen.findByText('Standing reminders are off');
@@ -135,7 +160,8 @@ describe('service authority boundaries', () => {
     expect(screen.getByLabelText('Equipment')).toHaveProperty('value', 'Unfinished new service draft');
     expect(screen.getByLabelText(/Conversation and agreed next step/)).toHaveProperty('value', 'Unfinished actual customer conversation note.');
     expect(screen.getByLabelText(/I reviewed the actual customer response/)).toHaveProperty('checked', true);
-    expect(screen.getByLabelText(/Visit starts/)).toHaveProperty('value', '2035-01-02T10:00');
+    expect(screen.getByLabelText('Service start')).toHaveProperty('value', '2035-01-02T10:00');
+    expect(screen.getByLabelText('Service end')).toHaveProperty('value', '2035-01-02T11:00');
     expect(screen.getByLabelText(/The customer confirmed this exact time/)).toHaveProperty('checked', true);
     expect(screen.getByRole('button', { name: 'Book confirmed visit' })).toHaveProperty('disabled', false);
   });
