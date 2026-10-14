@@ -2,6 +2,10 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { basename, dirname, resolve } from 'node:path';
+import { readFile, writeFile } from 'node:fs/promises';
+import https from 'node:https';
+import { syncBuiltinESMExports } from 'node:module';
+import { seedSchedulingThroughApp, probeSchedulingThroughApp, schedulingHash } from './saved-scheduling-recovery-fixture.mjs';
 import { nativeFixtureIds } from './native-contractor-recovery-fixture.mjs';
 import { careFixtureIds } from './customer-care-recovery-fixture.mjs';
 import { operationsFixtureIds } from './operations-wave-recovery-fixture.mjs';
@@ -18,29 +22,85 @@ import { returningCustomerIds } from './returning-customer-recovery-fixture.mjs'
 const target = new URL(process.env.DATABASE_URL ?? '');
 if (!['postgres:', 'postgresql:'].includes(target.protocol) || target.hostname !== '127.0.0.1' || target.pathname !== '/postgres' || process.env.CONTRACTOR_SYNTHETIC_RECOVERY !== 'true' || process.env.NODE_ENV !== 'test') throw new Error('contractor_probe_target_invalid');
 const fetchLocal = globalThis.fetch;
+let externalAttempts=0;
 globalThis.fetch = (input, init) => {
   const url = new URL(input instanceof Request ? input.url : input);
-  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1') throw new Error('contractor_probe_external_request_forbidden');
+  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1') { externalAttempts++; throw new Error('contractor_probe_external_request_forbidden'); }
   return fetchLocal(input, init);
 };
+https.request=https.get=()=>{ externalAttempts++; throw new Error('contractor_probe_external_request_forbidden'); };
+syncBuiltinESMExports();
 const { fixtureIds } = await import('./restore-drill-fixture.mjs');
 const compiled = resolve(process.env.CONTRACTOR_RECOVERY_APP ?? '');
 const artifactRoot = fileURLToPath(new URL('../artifacts/api-server', import.meta.url));
 if (dirname(dirname(compiled)) !== artifactRoot || !basename(dirname(compiled)).startsWith('.contractor-recovery-') || basename(compiled) !== 'contractor-recovery-entry.mjs') throw new Error('contractor_probe_build_invalid');
 const { default: app, pool } = await import(pathToFileURL(compiled).href);
 let databaseFailed = false;
+let databaseFailureCode;
+let databaseFailureClass, readerContext;
+pool.on('connect',client=>{
+  const query=client.query;
+  client.query=function(...args){
+    const result=query.apply(this,args);
+    if(result&&typeof result.catch==='function') return result.catch(error=>{
+      if(/^[A-Z0-9]{5}$/.test(error.code??'')) databaseFailureCode=error.code;
+      const sql=typeof args[0]==='string'?args[0]:args[0]?.text??'';
+      databaseFailureClass=/\bfrom\s+"?users"?\b/i.test(sql)&&/\bfor\s+share\b/i.test(sql)?'users_for_share':'other';
+      throw error;
+    });
+    return result;
+  };
+});
 // Keep connection failures observable without dumping driver objects/secrets.
 pool.on('error', () => { databaseFailed = true; });
 let server, check = 'database_identity';
 try {
+  const mode=process.env.CONTRACTOR_RECOVERY_PROBE_MODE??'reader';
+  assert.ok(['reader','seed','reconcile','reduced','disabled'].includes(mode));
+  if(mode!=='reader') {
+    assert.equal(process.env.RESTORE_DRILL_ONLY,undefined);
+    assert.equal(process.env.RESTORE_DRILL_EXPECTED_CLUSTER_ID,undefined);
+    assert.equal(process.env.FLY_APP_NAME,undefined);
+    assert.equal(process.env.GROWTHOS_OUTBOUND_HOLD,'true');
+    assert.equal(process.env.SCHEDULER_AUTOSTART,'false');
+    const identity=(await pool.query("SELECT session_user,current_user,current_database() AS database,current_setting('default_transaction_read_only') AS readonly")).rows[0];
+    assert.deepEqual(identity,{session_user:'contractor_recovery_writer',current_user:'contractor_recovery_writer',database:'postgres',readonly:'off'});
+    const privileges=(await pool.query("SELECT rolsuper,rolcreaterole,rolcreatedb,rolreplication,rolbypassrls FROM pg_roles WHERE rolname=session_user")).rows[0];
+    assert.ok(Object.values(privileges).every(value=>value===false));
+    await pool.query('BEGIN');
+    try { await pool.query("INSERT INTO organizations(name,slug) VALUES('SYNTHETIC writer control','synthetic-writer-control')"); }
+    finally { await pool.query('ROLLBACK'); }
+    server=app.listen(0,'127.0.0.1'); await new Promise(done=>server.once('listening',done));
+    const origin=`http://127.0.0.1:${server.address().port}`;
+    const readiness=await fetch(`${origin}/api/readyz`); assert.equal(readiness.status,200);
+    const artifactBuildStamp=(await readiness.json()).release;
+    const statePath=resolve(dirname(compiled),'scheduling-fixture.json');
+    check=`scheduling_${mode}`;
+    let result;
+    if(mode==='seed') {
+      const state=await seedSchedulingThroughApp(origin,pool);
+      await writeFile(statePath,JSON.stringify(state),{flag:'wx'});
+      result={fixtureSha256:schedulingHash(JSON.stringify(state))};
+    } else {
+      const raw=await readFile(statePath,'utf8');
+      assert.equal(schedulingHash(raw),process.env.CONTRACTOR_RECOVERY_FIXTURE_SHA256);
+      result=await probeSchedulingThroughApp(origin,pool,JSON.parse(raw),mode);
+    }
+    assert.equal(externalAttempts,0);
+    process.stdout.write(`${JSON.stringify({...result,artifactBuildStamp,providerCalls:externalAttempts,writerIdentityVerified:true})}\n`);
+  } else {
   const databaseIdentity = (await pool.query('SELECT session_user AS username')).rows[0];
   assert.equal(databaseIdentity.username, 'contractor_recovery_reader');
+  readerContext=(await pool.query("SELECT session_user,current_user,current_setting('transaction_read_only') AS transaction_read_only,current_setting('default_transaction_read_only') AS default_transaction_read_only,current_setting('transaction_isolation') AS transaction_isolation")).rows[0];
+  assert.equal(readerContext.transaction_read_only,'on');
+  assert.equal(readerContext.default_transaction_read_only,'on');
   check = 'database_write_rejected';
   await assert.rejects(pool.query("INSERT INTO organizations(name,slug) VALUES('Forbidden','forbidden')"));
   server = app.listen(0, '127.0.0.1');
   await new Promise((done) => server.once('listening', done));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const id = fixtureIds('restore-drill-contractor-a');
+  readerContext.actor=(await pool.query('SELECT id,organization_id,role,is_active FROM users WHERE id=$1',[id.user])).rows[0];
   const other = fixtureIds('restore-drill-contractor-b');
   const native = nativeFixtureIds('restore-drill-contractor-a'), otherNative = nativeFixtureIds('restore-drill-contractor-b');
   const headers = { authorization: `Bearer ${'a'.repeat(64)}` };
@@ -65,7 +125,15 @@ try {
   for (const route of good) {
     check = `read_${good.indexOf(route)}`;
     const response = await fetch(`${origin}${route}`, { headers });
-    assert.equal(response.status, 200, route); await response.arrayBuffer();
+    assert.equal(response.status, 200, route);
+    if(route===`/api/v1/service-obligations/${native.nextService}/care`) {
+      const care=await response.json();
+      assert.equal(care.scheduling.organizationId,id.organization);
+      assert.equal(care.scheduling.actorUserId,id.user);
+      assert.equal(care.scheduling.review.state,'held');
+      assert.equal(care.scheduling.review.code,'scheduling_reader_required');
+      assert.deepEqual(Object.keys(care.scheduling.review).sort(),['code','message','state']);
+    } else await response.arrayBuffer();
     assert.equal(databaseFailed, false);
   }
   const invoice = await (await fetch(`${origin}/api/v1/invoices/${native.invoice}`, { headers })).json();
@@ -308,10 +376,13 @@ try {
     const write=await fetch(`${origin}/api/v1/customer-work/projects`,{method:'POST',headers:{...workHeaders,'content-type':'application/json'},body:'{}'});assert.equal(write.status,405);await write.arrayBuffer();
     assert.equal(databaseFailed,false);
   }
-  process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, tenantBoundariesVerified: true, customerWorkspaceVerified: true, callieConversationReadVerified: true, workdayReadVerified: true, returningCustomerReadVerified:true, returningV3UnknownReadVerified:true, readChecks: good.length + receptionReadChecks + workdayReadChecks + returningReadChecks, writeBlocked: true })}\n`);
+  process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, readOnlySchedulingHeldVerified:true, tenantBoundariesVerified: true, customerWorkspaceVerified: true, callieConversationReadVerified: true, workdayReadVerified: true, returningCustomerReadVerified:true, returningV3UnknownReadVerified:true, readChecks: good.length + receptionReadChecks + workdayReadChecks + returningReadChecks, writeBlocked: true })}\n`);
+  }
 } catch (error) {
   // No response body, URL with credentials, SQL parameters or record content.
-  process.stderr.write(`CONTRACTOR_APP_PROBE_FAILED:${check}:${error.code === 'ERR_ASSERTION' ? 'assertion' : 'unavailable'}${Number.isInteger(error.actual) ? `:status_${error.actual}` : ''}\n`);
+  const step=globalThis.__contractorProbeStep??check;
+  if(readerContext) process.stderr.write(`CONTRACTOR_READER_DIAGNOSTIC:${JSON.stringify({...readerContext,step,sqlstate:databaseFailureCode??null,queryClass:databaseFailureClass??null})}\n`);
+  process.stderr.write(`CONTRACTOR_APP_PROBE_FAILED:${step}:${error.code === 'ERR_ASSERTION' ? 'assertion' : 'unavailable'}${Number.isInteger(error.actual) ? `:status_${error.actual}` : ''}${databaseFailureCode?`:sql_${databaseFailureCode}`:/^[A-Z0-9]{5}$/.test(error.code??'')?`:sql_${error.code}`:''}\n`);
   process.exitCode = 1;
 } finally {
   if (server) await new Promise((done) => server.close(done));
