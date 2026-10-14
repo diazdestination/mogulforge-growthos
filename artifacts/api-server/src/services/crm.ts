@@ -1,4 +1,5 @@
 import { projectEstimateDeliveryAudit } from "./estimate-delivery-projections";
+import { assertNoSchedulingParticipantHistory, readSchedulingAuditEvidence, projectSchedulingAuditRow, retainSchedulingProjectDeletion } from "./scheduling-history";
 import { dispatchWebhookEvent } from "./webhooks";
 import { enqueueStaffLeadPush } from "./staff-push";
 import {
@@ -220,7 +221,10 @@ export async function updateContact(
 export async function deleteContact(organizationId: string, id: string) {
   return db.transaction(async tx => {
   await lockCustomerWork(tx,organizationId);
+  const [selected] = await tx.select({id:contactsTable.id}).from(contactsTable).where(and(eq(contactsTable.organizationId,organizationId),eq(contactsTable.id,id))).for("update");
+  if (!selected) return false;
   if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"contactId",id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"This customer retains original estimate email history and cannot be deleted.");
+  await assertNoSchedulingParticipantHistory(tx,organizationId,[selected.id]);
   const rows = await tx
     .delete(contactsTable)
     .where(
@@ -1849,13 +1853,16 @@ export async function listAuditEvents(
   if (filters.since) {
     conditions.push(gte(auditEventsTable.createdAt, filters.since));
   }
-  const rows = await db
+  return db.transaction(async tx => {
+  const rows = await tx
     .select()
     .from(auditEventsTable)
     .where(and(...conditions))
     .orderBy(desc(auditEventsTable.createdAt))
     .limit(200);
-  return rows.map(projectEstimateDeliveryAudit).filter((e): e is NonNullable<typeof e> => e !== null);
+  const evidence = await readSchedulingAuditEvidence(tx,organizationId,rows);
+  return rows.map(row=>projectSchedulingAuditRow(row,evidence)).filter((e): e is NonNullable<typeof e>=>e!==null).map(projectEstimateDeliveryAudit).filter((e): e is NonNullable<typeof e> => e !== null);
+  },{isolationLevel:"repeatable read",accessMode:"read only"});
 }
 
 const AI_REFERRER_HOSTS = [
@@ -2478,13 +2485,17 @@ export async function createProjectInTransaction(
 
 export async function deleteProject(organizationId: string, id: string) {
   return db.transaction(async tx => {
-  await lockContractorSchedule(tx, organizationId);
-  const [native] = await tx.select({work:projectsTable.customerWorkId}).from(projectsTable).where(and(eq(projectsTable.organizationId,organizationId),eq(projectsTable.id,id)));
-  if (native?.work) customerWorkFail("customer_work_history_retained","Returning jobs retain their original command and billing history. Cancel the job through its versioned work command; it cannot be deleted.");
+  await lockCustomerWork(tx, organizationId);
+  const [native] = await tx.select().from(projectsTable).where(and(eq(projectsTable.organizationId,organizationId),eq(projectsTable.id,id))).for("update");
+  if (!native) return false;
+  if (native.customerWorkId) customerWorkFail("customer_work_history_retained","Returning jobs retain their original command and billing history. Cancel the job through its versioned work command; it cannot be deleted.");
   const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(
     eq(invoicesTable.organizationId, organizationId), eq(invoicesTable.projectId, id),
   )).limit(1);
   if (invoice) return INVOICE_HISTORY_RETAINED;
+  const [lead] = native.leadId ? await tx.select().from(leadsTable).where(and(eq(leadsTable.organizationId,organizationId),eq(leadsTable.id,native.leadId))).for("share") : [];
+  const source:ManualSourceRef|null=lead?{sourceKind:"lead",leadId:lead.id,contactId:lead.contactId,propertyId:lead.propertyId,estimateId:native.estimateId}:null;
+  await retainSchedulingProjectDeletion(tx,organizationId,native,source);
   const rows = await tx
     .delete(projectsTable)
     .where(

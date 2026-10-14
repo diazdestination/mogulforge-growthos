@@ -1,4 +1,5 @@
 import { lockCustomerWork, customerWorkFail } from "./customer-work-lineage";
+import { assertNoSchedulingParticipantHistory } from "./scheduling-history";
 import { hasRetainedEstimateEmailParticipant, ESTIMATE_EMAIL_HISTORY_RETAINED } from "./estimate-delivery-history";
 import { db, contactsTable, leadsTable } from '@workspace/db';
 import { and, eq, inArray, like } from 'drizzle-orm';
@@ -100,6 +101,7 @@ export async function clearDemoData(organizationId: string): Promise<SeedResult>
   const contacts=await tx.select({id:contactsTable.id}).from(contactsTable).where(and(eq(contactsTable.organizationId,organizationId),like(contactsTable.email,`%@${DEMO_EMAIL_DOMAIN}`)));
   for(const row of leads) if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"leadId",row.id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"Demo cleanup cannot remove retained estimate email history.");
   for(const row of contacts) if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"contactId",row.id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"Demo cleanup cannot remove retained estimate email history.");
+  await assertNoSchedulingParticipantHistory(tx,organizationId,[...leads.map(row=>row.id),...contacts.map(row=>row.id)]);
   // Ordinary source/email edits do not take the lifecycle lock. Delete only
   // the exact participants selected and checked above, never a fresh predicate match.
   const demoLeads = await tx

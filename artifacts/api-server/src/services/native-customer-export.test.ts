@@ -221,6 +221,12 @@ describe("native contractor customer export", () => {
       result = await createCustomerLifecycleExporter()(t.org, t.owner),
       encoded = JSON.stringify(result);
     expect(result.manifest.tables).toHaveLength(28);
+    expect(Object.keys(result.data)).toEqual(result.manifest.tables.map(row=>row.table));
+    expect(result.organization.schedulingPolicy).toBeNull();
+    expect(result.manifest.schedulingPolicy).toEqual({state:"unconfigured"});
+    expect(result.manifest.schedulingPolicySha256).toBe(createHash("sha256").update("null").digest("hex"));
+    expect(result.manifest.schedulingHistorySha256).toBe(createHash("sha256").update(JSON.stringify(result.organization.schedulingHistory)).digest("hex"));
+    expect(result.manifest.dataSha256).toBe(createHash("sha256").update(JSON.stringify(result.data)).digest("hex"));
     expect(result.manifest.tables.map(row=>row.table)).toContain("customer_work_roots");
     expect(result.manifest.tables.map(row=>row.table)).not.toContain("customer_work_commands");
     expect(result.data.invoices[0]).toMatchObject({

@@ -1,4 +1,5 @@
 import { lockCustomerWork, customerWorkFail } from "./customer-work-lineage";
+import { assertNoSchedulingParticipantHistory } from "./scheduling-history";
 import { hasRetainedEstimateEmailParticipant, ESTIMATE_EMAIL_HISTORY_RETAINED } from "./estimate-delivery-history";
 import {
   activitiesTable,
@@ -188,6 +189,7 @@ export async function deleteTestLeads(organizationId: string): Promise<number> {
 
   for(const id of leadIds) if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"leadId",id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"Test cleanup cannot remove retained estimate email history.");
   for(const id of contactIds) if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"contactId",id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"Test cleanup cannot remove retained estimate email history.");
+  await assertNoSchedulingParticipantHistory(tx,organizationId,[...leadIds,...contactIds]);
     await tx
       .delete(scheduledActionsTable)
       .where(

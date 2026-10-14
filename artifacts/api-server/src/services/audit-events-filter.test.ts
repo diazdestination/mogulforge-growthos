@@ -4,6 +4,8 @@
  * window by routine audit noise on a busy org.
  */
 import { auditEventsTable, db, organizationsTable } from "@workspace/db";
+import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
@@ -72,6 +74,15 @@ afterAll(async () => {
 });
 
 describe("listAuditEvents filters", () => {
+  it("strips only scheduling carriers from named native business audits and retains original private evidence", async () => {
+    const operation = randomUUID();
+    const metadata = {name:"Original job",status:"scheduled",review:"Established business review",nested:{schedulingSnapshot:{actorUserId:"PRIVATE_SCHEDULING_ACTOR",sourcePolicyDigest:"a".repeat(64)},description:"Keep authored description"},schedulingReview:{context:{policyRevision:1,organizationId:orgId}},schedulingOperation:{operationId:operation,payloadSha256:"b".repeat(64)}};
+    const [original] = await db.insert(auditEventsTable).values({organizationId:orgId,action:"project.updated",entityType:"project",entityId:randomUUID(),metadata,createdAt:tenDaysAgo}).returning();
+    const [projected] = await listAuditEvents(orgId,{action:"project.updated"});
+    expect(projected.metadata).toEqual({name:"Original job",status:"scheduled",review:"Established business review",nested:{description:"Keep authored description"}});
+    expect(JSON.stringify(projected)).not.toContain(operation);
+    expect((await db.select().from(auditEventsTable).where(eq(auditEventsTable.id,original.id)))[0].metadata).toEqual(metadata);
+  });
   it("unfiltered top-200 crowds out the older security event (the bug being guarded against)", async () => {
     const rows = await listAuditEvents(orgId);
     expect(rows).toHaveLength(200);
