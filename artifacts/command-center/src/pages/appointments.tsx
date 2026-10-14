@@ -831,6 +831,11 @@ function ApptFormModal({
   const resourcesUnchanged =
     JSON.stringify(review.draft.resourceUserIds) ===
     JSON.stringify(appt?.assignedUserId ? [appt.assignedUserId] : []);
+  const resourcesOnlyRemoved =
+    !resourcesUnchanged &&
+    review.draft.resourceUserIds.every(
+      (resourceId) => resourceId === appt?.assignedUserId,
+    );
   const sourceUnchanged =
     leadId === (appt?.leadId ?? '') &&
     contactId === (appt?.contactId ?? '') &&
@@ -875,7 +880,8 @@ function ApptFormModal({
     endpointsUnchanged &&
     sourceUnchanged &&
     transition !== 'admission' &&
-    (resourcesUnchanged || !!appt.schedulingTargetFingerprint) &&
+    (resourcesUnchanged ||
+      (resourcesOnlyRemoved && !!appt.schedulingTargetFingerprint)) &&
     (interval.evidence !== 'invalid' ||
       resourcesUnchanged ||
       !['scheduled', 'confirmed'].includes(status));
@@ -1285,7 +1291,11 @@ function ApptFormModal({
             <SchedulingIntervalFields
               {...review.fields}
               resources={resources}
-              presets={read.value?.policy?.durationPresets ?? []}
+              presets={
+                read.value?.policy?.enabled
+                  ? read.value.policy.durationPresets
+                  : []
+              }
               disabled={controlsLocked}
             />
             {review.draft.resourceUserIds.length > 1 && (
