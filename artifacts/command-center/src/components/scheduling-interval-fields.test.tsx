@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithQuery } from '@/test/render';
 import { SchedulingIntervalFields } from './scheduling-interval-fields';
@@ -28,6 +28,10 @@ function ContextHarness() {
   const [context, setContext] = useState(makeSchedulingContext());
   return <><Harness value={props({ context })} /><button onClick={() => setContext(makeSchedulingContext({ organizationId: '44444444-4444-4444-8444-444444444444' }))}>Switch context</button></>;
 }
+function ModeHarness() {
+  const [mode, setMode] = useState<'preserve_elapsed' | 'preserve_absolute_end' | undefined>();
+  return <><Harness value={props({ startOnlyBehavior: mode })} /><button onClick={() => setMode('preserve_absolute_end')}>Use absolute end</button><button onClick={() => setMode('preserve_elapsed')}>Use elapsed</button><button onClick={() => setMode(undefined)}>Use default</button></>;
+}
 function MismatchedAcknowledgmentHarness() {
   const [context, setContext] = useState(makeSchedulingContext());
   const [draft, setDraft] = useState(makeSchedulingDraft());
@@ -46,6 +50,193 @@ function MismatchedAcknowledgmentHarness() {
 }
 
 describe('controlled scheduling interval fields', () => {
+  it('preserves exact current absolute end bytes and reviews only after exact controlled acknowledgment', () => {
+    const requested: SchedulingDraft[] = [], reviews: (SchedulingMutationReview | null)[] = [];
+    const value = props({ startOnlyBehavior: 'preserve_absolute_end', onDraftChange: next => requested.push(next), onReviewChange: next => reviews.push(next) });
+    const current = makeSchedulingDraft({ endAt: '2035-01-04T10:30:40.456-08:00', resourceUserIds: ['staff-secondary', 'staff-synthetic'] });
+    const view = render(<SchedulingIntervalFields {...value} />);
+    view.rerender(<SchedulingIntervalFields {...value} draft={current} />);
+    change('Service start', '2035-01-02T09:00');
+    expect(requested).toEqual([{ startAt: '2035-01-02T17:00:00.000Z', endAt: '2035-01-04T10:30:40.456-08:00', resourceUserIds: ['staff-secondary', 'staff-synthetic'] }]);
+    expect(reviews).toEqual([null]);
+    const control = () => screen.getByRole('button', { name: 'Review interval' }) as HTMLButtonElement;
+    expect(control().disabled).toBe(true);
+    view.rerender(<SchedulingIntervalFields {...value} draft={{ ...requested[0], endAt: '2035-01-04T18:30:40.456Z' }} />);
+    expect(control().disabled).toBe(true);
+    review();
+    expect(reviews).toEqual([null]);
+    view.rerender(<SchedulingIntervalFields {...value} draft={{ resourceUserIds: [...requested[0].resourceUserIds], endAt: requested[0].endAt, startAt: requested[0].startAt }} />);
+    expect(control().disabled).toBe(false);
+    expect(reviews).toEqual([null]);
+    review();
+    expect(reviews[1]?.duration).toEqual({ kind: 'explicit', preset: null });
+    expect(reviews[1]?.endWallTime).toEqual({ localDateTime: '2035-01-04T10:30:40.456', timeZone: 'America/Los_Angeles', offset: '-08:00' });
+  });
+  it('clears an absolute-mode preset on start edit and applies an explicitly reselected preset', () => {
+    renderWithQuery(<Harness value={props({ startOnlyBehavior: 'preserve_absolute_end' })} />);
+    change('Duration preset', '33333333-3333-4333-8333-333333333333');
+    review();
+    change('Service start', '2035-01-01T09:30');
+    expect(state('Root draft').endAt).toBe('2035-01-01T18:30:00.000Z');
+    expect((screen.getByLabelText('Duration preset') as HTMLSelectElement).value).toBe('');
+    expect(state('Root review')).toBeNull();
+    review();
+    expect(state('Root review').duration).toEqual({ kind: 'explicit', preset: null });
+    change('Duration preset', '33333333-3333-4333-8333-333333333333');
+    expect(state('Root draft').endAt).toBe('2035-01-01T19:00:00.000Z');
+    expect(state('Root review')).toBeNull();
+    review();
+    expect(state('Root review').duration.kind).toBe('preset');
+    expect(screen.getByText(/A start-only change keeps the absolute end/)).toBeTruthy();
+    expect(screen.queryByText(/A start-only change preserves elapsed duration/)).toBeNull();
+  });
+  it('invalidates review and isolates old preset and wall state when the effective mode changes', () => {
+    renderWithQuery(<ModeHarness />);
+    change('Duration preset', '33333333-3333-4333-8333-333333333333');
+    review();
+    fireEvent.click(screen.getByRole('button', { name: 'Use absolute end' }));
+    expect(state('Root review')).toBeNull();
+    expect((screen.getByLabelText('Duration preset') as HTMLSelectElement).value).toBe('');
+    expect(state('Callback order').slice(-2)).toEqual(['invalidate', 'draft']);
+    change('Service start', '2035-01-01T09:30');
+    expect(state('Root draft').endAt).toBe('2035-01-01T18:30:00.000Z');
+    change('Service start', '2026-11-01T01:30');
+    expect(state('Root draft').startAt).toBeNull();
+    expect((screen.getByLabelText('Service start') as HTMLInputElement).value).toBe('2026-11-01T01:30');
+    fireEvent.click(screen.getByRole('button', { name: 'Use elapsed' }));
+    expect(state('Root review')).toBeNull();
+    expect((screen.getByLabelText('Service start') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('Duration preset') as HTMLSelectElement).value).toBe('');
+    expect((screen.getByLabelText('Service end') as HTMLInputElement).value).toBe('2035-01-01T10:30');
+  });
+  it('does not reset a preset or approved review between omitted and explicit elapsed mode', () => {
+    renderWithQuery(<ModeHarness />);
+    change('Duration preset', '33333333-3333-4333-8333-333333333333');
+    review();
+    const events = state('Callback order'), approved = state('Root review');
+    fireEvent.click(screen.getByRole('button', { name: 'Use elapsed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use default' }));
+    expect((screen.getByLabelText('Duration preset') as HTMLSelectElement).value).toBe('33333333-3333-4333-8333-333333333333');
+    expect(state('Callback order')).toEqual(events);
+    expect(state('Root review')).toEqual(approved);
+    change('Service start', '2035-01-02T09:00');
+    expect(state('Root draft').endAt).toBe('2035-01-02T18:30:00.000Z');
+  });
+  it('retains a pending exact acknowledgment hold when omitted mode becomes explicit elapsed', () => {
+    const events: string[] = [];
+    const value = props({ onDraftChange: () => events.push('draft'), onReviewChange: next => events.push(next ? 'review' : 'invalidate') });
+    const view = render(<SchedulingIntervalFields {...value} />);
+    change('Service start', '2035-01-02T09:00');
+    view.rerender(<SchedulingIntervalFields {...value} startOnlyBehavior="preserve_elapsed" />);
+    expect((screen.getByLabelText('Service start') as HTMLInputElement).value).toBe('2035-01-02T09:00');
+    expect((screen.getByRole('button', { name: 'Review interval' }) as HTMLButtonElement).disabled).toBe(true);
+    review();
+    expect(events).toEqual(['invalidate', 'draft']);
+  });
+  it.each(['2026-11-01T05:30:00.000Z', '2026-11-01T06:30:00.000Z'])('holds absolute-mode fold review until occurrence %s without shifting the end', instant => {
+    const endAt = '2026-11-01T04:00:40.456-08:00';
+    renderWithQuery(<Harness value={props({ startOnlyBehavior: 'preserve_absolute_end', companyTimeZone: 'America/New_York', context: makeSchedulingContext({ companyTimeZone: 'America/New_York' }), draft: makeSchedulingDraft({ startAt: '2026-11-01T04:30:00.000Z', endAt }) })} />);
+    change('Service start', '2026-11-01T01:30');
+    expect(state('Root draft')).toEqual({ startAt: null, endAt, resourceUserIds: [] });
+    review();
+    expect(state('Root review')).toBeNull();
+    change('Service start occurrence', instant);
+    expect(state('Root draft')).toEqual({ startAt: instant, endAt, resourceUserIds: [] });
+    expect(state('Root review')).toBeNull();
+    review();
+    expect(state('Root review').duration).toEqual({ kind: 'explicit', preset: null });
+  });
+  it('retains the absolute end through a nonexistent start and its correction', () => {
+    const endAt = '2026-03-08T05:30:40.456-04:00';
+    renderWithQuery(<Harness value={props({ startOnlyBehavior: 'preserve_absolute_end', companyTimeZone: 'America/New_York', context: makeSchedulingContext({ companyTimeZone: 'America/New_York' }), draft: makeSchedulingDraft({ startAt: '2026-03-08T06:30:00.000Z', endAt }) })} />);
+    change('Service start', '2026-03-08T02:30');
+    expect(state('Root draft')).toEqual({ startAt: null, endAt, resourceUserIds: [] });
+    expect(screen.getByRole('alert').textContent).toContain('does not exist');
+    change('Service start', '2026-03-08T03:30');
+    expect(state('Root draft')).toEqual({ startAt: '2026-03-08T07:30:00.000Z', endAt, resourceUserIds: [] });
+    expect(state('Root review')).toBeNull();
+    review();
+    expect(state('Root review')).not.toBeNull();
+  });
+  it('discards an obsolete pending acknowledgment when the effective mode changes', () => {
+    const events: string[] = [];
+    const value = props({ onDraftChange: () => events.push('draft'), onReviewChange: next => events.push(next ? 'review' : 'invalidate') });
+    const view = render(<SchedulingIntervalFields {...value} />);
+    change('Service start', '2035-01-02T09:00');
+    expect((screen.getByRole('button', { name: 'Review interval' }) as HTMLButtonElement).disabled).toBe(true);
+    view.rerender(<SchedulingIntervalFields {...props({ ...value, startOnlyBehavior: 'preserve_absolute_end' })} />);
+    expect(events).toEqual(['invalidate', 'draft', 'invalidate', 'draft']);
+    expect((screen.getByLabelText('Service start') as HTMLInputElement).value).toBe('2035-01-01T09:00');
+    expect((screen.getByRole('button', { name: 'Review interval' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(events).not.toContain('review');
+    review();
+    expect(events.at(-1)).toBe('review');
+  });
+  it.each(['preserve_elapsed', 'preserve_absolute_end'] as const)('preserves untouched and reversible original legacy NULL in %s', startOnlyBehavior => {
+    const interval = makeSchedulingInterval({ endAt: null, reservation: null, evidence: 'legacy', legacyEffectiveEnd: '2035-01-01T19:00:00.000Z' });
+    renderWithQuery(<Harness value={props({ startOnlyBehavior, interval, draft: makeSchedulingDraft({ startAt: '2035-01-01T09:00:00-08:00', endAt: null }), review: null })} />);
+    review();
+    expect(state('Root review').endWallTime).toBeNull();
+    change('Service start', '2035-01-02T09:00');
+    expect(state('Root draft').endAt).toBeNull();
+    expect((screen.getByRole('button', { name: 'Review interval' }) as HTMLButtonElement).disabled).toBe(true);
+    review();
+    expect(state('Root review')).toBeNull();
+    change('Service start', '2035-01-01T09:00');
+    expect(state('Root draft').endAt).toBeNull();
+    expect(state('Root review')).toBeNull();
+    review();
+    expect(state('Root review').endWallTime).toBeNull();
+  });
+  it.each(['preserve_elapsed', 'preserve_absolute_end'] as const)('requires a valid explicit end or preset after changing a legacy NULL start in %s', startOnlyBehavior => {
+    const interval = makeSchedulingInterval({ endAt: null, reservation: null, evidence: 'legacy', legacyEffectiveEnd: '2035-01-01T19:00:00.000Z' });
+    renderWithQuery(<Harness value={props({ startOnlyBehavior, interval, draft: makeSchedulingDraft({ endAt: null }), review: null })} />);
+    change('Service start', '2035-01-02T09:00');
+    expect(state('Root draft').endAt).toBeNull();
+    expect((screen.getByRole('button', { name: 'Review interval' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole('alert').textContent).toContain('Choose a duration preset or enter a valid end');
+    change('Service end', '2035-01-02T08:00');
+    review();
+    expect(state('Root review')).toBeNull();
+    change('Service end', '2035-01-02T11:00');
+    expect(state('Root draft').endAt).toBe('2035-01-02T19:00:00.000Z');
+    expect(state('Root review')).toBeNull();
+    review();
+    expect(state('Root review').duration.kind).toBe('explicit');
+    change('Service end', '');
+    change('Duration preset', '33333333-3333-4333-8333-333333333333');
+    expect(state('Root draft').endAt).toBe('2035-01-02T18:30:00.000Z');
+    expect(state('Root review')).toBeNull();
+    review();
+    expect(state('Root review').duration.kind).toBe('preset');
+  });
+  it('uses portable keyboard controls to review absolute-mode acknowledged edits', async () => {
+    const user = userEvent.setup();
+    renderWithQuery(<Harness value={props({ startOnlyBehavior: 'preserve_absolute_end' })} />);
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByLabelText('Service start'));
+    // datetime-local segment editing is browser-specific; the new mode is exercised
+    // through the controlled change while Tab/Space/Enter use portable user-event.
+    change('Service start', '2035-01-01T09:30');
+    expect(state('Root draft').endAt).toBe('2035-01-01T18:30:00.000Z');
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByLabelText('Service end'));
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByLabelText('Duration preset'));
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole('checkbox', { name: 'Synthetic staff' }));
+    await user.keyboard(' ');
+    expect(state('Root draft').resourceUserIds).toEqual(['staff-synthetic']);
+    expect(state('Root review')).toBeNull();
+    await user.tab();
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Review interval' }));
+    await user.keyboard('{Enter}');
+    expect(state('Root review').duration).toEqual({ kind: 'explicit', preset: null });
+    expect(state('Root review').startWallTime.localDateTime).toBe('2035-01-01T09:30');
+    expect(screen.getByText(/Company time zone:/).textContent).toContain('End offset: -08:00');
+    expect(screen.getByText(/A start-only change keeps the absolute end/)).toBeTruthy();
+  });
   it('invalidates a valid review before publishing an invalid draft', () => {
     renderWithQuery(<Harness value={props()} />);
     change('Service end', '2035-01-01T08:00');
@@ -311,21 +502,22 @@ describe('controlled scheduling interval fields', () => {
     expect(screen.getByRole('alert').textContent).toContain('Saved scheduling evidence');
     expect((screen.getByRole('button', { name: 'Review interval' }) as HTMLButtonElement).disabled).toBe(true);
   });
-  it('preserves a legacy NULL end during a start-only edit', () => {
+  it('preserves a legacy NULL end but holds review during a changed start-only edit', () => {
     renderWithQuery(<Harness value={props({ interval: makeSchedulingInterval({ endAt: null, reservation: null, evidence: 'legacy', legacyEffectiveEnd: '2035-01-01T19:00:00.000Z' }), draft: makeSchedulingDraft({ endAt: null }), review: null })} />);
     change('Service start', '2035-01-02T09:00');
     expect(state('Root draft')).toEqual({ startAt: '2035-01-02T17:00:00.000Z', endAt: null, resourceUserIds: [] });
     review();
-    expect(state('Root review').endWallTime).toBeNull();
+    expect(state('Root review')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Review interval' }) as HTMLButtonElement).disabled).toBe(true);
   });
-  it('retains legacy compatibility duration across repeated start-only edits', () => {
+  it('holds legacy NULL review across repeated start-only edits without persisting compatibility duration', () => {
     renderWithQuery(<Harness value={props({ interval: makeSchedulingInterval({ endAt: null, reservation: null, evidence: 'legacy', legacyEffectiveEnd: '2035-01-01T19:00:00.000Z' }), draft: makeSchedulingDraft({ endAt: null }), review: null })} />);
     change('Service start', '2035-01-02T09:00');
     change('Service start', '2035-01-03T09:00');
-    expect((screen.getByRole('button', { name: 'Review interval' }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: 'Review interval' }) as HTMLButtonElement).disabled).toBe(true);
     review();
     expect(state('Root draft').endAt).toBeNull();
-    expect(state('Root review').endWallTime).toBeNull();
+    expect(state('Root review')).toBeNull();
   });
   it('rejects an end inside the spring gap while preserving its visible wall input', () => {
     renderWithQuery(<Harness value={props({ companyTimeZone: 'America/New_York', context: makeSchedulingContext({ companyTimeZone: 'America/New_York' }), draft: makeSchedulingDraft({ startAt: '2026-03-08T06:30:00.000Z', endAt: '2026-03-08T09:30:00.000Z' }) })} />);
