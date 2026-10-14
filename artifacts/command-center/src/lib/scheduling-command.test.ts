@@ -2,7 +2,10 @@ import { webcrypto, createHash } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   canonicalSchedulingEnvelope,
+  classifyReservationTransition,
+  effectiveReservation,
   type ReservationSnapshot,
+  type SchedulingCandidate,
 } from "@workspace/scheduling-core";
 import { ApiError } from "@workspace/api-client-react";
 import {
@@ -227,6 +230,104 @@ describe("original manual wire and native acknowledgements", () => {
 });
 
 describe("proposal describes exact draft without claiming capacity", () => {
+  it("rejects legacy NULL-to-explicit-end retention even when the effective range is equal", () => {
+    const before: SchedulingCandidate = {
+      kind: "appointment",
+      id: appointmentCommand.operationId,
+      startAt: draft.startAt,
+      endAt: null,
+      resourceUserIds: [],
+      type: "inspection",
+      status: "scheduled",
+      source,
+      reservation: null,
+    };
+    const effectiveEnd = effectiveReservation(before)!.endAt;
+    const after = { ...before, endAt: effectiveEnd };
+    expect(classifyReservationTransition(before, after)).toBe("admission");
+    const legacy = {
+      ...interval,
+      startAt: before.startAt,
+      legacyEffectiveEnd: effectiveEnd,
+    };
+    const edited = {
+      startAt: after.startAt,
+      endAt: after.endAt,
+      resourceUserIds: [],
+    };
+    expect(
+      buildSchedulingProposalView({
+        context: enabledContext,
+        interval: legacy,
+        draft: edited,
+        transition: "admission",
+      }),
+    ).toMatchObject({
+      basis: "new_admission",
+      appliedTravelGapMinutes: 60,
+      companyCeiling: 3,
+    });
+    for (const transition of ["preserve", "release"] as const) {
+      expect(
+        buildSchedulingProposalView({
+          context: enabledContext,
+          interval: legacy,
+          draft: edited,
+          transition,
+        }),
+      ).toBeNull();
+    }
+    expect(legacy.endAt).toBeNull();
+  });
+  it("rejects legacy non-admission claims without original resource evidence", () => {
+    const before: SchedulingCandidate = {
+      kind: "appointment",
+      id: appointmentCommand.operationId,
+      startAt: draft.startAt,
+      endAt: draft.endAt,
+      resourceUserIds: ["original-staff"],
+      type: "inspection",
+      status: "scheduled",
+      source,
+      reservation: null,
+    };
+    const after = { ...before, resourceUserIds: ["new-unreviewed-staff"] };
+    expect(classifyReservationTransition(before, after)).toBe("admission");
+    const legacy = {
+      ...interval,
+      startAt: before.startAt,
+      endAt: before.endAt,
+    };
+    for (const transition of ["release", "preserve"] as const) {
+      expect(
+        buildSchedulingProposalView({
+          context: enabledContext,
+          interval: legacy,
+          draft: {
+            startAt: after.startAt,
+            endAt: after.endAt,
+            resourceUserIds: after.resourceUserIds,
+          },
+          transition,
+        }),
+      ).toBeNull();
+    }
+    // The frozen IntervalInput cannot prove even a genuinely unchanged legacy
+    // resource set. A null presentation must not gate the separate host action.
+    expect(classifyReservationTransition(before, before)).toBe("preserve");
+    expect(
+      buildSchedulingProposalView({
+        context: enabledContext,
+        interval: legacy,
+        draft: {
+          startAt: before.startAt,
+          endAt: before.endAt,
+          resourceUserIds: before.resourceUserIds,
+        },
+        transition: "preserve",
+      }),
+    ).toBeNull();
+  });
   it("uses current rules for new reservations and copies resource order", () => {
     const proposal = buildSchedulingProposalView({
       context: enabledContext,

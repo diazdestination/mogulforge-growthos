@@ -236,28 +236,26 @@ export function buildSchedulingProposalView(args: {
     if (!["admission", "release", "preserve"].includes(args.transition))
       return null;
     const admission = args.transition === "admission";
-    // A legacy effective end explains the recorded range only. Never put it in a draft.
-    const endAt =
-      draft.endAt ??
-      (!admission &&
-      draft.startAt === interval.startAt &&
-      interval.endAt === null &&
-      interval.evidence === "legacy"
-        ? interval.legacyEffectiveEnd
-        : null);
+    const saved = interval.reservation;
+    // Equal effective instants do not make NULL -> explicit end a preservation.
+    if (!admission && (draft.endAt === null) !== (interval.endAt === null))
+      return null;
+    // IntervalInput has no original legacy resources. Without a saved snapshot
+    // it cannot prove retention/release, even when the endpoints are unchanged.
+    // A null presentation is not a permission gate for historical host actions.
+    if (!admission && !saved) return null;
+    const endAt = draft.endAt;
     if (
       !draft.startAt ||
       !endAt ||
       Date.parse(endAt) <= Date.parse(draft.startAt)
     )
       return null;
-    const saved = interval.reservation;
     if (!admission) {
       if (
         !interval.startAt ||
         Date.parse(draft.startAt) !== Date.parse(interval.startAt) ||
-        Date.parse(endAt) !==
-          Date.parse(interval.endAt ?? interval.legacyEffectiveEnd ?? "")
+        Date.parse(endAt) !== Date.parse(interval.endAt ?? "")
       )
         return null;
       if (
@@ -294,7 +292,7 @@ export function buildSchedulingProposalView(args: {
       resourceUserIds: [...draft.resourceUserIds],
       appliedTravelGapMinutes: admission
         ? context.applicableRules.newTravelGapMinutes
-        : (saved?.minimumTravelGapMinutes ?? 0),
+        : saved!.minimumTravelGapMinutes,
       companyCeiling: admission ? context.applicableRules.companyCeiling : null,
       inspectionCeiling: admission
         ? context.applicableRules.inspectionCeiling
