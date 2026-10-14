@@ -176,12 +176,95 @@ describe("closed scheduling generation", () => {
     ).toBe(false);
   });
   it("keeps estimate delivery nested DTO strictness", () => {
+    const previewSchema = generated.PreviewEstimateDeliveryBody;
+    const sendSchema = generated.SendEstimateDeliveryBody;
+    const preview = {
+      expectedUpdatedAt: "2035-01-01T12:00:00.000Z",
+      expectedWorkVersion: null,
+    };
+    const send = {
+      previewId: id,
+      payloadSha256: "a".repeat(64),
+      confirmed: true,
+    };
+    for (const [schema, valid] of [
+      [previewSchema, preview],
+      [sendSchema, send],
+    ]) {
+      expect(schema.safeParse(valid).success).toBe(true);
+      for (const forbidden of [
+        { actorUserId: "forged" },
+        { recipient: "forged@example.test" },
+        { document: { title: "forged" } },
+      ]) {
+        const result = schema.safeParse({ ...valid, ...forbidden });
+        expect(result.success).toBe(false);
+        expect(result.error.issues).toEqual([
+          {
+            code: "unrecognized_keys",
+            keys: Object.keys(forbidden),
+            path: [],
+            message: expect.any(String),
+          },
+        ]);
+      }
+    }
+    const response = {
+      estimateId: id,
+      previewId: id,
+      payloadSha256: "a".repeat(64),
+      expiresAt: "2035-01-01T12:00:00.000Z",
+      document: {
+        estimateId: id,
+        businessName: "Synthetic",
+        customerLabel: "Synthetic customer",
+        propertyLabel: null,
+        title: "Synthetic estimate",
+        lineItems: [
+          {
+            description: "Synthetic work",
+            quantity: 1,
+            unitPriceCents: 100,
+            totalCents: 100,
+          },
+        ],
+        subtotalCents: 100,
+        taxCents: 0,
+        totalCents: 100,
+        notes: null,
+      },
+      message: {
+        recipient: "customer@example.test",
+        subject: "Synthetic estimate",
+        body: "Synthetic",
+      },
+      sender: {
+        provider: "gmail",
+        senderEmail: "staff@example.test",
+        source: "company_default",
+      },
+    };
     expect(
-      generated.PreviewEstimateDeliveryBody.safeParse({ extra: true }).success,
-    ).toBe(false);
-    expect(
-      generated.SendEstimateDeliveryBody.safeParse({ extra: true }).success,
-    ).toBe(false);
+      generated.PreviewEstimateDeliveryResponse.safeParse(response).success,
+    ).toBe(true);
+    const nested = generated.PreviewEstimateDeliveryResponse.safeParse({
+      ...response,
+      document: {
+        ...response.document,
+        lineItems: [
+          { ...response.document.lineItems[0], actorUserId: "forged" },
+        ],
+      },
+    });
+    expect(nested.success).toBe(false);
+    expect(nested.error.issues).toEqual([
+      {
+        code: "unrecognized_keys",
+        keys: ["actorUserId"],
+        path: ["document", "lineItems", 0],
+        message: expect.any(String),
+      },
+    ]);
   });
   it("is idempotent and refuses a missing operation before returning changed text", () => {
     const text = readFileSync(

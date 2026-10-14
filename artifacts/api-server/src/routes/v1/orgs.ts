@@ -196,12 +196,10 @@ router.patch(
       try {
         new Intl.DateTimeFormat("en-US", { timeZone: body.timezone });
         if (typeof body.expectedTimeZone !== "string") {
-          res
-            .status(400)
-            .json({
-              error: "Review the current company timezone before changing it.",
-              code: "stale_scheduling_review",
-            });
+          res.status(400).json({
+            error: "Review the current company timezone before changing it.",
+            code: "stale_scheduling_review",
+          });
           return;
         }
       } catch {
@@ -223,13 +221,16 @@ router.patch(
           String(req.params.id),
           body.timezone,
           body.expectedTimeZone,
+          patch.name,
         );
       } catch (error) {
         if (schedulingError(error, res)) return;
         throw error;
       }
     }
-    const [updated] = Object.keys(patch).length
+    const nameOnly =
+      typeof body.timezone !== "string" && Object.keys(patch).length > 0;
+    const [updated] = nameOnly
       ? await db
           .update(organizationsTable)
           .set(patch)
@@ -243,7 +244,7 @@ router.patch(
       res.status(404).json({ error: "Organization not found" });
       return;
     }
-    if (Object.keys(patch).length)
+    if (nameOnly)
       await recordAudit({
         organizationId: updated.id,
         actorUserId: req.sessionUser!.id,

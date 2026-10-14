@@ -17,6 +17,7 @@ import {
 } from "@workspace/db";
 import {
   appointmentTypes,
+  effectiveReservation,
   policySaveInputSchema,
   reservationSnapshotSchema,
   schedulingPolicySchema,
@@ -27,6 +28,7 @@ import {
   type ManualSourceRef,
   type PolicyReadResult,
   type PolicySaveInput,
+  type ReservationSnapshot,
   type SchedulingCandidate,
   type SchedulingPolicy,
   type SchedulingReviewContext,
@@ -263,7 +265,8 @@ export function projectSchedulingEvidence(
   const bound =
     parsed.success &&
     parsed.data.target.kind === kind &&
-    parsed.data.target.id === row.id;
+    parsed.data.target.id === row.id &&
+    activeSnapshotAgrees(kind, row, parsed.data);
   return {
     schedulingReservation: bound ? parsed.data : null,
     schedulingEvidence:
@@ -274,6 +277,55 @@ export function projectSchedulingEvidence(
           : ("invalid" as const),
     schedulingTargetFingerprint: schedulingTargetFingerprint(kind, row),
   };
+}
+/** Reuse core normalization without loading policy or assigning source authority.
+ * This local math candidate is never returned as a review/command source. */
+function activeSnapshotAgrees(
+  kind: "appointment" | "project",
+  row: NativeRow,
+  snapshot: ReservationSnapshot,
+): boolean {
+  try {
+    const appointment =
+      kind === "appointment"
+        ? (row as typeof appointmentsTable.$inferSelect)
+        : null;
+    const project =
+      kind === "project" ? (row as typeof projectsTable.$inferSelect) : null;
+    const candidate: SchedulingCandidate = {
+      kind,
+      id: row.id,
+      startAt: instant(row.scheduledStart),
+      endAt: instant(row.scheduledEnd),
+      type: appointment?.type ?? "project",
+      status: row.status,
+      resourceUserIds: appointment
+        ? appointment.assignedUserId
+          ? [appointment.assignedUserId]
+          : []
+        : project!.crewUserIds,
+      source: {
+        sourceKind: "unlinked_manual",
+        leadId: null,
+        contactId: null,
+        propertyId: null,
+        estimateId: null,
+      },
+      reservation: snapshot,
+    };
+    const actual = effectiveReservation(candidate);
+    // Terminal and date-cleared releases retain their historical interval/staff.
+    if (actual === null) return true;
+    const recorded = effectiveReservation({
+      ...candidate,
+      startAt: snapshot.startAt,
+      endAt: snapshot.endAt,
+      resourceUserIds: snapshot.resourceUserIds,
+    });
+    return canonical(actual) === canonical(recorded);
+  } catch {
+    return false;
+  }
 }
 async function targetRow(
   tx: ScheduleTransaction,
@@ -468,16 +520,14 @@ async function writePolicy(
     .update(orgSettingsTable)
     .set({ schedulingPolicy: policy })
     .where(eq(orgSettingsTable.organizationId, actor.organizationId));
-  await tx
-    .insert(auditEventsTable)
-    .values({
-      organizationId: actor.organizationId,
-      actorUserId: actor.userId,
-      action,
-      entityType: "org_settings",
-      entityId: actor.organizationId,
-      metadata: { previousPolicy: previous, policy },
-    });
+  await tx.insert(auditEventsTable).values({
+    organizationId: actor.organizationId,
+    actorUserId: actor.userId,
+    action,
+    entityType: "org_settings",
+    entityId: actor.organizationId,
+    metadata: { previousPolicy: previous, policy },
+  });
   return policy;
 }
 export async function saveSchedulingPolicy(
@@ -562,6 +612,7 @@ export async function setSchedulingCompanyTimeZone(
   orgId: UUID,
   zone: string,
   expectedZone: string,
+  name?: string,
 ): Promise<void> {
   validateCompanyTimeZone(zone);
   // The expected value is an exact compare token, including a malformed legacy
@@ -588,7 +639,7 @@ export async function setSchedulingCompanyTimeZone(
         : (await readSchedulingContext(tx, orgId)).policy;
     await tx
       .update(organizationsTable)
-      .set({ timezone: zone })
+      .set({ timezone: zone, ...(name === undefined ? {} : { name }) })
       .where(eq(organizationsTable.id, orgId));
     if (previous)
       await writePolicy(
@@ -600,19 +651,26 @@ export async function setSchedulingCompanyTimeZone(
         settings?.inspectionAvailability,
         "scheduling.company_timezone_changed",
       );
-    await tx
-      .insert(auditEventsTable)
-      .values({
+    await tx.insert(auditEventsTable).values({
+      organizationId: orgId,
+      actorUserId: actor.userId,
+      action: "organization.timezone_updated",
+      entityType: "organization",
+      entityId: orgId,
+      metadata: {
+        previousTimeZone: expectedZone,
+        timeZone: zone,
+        policyRevision: previous ? previous.revision + 1 : 0,
+      },
+    });
+    if (name !== undefined)
+      await tx.insert(auditEventsTable).values({
         organizationId: orgId,
         actorUserId: actor.userId,
-        action: "organization.timezone_updated",
+        action: "organization.updated",
         entityType: "organization",
         entityId: orgId,
-        metadata: {
-          previousTimeZone: expectedZone,
-          timeZone: zone,
-          policyRevision: previous ? previous.revision + 1 : 0,
-        },
+        metadata: { name },
       });
   });
 }
@@ -801,10 +859,16 @@ export async function getSchedulingReviewContext(
         parsed.targetKind === "project"
           ? (row as typeof projectsTable.$inferSelect)
           : null;
+      // Only an original lead-linked legacy row may resolve its absent stored
+      // contact through that same lead. A truly unlinked target stays unlinked.
+      const originalLeadContactFallback =
+        appointment?.contactId === null &&
+        appointment.leadId !== null &&
+        appointment.leadId === source.leadId;
       if (
         row.leadId !== source.leadId ||
         (appointment &&
-          ((appointment.contactId !== null &&
+          ((!originalLeadContactFallback &&
             appointment.contactId !== source.contactId) ||
             appointment.propertyId !== source.propertyId)) ||
         (project && project.estimateId !== source.estimateId)

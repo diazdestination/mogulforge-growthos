@@ -13,9 +13,14 @@ import {
   organizationsTable,
   orgSettingsTable,
   propertiesTable,
+  projectsTable,
   usersTable,
 } from "@workspace/db";
-import { schedulingReviewContextSchema } from "@workspace/scheduling-core";
+import {
+  effectiveReservation,
+  schedulingReviewContextSchema,
+  type ReservationSnapshot,
+} from "@workspace/scheduling-core";
 import app from "../app";
 import { createSession, deleteSession } from "../lib/auth";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
@@ -87,6 +92,216 @@ async function cookie(user: string) {
   sessions.push(sid);
   return `sid=${sid}`;
 }
+
+function reservationSnapshot(
+  kind: "appointment" | "project",
+  id: string,
+  resources: string[],
+): ReservationSnapshot {
+  return {
+    formatVersion: 1,
+    reservationRevision: 1,
+    sourcePolicyRevision: 1,
+    sourcePolicyDigest: "a".repeat(64),
+    approvedTimeZone: "UTC",
+    inspection: null,
+    startAt: "2035-01-01T12:00:00.000Z",
+    endAt: "2035-01-01T14:00:00.000Z",
+    resourceUserIds: resources,
+    minimumTravelGapMinutes: 60,
+    duration: { kind: "explicit", preset: null },
+    admittedAt: "2035-01-01T00:00:00.000Z",
+    admittedByUserId: null,
+    target: { kind, id },
+    lastTransition: {
+      kind: "admission",
+      actorUserId: null,
+      at: "2035-01-01T00:00:00.000Z",
+    },
+  };
+}
+async function protectedFixture(kind: "appointment" | "project") {
+  const f = await fixture();
+  const [contact] = await db
+    .insert(contactsTable)
+    .values({ organizationId: f.org, firstName: "Synthetic" })
+    .returning();
+  const [lead] = await db
+    .insert(leadsTable)
+    .values({ organizationId: f.org, contactId: contact.id })
+    .returning();
+  const common = {
+    organizationId: f.org,
+    leadId: lead.id,
+    scheduledStart: new Date("2035-01-01T12:00:00Z"),
+    scheduledEnd: new Date("2035-01-01T14:00:00Z"),
+  };
+  const row =
+    kind === "appointment"
+      ? (
+          await db
+            .insert(appointmentsTable)
+            .values({
+              ...common,
+              contactId: contact.id,
+              assignedUserId: f.user,
+            })
+            .returning()
+        )[0]
+      : (
+          await db
+            .insert(projectsTable)
+            .values({
+              ...common,
+              name: "Synthetic",
+              status: "scheduled",
+              crewUserIds: [f.user, "synthetic-second-resource"],
+            })
+            .returning()
+        )[0];
+  const resources =
+    kind === "appointment" ? [f.user] : [f.user, "synthetic-second-resource"];
+  const snapshot = reservationSnapshot(kind, row.id, resources);
+  const query = `/scheduling/review-context?sourceKind=lead&sourceId=${lead.id}&reservationKind=${kind}&targetKind=${kind}&targetId=${row.id}`;
+  return {
+    ...f,
+    row: { ...row, schedulingReservation: snapshot },
+    snapshot,
+    query,
+  };
+}
+
+describe("active reservation projection agreement", () => {
+  it.each(["appointment", "project"] as const)(
+    "rejects changed active %s interval/resources and absent actual end",
+    async (kind) => {
+      const f = await protectedFixture(kind);
+      expect(
+        policy.projectSchedulingEvidence(kind, f.row).schedulingEvidence,
+      ).toBe("versioned");
+      const changes = [
+        { scheduledStart: new Date("2035-01-01T12:30:00Z") },
+        { scheduledEnd: new Date("2035-01-01T15:00:00Z") },
+        { scheduledEnd: null },
+        kind === "appointment"
+          ? { assignedUserId: "changed-resource" }
+          : { crewUserIds: [f.user] },
+      ];
+      for (const change of changes)
+        expect(
+          policy.projectSchedulingEvidence(kind, { ...f.row, ...change }),
+        ).toMatchObject({
+          schedulingEvidence: "invalid",
+          schedulingReservation: null,
+        });
+      const normalized = {
+        ...f.snapshot,
+        startAt: "2035-01-01T07:00:00-05:00",
+        endAt: "2035-01-01T09:00:00-05:00",
+        resourceUserIds: [...f.snapshot.resourceUserIds]
+          .reverse()
+          .concat(f.user),
+      };
+      expect(
+        policy.projectSchedulingEvidence(kind, {
+          ...f.row,
+          schedulingReservation: normalized,
+        }),
+      ).toMatchObject({
+        schedulingEvidence: "versioned",
+        schedulingReservation: normalized,
+      });
+    },
+  );
+  it.each(["appointment", "project"] as const)(
+    "holds GET review for mismatched protected active %s",
+    async (kind) => {
+      const f = await protectedFixture(kind);
+      const values = {
+        schedulingReservation: f.snapshot,
+        scheduledEnd: new Date("2035-01-01T15:00:00Z"),
+      };
+      if (kind === "appointment")
+        await db
+          .update(appointmentsTable)
+          .set(values)
+          .where(eq(appointmentsTable.id, f.row.id));
+      else
+        await db
+          .update(projectsTable)
+          .set(values)
+          .where(eq(projectsTable.id, f.row.id));
+      const response = await fetch(base + f.query, {
+        headers: { Cookie: await cookie(f.user) },
+      });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        code: "invalid_reservation_snapshot",
+      });
+    },
+  );
+  it.each(["appointment", "project"] as const)(
+    "retains %s terminal history and legacy null-snapshot fixed-end compatibility",
+    async (kind) => {
+      const f = await protectedFixture(kind);
+      expect(
+        policy.projectSchedulingEvidence(kind, {
+          ...f.row,
+          status: "completed",
+          scheduledEnd: null,
+        }),
+      ).toMatchObject({
+        schedulingEvidence: "versioned",
+        schedulingReservation: f.snapshot,
+      });
+      if (kind === "project")
+        expect(
+          policy.projectSchedulingEvidence(kind, {
+            ...(f.row as typeof projectsTable.$inferSelect),
+            scheduledStart: null,
+            scheduledEnd: null,
+            schedulingReservation: {
+              ...f.snapshot,
+              lastTransition: { ...f.snapshot.lastTransition, kind: "release" },
+            },
+          }),
+        ).toMatchObject({ schedulingEvidence: "versioned" });
+      expect(
+        policy.projectSchedulingEvidence(kind, {
+          ...f.row,
+          scheduledEnd: null,
+          schedulingReservation: null,
+        }),
+      ).toMatchObject({
+        schedulingEvidence: "legacy",
+        schedulingReservation: null,
+      });
+      const legacy = effectiveReservation({
+        kind,
+        id: f.row.id,
+        startAt: f.row.scheduledStart!.toISOString(),
+        endAt: null,
+        type: kind === "appointment" ? "inspection" : "project",
+        status: "scheduled",
+        resourceUserIds: f.snapshot.resourceUserIds,
+        reservation: null,
+        source: {
+          sourceKind: "lead",
+          leadId: f.row.leadId!,
+          contactId: null,
+          propertyId: null,
+          estimateId: null,
+        },
+      });
+      expect(legacy?.endAt).toBe(
+        kind === "appointment"
+          ? "2035-01-01T14:00:00.000Z"
+          : "2035-01-02T12:00:00.000Z",
+      );
+      expect(legacy?.savedGapMinutes).toBe(0);
+    },
+  );
+});
 
 describe("serialized scheduling configuration", () => {
   it("labels normalized legacy inspection evidence without rewriting the stored rules", async () => {
@@ -530,6 +745,7 @@ describe("serialized scheduling configuration", () => {
     expect(
       policy.projectSchedulingEvidence("appointment", {
         ...visit,
+        scheduledEnd: new Date(snapshot.endAt),
         schedulingReservation: {
           ...snapshot,
           target: { kind: "appointment", id: visit.id },
@@ -540,6 +756,144 @@ describe("serialized scheduling configuration", () => {
 });
 
 describe("authorized scheduling routes", () => {
+  it("keeps truly unlinked target source exact while allowing original lead-linked NULL-contact fallback", async () => {
+    const f = await fixture(),
+      headers = { Cookie: await cookie(f.user) };
+    const [contact] = await db
+      .insert(contactsTable)
+      .values({ organizationId: f.org, firstName: "Synthetic" })
+      .returning();
+    const [lead] = await db
+      .insert(leadsTable)
+      .values({ organizationId: f.org, contactId: contact.id })
+      .returning();
+    const [unlinked, legacyLead] = await db
+      .insert(appointmentsTable)
+      .values([
+        {
+          organizationId: f.org,
+          scheduledStart: new Date("2035-01-01T12:00:00Z"),
+        },
+        {
+          organizationId: f.org,
+          leadId: lead.id,
+          contactId: null,
+          scheduledStart: new Date("2035-01-01T12:00:00Z"),
+        },
+      ])
+      .returning();
+    const query = (id: string, source: string) =>
+      base +
+      `/scheduling/review-context?reservationKind=appointment&targetKind=appointment&targetId=${id}&${source}`;
+    const proper = await fetch(
+      query(unlinked.id, "sourceKind=unlinked_manual"),
+      { headers },
+    );
+    expect(proper.status).toBe(200);
+    expect(await proper.json()).toMatchObject({
+      source: {
+        sourceKind: "unlinked_manual",
+        leadId: null,
+        contactId: null,
+        propertyId: null,
+        estimateId: null,
+      },
+    });
+    const fallback = await fetch(
+      query(legacyLead.id, `sourceKind=lead&sourceId=${lead.id}`),
+      { headers },
+    );
+    expect(fallback.status).toBe(200);
+    expect(await fallback.json()).toMatchObject({
+      source: { sourceKind: "lead", leadId: lead.id, contactId: contact.id },
+    });
+    for (const source of [
+      `sourceKind=direct_customer&sourceId=${contact.id}`,
+      `sourceKind=lead&sourceId=${lead.id}`,
+    ]) {
+      const wrong = await fetch(query(unlinked.id, source), { headers });
+      expect(wrong.status).toBe(400);
+      expect(await wrong.json()).toMatchObject({
+        code: "customer_reference_mismatch",
+      });
+    }
+  });
+  it("commits mixed name/timezone changes atomically and rolls back all scheduling evidence on an actual rename write failure", async () => {
+    const f = await fixture();
+    await policy.saveSchedulingPolicy(f.actor, input());
+    await db
+      .update(usersTable)
+      .set({ isPlatformAdmin: true })
+      .where(eq(usersTable.id, f.user));
+    const headers = {
+      Cookie: await cookie(f.user),
+      "Content-Type": "application/json",
+    };
+    const send = (body: unknown) =>
+      fetch(base + "/platform/orgs/" + f.org, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(body),
+      });
+    const success = await send({
+      name: "Synthetic renamed",
+      timezone: "UTC",
+      expectedTimeZone: "America/Los_Angeles",
+    });
+    expect(success.status).toBe(200);
+    expect(await success.json()).toMatchObject({
+      organization: { name: "Synthetic renamed", timezone: "UTC" },
+    });
+    expect((await policy.readSchedulingPolicy(f.actor)).policy).toMatchObject({
+      revision: 2,
+      timeZone: "UTC",
+    });
+    const beforePolicy = (await policy.readSchedulingPolicy(f.actor)).policy;
+    const beforeAudit = await db
+      .select()
+      .from(auditEventsTable)
+      .where(eq(auditEventsTable.organizationId, f.org))
+      .orderBy(auditEventsTable.id);
+    const hook = `scheduling_rename_failure_${randomUUID().replaceAll("-", "")}`;
+    try {
+      await db.execute(
+        sql.raw(
+          `CREATE FUNCTION ${hook}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Synthetic scheduling rename storage failure'; END $$`,
+        ),
+      );
+      await db.execute(
+        sql.raw(
+          `CREATE TRIGGER ${hook} BEFORE UPDATE ON organizations FOR EACH ROW WHEN (NEW.id = '${f.org}'::uuid AND NEW.name = 'Synthetic rejected rename') EXECUTE FUNCTION ${hook}()`,
+        ),
+      );
+      const failed = await send({
+        name: "Synthetic rejected rename",
+        timezone: "Europe/London",
+        expectedTimeZone: "UTC",
+      });
+      expect(failed.status).toBe(500);
+      const [org] = await db
+        .select()
+        .from(organizationsTable)
+        .where(eq(organizationsTable.id, f.org));
+      expect(org).toMatchObject({ name: "Synthetic renamed", timezone: "UTC" });
+      expect((await policy.readSchedulingPolicy(f.actor)).policy).toEqual(
+        beforePolicy,
+      );
+      expect(
+        await db
+          .select()
+          .from(auditEventsTable)
+          .where(eq(auditEventsTable.organizationId, f.org))
+          .orderBy(auditEventsTable.id),
+      ).toEqual(beforeAudit);
+    } finally {
+      await db.execute(
+        sql.raw(`DROP TRIGGER IF EXISTS ${hook} ON organizations`),
+      );
+      await db.execute(sql.raw(`DROP FUNCTION IF EXISTS ${hook}()`));
+    }
+  });
   it("serves policy saves through the closed dedicated endpoint and refuses generic policy injection", async () => {
     const f = await fixture(),
       headers = {
