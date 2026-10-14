@@ -26,3 +26,12 @@ it('refuses invalid or extra envelope/body fields before canonicalization', () =
   expect(() => canonicalSchedulingEnvelope({ ...args, body: { ...args.body, scheduledStart: 'invalid' } })).toThrow();
   expect(() => canonicalSchedulingEnvelope({ ...args, extra: true } as typeof args)).toThrow();
 });
+it.each([
+  { kind: 'appointment_create' as const, body: { scheduledStart: args.body.scheduledStart } },
+  { kind: 'project_create' as const, body: { leadId: id, name: 'Job' } },
+])('refuses to canonicalize existing-target edit tokens for $kind', ({ kind, body }) => {
+  const createArgs = { ...args, kind, body };
+  expect(() => canonicalSchedulingEnvelope(createArgs)).not.toThrow();
+  const editReview = { ...review, context: { ...review.context, targetVersion: '2026-10-13T09:00:00.000Z', targetFingerprint: 'a'.repeat(64) } };
+  expect(() => canonicalSchedulingEnvelope({ ...createArgs, review: editReview })).toThrow();
+});

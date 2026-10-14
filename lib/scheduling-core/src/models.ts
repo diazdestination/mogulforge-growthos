@@ -144,6 +144,9 @@ export const manualSchedulingCommandSchema = z.discriminatedUnion('kind', [
   z.strictObject({ operationId: uuidSchema, review: schedulingMutationReviewSchema, kind: z.literal('project_create'), body: nativeProjectCreateInputSchema }),
 ]).superRefine((value, ctx) => {
   if (value.review.context.source === null) ctx.addIssue({ code: 'custom', message: 'Staff command requires reviewed source' });
+  if (value.review.context.targetVersion !== null || value.review.context.targetFingerprint !== null) {
+    ctx.addIssue({ code: 'custom', path: ['review', 'context'], message: 'CREATE review requires null target version and fingerprint' });
+  }
 });
 export type ManualSchedulingCommand = z.infer<typeof manualSchedulingCommandSchema>;
 export const manualSchedulingAckSchema = z.strictObject({

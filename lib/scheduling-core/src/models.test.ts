@@ -90,6 +90,16 @@ describe('closed scheduling DTOs', () => {
     expect(schedulingReviewContextSchema.safeParse({ ...context, policyRevision: 0, policyDigest: null }).success).toBe(true);
     expect(schedulingReviewContextSchema.safeParse({ ...context, policyRevision: 0 }).success).toBe(false);
     expect(schedulingReviewContextSchema.safeParse({ ...context, targetVersion: instant }).success).toBe(false);
+    expect(schedulingReviewContextSchema.safeParse({ ...context, targetVersion: instant, targetFingerprint: digest }).success).toBe(true);
+  });
+  it.each([
+    { kind: 'appointment_create', body: { scheduledStart: instant } },
+    { kind: 'project_create', body: { leadId: id, name: 'Job' } },
+  ])('rejects existing-target edit tokens in a $kind command', ({ kind, body }) => {
+    const command = { operationId: id, kind, body, review };
+    expect(manualSchedulingCommandSchema.safeParse(command).success).toBe(true);
+    const editReview = { ...review, context: { ...context, targetVersion: instant, targetFingerprint: digest } };
+    expect(manualSchedulingCommandSchema.safeParse({ ...command, review: editReview }).success).toBe(false);
   });
   it('pins native enums and refuses client snapshot or actor metadata in commands', () => {
     const command = { operationId: id, kind: 'appointment_create', body: { scheduledStart: instant, propertyId: null }, review };
