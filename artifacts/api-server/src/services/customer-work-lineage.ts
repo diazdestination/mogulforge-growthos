@@ -5,19 +5,13 @@ import { customerWorkRootsTable } from "../../../../lib/db/src/schema/customer-w
 import { hasPermission, type Permission } from "../lib/permissions";
 import { lockContractorSchedule } from "./contractor-scheduling";
 import { getCustomerLifecycleStatus } from "./customer-lifecycle";
-import { CustomerWorkError } from "./returning-customer-contract";
+import { canonicalCustomerWorkValue, CustomerWorkError } from "./returning-customer-contract";
 
 export type CustomerWorkTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type CustomerWorkReader = typeof db | CustomerWorkTx;
 export type CustomerWorkActor = { userId: string; effectiveRole?: UserRole };
 export function customerWorkFail(code: string, message = "This saved work changed or is unavailable. Refresh the exact original record before continuing.", status = 409): never { throw new CustomerWorkError(status, code, message); }
-function canonical(value: unknown): string {
-  if (value instanceof Date) return JSON.stringify(value.toISOString());
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  if (value && typeof value === "object") return `{${Object.entries(value).filter(([,v]) => v !== undefined).sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(",")}}`;
-  return JSON.stringify(value) ?? "null";
-}
-export const customerWorkHash = (value: unknown) => createHash("sha256").update(canonical(value)).digest("hex");
+export const customerWorkHash = (value: unknown) => createHash("sha256").update(canonicalCustomerWorkValue(value)).digest("hex");
 export function assertCustomerWorkReader(reader: CustomerWorkReader, locked: boolean) { if (locked && reader === db) customerWorkFail("customer_work_transaction_required", "Locked authority requires the original transaction.", 503); }
 export async function lockCustomerWork(tx: CustomerWorkTx, org: string, billing = false) {
   await tx.execute(sql`select set_config('lock_timeout','3000ms',true),set_config('statement_timeout','10000ms',true)`);

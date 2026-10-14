@@ -6,6 +6,14 @@ import {
   userIdSchema,
 } from "@workspace/scheduling-core";
 
+/** Exact source command serialization, shared with browser custody. */
+export function canonicalCustomerWorkValue(value: unknown): string {
+  if (value instanceof Date) return JSON.stringify(value.toISOString());
+  if (Array.isArray(value)) return `[${value.map(canonicalCustomerWorkValue).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.entries(value).filter(([,v]) => v !== undefined).sort(([a],[b]) => a.localeCompare(b)).map(([k,v]) => `${JSON.stringify(k)}:${canonicalCustomerWorkValue(v)}`).join(",")}}`;
+  return JSON.stringify(value) ?? "null";
+}
+
 /** Browser/codegen safe. Native records remain the only work and billing state. */
 export class CustomerWorkError extends Error {
   constructor(
