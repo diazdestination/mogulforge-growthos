@@ -1,57 +1,30 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { useGetMe, type MemberProfile } from "@workspace/api-client-react";
+import { useGetMe, type MemberProfile, type ContractorToday } from "@workspace/api-client-react";
+import { addElapsedMinutes, isoSchema, timeZoneSchema } from "@workspace/scheduling-core";
 import { ArrowRight, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { contractorRequest } from "@/lib/contractor-api";
 import { canManageSettings } from "@/lib/permissions";
 import { memberAuthorityScope } from "@/lib/member-authority-scope";
 import { customerWorkLocation, customerWorkPath } from "@/lib/customer-work-links";
+import { SchedulingReservationSummary } from "@/components/scheduling-reservation-summary";
+import type { IntervalInput } from "@/lib/scheduling-ui-contract";
 
 type Queue<T> = { items: T[]; total: number; truncated: boolean };
-type AssignedWork = {
-  id: string;
-  title: string;
-  status: string;
-  dueAt: string | null;
-  leadId: string | null;
-  contactId: string | null;
-  customerLabel: string | null;
-  assignedUserId: string | null;
-  assigneeName: string | null;
-};
-export interface ContractorDay {
-  organizationId: string;
-  generatedAt: string;
-  date: string;
-  timeZone: string;
-  timeZoneSource: "configured" | "utc_fallback";
-  startAt: string;
-  endAt: string;
-  scope: "mine" | "company";
-  tasks: Queue<AssignedWork & { actionPath: string }>;
-  appointments: Queue<
-    Omit<AssignedWork, "title" | "dueAt"> & {
-      type: string;
-      scheduledStart: string;
-      scheduledEnd: string | null;
-    }
-  >;
-  projects: Queue<{
-    id: string;
-    title: string;
-    status: string;
-    leadId: string | null;
-    contactId?: string | null;
-    customerWorkId?: string | null;
-    customerLabel: string | null;
-    crewNames: string[];
-    scheduledStart: string | null;
-    scheduledEnd: string | null;
-  }>;
-  services: Queue<
-    Omit<AssignedWork, "leadId"> & { kind: string; taskId: string | null }
-  >;
+export type ContractorDay = ContractorToday;
+
+function serviceInterval(item: ContractorDay["appointments"]["items"][number] | ContractorDay["projects"]["items"][number], kind: "appointment" | "project"): IntervalInput {
+  const reservation = item.schedulingReservation ?? null;
+  const evidence = item.schedulingEvidence ?? "invalid";
+  const wrongTarget = reservation && (reservation.target.kind !== kind || reservation.target.id !== item.id);
+  return {
+    startAt: item.scheduledStart,
+    endAt: item.scheduledEnd,
+    legacyEffectiveEnd: evidence === "legacy" && item.scheduledEnd === null && isoSchema.safeParse(item.scheduledStart).success ? addElapsedMinutes(item.scheduledStart!, kind === "appointment" ? 120 : 1440) : null,
+    reservation,
+    evidence: wrongTarget ? "invalid" : evidence,
+  };
 }
 
 const control =
@@ -64,6 +37,7 @@ const shiftDay = (day: string, delta: number) => {
 };
 function time(value: string | null, timeZone: string, withDate = false) {
   if (!value) return "Date not set";
+  if (!isoSchema.safeParse(value).success) return "Invalid date — review required";
   return new Intl.DateTimeFormat("en-US", {
     timeZone,
     ...(withDate ? ({ month: "short", day: "numeric" } as const) : {}),
@@ -136,6 +110,7 @@ function WorkRow({
   customerHref,
   detail,
   status,
+  children,
 }: {
   href: string;
   title: string;
@@ -143,6 +118,7 @@ function WorkRow({
   customerHref?: string;
   detail: string;
   status: string;
+  children?: ReactNode;
 }) {
   return (
     <li className="px-4 py-3">
@@ -164,6 +140,7 @@ function WorkRow({
         </p>
       </Link>
       {customerHref && <Link href={customerHref} aria-label={`Open customer record for ${customer || "this work"}`} className="inline-flex min-h-11 items-center rounded text-sm underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Customer record</Link>}
+      {children}
     </li>
   );
 }
@@ -198,7 +175,9 @@ function TodayContent({ me, scopeKey }: { me: MemberProfile; scopeKey: string })
       if (
         result.organizationId !== companyId ||
         result.scope !== scope ||
-        (date && result.date !== date)
+        (date && result.date !== date) ||
+        result.timeZoneSource !== "configured" ||
+        !timeZoneSchema.safeParse(result.timeZone).success
       )
         throw new Error("Workspace response mismatch");
       return result;
@@ -328,9 +307,9 @@ function TodayContent({ me, scopeKey }: { me: MemberProfile; scopeKey: string })
                 · {data.timeZone} ·{" "}
                 {data.scope === "mine" ? "My assignments" : "Company work"}
               </p>
-              {data.timeZoneSource === "utc_fallback" && (
-                <p className="mt-1">
-                  The company time zone is not configured; this view uses UTC.
+              {data.schedulingPolicyState === "invalid" && (
+                <p role="alert" className="mt-1">
+                  The current scheduling policy is invalid. Scheduling changes are held; historical work remains visible.
                   {canManageSettings(me?.role) && (
                     <>
                       {" "}
@@ -361,7 +340,9 @@ function TodayContent({ me, scopeKey }: { me: MemberProfile; scopeKey: string })
                     customerHref={item.contactId ? `/contacts/${encodeURIComponent(item.contactId)}?organizationId=${encodeURIComponent(data.organizationId)}` : undefined}
                     status={item.status}
                     detail={`${time(item.scheduledStart, data.timeZone, new Date(item.scheduledStart) < new Date(data.startAt))}${item.scheduledEnd ? ` – ${time(item.scheduledEnd, data.timeZone, new Date(item.scheduledEnd) >= new Date(data.endAt))}` : ""} · ${item.assigneeName || "Unassigned"}`}
-                  />
+                  >
+                    <SchedulingReservationSummary companyTimeZone={data.timeZone} interval={serviceInterval(item, "appointment")} proposal={null} resources={item.assignedUserId ? [{ id: item.assignedUserId, label: item.assigneeName || "Assigned staff (name unavailable)" }] : []} conflict={null} />
+                  </WorkRow>
                 ))}
               </WorkQueue>
               <WorkQueue
@@ -406,7 +387,9 @@ function TodayContent({ me, scopeKey }: { me: MemberProfile; scopeKey: string })
                     customerHref={item.contactId ? `/contacts/${encodeURIComponent(item.contactId)}?organizationId=${encodeURIComponent(data.organizationId)}` : undefined}
                     status={item.status}
                     detail={`Crew: ${item.crewNames.length ? item.crewNames.join(", ") : "Unassigned"}`}
-                  />
+                  >
+                    <SchedulingReservationSummary companyTimeZone={data.timeZone} interval={serviceInterval(item, "project")} proposal={null} resources={[]} conflict={null} />
+                  </WorkRow>
                 ))}
               </WorkQueue>
               <WorkQueue
