@@ -128,9 +128,17 @@ export async function assertSchedulingActor(
   actor: SchedulingActor,
   permission: Permission,
   platform = false,
+  options: { readOnly?: true } = {},
 ) {
   transactionOnly(tx);
-  const [user] = await tx
+  // Internal Reader use only: callers cannot opt out of writer locks unless
+  // PostgreSQL itself confirms this transaction cannot write.
+  if (options.readOnly) {
+    const mode = await tx.execute(sql`SELECT current_setting('transaction_read_only') AS read_only`);
+    if (mode.rows[0]?.read_only !== "on")
+      fail("scheduling_transaction_required", "Nonlocking actor validation requires a read-only transaction.", 503);
+  }
+  const query = tx
     .select()
     .from(usersTable)
     .where(
@@ -140,8 +148,8 @@ export async function assertSchedulingActor(
           ? undefined
           : eq(usersTable.organizationId, actor.organizationId),
       ),
-    )
-    .for("share");
+    );
+  const [user] = await (options.readOnly ? query : query.for("share"));
   if (
     !user?.isActive ||
     !user.emailVerifiedAt ||

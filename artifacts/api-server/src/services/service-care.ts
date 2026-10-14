@@ -110,14 +110,20 @@ async function eligibility(org: string, contact: Contact, channel: Channel, acti
 export type ServiceCareReadOptions = { actorUserId?: string; appointmentType?: "inspection" | "other" };
 async function readServiceScheduling(org: string, id: string, options: ServiceCareReadOptions) {
   return db.transaction(async tx => {
-    await lockSchedulingConfiguration(tx, org, false);
-    if (options.actorUserId !== undefined) await assertSchedulingActor(tx, { organizationId: org, userId: options.actorUserId }, "crm.read");
-    const { obligation, contact } = await readService(org, id, tx, "share");
-    await appointmentCustomer(tx, org, obligation);
+    // A recovery Reader can inspect Care but cannot acquire row locks or offer
+    // a writable scheduling review. This mode comes only from PostgreSQL.
+    const mode = await tx.execute(sql`SELECT current_setting('transaction_read_only') AS read_only`);
+    const readOnly = mode.rows[0]?.read_only === "on";
+    const readOptions = readOnly ? { readOnly: true as const } : {};
+    if (!readOnly) await lockSchedulingConfiguration(tx, org, false);
+    if (options.actorUserId !== undefined) await assertSchedulingActor(tx, { organizationId: org, userId: options.actorUserId }, "crm.read", false, readOptions);
+    const { obligation, contact } = await readService(org, id, tx, readOnly ? undefined : "share");
+    await appointmentCustomer(tx, org, obligation, readOptions);
     const source = { sourceKind: "direct_customer" as const, leadId: null, contactId: obligation.contactId, propertyId: obligation.propertyId, estimateId: null };
     const appointmentType = options.appointmentType ?? "inspection";
     let review: ServiceCareSchedulingRead["review"] = { state: "held", code: "scheduling_reader_required", message: "Sign in as an accepted staff member to review this booking." };
-    if (options.actorUserId !== undefined) {
+    if (readOnly) review = { state: "held", code: "scheduling_reader_required", message: "Scheduling review requires a writable database connection." };
+    if (options.actorUserId !== undefined && !readOnly) {
       try {
         const current = await readSchedulingContext(tx, org, undefined, { reservationKind: "appointment", appointmentType });
         review = { state: "ready", policy: current.policy, context: { ...current.context, source } };
