@@ -71,10 +71,11 @@ export async function validateOrgRefs(
   refs: RelationalRefs,
   reader: typeof db | ScheduleTransaction = db,
 ): Promise<boolean> {
-  const checks: Promise<boolean>[] = [];
+  // A transaction reader owns one client; finish each check before starting the next.
+  const checks: boolean[] = [];
   if (refs.contactId) {
     checks.push(
-      reader
+      await reader
         .select({ id: contactsTable.id })
         .from(contactsTable)
         .where(
@@ -88,7 +89,7 @@ export async function validateOrgRefs(
   }
   if (refs.propertyId) {
     checks.push(
-      reader
+      await reader
         .select({ id: propertiesTable.id })
         .from(propertiesTable)
         .where(
@@ -102,7 +103,7 @@ export async function validateOrgRefs(
   }
   if (refs.leadId) {
     checks.push(
-      reader
+      await reader
         .select({ id: leadsTable.id })
         .from(leadsTable)
         .where(
@@ -116,7 +117,7 @@ export async function validateOrgRefs(
   }
   if (refs.assignedUserId) {
     checks.push(
-      reader
+      await reader
         .select({ id: usersTable.id })
         .from(usersTable)
         .where(
@@ -129,8 +130,7 @@ export async function validateOrgRefs(
         .then((r) => r.length > 0),
     );
   }
-  const results = await Promise.all(checks);
-  return results.every(Boolean);
+  return checks.every(Boolean);
 }
 
 // ---------- contacts ----------
