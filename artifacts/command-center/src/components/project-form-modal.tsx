@@ -21,6 +21,7 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   classifyReservationTransition,
   effectiveReservation,
+  manualSourceRefSchema,
   schedulingReviewContextSchema,
   type ManualSourceRef,
   type SchedulingCandidate,
@@ -41,6 +42,7 @@ import {
 import {
   buildSchedulingProposalView,
   manualSchedulingSourceKey,
+  parseManualSchedulingCustody,
 } from "@/lib/scheduling-command";
 import { SchedulingIntervalFields } from "./scheduling-interval-fields";
 import { SchedulingIntervalReview } from "./scheduling-interval-review";
@@ -56,6 +58,43 @@ export interface ProjectFormDefaults {
 }
 const field = "min-h-11 w-full rounded border bg-background p-2 text-base";
 const button = "min-h-11 rounded border px-4 py-2 disabled:opacity-50";
+
+// Discover only this selected source in the existing native custody namespace.
+// A current admission GET cannot recover the original contact/property tuple.
+async function retainedProjectSource(
+  scope: { organizationId: string; actorUserId: string },
+  leadId: string,
+  estimateId: string,
+) {
+  if (!leadId) return null;
+  const prefix = `growthos.scheduling.pending.v1:${scope.organizationId}:${scope.actorUserId}:project_create:`;
+  const matching = () => {
+    const entries: { key: string; sourceKey: string; bytes: string }[] = [];
+    for (let index = 0; index < sessionStorage.length; index++) {
+      const key = sessionStorage.key(index);
+      if (!key?.startsWith(prefix)) continue;
+      const sourceKey = key.slice(prefix.length);
+      const tuple: unknown = JSON.parse(sourceKey);
+      if (!Array.isArray(tuple)) throw new Error('Unverifiable native source key');
+      if (tuple[1] !== leadId || tuple[4] !== (estimateId || null)) continue;
+      if (tuple.length !== 5) throw new Error('Unverifiable native source tuple');
+      const source = manualSourceRefSchema.parse({
+        sourceKind: tuple[0], leadId: tuple[1], contactId: tuple[2], propertyId: tuple[3], estimateId: tuple[4],
+      });
+      if (source.sourceKind !== 'lead' || manualSchedulingSourceKey(source) !== sourceKey)
+        throw new Error('Unverifiable native source binding');
+      const bytes = sessionStorage.getItem(key);
+      if (bytes === null) throw new Error('Original custody disappeared');
+      entries.push({ key, sourceKey, bytes });
+    }
+    return entries.sort((a, b) => a.key.localeCompare(b.key));
+  };
+  const entries = matching();
+  if (entries.length > 1) throw new Error('Ambiguous original project source');
+  if (entries[0]) await parseManualSchedulingCustody(entries[0].bytes, scope, 'project_create', entries[0].sourceKey);
+  if (JSON.stringify(matching()) !== JSON.stringify(entries)) throw new Error('Original custody changed during discovery');
+  return entries[0]?.sourceKey ?? null;
+}
 export default function ProjectFormModal({
   project,
   defaults,
@@ -218,12 +257,36 @@ export default function ProjectFormModal({
     (interval.evidence !== "invalid" ||
       unchangedResources ||
       !["scheduled", "in_progress"].includes(status));
-  const sourceKey = context?.source
-    ? manualSchedulingSourceKey(context.source)
-    : JSON.stringify(["unready", leadId, estimateId]);
+  const custodyIdentity = JSON.stringify([actor?.organizationId, actor?.id, project?.id ?? null, returning, leadId, estimateId]);
+  const retainedSource = useRef<{ identity: string; sourceKey: string | null; original: boolean }>({ identity: custodyIdentity, sourceKey: null, original: false });
+  if (retainedSource.current.identity !== custodyIdentity)
+    retainedSource.current = { identity: custodyIdentity, sourceKey: null, original: false };
+  const retained = retainedSource.current;
+  const [discovery, setDiscovery] = useState<{ identity: string; authority: string; blocked: boolean } | null>(null);
+  useEffect(() => {
+    if (project || returning || !actor || !authority.isCurrent()) return;
+    let cancelled = false;
+    const current = () => !cancelled && retainedSource.current === retained && authority.isCurrent();
+    void (async () => {
+      try {
+        const originalKey = await retainedProjectSource({ organizationId: actor.organizationId, actorUserId: actor.id }, leadId, estimateId);
+        if (!current()) return;
+        if (originalKey) { retained.sourceKey = originalKey; retained.original = true; }
+        else if (retained.original) throw new Error('Original project custody is missing');
+        setDiscovery({ identity: custodyIdentity, authority: authority.identity, blocked: false });
+      } catch {
+        if (current()) setDiscovery({ identity: custodyIdentity, authority: authority.identity, blocked: true });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [custodyIdentity, authority.identity]);
+  const discoveryReady = !!project || returning || (discovery?.identity === custodyIdentity && discovery.authority === authority.identity);
+  const discoveryBlocked = discoveryReady && !project && !returning && discovery?.blocked === true;
+  if (!retained.original && context?.source) retained.sourceKey = manualSchedulingSourceKey(context.source);
+  const sourceKey = retained.sourceKey ?? JSON.stringify(["unready", leadId, estimateId]);
   const manual = useManualSchedulingCommand({
     scope:
-      actor && authority.allowed
+      actor && authority.allowed && !discoveryBlocked && (discoveryReady || retained.original)
         ? {
             organizationId: actor.organizationId,
             actorUserId: actor.id,
@@ -232,17 +295,35 @@ export default function ProjectFormModal({
         : null,
     kind: "project_create",
     sourceKey,
-    dispatch: (command) => {
+    dispatch: async (command) => {
+      const current = authority.isCurrent;
+      if (!current()) throw new Error('Project authority changed');
       if (command.kind !== "project_create")
         throw new Error("Wrong project command");
-      return createProject({
-        ...command.body,
-        operationId: command.operationId,
-        schedulingReview: command.review,
-      });
+      try {
+        return await createProject({
+          ...command.body,
+          operationId: command.operationId,
+          schedulingReview: command.review,
+        });
+      } finally {
+        if (!current()) throw new Error('Project authority changed');
+      }
     },
-    reconcile: (original) => reconcileSchedulingOperation(original),
+    reconcile: async (original) => {
+      const current = authority.isCurrent;
+      if (!current()) throw new Error('Project authority changed');
+      try {
+        return await reconcileSchedulingOperation(original);
+      } finally {
+        if (!current()) throw new Error('Project authority changed');
+      }
+    },
   });
+  if (!project && manual.state.command) {
+    retained.sourceKey = manualSchedulingSourceKey(manual.state.command.review.context.source!);
+    retained.original = true;
+  }
   const intent = useRef<{
       operationId: string;
       leadId: string;
@@ -297,6 +378,8 @@ export default function ProjectFormModal({
       ["preparing", "submitting", "reconciling"].includes(manual.state.kind));
   const locked =
     !authority.allowed ||
+    !discoveryReady ||
+    discoveryBlocked ||
     busy ||
     nativeHeld ||
     terminal ||
@@ -442,7 +525,7 @@ export default function ProjectFormModal({
             </button>
           </div>
         )}
-        {!project && manual.state.kind === "blocked_custody" && (
+        {!project && (manual.state.kind === "blocked_custody" || discoveryBlocked) && (
           <p role="alert">
             Original command custody is unavailable or invalid. Nothing new can
             be submitted.
@@ -467,6 +550,9 @@ export default function ProjectFormModal({
             </button>
           </div>
         )}
+        <button type="button" className={button} onClick={() => void read.refresh()}>
+          Refresh scheduling review
+        </button>
         <form onSubmit={(event) => void submit(event)} className="space-y-4">
           <fieldset disabled={locked} className="space-y-4">
             {!project && !defaults?.leadId && (
@@ -549,13 +635,6 @@ export default function ProjectFormModal({
                 retain their existing authority.
               </p>
             )}
-            <button
-              type="button"
-              className={button}
-              onClick={() => void read.refresh()}
-            >
-              Refresh scheduling review
-            </button>
             <SchedulingIntervalFields
               {...review.fields}
               resources={resources}

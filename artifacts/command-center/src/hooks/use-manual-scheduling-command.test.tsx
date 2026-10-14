@@ -264,6 +264,44 @@ describe("manual same-tab custody", () => {
     expect(sessionStorage.getItem(key)).toBeNull();
     expect(original.body.scheduledStart).not.toBe(command.body.scheduledStart);
   });
+  it.each(['completeness', 'zone'] as const)('fences original dispatch after %s revoke-and-restore during a deferred hash', async (change) => {
+    const gate = deferred<void>();
+    const real = webcrypto.subtle.digest.bind(webcrypto.subtle);
+    vi.spyOn(webcrypto.subtle, 'digest').mockImplementationOnce(async (algorithm, data) => {
+      await gate.promise; return real(algorithm, data);
+    });
+    const h = setup();
+    await waitFor(() => expect(h.result.current.state.kind).toBe('idle'));
+    let pending!: Promise<void>;
+    act(() => { pending = h.result.current.submit(clone()); });
+    act(() => {
+      h.client.setQueryData(getGetMeQueryKey(), change === 'completeness' ? { ...profile, firstName: undefined } : { ...profile, organization: { ...profile.organization!, timezone: 'UTC' } });
+      h.client.setQueryData(getGetMeQueryKey(), profile);
+    });
+    await act(async () => { gate.resolve(); await pending; });
+    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(key)).toBeNull();
+  });
+  it.each(['completeness', 'zone'] as const)('fences original reconciliation after %s revoke-and-restore during custody verification', async (change) => {
+    const h = setup();
+    await waitFor(() => expect(h.result.current.state.kind).toBe('idle'));
+    await act(async () => { await h.result.current.submit(clone()); });
+    const bytes = sessionStorage.getItem(key);
+    const gate = deferred<void>();
+    const real = webcrypto.subtle.digest.bind(webcrypto.subtle);
+    vi.spyOn(webcrypto.subtle, 'digest').mockImplementationOnce(async (algorithm, data) => {
+      await gate.promise; return real(algorithm, data);
+    });
+    let pending!: Promise<void>;
+    act(() => { pending = h.result.current.reconcileOriginal(); });
+    act(() => {
+      h.client.setQueryData(getGetMeQueryKey(), change === 'completeness' ? { ...profile, firstName: undefined } : { ...profile, organization: { ...profile.organization!, timezone: 'UTC' } });
+      h.client.setQueryData(getGetMeQueryKey(), profile);
+    });
+    await act(async () => { gate.resolve(); await pending; });
+    expect(h.reconcile).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(key)).toBe(bytes);
+  });
   it("uses frozen input across an asynchronous digest, including real native SDK serialization", async () => {
     const fetch = vi.fn(async (_url: unknown, init: RequestInit) => {
       const body = JSON.parse(init.body as string);

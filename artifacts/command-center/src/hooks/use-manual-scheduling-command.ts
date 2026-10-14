@@ -16,6 +16,7 @@ import type {
   ManualSchedulingCommand,
 } from "@workspace/scheduling-core";
 import { canWrite } from "@/lib/permissions";
+import { useSchedulingAuthority } from "./use-scheduling-review";
 import {
   freezeManualSchedulingCommand,
   freezeSchedulingValue,
@@ -83,6 +84,9 @@ export function useManualSchedulingCommand({
   reconcile,
 }: Options) {
   const client = useQueryClient();
+  const strictAuthority = useSchedulingAuthority(scope ? {
+    organizationId: scope.organizationId, actorUserId: scope.actorUserId,
+  } : null);
   const tokenRef = useRef<Token | null>(null);
   const [, rerender] = useState(0);
   const snapshot = useCallback(() => {
@@ -114,11 +118,13 @@ export function useManualSchedulingCommand({
     kind,
     sourceKey,
     authority,
+    strictAuthority.identity,
   ]);
   const allowed = () => {
     const query = client.getQueryState<MemberProfile>(getGetMeQueryKey());
     const p = query?.data;
     return (
+      strictAuthority.isCurrent() &&
       scope?.canWrite === true &&
       query?.status === "success" &&
       !!p &&
