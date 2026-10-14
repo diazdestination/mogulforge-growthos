@@ -63,6 +63,23 @@ describe('authoritative interval and travel review', () => {
     expect(text()).toContain('Legacy travel gap: 0 minutes');
     expect(text()).toContain('Review pending');
   });
+  it('keeps legacy pending NULL-end assignment unknown even with a nonempty resource directory', () => {
+    renderWithQuery(<SchedulingIntervalReview {...props({ proposal: null, interval: makeSchedulingInterval({ endAt: null, legacyEffectiveEnd: '2035-01-01T19:00:00.000Z', reservation: null, evidence: 'legacy' }), resources: makeSchedulingResources() })} />);
+    expect(text()).toContain('Assigned resources: Unknown');
+    expect(text()).toContain('Assignment and availability are unchecked');
+    expect(text()).not.toContain('Unassigned');
+    expect(text()).not.toContain('Synthetic staff');
+    expect(text()).toContain('Stored end: Empty');
+    expect(text()).toContain('Legacy effective end');
+    expect(text()).toContain('Review pending');
+  });
+  it('retains Unassigned for an explicitly empty saved resource list with no proposal', () => {
+    renderWithQuery(<SchedulingIntervalReview {...props({ proposal: null, interval: makeSchedulingInterval({ reservation: makeReservationSnapshot({ resourceUserIds: [] }) }) })} />);
+    expect(text()).toContain('Assigned resources: Unassigned');
+    expect(text()).toContain('does not establish availability');
+    expect(text()).not.toContain('Assigned resources: Unknown');
+    expect(text()).not.toContain('Synthetic staff');
+  });
   it.each([null, 'America/Imaginary'])('holds display without a usable current zone %s', companyTimeZone => {
     renderWithQuery(<SchedulingIntervalReview {...props({ companyTimeZone })} />);
     expect(screen.getByRole('alert').textContent).toContain('Current company time zone');

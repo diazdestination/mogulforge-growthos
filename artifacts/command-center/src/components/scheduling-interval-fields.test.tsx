@@ -35,7 +35,7 @@ function MismatchedAcknowledgmentHarness() {
   const [review, setReview] = useState<SchedulingMutationReview | null>(structuredClone(appointmentCommand.review));
   const [events, setEvents] = useState<string[]>([]);
   return <><SchedulingIntervalFields {...props()} context={context} draft={draft} review={review} onDraftChange={next => { setRequested(structuredClone(next)); setEvents(events => [...events, 'draft']); }} onReviewChange={next => { setReview(next); setEvents(events => [...events, next ? 'review' : 'invalidate']); }} />
-    {requested && <><button onClick={() => setDraft({ ...requested, resourceUserIds: ['staff-secondary'] })}>Return mismatched resources</button><button onClick={() => setDraft({ ...requested, startAt: '2035-01-01T19:00:00.000Z', endAt: '2035-01-01T20:30:00.000Z' })}>Return mismatched endpoints</button><button onClick={() => setDraft(structuredClone(requested))}>Return exact draft</button><button onClick={() => setContext({
+    {requested && <><button onClick={() => setDraft({ ...requested, resourceUserIds: ['staff-secondary'] })}>Return mismatched resources</button><button onClick={() => setDraft({ ...requested, startAt: '2035-01-01T19:00:00.000Z', endAt: '2035-01-01T20:30:00.000Z' })}>Return mismatched endpoints</button><button onClick={() => setDraft(structuredClone(requested))}>Return exact draft</button><button onClick={() => setDraft({ resourceUserIds: [...requested.resourceUserIds], endAt: requested.endAt, startAt: requested.startAt })}>Return reordered draft</button><button onClick={() => setContext({
       targetFingerprint: context.targetFingerprint, targetVersion: context.targetVersion,
       source: context.source && { estimateId: context.source.estimateId, propertyId: context.source.propertyId, contactId: context.source.contactId, leadId: context.source.leadId, sourceKind: context.source.sourceKind },
       applicableRules: { inspectionCeiling: context.applicableRules.inspectionCeiling, companyCeiling: context.applicableRules.companyCeiling, newTravelGapMinutes: context.applicableRules.newTravelGapMinutes },
@@ -231,6 +231,21 @@ describe('controlled scheduling interval fields', () => {
     fireEvent.click(control);
     expect(state('Root draft')).toEqual({ startAt: '2035-01-01T17:00:00.000Z', endAt: '2035-01-01T18:30:00.000Z', resourceUserIds: ['staff-synthetic'] });
     expect(state('Root review').context.organizationId).toBe('11111111-1111-4111-8111-111111111111');
+    expect(state('Callback order')).toEqual(['invalidate', 'draft', 'review']);
+  });
+  it('acknowledges exact draft values returned in a different object-key order and requires explicit Review', () => {
+    renderWithQuery(<MismatchedAcknowledgmentHarness />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Synthetic staff' }));
+    const control = screen.getByRole('button', { name: 'Review interval' }) as HTMLButtonElement;
+    expect(control.disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Return reordered draft' }));
+    expect(state('Root draft')).toEqual({ resourceUserIds: ['staff-synthetic'], endAt: '2035-01-01T18:30:00.000Z', startAt: '2035-01-01T17:00:00.000Z' });
+    expect(control.disabled).toBe(false);
+    expect(state('Root review')).toBeNull();
+    expect(state('Callback order')).toEqual(['invalidate', 'draft']);
+    fireEvent.click(control);
+    expect(state('Root review').startWallTime).toEqual({ localDateTime: '2035-01-01T09:00:00.000', offset: '-08:00', timeZone: 'America/Los_Angeles' });
+    expect(state('Root review').endWallTime).toEqual({ localDateTime: '2035-01-01T10:30:00.000', offset: '-08:00', timeZone: 'America/Los_Angeles' });
     expect(state('Callback order')).toEqual(['invalidate', 'draft', 'review']);
   });
   it('applies an explicitly selected preset after an unresolved start is corrected', () => {
