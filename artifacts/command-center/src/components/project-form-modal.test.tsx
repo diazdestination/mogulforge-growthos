@@ -1,233 +1,287 @@
-/**
- * Covers the "Start Project" flow launched from an accepted estimate:
- * creating the project must advance the lead to production_scheduled, and a
- * failed lead update must surface an error toast instead of closing silently.
- */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createHash, webcrypto } from "node:crypto";
+import { useState } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
-import ProjectFormModal from '@/components/project-form-modal';
+import ProjectFormModal from "./project-form-modal";
 import { Toaster } from '@/components/ui/toaster';
 import { renderWithQuery } from '@/test/render';
-import { mockApi, sampleLead } from '@/test/mock-api';
-
-const sampleProject = {
-  id: 'p1-00000000',
-  leadId: sampleLead.id,
-  name: 'Roof Replacement',
-  estimateId: 'e1-00000000',
-  status: 'scheduled',
+import { mockApi } from "@/test/mock-api";
+import { workId, workMember, workContact } from "@/test/customer-work-fixtures";
+import { projectContext } from "@/lib/scheduling-ui-contract.fixtures";
+import { canonicalSchedulingEnvelope } from "@workspace/scheduling-core";
+const leadId = workId(707),
+  estimateId = workId(708),
+  projectId = workId(709);
+const context = {
+  ...projectContext,
+  organizationId: workMember.organization.id,
+  companyTimeZone: workMember.organization.timezone,
+  policyRevision: 0,
+  policyDigest: null,
+  applicableRules: {
+    newTravelGapMinutes: 0,
+    companyCeiling: null,
+    inspectionCeiling: null,
+  },
+  source: {
+    sourceKind: "lead" as const,
+    leadId,
+    contactId: workContact,
+    propertyId: null,
+    estimateId,
+  },
+};
+const record = {
+  id: projectId,
+  leadId,
+  name: "Roof Replacement",
+  estimateId,
+  status: "scheduled",
   scheduledStart: null,
   scheduledEnd: null,
   crewUserIds: [],
   crewNotes: null,
-  createdAt: new Date().toISOString(),
+  createdAt: "2035-01-01T00:00:00Z",
 };
-
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
-}
-
-function callInfo([input, init]: [RequestInfo | URL, RequestInit?]) {
-  return {
-    method: (init?.method ?? 'GET').toUpperCase(),
-    path: String(
-      typeof input === 'string' ? input : input instanceof URL ? input.href : input.url,
-    ).split('?')[0],
-    body: init?.body,
-  };
-}
-
+const json = (value: unknown, status = 200) => Response.json(value, { status });
+type Request = { method: string; path: string; body: Record<string, any> };
 function renderStartProject(
-  handler?: (method: string, path: string) => Response | undefined,
+  handler?: (request: Request) => Response | Promise<Response> | undefined,
 ) {
-  const fetchMock = mockApi('admin', {
-    handler: (method, path) => {
-      const override = handler?.(method, path);
-      if (override) return override;
-      if (method === 'POST' && path.endsWith('/api/v1/projects')) {
-        return jsonResponse(sampleProject, 201);
-      }
-      if (method === 'PATCH' && path.endsWith(`/api/v1/leads/${sampleLead.id}`)) {
-        return jsonResponse({ ...sampleLead, status: 'production_scheduled' });
-      }
-      return undefined;
-    },
+  const requests: Request[] = [];
+  const fetchMock = mockApi("office", { me: workMember }),
+    fallback = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url, init) => {
+    const path = String(url).split("?")[0],
+      method = init?.method ?? "GET",
+      body = init?.body ? JSON.parse(String(init.body)) : {};
+    const request = { method, path, body };
+    requests.push(request);
+    const response = handler?.(request);
+    if (response) return response;
+    if (path.endsWith("/scheduling/review-context")) return json(context);
+    if (path.endsWith("/settings/scheduling-policy"))
+      return json({ policy: null, context: { ...context, source: null } });
+    if (method === "POST" && path.endsWith("/projects")) {
+      const { operationId, schedulingReview, ...original } = body;
+      return json(
+        {
+          ...record,
+          schedulingOperation: {
+            operationId,
+            organizationId: workMember.organization.id,
+            actorUserId: workMember.id,
+            kind: "project_create",
+            source: context.source,
+            payloadSha256: createHash("sha256")
+              .update(
+                canonicalSchedulingEnvelope({
+                  organizationId: workMember.organization.id,
+                  actorUserId: workMember.id,
+                  kind: "project_create",
+                  body: original,
+                  review: schedulingReview,
+                }),
+              )
+              .digest("hex"),
+            outcome: "committed",
+            target: { kind: "project", id: projectId, available: true },
+            refusalCode: null,
+          },
+        },
+        201,
+      );
+    }
+    if (method === "PATCH" && path.endsWith("/leads/" + leadId))
+      return json({ id: leadId, status: "production_scheduled" });
+    return fallback(url, init);
   });
   const onClose = vi.fn();
-  renderWithQuery(
-    <>
-      <ProjectFormModal
-        project={null}
-        defaults={{
-          leadId: sampleLead.id,
-          estimateId: 'e1-00000000',
-          name: 'Roof Replacement',
-          offerLeadAdvance: true,
-        }}
-        onClose={onClose}
-      />
-      <Toaster />
-    </>,
-  );
-  return { fetchMock, onClose };
+  function Host() {
+    const [shown, setShown] = useState(true);
+    return (
+      <>
+        {shown && (
+          <ProjectFormModal
+            project={null}
+            defaults={{
+              leadId,
+              estimateId,
+              name: "Roof Replacement",
+              offerLeadAdvance: true,
+            }}
+            onClose={() => {
+              onClose();
+              setShown(false);
+            }}
+          />
+        )}
+        <Toaster />
+      </>
+    );
+  }
+  const view = renderWithQuery(<Host />);
+  return { ...view, requests, onClose };
 }
-
-describe('Start Project flow', () => {
-  afterEach(() => {
-    cleanup();
-    vi.unstubAllGlobals();
+async function submit() {
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Review unscheduled job" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Start Project" }));
+}
+beforeEach(() => {
+  Object.defineProperty(globalThis, "crypto", {
+    configurable: true,
+    value: webcrypto,
   });
-
-  it('creates the project and advances the lead to production_scheduled', async () => {
-    const { fetchMock, onClose } = renderStartProject();
-
-    const advance = await screen.findByRole('checkbox', {
-      name: /advance lead status/i,
-    }) as HTMLInputElement;
-    expect(advance.checked).toBe(true);
-
-    fireEvent.click(await screen.findByRole('button', { name: /start project/i }));
-
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
-
-    const calls = fetchMock.mock.calls.map(callInfo);
-
-    const createCall = calls.find(
-      c => c.method === 'POST' && c.path.endsWith('/api/v1/projects'),
+  sessionStorage.clear();
+});
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+describe("Start Project original command and separate lead advancement", () => {
+  it.each(["notes", "release", "closure"] as const)(
+    "preserves raw legacy-null schedule and target authority for historical %s despite failed current policy reads",
+    async (change) => {
+      const original = {
+        ...record,
+        updatedAt: "2035-01-01T00:00:00Z",
+        contactId: workContact,
+        propertyId: null,
+        scheduledStart: "2035-01-01T17:00:00.125Z",
+        scheduledEnd: null,
+        crewUserIds: ["tech"],
+        schedulingReservation: null,
+        schedulingEvidence: "legacy" as const,
+        schedulingTargetFingerprint: "b".repeat(64),
+      };
+      const writes: Record<string, any>[] = [];
+      const fetcher = mockApi("office", { me: workMember }),
+        fallback = fetcher.getMockImplementation()!;
+      fetcher.mockImplementation(async (url, init) => {
+        if (
+          String(url).includes("/scheduling/") ||
+          String(url).includes("/scheduling-policy")
+        )
+          return json({ error: "unavailable" }, 503);
+        if (init?.method === "PATCH") {
+          writes.push(JSON.parse(String(init.body)));
+          return json(original);
+        }
+        return fallback(url, init);
+      });
+      const close = vi.fn();
+      renderWithQuery(
+        <ProjectFormModal project={original as any} onClose={close} />,
+      );
+      await screen.findByText(/Current scheduling review is unavailable/);
+      if (change === "notes")
+        fireEvent.change(screen.getByLabelText("Crew notes"), {
+          target: { value: "Reviewed historical notes" },
+        });
+      if (change === "release")
+        fireEvent.click(
+          screen.getByRole("button", { name: "Remove tech from saved crew" }),
+        );
+      if (change === "closure")
+        fireEvent.change(screen.getByLabelText("Job status"), {
+          target: { value: "completed" },
+        });
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(close).toHaveBeenCalledOnce());
+      expect(writes).toHaveLength(1);
+      expect(writes[0]).toMatchObject({
+        scheduledStart: original.scheduledStart,
+        scheduledEnd: null,
+        expectedUpdatedAt: original.updatedAt,
+        expectedTargetFingerprint: original.schedulingTargetFingerprint,
+        crewUserIds: change === "release" ? [] : ["tech"],
+      });
+      expect(writes[0]).not.toHaveProperty("schedulingReview");
+      expect(writes[0]).not.toHaveProperty("operationId");
+    },
+  );
+  it("creates only the explicitly reviewed job then advances its actual lead", async () => {
+    const api = renderStartProject();
+    await submit();
+    await waitFor(() => expect(api.onClose).toHaveBeenCalledTimes(1));
+    const create = api.requests.find((r) => r.method === "POST")!;
+    expect(create.body).toMatchObject({
+      leadId,
+      estimateId,
+      name: "Roof Replacement",
+      schedulingReview: { context },
+    });
+    expect(create.body.operationId).toMatch(/^[a-f0-9-]{36}$/);
+    expect(api.requests.filter((r) => r.method === "PATCH")).toHaveLength(1);
+  });
+  it("retains an unknown create and offers original reconciliation without a new POST", async () => {
+    const api = renderStartProject((r) =>
+      r.method === "POST" ? json({ error: "lost" }, 503) : undefined,
     );
-    expect(createCall).toBeDefined();
-    expect(JSON.parse(String(createCall!.body))).toMatchObject({
-      leadId: sampleLead.id,
-      name: 'Roof Replacement',
-      estimateId: 'e1-00000000',
+    await submit();
+    await screen.findByRole("button", {
+      name: "Reconcile original project command",
     });
-
-    const leadCall = calls.find(
-      c => c.method === 'PATCH' && c.path.endsWith(`/api/v1/leads/${sampleLead.id}`),
-    );
-    expect(leadCall).toBeDefined();
-    expect(JSON.parse(String(leadCall!.body))).toMatchObject({
-      status: 'production_scheduled',
-    });
-
-    // No error toast on the happy path.
-    expect(screen.queryByText(/lead status not updated/i)).toBeNull();
-  });
-
-  it('shows an error toast and keeps the modal open when project creation fails', async () => {
-    const { onClose } = renderStartProject((method, path) => {
-      if (method === 'POST' && path.endsWith('/api/v1/projects')) {
-        return jsonResponse({ error: 'boom' }, 500);
-      }
-      return undefined;
-    });
-
-    fireEvent.click(await screen.findByRole('button', { name: /start project/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/project not created/i)).toBeTruthy();
-    });
-    // The server-provided error message is surfaced when present.
-    expect(screen.getByText(/boom/i)).toBeTruthy();
-
-    // The modal must stay open so the user can retry.
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it('shows an error toast when the lead status update fails', async () => {
-    const { fetchMock, onClose } = renderStartProject((method, path) => {
-      if (method === 'PATCH' && path.endsWith(`/api/v1/leads/${sampleLead.id}`)) {
-        return jsonResponse({ error: 'boom' }, 500);
-      }
-      return undefined;
-    });
-
-    fireEvent.click(await screen.findByRole('button', { name: /start project/i }));
-
-    // The failure must be surfaced to the user, not swallowed.
-    await waitFor(() => {
-      expect(screen.getByText(/lead status not updated/i)).toBeTruthy();
-    });
+    expect(api.onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Start Project" }));
+    expect(api.requests.filter((r) => r.method === "POST")).toHaveLength(1);
     expect(
-      screen.getByText(/project was created, but advancing the lead/i),
-    ).toBeTruthy();
-
-    // The project itself was still created and the modal closed.
-    const createCall = fetchMock.mock.calls
-      .map(callInfo)
-      .find(c => c.method === 'POST' && c.path.endsWith('/api/v1/projects'));
-    expect(createCall).toBeDefined();
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
+      screen
+        .getByRole("button", { name: "Start Project" })
+        .matches(":disabled"),
+    ).toBe(true);
   });
-
-  it('retries the lead update from the toast and dismisses it on success', async () => {
-    let failLeadUpdate = true;
-    const { fetchMock, onClose } = renderStartProject((method, path) => {
-      if (
-        failLeadUpdate &&
-        method === 'PATCH' &&
-        path.endsWith(`/api/v1/leads/${sampleLead.id}`)
-      ) {
-        return jsonResponse({ error: 'boom' }, 500);
-      }
-      return undefined;
-    });
-
-    fireEvent.click(await screen.findByRole('button', { name: /start project/i }));
-
-    // Wait for the submit flow (and its failed lead update) to finish so we
-    // grab the Retry button from the freshly-raised toast, not a stale one.
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
-    const retry = await screen.findByRole('button', { name: /retry/i });
-
-    failLeadUpdate = false;
-    fireEvent.click(retry);
-
-    const patchCalls = () =>
-      fetchMock.mock.calls
-        .map(callInfo)
-        .filter(
-          c => c.method === 'PATCH' && c.path.endsWith(`/api/v1/leads/${sampleLead.id}`),
-        );
-
-    await waitFor(() => expect(patchCalls().length).toBe(2));
-    expect(JSON.parse(String(patchCalls()[1].body))).toMatchObject({
-      status: 'production_scheduled',
-    });
-
-    // Success dismisses the toast.
-    await waitFor(() => {
-      expect(screen.queryByText(/lead status not updated/i)).toBeNull();
-    });
+  it("shows a separate lead-update error after the job commit and retries only that lead update", async () => {
+    let fail = true;
+    const api = renderStartProject((r) =>
+      r.method === "PATCH" && fail
+        ? json({ error: "lost lead update" }, 500)
+        : undefined,
+    );
+    await submit();
+    await waitFor(() => expect(api.onClose).toHaveBeenCalledTimes(1));
+    await screen.findByText(/lead status not updated/i);
+    fail = false;
+    fireEvent.click(screen.getByRole("button", { name: /^Retry$/ }));
+    await waitFor(() =>
+      expect(api.requests.filter((r) => r.method === "PATCH")).toHaveLength(2),
+    );
+    expect(api.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+    await waitFor(() =>
+      expect(screen.queryByText(/lead status not updated/i)).toBeNull(),
+    );
   });
-
-  it('re-surfaces the toast when the retry fails again', async () => {
-    const { fetchMock, onClose } = renderStartProject((method, path) => {
-      if (method === 'PATCH' && path.endsWith(`/api/v1/leads/${sampleLead.id}`)) {
-        return jsonResponse({ error: 'boom' }, 500);
-      }
-      return undefined;
+  it("retains the lead retry action if that separate update fails again", async () => {
+    const api = renderStartProject((r) =>
+      r.method === "PATCH"
+        ? json({ error: "still unavailable" }, 500)
+        : undefined,
+    );
+    await submit();
+    await waitFor(() => expect(api.onClose).toHaveBeenCalledTimes(1));
+    fireEvent.click(await screen.findByRole("button", { name: /^Retry$/ }));
+    await waitFor(() =>
+      expect(api.requests.filter((r) => r.method === "PATCH")).toHaveLength(2),
+    );
+      expect(screen.getByText(/lead status not updated/i)).toBeTruthy();
+    expect(api.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+  });
+  it("does not automatically replay a retained native command on remount", async () => {
+    const first = renderStartProject((r) =>
+      r.method === "POST" ? json({ error: "lost" }, 503) : undefined,
+    );
+    await submit();
+    await screen.findByRole("button", {
+      name: "Reconcile original project command",
     });
-
-    fireEvent.click(await screen.findByRole('button', { name: /start project/i }));
-
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
-    const retry = await screen.findByRole('button', { name: /retry/i });
-    fireEvent.click(retry);
-
-    const patchCalls = () =>
-      fetchMock.mock.calls
-        .map(callInfo)
-        .filter(
-          c => c.method === 'PATCH' && c.path.endsWith(`/api/v1/leads/${sampleLead.id}`),
-        );
-    await waitFor(() => expect(patchCalls().length).toBe(2));
-
-    // The toast (with its Retry action) is still there for another attempt.
-    expect(screen.getByText(/lead status not updated/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy();
+    first.unmount();
+    const second = renderStartProject();
+    await screen.findByRole("button", {
+      name: "Reconcile original project command",
+    });
+    expect(second.requests.filter((r) => r.method !== "GET")).toHaveLength(0);
   });
 });

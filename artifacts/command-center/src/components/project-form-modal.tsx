@@ -1,276 +1,701 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  useCreateProject,
-  useUpdateProject,
-  useUpdateLead,
+  createProject,
+  updateProject,
+  getSchedulingReviewContext,
+  getSchedulingPolicy,
+  reconcileSchedulingOperation,
   updateLead as updateLeadRequest,
   getListProjectsQueryKey,
   getListLeadsQueryKey,
   getListEstimatesQueryKey,
   getListUsersQueryKey,
+  getGetMeQueryKey,
   useListEstimates,
   useListUsers,
-  Project,
   useGetMe,
-} from '@workspace/api-client-react';
-import { Loader2 } from 'lucide-react';
+  type MemberProfile,
+  type Project,
+} from "@workspace/api-client-react";
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { useToast, toast as globalToast } from '@/hooks/use-toast';
+import {
+  classifyReservationTransition,
+  effectiveReservation,
+  schedulingReviewContextSchema,
+  type ManualSourceRef,
+  type SchedulingCandidate,
+} from "@workspace/scheduling-core";
+import { toast as globalToast } from "@/hooks/use-toast";
 import { ToastAction } from '@/components/ui/toast';
-import LeadSelect from '@/components/lead-select';
-import { canAssignWork, localDateTime, scheduleTimezone } from '@/lib/contractor-schedule';
+import LeadSelect from "./lead-select";
+import { canAssignWork } from "@/lib/contractor-schedule";
 import { CustomerWorkForm, type CustomerWorkActor } from './customer-work-form';
 import { customerWorkCommandKey } from '@/hooks/use-customer-work-command';
-import { memberAuthorityScope, currentMemberAuthorityMatches } from '@/lib/member-authority-scope';
-import { canWrite } from '@/lib/permissions';
-
-function toDateInput(value: string | null | undefined) {
-  return localDateTime(value);
-}
+import { memberAuthorityScope } from "@/lib/member-authority-scope";
+import { useManualSchedulingCommand } from "@/hooks/use-manual-scheduling-command";
+import {
+  useSchedulingAuthority,
+  useSchedulingContext,
+  useSchedulingReview,
+} from "@/hooks/use-scheduling-review";
+import {
+  buildSchedulingProposalView,
+  manualSchedulingSourceKey,
+} from "@/lib/scheduling-command";
+import { SchedulingIntervalFields } from "./scheduling-interval-fields";
+import { SchedulingIntervalReview } from "./scheduling-interval-review";
+import { SchedulingReservationSummary } from "./scheduling-reservation-summary";
+import type { IntervalInput } from "@/lib/scheduling-ui-contract";
 
 export interface ProjectFormDefaults {
   leadId?: string;
-  /** Display label for the pre-selected lead (shown when `leadId` is fixed). */
   leadLabel?: string;
   estimateId?: string;
   name?: string;
-  /** Show an option to advance the lead's status to production_scheduled after creation. */
   offerLeadAdvance?: boolean;
 }
-
+const field = "min-h-11 w-full rounded border bg-background p-2 text-base";
+const button = "min-h-11 rounded border px-4 py-2 disabled:opacity-50";
 export default function ProjectFormModal({
   project,
   defaults,
   initialLeadId,
   initialContactId,
-  authority,
+  authority: supplied,
   onClose,
 }: {
   project: Project | null;
   defaults?: ProjectFormDefaults;
-  /** Seeds the lead selector (still editable), e.g. from a ?leadId= link. */
   initialLeadId?: string;
   initialContactId?: string;
   authority?: CustomerWorkActor;
   onClose: () => void;
 }) {
-  const profile = useGetMe();
-  const actor = authority ?? (profile.data?.organization ? { id: profile.data.id, organizationId: profile.data.organization.id, scopeKey: memberAuthorityScope(profile.data) } : null);
+  const profile = useGetMe(),
+    client = useQueryClient();
+  const actor =
+    supplied ?? (profile.data?.organization ? { id: profile.data.id, organizationId: profile.data.organization.id, scopeKey: memberAuthorityScope(profile.data) } : null);
+  const authority = useSchedulingAuthority(
+    actor
+      ? {
+          organizationId: actor.organizationId,
+          actorUserId: actor.id,
+          scopeKey: actor.scopeKey,
+        }
+      : null,
+  );
   const [returning, setReturning] = useState(() => { try { return !!initialContactId || (!!actor && !!sessionStorage.getItem(customerWorkCommandKey(actor.id, actor.organizationId, 'projects:new'))); } catch { return !!initialContactId; } });
-  const alive = useRef(true), identity = useRef(actor?.scopeKey);
-  if (identity.current !== actor?.scopeKey) { if (identity.current !== undefined) alive.current = false; identity.current = actor?.scopeKey; }
-  useEffect(() => { return () => { alive.current = false; }; }, []);
-  const [name, setName] = useState(project?.name || defaults?.name || '');
-  const [leadId, setLeadId] = useState(project?.leadId || defaults?.leadId || initialLeadId || '');
-  const [estimateId, setEstimateId] = useState(project?.estimateId || defaults?.estimateId || '');
-  const [start, setStart] = useState(toDateInput(project?.scheduledStart));
-  const [end, setEnd] = useState(toDateInput(project?.scheduledEnd));
-  const [crew, setCrew] = useState<string[]>(project?.crewUserIds || []);
-  const [crewNotes, setCrewNotes] = useState(project?.crewNotes || '');
-  const [advanceLead, setAdvanceLead] = useState(defaults?.offerLeadAdvance ?? false);
-  const [formError, setFormError] = useState('');
-
-  const { data: users } = useListUsers({ query: { queryKey: [...getListUsersQueryKey(), actor?.scopeKey], enabled: !!actor && !profile.isError } });
-  const effectiveLeadId = project?.leadId || leadId;
-  const { data: allEstimates } = useListEstimates(undefined, { query: { queryKey: [...getListEstimatesQueryKey(), actor?.scopeKey], enabled: !!actor && !profile.isError } });
-  const estimates = effectiveLeadId
-    ? allEstimates?.filter(e => e.leadId === effectiveLeadId)
-    : [];
-  const createProject = useCreateProject();
-  const updateProject = useUpdateProject();
-  const updateLead = useUpdateLead();
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const currentMember = () => !!actor && currentMemberAuthorityMatches(queryClient, actor.scopeKey);
-
-  const isSubmitting = createProject.isPending || updateProject.isPending || updateLead.isPending;
-
-  const toggleCrew = (userId: string) => {
-    setCrew(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
+  const [name, setName] = useState(project?.name ?? defaults?.name ?? ""),
+    [leadId, setLeadId] = useState(
+      project?.leadId ?? defaults?.leadId ?? initialLeadId ?? "",
+    );
+  const [estimateId, setEstimateId] = useState(
+      project?.estimateId ?? defaults?.estimateId ?? "",
+    ),
+    [crewNotes, setCrewNotes] = useState(project?.crewNotes ?? "");
+  const [status, setStatus] = useState(project?.status ?? "scheduled"), [advanceLead, setAdvanceLead] = useState(defaults?.offerLeadAdvance ?? false);
+  const [formError, setFormError] = useState(""),
+    [patchState, setPatchState] = useState<"idle" | "saving" | "unknown">(
+      "idle",
+    ),
+    [future, setFuture] = useState(false);
+  const { data: users } = useListUsers({
+    query: {
+      queryKey: [...getListUsersQueryKey(), actor?.scopeKey],
+      enabled: authority.allowed,
+    },
+  });
+  const { data: estimates } = useListEstimates(undefined, {
+    query: {
+      queryKey: [...getListEstimatesQueryKey(), actor?.scopeKey],
+      enabled: authority.allowed,
+    },
+  });
+  const selection = JSON.stringify([
+    project?.id ?? "new",
+    leadId,
+    estimateId,
+    project?.updatedAt ?? null,
+    project?.schedulingTargetFingerprint ?? null,
+  ]);
+  const read = useSchedulingContext({
+    authority,
+    identity: selection,
+    enabled: !returning && !!leadId && authority.allowed,
+    load: async () => {
+      const [raw, policy] = await Promise.all([
+        getSchedulingReviewContext({
+          sourceKind: "lead",
+          sourceId: leadId,
+          ...(estimateId ? { estimateId } : {}),
+          reservationKind: "project",
+          ...(project ? { targetKind: "project", targetId: project.id } : {}),
+        }),
+        getSchedulingPolicy(),
+      ]);
+      const context = schedulingReviewContextSchema.parse(raw);
+      if (
+        context.source?.sourceKind !== "lead" ||
+        context.source.leadId !== leadId ||
+        context.source.estimateId !== (estimateId || null) ||
+        (project
+          ? context.targetVersion !== project.updatedAt ||
+            context.targetFingerprint !== project.schedulingTargetFingerprint
+          : context.targetVersion !== null ||
+            context.targetFingerprint !== null)
+      )
+        throw new Error("Project source changed");
+      return { context, policy: policy.policy };
+    },
+  });
+  const context = read.value?.context ?? null;
+  const source: ManualSourceRef = {
+    sourceKind: "lead",
+    leadId: project?.leadId ?? leadId,
+    contactId: project?.contactId ?? null,
+    propertyId: project?.propertyId ?? null,
+    estimateId: project?.estimateId ?? null,
   };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || (!project && !leadId) || !alive.current || !currentMember() || !profile.data?.isActive || !canWrite(profile.data.role)) return;
-    setFormError('');
-    if ((end && (!start || new Date(end) <= new Date(start))) || (start && crew.length && !end)) { setFormError('Set an end time after the start time for assigned work.'); return; }
-
-    const finish = () => {
-      if (!alive.current || !currentMember()) return;
-      queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
-      onClose();
-    };
-
-    const handleSaveError = (error: unknown) => {
-      if (!alive.current || !currentMember()) return;
-      const serverMessage =
-        error && typeof error === 'object' && 'data' in error
-          ? (error as { data?: { error?: string } }).data?.error
-          : undefined;
-      toast({
-        variant: 'destructive',
-        title: project ? 'Project not saved' : 'Project not created',
-        description:
-          serverMessage ||
-          'Saving the project failed. Check your connection and try again.',
-      });
-    };
-
-    if (project) {
-      updateProject.mutate({
+  const before: SchedulingCandidate | null = project
+    ? {
+        kind: "project",
         id: project.id,
-        data: {
+        startAt: project.scheduledStart ?? null,
+        endAt: project.scheduledEnd ?? null,
+        resourceUserIds: project.crewUserIds ?? [],
+        type: "project",
+        status: project.status,
+        source,
+        reservation: project.schedulingReservation ?? null,
+      }
+    : null;
+  let legacyEffectiveEnd: string | null = null;
+  if (before && before.endAt === null)
+    try {
+      legacyEffectiveEnd = effectiveReservation(before)?.endAt ?? null;
+    } catch {
+      /* Invalid historical evidence remains held. */
+    }
+  const interval: IntervalInput = {
+    startAt: before?.startAt ?? null,
+    endAt: before?.endAt ?? null,
+    legacyEffectiveEnd,
+    reservation: project?.schedulingReservation ?? null,
+    evidence: project?.schedulingEvidence ?? "legacy",
+  };
+  const review = useSchedulingReview({
+    authority,
+    identity: selection,
+    context,
+    interval,
+    initialDraft: {
+      startAt: interval.startAt,
+      endAt: interval.endAt,
+      resourceUserIds: project?.crewUserIds ?? [],
+    },
+    transition: "admission",
+  });
+  let transition: "admission" | "release" | "preserve" = "admission";
+  if (before)
+    try {
+      transition = classifyReservationTransition(before, {
+        ...before,
+        ...review.draft,
+        status,
+        source: { ...source, estimateId: estimateId || null },
+      });
+    } catch {
+      /* Material change remains held. */
+    }
+  const unchangedResources =
+    JSON.stringify(review.draft.resourceUserIds) ===
+    JSON.stringify(project?.crewUserIds ?? []);
+  const historical =
+    !!project &&
+    !!project.updatedAt &&
+    !!project.schedulingTargetFingerprint &&
+    transition !== "admission" &&
+    (interval.evidence !== "invalid" ||
+      unchangedResources ||
+      !["scheduled", "in_progress"].includes(status));
+  const sourceKey = context?.source
+    ? manualSchedulingSourceKey(context.source)
+    : JSON.stringify(["unready", leadId, estimateId]);
+  const manual = useManualSchedulingCommand({
+    scope:
+      actor && authority.allowed
+        ? {
+            organizationId: actor.organizationId,
+            actorUserId: actor.id,
+            canWrite: true,
+          }
+        : null,
+    kind: "project_create",
+    sourceKey,
+    dispatch: (command) => {
+      if (command.kind !== "project_create")
+        throw new Error("Wrong project command");
+      return createProject({
+        ...command.body,
+        operationId: command.operationId,
+        schedulingReview: command.review,
+      });
+    },
+    reconcile: (original) => reconcileSchedulingOperation(original),
+  });
+  const intent = useRef<{
+      operationId: string;
+      leadId: string;
+      advance: boolean;
+      current: () => boolean;
+    } | null>(null),
+    finished = useRef<string | null>(null);
+  const finish = () => {
+    if (!authority.isCurrent()) return;
+    void client.invalidateQueries({ queryKey: getListProjectsQueryKey() });
+    onClose();
+  };
+  useEffect(() => {
+    if (
+      project ||
+      manual.state.kind !== "committed" ||
+      !manual.state.ack ||
+      !intent.current ||
+      intent.current.operationId !== manual.state.ack.operationId ||
+      finished.current === intent.current.operationId ||
+      !intent.current.current()
+    )
+      return;
+    const original = intent.current;
+    finished.current = original.operationId;
+    void (async () => {
+      if (original.advance) {
+        try {
+          await updateLeadRequest(original.leadId, {
+            status: "production_scheduled",
+          });
+        } catch {
+          if (original.current() && actor)
+            showLeadAdvanceFailedToast(
+              original.leadId,
+              client,
+              detachedLeadRetryAuthority(client, actor.scopeKey),
+            );
+        }
+        if (original.current())
+          void client.invalidateQueries({ queryKey: getListLeadsQueryKey() });
+      }
+      if (original.current()) finish();
+    })();
+  }, [manual.state.kind, manual.state.ack]);
+  const nativeHeld =
+    !project && !["idle", "committed"].includes(manual.state.kind);
+  const terminal = !project && manual.state.kind === "committed" && !future;
+  const busy =
+    patchState === "saving" ||
+    (!project &&
+      ["preparing", "submitting", "reconciling"].includes(manual.state.kind));
+  const locked =
+    !authority.allowed ||
+    busy ||
+    nativeHeld ||
+    terminal ||
+    patchState === "unknown";
+  const proposal = context
+    ? buildSchedulingProposalView({
+        context,
+        interval,
+        draft: review.draft,
+        transition,
+      })
+    : null;
+  const resources = (users ?? [])
+    .filter(canAssignWork)
+    .map((user) => ({
+      id: user.id,
+      label:
+        [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+        user.email ||
+        user.id,
+    }));
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (
+      locked ||
+      !authority.isCurrent() ||
+      !name ||
+      !leadId ||
+      (!historical && (!review.review || !review.current()))
+    )
+      return;
+    setFormError("");
+    if (project) {
+      const guard = authority.isCurrent;
+      setPatchState("saving");
+      try {
+        await updateProject(project.id, {
           name,
           estimateId: estimateId || null,
-          scheduledStart: start ? new Date(start).toISOString() : null,
-          scheduledEnd: end ? new Date(end).toISOString() : null,
-          crewUserIds: crew,
+          status,
+          scheduledStart: review.draft.startAt,
+          scheduledEnd: review.draft.endAt,
+          crewUserIds: review.draft.resourceUserIds,
           crewNotes: crewNotes || null,
-          ...(project.updatedAt ? { expectedUpdatedAt: project.updatedAt } : {}),
-        },
-      }, { onSuccess: finish, onError: handleSaveError });
-    } else {
-      createProject.mutate({
-        data: {
-          leadId,
-          name,
-          estimateId: estimateId || undefined,
-          scheduledStart: start ? new Date(start).toISOString() : undefined,
-          scheduledEnd: end ? new Date(end).toISOString() : undefined,
-          crewUserIds: crew,
-          crewNotes: crewNotes || undefined,
-        },
-      }, {
-        onSuccess: () => {
-          if (!alive.current || !currentMember()) return;
-          if (defaults?.offerLeadAdvance && advanceLead) {
-            updateLead.mutate(
-              { id: leadId, data: { status: 'production_scheduled' } },
-              {
-                onSuccess: () => {
-                  if (!currentMember()) return;
-                  queryClient.invalidateQueries({ queryKey: getListLeadsQueryKey() });
-                  finish();
-                },
-                onError: () => {
-                  if (!currentMember()) return;
-                  queryClient.invalidateQueries({ queryKey: getListLeadsQueryKey() });
-                  showLeadAdvanceFailedToast(leadId, queryClient, currentMember);
-                  finish();
-                },
-              },
-            );
-          } else {
-            finish();
-          }
-        },
-        onError: handleSaveError,
-      });
+          expectedUpdatedAt: project.updatedAt,
+          expectedTargetFingerprint: project.schedulingTargetFingerprint,
+          ...(!historical && review.review
+            ? { schedulingReview: review.review }
+            : {}),
+        });
+        if (guard()) finish();
+      } catch {
+        if (guard()) {
+          setPatchState("unknown");
+          setFormError(
+            "The project update result is unconfirmed. Read the original project before another deliberate change. No automatic retry was made.",
+          );
+        }
+      }
+      return;
     }
-  };
-
-  if (profile.isError || !alive.current || (profile.data && (!profile.data.isActive || !canWrite(profile.data.role)))) return <p role="alert">Current job access changed. Close this form and reopen the exact record.</p>;
-  if (profile.isLoading || !profile.data) return <p role="status">Checking current job access…</p>;
+    if (!review.review) return;
+    const operationId = crypto.randomUUID();
+    intent.current = {
+      operationId,
+      leadId,
+      advance: !!defaults?.offerLeadAdvance && advanceLead,
+      current: authority.isCurrent,
+    };
+    await manual.submit({
+      operationId,
+      kind: "project_create",
+      body: {
+        leadId,
+        name,
+        ...(estimateId ? { estimateId } : {}),
+        status,
+        ...(review.draft.startAt
+          ? { scheduledStart: review.draft.startAt }
+          : {}),
+        ...(review.draft.endAt ? { scheduledEnd: review.draft.endAt } : {}),
+        crewUserIds: [...review.draft.resourceUserIds],
+        ...(crewNotes ? { crewNotes } : {}),
+      },
+      review: review.review,
+    });
+    setFuture(false);
+  }
+  if (!authority.allowed)
+    return (
+      <p role="status">
+        Checking current job access. Reopen the exact job if access changed.
+      </p>
+    );
   if (returning && actor && !project && !defaults?.leadId) return <CustomerWorkForm kind="projects" actor={actor} contactId={initialContactId} onOpportunity={() => setReturning(false)} onClose={onClose} />;
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-card border border-border shadow-xl rounded-xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30 shrink-0">
-          <h2 className="text-lg font-bold">{project ? 'Edit Project' : defaults?.offerLeadAdvance ? 'Start Project' : 'New Project'}</h2>
-          <button aria-label="Close project form" onClick={onClose} className="min-h-11 min-w-11 text-muted-foreground hover:text-foreground">&times;</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 p-4">
+      <section
+        role="dialog"
+        aria-label="Project form"
+        className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded border bg-card p-5 space-y-4"
+      >
+        <div className="flex justify-between">
+          <h2>
+            {project ? 'Edit Project' : defaults?.offerLeadAdvance ? 'Start Project' : 'New Project'}
+          </h2>
+          <button
+            className={button}
+            aria-label="Close project form"
+            onClick={onClose}
+          >
+            Close
+          </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
-          {!project && !defaults?.leadId && <div className="rounded border p-3 text-sm"><p>Work source: Customer opportunity</p><button type="button" className="min-h-11 underline" disabled={isSubmitting || !actor} onClick={() => setReturning(true)}>Use existing customer instead</button></div>}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Name *</label>
-            <input aria-label="Project name" required className="w-full bg-background border border-border rounded-md px-3 py-2 text-base focus:ring-2 focus:ring-primary focus:outline-none" value={name} onChange={e => setName(e.target.value)} />
-          </div>
-
-          {!project && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Lead *</label>
-              {defaults?.leadId ? (
-                <div className="w-full bg-muted/40 border border-border rounded-md px-3 py-2 text-sm text-muted-foreground">
-                  {defaults.leadLabel || defaults.leadId.substring(0, 8)}
-                </div>
-              ) : (
-                <LeadSelect required withStatus queryScope={actor?.scopeKey} value={leadId} onChange={id => { setLeadId(id); setEstimateId(''); }} />
-              )}
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Linked Estimate</label>
-            <select aria-label="Linked estimate" className="w-full bg-background border border-border rounded-md px-3 py-2 text-base focus:ring-2 focus:ring-primary focus:outline-none" value={estimateId} onChange={e => setEstimateId(e.target.value)} disabled={!effectiveLeadId}>
-              <option value="">-- None --</option>
-              {estimates?.map(estimate => (
-                <option key={estimate.id} value={estimate.id}>
-                  {estimate.title} ({(estimate.totalCents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Scheduled Start</label>
-              <input aria-label="Scheduled start" type="datetime-local" className="min-w-0 w-full bg-background border border-border rounded-md px-3 py-2 text-base focus:ring-2 focus:ring-primary focus:outline-none" value={start} onChange={e => setStart(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Scheduled End</label>
-              <input aria-label="Scheduled end" type="datetime-local" className="min-w-0 w-full bg-background border border-border rounded-md px-3 py-2 text-base focus:ring-2 focus:ring-primary focus:outline-none" value={end} onChange={e => setEnd(e.target.value)} />
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground">Times use {scheduleTimezone}. The full window reserves the assigned crew, including multi-day jobs.</p>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Crew Assignment</label>
-            <div className="border border-border rounded-md p-2 max-h-36 overflow-y-auto space-y-1 bg-background">
-              {users?.filter(canAssignWork).map(user => (
-                <label key={user.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted cursor-pointer text-sm">
-                  <input type="checkbox" checked={crew.includes(user.id)} onChange={() => toggleCrew(user.id)} className="accent-primary" />
-                  <span>{`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email}</span>
-                  <span className="text-[10px] font-mono text-muted-foreground uppercase ml-auto">{user.role}</span>
-                </label>
-              ))}
-              {!users?.length && <div className="text-sm text-muted-foreground px-2 py-1">No team members found.</div>}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Crew Notes</label>
-            <textarea aria-label="Crew notes" className="w-full bg-background border border-border rounded-md px-3 py-2 text-base focus:ring-2 focus:ring-primary focus:outline-none min-h-[60px] resize-none" value={crewNotes} onChange={e => setCrewNotes(e.target.value)} />
-          </div>
-
-          {!project && defaults?.offerLeadAdvance && (
-            <label className="flex items-center gap-2 text-sm cursor-pointer bg-muted/40 border border-border rounded-md px-3 py-2.5">
-              <input type="checkbox" checked={advanceLead} onChange={e => setAdvanceLead(e.target.checked)} className="accent-primary" />
-              <span>Advance lead status to <span className="font-semibold">Production Scheduled</span></span>
-            </label>
-          )}
-
-          {formError && <p role="alert" className="text-sm text-destructive">{formError}</p>}
-          <div className="pt-2 flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium hover:bg-muted rounded-md transition-colors">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 min-w-[100px]">
-              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : defaults?.offerLeadAdvance ? 'Start Project' : 'Save'}
+        {!project && manual.state.kind === "unknown" && (
+          <div role="alert">
+            <p>
+              The original project result is unconfirmed. Its exact command is
+              retained in this tab.
+            </p>
+            <button
+              className={button}
+              onClick={() => void manual.reconcileOriginal()}
+            >
+              Reconcile original project command
             </button>
           </div>
+        )}
+        {!project && manual.state.kind === "refused" && (
+          <div role="alert">
+            <p>
+              The original command was permanently refused. Review again for
+              distinct future work.
+            </p>
+            <button
+              className={button}
+              onClick={() => {
+                manual.acknowledgeRefusal();
+                review.invalidate();
+              }}
+            >
+              Acknowledge original refusal
+            </button>
+          </div>
+        )}
+        {!project && manual.state.kind === "blocked_custody" && (
+          <p role="alert">
+            Original command custody is unavailable or invalid. Nothing new can
+            be submitted.
+          </p>
+        )}
+        {terminal && (
+          <div role="status">
+            <p>
+              The original project committed
+              {manual.state.ack?.target?.available === false
+                ? ", but its display is unavailable. Do not recreate it."
+                : ". Its original proof is retained."}
+            </p>
+            <button
+              className={button}
+              onClick={() => {
+                setFuture(true);
+                review.invalidate();
+              }}
+            >
+              Prepare separate new project
+            </button>
+          </div>
+        )}
+        <form onSubmit={(event) => void submit(event)} className="space-y-4">
+          <fieldset disabled={locked} className="space-y-4">
+            {!project && !defaults?.leadId && (
+              <>
+                <p>Work source: Customer opportunity</p>
+                <button
+                  type="button"
+                  className={button}
+                  onClick={() => setReturning(true)}
+                >
+                  Use existing customer instead
+                </button>
+                <LeadSelect
+                  required
+                  withStatus
+                  queryScope={actor?.scopeKey}
+                  value={leadId}
+                  onChange={(id) => {
+                    setLeadId(id);
+                    setEstimateId("");
+                  }}
+                />
+              </>
+            )}
+            <label className="block">
+              Name
+              <input
+                aria-label="Project name"
+                className={field}
+                required
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </label>
+            <label className="block">
+              Linked Estimate
+              <select
+                aria-label="Linked estimate"
+                className={field}
+                value={estimateId}
+                disabled={!leadId}
+                onChange={(event) => setEstimateId(event.target.value)}
+              >
+                <option value="">-- None --</option>
+                {estimates
+                  ?.filter((row) => row.leadId === leadId)
+                  .map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.title}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            {project && (
+              <label className="block">
+                Job status
+                <select
+                  className={field}
+                  value={status}
+                  onChange={(event) => {
+                    review.invalidate();
+                    setStatus(event.target.value as typeof status);
+                  }}
+                >
+                  {[
+                    "scheduled",
+                    "in_progress",
+                    "on_hold",
+                    "completed",
+                    "cancelled",
+                  ].map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {read.error && (
+              <p role="status">
+                {read.error} Historical notes, closure and eligible crew removal
+                retain their existing authority.
+              </p>
+            )}
+            <button
+              type="button"
+              className={button}
+              onClick={() => void read.refresh()}
+            >
+              Refresh scheduling review
+            </button>
+            <SchedulingIntervalFields
+              {...review.fields}
+              resources={resources}
+              presets={read.value?.policy?.durationPresets ?? []}
+              disabled={locked}
+              startOnlyBehavior="preserve_absolute_end"
+            />
+            {!review.draft.startAt && !review.draft.endAt && context && (
+              <button
+                type="button"
+                className={button}
+                onClick={() =>
+                  review.fields.onReviewChange({
+                    context,
+                    duration: { kind: "explicit", preset: null },
+                    startWallTime: null,
+                    endWallTime: null,
+                  })
+                }
+              >
+                Review unscheduled job
+              </button>
+            )}
+            {project &&
+              !context &&
+              interval.evidence !== "invalid" &&
+              review.draft.resourceUserIds.map((id) => (
+                <button
+                  type="button"
+                  className={button}
+                  key={id}
+                  onClick={() =>
+                    review.fields.onDraftChange({
+                      ...review.draft,
+                      resourceUserIds: review.draft.resourceUserIds.filter(
+                        (value) => value !== id,
+                      ),
+                    })
+                  }
+                >
+                  Remove {id} from saved crew
+                </button>
+              ))}
+            <SchedulingIntervalReview
+              companyTimeZone={
+                context?.companyTimeZone ??
+                authority.profile?.organization?.timezone ??
+                null
+              }
+              interval={interval}
+              proposal={proposal}
+              resources={resources}
+              conflict={null}
+            />
+            {project && (
+              <SchedulingReservationSummary
+                companyTimeZone={
+                  context?.companyTimeZone ??
+                  authority.profile?.organization?.timezone ??
+                  null
+                }
+                interval={interval}
+                proposal={proposal}
+                resources={resources}
+                conflict={null}
+              />
+            )}
+            <label className="block">
+              Crew Notes
+              <textarea
+                aria-label="Crew notes"
+                className={field}
+                value={crewNotes}
+                onChange={(event) => setCrewNotes(event.target.value)}
+              />
+            </label>
+            {!project && defaults?.offerLeadAdvance && (
+              <label className="flex gap-2">
+                <input
+                  type="checkbox"
+                  checked={advanceLead}
+                  onChange={(event) => setAdvanceLead(event.target.checked)}
+                />
+                Advance lead status to Production Scheduled
+              </label>
+            )}
+            {formError && <p role="alert">{formError}</p>}
+            <button
+              className={button}
+              type="submit"
+              disabled={locked || (!historical && !review.review)}
+            >
+              {defaults?.offerLeadAdvance ? "Start Project" : "Save"}
+            </button>
+          </fieldset>
         </form>
-      </div>
+      </section>
     </div>
   );
 }
-
 /**
  * Shows the "Lead status not updated" toast with a Retry action.
  * Lives at module level (using the global toast store and the plain fetch
  * client) so retrying keeps working after the modal has closed.
  */
-function showLeadAdvanceFailedToast(leadId: string, queryClient: QueryClient, currentMember = () => true) {
+type LeadRetryAuthority = (() => boolean) & { dispose: () => void };
+function detachedLeadRetryAuthority(
+  client: QueryClient,
+  scope: string,
+): LeadRetryAuthority {
+  const matches = () => {
+    const query = client.getQueryState<MemberProfile>(getGetMeQueryKey());
+    return (
+      query?.status === "success" &&
+      query.data?.isActive === true &&
+      memberAuthorityScope(query.data) === scope
+    );
+  };
+  let valid = matches();
+  const unsubscribe = client.getQueryCache().subscribe(() => {
+    if (!matches()) {
+      valid = false;
+      unsubscribe();
+    }
+  });
+  return Object.assign(() => valid && matches(), {
+    dispose: () => {
+      valid = false;
+      unsubscribe();
+    },
+  });
+}
+function showLeadAdvanceFailedToast(
+  leadId: string,
+  queryClient: QueryClient,
+  currentMember: LeadRetryAuthority,
+) {
   const { dismiss } = globalToast({
-    variant: 'destructive',
-    title: 'Lead status not updated',
+    variant: "destructive",
+    title: "Lead status not updated",
     description:
       'The project was created, but advancing the lead to Production Scheduled failed. Retry below or update the lead manually from the Leads page.',
     action: (
@@ -280,10 +705,13 @@ function showLeadAdvanceFailedToast(leadId: string, queryClient: QueryClient, cu
           if (!currentMember()) return;
           try {
             await updateLeadRequest(leadId, { status: 'production_scheduled' });
-            queryClient.invalidateQueries({ queryKey: getListLeadsQueryKey() });
+            if (!currentMember()) return;
+                  queryClient.invalidateQueries({ queryKey: getListLeadsQueryKey() });
             dismiss();
+            currentMember.dispose();
           } catch {
-            queryClient.invalidateQueries({ queryKey: getListLeadsQueryKey() });
+            if (!currentMember()) return;
+                  queryClient.invalidateQueries({ queryKey: getListLeadsQueryKey() });
             if (currentMember()) showLeadAdvanceFailedToast(leadId, queryClient, currentMember);
           }
         }}

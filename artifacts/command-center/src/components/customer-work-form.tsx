@@ -6,6 +6,8 @@ import {
   getListProjectsQueryKey,
   getListUsersQueryKey,
   useListUsers,
+  getSchedulingReviewContext,
+  getSchedulingPolicy,
 } from "@workspace/api-client-react";
 import {
   customerWorkEstimateSchema,
@@ -19,7 +21,27 @@ import {
   type CustomerWorkEstimate,
   type CustomerWorkProject,
 } from "../../../api-server/src/services/returning-customer-contract";
-import { useCustomerWorkCommand } from "@/hooks/use-customer-work-command";
+import {
+  sameCustomerWorkId,
+  useCustomerWorkCommand,
+} from "@/hooks/use-customer-work-command";
+import {
+  useSchedulingAuthority,
+  useSchedulingContext,
+  useSchedulingReview,
+} from "@/hooks/use-scheduling-review";
+import {
+  classifyReservationTransition,
+  effectiveReservation,
+  schedulingReviewContextSchema,
+  type SchedulingCandidate,
+  type ManualSourceRef,
+} from "@workspace/scheduling-core";
+import { SchedulingIntervalFields } from "./scheduling-interval-fields";
+import { SchedulingIntervalReview } from "./scheduling-interval-review";
+import { SchedulingReservationSummary } from "./scheduling-reservation-summary";
+import { buildSchedulingProposalView } from "@/lib/scheduling-command";
+import type { IntervalInput } from "@/lib/scheduling-ui-contract";
 import {
   CustomerWorkSource,
   CustomerWorkCommandNotice,
@@ -27,15 +49,10 @@ import {
 } from "./customer-work-source";
 import { workdayButton as button, workdayField as field } from "./workday-ui";
 import { dollarsToCents } from "@/lib/invoice-ui";
-import {
-  canAssignWork,
-  localDateTime,
-  scheduleTimezone,
-} from "@/lib/contractor-schedule";
+import { canAssignWork } from "@/lib/contractor-schedule";
 import { customerWorkPath } from "@/lib/customer-work-links";
 import { customerWorkspacePath } from "@/lib/customer-workspace-links";
 import { contractorRequest } from "@/lib/contractor-api";
-import { currentMemberAuthorityMatches } from "@/lib/member-authority-scope";
 
 export const returningEstimate = (value: unknown) => {
   const parsed = customerWorkEstimateSchema.safeParse(value);
@@ -115,6 +132,11 @@ function CustomerWorkFormDraft({
   }, []);
   const client = useQueryClient(),
     [saved, setSaved] = useState<WorkRecord | null>(null);
+  const authority = useSchedulingAuthority({
+    organizationId: actor.organizationId,
+    actorUserId: actor.id,
+    scopeKey: actor.scopeKey,
+  });
   const [receipt, setReceipt] = useState<{
     version: number;
     duplicate: boolean;
@@ -136,7 +158,10 @@ function CustomerWorkFormDraft({
         result.organizationId !== actor.organizationId ||
         native.organizationId !== actor.organizationId ||
         native.sourceKind !== "customer_work" ||
-        result.command.requestId !== submitted.body.requestId ||
+        !sameCustomerWorkId(
+          result.command.requestId,
+          submitted.body.requestId,
+        ) ||
         result.command.targetId !== native.id ||
         result.command.customerWorkId !== native.customerWorkId ||
         (record &&
@@ -259,28 +284,165 @@ function CustomerWorkFormDraft({
       price: (row.unitPriceCents / 100).toFixed(2),
     })),
   );
-  const [start, setStart] = useState(
-      localDateTime(
-        (pending?.scheduledStart as string) ?? projectRecord?.scheduledStart,
-      ),
-    ),
-    [end, setEnd] = useState(
-      localDateTime(
-        (pending?.scheduledEnd as string) ?? projectRecord?.scheduledEnd,
-      ),
+  const selectedContact =
+    projectRecord?.contactId ?? fromEstimate?.contactId ?? choice.contactId;
+  const selectedProperty =
+    projectRecord?.propertyId ?? fromEstimate?.propertyId ?? choice.propertyId;
+  const selectedEstimate =
+    projectRecord?.estimateId ?? fromEstimate?.id ?? null;
+  const selection = JSON.stringify([
+    record?.id ?? "new",
+    selectedContact,
+    selectedProperty,
+    selectedEstimate,
+    record?.workVersion,
+    projectRecord?.schedulingTargetFingerprint,
+  ]);
+  const read = useSchedulingContext({
+    authority,
+    identity: selection,
+    enabled: kind === "projects" && !!selectedContact && authority.allowed,
+    load: async () => {
+      const [raw, policy] = await Promise.all([
+        getSchedulingReviewContext({
+          sourceKind: "direct_customer",
+          sourceId: selectedContact!,
+          ...(selectedProperty ? { propertyId: selectedProperty } : {}),
+          ...(selectedEstimate ? { estimateId: selectedEstimate } : {}),
+          reservationKind: "project",
+          ...(projectRecord
+            ? { targetKind: "project", targetId: projectRecord.id }
+            : {}),
+        }),
+        getSchedulingPolicy(),
+      ]);
+      const context = schedulingReviewContextSchema.parse(raw),
+        source = context.source;
+      if (
+        !source ||
+        source.sourceKind !== "direct_customer" ||
+        !sameCustomerWorkId(source.contactId, selectedContact) ||
+        !sameCustomerWorkId(source.propertyId, selectedProperty) ||
+        !sameCustomerWorkId(source.estimateId, selectedEstimate) ||
+        (projectRecord
+          ? context.targetVersion !== projectRecord.updatedAt ||
+            context.targetFingerprint !==
+              projectRecord.schedulingTargetFingerprint
+          : context.targetVersion !== null ||
+            context.targetFingerprint !== null)
+      )
+        throw new Error("Customer work source changed");
+      return { context, policy: policy.policy };
+    },
+  });
+  const context = read.value?.context ?? null;
+  const source: ManualSourceRef = {
+    sourceKind: "direct_customer",
+    leadId: null,
+    contactId: selectedContact || null,
+    propertyId: selectedProperty,
+    estimateId: selectedEstimate,
+  };
+  const before: SchedulingCandidate | null = projectRecord
+    ? {
+        kind: "project",
+        id: projectRecord.id,
+        startAt: projectRecord.scheduledStart,
+        endAt: projectRecord.scheduledEnd,
+        resourceUserIds: projectRecord.crewUserIds,
+        type: "project",
+        status: projectRecord.status,
+        source,
+        reservation: projectRecord.schedulingReservation,
+      }
+    : null;
+  let legacyEffectiveEnd: string | null = null;
+  if (before && before.endAt === null)
+    try {
+      legacyEffectiveEnd = effectiveReservation(before)?.endAt ?? null;
+    } catch {
+      /* Invalid saved evidence stays held. */
+    }
+  const interval: IntervalInput = {
+    startAt: before?.startAt ?? null,
+    endAt: before?.endAt ?? null,
+    legacyEffectiveEnd,
+    reservation: projectRecord?.schedulingReservation ?? null,
+    evidence: projectRecord?.schedulingEvidence ?? "legacy",
+  };
+  const review = useSchedulingReview({
+    authority,
+    identity: selection,
+    context,
+    interval,
+    initialDraft: {
+      startAt: interval.startAt,
+      endAt: interval.endAt,
+      resourceUserIds: projectRecord?.crewUserIds ?? [],
+    },
+    transition: "admission",
+  });
+  let transition: "admission" | "release" | "preserve" = "admission";
+  if (before)
+    try {
+      transition = classifyReservationTransition(before, {
+        ...before,
+        ...review.draft,
+        status,
+      });
+    } catch {
+      /* No inferred historical permission. */
+    }
+  const historical =
+    !!projectRecord?.workVersion &&
+    !!projectRecord.schedulingTargetFingerprint &&
+    transition !== "admission" &&
+    (interval.evidence !== "invalid" ||
+      JSON.stringify(review.draft.resourceUserIds) ===
+        JSON.stringify(projectRecord.crewUserIds) ||
+      !["scheduled", "in_progress"].includes(status));
+  const proposal = context
+    ? buildSchedulingProposalView({
+        context,
+        interval,
+        draft: review.draft,
+        transition,
+      })
+    : null;
+  const hydrated = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pending || hydrated.current === pending.requestId) return;
+    hydrated.current = pending.requestId;
+    setTitle(String(pending[kind === "projects" ? "name" : "title"]));
+    setNotes(
+      String(pending[kind === "projects" ? "crewNotes" : "notes"] ?? ""),
     );
-  const [crew, setCrew] = useState<string[]>(
-    (pending?.crewUserIds as string[] | undefined) ??
-      projectRecord?.crewUserIds ??
-      [],
-  );
+    if (pending.status) setStatus(String(pending.status));
+    if (kind === "estimates") {
+      setTax((Number(pending.taxCents ?? 0) / 100).toFixed(2));
+      setItems(
+        (pending.lineItems as CustomerWorkEstimate["lineItems"]).map((row) => ({
+      description: row.description,
+      quantity: String(row.quantity),
+      price: (row.unitPriceCents / 100).toFixed(2),
+    })),
+      );
+    }
+    if (kind === "projects")
+      review.fields.onDraftChange({
+        startAt: pending.scheduledStart as string | null,
+        endAt: pending.scheduledEnd as string | null,
+        resourceUserIds: pending.crewUserIds as string[],
+      });
+    setConfirmed(false);
+  }, [pending?.requestId]);
   const [confirmed, setConfirmed] = useState(false),
     [error, setError] = useState("");
   const [reloading, setReloading] = useState(false);
   const users = useListUsers({
     query: {
       queryKey: [...getListUsersQueryKey(), actor.scopeKey],
-      enabled: kind === "projects",
+      enabled: kind === "projects" && authority.allowed,
     },
   });
   const versionChanged =
@@ -291,6 +453,10 @@ function CustomerWorkFormDraft({
     event.preventDefault();
     if (
       !confirmed ||
+      !authority.isCurrent() ||
+      (kind === "projects" &&
+        !historical &&
+        (!review.review || !review.current())) ||
       command.locked ||
       saved ||
       (!record && !fromEstimate && !choice.confirmed)
@@ -332,10 +498,19 @@ function CustomerWorkFormDraft({
           : {
               name: title,
               status,
-              scheduledStart: start ? new Date(start).toISOString() : null,
-              scheduledEnd: end ? new Date(end).toISOString() : null,
-              crewUserIds: crew,
+              scheduledStart: review.draft.startAt,
+              scheduledEnd: review.draft.endAt,
+              crewUserIds: review.draft.resourceUserIds,
               crewNotes: notes || null,
+              ...(projectRecord
+                ? {
+                    expectedTargetFingerprint:
+                      projectRecord.schedulingTargetFingerprint,
+                  }
+                : {}),
+              ...(!historical && review.review
+                ? { schedulingReview: review.review }
+                : {}),
             };
       const schema =
         kind === "estimates"
@@ -397,6 +572,29 @@ function CustomerWorkFormDraft({
           </button>
         </div>
         <CustomerWorkCommandNotice command={command} />
+        {command.committed && !saved && (
+          <section role="status">
+            <p>
+              The original job committed.{" "}
+              {command.committed.target.available
+                ? "Its original proof is retained."
+                : "Its display is unavailable; do not recreate it."}
+            </p>
+            {!record && !command.separate && (
+              <button
+                type="button"
+                className={button}
+                onClick={() => {
+                  command.prepareSeparate();
+                  review.invalidate();
+                  setConfirmed(false);
+                }}
+              >
+                Prepare separate new job
+              </button>
+            )}
+          </section>
+        )}
         {!saved &&
           !record &&
           !fromEstimate &&
@@ -469,8 +667,7 @@ function CustomerWorkFormDraft({
                   disabled={command.busy || !!command.pending || reloading}
                   onClick={async () => {
                     const current = () =>
-                      active.current &&
-                      currentMemberAuthorityMatches(client, actor.scopeKey);
+                      active.current && authority.isCurrent();
                     if (!current()) return;
                     const original = record ?? fromEstimate;
                     if (!original) {
@@ -533,7 +730,7 @@ function CustomerWorkFormDraft({
               </p>
             )}
             <fieldset
-              disabled={command.locked}
+              disabled={command.locked || !authority.allowed}
               className="min-w-0 space-y-4 disabled:opacity-70"
             >
               {!original &&
@@ -584,6 +781,7 @@ function CustomerWorkFormDraft({
                     value={status}
                     onChange={(event) => {
                       setStatus(event.target.value);
+                      review.invalidate();
                       setConfirmed(false);
                     }}
                   >
@@ -719,61 +917,95 @@ function CustomerWorkFormDraft({
                 </>
               ) : (
                 <>
-                  <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-                    <label className="block text-sm">
-                      Scheduled start
-                      <input
-                        className={field}
-                        type="datetime-local"
-                        value={start}
-                        onChange={(event) => {
-                          setStart(event.target.value);
-                          setConfirmed(false);
-                        }}
-                      />
-                    </label>
-                    <label className="block text-sm">
-                      Scheduled end
-                      <input
-                        className={field}
-                        type="datetime-local"
-                        value={end}
-                        onChange={(event) => {
-                          setEnd(event.target.value);
-                          setConfirmed(false);
-                        }}
-                      />
-                    </label>
-                  </div>
-                  <p className="text-xs">
-                    Times use {scheduleTimezone}. Current native crew/capacity
-                    checks still apply.
-                  </p>
-                  <fieldset className="rounded border p-3">
-                    <legend className="text-sm">Crew assignment</legend>
-                    {users.data?.filter(canAssignWork).map((user) => (
-                      <label
-                        key={user.id}
-                        className="flex min-h-11 items-center gap-2 text-sm"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={crew.includes(user.id)}
-                          onChange={(event) => {
-                            setCrew((values) =>
-                              event.target.checked
-                                ? [...values, user.id]
-                                : values.filter((id) => id !== user.id),
-                            );
-                            setConfirmed(false);
-                          }}
-                        />
-                        {[user.firstName, user.lastName]
+                  {read.error && (
+                    <p role="status">
+                      {read.error} Historical notes, closure and eligible saved
+                      crew removal remain available.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className={button}
+                    onClick={() => void read.refresh()}
+                  >
+                    Refresh scheduling review
+                  </button>
+                  <SchedulingIntervalFields
+                    {...review.fields}
+                    resources={(users.data ?? [])
+                      .filter(canAssignWork)
+                      .map((user) => ({
+                        id: user.id,
+                        label:[user.firstName, user.lastName]
                           .filter(Boolean)
-                          .join(" ") || user.email}
-                      </label>
+                          .join(" ") || user.email ||
+                          user.id,
+                      }))}
+                    presets={read.value?.policy?.durationPresets ?? []}
+                    disabled={command.locked}
+                    startOnlyBehavior="preserve_absolute_end"
+                  />
+                  {!review.draft.startAt && !review.draft.endAt && context && (
+                    <button
+                      type="button"
+                      className={button}
+                      onClick={() =>
+                        review.fields.onReviewChange({
+                          context,
+                          duration: { kind: "explicit", preset: null },
+                          startWallTime: null,
+                          endWallTime: null,
+                        })
+                      }
+                    >
+                      Review unscheduled job
+                    </button>
+                  )}
+                  {projectRecord &&
+                    !context &&
+                    interval.evidence !== "invalid" &&
+                    review.draft.resourceUserIds.map((id) => (
+                      <button
+                        type="button"
+                        className={button}
+                        key={id}
+                        onClick={() =>
+                          review.fields.onDraftChange({
+                            ...review.draft,
+                            resourceUserIds:
+                              review.draft.resourceUserIds.filter(
+                                (value) => value !== id,
+                              ),
+                          })
+                        }
+                      >
+                        Remove {id} from saved crew
+                      </button>
                     ))}
-                  </fieldset>
+                  <SchedulingIntervalReview
+                    companyTimeZone={
+                      context?.companyTimeZone ??
+                      authority.profile?.organization?.timezone ??
+                      null
+                    }
+                    interval={interval}
+                    proposal={proposal}
+                    resources={[]}
+                    conflict={null}
+                  />
+                  {projectRecord && (
+                    <SchedulingReservationSummary
+                      companyTimeZone={
+                        context?.companyTimeZone ??
+                        authority.profile?.organization?.timezone ??
+                        null
+                      }
+                      interval={interval}
+                      proposal={proposal}
+                      resources={[]}
+                      conflict={null}
+                    />
+                  )}
                 </>
               )}
               <label className="block text-sm">
@@ -804,7 +1036,11 @@ function CustomerWorkFormDraft({
               )}
               <button
                 className={button}
-                disabled={!confirmed || (!original && !choice.confirmed)}
+                disabled={
+                  !confirmed ||
+                  (!original && !choice.confirmed) ||
+                  (kind === "projects" && !historical && !review.review)
+                }
                 type="submit"
               >
                 Save customer {kind === "estimates" ? "estimate" : "job"}
