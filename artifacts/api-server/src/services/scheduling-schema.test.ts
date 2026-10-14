@@ -1,5 +1,8 @@
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { insertAppointmentSchema, insertOrgSettingsSchema, insertProjectSchema } from '@workspace/db/schema';
@@ -7,7 +10,6 @@ import type { ReservationSnapshot, SchedulingPolicy } from '@workspace/schedulin
 
 const root = new URL('../../../../', import.meta.url);
 const migration = new URL('reports/staging-schema-preview-2026-10-01/0019_saved-scheduling-policy.sql', root);
-const pinsUrl = new URL('.superpowers/sdd/2026-10-13-saved-scheduling-capacity/baseline-sql-pins.json', root);
 const organizationId = randomUUID(), contactId = randomUUID(), leadId = randomUUID();
 const rowIds = { org_settings: randomUUID(), appointments: randomUUID(), projects: randomUUID() };
 const surfaces = [
@@ -49,24 +51,77 @@ async function seed(client: pg.Client) {
   await client.query('INSERT INTO appointments(id,organization_id,scheduled_start,notes) VALUES($1,$2,$3,$4)', [rowIds.appointments, organizationId, '2026-10-13T15:00:00Z', 'Retained legacy visit']);
   await client.query('INSERT INTO projects(id,organization_id,lead_id,name,scheduled_start,crew_notes) VALUES($1,$2,$3,$4,$5,$6)', [rowIds.projects, organizationId, leadId, 'Retained legacy project', '2026-10-13T15:00:00Z', 'Retained crew notes']);
 }
+function fixtureUrl(raw: string, env: Record<string, string | undefined>, ownedLocalPort?: number): URL {
+  const url = new URL(raw);
+  const common = env.NODE_ENV === 'test' && env.CI === 'true' && url.protocol === 'postgresql:' && url.hostname === '127.0.0.1' && url.username === 'postgres' && url.pathname === '/mogulforge_test' && !url.search && !url.hash;
+  const ci = env.GITHUB_ACTIONS === 'true' && env.FORGE_SCHEDULING_PG_FIXTURE === 'github-actions-postgres16' && url.password === 'postgres' && url.port === '5432';
+  const local = env.GITHUB_ACTIONS !== 'true' && env.FORGE_SCHEDULING_PG_FIXTURE === undefined && url.password === 'forge-local-test-only' && Number.isInteger(ownedLocalPort) && ownedLocalPort! > 0 && ownedLocalPort! <= 65535 && url.port === String(ownedLocalPort);
+  if (!common || (!ci && !local)) throw new Error('Only an independently owned local-dev or explicitly owned CI PostgreSQL16 fixture is authorized');
+  return url;
+}
+function localOwnedPort(raw: string): number | undefined {
+  const url = new URL(raw);
+  // Refuse unrelated endpoints before even inspecting the local Docker engine.
+  if (process.env.NODE_ENV !== 'test' || process.env.CI !== 'true' || process.env.GITHUB_ACTIONS === 'true' || url.hostname !== '127.0.0.1' || url.password !== 'forge-local-test-only') return;
+  const bridge = 'C:/Forge/tools/local-dev/docker-wsl.mjs';
+  const docker = (args: string[]) => execFileSync(process.platform === 'win32' && existsSync(bridge) ? process.execPath : 'docker', process.platform === 'win32' && existsSync(bridge) ? [bridge, ...args] : args, { cwd: fileURLToPath(root), encoding: 'utf8', windowsHide: true, timeout: 15_000 });
+  const ids = docker(['ps', '--filter', 'label=com.forge.local-test', '--format', '{{.ID}}']).trim().split(/\r?\n/).filter(Boolean);
+  for (const id of ids) {
+    if (!/^[a-f0-9]{12,64}$/.test(id)) throw new Error('invalid_owned_container_identity');
+    const inspection = JSON.parse(docker(['inspect', id]))[0];
+    const runId = inspection?.Config?.Labels?.['com.forge.local-test'];
+    const ports = inspection?.NetworkSettings?.Ports?.['5432/tcp'];
+    const environment: string[] = inspection?.Config?.Env ?? [];
+    if (typeof runId === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(runId) && /^\/forge-growthos-test-\d+-[a-f0-9]{8}$/.test(inspection.Name) && inspection.Name.endsWith(runId.slice(0, 8)) && inspection.Config.Image === 'postgres:16-alpine' && ['POSTGRES_USER=postgres', 'POSTGRES_PASSWORD=forge-local-test-only', 'POSTGRES_DB=mogulforge_test'].every(value => environment.includes(value)) && ports?.length === 1 && ports[0].HostIp === '127.0.0.1' && ports[0].HostPort === url.port) return Number(url.port);
+  }
+}
+async function verifyServer(client: pg.Client, database: string) {
+  const actual = (await client.query("SELECT current_database() AS database,current_schema() AS schema,current_setting('server_version_num')::int AS version")).rows[0];
+  expect(actual).toMatchObject({ database, schema: 'public' });
+  expect(actual.version).toBeGreaterThanOrEqual(160000);
+  expect(actual.version).toBeLessThan(170000);
+}
+const ciFixtureEnv = { NODE_ENV: 'test', CI: 'true', GITHUB_ACTIONS: 'true', FORGE_SCHEDULING_PG_FIXTURE: 'github-actions-postgres16' };
+const ciFixtureUrl = 'postgresql://postgres:postgres@127.0.0.1:5432/mogulforge_test';
+describe('disposable scheduling fixture admission', () => {
+  it('accepts the explicitly owned existing CI postgres16 service', () => {
+    expect(fixtureUrl(ciFixtureUrl, ciFixtureEnv).pathname).toBe('/mogulforge_test');
+  });
+  it.each([
+    ['hosted host', ciFixtureUrl.replace('127.0.0.1', 'example.invalid'), ciFixtureEnv],
+    ['wrong database', ciFixtureUrl.replace('mogulforge_test', 'postgres'), ciFixtureEnv],
+    ['wrong user', ciFixtureUrl.replace('postgres:postgres', 'owner:postgres'), ciFixtureEnv],
+    ['wrong password', ciFixtureUrl.replace('postgres:postgres', 'postgres:other'), ciFixtureEnv],
+    ['wrong port', ciFixtureUrl.replace(':5432/', ':5433/'), ciFixtureEnv],
+    ['URL options', `${ciFixtureUrl}?options=-csearch_path=other`, ciFixtureEnv],
+    ['missing marker', ciFixtureUrl, { ...ciFixtureEnv, FORGE_SCHEDULING_PG_FIXTURE: undefined }],
+    ['missing CI provenance', ciFixtureUrl, { ...ciFixtureEnv, GITHUB_ACTIONS: undefined }],
+    ['non-test environment', ciFixtureUrl, { ...ciFixtureEnv, NODE_ENV: 'production' }],
+    ['unowned local synthetic password', ciFixtureUrl.replace('postgres:postgres', 'postgres:forge-local-test-only'), { NODE_ENV: 'test', CI: 'true' }],
+  ])('refuses %s before opening a client', (_name, raw, env) => {
+    expect(() => fixtureUrl(raw as string, env as Record<string, string | undefined>)).toThrow();
+  });
+  it('accepts only the port of the independently verified local-dev owned container', () => {
+    const raw = 'postgresql://postgres:forge-local-test-only@127.0.0.1:49123/mogulforge_test';
+    expect(fixtureUrl(raw, { NODE_ENV: 'test', CI: 'true' }, 49123).port).toBe('49123');
+    expect(() => fixtureUrl(raw, { NODE_ENV: 'test', CI: 'true' }, 49124)).toThrow();
+    expect(() => fixtureUrl(raw, { NODE_ENV: 'production', CI: 'true' }, 49123)).toThrow();
+  });
+});
 beforeAll(async () => {
-  const url = new URL(process.env.DATABASE_URL!);
-  if (url.hostname !== '127.0.0.1' || url.username !== 'postgres' || url.password !== 'forge-local-test-only' || url.pathname !== '/mogulforge_test') throw new Error('Only the local-dev runner owned fixture is authorized');
+  const raw = process.env.DATABASE_URL!;
+  const url = fixtureUrl(raw, process.env, localOwnedPort(raw));
+  const { readVerifiedSchedulingPredecessors } = await import(new URL('scripts/saved-scheduling-schema-preview.mjs', root).href);
+  const { predecessors, buffers } = await readVerifiedSchedulingPredecessors();
+  expect(predecessors).toHaveLength(19);
   current = new pg.Client({ connectionString: url.toString() }); await current.connect();
-  expect((await current.query("SELECT current_database() AS database,current_schema() AS schema,current_setting('server_version_num')::int AS version")).rows[0]).toMatchObject({ database: 'mogulforge_test', schema: 'public' });
-  expect(Number((await current.query("SELECT current_setting('server_version_num') AS version")).rows[0].version)).toBeGreaterThanOrEqual(160000);
-  expect(Number((await current.query("SELECT current_setting('server_version_num') AS version")).rows[0].version)).toBeLessThan(170000);
+  await verifyServer(current, 'mogulforge_test');
   await seed(current);
   await current.query(`CREATE DATABASE "${ownedDatabase}"`); databaseCreated = true;
   url.pathname = `/${ownedDatabase}`;
   upgraded = new pg.Client({ connectionString: url.toString() }); await upgraded.connect();
-  expect((await upgraded.query('SELECT current_database() AS database,current_schema() AS schema')).rows[0]).toEqual({ database: ownedDatabase, schema: 'public' });
-  const pins = JSON.parse(await readFile(pinsUrl, 'utf8'));
-  const predecessors = pins.files.filter((pin: { path: string }) => /^reports\/staging-schema-preview-2026-(?:09-30|10-01)\/\d{4}_/.test(pin.path));
-  expect(predecessors).toHaveLength(19);
-  for (const pin of predecessors) {
-    const bytes = await readFile(new URL(pin.path, root));
-    expect(createHash('sha256').update(bytes).digest('hex')).toBe(pin.workingCopySha256);
+  await verifyServer(upgraded, ownedDatabase);
+  for (const bytes of buffers as Buffer[]) {
     await upgraded.query(bytes.toString('utf8'));
   }
   await seed(upgraded);

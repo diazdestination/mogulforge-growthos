@@ -1,7 +1,7 @@
 /** Offline review of the approved additive delta. No environment or database access. */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -54,20 +54,35 @@ export function verifyMigrationSql(candidate, generated) {
 }
 
 export function verifySqlPin(pin, workingCopy, gitBlob) {
-  guard(workingCopy.length === pin.workingCopyBytes && sha(workingCopy) === pin.workingCopySha256, `working_sql_bytes_changed:${pin.path}`);
   guard(gitBlob.length === pin.gitBlobBytes && sha(gitBlob) === pin.gitBlobSha256, `git_sql_bytes_changed:${pin.path}`);
+  // Git may check these text files out as LF or CRLF. Compare exact buffers for
+  // the two representations; do not trim, normalize whitespace or accept mixed EOLs.
+  const crlf = Buffer.from(gitBlob.toString('utf8').replace(/(?<!\r)\n/g, '\r\n'));
+  guard(workingCopy.equals(gitBlob) || workingCopy.equals(crlf), `working_sql_bytes_changed:${pin.path}`);
 }
 
-export async function runSchedulingSchemaPreview({ writeMigration = false } = {}) {
-  const pins = JSON.parse(await readFile(new URL('../.superpowers/sdd/2026-10-13-saved-scheduling-capacity/baseline-sql-pins.json', import.meta.url), 'utf8'));
+export async function readVerifiedSchedulingPredecessors() {
+  const available = spawnSync('git', ['cat-file', '-e', `${base}^{commit}`], { cwd: root, windowsHide: true, stdio: 'pipe' });
+  guard(available.status === 0, 'baseline_git_object_missing:use_a_full_history_checkout');
+  const pins = JSON.parse(await readFile(new URL('../reports/staging-schema-preview-2026-10-01/saved-scheduling-predecessor-pins.json', import.meta.url), 'utf8'));
   guard(pins.base === base && pins.files.length === 23 && new Set(pins.files.map(pin => pin.path)).size === 23, 'pin_inventory_invalid');
+  const canonical = new Map();
   for (const pin of pins.files) {
     guard(/^(?:reports\/[a-z0-9-]+\/|scripts\/)[a-zA-Z0-9_-]+\.sql$/.test(pin.path), 'pin_path_invalid');
-    verifySqlPin(pin, await readFile(resolve(root, pin.path)), execFileSync('git', ['show', `${base}:${pin.path}`], { cwd: root, windowsHide: true }));
-    verifySqlPin(pin, await readFile(resolve(root, pin.path)), execFileSync('git', ['show', `HEAD:${pin.path}`], { cwd: root, windowsHide: true }));
+    guard(Object.keys(pin).sort().join(',') === 'gitBlobBytes,gitBlobSha256,path' && Number.isSafeInteger(pin.gitBlobBytes) && pin.gitBlobBytes > 0 && /^[a-f0-9]{64}$/.test(pin.gitBlobSha256), 'pin_shape_invalid');
+    const bytes = execFileSync('git', ['show', `${base}:${pin.path}`], { cwd: root, windowsHide: true });
+    const working = await readFile(resolve(root, pin.path));
+    verifySqlPin(pin, working, bytes);
+    verifySqlPin(pin, working, execFileSync('git', ['show', `HEAD:${pin.path}`], { cwd: root, windowsHide: true }));
+    canonical.set(pin.path, bytes);
   }
   const predecessors = pins.files.filter(pin => /^reports\/staging-schema-preview-2026-(?:09-30|10-01)\/\d{4}_/.test(pin.path));
   guard(predecessors.length === 19 && predecessors.every((pin, index) => basename(pin.path).startsWith(`${String(index).padStart(4, '0')}_`)), 'predecessor_order_invalid');
+  return { pins, predecessors, buffers: predecessors.map(pin => canonical.get(pin.path)) };
+}
+
+export async function runSchedulingSchemaPreview({ writeMigration = false } = {}) {
+  const { pins, predecessors } = await readVerifiedSchedulingPredecessors();
   const temporary = await mkdtemp(join(schemaRoot, '.saved-scheduling-baseline-'));
   guard(dirname(temporary) === schemaRoot && basename(temporary).startsWith('.saved-scheduling-baseline-'), 'temporary_path_invalid');
   try {

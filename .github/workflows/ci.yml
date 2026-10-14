@@ -34,6 +34,7 @@ jobs:
 
     env:
       NODE_ENV: test
+      FORGE_SCHEDULING_PG_FIXTURE: github-actions-postgres16
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/mogulforge_test
       SESSION_SECRET: ci-only-session-secret-that-is-long-enough-for-validation
       EMAIL_INGESTION_WEBHOOK_SECRET: ci-only-email-intake-signing-secret
@@ -43,6 +44,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
