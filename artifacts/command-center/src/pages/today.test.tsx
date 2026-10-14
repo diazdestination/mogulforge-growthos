@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import Today, { type ContractorDay } from "./today";
 import { mockApi, sampleMe } from "@/test/mock-api";
 import { renderWithQuery } from "@/test/render";
+import { makeReservationSnapshot } from "@/test/scheduling-ui-fixtures";
 
 const queue = { items: [], total: 0, truncated: false };
 function day(overrides: Partial<ContractorDay> = {}): ContractorDay {
@@ -19,6 +20,8 @@ function day(overrides: Partial<ContractorDay> = {}): ContractorDay {
     startAt: "2026-10-01T07:00:00Z",
     endAt: "2026-10-02T07:00:00Z",
     scope: "company",
+    schedulingPolicyState: "unconfigured",
+    schedulingPolicyRevision: 0,
     tasks: queue,
     appointments: queue,
     projects: queue,
@@ -57,6 +60,36 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe("Today work day", () => {
+  it("renders saved appointment and job projections in the current company zone while retaining original protection", async () => {
+    const reservation = makeReservationSnapshot();
+    renderDay("office", () => json(day({ date: "2035-01-01", timeZone: "America/New_York", startAt: "2035-01-01T05:00:00Z", endAt: "2035-01-02T05:00:00Z", schedulingPolicyState: "unconfigured", schedulingPolicyRevision: 2,
+      appointments: { total: 1, truncated: false, items: [{ id: reservation.target.id, title: "Synthetic inspection", type: "inspection", status: "scheduled", leadId: null, contactId: null, customerLabel: "Synthetic customer", assignedUserId: "staff-synthetic", assigneeName: "Synthetic staff", scheduledStart: reservation.startAt, scheduledEnd: reservation.endAt, schedulingReservation: reservation, schedulingEvidence: "versioned" }] },
+      projects: { total: 1, truncated: false, items: [{ id: reservation.target.id, title: "Protected job", status: "scheduled", leadId: null, customerLabel: null, crewNames: ["Job staff"], scheduledStart: reservation.startAt, scheduledEnd: reservation.endAt, schedulingReservation: makeReservationSnapshot({ target: { kind: "project", id: reservation.target.id } }), schedulingEvidence: "versioned" }] },
+    })));
+    await screen.findByText("Protected job");
+    expect(screen.getAllByText(/Saved travel gap: 60 minutes/)).toHaveLength(2);
+    expect(screen.getAllByText(/Approved company zone: America\/Los_Angeles/)).toHaveLength(2);
+    expect(screen.getAllByText(/Current company zone: America\/New_York/)).toHaveLength(2);
+    expect(screen.getAllByText(/90 elapsed minutes/)).toHaveLength(2);
+    expect(screen.getAllByRole("region")).toHaveLength(4);
+    const link = screen.getByRole("link", { name: /^inspection/ });
+    expect(link.getAttribute("href")).toBe(`/appointments?appointmentId=${reservation.target.id}&organizationId=o1`);
+    expect(link.querySelector('[role="group"]')).toBeNull();
+  });
+  it("holds invalid projected evidence while keeping historical work and invalid-policy status visible", async () => {
+    renderDay("office", () => json(day({ schedulingPolicyState: "invalid", schedulingPolicyRevision: null,
+      appointments: { total: 1, truncated: false, items: [{ id: "invalid", title: "Invalid inspection", type: "inspection", status: "scheduled", leadId: null, contactId: null, customerLabel: "Retained customer", assignedUserId: null, assigneeName: null, scheduledStart: "2026-10-01T14:00:00Z", scheduledEnd: null, schedulingReservation: null, schedulingEvidence: "invalid" }] },
+    })));
+    await screen.findByText("Retained customer");
+    expect(screen.getAllByRole("alert").some(item => /current scheduling policy.*held/i.test(item.textContent || ""))).toBe(true);
+    expect(screen.getAllByRole("alert").some(item => /Scheduling evidence.*held/.test(item.textContent || ""))).toBe(true);
+    expect(screen.queryByText(/Legacy travel gap: 0/)).toBeNull();
+  });
+  it.each(["Invalid/Zone", ""])("holds unusable backend company zone %s without hiding the load failure as an empty day", async timeZone => {
+    renderDay("office", () => json(day({ timeZone })));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/work day could not load/);
+    expect(screen.queryByText(/No appointments overlap/)).toBeNull();
+  });
   it('opens returning jobs and native office handoffs at exact company-pinned records without a fifth queue', async () => {
     const organizationId = '00000000-0000-4000-8000-000000000001', contactId = '00000000-0000-4000-8000-000000000002', projectId = '00000000-0000-4000-8000-000000000003';
     const actionPath = `/invoices?projectId=${projectId}&organizationId=${organizationId}`;
@@ -77,7 +110,7 @@ describe("Today work day", () => {
     const appointmentId = "00000000-0000-4000-8000-000000000003", serviceId = "00000000-0000-4000-8000-000000000004";
     const assigned = { contactId, customerLabel: "Synthetic Customer", assignedUserId: null, assigneeName: null, status: "scheduled" };
     mockApi("office", { me: { organization: { id: organizationId, name: "Synthetic HVAC", slug: "synthetic", timezone: "UTC" } }, handler: (_method, path) => path.endsWith("/contractor/today") ? json(day({ organizationId,
-      appointments: { total: 2, truncated: false, items: [{ ...assigned, id: appointmentId, type: "inspection", leadId: null, scheduledStart: "2026-10-01T14:00:00Z", scheduledEnd: null }, { ...assigned, id: "unlinked", contactId: null, type: "other", leadId: null, scheduledStart: "2026-10-01T15:00:00Z", scheduledEnd: null }] },
+      appointments: { total: 2, truncated: false, items: [{ ...assigned, id: appointmentId, title: "Inspection", type: "inspection", leadId: null, scheduledStart: "2026-10-01T14:00:00Z", scheduledEnd: null }, { ...assigned, id: "unlinked", title: "Other visit", contactId: null, type: "other", leadId: null, scheduledStart: "2026-10-01T15:00:00Z", scheduledEnd: null }] },
       services: { total: 1, truncated: false, items: [{ ...assigned, id: serviceId, title: "Heat pump maintenance", dueAt: "2026-10-01T12:00:00Z", kind: "maintenance", taskId: "task" }] },
     })) : undefined });
     const { hook } = memoryLocation({ path: "/" }); renderWithQuery(<Router hook={hook}><Today /></Router>);
@@ -169,13 +202,14 @@ describe("Today work day", () => {
       new URL(requests[0], "http://localhost").searchParams.get("scope"),
     ).toBe("company");
   });
-  it("defaults field staff to their assignments and states the UTC fallback", async () => {
+  it("defaults field staff to their assignments and holds obsolete UTC fallback responses", async () => {
     const requests = renderDay("production", () =>
       json(
         day({ scope: "mine", timeZone: "UTC", timeZoneSource: "utc_fallback" }),
       ),
     );
-    await screen.findByText(/company time zone is not configured/);
+    await screen.findByRole("alert");
+    expect(screen.queryByText(/this view uses UTC/)).toBeNull();
     expect(
       new URL(requests[0], "http://localhost").searchParams.get("scope"),
     ).toBe("mine");
@@ -230,6 +264,8 @@ describe("Today work day", () => {
               {
                 ...assigned,
                 type: "inspection",
+                schedulingEvidence: "legacy",
+                schedulingReservation: null,
                 scheduledStart: "2026-09-30T09:30:00Z",
                 scheduledEnd: "2026-09-30T11:00:00Z",
               },
@@ -238,7 +274,7 @@ describe("Today work day", () => {
             truncated: false,
           },
           services: {
-            items: [{ ...assigned, kind: "maintenance", taskId: "task-1" }],
+            items: [{ ...assigned, contactId: "contact-1", kind: "maintenance", taskId: "task-1" }],
             total: 1,
             truncated: false,
           },
