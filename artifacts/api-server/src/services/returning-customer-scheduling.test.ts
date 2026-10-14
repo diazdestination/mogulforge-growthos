@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, expect, it, vi } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   auditEventsTable,
   customerWorkCommandsTable,
   customerWorkRootsTable,
+  crmTasksTable,
   db,
   orgSettingsTable,
   organizationsTable,
@@ -24,6 +25,7 @@ import {
 } from "./returning-customer";
 import {
   createCustomerWorkProjectSchema,
+  updateCustomerWorkProjectSchema,
   customerWorkProjectMutationSchema,
   CustomerWorkError,
 } from "./returning-customer-contract";
@@ -111,6 +113,313 @@ function edit(
   const { source: _source, ...body } = input;
   return { ...body, requestId: randomUUID(), expectedWorkVersion };
 }
+
+const uppercaseRequestId = "ABCDEF12-1111-4111-8111-111111111111";
+async function sourceEffects(f: F) {
+  return {
+    roots: await db
+      .select()
+      .from(customerWorkRootsTable)
+      .where(eq(customerWorkRootsTable.organizationId, f.org)),
+    projects: await db
+      .select()
+      .from(projectsTable)
+      .where(eq(projectsTable.organizationId, f.org)),
+    commands: await db
+      .select()
+      .from(customerWorkCommandsTable)
+      .where(eq(customerWorkCommandsTable.organizationId, f.org)),
+    sourceAudits: await db
+      .select()
+      .from(auditEventsTable)
+      .where(
+        and(
+          eq(auditEventsTable.organizationId, f.org),
+          inArray(auditEventsTable.action, [
+            "customer_work.project_created",
+            "customer_work.project_updated",
+          ]),
+        ),
+      ),
+    transitions: await events(f),
+    invoiceTasks: await db
+      .select()
+      .from(crmTasksTable)
+      .where(eq(crmTasksTable.organizationId, f.org)),
+  };
+}
+
+async function uppercaseProof(
+  f: F,
+  input:
+    | ReturnType<typeof createCustomerWorkProjectSchema.parse>
+    | ReturnType<typeof updateCustomerWorkProjectSchema.parse>,
+  projectId: string,
+  action: "project_created" | "project_updated",
+  version: number,
+  transition: string,
+) {
+  const effects = await sourceEffects(f);
+  const command = effects.commands.find(
+    (row) => row.requestId === input.requestId.toLowerCase(),
+  );
+  expect(command).toMatchObject({
+    organizationId: f.org,
+    actorUserId: f.owner.id,
+    action,
+    projectId,
+    resultVersion: version,
+    payloadSha256: customerWorkHash({
+      action,
+      targetId: action === "project_created" ? null : projectId,
+      input,
+      actorUserId: f.owner.id,
+    }),
+  });
+  expect(command!.payloadSha256).not.toBe(
+    customerWorkHash({
+      action,
+      targetId: action === "project_created" ? null : projectId,
+      input: { ...input, requestId: input.requestId.toLowerCase() },
+      actorUserId: f.owner.id,
+    }),
+  );
+  expect(
+    effects.sourceAudits.filter(
+      (row) => row.metadata.requestId === input.requestId,
+    ),
+  ).toMatchObject([
+    {
+      organizationId: f.org,
+      actorUserId: f.owner.id,
+      action: `customer_work.${action}`,
+      entityId: projectId,
+      metadata: {
+        requestId: input.requestId,
+        workVersion: version,
+        staffRecorded: true,
+        providerEffect: false,
+      },
+    },
+  ]);
+  expect(
+    effects.transitions.filter(
+      (row) => row.metadata.sourceId === input.requestId.toLowerCase(),
+    ),
+  ).toMatchObject([
+    {
+      organizationId: f.org,
+      actorUserId: f.owner.id,
+      entityId: projectId,
+      metadata: {
+        sourceId: input.requestId.toLowerCase(),
+        transition,
+        origin: "returning_command",
+        source: {
+          sourceKind: "direct_customer",
+          contactId: f.contact.id,
+          propertyId: f.secondProperty.id,
+          estimateId: null,
+        },
+        invalidHistoricalEvidenceRetained: false,
+      },
+    },
+  ]);
+  return command!;
+}
+
+it.each([false, true])(
+  "commits fresh uppercase returning UUID with original body/audit/hash and exact replay (configured=%s)",
+  async (configured) => {
+    const f = await fixture();
+    if (configured) await configure(f);
+    const input = {
+      ...returningProjectDraft(f),
+      requestId: uppercaseRequestId,
+      ...(configured
+        ? {
+            ...interval,
+            crewUserIds: [f.office.id, f.owner.id],
+            schedulingReview: await review(f),
+          }
+        : {}),
+    };
+    const parsed = createCustomerWorkProjectSchema.parse(input);
+    expect(parsed).toEqual(input);
+    expect(parsed.requestId).toBe(uppercaseRequestId);
+    expect(Object.hasOwn(parsed, "schedulingReview")).toBe(configured);
+    const before = await sourceEffects(f);
+    let saved;
+    try {
+      saved = await createCustomerWorkProject(f.org, f.actor, input);
+    } catch (error) {
+      // A failing fresh command must roll back every transactional effect, even
+      // when transition validation occurs after root/project insertion.
+      expect(await sourceEffects(f)).toEqual(before);
+      console.info(
+        "Uppercase fresh-command atomic rollback verified: root/project/command/source-audit/transition/invoice-task unchanged",
+      );
+      throw error;
+    }
+    expect(saved.project).toMatchObject({
+      leadId: null,
+      contactId: f.contact.id,
+      propertyId: f.secondProperty.id,
+      crewNotes: "Preserve the original office notes.",
+      scheduledStart: configured ? interval.scheduledStart : null,
+      scheduledEnd: configured ? interval.scheduledEnd : null,
+      schedulingEvidence: configured ? "versioned" : "legacy",
+    });
+    const command = await uppercaseProof(
+      f,
+      parsed,
+      saved.project.id,
+      "project_created",
+      1,
+      configured ? "admission" : "preserve",
+    );
+    expect(saved.command.requestId).toBe(command.requestId);
+    expect(saved.commandOutcome).toMatchObject({
+      requestId: command.requestId,
+      payloadSha256: command.payloadSha256,
+      resultWorkVersion: 1,
+    });
+    const committed = await sourceEffects(f);
+    expect(
+      Object.fromEntries(
+        Object.entries(committed).map(([key, rows]) => [key, rows.length]),
+      ),
+    ).toEqual({
+      roots: 1,
+      projects: 1,
+      commands: 1,
+      sourceAudits: 1,
+      transitions: 1,
+      invoiceTasks: 0,
+    });
+    await configure(f, 90, 1);
+    const replay = await createCustomerWorkProject(f.org, f.actor, input);
+    expect(replay.command).toEqual({ ...saved.command, duplicate: true });
+    expect(replay.commandOutcome).toEqual(saved.commandOutcome);
+    expect(replay.project).toEqual(saved.project);
+    expect(await sourceEffects(f)).toEqual(committed);
+    await expect(
+      createCustomerWorkProject(f.org, f.actor, {
+        ...input,
+        requestId: uppercaseRequestId.toLowerCase(),
+      }),
+    ).rejects.toMatchObject({ code: "customer_work_request_conflict" });
+    await expect(
+      createCustomerWorkProject(f.org, { userId: f.office.id }, input),
+    ).rejects.toMatchObject({ code: "customer_work_request_conflict" });
+    expect(await sourceEffects(f)).toEqual(committed);
+    expect(input.requestId).toBe(uppercaseRequestId);
+  },
+);
+
+it("uses canonical uppercase UUID identity for material and release updates while retaining source bytes, parent and notes", async () => {
+  const f = await fixture();
+  await configure(f);
+  const { input, result } = await booked(f);
+  const material = updateCustomerWorkProjectSchema.parse({
+    ...edit(input, 1),
+    requestId: uppercaseRequestId,
+    scheduledStart: "2037-06-16T14:00:00.000Z",
+    scheduledEnd: "2037-06-16T15:00:00.000Z",
+    expectedTargetFingerprint: result.project.schedulingTargetFingerprint,
+    schedulingReview: await review(f, result.project.id),
+  });
+  const before = await sourceEffects(f);
+  await expect(
+    updateCustomerWorkProject(f.org, f.actor, result.project.id, {
+      ...material,
+      expectedTargetFingerprint: "0".repeat(64),
+    }),
+  ).rejects.toMatchObject({ code: "stale_scheduling_review" });
+  expect(await sourceEffects(f)).toEqual(before);
+  const moved = await updateCustomerWorkProject(
+    f.org,
+    f.actor,
+    result.project.id,
+    material,
+  );
+  await uppercaseProof(
+    f,
+    material,
+    result.project.id,
+    "project_updated",
+    2,
+    "admission",
+  );
+  const release = updateCustomerWorkProjectSchema.parse({
+    ...edit(input, 2),
+    requestId: "ABCDEF12-1111-4111-8111-111111111112",
+    scheduledStart: material.scheduledStart,
+    scheduledEnd: material.scheduledEnd,
+    crewUserIds: [f.office.id],
+    expectedTargetFingerprint: moved.project.schedulingTargetFingerprint,
+  });
+  const released = await updateCustomerWorkProject(
+    f.org,
+    f.actor,
+    result.project.id,
+    release,
+  );
+  await uppercaseProof(
+    f,
+    release,
+    result.project.id,
+    "project_updated",
+    3,
+    "release",
+  );
+  expect(released.project).toMatchObject({
+    customerWorkId: result.project.customerWorkId,
+    estimateId: null,
+    contactId: f.contact.id,
+    propertyId: f.secondProperty.id,
+    leadId: null,
+    crewNotes: "Preserve the original office notes.",
+    crewUserIds: [f.office.id],
+  });
+  expect(released.project.schedulingReservation).toMatchObject({
+    reservationRevision: 3,
+    lastTransition: { kind: "release", actorUserId: f.owner.id },
+  });
+  const committed = await sourceEffects(f);
+  expect(committed.roots).toEqual(before.roots);
+  expect(committed.projects).toHaveLength(1);
+  expect(committed.commands).toHaveLength(3);
+  expect(committed.sourceAudits).toHaveLength(3);
+  expect(committed.transitions).toHaveLength(3);
+  expect(committed.invoiceTasks).toEqual(before.invoiceTasks);
+  await configure(f, 120, 1);
+  const replay = await updateCustomerWorkProject(
+    f.org,
+    f.actor,
+    result.project.id,
+    release,
+  );
+  expect(replay.command).toEqual({ ...released.command, duplicate: true });
+  expect(replay.commandOutcome).toEqual(released.commandOutcome);
+  await expect(
+    updateCustomerWorkProject(f.org, f.actor, result.project.id, {
+      ...release,
+      requestId: release.requestId.toLowerCase(),
+    }),
+  ).rejects.toMatchObject({ code: "customer_work_request_conflict" });
+  await expect(
+    updateCustomerWorkProject(
+      f.org,
+      { userId: f.office.id },
+      result.project.id,
+      release,
+    ),
+  ).rejects.toMatchObject({ code: "customer_work_request_conflict" });
+  expect(await sourceEffects(f)).toEqual(committed);
+  expect(material.requestId).toBe(uppercaseRequestId);
+  expect(release.requestId).toBe("ABCDEF12-1111-4111-8111-111111111112");
+});
 
 it("requires reviewed fresh material staff admission at revision zero and rolls back its source root", async () => {
   const f = await fixture();
