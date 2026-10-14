@@ -198,6 +198,7 @@ import type {
   LogoutSuccess,
   ManualSchedulingAck,
   ManualSchedulingCommand,
+  ManualSchedulingError,
   MarketingSummary,
   Member,
   MemberProfile,
@@ -10596,7 +10597,7 @@ export const createProject = async (
 };
 
 export const getCreateProjectMutationOptions = <
-  TError = ErrorType<ErrorEnvelope>,
+  TError = ErrorType<ErrorEnvelope | ManualSchedulingError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -10637,10 +10638,12 @@ export type CreateProjectMutationResult = NonNullable<
   Awaited<ReturnType<typeof createProject>>
 >;
 export type CreateProjectMutationBody = BodyType<ProjectInput>;
-export type CreateProjectMutationError = ErrorType<ErrorEnvelope>;
+export type CreateProjectMutationError = ErrorType<
+  ErrorEnvelope | ManualSchedulingError
+>;
 
 export const useCreateProject = <
-  TError = ErrorType<ErrorEnvelope>,
+  TError = ErrorType<ErrorEnvelope | ManualSchedulingError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -11920,7 +11923,7 @@ export const createAppointment = async (
 };
 
 export const getCreateAppointmentMutationOptions = <
-  TError = ErrorType<ErrorEnvelope>,
+  TError = ErrorType<ManualSchedulingError | ErrorEnvelope>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -11961,10 +11964,12 @@ export type CreateAppointmentMutationResult = NonNullable<
   Awaited<ReturnType<typeof createAppointment>>
 >;
 export type CreateAppointmentMutationBody = BodyType<AppointmentInput>;
-export type CreateAppointmentMutationError = ErrorType<ErrorEnvelope>;
+export type CreateAppointmentMutationError = ErrorType<
+  ManualSchedulingError | ErrorEnvelope
+>;
 
 export const useCreateAppointment = <
-  TError = ErrorType<ErrorEnvelope>,
+  TError = ErrorType<ManualSchedulingError | ErrorEnvelope>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<

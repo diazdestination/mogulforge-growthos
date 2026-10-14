@@ -55,17 +55,17 @@ export function assertScheduleInterval(start?: Date | null, end?: Date | null) {
 }
 
 export async function assertOperationalStaff(tx: ScheduleTransaction, org: string, ids: string[]) {
-  const unique = [...new Set(ids)];
+  const unique = [...new Set(ids)].sort();
   if (!unique.length) return;
-  const users = await tx.select().from(usersTable).where(and(eq(usersTable.organizationId, org), inArray(usersTable.id, unique))).for("share");
+  const users = await tx.select().from(usersTable).where(and(eq(usersTable.organizationId, org), inArray(usersTable.id, unique))).orderBy(usersTable.id).for("share");
   if (users.length !== unique.length || users.some(user => !user.isActive || user.id.startsWith("invite:") || !user.emailVerifiedAt || !hasPermission(user.role, "crm.write"))) throw new ScheduleError("invalid_assignee", 400);
 }
 
 /** Terminal transitions retain same-company history even after access is revoked. */
 export async function assertHistoricalStaff(tx: ScheduleTransaction, org: string, ids: string[]) {
-  const unique = [...new Set(ids)];
+  const unique = [...new Set(ids)].sort();
   if (!unique.length) return;
-  const users = await tx.select({ id: usersTable.id }).from(usersTable).where(and(eq(usersTable.organizationId, org), inArray(usersTable.id, unique))).for("share");
+  const users = await tx.select({ id: usersTable.id }).from(usersTable).where(and(eq(usersTable.organizationId, org), inArray(usersTable.id, unique))).orderBy(usersTable.id).for("share");
   if (users.length !== unique.length) throw new ScheduleError("invalid_assignee", 400);
 }
 

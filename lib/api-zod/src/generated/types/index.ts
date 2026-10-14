@@ -513,6 +513,8 @@ export * from './manualSchedulingAckOutcome';
 export * from './manualSchedulingAckTarget';
 export * from './manualSchedulingAckTargetKind';
 export * from './manualSchedulingCommand';
+export * from './manualSchedulingError';
+export * from './manualSchedulingErrorCode';
 export * from './manualSourceRef';
 export * from './manualSourceRefSourceKind';
 export * from './marketingLandingPage';

@@ -21843,3 +21843,5 @@ export const ReconcileSchedulingOperationResponse = zod.object({
 }).strict()
 
 
+
+export const ManualSchedulingErrorSchema = zod.object({ error: zod.string(), code: zod.enum(['manual_scheduling_refused', 'manual_scheduling_target_unavailable']), schedulingOperation: ReconcileSchedulingOperationResponse }).strict();

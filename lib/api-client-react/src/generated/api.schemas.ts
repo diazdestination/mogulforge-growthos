@@ -149,6 +149,14 @@ export interface PolicySaveInput {
   durationPresets: PolicySaveInputDurationPresetsItem[];
 }
 
+export type ManualSchedulingErrorCode = typeof ManualSchedulingErrorCode[keyof typeof ManualSchedulingErrorCode];
+
+
+export const ManualSchedulingErrorCode = {
+  manual_scheduling_refused: 'manual_scheduling_refused',
+  manual_scheduling_target_unavailable: 'manual_scheduling_target_unavailable',
+} as const;
+
 export type ManualSchedulingAckKind = typeof ManualSchedulingAckKind[keyof typeof ManualSchedulingAckKind];
 
 
@@ -197,6 +205,12 @@ export interface ManualSchedulingAck {
   outcome: ManualSchedulingAckOutcome;
   target: ManualSchedulingAckTarget;
   refusalCode: string | null;
+}
+
+export interface ManualSchedulingError {
+  error: string;
+  code: ManualSchedulingErrorCode;
+  schedulingOperation: ManualSchedulingAck;
 }
 
 export type ManualSchedulingCommand = {

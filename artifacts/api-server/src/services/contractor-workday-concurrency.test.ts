@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-import { appointmentWorkCompletionsTable, crmTasksTable, db, pool, serviceObligationsTable, usersTable } from "@workspace/db";
+import { appointmentWorkCompletionsTable, crmTasksTable, db, pool, serviceObligationsTable, usersTable,orgSettingsTable } from "@workspace/db";
+import {saveSchedulingPolicy,readSchedulingPolicy} from './scheduling-policy';
 import { eq } from "drizzle-orm";
 import app from "../app";
 import { createSession, deleteSession } from "../lib/auth";
@@ -38,6 +39,17 @@ async function barrier(table: string, timing: "BEFORE INSERT" | "AFTER UPDATE" |
   return { pid, release: () => keeper.query("COMMIT"), cleanup: async (pending: Promise<unknown>[]) => { await keeper.query("ROLLBACK"); keeper.release(); await Promise.allSettled(pending); await pool.query(`DROP TRIGGER IF EXISTS ${hook} ON ${table}`); await pool.query(`DROP FUNCTION IF EXISTS ${hook}()`); } };
 }
 function observe<T>(promise: Promise<T>, pending: Promise<unknown>[]) { pending.push(promise); void promise.catch(() => {}); return promise; }
+
+realPg('native work completion preserves its original transaction and task plan after current scheduling evidence becomes corrupt',async()=>{
+ const f=await fixture();
+ const actor={organizationId:f.org,userId:f.owner.id};const current=await readSchedulingPolicy(actor);
+ const saved=await saveSchedulingPolicy(actor,{expectedRevision:0,expectedCompanyTimeZone:current.context.companyTimeZone,enabled:true,minimumTravelGapMinutes:1440,maxConcurrentReservations:1,durationPresets:[]});
+ await db.update(orgSettingsTable).set({schedulingPolicy:{...saved.policy!,digest:'0'.repeat(64)}}).where(eq(orgSettingsTable.organizationId,f.org));
+ const result=await completeAppointmentWork(f.org,f.actor,f.appointment.id,f.command);
+ expect(result.work.completion?.services[0].nextObligationId).toBeTruthy();
+ expect(await db.select().from(appointmentWorkCompletionsTable).where(eq(appointmentWorkCompletionsTable.organizationId,f.org))).toHaveLength(1);
+ expect((await completeAppointmentWork(f.org,f.actor,f.appointment.id,f.command)).receipt.replayed).toBe(true);
+});
 
 realPg("retains actual property, task and performing member locks through atomic work completion while generic writers wait", async () => {
   const f = await fixture(), pending: Promise<unknown>[] = [];

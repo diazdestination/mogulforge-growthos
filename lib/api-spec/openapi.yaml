@@ -1463,7 +1463,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
-  "/v1/projects": {"get":{"operationId":"listProjects","tags":["projects"],"parameters":[{"name":"leadId","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"status","in":"query","required":false,"schema":{"$ref":"#/components/schemas/ProjectStatus"}},{"name":"contactId","in":"query","schema":{"type":"string","format":"uuid"}},{"name":"customerWorkId","in":"query","schema":{"type":"string","format":"uuid"}},{"name":"propertyId","in":"query","schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Projects","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Project"}}}}}}},"post":{"operationId":"createProject","tags":["projects"],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProjectInput"}}}},"responses":{"201":{"description":"Created","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Project"}}}},"400":{"description":"Invalid input","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ErrorEnvelope"}}}}}}}
+  "/v1/projects": {"get":{"operationId":"listProjects","tags":["projects"],"parameters":[{"name":"leadId","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"status","in":"query","required":false,"schema":{"$ref":"#/components/schemas/ProjectStatus"}},{"name":"contactId","in":"query","schema":{"type":"string","format":"uuid"}},{"name":"customerWorkId","in":"query","schema":{"type":"string","format":"uuid"}},{"name":"propertyId","in":"query","schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Projects","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/Project"}}}}}}},"post":{"operationId":"createProject","tags":["projects"],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProjectInput"}}}},"responses":{"201":{"description":"Created","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Project"}}}},"400":{"description":"Invalid input","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ErrorEnvelope"}}}},"409":{"description":"Original manual scheduling refusal or unavailable committed target, or ordinary scheduling conflict.","content":{"application/json":{"schema":{"anyOf":[{"$ref":"#/components/schemas/ManualSchedulingError"},{"$ref":"#/components/schemas/ErrorEnvelope"}]}}}}}}}
   /v1/projects/{id}:
     get:
       operationId: getProject
@@ -1861,11 +1861,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/Appointment"
         "409":
-          description: Inspection window already at capacity
+          description: Original manual scheduling refusal or unavailable committed target, or ordinary scheduling conflict.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorEnvelope"
+                anyOf:
+                  - $ref: "#/components/schemas/ManualSchedulingError"
+                  - $ref: "#/components/schemas/ErrorEnvelope"
   /v1/appointments/{id}:
     get: {"operationId":"getCustomerWorkspaceAppointment","tags":["contacts"],"summary":"Read one exact appointment outside schedule list filters","description":"Read-only canonical customer records for current accepted staff. Company comes only from the session. No writes, financial totals, raw activity/mailbox contents or inferred parent links. Sending holds do not block historical reading. Section pages contain at most 25 valid rows in created-descending order, using company/customer/section-bound keyset cursors; not a frozen export.","parameters":[{"$ref":"#/components/parameters/IdPathParam"}],"responses":{"200":{"description":"Safe canonical read projection.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CustomerWorkspaceAppointmentDetail"}}}},"400":{"description":"Invalid UUID, section, cursor or query. Unknown and duplicate selectors rejected."},"401":{"description":"Staff sign-in required."},"403":{"description":"Accepted active staff session and current section permission required. API keys are not accepted."},"404":{"description":"Canonical record not found in this company."},"503":{"description":"Record unavailable; refresh before continuing."}}}
     patch:
@@ -4733,6 +4735,18 @@ components:
         - maxConcurrentReservations
         - durationPresets
       additionalProperties: false
+    ManualSchedulingError:
+      type: object
+      additionalProperties: false
+      required: [error, code, schedulingOperation]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum: [manual_scheduling_refused, manual_scheduling_target_unavailable]
+        schedulingOperation:
+          $ref: "#/components/schemas/ManualSchedulingAck"
     ManualSchedulingAck:
       type: object
       properties:

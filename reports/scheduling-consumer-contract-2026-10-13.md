@@ -93,6 +93,28 @@ The command body is a closed native business shape without nested operationId/re
 
 Implemented structured errors are `stale_scheduling_review`409, `invalid_scheduling_policy`400/409, `invalid_reservation_snapshot`409, `invalid_scheduling_context`400, `scheduling_access_denied`403, `organization_missing`404, `scheduling_source_missing`404, `scheduling_target_missing`404, `customer_reference_mismatch`400, `estimate_lead_mismatch`400 and existing `customer_lifecycle_paused`423. Internal global-reader misuse is `scheduling_transaction_required`503. Unknown database/lock errors remain unknown, never terminal no-commit evidence. Future gates use the already frozen core/domain error names in the plan; no conflict authority is added here.
 
+## Task5 native admission and original-operation responses
+
+Native appointment/project CREATE with `operationId` validates and hashes the original `req.body` spelling, omissions and array order before generated Date coercion. Reviewed CREATE without `operationId` returns400 `scheduling_operation_required`; eligible old unreviewed/unconfigured calls retain their wrapper compatibility. A server-constructed `SchedulingActor` is rechecked under lifecycle/schedule locks. The native callback uses `createAppointmentInTransaction` or `createProjectInTransaction` inside the receipt's enclosing transaction. Exact prior replay precedes live policy, source, default or native-create reads. Available fresh/replay returns the original row plus `schedulingOperation`, with201/200 respectively. Appointment booking observers run only for a newly created original target; their failure cannot change the committed response.
+
+Native CREATE refused/unavailable409 is the closed `ManualSchedulingError` type, validated by the runtime export **`ManualSchedulingErrorSchema`** from `@workspace/api-zod`:
+
+```ts
+{
+  error: string;
+  code: 'manual_scheduling_refused' | 'manual_scheduling_target_unavailable';
+  schedulingOperation: ManualSchedulingAck;
+}
+```
+
+Validate the terminal acknowledgement independently of HTTP success. A refused original remains `no_commit_refused`; a deleted original target remains `committed` with `target.available:false`. Ordinary errors do not establish no-commit. Native deterministic adaptation is deliberately bounded to actual `NativeSchedulingDomainError`, whitelisted `ScheduleError`, and whitelisted `SchedulingPolicyError` instances. Raw SQL, transaction misuse, authentication/lifecycle failures and code-shaped lookalikes propagate without a receipt. The generated correction preserves the existing20 scheduling and18 PR57 strict boundaries, and separately closes the new error envelope and its nested acknowledgement. No UI prop or literal fixture changed.
+
+Native material admission validates actual and raw claimed staff evidence across appointments/projects before applying the1440-minute maximum travel horizon. Each physical query is bounded at10001; the combined unique kind/id population holds above10000. Company overlap and inspection populations have separate10000 budgets and use core half-open true peak. Native reviewed/protected inspection admission writes through the supplied transaction without the old intersection-count helper; eligible legacy compatibility retains that helper until Task6D integrates it. All native source/staff, target-version/fingerprint, snapshot, transition audit, reminder and invoice-task changes use the original transaction.
+
+Locked classification precedes live policy on notes/confirmation, terminal closure and pure resource release. Corrupt raw historical JSON remains in its column for allowed notes/closure and never becomes emitted legacy evidence; active partial release/admission holds. Protected active end-only clearing holds even with no assigned staff. Project both-date clearing releases capacity and retains the last snapshot. Appointment start-only edits preserve duration; project start-only edits keep the absolute end. Supplied workday execution preserves its original transaction, task-plan flag and completion ID without reacquiring lifecycle locks after participants.
+
+`scheduling.reservation_transition.v1` metadata is the closed `schedulingTransitionSchema` exported from `scheduling-admission.ts`. It carries actual target, trusted origin/source ID, validated before/after snapshots, exact transition, source, recordedAt and `invalidHistoricalEvidenceRetained`. All new callers supply explicit facts to `appendSchedulingTransition`; ambiguous null/equal snapshots without facts throw. Task7 owns subsequent history projection. Task6 source writers must construct their authority only after their own locked source approval; actorless compatibility cannot mint protected authority or snapshots.
+
 ## Controlled UI seam
 
 Use the exact exported `SchedulingPolicyPanelProps`, `SchedulingIntervalFieldsProps`, `SchedulingTravelReviewProps`, `PolicyViewState`, `PolicySaveResult`, `IntervalInput`, `ResourceChoice`, `GateView`, `AuthorizedConflict`, `SchedulingDraft` and `SchedulingProposalView` types. Scope includes organization and actor. Root owns draft, review, requests and custody. Current companyTimeZone is explicit and may be null during loading/hold; saved approvedTimeZone is historical provenance only.

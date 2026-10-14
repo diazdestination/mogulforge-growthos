@@ -5,6 +5,7 @@ import {
   activitiesTable,
   analyticsEventsTable,
   appointmentsTable,
+  appointmentWorkCompletionsTable,
   auditEventsTable,
   contactsTable,
   conversationsTable,
@@ -32,7 +33,7 @@ import {
   insertInspectionInTransaction,
   updateInspectionInTransaction,
 } from "./inspection-booking";
-import { appointmentCustomer, assertHistoricalStaff, assertOperationalStaff, assertResourceWindow, assertScheduleInterval, assertScheduleVersion, ensureInvoicePreparationTask, lockContractorSchedule, ScheduleError, type ScheduleTransaction } from "./contractor-scheduling";
+import { appointmentCustomer, assertHistoricalStaff, assertOperationalStaff, assertScheduleInterval, assertScheduleVersion, ensureInvoicePreparationTask, lockContractorSchedule, ScheduleError, type ScheduleTransaction } from "./contractor-scheduling";
 import { reconcileServiceAppointment } from "./service-obligations";
 import { guardWorkdayAppointment, retainsWorkdayLeadHistory } from "./workday-guards";
 import { lockReplyLead } from "./response-correlation";
@@ -40,6 +41,10 @@ import { customerWorkRootsTable } from "../../../../lib/db/src/schema/customer-w
 import { customerWorkFail, lockCustomerWork, type CustomerWorkActor } from "./customer-work-lineage";
 import { recordEstimateSavedState, hasRetainedEstimateEmail, hasRetainedEstimateEmailParticipant, ESTIMATE_EMAIL_HISTORY_RETAINED } from "./estimate-delivery-history";
 import { readNativeEstimate, readNativeProject } from "./returning-customer";
+import { randomUUID } from "node:crypto";
+import { classifyReservationTransition, type ManualSourceRef, type SchedulingMutationReview } from "@workspace/scheduling-core";
+import { assertSchedulingActor, lockSchedulingConfiguration, readSchedulingContext, projectSchedulingEvidence, schedulingTargetFingerprint, type SchedulingActor, SchedulingPolicyError } from "./scheduling-policy";
+import { activeSchedulingCandidate, appendSchedulingTransition, nativeSchedulingCandidate, prepareNativeSchedulingAdmission, schedulingFailure, type ServerSchedulingAuthority } from "./scheduling-admission";
 
 /**
  * Org-scoped CRM data access. Every query in this module REQUIRES an
@@ -1172,6 +1177,7 @@ export async function listAppointments(organizationId: string, leadId?: string, 
     .limit(200);
   return rows.map((row) => ({
     ...row.appointment,
+    ...projectSchedulingEvidence('appointment',row.appointment),
     leadLabel: buildLeadLabel(row),
   }));
 }
@@ -1195,185 +1201,626 @@ function isPastActiveStart(status: string, scheduledStart: Date | null | undefin
 
 export async function createAppointment(
   organizationId: string,
-  input: Omit<typeof appointmentsTable.$inferInsert, "organizationId">,
-): Promise<typeof appointmentsTable.$inferSelect | null | "conflict" | "past_start"> {
-  // Server-side guard: clients (web CRM, direct API calls) must not be able
-  // to book an appointment that already happened.
-  if (isPastActiveStart(input.status ?? "scheduled", input.scheduledStart)) {
-    return "past_start";
+  input: Omit<typeof appointmentsTable.$inferInsert, "organizationId"> & {
+    schedulingReview?: SchedulingMutationReview;
+  },
+  actor?: SchedulingActor,
+): Promise<
+  typeof appointmentsTable.$inferSelect | null | "conflict" | "past_start"
+> {
+  try {
+    return await db.transaction(async (tx) => {
+      await lockSchedulingConfiguration(tx, organizationId);
+      const authority = await nativeSchedulingAuthority(
+        tx,
+        organizationId,
+        actor,
+      );
+      return createAppointmentInTransaction(
+        tx,
+        organizationId,
+        input,
+        authority,
+      );
+    });
+  } catch (error) {
+    if (error instanceof NativeSchedulingDomainError) {
+      if (error.code === "past_start") return "past_start";
+      if (error.code === "related_record_missing") return null;
+      if (error.code === "inspection_capacity_conflict") return "conflict";
+    }
+    if (
+      error instanceof SchedulingPolicyError &&
+      error.code === "inspection_capacity_conflict"
+    )
+      return "conflict";
+    throw error;
   }
-  const ok = await validateOrgRefs(organizationId, {
-    leadId: input.leadId,
-    contactId: input.contactId,
-    propertyId: input.propertyId,
-    assignedUserId: input.assignedUserId,
+}
+
+/** Deliberate domain failures, never SQL/transport-shaped exceptions. */
+export class NativeSchedulingDomainError extends Error {
+  constructor(
+    readonly code:
+      | "past_start"
+      | "related_record_missing"
+      | "duplicate_estimate"
+      | "inspection_capacity_conflict",
+  ) {
+    super(code);
+  }
+}
+async function nativeSchedulingAuthority(
+  tx: ScheduleTransaction,
+  org: string,
+  actor?: SchedulingActor,
+): Promise<ServerSchedulingAuthority | undefined> {
+  if (!actor) return undefined;
+  if (actor.organizationId !== org)
+    schedulingFailure(
+      "scheduling_access_denied",
+      "Wrong scheduling company.",
+      403,
+    );
+  await assertSchedulingActor(tx, actor, "crm.write");
+  return {
+    organizationId: org,
+    actorUserId: actor.userId,
+    origin: "manual",
+    sourceId: null,
+    reviewMode: "reviewed",
+  };
+}
+async function schedulingSource(
+  tx: ScheduleTransaction,
+  org: string,
+  refs: {
+    leadId?: string | null;
+    contactId?: string | null;
+    propertyId?: string | null;
+    estimateId?: string | null;
+  },
+  strict = false,
+): Promise<ManualSourceRef> {
+  const contactId = await appointmentCustomer(tx, org, refs, {
+    requireCoherentLeadProperty: strict,
   });
-  if (!ok) return null;
-  return db.transaction(async tx => {
-    await lockContractorSchedule(tx, organizationId);
-    const status = input.status ?? "scheduled";
-    const active = status === "scheduled" || status === "confirmed";
-    const staff = input.assignedUserId ? [input.assignedUserId] : [];
-    await assertOperationalStaff(tx, organizationId, staff);
-    const end = input.scheduledEnd ?? new Date(input.scheduledStart.getTime() + 2 * 3_600_000);
-    assertScheduleInterval(input.scheduledStart, end);
-    if (active) await assertResourceWindow(tx, organizationId, staff, input.scheduledStart, end);
-    const contactId = await appointmentCustomer(tx, organizationId, input, { requireCoherentLeadProperty: true });
-    const values = { ...input, organizationId, contactId, scheduledEnd: end };
-    const row = (input.type ?? "inspection") === "inspection" && active
+  if (refs.estimateId) {
+    const [estimate] = await tx
+      .select()
+      .from(estimatesTable)
+      .where(
+        and(
+          eq(estimatesTable.organizationId, org),
+          eq(estimatesTable.id, refs.estimateId),
+        ),
+      )
+      .for("share");
+    if (
+      !estimate ||
+      estimate.leadId !== (refs.leadId ?? null) ||
+      estimate.customerWorkId
+    )
+      throw new ScheduleError("estimate_lead_mismatch", 400);
+  }
+  return {
+    sourceKind: refs.leadId
+      ? "lead"
+      : contactId
+        ? "direct_customer"
+        : "unlinked_manual",
+    leadId: refs.leadId ?? null,
+    contactId,
+    propertyId: refs.propertyId ?? null,
+    estimateId: refs.estimateId ?? null,
+  };
+}
+export async function createAppointmentInTransaction(
+  tx: ScheduleTransaction,
+  org: string,
+  input: Omit<typeof appointmentsTable.$inferInsert, "organizationId"> & {
+    schedulingReview?: SchedulingMutationReview;
+  },
+  authority?: ServerSchedulingAuthority,
+): Promise<typeof appointmentsTable.$inferSelect> {
+  const {
+    schedulingReview,
+    schedulingReservation: _untrusted,
+    ...body
+  } = input;
+  const status = body.status ?? "scheduled",
+    active = ["scheduled", "confirmed"].includes(status);
+  if (isPastActiveStart(status, body.scheduledStart))
+    throw new NativeSchedulingDomainError("past_start");
+  await readSchedulingContext(tx, org, undefined, {
+    reservationKind: "appointment",
+    appointmentType: body.type ?? "inspection",
+  });
+  if (!(await validateOrgRefs(org, body, tx)))
+    throw new NativeSchedulingDomainError("related_record_missing");
+  const source = await schedulingSource(
+    tx,
+    org,
+    { ...body, estimateId: schedulingReview?.context.source?.estimateId },
+    true,
+  );
+  await assertOperationalStaff(
+    tx,
+    org,
+    body.assignedUserId ? [body.assignedUserId] : [],
+  );
+  const end =
+    body.scheduledEnd ?? new Date(body.scheduledStart.getTime() + 2 * 3600000);
+  assertScheduleInterval(body.scheduledStart, end);
+  const id = randomUUID();
+  const candidate = {
+    kind: "appointment" as const,
+    id,
+    startAt: body.scheduledStart.toISOString(),
+    endAt: end.toISOString(),
+    type: body.type ?? "inspection",
+    status,
+    resourceUserIds: body.assignedUserId ? [body.assignedUserId] : [],
+    source,
+    reservation: null,
+  };
+  const admission = await prepareNativeSchedulingAdmission(
+    tx,
+    org,
+    authority,
+    null,
+    candidate,
+    schedulingReview ?? null,
+  );
+  const values = {
+    ...body,
+    id,
+    organizationId: org,
+    contactId: source.contactId,
+    scheduledEnd: end,
+    schedulingReservation: admission.snapshot,
+  };
+  const legacy = !schedulingReview && !admission.snapshot;
+  const row =
+    legacy && candidate.type === "inspection" && active
       ? await insertInspectionInTransaction(tx, values)
       : (await tx.insert(appointmentsTable).values(values).returning())[0];
-    if (!row) return "conflict" as const;
-    if (active) await scheduleAppointmentReminder(organizationId, row, undefined, tx);
-    return row;
-  });
+  if (!row)
+    throw new NativeSchedulingDomainError("inspection_capacity_conflict");
+  if (authority)
+    await appendSchedulingTransition(
+      tx,
+      authority,
+      null,
+      admission.snapshot,
+      { kind: "appointment", id },
+      {
+        transition: admission.transition,
+        source,
+        invalidHistoricalEvidenceRetained: false,
+      },
+    );
+  if (active) await scheduleAppointmentReminder(org, row, undefined, tx);
+  return row;
 }
 
 export async function updateAppointment(
   organizationId: string,
   id: string,
-  input: Partial<typeof appointmentsTable.$inferInsert> & { expectedUpdatedAt?: string | Date },
-  execution?: { transaction: ScheduleTransaction; preserveServiceTaskPlan: true; originalCompletionId: string },
-): Promise<typeof appointmentsTable.$inferSelect | null | "conflict" | "past_start"> {
-  const { organizationId: _ignored, id: _id, expectedUpdatedAt, ...safe } = input;
-  const ok = await validateOrgRefs(organizationId, {
-    leadId: input.leadId,
-    contactId: input.contactId,
-    propertyId: input.propertyId,
-  }, execution?.transaction ?? db);
-  if (!ok) return null;
+  input: Partial<typeof appointmentsTable.$inferInsert> & {
+    expectedUpdatedAt?: string | Date;
+    expectedTargetFingerprint?: string;
+    schedulingReview?: SchedulingMutationReview;
+  },
+  execution?: {
+    transaction: ScheduleTransaction;
+    preserveServiceTaskPlan: true;
+    originalCompletionId: string;
+  },
+  actor?: SchedulingActor,
+): Promise<
+  typeof appointmentsTable.$inferSelect | null | "conflict" | "past_start"
+> {
+  const {
+    organizationId: _ignored,
+    id: _id,
+    expectedUpdatedAt,
+    expectedTargetFingerprint,
+    schedulingReview,
+    schedulingReservation: _untrusted,
+    ...safe
+  } = input;
   let becameCancelled = false;
   const mutate = async (tx: ScheduleTransaction) => {
-  await lockContractorSchedule(tx, organizationId);
-  const [existing] = await tx
-    .select()
-    .from(appointmentsTable)
-    .where(
-      and(
-        eq(appointmentsTable.id, id),
-        eq(appointmentsTable.organizationId, organizationId),
-      ),
-    );
-  if (!existing) return null;
-  await guardWorkdayAppointment(tx, organizationId, id, existing, safe, execution?.originalCompletionId);
-  assertScheduleVersion(existing.updatedAt, expectedUpdatedAt);
-  const resolvedCustomerId = await appointmentCustomer(tx, organizationId, { leadId: input.leadId === undefined ? existing.leadId : input.leadId, contactId: input.contactId === undefined ? existing.contactId : input.contactId, propertyId: input.propertyId === undefined ? existing.propertyId : input.propertyId });
-  // Work completion records the resolved customer in its immutable evidence but
-  // does not backfill a historical lead-only appointment's native null parent.
-  safe.contactId = execution ? existing.contactId : resolvedCustomerId;
-  // A generic edit must not use implicit lead resolution to bypass the retained
-  // work-lineage guard when the caller did not explicitly supply a customer.
-  if (safe.contactId !== existing.contactId && input.contactId === undefined) {
-    await guardWorkdayAppointment(tx, organizationId, id, existing, safe, execution?.originalCompletionId);
-  }
-  // A start-only move preserves the already recorded duration. Explicit end
-  // edits are validated below; the UI sends both endpoints.
-  if (input.scheduledStart !== undefined && input.scheduledEnd === undefined) {
-    safe.scheduledEnd = new Date(input.scheduledStart.getTime() + (existing.scheduledEnd ? existing.scheduledEnd.getTime() - existing.scheduledStart.getTime() : 2 * 3_600_000));
-  }
-
-  // The edit path must not sneak an inspection into a full window: if the
-  // result of this update is an active inspection and its window changed —
-  // or it wasn't consuming capacity before (cancelled/completed, or a
-  // different type) — re-check capacity with the shared guard, excluding
-  // this appointment from the conflict count.
-  // Guard the *effective next state*: an update may not leave an active
-  // (scheduled/confirmed) appointment with a start materially in the past —
-  // whether by rescheduling the start backwards or by reactivating a past
-  // appointment via a status-only change. Updates that keep or make the
-  // appointment inactive (completed/cancelled/no-show history) stay allowed,
-  // as do updates that don't touch status or start on an already-inactive
-  // past record.
-  const effectiveStatus = input.status ?? existing.status;
-  const effectiveStart =
-    input.scheduledStart !== undefined ? input.scheduledStart : existing.scheduledStart;
-  const touchesSchedulingState =
-    input.scheduledStart !== undefined || input.status !== undefined;
-  if (touchesSchedulingState && isPastActiveStart(effectiveStatus, effectiveStart)) {
-    // Exception: pure status churn between the two active states on an
-    // appointment that is already active (e.g. confirming a scheduled
-    // appointment that just started) is not "slipping in" a past booking.
-    const wasActive = existing.status === "scheduled" || existing.status === "confirmed";
-    const startUnchanged = input.scheduledStart === undefined;
-    if (!(wasActive && startUnchanged)) {
-      return "past_start";
+    if (!execution) await lockSchedulingConfiguration(tx, organizationId);
+    let authority = execution
+      ? undefined
+      : await nativeSchedulingAuthority(tx, organizationId, actor);
+    if (execution) {
+      const [completion] = await tx
+        .select()
+        .from(appointmentWorkCompletionsTable)
+        .where(
+          and(
+            eq(appointmentWorkCompletionsTable.organizationId, organizationId),
+            eq(
+              appointmentWorkCompletionsTable.id,
+              execution.originalCompletionId,
+            ),
+            eq(appointmentWorkCompletionsTable.appointmentId, id),
+          ),
+        )
+        .for("share");
+      if (completion && !completion.originalCompletionId)
+        authority = {
+          organizationId,
+          actorUserId: completion.actorUserId,
+          origin: "workday",
+          sourceId: completion.id,
+          reviewMode: "reviewed",
+        };
     }
-  }
-
-  const isActive = (s: string) => s === "scheduled" || s === "confirmed";
-  const next = {
-    type: input.type ?? existing.type,
-    status: input.status ?? existing.status,
-    scheduledStart:
-      input.scheduledStart !== undefined ? input.scheduledStart : existing.scheduledStart,
-    scheduledEnd:
-      safe.scheduledEnd !== undefined ? safe.scheduledEnd : existing.scheduledEnd,
-  };
-  const staff = (input.assignedUserId === undefined ? existing.assignedUserId : input.assignedUserId);
-  if (!isActive(next.status)) {
-    await assertHistoricalStaff(tx, organizationId, staff ? [staff] : []);
-    if (staff && staff !== existing.assignedUserId) await assertOperationalStaff(tx, organizationId, [staff]);
-  } else if (input.assignedUserId !== undefined || input.status !== undefined || input.scheduledStart !== undefined || input.scheduledEnd !== undefined) await assertOperationalStaff(tx, organizationId, staff ? [staff] : []);
-  assertScheduleInterval(next.scheduledStart, next.scheduledEnd);
-  if (isActive(next.status)) await assertResourceWindow(tx, organizationId, staff ? [staff] : [], next.scheduledStart, next.scheduledEnd ?? new Date(next.scheduledStart.getTime() + 2 * 3_600_000), { appointmentId: id });
-  const wasCounting = existing.type === "inspection" && isActive(existing.status);
-  const windowChanged =
-    input.scheduledStart !== undefined || input.scheduledEnd !== undefined;
-  const needsGuard =
-    next.type === "inspection" &&
-    isActive(next.status) &&
-    next.scheduledStart != null &&
-    (windowChanged || !wasCounting);
-
-  let row: typeof appointmentsTable.$inferSelect | null;
-  if (needsGuard) {
-    const guarded = await updateInspectionInTransaction(tx, organizationId, id, safe, {
-      start: next.scheduledStart!,
-      end: next.scheduledEnd,
-    });
-    if (guarded === "conflict") return "conflict";
-    row = guarded;
-  } else {
-    const [updated] = await tx
-      .update(appointmentsTable)
-      .set(safe)
+    const [existing] = await tx
+      .select()
+      .from(appointmentsTable)
       .where(
         and(
           eq(appointmentsTable.id, id),
           eq(appointmentsTable.organizationId, organizationId),
         ),
       )
-      .returning();
-    row = updated ?? null;
-  }
-  if (row) {
-    becameCancelled = row.status === "cancelled" && existing.status !== "cancelled";
-    // Keep the ~24h homeowner reminder in sync: cancelled/completed/no-show
-    // appointments must not send stale reminders, and a rescheduled start
-    // gets a fresh reminder aligned to the new window.
-    if (row.status !== "scheduled" && row.status !== "confirmed") {
-      await cancelAppointmentReminders(organizationId, row.id, tx);
-      // Outbound webhook mirror: a booked appointment being cancelled is a
-      // lifecycle event outside systems care about. Only fire on the actual
-      // transition into cancelled, not repeat saves.
-    } else if (input.scheduledStart !== undefined || !isActive(existing.status)) {
-      await cancelAppointmentReminders(organizationId, row.id, tx);
-      await scheduleAppointmentReminder(organizationId, row, undefined, tx);
+      .for("update");
+    if (!existing) return null;
+    await guardWorkdayAppointment(
+      tx,
+      organizationId,
+      id,
+      existing,
+      safe,
+      execution?.originalCompletionId,
+    );
+    assertScheduleVersion(existing.updatedAt, expectedUpdatedAt);
+    if (
+      expectedTargetFingerprint !== undefined &&
+      expectedTargetFingerprint !==
+        schedulingTargetFingerprint("appointment", existing)
+    )
+      schedulingFailure("stale_scheduling_review");
+    const rawNext = { ...existing, ...safe };
+    const structuralTransition = classifyReservationTransition(
+      nativeSchedulingCandidate("appointment", existing),
+      nativeSchedulingCandidate("appointment", rawNext),
+    );
+    if (structuralTransition === "admission")
+      await readSchedulingContext(tx, organizationId, undefined, {
+        reservationKind: "appointment",
+        appointmentType: rawNext.type,
+      });
+    if (
+      !(await validateOrgRefs(
+        organizationId,
+        {
+          leadId: input.leadId,
+          contactId: input.contactId,
+          propertyId: input.propertyId,
+        },
+        tx,
+      ))
+    )
+      return null;
+    const beforeSource = await schedulingSource(tx, organizationId, {
+      ...existing,
+      estimateId: schedulingReview?.context.source?.estimateId,
+    });
+    const resolvedCustomerId = await appointmentCustomer(tx, organizationId, {
+      leadId: input.leadId === undefined ? existing.leadId : input.leadId,
+      contactId:
+        input.contactId === undefined ? existing.contactId : input.contactId,
+      propertyId:
+        input.propertyId === undefined ? existing.propertyId : input.propertyId,
+    });
+    // Work completion records the resolved customer in its immutable evidence but
+    // does not backfill a historical lead-only appointment's native null parent.
+    safe.contactId = execution ? existing.contactId : resolvedCustomerId;
+    // A generic edit must not use implicit lead resolution to bypass the retained
+    // work-lineage guard when the caller did not explicitly supply a customer.
+    if (
+      safe.contactId !== existing.contactId &&
+      input.contactId === undefined
+    ) {
+      await guardWorkdayAppointment(
+        tx,
+        organizationId,
+        id,
+        existing,
+        safe,
+        execution?.originalCompletionId,
+      );
     }
-    await reconcileServiceAppointment(tx, organizationId, execution ? { ...row, contactId: resolvedCustomerId } : row, { preserveTaskPlan: execution?.preserveServiceTaskPlan === true });
-  }
-  return row ?? null;
+    // A start-only move preserves the already recorded duration. Explicit end
+    // edits are validated below; the UI sends both endpoints.
+    if (
+      input.scheduledStart !== undefined &&
+      input.scheduledEnd === undefined
+    ) {
+      safe.scheduledEnd = new Date(
+        input.scheduledStart.getTime() +
+          (existing.scheduledEnd
+            ? existing.scheduledEnd.getTime() -
+              existing.scheduledStart.getTime()
+            : 2 * 3_600_000),
+      );
+    }
+
+    // The edit path must not sneak an inspection into a full window: if the
+    // result of this update is an active inspection and its window changed —
+    // or it wasn't consuming capacity before (cancelled/completed, or a
+    // different type) — re-check capacity with the shared guard, excluding
+    // this appointment from the conflict count.
+    // Guard the *effective next state*: an update may not leave an active
+    // (scheduled/confirmed) appointment with a start materially in the past —
+    // whether by rescheduling the start backwards or by reactivating a past
+    // appointment via a status-only change. Updates that keep or make the
+    // appointment inactive (completed/cancelled/no-show history) stay allowed,
+    // as do updates that don't touch status or start on an already-inactive
+    // past record.
+    const effectiveStatus = input.status ?? existing.status;
+    const effectiveStart =
+      input.scheduledStart !== undefined
+        ? input.scheduledStart
+        : existing.scheduledStart;
+    const touchesSchedulingState =
+      input.scheduledStart !== undefined || input.status !== undefined;
+    if (
+      touchesSchedulingState &&
+      isPastActiveStart(effectiveStatus, effectiveStart)
+    ) {
+      // Exception: pure status churn between the two active states on an
+      // appointment that is already active (e.g. confirming a scheduled
+      // appointment that just started) is not "slipping in" a past booking.
+      const wasActive =
+        existing.status === "scheduled" || existing.status === "confirmed";
+      const startUnchanged = input.scheduledStart === undefined;
+      if (!(wasActive && startUnchanged)) {
+        return "past_start";
+      }
+    }
+
+    const isActive = (s: string) => s === "scheduled" || s === "confirmed";
+    const next = {
+      type: input.type ?? existing.type,
+      status: input.status ?? existing.status,
+      scheduledStart:
+        input.scheduledStart !== undefined
+          ? input.scheduledStart
+          : existing.scheduledStart,
+      scheduledEnd:
+        safe.scheduledEnd !== undefined
+          ? safe.scheduledEnd
+          : existing.scheduledEnd,
+    };
+    const staff =
+      input.assignedUserId === undefined
+        ? existing.assignedUserId
+        : input.assignedUserId;
+    if (!isActive(next.status)) {
+      await assertHistoricalStaff(tx, organizationId, staff ? [staff] : []);
+      if (staff && staff !== existing.assignedUserId)
+        await assertOperationalStaff(tx, organizationId, [staff]);
+    } else if (
+      input.assignedUserId !== undefined ||
+      input.status !== undefined ||
+      input.scheduledStart !== undefined ||
+      input.scheduledEnd !== undefined
+    )
+      await assertOperationalStaff(tx, organizationId, staff ? [staff] : []);
+    assertScheduleInterval(next.scheduledStart, next.scheduledEnd);
+    const source = await schedulingSource(tx, organizationId, {
+      ...existing,
+      ...safe,
+      estimateId: schedulingReview?.context.source?.estimateId,
+    });
+    const admission = await prepareNativeEdit(
+      tx,
+      organizationId,
+      "appointment",
+      existing,
+      { ...existing, ...safe },
+      beforeSource,
+      source,
+      authority,
+      schedulingReview ?? null,
+      expectedUpdatedAt,
+      expectedTargetFingerprint,
+    );
+    if (admission.writeSnapshot)
+      (
+        safe as Partial<typeof appointmentsTable.$inferInsert>
+      ).schedulingReservation = admission.snapshot;
+    if (admission.snapshot && admission.transition === "admission")
+      safe.scheduledEnd = new Date(admission.snapshot.endAt);
+    const wasCounting =
+      existing.type === "inspection" && isActive(existing.status);
+    const windowChanged =
+      input.scheduledStart !== undefined || input.scheduledEnd !== undefined;
+    const needsGuard =
+      next.type === "inspection" &&
+      isActive(next.status) &&
+      next.scheduledStart != null &&
+      (windowChanged || !wasCounting) &&
+      admission.transition === "admission" &&
+      !schedulingReview &&
+      !admission.snapshot;
+
+    let row: typeof appointmentsTable.$inferSelect | null;
+    if (needsGuard) {
+      const guarded = await updateInspectionInTransaction(
+        tx,
+        organizationId,
+        id,
+        safe,
+        {
+          start: next.scheduledStart!,
+          end: next.scheduledEnd,
+        },
+      );
+      if (guarded === "conflict") return "conflict";
+      row = guarded;
+    } else {
+      const [updated] = await tx
+        .update(appointmentsTable)
+        .set(safe)
+        .where(
+          and(
+            eq(appointmentsTable.id, id),
+            eq(appointmentsTable.organizationId, organizationId),
+          ),
+        )
+        .returning();
+      row = updated ?? null;
+    }
+    if (row) {
+      if (
+        authority &&
+        (admission.transition !== "preserve" ||
+          admission.invalidHistoricalEvidenceRetained)
+      )
+        await appendSchedulingTransition(
+          tx,
+          authority,
+          admission.beforeSnapshot,
+          admission.snapshot,
+          { kind: "appointment", id },
+          {
+            transition: admission.transition,
+            source,
+            invalidHistoricalEvidenceRetained:
+              admission.invalidHistoricalEvidenceRetained,
+          },
+        );
+      becameCancelled =
+        row.status === "cancelled" && existing.status !== "cancelled";
+      // Keep the ~24h homeowner reminder in sync: cancelled/completed/no-show
+      // appointments must not send stale reminders, and a rescheduled start
+      // gets a fresh reminder aligned to the new window.
+      if (row.status !== "scheduled" && row.status !== "confirmed") {
+        await cancelAppointmentReminders(organizationId, row.id, tx);
+        // Outbound webhook mirror: a booked appointment being cancelled is a
+        // lifecycle event outside systems care about. Only fire on the actual
+        // transition into cancelled, not repeat saves.
+      } else if (
+        input.scheduledStart !== undefined ||
+        !isActive(existing.status)
+      ) {
+        await cancelAppointmentReminders(organizationId, row.id, tx);
+        await scheduleAppointmentReminder(organizationId, row, undefined, tx);
+      }
+      await reconcileServiceAppointment(
+        tx,
+        organizationId,
+        execution ? { ...row, contactId: resolvedCustomerId } : row,
+        { preserveTaskPlan: execution?.preserveServiceTaskPlan === true },
+      );
+    }
+    return row ?? null;
   };
-  const result = execution ? await mutate(execution.transaction) : await db.transaction(mutate);
+  const result = await (
+    execution ? mutate(execution.transaction) : db.transaction(mutate)
+  ).catch((error) => {
+    if (
+      !actor &&
+      !schedulingReview &&
+      error instanceof SchedulingPolicyError &&
+      error.code === "inspection_capacity_conflict"
+    )
+      return "conflict" as const;
+    throw error;
+  });
   if (!execution && result && typeof result !== "string" && becameCancelled) {
-    void dispatchWebhookEvent(organizationId, "appointment.cancelled", { appointmentId: result.id, leadId: result.leadId, contactId: result.contactId }).catch(() => {});
+    void dispatchWebhookEvent(organizationId, "appointment.cancelled", {
+      appointmentId: result.id,
+      leadId: result.leadId,
+      contactId: result.contactId,
+    }).catch(() => {});
   }
   return result;
 }
 
+async function prepareNativeEdit(
+  tx: ScheduleTransaction,
+  org: string,
+  kind: "appointment" | "project",
+  before:
+    typeof appointmentsTable.$inferSelect | typeof projectsTable.$inferSelect,
+  after:
+    typeof appointmentsTable.$inferSelect | typeof projectsTable.$inferSelect,
+  beforeSource: ManualSourceRef,
+  source: ManualSourceRef,
+  authority: ServerSchedulingAuthority | undefined,
+  review: SchedulingMutationReview | null,
+  expected?: string | Date,
+  fingerprint?: string,
+) {
+  const evidence = projectSchedulingEvidence(kind, before),
+    old = nativeSchedulingCandidate(kind, before, beforeSource),
+    next = nativeSchedulingCandidate(kind, after, source);
+  const transition = classifyReservationTransition(old, next),
+    terminal = !["scheduled", "confirmed", "in_progress"].includes(next.status);
+  if (
+    evidence.schedulingEvidence !== "legacy" &&
+    transition !== "preserve" &&
+    !terminal &&
+    (!expected || !fingerprint)
+  )
+    schedulingFailure("stale_scheduling_review");
+  if (evidence.schedulingEvidence === "invalid") {
+    if (
+      transition === "admission" ||
+      (transition === "release" && activeSchedulingCandidate(next))
+    )
+      schedulingFailure("invalid_reservation_snapshot");
+    return {
+      transition,
+      snapshot: null,
+      beforeSnapshot: null,
+      writeSnapshot: false,
+      invalidHistoricalEvidenceRetained: true,
+    };
+  }
+  if (old.reservation && activeSchedulingCandidate(next) && next.endAt === null)
+    throw new ScheduleError("invalid_interval", 400);
+  const prepared = await prepareNativeSchedulingAdmission(
+    tx,
+    org,
+    authority,
+    old,
+    next,
+    review,
+  );
+  return {
+    ...prepared,
+    beforeSnapshot: old.reservation,
+    writeSnapshot:
+      prepared.transition === "admission" ||
+      (prepared.transition === "release" && activeSchedulingCandidate(next)),
+    invalidHistoricalEvidenceRetained: false,
+  };
+}
+
 /** Internal same-transaction composition; all original scheduling and work guards still run. */
-export async function completeWorkdayAppointmentInTransaction(tx: ScheduleTransaction, organizationId: string, id: string, expectedUpdatedAt: string, originalCompletionId: string) {
-  return updateAppointment(organizationId, id, { status: "completed", expectedUpdatedAt }, { transaction: tx, preserveServiceTaskPlan: true, originalCompletionId });
+export async function completeWorkdayAppointmentInTransaction(
+  tx: ScheduleTransaction,
+  organizationId: string,
+  id: string,
+  expectedUpdatedAt: string,
+  originalCompletionId: string,
+) {
+  return updateAppointment(
+    organizationId,
+    id,
+    { status: "completed", expectedUpdatedAt },
+    { transaction: tx, preserveServiceTaskPlan: true, originalCompletionId },
+  );
 }
 
 // ---------- users / dashboard / audit ----------
@@ -1661,78 +2108,228 @@ export async function updateProject(
     crewUserIds?: string[];
     crewNotes?: string | null;
     expectedUpdatedAt?: string | Date;
+    expectedTargetFingerprint?: string;
+    schedulingReview?: SchedulingMutationReview;
   },
+  actor?: SchedulingActor,
 ) {
-  return db.transaction(async tx => {
-  await lockContractorSchedule(tx, organizationId);
-  const [existing] = await tx.select().from(projectsTable).where(and(eq(projectsTable.id, id), eq(projectsTable.organizationId, organizationId)));
-  if (!existing) return null;
-  if (existing.customerWorkId) customerWorkFail("customer_work_versioned_command_required","Use the saved returning-job version and original request identity. Its estimate and customer cannot be changed.");
-  if (input.estimateId !== undefined && input.estimateId !== existing.estimateId) {
-    // Draft, issued and void documents all retain their original ancestry.
-    // Same-value edits and ordinary job changes remain compatible.
-    const [invoice] = await tx.select({ id: invoicesTable.id }).from(invoicesTable).where(and(
-      eq(invoicesTable.organizationId, organizationId), eq(invoicesTable.projectId, id),
-    )).limit(1);
-    if (invoice) customerWorkFail(INVOICE_HISTORY_RETAINED, "This job has retained invoice history. Its original estimate cannot be replaced or removed.");
-  }
-  assertScheduleVersion(existing.updatedAt, input.expectedUpdatedAt);
-  const ok = await validateProjectRefs(organizationId, {
-    estimateId: input.estimateId,
-  }, tx);
-  if (!ok) return null;
-  const staff = input.crewUserIds ?? existing.crewUserIds;
-  if (["completed", "cancelled"].includes(input.status ?? existing.status)) {
-    await assertHistoricalStaff(tx, organizationId, staff);
-    await assertOperationalStaff(tx, organizationId, staff.filter(id => !existing.crewUserIds.includes(id)));
-  } else if (input.crewUserIds !== undefined || input.status !== undefined || input.scheduledStart !== undefined || input.scheduledEnd !== undefined) await assertOperationalStaff(tx, organizationId, staff);
-  const start = input.scheduledStart === undefined ? existing.scheduledStart : input.scheduledStart;
-  const end = input.scheduledEnd === undefined ? existing.scheduledEnd : input.scheduledEnd;
-  assertScheduleInterval(start, end);
-  if (start && staff.length && !end && (input.scheduledStart !== undefined || input.scheduledEnd !== undefined || input.crewUserIds !== undefined)) throw new ScheduleError("invalid_interval", 400);
-  if (start && ["scheduled", "in_progress"].includes(input.status ?? existing.status)) await assertResourceWindow(tx, organizationId, staff, start, end ?? new Date(start.getTime() + 86_400_000), { projectId: id });
-  const estimateId = input.estimateId === undefined ? existing.estimateId : input.estimateId;
-  if (estimateId) {
-    const [estimate] = await tx.select().from(estimatesTable).where(and(eq(estimatesTable.id, estimateId), eq(estimatesTable.organizationId, organizationId)));
-    if (!estimate || estimate.leadId !== existing.leadId) throw new ScheduleError("estimate_lead_mismatch", 400);
-  }
-  if (
-    input.estimateId &&
-    (await estimateAlreadyLinked(organizationId, input.estimateId, id, tx))
-  ) {
-    return DUPLICATE_ESTIMATE;
-  }
-
-  const patch: Record<string, unknown> = {};
-  if (input.estimateId !== undefined) patch.estimateId = input.estimateId;
-  if (input.name !== undefined) patch.name = input.name;
-  if (input.scheduledStart !== undefined) patch.scheduledStart = input.scheduledStart;
-  if (input.scheduledEnd !== undefined) patch.scheduledEnd = input.scheduledEnd;
-  if (input.crewUserIds !== undefined) patch.crewUserIds = input.crewUserIds;
-  if (input.crewNotes !== undefined) patch.crewNotes = input.crewNotes;
-  if (input.status !== undefined && input.status !== existing.status) {
-    patch.status = input.status;
-    if (input.status === "completed" && !existing.completedAt) {
-      patch.completedAt = new Date();
-    } else if (input.status !== "completed") patch.completedAt = null;
-  }
-
-  try {
-    if (!Object.keys(patch).length) return existing;
-    const [row] = await tx
-      .update(projectsTable)
-      .set(patch)
+  return db.transaction(async (tx) => {
+    await lockSchedulingConfiguration(tx, organizationId);
+    const authority = await nativeSchedulingAuthority(
+      tx,
+      organizationId,
+      actor,
+    );
+    const [existing] = await tx
+      .select()
+      .from(projectsTable)
       .where(
-        and(eq(projectsTable.id, id), eq(projectsTable.organizationId, organizationId)),
+        and(
+          eq(projectsTable.id, id),
+          eq(projectsTable.organizationId, organizationId),
+        ),
       )
-      .returning();
-    if (row && input.status !== undefined) await ensureInvoicePreparationTask(tx, row);
-    return row ?? null;
-  } catch (error) {
-    // Concurrent link raced past the pre-check; the unique index caught it.
-    if (isUniqueEstimateViolation(error)) return DUPLICATE_ESTIMATE;
-    throw error;
-  }
+      .for("update");
+    if (!existing) return null;
+    if (existing.customerWorkId)
+      customerWorkFail(
+        "customer_work_versioned_command_required",
+        "Use the saved returning-job version and original request identity. Its estimate and customer cannot be changed.",
+      );
+    if (
+      input.estimateId !== undefined &&
+      input.estimateId !== existing.estimateId
+    ) {
+      // Draft, issued and void documents all retain their original ancestry.
+      // Same-value edits and ordinary job changes remain compatible.
+      const [invoice] = await tx
+        .select({ id: invoicesTable.id })
+        .from(invoicesTable)
+        .where(
+          and(
+            eq(invoicesTable.organizationId, organizationId),
+            eq(invoicesTable.projectId, id),
+          ),
+        )
+        .limit(1);
+      if (invoice)
+        customerWorkFail(
+          INVOICE_HISTORY_RETAINED,
+          "This job has retained invoice history. Its original estimate cannot be replaced or removed.",
+        );
+    }
+    assertScheduleVersion(existing.updatedAt, input.expectedUpdatedAt);
+    if (
+      input.expectedTargetFingerprint !== undefined &&
+      input.expectedTargetFingerprint !==
+        schedulingTargetFingerprint("project", existing)
+    )
+      schedulingFailure("stale_scheduling_review");
+    const structuralTransition = classifyReservationTransition(
+      nativeSchedulingCandidate("project", existing),
+      nativeSchedulingCandidate("project", { ...existing, ...input }),
+    );
+    if (structuralTransition === "admission")
+      await readSchedulingContext(tx, organizationId, undefined, {
+        reservationKind: "project",
+      });
+    const ok = await validateProjectRefs(
+      organizationId,
+      {
+        estimateId: input.estimateId,
+      },
+      tx,
+    );
+    if (!ok) return null;
+    const staff = input.crewUserIds ?? existing.crewUserIds;
+    if (["completed", "cancelled"].includes(input.status ?? existing.status)) {
+      await assertHistoricalStaff(tx, organizationId, staff);
+      await assertOperationalStaff(
+        tx,
+        organizationId,
+        staff.filter((id) => !existing.crewUserIds.includes(id)),
+      );
+    } else if (
+      input.crewUserIds !== undefined ||
+      input.status !== undefined ||
+      input.scheduledStart !== undefined ||
+      input.scheduledEnd !== undefined
+    )
+      await assertOperationalStaff(tx, organizationId, staff);
+    const start =
+      input.scheduledStart === undefined
+        ? existing.scheduledStart
+        : input.scheduledStart;
+    const end =
+      input.scheduledEnd === undefined
+        ? existing.scheduledEnd
+        : input.scheduledEnd;
+    assertScheduleInterval(start, end);
+    if (
+      start &&
+      staff.length &&
+      !end &&
+      (input.scheduledStart !== undefined ||
+        input.scheduledEnd !== undefined ||
+        input.crewUserIds !== undefined)
+    )
+      throw new ScheduleError("invalid_interval", 400);
+    const estimateId =
+      input.estimateId === undefined ? existing.estimateId : input.estimateId;
+    if (estimateId) {
+      const [estimate] = await tx
+        .select()
+        .from(estimatesTable)
+        .where(
+          and(
+            eq(estimatesTable.id, estimateId),
+            eq(estimatesTable.organizationId, organizationId),
+          ),
+        )
+        .for("share");
+      if (!estimate || estimate.leadId !== existing.leadId)
+        throw new ScheduleError("estimate_lead_mismatch", 400);
+    }
+    if (
+      input.estimateId &&
+      (await estimateAlreadyLinked(organizationId, input.estimateId, id, tx))
+    ) {
+      return DUPLICATE_ESTIMATE;
+    }
+
+    const patch: Record<string, unknown> = {};
+    const beforeSource = await schedulingSource(tx, organizationId, {
+      leadId: existing.leadId,
+      estimateId: existing.estimateId,
+      propertyId: input.schedulingReview?.context.source?.propertyId,
+    });
+    const source = await schedulingSource(tx, organizationId, {
+      leadId: existing.leadId,
+      estimateId,
+      propertyId: input.schedulingReview?.context.source?.propertyId,
+    });
+    const admission = await prepareNativeEdit(
+      tx,
+      organizationId,
+      "project",
+      existing,
+      { ...existing, ...input },
+      beforeSource,
+      source,
+      authority,
+      input.schedulingReview ?? null,
+      input.expectedUpdatedAt,
+      input.expectedTargetFingerprint,
+    );
+    if (admission.writeSnapshot)
+      patch.schedulingReservation = admission.snapshot;
+    if (input.estimateId !== undefined) patch.estimateId = input.estimateId;
+    if (input.name !== undefined) patch.name = input.name;
+    if (input.scheduledStart !== undefined)
+      patch.scheduledStart = input.scheduledStart;
+    if (input.scheduledEnd !== undefined)
+      patch.scheduledEnd = input.scheduledEnd;
+    if (admission.snapshot && admission.transition === "admission")
+      patch.scheduledEnd = new Date(admission.snapshot.endAt);
+    if (input.crewUserIds !== undefined) patch.crewUserIds = input.crewUserIds;
+    if (input.crewNotes !== undefined) patch.crewNotes = input.crewNotes;
+    if (input.status !== undefined && input.status !== existing.status) {
+      patch.status = input.status;
+      if (input.status === "completed" && !existing.completedAt) {
+        patch.completedAt = new Date();
+      } else if (input.status !== "completed") patch.completedAt = null;
+    }
+
+    try {
+      if (input.status !== undefined && authority)
+        await tx
+          .insert(auditEventsTable)
+          .values({
+            organizationId,
+            actorUserId: authority.actorUserId,
+            action: "project.status_changed",
+            entityType: "project",
+            entityId: id,
+            metadata: { status: input.status },
+          });
+      if (!Object.keys(patch).length) return existing;
+      const [row] = await tx
+        .update(projectsTable)
+        .set(patch)
+        .where(
+          and(
+            eq(projectsTable.id, id),
+            eq(projectsTable.organizationId, organizationId),
+          ),
+        )
+        .returning();
+      if (row && input.status !== undefined)
+        await ensureInvoicePreparationTask(tx, row);
+      if (
+        row &&
+        authority &&
+        (admission.transition !== "preserve" ||
+          admission.invalidHistoricalEvidenceRetained)
+      )
+        await appendSchedulingTransition(
+          tx,
+          authority,
+          admission.beforeSnapshot,
+          admission.snapshot,
+          { kind: "project", id },
+          {
+            transition: admission.transition,
+            source,
+            invalidHistoricalEvidenceRetained:
+              admission.invalidHistoricalEvidenceRetained,
+          },
+        );
+      return row ?? null;
+    } catch (error) {
+      // Concurrent link raced past the pre-check; the unique index caught it.
+      if (isUniqueEstimateViolation(error)) return DUPLICATE_ESTIMATE;
+      throw error;
+    }
   });
 }
 
@@ -1743,66 +2340,140 @@ interface EstimateLineItemInput {
   totalCents: number;
 }
 
+type NativeProjectCreateInput = {
+  leadId: string;
+  estimateId?: string | null;
+  name: string;
+  status?: typeof projectsTable.$inferSelect.status;
+  scheduledStart?: Date | null;
+  scheduledEnd?: Date | null;
+  crewUserIds?: string[];
+  crewNotes?: string | null;
+  schedulingReview?: SchedulingMutationReview;
+};
 export async function createProject(
   organizationId: string,
-  input: {
-    leadId: string;
-    estimateId?: string | null;
-    name: string;
-    status?: typeof projectsTable.$inferSelect.status;
-    scheduledStart?: Date | null;
-    scheduledEnd?: Date | null;
-    crewUserIds?: string[];
-    crewNotes?: string | null;
-  },
+  input: NativeProjectCreateInput,
+  actor?: SchedulingActor,
 ) {
-  return db.transaction(async tx => {
-  await lockContractorSchedule(tx, organizationId);
-  const ok = await validateProjectRefs(organizationId, {
-    leadId: input.leadId,
-    estimateId: input.estimateId,
-    crewUserIds: input.crewUserIds,
-  }, tx);
-  if (!ok) return null;
-  await assertOperationalStaff(tx, organizationId, input.crewUserIds ?? []);
-  assertScheduleInterval(input.scheduledStart, input.scheduledEnd);
-  if (input.scheduledStart && input.crewUserIds?.length && !input.scheduledEnd) throw new ScheduleError("invalid_interval", 400);
-  if (input.scheduledStart && ["scheduled", "in_progress"].includes(input.status ?? "scheduled")) await assertResourceWindow(tx, organizationId, input.crewUserIds ?? [], input.scheduledStart, input.scheduledEnd ?? new Date(input.scheduledStart.getTime() + 86_400_000));
-  if (input.estimateId) {
-    const [estimate] = await tx.select().from(estimatesTable).where(and(eq(estimatesTable.id, input.estimateId), eq(estimatesTable.organizationId, organizationId)));
-    if (!estimate || estimate.leadId !== input.leadId) throw new ScheduleError("estimate_lead_mismatch", 400);
-  }
-  if (
-    input.estimateId &&
-    (await estimateAlreadyLinked(organizationId, input.estimateId, undefined, tx))
-  ) {
-    return DUPLICATE_ESTIMATE;
-  }
-  const status = input.status ?? "scheduled";
   try {
-    const [row] = await tx
-      .insert(projectsTable)
-      .values({
+    return await db.transaction(async (tx) => {
+      await lockSchedulingConfiguration(tx, organizationId);
+      const authority = await nativeSchedulingAuthority(
+        tx,
         organizationId,
-        leadId: input.leadId,
-        estimateId: input.estimateId ?? null,
-        name: input.name,
-        status,
-        scheduledStart: input.scheduledStart ?? null,
-        scheduledEnd: input.scheduledEnd ?? null,
-        crewUserIds: input.crewUserIds ?? [],
-        crewNotes: input.crewNotes ?? null,
-        completedAt: status === "completed" ? new Date() : null,
-      })
-      .returning();
-    await ensureInvoicePreparationTask(tx, row);
-    return row;
+        actor,
+      );
+      return createProjectInTransaction(tx, organizationId, input, authority);
+    });
   } catch (error) {
-    // Concurrent create raced past the pre-check; the unique index caught it.
+    if (error instanceof NativeSchedulingDomainError) {
+      if (error.code === "related_record_missing") return null;
+      if (error.code === "duplicate_estimate") return DUPLICATE_ESTIMATE;
+    }
     if (isUniqueEstimateViolation(error)) return DUPLICATE_ESTIMATE;
     throw error;
   }
+}
+export async function createProjectInTransaction(
+  tx: ScheduleTransaction,
+  organizationId: string,
+  input: NativeProjectCreateInput,
+  authority?: ServerSchedulingAuthority,
+): Promise<typeof projectsTable.$inferSelect> {
+  await readSchedulingContext(tx, organizationId, undefined, {
+    reservationKind: "project",
   });
+  if (!(await validateProjectRefs(organizationId, input, tx)))
+    throw new NativeSchedulingDomainError("related_record_missing");
+  const source = await schedulingSource(
+    tx,
+    organizationId,
+    {
+      leadId: input.leadId,
+      estimateId: input.estimateId,
+      propertyId: input.schedulingReview?.context.source?.propertyId,
+    },
+    true,
+  );
+  await assertOperationalStaff(tx, organizationId, input.crewUserIds ?? []);
+  assertScheduleInterval(input.scheduledStart, input.scheduledEnd);
+  if (input.scheduledStart && input.crewUserIds?.length && !input.scheduledEnd)
+    throw new ScheduleError("invalid_interval", 400);
+  if (
+    input.estimateId &&
+    (await estimateAlreadyLinked(
+      organizationId,
+      input.estimateId,
+      undefined,
+      tx,
+    ))
+  )
+    throw new NativeSchedulingDomainError("duplicate_estimate");
+  const status = input.status ?? "scheduled",
+    id = randomUUID();
+  const candidate = {
+    kind: "project" as const,
+    id,
+    startAt: input.scheduledStart?.toISOString() ?? null,
+    endAt: input.scheduledEnd?.toISOString() ?? null,
+    type: "project",
+    status,
+    resourceUserIds: input.crewUserIds ?? [],
+    source,
+    reservation: null,
+  };
+  const admission = await prepareNativeSchedulingAdmission(
+    tx,
+    organizationId,
+    authority,
+    null,
+    candidate,
+    input.schedulingReview ?? null,
+  );
+  const [row] = await tx
+    .insert(projectsTable)
+    .values({
+      organizationId,
+      id,
+      leadId: input.leadId,
+      estimateId: input.estimateId ?? null,
+      name: input.name,
+      status,
+      scheduledStart: input.scheduledStart ?? null,
+      scheduledEnd: admission.snapshot
+        ? new Date(admission.snapshot.endAt)
+        : (input.scheduledEnd ?? null),
+      schedulingReservation: admission.snapshot,
+      crewUserIds: input.crewUserIds ?? [],
+      crewNotes: input.crewNotes ?? null,
+      completedAt: status === "completed" ? new Date() : null,
+    })
+    .returning();
+  await ensureInvoicePreparationTask(tx, row);
+  await tx
+    .insert(auditEventsTable)
+    .values({
+      organizationId,
+      actorUserId: authority?.actorUserId ?? null,
+      action: "project.created",
+      entityType: "project",
+      entityId: row.id,
+    });
+  if (authority)
+    await appendSchedulingTransition(
+      tx,
+      authority,
+      null,
+      admission.snapshot,
+      { kind: "project", id },
+      {
+        transition: admission.transition,
+        source,
+        invalidHistoricalEvidenceRetained: false,
+      },
+    );
+  return row;
 }
 
 export async function deleteProject(organizationId: string, id: string) {
@@ -1974,7 +2645,7 @@ export async function listProjects(
     .orderBy(desc(projectsTable.createdAt),desc(projectsTable.id))
     .limit(clampPage({limit:filters.limit ?? 200}).limit).offset(clampPage(filters).offset);
   const result=[];
-  for(const row of rows){const value=await readNativeProject(db,organizationId,row.project.id);if(value)result.push({...value,leadLabel:row.project.leadId ? buildLeadLabel(row) : null});}
+  for(const row of rows){const value=await readNativeProject(db,organizationId,row.project.id);if(value)result.push({...value,...projectSchedulingEvidence('project',row.project),leadLabel:row.project.leadId ? buildLeadLabel(row) : null});}
   return result;
 }
 

@@ -2,6 +2,8 @@ import type { Request, Response, NextFunction } from "express";
 import { ScheduleError } from "../services/contractor-scheduling";
 import { WorkdayError } from "../services/contractor-workday-contract";
 import { CustomerWorkError } from "../services/returning-customer-contract";
+import { SchedulingPolicyError } from "../services/scheduling-policy";
+import { CustomerLifecycleHoldError } from "../services/customer-lifecycle";
 
 export function contractorMutation(req: Request, res: Response, next: NextFunction) {
   if (!["POST", "PATCH", "DELETE"].includes(req.method)) return next();
@@ -16,6 +18,6 @@ export function contractorMutation(req: Request, res: Response, next: NextFuncti
 }
 
 export function contractorScheduleError(error: unknown, _req: Request, res: Response, next: NextFunction) {
-  if (error instanceof ScheduleError || error instanceof WorkdayError || error instanceof CustomerWorkError) { res.status(error.status).json({ error: error.message, code: error.code }); return; }
+  if (error instanceof ScheduleError || error instanceof WorkdayError || error instanceof CustomerWorkError || error instanceof SchedulingPolicyError || error instanceof CustomerLifecycleHoldError) { res.status(error.status).json({ error: error.message, code: error.code }); return; }
   next(error);
 }

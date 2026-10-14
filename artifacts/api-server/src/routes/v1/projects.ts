@@ -5,7 +5,16 @@ import { requireMember } from "../../middlewares/requireMember";
 import { recordAudit } from "../../services/audit";
 import * as crm from "../../services/crm";
 import { z } from "zod";
-import { contractorMutation, contractorScheduleError } from "../../middlewares/contractor-mutation";
+import {
+  contractorMutation,
+  contractorScheduleError,
+} from "../../middlewares/contractor-mutation";
+import {
+  createManualScheduledProject,
+  manualSchedulingError,
+  nativeManualCommand,
+} from "../../services/manual-scheduling";
+import { projectSchedulingEvidence } from "../../services/scheduling-policy";
 
 const router: IRouter = Router();
 router.use(["/projects", "/projects/:id"], contractorMutation);
@@ -16,10 +25,22 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     res.json(
       await crm.listProjects(req.member!.organizationId, {
-        contactId: typeof req.query.contactId === "string" ? req.query.contactId : undefined,
-        customerWorkId: typeof req.query.customerWorkId === "string" ? req.query.customerWorkId : undefined,
-        limit: typeof req.query.limit === "string" && req.query.limit !== "" ? Number(req.query.limit) : undefined,
-        offset: typeof req.query.offset === "string" && req.query.offset !== "" ? Number(req.query.offset) : undefined,
+        contactId:
+          typeof req.query.contactId === "string"
+            ? req.query.contactId
+            : undefined,
+        customerWorkId:
+          typeof req.query.customerWorkId === "string"
+            ? req.query.customerWorkId
+            : undefined,
+        limit:
+          typeof req.query.limit === "string" && req.query.limit !== ""
+            ? Number(req.query.limit)
+            : undefined,
+        offset:
+          typeof req.query.offset === "string" && req.query.offset !== ""
+            ? Number(req.query.offset)
+            : undefined,
         leadId:
           typeof req.query.leadId === "string" ? req.query.leadId : undefined,
         status:
@@ -33,6 +54,41 @@ router.post(
   "/projects",
   requireMember("crm.write"),
   async (req: Request, res: Response): Promise<void> => {
+    const actor = {
+      organizationId: req.member!.organizationId,
+      userId: req.member!.user.id,
+    };
+    if (req.body?.operationId !== undefined) {
+      let command;
+      try {
+        command = nativeManualCommand(actor, "project_create", req.body);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          res.status(400).json({ error: "Invalid scheduling command" });
+          return;
+        }
+        throw error;
+      }
+      const result = await createManualScheduledProject(actor, command);
+      if (!result.record) {
+        res.status(409).json(manualSchedulingError(result.ack));
+        return;
+      }
+      res
+        .status(result.newlyCreated ? 201 : 200)
+        .json({ ...result.record, schedulingOperation: result.ack });
+      return;
+    }
+    if (req.body?.schedulingReview !== undefined) {
+      res
+        .status(400)
+        .json({
+          error:
+            "Reviewed scheduling requires the original operation identity.",
+          code: "scheduling_operation_required",
+        });
+      return;
+    }
     const parsed = CreateProjectBody.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid project" });
@@ -41,6 +97,7 @@ router.post(
     const project = await crm.createProject(
       req.member!.organizationId,
       parsed.data,
+      actor,
     );
     if (project === crm.DUPLICATE_ESTIMATE) {
       res.status(409).json({
@@ -51,17 +108,15 @@ router.post(
     if (!project) {
       res
         .status(400)
-        .json({ error: "Lead, estimate, or crew member not found in your organization" });
+        .json({
+          error:
+            "Lead, estimate, or crew member not found in your organization",
+        });
       return;
     }
-    await recordAudit({
-      organizationId: req.member!.organizationId,
-      actorUserId: req.member!.user.id,
-      action: "project.created",
-      entityType: "project",
-      entityId: project.id,
-    });
-    res.status(201).json(project);
+    res
+      .status(201)
+      .json({ ...project, ...projectSchedulingEvidence("project", project) });
   },
 );
 
@@ -77,7 +132,7 @@ router.get(
       res.status(404).json({ error: "Project not found" });
       return;
     }
-    res.json(project);
+    res.json({ ...project, ...projectSchedulingEvidence("project", project) });
   },
 );
 
@@ -85,7 +140,9 @@ router.patch(
   "/projects/:id",
   requireMember("crm.write"),
   async (req: Request, res: Response): Promise<void> => {
-    const parsed = UpdateProjectBody.extend({ expectedUpdatedAt: z.iso.datetime().optional() }).safeParse(req.body);
+    const parsed = UpdateProjectBody.extend({
+      expectedUpdatedAt: z.iso.datetime().optional(),
+    }).safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid project update" });
       return;
@@ -94,6 +151,10 @@ router.patch(
       req.member!.organizationId,
       String(req.params.id),
       parsed.data,
+      {
+        organizationId: req.member!.organizationId,
+        userId: req.member!.user.id,
+      },
     );
     if (project === crm.DUPLICATE_ESTIMATE) {
       res.status(409).json({
@@ -105,17 +166,7 @@ router.patch(
       res.status(404).json({ error: "Project not found" });
       return;
     }
-    if (parsed.data.status) {
-      await recordAudit({
-        organizationId: req.member!.organizationId,
-        actorUserId: req.member!.user.id,
-        action: "project.status_changed",
-        entityType: "project",
-        entityId: project.id,
-        metadata: { status: parsed.data.status },
-      });
-    }
-    res.json(project);
+    res.json({ ...project, ...projectSchedulingEvidence("project", project) });
   },
 );
 
@@ -128,7 +179,13 @@ router.delete(
       String(req.params.id),
     );
     if (deleted === crm.INVOICE_HISTORY_RETAINED) {
-      res.status(409).json({ error: "This job is referenced by retained invoice history and cannot be deleted.", code: deleted });
+      res
+        .status(409)
+        .json({
+          error:
+            "This job is referenced by retained invoice history and cannot be deleted.",
+          code: deleted,
+        });
       return;
     }
     if (!deleted) {

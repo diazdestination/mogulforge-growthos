@@ -29,6 +29,10 @@ const counts = {
   ListProjectsResponseItem: 10,
 };
 export function closeSchedulingSchemas(text) {
+  // Orval emits validators for successful operations only. This additional
+  // named error validator reuses the already closed acknowledgement boundary.
+  const manualError = `export const ManualSchedulingErrorSchema = zod.object({ error: zod.string(), code: zod.enum(['manual_scheduling_refused', 'manual_scheduling_target_unavailable']), schedulingOperation: ReconcileSchedulingOperationResponse }).strict();`;
+  if (!/export const ManualSchedulingErrorSchema\s*=/.test(text)) text += `\n${manualError}\n`;
   const tree = ts.createSourceFile(
     "api.ts",
     text,
@@ -54,6 +58,8 @@ export function closeSchedulingSchemas(text) {
     ts.forEachChild(node, collect);
   }
   collect(tree);
+  const errors = tree.statements.filter(node => ts.isVariableStatement(node) && node.declarationList.declarations.some(d => d.name.getText(tree) === 'ManualSchedulingErrorSchema'));
+  if (errors.length !== 1 || errors[0].getText(tree) !== manualError) throw Error('Scheduling manual error boundary changed; no file modified.');
   for (const [name, expected] of Object.entries(counts)) {
     const node = declarations.get(name);
     if (!node)

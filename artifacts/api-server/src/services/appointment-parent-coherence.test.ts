@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { appointmentsTable, contactsTable, db, leadsTable, organizationsTable, pool, propertiesTable, scheduledActionsTable } from "@workspace/db";
+import { appointmentsTable, contactsTable, db, leadsTable, organizationsTable, pool, propertiesTable, scheduledActionsTable, usersTable } from "@workspace/db";
+import {getSchedulingReviewContext} from './scheduling-policy';
+import {createManualScheduledAppointment} from './manual-scheduling';
 import { and, eq, sql } from "drizzle-orm";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import { createAppointment, updateAppointment, updateContact, updateLead, updateProperty } from "./crm";
@@ -51,6 +53,14 @@ function saved(value: Awaited<ReturnType<typeof createAppointment>>) {
   if (!value || typeof value === "string") throw new Error(`Unexpected create result: ${value}`);
   return value;
 }
+
+it('manual receipt callback rechecks an explicitly reviewed property before native insert',async()=>{
+ const f=await fixture();const [user]=await db.insert(usersTable).values({organizationId:org,role:'owner'}).returning();const actor={organizationId:org,userId:user.id};
+ const context=await getSchedulingReviewContext(actor,{sourceKind:'direct_customer',sourceId:f.a,propertyId:f.property,reservationKind:'appointment',appointmentType:'other'});
+ await db.update(propertiesTable).set({contactId:f.b}).where(eq(propertiesTable.id,f.property));
+ const result=await createManualScheduledAppointment(actor,{operationId:randomUUID(),kind:'appointment_create',body:{contactId:f.a,propertyId:f.property,type:'other',scheduledStart:start.toISOString(),scheduledEnd:end.toISOString()},review:{context,duration:{kind:'explicit',preset:null},startWallTime:null,endWallTime:null}});
+ expect(result).toMatchObject({record:null,newlyCreated:false,ack:{outcome:'no_commit_refused',refusalCode:'customer_reference_mismatch'}});
+});
 
 it("creates exactly one native visit and reminder for the explicitly selected property without an acquisition lead", async () => {
   const f = await fixture(), before = await counts();

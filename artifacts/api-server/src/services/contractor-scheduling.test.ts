@@ -33,6 +33,11 @@ async function service(dueDate = "2035-01-31", extra = {}) {
 }
 
 describe("native schedule resources", () => {
+  it('keeps legacy project start-only absolute ends and null reservation evidence',async()=>{
+    const job=await crm.createProject(org,{leadId:lead,name:'Legacy absolute end',scheduledStart:slot(90).scheduledStart,scheduledEnd:slot(93).scheduledEnd});
+    if(!job||job===crm.DUPLICATE_ESTIMATE)throw Error('fixture');
+    expect(await crm.updateProject(org,job.id,{scheduledStart:slot(91).scheduledStart})).toMatchObject({scheduledEnd:slot(93).scheduledEnd,schedulingReservation:null});
+  });
   it("blocks the same staff across appointment types and jobs; allows another staff", async () => {
     await appointment(1, { assignedUserId: staff });
     await expect(appointment(1, { assignedUserId: staff, type: "other" })).rejects.toMatchObject({ code: "resource_conflict" });

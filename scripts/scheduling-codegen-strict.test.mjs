@@ -40,6 +40,12 @@ const body = {
   review,
 };
 describe("closed scheduling generation", () => {
+  it('closes the native409 envelope and every acknowledgement object',()=>{
+    const ack={operationId:id,organizationId:id,actorUserId:'synthetic',kind:'appointment_create',source:context.source,payloadSha256:'a'.repeat(64),outcome:'no_commit_refused',target:null,refusalCode:'original_create_fenced'};
+    const value={error:'Original refused',code:'manual_scheduling_refused',schedulingOperation:ack};
+    expect(generated.ManualSchedulingErrorSchema.safeParse(value).success).toBe(true);
+    for(const invalid of [{...value,extra:true},{...value,schedulingOperation:{...ack,extra:true}},{...value,schedulingOperation:{...ack,source:{...ack.source,extra:true}}}])expect(generated.ManualSchedulingErrorSchema.safeParse(invalid).success).toBe(false);
+  });
   it("publishes the exact typed JSON examples accepted by generated schemas", () => {
     const fixtures = JSON.parse(
       readFileSync(
