@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { policySaveInputSchema, schedulingPolicySchema } from '@workspace/scheduling-core';
-import type { PolicyReadResult, PolicySaveInput, SchedulingPolicyPanelProps } from '@/lib/scheduling-ui-contract';
+import type { PolicyReadResult, PolicySaveInput, SchedulingPolicyPanelProps, SchedulingReviewContext } from '@/lib/scheduling-ui-contract';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,27 +11,41 @@ type RequestState = { kind: 'pending' | 'completed' | 'stale' | 'unknown' | 'ref
 const requiredNumber = (value: string) => value === '' ? Number.NaN : Number(value);
 const numberText = (value: number) => Number.isFinite(value) ? String(value) : '';
 
+// Fixed field order preserves semantic identity across equivalent parent clones.
+function contextIdentity(context: SchedulingReviewContext | null) {
+  return JSON.stringify(context === null ? null : [
+    context.organizationId, context.policyRevision, context.policyDigest, context.companyTimeZone,
+    context.inspection === null ? null : [context.inspection.ruleTimeZone, context.inspection.availabilityDigest, context.inspection.sourceState],
+    [context.applicableRules.newTravelGapMinutes, context.applicableRules.companyCeiling, context.applicableRules.inspectionCeiling],
+    context.source === null ? null : [context.source.sourceKind, context.source.leadId, context.source.contactId, context.source.propertyId, context.source.estimateId],
+    context.targetVersion, context.targetFingerprint,
+  ]);
+}
+
 /** Draft and saved authority belong to the parent; local state only fences dispatch. */
 export function SchedulingPolicyEditor(props: SchedulingPolicyPanelProps) {
   const { state } = props;
   const context = 'value' in state ? state.value.context : null;
-  const key = JSON.stringify([state.scope.organizationId, state.scope.actorUserId, context?.policyRevision, context?.policyDigest, context?.companyTimeZone]);
-  return <ScopedPolicyEditor key={key} {...props} />;
+  const requestContextKey = JSON.stringify([state.scope.organizationId, state.scope.actorUserId, contextIdentity(context)]);
+  return <ScopedPolicyEditor key={requestContextKey} {...props} requestContextKey={requestContextKey} />;
 }
 
-function ScopedPolicyEditor({ state, draft, canManage, onDraftChange, onSave, onRefresh }: SchedulingPolicyPanelProps) {
+function ScopedPolicyEditor({ state, draft, canManage, onDraftChange, onSave, onRefresh, requestContextKey }: SchedulingPolicyPanelProps & { requestContextKey: string }) {
   const id = useId();
   const value = 'value' in state ? state.value : null;
-  const contextToken = JSON.stringify(value?.context);
-  const latestContext = useRef(contextToken);
-  latestContext.current = contextToken;
+  const latestContext = useRef<string | null>(requestContextKey);
+  latestContext.current = requestContextKey;
+  useEffect(() => {
+    latestContext.current = requestContextKey;
+    return () => { latestContext.current = null; };
+  }, [requestContextKey]);
   const requestRef = useRef<RequestState | null>(null);
   const [request, setRequest] = useState<RequestState | null>(null);
   const [refreshBasis, setRefreshBasis] = useState<PolicyReadResult | null>(null);
   const scopeMismatch = value !== null && value.context.organizationId !== state.scope.organizationId;
   const visibleValue = scopeMismatch ? null : value;
   const visibleDraft = scopeMismatch ? null : draft;
-  const activeRequest = request;
+  const activeRequest = scopeMismatch ? null : request;
   const ready = (state.kind === 'loaded' || state.kind === 'unconfigured') && visibleValue !== null;
   // A passive parent clone is not permission to dispatch again. Only an explicit
   // refresh returning authoritative props may release a settled local hold.
@@ -67,7 +81,7 @@ function ScopedPolicyEditor({ state, draft, canManage, onDraftChange, onSave, on
   async function save() {
     // Ref closes the same-event duplicate window before React renders disabled controls.
     if (!canSave || !visibleValue || !parsed?.success || requestRef.current !== null) return;
-    const basis = contextToken;
+    const basis = requestContextKey;
     const pending: RequestState = { kind: 'pending', message: 'Saving scheduling settings…' };
     requestRef.current = pending;
     setRequest(pending);
