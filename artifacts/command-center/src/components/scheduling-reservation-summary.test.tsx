@@ -1,4 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import { isInaccessible } from "@testing-library/dom";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import type { SchedulingTravelReviewProps } from "@/lib/scheduling-ui-contract";
 import { makeReservationSnapshot, makeSchedulingInterval, makeSchedulingProposal, makeSchedulingResources } from "@/test/scheduling-ui-fixtures";
@@ -9,6 +11,26 @@ function props(overrides: Partial<SchedulingTravelReviewProps> = {}): Scheduling
   return { companyTimeZone: "America/New_York", interval: makeSchedulingInterval(), proposal: null, resources: makeSchedulingResources(), conflict: null, ...overrides };
 }
 describe("Scheduling reservation summary", () => {
+  it("keeps service, travel and separate cap checks readable without adding a keyboard focus stop", async () => {
+    const user = userEvent.setup();
+    render(<>
+      <button>Review booking</button>
+      <SchedulingReservationSummary {...props({ interval: makeSchedulingInterval({ startAt: null, endAt: null, reservation: null, evidence: "legacy" }), proposal: makeSchedulingProposal() })} />
+      <button>Continue booking</button>
+    </>);
+    const summary = screen.getByRole("group", { name: "Scheduling reservation" });
+    expect(isInaccessible(summary)).toBe(false);
+    expect(summary.textContent).toMatch(/Proposed service interval.*Service start:.*12:00:00 PM GMT-05:00.*Service end:.*1:30:00 PM GMT-05:00.*90 elapsed minutes.*Proposed travel gap: 60 minutes.*Company reservation cap: 3.*Rechecked when saving.*Inspection reservation cap: 2.*Rechecked when saving/);
+    for (const content of [screen.getByText(/^Service start:/), screen.getByText(/^Service end:/), screen.getByText(/90 elapsed minutes/), screen.getByText(/^Proposed travel gap: 60 minutes/), screen.getByText(/^Company reservation cap: 3/), screen.getByText(/^Inspection reservation cap: 2/), ...screen.getAllByText(/Rechecked when saving/)]) {
+      expect(isInaccessible(content)).toBe(false);
+    }
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Review booking" }));
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Continue booking" }));
+    await user.tab({ shift: true });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Review booking" }));
+  });
   it("retains saved service endpoints, gap, preset and source evidence after a company zone and policy change", () => {
     render(<SchedulingReservationSummary {...props({ proposal: makeSchedulingProposal({ basis: "saved_preservation", resourceUserIds: ["staff-synthetic"], appliedTravelGapMinutes: 60, companyCeiling: null, inspectionCeiling: null }) })} />);
     expect(screen.getByText(/90 elapsed minutes/)).toBeTruthy();
@@ -36,6 +58,21 @@ describe("Scheduling reservation summary", () => {
     expect(screen.getAllByText(/Rechecked when saving/)).toHaveLength(2);
     expect(screen.getByText(/Unassigned.*technician availability has not been checked/)).toBeTruthy();
     expect(screen.queryByText(/Saved travel gap/)).toBeNull();
+  });
+  it("retains surviving assigned staff and saved protection during a release without inventing historical caps", () => {
+    const reservation = makeReservationSnapshot({ resourceUserIds: ["staff-secondary"], reservationRevision: 2, lastTransition: { kind: "release", actorUserId: "staff-synthetic", at: "2035-01-01T16:30:00Z" } });
+    render(<SchedulingReservationSummary {...props({
+      interval: makeSchedulingInterval({ reservation }),
+      proposal: makeSchedulingProposal({ basis: "saved_release", resourceUserIds: ["staff-secondary"], appliedTravelGapMinutes: 60, companyCeiling: null, inspectionCeiling: null, companyGate: { kind: "held", message: "Recorded work is retained; no new capacity admission is requested." }, inspectionGate: { kind: "held", message: "Recorded work is retained; no new capacity admission is requested." } }),
+    })} />);
+    expect(screen.getByRole("group", { name: "Scheduling reservation" })).toBeTruthy();
+    expect(screen.getByText(/Resources: Second synthetic staff/)).toBeTruthy();
+    expect(screen.queryByText(/Resources: Synthetic staff/)).toBeNull();
+    expect(screen.getByText(/Reservation revision: 2.*Saved release/)).toBeTruthy();
+    expect(screen.getByText(/Saved travel gap: 60 minutes/)).toBeTruthy();
+    expect(screen.getByText(/Recorded work is retained; no new capacity admission is requested/)).toBeTruthy();
+    expect(screen.queryByText(/reservation cap|Rechecked when saving|Unassigned/)).toBeNull();
+    expect([...document.querySelectorAll("time")].map(item => item.dateTime)).toEqual(["2035-01-01T17:00:00.000Z", "2035-01-01T18:30:00.000Z"]);
   });
   it("keeps a null saved end explicit while rendering the caller's legacy compatibility window", () => {
     render(<SchedulingReservationSummary {...props({ companyTimeZone: "UTC", interval: makeSchedulingInterval({ startAt: "2035-01-01T17:00:00Z", endAt: null, legacyEffectiveEnd: "2035-01-01T19:00:00Z", reservation: null, evidence: "legacy" }) })} />);
