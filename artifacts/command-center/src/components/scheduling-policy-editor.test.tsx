@@ -117,6 +117,33 @@ describe('closed policy validation before dispatch', () => {
 });
 
 describe('explicit dispatch custody', () => {
+  it('treats reordered copies of identical context as the same unresolved save authority', async () => {
+    const pending = deferred(); const onSave = vi.fn(() => pending.promise); const original = props({ onSave }); const view = render(<SchedulingPolicyEditor {...original} />); fireEvent.click(saveButton());
+    const value = makePolicyReadResult(); const context = value.context;
+    value.context = { targetFingerprint: context.targetFingerprint, targetVersion: context.targetVersion, source: context.source, applicableRules: { inspectionCeiling: context.applicableRules.inspectionCeiling, companyCeiling: context.applicableRules.companyCeiling, newTravelGapMinutes: context.applicableRules.newTravelGapMinutes }, inspection: context.inspection, companyTimeZone: context.companyTimeZone, policyDigest: context.policyDigest, policyRevision: context.policyRevision, organizationId: context.organizationId };
+    view.rerender(<SchedulingPolicyEditor {...original} state={makePolicyViewState(value)} />);
+    expect(saveButton().disabled).toBe(true); fireEvent.click(saveButton()); expect(onSave).toHaveBeenCalledTimes(1);
+    await act(async () => pending.resolve({ kind: 'unknown', message: 'Identical authority save uncertain' }));
+    expect(screen.getByText('Identical authority save uncertain')).toBeTruthy(); expect(saveButton().disabled).toBe(true);
+  });
+  it('recovers matching authority after a mismatched context discards the prior pending completion', async () => {
+    const pending = deferred(); const onSave = vi.fn(() => pending.promise); const onRefresh = vi.fn(); const original = props({ onSave, onRefresh });
+    const view = render(<SchedulingPolicyEditor {...original} />); fireEvent.click(saveButton());
+    const mismatched = makePolicyReadResult({ context: makeSchedulingContext({ organizationId: schedulingFixtureIds.alternateOrganization, inspection: null, source: null }) });
+    view.rerender(<SchedulingPolicyEditor {...original} state={{ kind: 'loaded', scope: makeSchedulingScope(), value: mismatched }} />);
+    expect(saveButton().disabled).toBe(true); expect(screen.queryByRole('spinbutton')).toBeNull();
+    await act(async () => pending.resolve({ kind: 'unknown', message: 'Prior context uncertain save' }));
+    view.rerender(<SchedulingPolicyEditor {...original} />);
+    expect(saveButton().disabled).toBe(false); expect((screen.getByRole('button', { name: 'Refresh scheduling settings' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByText('Prior context uncertain save')).toBeNull(); expect(onSave).toHaveBeenCalledTimes(1); expect(onRefresh).not.toHaveBeenCalled();
+  });
+  it('hides a settled prior-context request message during an organization mismatch', async () => {
+    const onSave = vi.fn(async () => ({ kind: 'unknown' as const, message: 'Private original scope uncertainty' })); const original = props({ onSave }); const view = render(<SchedulingPolicyEditor {...original} />);
+    fireEvent.click(saveButton()); await screen.findByText('Private original scope uncertainty');
+    const mismatched = makePolicyReadResult({ context: makeSchedulingContext({ organizationId: schedulingFixtureIds.alternateOrganization, inspection: null, source: null }) });
+    view.rerender(<SchedulingPolicyEditor {...original} state={{ kind: 'loaded', scope: makeSchedulingScope(), value: mismatched }} />);
+    expect(screen.queryByText('Private original scope uncertainty')).toBeNull(); expect(saveButton().disabled).toBe(true); expect(onSave).toHaveBeenCalledTimes(1);
+  });
   it('keeps duplicate dispatch fenced when the parent clones unchanged authority during a pending save', async () => {
     const pending = deferred(); const onSave = vi.fn(() => pending.promise); const view = render(<SchedulingPolicyEditor {...props({ onSave })} />); fireEvent.click(saveButton());
     view.rerender(<SchedulingPolicyEditor {...props({ onSave })} />);
