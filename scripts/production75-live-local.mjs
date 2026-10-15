@@ -191,6 +191,21 @@ export function createCombinedLocalBudget(now = Date.now) {
     },
   });
 }
+export async function cleanupCombinedLocalContainer(identity, command) {
+  if (identity.__cleanupAttempted) return null;
+  // Read-only ownership checks may resume in the cleanup reserve. Only the
+  // executor's actual removal dispatch consumes the one removal opportunity.
+  return cleanupProduction75Container(identity, (args) =>
+    command(
+      args,
+      args[0] === "rm"
+        ? () => {
+            identity.__cleanupAttempted = true;
+          }
+        : undefined,
+    ),
+  );
+}
 export function handleOperatorClientErrors(client, onFailure) {
   client.on("error", () => {
     try {
@@ -199,7 +214,7 @@ export function handleOperatorClientErrors(client, onFailure) {
   });
   return client;
 }
-async function docker(args, input, timeoutMs = 60000) {
+async function docker(args, input, timeoutMs = 60000, onDispatch) {
   let executable = "docker";
   if (
     process.platform === "win32" &&
@@ -214,6 +229,7 @@ async function docker(args, input, timeoutMs = 60000) {
       windowsHide: true,
       stdio: [input ? "pipe" : "ignore", "pipe", "pipe"],
     });
+    onDispatch?.();
     const chunks = [];
     let size = 0;
     const timer = setTimeout(() => {
@@ -390,12 +406,13 @@ async function runLocal(combined = false, context = {}) {
       clearTimeout(timer);
     }
   };
-  const runDocker = async (args, input) => {
+  const runDocker = async (args, input, onDispatch) => {
     active();
     return docker(
       args,
       input,
       combined ? Math.min(60000, budget.remaining()) : 60000,
+      onDispatch,
     );
   };
   const { Client } = createRequire(
@@ -1858,9 +1875,14 @@ async function runLocal(combined = false, context = {}) {
       );
       for (const b of [copyBox, sourceBox])
         if (b && !b.__removed) {
-          if (combined) b.__cleanupAttempted = true;
-          const proof = await cleanupProduction75Container(b, async (args) => ({
-            output: (await runDocker(args)).toString().trim(),
+          const proof = await (
+            combined
+              ? cleanupCombinedLocalContainer
+              : cleanupProduction75Container
+          )(b, async (args, onDispatch) => ({
+            output: (await runDocker(args, undefined, onDispatch))
+              .toString()
+              .trim(),
           }));
           check(proof.containerRemoved, "production75_operator_local_cleanup");
           b.__removed = true;
@@ -1884,15 +1906,18 @@ async function runLocal(combined = false, context = {}) {
         c.connection?.stream?.destroy();
         failed = true;
       }
-    for (const b of containers.filter(
-      (b) => !b.__removed && (!combined || !b.__cleanupAttempted),
-    ))
+    for (const b of containers.filter((b) => !b.__removed))
       try {
-        if (combined) b.__cleanupAttempted = true;
-        const p = await cleanupProduction75Container(b, async (args) => ({
-          output: (await runDocker(args)).toString().trim(),
+        const p = await (
+          combined
+            ? cleanupCombinedLocalContainer
+            : cleanupProduction75Container
+        )(b, async (args, onDispatch) => ({
+          output: (await runDocker(args, undefined, onDispatch))
+            .toString()
+            .trim(),
         }));
-        if (p.containerRemoved) {
+        if (p?.containerRemoved) {
           b.__removed = true;
           if (combined) b.__cleanupEvidence = p;
           receipt.cleanup.containers++;

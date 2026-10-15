@@ -88,6 +88,88 @@ test("native finalization rejects proof accessors without invoking them", () => 
   expect(invoked).toBe(0);
 });
 
+function cleanupFixture(expireAt, rejectRemoval = false) {
+  let at = 0,
+    present = true,
+    expired = false;
+  const budget = local.createCombinedLocalBudget(() => at);
+  const identity = {
+    runId: "12345678-1234-4123-8123-123456789012",
+    name: "production75-local-123-12345678",
+    id: "a".repeat(64),
+  };
+  const dispatched = [];
+  const inspection = {
+    Name: `/${identity.name}`,
+    Id: identity.id,
+    Config: {
+      Labels: {
+        "com.forge.local-test": identity.runId,
+        "com.forge.fixture-purpose": "production75-local",
+      },
+    },
+  };
+  const execute = async (args, beforeDispatch) => {
+    budget.remaining();
+    beforeDispatch?.();
+    dispatched.push([...args]);
+    if (args[0] === "ps") {
+      if (expireAt === "after-inventory" && !expired) {
+        at = 1200000;
+        expired = true;
+      }
+      return { output: present ? identity.id : "" };
+    }
+    if (args[0] === "inspect") {
+      if (expireAt === "after-inspection" && !expired) {
+        at = 1200000;
+        expired = true;
+      }
+      return { output: JSON.stringify([inspection]) };
+    }
+    expect(args).toEqual(["rm", "--force", identity.id]);
+    if (rejectRemoval) throw Error("synthetic removal rejected");
+    present = false;
+    return { output: identity.id };
+  };
+  if (expireAt === "before-inventory") at = 1200000;
+  return { identity, budget, execute, dispatched };
+}
+
+test.each(["before-inventory", "after-inventory", "after-inspection"])(
+  "combined cleanup resumes exact ownership checks in reserve after work expiry %s",
+  async (expireAt) => {
+    const f = cleanupFixture(expireAt);
+    await expect(
+      local.cleanupCombinedLocalContainer(f.identity, f.execute),
+    ).rejects.toThrow(/production75_operator_local_deadline/);
+    expect(f.dispatched.filter((args) => args[0] === "rm")).toHaveLength(0);
+    f.budget.beginCleanup();
+    const proof = await local.cleanupCombinedLocalContainer(
+      f.identity,
+      f.execute,
+    );
+    expect(proof?.containerRemoved).toBe(true);
+    expect(proof.removedId).toBe(f.identity.id);
+    expect(f.dispatched.filter((args) => args[0] === "rm")).toHaveLength(1);
+    expect(f.dispatched.at(-1)[0]).toBe("ps");
+  },
+);
+
+test("combined cleanup never retries an actual rejected removal in the reserved phase", async () => {
+  const f = cleanupFixture(null, true);
+  await expect(
+    local.cleanupCombinedLocalContainer(f.identity, f.execute),
+  ).rejects.toThrow("synthetic removal rejected");
+  f.budget.beginCleanup();
+  expect(
+    await local.cleanupCombinedLocalContainer(f.identity, f.execute),
+  ).toBeNull();
+  expect(f.dispatched.filter((args) => args[0] === "rm")).toEqual([
+    ["rm", "--force", f.identity.id],
+  ]);
+});
+
 test.each([
   "unfinished",
   "layout",
