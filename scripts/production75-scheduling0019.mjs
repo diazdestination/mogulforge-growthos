@@ -971,7 +971,8 @@ export async function runScheduling0019Verification(input = {}) {
       settings.map(() => "SET"),
     );
     await journal({ phase: "begin-ack", pid: writerPid });
-    await writerView.query(IDENTITY_SQL);
+    // RR freezes its snapshot at the first SELECT. Acquire every protecting
+    // lock first, including before the otherwise read-only identity query.
     acknowledge(
       await query(
         `LOCK TABLE ${plan.catalogs.before.tables
@@ -981,6 +982,7 @@ export async function runScheduling0019Verification(input = {}) {
       ),
       ["LOCK"],
     );
+    await writerView.query(IDENTITY_SQL);
     const before = await captureScheduling0019State(writerView, plan);
     assertScheduling0019Preserved(baseline, before, plan, "pre0019");
     proof.preimageVerified = true;

@@ -303,7 +303,7 @@ test("constructor rejects callback accessors before invoking hooks or consuming 
   expect(reads).toBe(0);
   expect(f.calls).toHaveLength(0);
 });
-test("writer backend drift holds before LOCK or DDL without a terminal mutation on the wrong backend", async () => {
+test("writer backend drift after LOCK blocks DDL and unsafe terminal cleanup", async () => {
   let identities = 0;
   const f = transactionFixture({
       query: async (sql, args, next) => {
@@ -315,9 +315,67 @@ test("writer backend drift holds before LOCK or DDL without a terminal mutation 
     result = await runScheduling0019Verification(f.args);
   expect(result.status).toBe("verification-held-no-replay");
   expect(f.ddlDispatches).toBe(0);
-  expect(queryCalls(f).some((s) => s.startsWith("LOCK TABLE"))).toBe(false);
+  expect(queryCalls(f).filter((s) => s.startsWith("LOCK TABLE"))).toHaveLength(
+    1,
+  );
   expect(queryCalls(f)).not.toContain("ROLLBACK");
   expect(result.proof.requiresOwningCleanup).toBe(true);
+});
+test("RR locks precede the first SELECT so a concurrent pre-lock commit blocks DDL", async () => {
+  let inTransaction = false,
+    locked = false,
+    changedCommittedData = false,
+    snapshot = null,
+    sourceCommitted = false;
+  const f = transactionFixture({
+      outcome: "commit",
+      query: async (sql, args, next) => {
+        if (sql === "BEGIN ISOLATION LEVEL REPEATABLE READ")
+          inTransaction = true;
+        // Model a concurrent writer committing immediately before lock acquisition.
+        if (sql.startsWith("LOCK TABLE")) {
+          changedCommittedData = true;
+          locked = true;
+        }
+        if (inTransaction && sql.startsWith("SELECT") && snapshot === null)
+          snapshot = { changed: changedCommittedData, beforeLock: !locked };
+        const response = await next(sql, args);
+        if (
+          sql.includes("AS hashes") &&
+          sql.includes('FROM public."appointment_work_entries"') &&
+          snapshot?.changed
+        )
+          response.rows[0].digest = "a".repeat(32);
+        if (sql === "COMMIT") {
+          sourceCommitted = true;
+          inTransaction = false;
+        }
+        if (sql === "ROLLBACK") inTransaction = false;
+        return response;
+      },
+      readFresh: async (n) => {
+        const state = structuredClone(
+          sourceCommitted ? fixtures[0].after : fixtures[0].before,
+        );
+        state.identity.pid = 89 + n;
+        if (changedCommittedData)
+          state.fingerprints.find(
+            (x) => x.table === "appointment_work_entries",
+          ).digest = "a".repeat(32);
+        return state;
+      },
+    }),
+    result = await runScheduling0019Verification(f.args);
+  expect(f.ddlDispatches).toBe(0);
+  expect(queryCalls(f)).not.toContain("COMMIT");
+  expect(snapshot.beforeLock).toBe(false);
+  expect(result.proof.preimageVerified).toBe(false);
+  const sql = queryCalls(f),
+    begin = sql.indexOf("BEGIN ISOLATION LEVEL REPEATABLE READ"),
+    lock = sql.findIndex((s) => s.startsWith("LOCK TABLE")),
+    firstSelect = sql.findIndex((s, i) => i > begin && s.startsWith("SELECT"));
+  expect(lock).toBeLessThan(firstSelect);
+  expect(sql[lock].match(/public\."[a-z_]+"/g)).toHaveLength(142);
 });
 test("reservation denial and persistence failure before BEGIN never dispatch DDL", async () => {
   for (const options of [
