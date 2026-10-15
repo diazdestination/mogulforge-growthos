@@ -8,6 +8,7 @@ import { writeFile, readFile, mkdtemp, rm } from "node:fs/promises";
 import { spawn, execFileSync } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
+import { fileURLToPath } from "node:url";
 
 const digest = (v) =>
   createHash("sha256")
@@ -43,6 +44,365 @@ const inventory = (o) =>
   );
 const added = (before, after, key) =>
   after[key].filter((r) => !before[key].some((b) => b.id === r.id));
+
+export const INDEX_FONT_STYLESHEET_URL =
+  "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap";
+const requestBinding = [
+  "requestId",
+  "pageId",
+  "url",
+  "method",
+  "phase",
+  "operationId",
+  "bodyHash",
+];
+const sameRequestBinding = (a, b) =>
+  requestBinding.every((key) => a[key] === b[key]);
+
+/** Request objects never leave this closure. Reports retain only non-auth metadata. */
+export function createBrowserNetworkGate(origin) {
+  const requests = new WeakMap(),
+    expected = new WeakMap();
+  const injections = [],
+    failures = [];
+  let sequence = 0;
+  return {
+    injections,
+    failures,
+    start(request, phase, pageId) {
+      assert.ok(
+        !requests.has(request),
+        "Request start is recorded exactly once",
+      );
+      const url = new URL(request.url()),
+        body = request.postData() ?? "";
+      const entry = Object.freeze({
+        requestId: `request-${++sequence}`,
+        pageId,
+        phase,
+        url: url.href,
+        path: url.pathname,
+        method: request.method(),
+        bodyHash: digest(body),
+        operationId:
+          url.origin === origin &&
+          [
+            "/api/v1/appointments",
+            "/api/v1/scheduling/operations/reconcile",
+          ].includes(url.pathname) &&
+          body
+            ? (JSON.parse(body).operationId ?? null)
+            : null,
+      });
+      requests.set(request, entry);
+      return entry;
+    },
+    get(request) {
+      return requests.get(request);
+    },
+    inject(request, kind, proof = null) {
+      const entry = requests.get(request);
+      assert.ok(entry, "Injection must bind an observed Request object");
+      assert.ok(
+        !expected.has(request),
+        "Exactly one injection per Request object",
+      );
+      let error, commitProof;
+      if (kind === "declared-font-denial") {
+        assert.equal(entry.url, INDEX_FONT_STYLESHEET_URL);
+        assert.equal(entry.method, "GET");
+        assert.equal(entry.bodyHash, digest(""));
+        error = "net::ERR_BLOCKED_BY_CLIENT.Inspector";
+      } else {
+        assert.equal(kind, "proved-postcommit-abort");
+        assert.equal(
+          injections.filter((item) => item.kind === kind).length,
+          0,
+          "Only one lost ACK injection",
+        );
+        assert.equal(entry.url, `${origin}/api/v1/appointments`);
+        assert.equal(entry.method, "POST");
+        assert.equal(entry.phase, "lost-ack-same-tab-original-reconcile");
+        assert.equal(proof.status, 201);
+        assert.equal(proof.ack.outcome, "committed");
+        assert.equal(proof.ack.operationId, entry.operationId);
+        assert.equal(proof.receipt.id, entry.operationId);
+        assert.equal(proof.receipt.action, "scheduling.manual_operation.v1");
+        assert.equal(proof.receipt.metadata.outcome, "committed");
+        assert.equal(
+          proof.receipt.metadata.payloadSha256,
+          proof.ack.payloadSha256,
+        );
+        assert.equal(proof.target.id, proof.ack.target.id);
+        assert.equal(proof.target.organization_id, proof.ack.organizationId);
+        commitProof = {
+          status: 201,
+          operationId: entry.operationId,
+          targetId: proof.target.id,
+          payloadSha256: proof.ack.payloadSha256,
+        };
+        error = "net::ERR_FAILED";
+      }
+      const injection = Object.freeze({
+        ...entry,
+        injectionId: `injection-${injections.length + 1}`,
+        kind,
+        error,
+        ...(commitProof ? { commitProof } : {}),
+      });
+      expected.set(request, injection);
+      injections.push(injection);
+      return injection;
+    },
+    failed(request) {
+      const entry = requests.get(request);
+      const injection = expected.get(request); // Object identity, never URL-only lookup.
+      const failure = {
+        ...(entry ?? {
+          requestId: null,
+          phase: null,
+          pageId: null,
+          url: request.url(),
+          method: request.method(),
+        }),
+        error: request.failure()?.errorText,
+        injectionId: injection?.injectionId ?? null,
+      };
+      failures.push(failure);
+      return failure;
+    },
+  };
+}
+
+/** Every failure is fatal unless one exact, deliberately injected request proves it. */
+export function classifyBrowserNetwork({
+  failures,
+  injections,
+  consoleEntries,
+  responses = [],
+  expectedDenials = [],
+}) {
+  const unclassifiedFailures = [],
+    unclassifiedConsole = [],
+    unmatchedInjections = [],
+    unclassifiedResponses = [];
+  const classifiedFailures = [],
+    classifiedConsole = [],
+    consumedConsoleProofs = new Set();
+  for (const failure of failures) {
+    const candidates = injections.filter(
+      (injection) =>
+        injection.injectionId === failure.injectionId &&
+        sameRequestBinding(injection, failure) &&
+        injection.error === failure.error,
+    );
+    const unique =
+      failures.filter((other) => other.requestId === failure.requestId)
+        .length === 1;
+    if (candidates.length !== 1 || !unique) unclassifiedFailures.push(failure);
+    else classifiedFailures.push({ ...failure, kind: candidates[0].kind });
+  }
+  for (const injection of injections)
+    if (
+      classifiedFailures.filter(
+        (failure) => failure.injectionId === injection.injectionId,
+      ).length !== 1
+    )
+      unmatchedInjections.push(injection);
+  const expectedHttp = (response) =>
+    (response.method === "POST" &&
+      response.path === "/api/v1/appointments" &&
+      response.status === 409 &&
+      response.ack?.outcome === "no_commit_refused" &&
+      response.ack.operationId === response.operationId) ||
+    expectedDenials.some(
+      (denial) =>
+        sameRequestBinding(denial, response) &&
+        response.method === "GET" &&
+        response.status === 404 &&
+        denial.code === "customer_workspace_not_found",
+    );
+  for (const response of responses)
+    if (response.status >= 400 && !expectedHttp(response))
+      unclassifiedResponses.push(response);
+  for (const entry of consoleEntries) {
+    const networkMatches = classifiedFailures.filter(
+      (failure) =>
+        failure.url === entry.location.url &&
+        failure.phase === entry.phase &&
+        failure.pageId === entry.pageId &&
+        entry.text === `Failed to load resource: ${failure.error}`,
+    );
+    const loss = networkMatches.filter(
+      (failure) => failure.kind === "proved-postcommit-abort",
+    );
+    const fonts = networkMatches.filter(
+      (failure) =>
+        failure.kind === "declared-font-denial" &&
+        failure.url === INDEX_FONT_STYLESHEET_URL &&
+        failure.method === "GET",
+    );
+    let proof;
+    if (loss.length === 1) proof = loss[0];
+    else if (loss.length === 0)
+      proof = fonts.find(
+        (failure) => !consumedConsoleProofs.has(failure.requestId),
+      );
+    if (!proof) {
+      const httpMatches = responses.filter(
+        (response) =>
+          expectedHttp(response) &&
+          response.phase === entry.phase &&
+          response.pageId === entry.pageId &&
+          response.url === entry.location.url &&
+          entry.text ===
+            `Failed to load resource: the server responded with a status of ${response.status} (${response.status === 409 ? "Conflict" : "Not Found"})`,
+      );
+      if (httpMatches.length === 1) proof = httpMatches[0];
+    }
+    if (!proof || consumedConsoleProofs.has(proof.requestId))
+      unclassifiedConsole.push(entry);
+    else {
+      consumedConsoleProofs.add(proof.requestId);
+      classifiedConsole.push({
+        ...entry,
+        requestId: proof.requestId,
+        operationId: proof.operationId ?? null,
+        injectionId: proof.injectionId ?? null,
+      });
+    }
+  }
+  return {
+    passed: ![
+      unclassifiedFailures,
+      unclassifiedConsole,
+      unmatchedInjections,
+      unclassifiedResponses,
+    ].some((items) => items.length),
+    unclassifiedFailures,
+    unclassifiedConsole,
+    unmatchedInjections,
+    unclassifiedResponses,
+    classifiedFailures,
+    classifiedConsole,
+  };
+}
+
+export const HARNESS_UI_ASSERTION_PYTHON = `def assert_ui_state(state, expected_focus):
+    assert state.get('dialogVisible') is True, 'New Appointment dialog must be visible'
+    assert state.get('dialogTitle') == 'New Appointment', 'Exact new-appointment dialog required'
+    assert state.get('focusVisible') is True, 'Focused control must be visible'
+    assert state.get('focusInDialog') is True, 'Focus must stay inside the opened dialog'
+    assert state.get('focusName') == expected_focus, 'Unexpected keyboard focus: '+str(state.get('focusName'))
+`;
+export const HARNESS_UI_SNAPSHOT_JS = `(() => {
+  const dialog = document.querySelector('[role="dialog"]'), focused = document.activeElement;
+  const visible = (element) => {
+    if (!element || !element.getClientRects().length || element.closest('[hidden],[aria-hidden="true"]')) return false;
+    for (let node = element; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.visibility !== 'visible' || style.display === 'none' || style.opacity === '0') return false;
+    }
+    const box = element.getBoundingClientRect();
+    return box.width > 0 && box.height > 0 && box.right > 0 && box.bottom > 0 && box.left < innerWidth && box.top < innerHeight;
+  };
+  return { dialogVisible: visible(dialog), dialogTitle: dialog && document.getElementById(dialog.getAttribute('aria-labelledby'))?.textContent.trim(), focusVisible: visible(focused), focusInDialog: !!dialog && dialog.contains(focused), focusName: focused && (focused.getAttribute('aria-label') || focused.textContent.trim()) };
+})()`;
+
+export function literalHarnessPython(origin) {
+  assert.equal(origin, "http://127.0.0.1:4193");
+  return `import json,time
+${HARNESS_UI_ASSERTION_PYTHON}
+new_tab(${JSON.stringify(origin + "/login")})
+wait_for_load()
+def find(name,role=None):
+    for attempt in range(100):
+        nodes=cdp('Accessibility.getFullAXTree')['nodes']
+        for n in nodes:
+            if n.get('name',{}).get('value')==name and (role is None or n.get('role',{}).get('value')==role): return n['backendDOMNodeId']
+        time.sleep(.1)
+    raise Exception('Missing AX '+name)
+def click(name,role=None):
+    q=cdp('DOM.getBoxModel',backendNodeId=find(name,role))['model']['content']
+    click_at_xy(sum(q[0::2])/4,sum(q[1::2])/4)
+click('Email','textbox')
+cdp('Input.insertText',text='runtime-qa@example.invalid')
+click('Password','textbox')
+cdp('Input.insertText',text='Local-QA-only-2026!')
+click('SIGN IN','button')
+for i in range(100):
+    if '/login' not in page_info().get('url',''): break
+    time.sleep(.1)
+wait_for_load()
+assert 'LOCAL RUNTIME QA - fictional' in js('document.body.innerText')
+print(json.dumps({'authenticated':True,'page':page_info()}))
+cdp('Page.navigate',url=${JSON.stringify(origin + "/appointments")})
+wait_for_load()
+click('Schedule appointment','button')
+find('New Appointment','dialog')
+opened=js(${JSON.stringify(HARNESS_UI_SNAPSHOT_JS)})
+assert opened['dialogVisible'] is True and opened['dialogTitle']=='New Appointment', 'Visible opened Schedule appointment dialog required'
+cdp('Input.dispatchKeyEvent',type='keyDown',key='Tab',code='Tab',windowsVirtualKeyCode=9)
+cdp('Input.dispatchKeyEvent',type='keyUp',key='Tab',code='Tab',windowsVirtualKeyCode=9)
+forward=js(${JSON.stringify(HARNESS_UI_SNAPSHOT_JS)})
+assert_ui_state(forward,'Appointment type')
+print(json.dumps({'forwardAssertion':forward}))
+cdp('Input.dispatchKeyEvent',type='keyDown',key='Tab',code='Tab',windowsVirtualKeyCode=9,modifiers=8)
+cdp('Input.dispatchKeyEvent',type='keyUp',key='Tab',code='Tab',windowsVirtualKeyCode=9,modifiers=8)
+reverse=js(${JSON.stringify(HARNESS_UI_SNAPSHOT_JS)})
+assert_ui_state(reverse,'Close')
+print(json.dumps({'reverseAssertion':reverse}))
+`;
+}
+
+/** Counts only the explicit owned-page observation window; UUID values stay native. */
+export async function countNativeUuidCallsDuring(page, action) {
+  await page.evaluate(() => {
+    const key = "__savedSchedulingUuidCounter";
+    if (Object.hasOwn(window, key))
+      throw new Error("UUID observation already active");
+    const descriptor = Object.getOwnPropertyDescriptor(crypto, "randomUUID"),
+      original = crypto.randomUUID;
+    if (typeof original !== "function")
+      throw new Error("Native UUID function unavailable");
+    let calls = 0;
+    const wrapped = function (...args) {
+      calls++;
+      return Reflect.apply(original, this, args);
+    };
+    Object.defineProperty(crypto, "randomUUID", {
+      configurable: true,
+      writable: true,
+      value: wrapped,
+    });
+    window[key] = () => {
+      const wrapperUnchanged = crypto.randomUUID === wrapped;
+      if (descriptor) Object.defineProperty(crypto, "randomUUID", descriptor);
+      else delete crypto.randomUUID;
+      delete window[key];
+      return {
+        calls,
+        wrapperUnchanged,
+        restored: crypto.randomUUID === original,
+      };
+    };
+  });
+  let observation;
+  try {
+    await action();
+  } finally {
+    observation = await page.evaluate(() =>
+      window.__savedSchedulingUuidCounter(),
+    );
+    assert.equal(observation.wrapperUnchanged, true);
+    assert.equal(
+      observation.restored,
+      true,
+      "Native UUID function restored in finally",
+    );
+  }
+  return observation;
+}
 
 export async function runSavedSchedulingBrowserQA(options) {
   const {
@@ -97,9 +457,15 @@ export async function runSavedSchedulingBrowserQA(options) {
     "scope-switch-primary",
   ]);
   const expectedDenials = [];
-  const requestMap = new WeakMap(),
+  const networkGate = createBrowserNetworkGate(origin),
     pending = new Set();
-  const blockedFonts = [];
+  let pageSequence = 0;
+  const pageIds = new WeakMap();
+  const identifyPage = (page) => {
+    if (!pageIds.has(page)) pageIds.set(page, `page-${++pageSequence}`);
+    return pageIds.get(page);
+  };
+  report.networkInjections = networkGate.injections;
   const allow = new Set([
     "POST /api/auth/login",
     "POST /api/auth/logout",
@@ -330,6 +696,11 @@ export async function runSavedSchedulingBrowserQA(options) {
             0,
           );
           const targetPath = `/api/v1/appointments/${original.body.id}`;
+          const deniedResponse = page.waitForResponse(
+            (response) =>
+              response.request().method() === "GET" &&
+              response.url() === `${origin}${targetPath}`,
+          );
           const denial = await page.evaluate(async (path) => {
             const r = await fetch(path, {
               credentials: "include",
@@ -346,8 +717,7 @@ export async function runSavedSchedulingBrowserQA(options) {
             },
           });
           expectedDenials.push({
-            phase,
-            path: targetPath,
+            ...networkGate.get((await deniedResponse).request()),
             status: 404,
             code: denial.body.code,
           });
@@ -744,6 +1114,129 @@ export async function runSavedSchedulingBrowserQA(options) {
     await fill(p, config);
     return submit(p, behavior);
   }
+  async function repeatAfterReconcile(page, original) {
+    await guard(page);
+    await page
+      .getByText("Original appointment committed.", { exact: false })
+      .waitFor();
+    const prior = await custody(page, original.wire.operationId);
+    const storedOriginal = JSON.parse(prior.bytes);
+    assert.deepEqual(storedOriginal.ack, original.body.schedulingOperation);
+    assert.equal(storedOriginal.ack.outcome, "committed");
+    const before = await observe({
+      operationId: original.wire.operationId,
+      targetId: original.body.id,
+    });
+    const createCount = count("/api/v1/appointments"),
+      reconcileCount = count("/api/v1/scheduling/operations/reconcile");
+    const newIntent = page.getByRole("button", {
+      name: "Start a new appointment",
+      exact: true,
+    });
+    assert.equal(
+      await newIntent.count(),
+      1,
+      "PRODUCT RED: known committed original has no explicit same-source new-appointment intent",
+    );
+    assert.equal(
+      await newIntent.isEnabled(),
+      true,
+      "PRODUCT RED: known committed original permanently holds another intentional same-source booking",
+    );
+    const uuidObservation = await countNativeUuidCallsDuring(page, async () => {
+      await newIntent.click();
+      await settled(page);
+    });
+    assert.equal(
+      uuidObservation.calls,
+      0,
+      "Explicit new-intent click/settle generates no UUID",
+    );
+    assert.equal(
+      count("/api/v1/appointments"),
+      createCount,
+      "New-intent click has no create transport",
+    );
+    assert.equal(
+      count("/api/v1/scheduling/operations/reconcile"),
+      reconcileCount,
+    );
+    assert.deepEqual(
+      await custody(page, original.wire.operationId),
+      prior,
+      "New-intent click cannot replace original custody/UUID/ACK",
+    );
+    const dialog = page.getByRole("dialog");
+    assert.equal(
+      await dialog.getByTestId("appointment-contact").inputValue(),
+      m.contactId,
+    );
+    assert.equal(
+      await dialog
+        .getByRole("combobox", { name: /^Property for this new appointment/ })
+        .inputValue(),
+      m.propertyId,
+    );
+    assert.equal(
+      await dialog
+        .getByRole("button", { name: "Save Appt", exact: true })
+        .isEnabled(),
+      false,
+      "Old interval review cannot authorize a new booking",
+    );
+    await fill(page, { start: "2026-10-30T09:00" });
+    assert.equal(count("/api/v1/appointments"), createCount);
+    assert.deepEqual(await custody(page, original.wire.operationId), prior);
+    const next = await submit(page); // Explicit fresh Review interval, then one Save.
+    assert.notEqual(next.wire.operationId, original.wire.operationId);
+    assert.ok(
+      !storedOriginal.retiredOperationIds.includes(next.wire.operationId),
+    );
+    assert.notEqual(next.body.id, original.body.id);
+    assert.deepEqual(
+      next.wire.schedulingReview.context.source,
+      original.wire.schedulingReview.context.source,
+    );
+    assert.notEqual(next.wire.scheduledStart, original.wire.scheduledStart);
+    assert.equal(count("/api/v1/appointments"), createCount + 1);
+    assert.equal(
+      count("/api/v1/scheduling/operations/reconcile"),
+      reconcileCount,
+    );
+    const nextCustody = await custody(page, next.wire.operationId),
+      storedNext = JSON.parse(nextCustody.bytes);
+    assert.equal(
+      nextCustody.key,
+      prior.key,
+      "Same actor/company/customer/property custody namespace",
+    );
+    assert.ok(
+      storedNext.retiredOperationIds.includes(original.wire.operationId),
+    );
+    assert.ok(!storedNext.retiredOperationIds.includes(next.wire.operationId));
+    assert.deepEqual(storedNext.ack, next.body.schedulingOperation);
+    const originalAfter = await observe({
+      operationId: original.wire.operationId,
+      targetId: original.body.id,
+    });
+    assert.deepEqual(originalAfter.target, before.target);
+    assert.deepEqual(originalAfter.receipt, before.receipt);
+    assertEffects(before, next.after, next.body, next.wire, null);
+    await saveEvidence("known-commit-repeat-same-source", {
+      before,
+      originalCustody: prior,
+      originalAck: storedOriginal.ack,
+      nextWire: next.wire,
+      nextAck: next.body.schedulingOperation,
+      nextCustody,
+      after: next.after,
+      originalAfter,
+      createCountBefore: createCount,
+      createCountAfter: count("/api/v1/appointments"),
+      reconcileCount,
+      uuidObservation,
+    });
+  }
   async function policy({ gap, enabled = true, cap = null }) {
     phase = `policy-${enabled ? gap : "disabled"}-cap-${cap}`;
     await settings.goto(`${origin}/settings`);
@@ -879,6 +1372,19 @@ export async function runSavedSchedulingBrowserQA(options) {
     return p;
   }
   try {
+    const indexSource = await readFile(
+      path.resolve(
+        path.dirname(fileURLToPath(import.meta.url)),
+        "../artifacts/command-center/index.html",
+      ),
+      "utf8",
+    );
+    assert.ok(
+      indexSource.includes(
+        `href="${INDEX_FONT_STYLESHEET_URL}" rel="stylesheet"`,
+      ),
+      "Only the exact current index-declared font URL may be denied as expected",
+    );
     browser = await chromium.launch({
       executablePath: "C:/Program Files/Google/Chrome/Application/chrome.exe",
       headless: true,
@@ -889,6 +1395,7 @@ export async function runSavedSchedulingBrowserQA(options) {
       timezoneId: report.browserTimezone,
     });
     context.on("page", (page) => {
+      const pageId = identifyPage(page);
       page.on("pageerror", (e) =>
         report.pageerrors.push({ phase, message: e.message }),
       );
@@ -896,73 +1403,65 @@ export async function runSavedSchedulingBrowserQA(options) {
         if (msg.type() === "error")
           report.console.push({
             phase,
+            pageId,
             text: msg.text(),
             location: msg.location(),
           });
       });
-      page.on("request", (req) => {
-        if (!["GET", "HEAD", "OPTIONS"].includes(req.method())) {
-          const url = new URL(req.url()),
-            isLogin = url.pathname === "/api/auth/login";
-          const wire = isLogin ? null : req.postDataJSON();
+    });
+    context.on("request", (req) => {
+      let pageId = "non-page-request";
+      try {
+        pageId = identifyPage(req.frame().page());
+      } catch {
+        /* Context-wide capture retains worker/non-page failures too. */
+      }
+      const started = networkGate.start(req, phase, pageId);
+      if (!["GET", "HEAD", "OPTIONS"].includes(req.method())) {
+        const url = new URL(req.url()),
+          isLogin = url.pathname === "/api/auth/login";
+        const entry = {
+          ...started,
+          ...(isLogin ? { syntheticEmail: m.actors[actorKey].email } : {}),
+        };
+        report.mutations.push(entry);
+      }
+    });
+    context.on("requestfailed", (req) =>
+      report.requestfailed.push(networkGate.failed(req)),
+    );
+    context.on("response", (response) => {
+      const task = (async () => {
+        const req = response.request();
+        if (
+          response.status() >= 400 ||
+          !["GET", "HEAD", "OPTIONS"].includes(req.method())
+        ) {
           const entry = {
-            phase,
-            method: req.method(),
-            path: url.pathname,
-            operationId: wire?.operationId ?? null,
-            bodyHash: digest(req.postData() ?? ""),
-            ...(isLogin ? { syntheticEmail: m.actors[actorKey].email } : {}),
+            ...networkGate.get(req),
+            status: response.status(),
           };
-          report.mutations.push(entry);
-          requestMap.set(req, entry);
-        }
-      });
-      page.on("requestfailed", (req) =>
-        report.requestfailed.push({
-          phase,
-          method: req.method(),
-          path: new URL(req.url()).pathname,
-          error: req.failure()?.errorText,
-          operationId: requestMap.get(req)?.operationId ?? null,
-        }),
-      );
-      page.on("response", (response) => {
-        const task = (async () => {
-          const req = response.request();
-          if (response.status() >= 400 || requestMap.has(req)) {
-            const entry = {
-              phase,
-              method: req.method(),
-              path: new URL(req.url()).pathname,
-              status: response.status(),
-              operationId: requestMap.get(req)?.operationId ?? null,
-            };
-            if (
-              entry.path === "/api/v1/appointments" ||
-              entry.path.endsWith("/reconcile")
-            ) {
-              const data = await response.json().catch(() => null);
-              entry.code = data?.code;
-              entry.ack =
-                data?.schedulingOperation ??
-                (entry.path.endsWith("/reconcile") ? data : null);
-            }
-            report.responses.push(entry);
+          if (
+            entry.path === "/api/v1/appointments" ||
+            entry.path.endsWith("/reconcile")
+          ) {
+            const data = await response.json().catch(() => null);
+            entry.code = data?.code;
+            entry.ack =
+              data?.schedulingOperation ??
+              (entry.path.endsWith("/reconcile") ? data : null);
           }
-        })();
-        pending.add(task);
-        task.finally(() => pending.delete(task));
-      });
+          report.responses.push(entry);
+        }
+      })();
+      pending.add(task);
+      task.finally(() => pending.delete(task));
     });
     await context.route("**/*", async (route) => {
       const req = route.request(),
         url = new URL(req.url());
-      if (
-        url.origin === "https://fonts.googleapis.com" &&
-        url.pathname === "/css2" &&
-        req.method() === "GET"
-      ) {
-        blockedFonts.push(req.url());
+      if (req.url() === INDEX_FONT_STYLESHEET_URL && req.method() === "GET") {
+        networkGate.inject(req, "declared-font-denial");
         return route.abort("blockedbyclient");
       }
       if (url.origin !== origin) {
@@ -1045,13 +1544,17 @@ export async function runSavedSchedulingBrowserQA(options) {
         assertEffects(active.before, after, body, wire, null);
         active.completed = { body, wire, after };
         report.responses.push({
-          phase,
-          method: "POST",
-          path: url.pathname,
+          ...networkGate.get(req),
           status: 201,
           operationId: wire.operationId,
           ack: body.schedulingOperation,
           deliberatelyWithheld: true,
+        });
+        networkGate.inject(req, "proved-postcommit-abort", {
+          status: real.status(),
+          ack: body.schedulingOperation,
+          receipt: after.receipt[0],
+          target: after.target[0],
         });
         await route.abort("failed");
         return;
@@ -1275,6 +1778,16 @@ export async function runSavedSchedulingBrowserQA(options) {
       await fill(p, { start: "2026-10-29T09:00" });
       const r = await submit(p, { lost: true });
       fault = null;
+      const unknownNewIntent = p.getByRole("button", {
+        name: "Start a new appointment",
+        exact: true,
+      });
+      if (await unknownNewIntent.count())
+        assert.equal(
+          await unknownNewIntent.isEnabled(),
+          false,
+          "UNKNOWN cannot rearm a new intent",
+        );
       const originalCustody = await custody(p, r.wire.operationId);
       await layouts(p, "unknown");
       const countBefore = count("/api/v1/appointments"),
@@ -1360,6 +1873,10 @@ export async function runSavedSchedulingBrowserQA(options) {
         before: r.after,
         after,
       });
+      if (!scopeSwitchOnly)
+        await checkpoint("known-commit-explicit-repeat-same-source", () =>
+          repeatAfterReconcile(p, r),
+        );
       await p.close();
     });
     if (!scopeSwitchOnly) {
@@ -1536,49 +2053,31 @@ export async function runSavedSchedulingBrowserQA(options) {
     } catch (e) {
       recordFinding("cleanup", e);
     }
-    // Exactly scoped anticipated network errors; no broad console whitelist.
-    report.blockedExternalFonts = [...new Set(blockedFonts)];
+    report.blockedExternalFonts = [
+      ...new Set(
+        networkGate.injections
+          .filter((item) => item.kind === "declared-font-denial")
+          .map((item) => item.url),
+      ),
+    ];
     report.limitations.push(
       "External Google font stylesheet deliberately blocked; screenshots use local fallback fonts",
     );
-    report.unclassifiedConsole = report.console.filter(
-      (e) =>
-        !(
-          e.text ===
-            "Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector" &&
-          blockedFonts.includes(e.location.url)
-        ) &&
-        !(
-          e.text === "Failed to load resource: net::ERR_FAILED" &&
-          report.requestfailed.some(
-            (r) =>
-              r.path === "/api/v1/appointments" &&
-              r.error === "net::ERR_FAILED",
-          )
-        ) &&
-        !(
-          e.text ===
-            "Failed to load resource: the server responded with a status of 409 (Conflict)" &&
-          report.responses.some(
-            (r) =>
-              r.phase === e.phase &&
-              r.status === 409 &&
-              r.ack?.outcome === "no_commit_refused" &&
-              e.location.url === `${origin}${r.path}`,
-          )
-        ) &&
-        !(
-          e.text ===
-            "Failed to load resource: the server responded with a status of 404 (Not Found)" &&
-          expectedDenials.some(
-            (r) =>
-              r.phase === e.phase &&
-              r.status === 404 &&
-              r.code === "customer_workspace_not_found" &&
-              e.location.url === `${origin}${r.path}`,
-          )
-        ),
-    );
+    report.networkClassification = classifyBrowserNetwork({
+      failures: report.requestfailed,
+      injections: networkGate.injections,
+      consoleEntries: report.console,
+      responses: report.responses,
+      expectedDenials,
+    });
+    report.unclassifiedConsole =
+      report.networkClassification.unclassifiedConsole;
+    if (!report.networkClassification.passed)
+      report.findings.push({
+        phase: "errors",
+        message:
+          "Unmatched request failure, injection, HTTP error or console evidence",
+      });
     if (report.pageerrors.length)
       report.findings.push({
         phase: "errors",
@@ -1697,9 +2196,7 @@ async function runLiteralHarness({
     result.name = env.BU_NAME;
     result.recording = "BH_RECORD=0";
     result.telemetry = await command("", ["telemetry", "status"]);
-    result.ui = await command(
-      `import json,time\nnew_tab(${JSON.stringify(origin + "/login")})\nwait_for_load()\ndef find(name,role=None):\n    for attempt in range(100):\n        nodes=cdp('Accessibility.getFullAXTree')['nodes']\n        for n in nodes:\n            if n.get('name',{}).get('value')==name and (role is None or n.get('role',{}).get('value')==role): return n['backendDOMNodeId']\n        time.sleep(.1)\n    raise Exception('Missing AX '+name+'; controls='+json.dumps([{'role':n.get('role',{}).get('value'),'name':n.get('name',{}).get('value')} for n in nodes if n.get('role',{}).get('value') in ['textbox','button']]))\ndef click(name,role=None):\n    q=cdp('DOM.getBoxModel',backendNodeId=find(name,role))['model']['content']\n    click_at_xy(sum(q[0::2])/4,sum(q[1::2])/4)\nclick('Email','textbox')\ncdp('Input.insertText',text='runtime-qa@example.invalid')\nclick('Password','textbox')\ncdp('Input.insertText',text='Local-QA-only-2026!')\nclick('SIGN IN','button')\nfor i in range(100):\n    if '/login' not in page_info().get('url',''): break\n    time.sleep(.1)\nwait_for_load()\nassert 'LOCAL RUNTIME QA - fictional' in js('document.body.innerText')\nprint(json.dumps({'authenticated':True,'page':page_info()}))\ncdp('Page.navigate',url=${JSON.stringify(origin + "/appointments")})\nwait_for_load()\nfor i in range(100):\n    try:\n        find('Schedule appointment','button');break\n    except Exception:time.sleep(.1)\nclick('Schedule appointment','button')\ncdp('Input.dispatchKeyEvent',type='keyDown',key='Tab',code='Tab',windowsVirtualKeyCode=9)\ncdp('Input.dispatchKeyEvent',type='keyUp',key='Tab',code='Tab',windowsVirtualKeyCode=9)\nprint(json.dumps({'keyboardFocus':js("document.activeElement.getAttribute('aria-label') || document.activeElement.textContent"),'dialog':any(n.get('role',{}).get('value')=='dialog' for n in cdp('Accessibility.getFullAXTree')['nodes'])}))\ncdp('Input.dispatchKeyEvent',type='keyDown',key='Tab',code='Tab',windowsVirtualKeyCode=9,modifiers=8)\ncdp('Input.dispatchKeyEvent',type='keyUp',key='Tab',code='Tab',windowsVirtualKeyCode=9,modifiers=8)\nprint(json.dumps({'reverseFocus':js("document.activeElement.getAttribute('aria-label') || document.activeElement.textContent")}))\n`,
-    );
+    result.ui = await command(literalHarnessPython(origin));
     result.status = "passed";
   } catch (e) {
     result.status = "failed";
