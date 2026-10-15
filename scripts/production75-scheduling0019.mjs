@@ -1,6 +1,6 @@
 /** Pure additive0019 contract. No I/O, transport, environment or SQL execution. */
 import { createHash } from "node:crypto";
-import { isDeepStrictEqual } from "node:util";
+import { isDeepStrictEqual, types } from "node:util";
 import {
   catalogDigest,
   collectSchemaCatalog,
@@ -102,9 +102,107 @@ export function buildScheduling0019Source(input) {
   sources.add(source);
   return source;
 }
-/** Metadata assertion only; measured expectations are not native proof. */
-export function assertScheduling0019Catalogs(catalogs) {
-  check(keys(catalogs, "before,after"), "catalog");
+const CATALOG_ROW_FIELDS = Object.freeze({
+  tables:
+    "schema,name,kind,persistence,row_security,force_row_security,is_partition",
+  columns:
+    "table_name,name,ordinal,type_schema,type_name,type_modifier,formatted_type,nullable,default_expression,identity,generated,collation_schema,collation_name",
+  constraints:
+    "table_name,name,kind,deferrable,initially_deferred,validated,no_inherit,definition,columns,referenced_schema,referenced_table,referenced_columns,update_action,delete_action,match_type",
+  indexes:
+    "table_name,name,method,is_unique,is_primary,is_exclusion,is_immediate,is_valid,is_ready,is_live,nulls_not_distinct,key_count,attribute_count,definition,expressions,predicate",
+  enums: "schema,name,labels",
+  triggers: "table_name,name,enabled,definition",
+  policies:
+    "schema,table_name,name,permissive,roles,command,using_expression,check_expression",
+});
+const CATALOG_ARRAY_FIELDS = new Set([
+  "constraints.columns",
+  "constraints.referenced_columns",
+  "enums.labels",
+  "policies.roles",
+]);
+// Descriptor reads never invoke accessors/serialization hooks. No caller object
+// is serialized or retained; array indices and every row key are closed too.
+function catalogRecord(value, fields, read) {
+  check(
+    value &&
+      typeof value === "object" &&
+      !types.isProxy(value) &&
+      [Object.prototype, null].includes(Object.getPrototypeOf(value)) &&
+      keys(value, fields),
+    "catalog",
+  );
+  const result = {};
+  for (const key of Object.keys(value))
+    result[key] = read(key, Object.getOwnPropertyDescriptor(value, key).value);
+  return result;
+}
+function catalogArray(value, read) {
+  check(
+    value &&
+      typeof value === "object" &&
+      !types.isProxy(value) &&
+      Array.isArray(value) &&
+      Object.getPrototypeOf(value) === Array.prototype,
+    "catalog",
+  );
+  const length = Object.getOwnPropertyDescriptor(value, "length")?.value;
+  check(
+    Number.isSafeInteger(length) &&
+      length >= 0 &&
+      length <= 20000 &&
+      Reflect.ownKeys(value).length === length + 1,
+    "catalog",
+  );
+  const result = [];
+  for (let index = 0; index < length; index++) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    check(
+      descriptor?.enumerable && Object.hasOwn(descriptor, "value"),
+      "catalog",
+    );
+    result.push(read(descriptor.value));
+  }
+  return result;
+}
+function snapshotCatalogs(input) {
+  return catalogRecord(input, "before,after", (_phase, catalog) => {
+    let bytes = 0;
+    const scalar = (value) => {
+      check(
+        value === null ||
+          typeof value === "string" ||
+          typeof value === "boolean" ||
+          Number.isSafeInteger(value),
+        "catalog",
+      );
+      bytes += typeof value === "string" ? Buffer.byteLength(value) : 8;
+      check(bytes <= 8000000, "catalog");
+      return value;
+    };
+    return catalogRecord(
+      catalog,
+      ["formatVersion", ...Object.keys(CATALOG_QUERIES)].join(","),
+      (section, value) => {
+        if (section === "formatVersion") return scalar(value);
+        return catalogArray(value, (row) =>
+          catalogRecord(row, CATALOG_ROW_FIELDS[section], (field, leaf) => {
+            if (CATALOG_ARRAY_FIELDS.has(`${section}.${field}`))
+              return catalogArray(leaf, (item) => {
+                check(typeof item === "string", "catalog");
+                return scalar(item);
+              });
+            return scalar(leaf);
+          }),
+        );
+      },
+    );
+  });
+}
+/** Returns admitted frozen metadata only; measured expectations are not native proof. */
+export function assertScheduling0019Catalogs(input) {
+  const catalogs = snapshotCatalogs(input);
   for (const c of [catalogs.before, catalogs.after])
     check(
       keys(c, ["formatVersion", ...Object.keys(CATALOG_QUERIES)].join(",")) &&
@@ -176,6 +274,7 @@ export function assertScheduling0019Catalogs(catalogs) {
     "catalog",
   );
   check(after.constraints.length === before.constraints.length + 3, "catalog");
+  return freeze(catalogs);
 }
 function validateTarget(t) {
   check(
@@ -336,7 +435,7 @@ export function prepareScheduling0019(input) {
     "source_required",
   );
   // Check closure before structuredClone, which intentionally drops hidden fields.
-  assertScheduling0019Catalogs(input.catalogs);
+  const admittedCatalogs = assertScheduling0019Catalogs(input.catalogs);
   validateTarget(input.target);
   const binding = input.sourceBinding;
   check(
@@ -354,7 +453,11 @@ export function prepareScheduling0019(input) {
       "policy",
     );
   const { catalogs, target, policyBefore, policyAfter, sourceBinding } =
-    structuredClone({ ...input, source: undefined });
+    structuredClone({
+      ...input,
+      source: undefined,
+      catalogs: admittedCatalogs,
+    });
   assertScheduling0019Catalogs(catalogs);
   validateTarget(target);
   check(

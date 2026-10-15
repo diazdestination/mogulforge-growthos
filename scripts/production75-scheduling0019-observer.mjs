@@ -37,7 +37,10 @@ const keys = (v) =>
   )
     ? Reflect.ownKeys(v).sort().join(",")
     : null;
-const q = (v) => `"${v}"`;
+const q = (v) => {
+  check(typeof v === "string" && /^[a-z_][a-z0-9_]*$/.test(v), "catalog");
+  return `"${v}"`;
+};
 export function createScheduling0019Observer(input = {}) {
   check(
     keys(input) !== null &&
@@ -84,7 +87,7 @@ export function createScheduling0019Observer(input = {}) {
       principals.includes(identity.login),
     "identity",
   );
-  assertScheduling0019Catalogs(catalogs);
+  const admittedCatalogs = assertScheduling0019Catalogs(catalogs);
   check(
     keys(limits) !== null &&
       Object.keys(limits).every((k) => Object.hasOwn(MAX, k)),
@@ -111,8 +114,8 @@ export function createScheduling0019Observer(input = {}) {
     add(sql);
   for (const sql of Object.values(PRODUCTION75_PRIVILEGE_QUERIES))
     add(sql, sql.includes("$1") ? [actors] : undefined);
-  for (const table of catalogs.before.tables) {
-    const columns = catalogs.before.columns
+  for (const table of admittedCatalogs.before.tables) {
+    const columns = admittedCatalogs.before.columns
         .filter((c) => c.table_name === table.name)
         .sort((a, b) => a.ordinal - b.ordinal),
       projection = `(SELECT ${columns.map((c) => q(c.name)).join(",")} FROM public.${q(table.name)}) AS original`;

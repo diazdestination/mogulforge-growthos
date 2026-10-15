@@ -53,6 +53,152 @@ test.each([
   });
   expect(calls).toHaveLength(0);
 });
+test("nested toJSON substitution cannot register injected caller SQL", () => {
+  const catalogs = structuredClone(f.catalogs),
+    original = { ...catalogs.before.tables[0] },
+    calls = [];
+  const injected = 'x") AS original; SELECT 123 AS injected; --';
+  for (const catalog of [catalogs.before, catalogs.after]) {
+    const row = catalog.tables[0];
+    row.name = injected;
+    Object.defineProperty(row, "toJSON", { value: () => original });
+  }
+  expect(() =>
+    fixture({
+      catalogs,
+      client: {
+        query: async (...args) => {
+          calls.push(args);
+          return { rows: [f.before.identity] };
+        },
+      },
+    }),
+  ).toThrow(/scheduling0019_catalog/);
+  expect(calls).toHaveLength(0);
+});
+test.each([
+  "accessor",
+  "hidden",
+  "symbol",
+  "enumerable-toJSON",
+  "array-hidden",
+  "array-accessor",
+  "nested-array-hidden",
+  "nested-array-accessor",
+  "array-toJSON",
+  "custom-prototype",
+  "proxy",
+])("nested catalog %s is rejected without invoking hooks or client", (kind) => {
+  // Retained constraints share fixture references; isolate each attack setup so
+  // constructing the second layout cannot read the first layout's accessor.
+  const catalogs = {
+      before: structuredClone(f.catalogs.before),
+      after: structuredClone(f.catalogs.after),
+    },
+    calls = [],
+    hiddenSymbol = Symbol("hidden");
+  let hookReads = 0;
+  for (const catalog of [catalogs.before, catalogs.after]) {
+    const row = catalog.tables[0];
+    if (kind === "accessor") {
+      const name = row.name;
+      Object.defineProperty(row, "name", {
+        enumerable: true,
+        get: () => {
+          hookReads++;
+          return name;
+        },
+      });
+    }
+    if (kind === "hidden")
+      Object.defineProperty(row, "hidden", { value: true });
+    if (kind === "symbol") row[hiddenSymbol] = true;
+    if (kind === "enumerable-toJSON")
+      row.toJSON = () => {
+        hookReads++;
+        return { ...row, toJSON: undefined };
+      };
+    if (kind === "array-hidden")
+      Object.defineProperty(catalog.tables, "hidden", { value: true });
+    if (kind === "array-accessor") {
+      const original = catalog.tables[0];
+      Object.defineProperty(catalog.tables, "0", {
+        enumerable: true,
+        get: () => {
+          hookReads++;
+          return original;
+        },
+      });
+    }
+    if (kind === "nested-array-hidden")
+      Object.defineProperty(catalog.constraints[0].columns, "hidden", {
+        value: true,
+      });
+    if (kind === "nested-array-accessor") {
+      const columns = catalog.constraints.find(
+          (c) => c.columns.length > 0,
+        ).columns,
+        original = columns[0];
+      Object.defineProperty(columns, "0", {
+        enumerable: true,
+        get: () => {
+          hookReads++;
+          return original;
+        },
+      });
+    }
+    if (kind === "array-toJSON")
+      Object.defineProperty(catalog.tables, "toJSON", {
+        value: () => {
+          hookReads++;
+          return [...catalog.tables];
+        },
+      });
+    if (kind === "custom-prototype")
+      Object.setPrototypeOf(row, {
+        toJSON: () => {
+          hookReads++;
+          return row;
+        },
+      });
+    if (kind === "proxy")
+      catalog.tables[0] = new Proxy(row, {
+        getOwnPropertyDescriptor(...args) {
+          hookReads++;
+          return Reflect.getOwnPropertyDescriptor(...args);
+        },
+      });
+  }
+  expect(() =>
+    fixture({
+      catalogs,
+      client: {
+        query: async (...args) => {
+          calls.push(args);
+          return { rows: [] };
+        },
+      },
+    }),
+  ).toThrow(/scheduling0019_catalog/);
+  expect(hookReads).toBe(0);
+  expect(calls).toHaveLength(0);
+});
+test("post-construction catalog mutation cannot add registry queries", async () => {
+  const catalogs = structuredClone(f.catalogs),
+    { observer, calls } = fixture({ catalogs });
+  const injected = 'x") AS original; SELECT 123 AS injected; --';
+  catalogs.before.tables[0].name = injected;
+  const sql = `SELECT count(*)::text AS rows,COALESCE(sum(octet_length(row_to_json(original)::text)),0)::text AS bytes FROM (SELECT  FROM public."${injected}") AS original`;
+  await expect(observer.query(sql)).rejects.toMatchObject({
+    safeCode: "scheduling0019_observer_query",
+  });
+  expect(calls).toHaveLength(0);
+  await observer.query(CATALOG_QUERIES.tables);
+  expect(calls.map((c) => c[0])).toEqual([
+    IDENTITY_SQL,
+    CATALOG_QUERIES.tables,
+  ]);
+});
 test("caller-added args, objects, principals and malformed bounds are refused before dispatch", async () => {
   const { observer, calls } = fixture();
   for (const [sql, args] of [
