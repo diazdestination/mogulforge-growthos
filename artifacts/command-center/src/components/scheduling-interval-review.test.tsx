@@ -102,3 +102,13 @@ describe('authoritative interval and travel review', () => {
     expect(text()).toContain('Saved travel gap: 60');
   });
 });
+
+it.each([
+  ['2035-01-01T17:00:00.000Z', '2035-01-01T18:30:00.000Z', 90],
+  ['2035-01-01T17:00:00.000Z', '2035-01-04T18:30:00.000Z', 4410],
+  ['2035-03-11T09:30:00.000Z', '2035-03-11T10:30:00.000Z', 60],
+  ['2035-11-04T08:30:00.000Z', '2035-11-04T10:30:00.000Z', 120],
+])('shows exact elapsed minutes for manual UTC endpoints %s', (startAt, endAt, minutes) => {
+  renderWithQuery(<SchedulingIntervalReview {...props({ interval: makeSchedulingInterval({ startAt: null, endAt: null, reservation: null, legacyEffectiveEnd: null, evidence: 'legacy' }), proposal: makeSchedulingProposal({ startAt, endAt }) })} />);
+  expect(text()).toContain(`${minutes} elapsed minutes`);
+});

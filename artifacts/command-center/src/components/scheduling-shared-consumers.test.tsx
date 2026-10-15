@@ -347,3 +347,27 @@ describe("dedicated scheduling policy host", () => {
     ).toHaveLength(1);
   });
 });
+
+describe('current explanation lifetime fences', () => {
+  it.each(['draft', 'source', 'context', 'actor', 'organization', 'malformed'] as const)('discards a late current conflict after %s changes', async change => {
+    const { client, Wrapper } = wrapper();
+    let resolveResponse!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { resolveResponse = resolve; })));
+    const draft = makeSchedulingDraft();
+    const options = { identity: 'current-source', context };
+    const hook = renderHook(({ identity, context }) => {
+      const authority = useSchedulingAuthority();
+      return useSchedulingReview({ authority, identity, context, interval: makeSchedulingInterval(), initialDraft: draft, transition: 'admission', explanationScope: { reservationKind: 'appointment', appointmentType: 'other' } });
+    }, { wrapper: Wrapper, initialProps: options });
+    act(() => hook.result.current.fields.onReviewChange({ context, duration: { kind: 'explicit', preset: null }, startWallTime: formatSchedulingWallTime(draft.startAt!, context.companyTimeZone), endWallTime: formatSchedulingWallTime(draft.endAt!, context.companyTimeZone) }));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    if (change === 'draft') act(() => hook.result.current.fields.onDraftChange({ ...draft, endAt: '2035-01-01T20:00:00.000Z' }));
+    if (change === 'source') hook.rerender({ ...options, identity: 'another-source' });
+    if (change === 'context') hook.rerender({ ...options, context: { ...context, companyTimeZone: 'UTC' } });
+    if (change === 'actor' || change === 'organization') act(() => client.setQueryData(getGetMeQueryKey(), { ...workMember, ...(change === 'actor' ? { id: 'different-actor' } : { organization: { ...workMember.organization, id: '33333333-3333-4333-8333-333333333333' } }) }));
+    await act(async () => resolveResponse(Response.json({ basis: 'current_schedule', evaluatedAt: '2035-01-01T10:00:00.000Z', context, conflict: { reservationKind: 'appointment', reservationId: '22222222-2222-4222-8222-222222222222', resourceUserId: draft.resourceUserIds[0], startAt: '2035-01-01T17:00:00.000Z', endAt: '2035-01-01T18:00:00.000Z', reason: 'resource_overlap', requiredGapMinutes: 0 }, ...(change === 'malformed' ? { operationId: 'forbidden' } : {}) })));
+    expect(hook.result.current.conflict).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.length).toBe(0);
+  });
+});

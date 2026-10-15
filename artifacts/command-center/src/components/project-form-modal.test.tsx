@@ -338,12 +338,13 @@ describe("Start Project original command and separate lead advancement", () => {
       await waitFor(() => expect(close).toHaveBeenCalledOnce());
       expect(writes).toHaveLength(1);
       expect(writes[0]).toMatchObject({
-        scheduledStart: original.scheduledStart,
-        scheduledEnd: null,
         expectedUpdatedAt: original.updatedAt,
         expectedTargetFingerprint: original.schedulingTargetFingerprint,
-        crewUserIds: change === "release" ? [] : ["tech"],
+        ...(change === "release" ? { crewUserIds: [] } : {}),
       });
+      expect(writes[0]).not.toHaveProperty("scheduledStart");
+      expect(writes[0]).not.toHaveProperty("scheduledEnd");
+      if (change !== "release") expect(writes[0]).not.toHaveProperty("crewUserIds");
       expect(writes[0]).not.toHaveProperty("schedulingReview");
       expect(writes[0]).not.toHaveProperty("operationId");
     },

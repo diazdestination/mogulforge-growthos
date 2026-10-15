@@ -1,3 +1,4 @@
+import { explainSchedulingConflict } from "../../services/scheduling-explanation";
 import { Router, type Response } from "express";
 import { z } from "zod/v4";
 import { requireMember } from "../../middlewares/requireMember";
@@ -113,4 +114,9 @@ router.post(
     }
   },
 );
+router.post('/scheduling/conflict-explanation', requireMember('crm.read'), async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try { res.json(await explainSchedulingConflict({ organizationId: req.member!.organizationId, userId: req.member!.user.id }, req.body)); }
+  catch (error) { if (!schedulingError(error, res)) throw error; }
+});
 export default router;

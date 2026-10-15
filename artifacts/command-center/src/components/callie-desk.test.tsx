@@ -363,7 +363,7 @@ function server(role = "owner", currentDetail = detail(), handler?: Handler) {
     }
     return fallback(input, init);
   });
-  return { requests, state, writes: () => requests.filter(req => req.method !== "GET") };
+  return { requests, state, writes: () => requests.filter(req => req.method !== "GET" && req.path !== "/api/v1/scheduling/conflict-explanation") };
 }
 const clients: QueryClient[] = [];
 function mount(path = "/calls") {

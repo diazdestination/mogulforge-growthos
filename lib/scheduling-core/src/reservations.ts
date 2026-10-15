@@ -42,18 +42,18 @@ export function classifyReservationTransition(before: SchedulingCandidate | null
   return oldResources.length > nextResources.length ? 'release' : 'preserve';
 }
 
-export function assertTravel(candidate: EffectiveReservation, neighbors: EffectiveReservation[]): void {
+export function findTravelConflict(candidate: EffectiveReservation, neighbors: EffectiveReservation[], excludeSelf = true): { neighbor: EffectiveReservation; resourceUserId: string; reason: 'resource_overlap' | 'travel_gap'; requiredGapMinutes: number } | null {
   effectiveReservationSchema.parse(candidate);
   const candidateStart = Temporal.Instant.from(candidate.startAt).epochMilliseconds;
   const candidateEnd = Temporal.Instant.from(candidate.endAt).epochMilliseconds;
   const shared: { row: EffectiveReservation; start: number; end: number }[] = [];
-  for (const neighbor of neighbors) {
+  for (const neighbor of [...neighbors].sort((a, b) => a.startAt.localeCompare(b.startAt) || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id))) {
     effectiveReservationSchema.parse(neighbor);
-    if (neighbor.kind === candidate.kind && neighbor.id === candidate.id) continue;
+    if (excludeSelf && neighbor.kind === candidate.kind && neighbor.id === candidate.id) continue;
     if (!neighbor.resourceUserIds.some(id => candidate.resourceUserIds.includes(id))) continue;
     const start = Temporal.Instant.from(neighbor.startAt).epochMilliseconds;
     const end = Temporal.Instant.from(neighbor.endAt).epochMilliseconds;
-    if (candidateStart < end && start < candidateEnd) throw new RangeError('Same-staff reservations overlap');
+    if (candidateStart < end && start < candidateEnd) return { neighbor, resourceUserId: resources(neighbor.resourceUserIds).find(id => candidate.resourceUserIds.includes(id))!, reason: 'resource_overlap', requiredGapMinutes: Math.max(candidate.savedGapMinutes, neighbor.savedGapMinutes) };
     shared.push({ row: neighbor, start, end });
   }
   for (const userId of resources(candidate.resourceUserIds)) {
@@ -68,9 +68,15 @@ export function assertTravel(candidate: EffectiveReservation, neighbors: Effecti
       if (neighbor.end !== precedingEnd && neighbor.start !== followingStart) continue;
       const requiredGap = Math.max(candidate.savedGapMinutes, neighbor.row.savedGapMinutes) * 60_000;
       const gap = candidateStart >= neighbor.end ? candidateStart - neighbor.end : neighbor.start - candidateEnd;
-      if (gap < requiredGap) throw new RangeError('Saved travel gap is not satisfied');
+      if (gap < requiredGap) return { neighbor: neighbor.row, resourceUserId: userId, reason: 'travel_gap', requiredGapMinutes: requiredGap / 60_000 };
     }
   }
+  return null;
+}
+
+export function assertTravel(candidate: EffectiveReservation, neighbors: EffectiveReservation[]): void {
+  const conflict = findTravelConflict(candidate, neighbors);
+  if (conflict) throw new RangeError(conflict.reason === 'resource_overlap' ? 'Same-staff reservations overlap' : 'Saved travel gap is not satisfied');
 }
 
 /** Peak is measured only inside the candidate interval; half-open ends release first. */

@@ -26,6 +26,7 @@ const c = await tsImport(
   "../artifacts/api-server/src/services/callie-office-contract.ts",
   import.meta.url,
 );
+const d = await tsImport("../lib/scheduling-core/src/explanation.ts", import.meta.url);
 const file = new URL("../lib/api-spec/openapi.yaml", import.meta.url);
 // Exact reviewed pre-Task6D component shapes at 8563ecdb. Required old
 // components may match this shape or their authoritative source projection;
@@ -47,6 +48,7 @@ const requiredComponentDigests = {
     "116424e0278d93294fbbfe06f6d257c7b85eaf0509a063f0dfeb71850493b596",
 };
 const newComponents = new Set([
+  "SchedulingConflictExplanationRequest", "SchedulingConflictExplanation",
   "CustomerWorkProjectOutcome",
   "CustomerWorkProjectUnavailable",
   "ServiceCareSchedulingSource",
@@ -101,6 +103,8 @@ export function projectSchedulingSourceSpec(before) {
   }
   const refs = {};
   for (const [name, contract] of Object.entries({
+    SchedulingConflictExplanationRequest: d.schedulingConflictExplanationRequestSchema,
+    SchedulingConflictExplanation: d.schedulingConflictExplanationSchema,
     CreateCustomerWorkProject: a.createCustomerWorkProjectSchema,
     UpdateCustomerWorkProject: a.updateCustomerWorkProjectSchema,
     CustomerWorkProject: a.customerWorkProjectSchema,
@@ -288,6 +292,10 @@ export function projectSchedulingSourceSpec(before) {
       },
     },
   });
+  const explanationPath = '/v1/scheduling/conflict-explanation';
+  const explanationOperation = { post: { operationId: 'explainSchedulingConflict', tags: ['scheduling'], summary: 'Read one authorized current adjacent staff conflict; never original operation evidence', requestBody: { required: true, content: { 'application/json': { schema: refs.SchedulingConflictExplanationRequest } } }, responses: { 200: { description: 'Current schedule only; no save or original-operation authority.', content: { 'application/json': { schema: refs.SchedulingConflictExplanation } } }, 400: { description: 'Invalid closed request.' }, 403: { description: 'Current staff read authority required.' }, 404: { description: 'Authorized source or target unavailable.' }, 409: { description: 'Stale or invalid current scheduling evidence.' } } } };
+  if (spec.paths[explanationPath] && componentCanonical(spec.paths[explanationPath]) !== componentCanonical(explanationOperation)) throw Error('source_explanation_anchor_changed');
+  paths.set(explanationPath, explanationOperation);
   function replaceSection(indent, key, value, anchor) {
     const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = new RegExp(

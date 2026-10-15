@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertTravel, classifyReservationTransition, effectiveReservation, peakConcurrency, type EffectiveReservation, type SchedulingCandidate } from './index';
+import { findTravelConflict, assertTravel, classifyReservationTransition, effectiveReservation, peakConcurrency, type EffectiveReservation, type SchedulingCandidate } from './index';
 
 const id = '11111111-1111-4111-8111-111111111111';
 const otherId = '22222222-2222-4222-8222-222222222222';
@@ -119,4 +119,14 @@ describe('reservation transitions', () => {
     const protectedVisit = { ...candidate, reservation: snapshot };
     expect(classifyReservationTransition(protectedVisit, { ...protectedVisit, endAt: null })).toBe('admission');
   });
+});
+
+it('returns the actual nearest travel neighbor deterministically and keeps equality valid', () => {
+  const candidate = reserve(id, '12:00', '13:00', ['b', 'a'], 60);
+  const near = reserve(otherId, '10:30', '11:30', ['a'], 0);
+  const distant = reserve('33333333-3333-4333-8333-333333333333', '09:00', '10:00', ['a'], 1440);
+  expect(findTravelConflict(candidate, [near, distant])).toEqual({ neighbor: near, resourceUserId: 'a', reason: 'travel_gap', requiredGapMinutes: 60 });
+  expect(findTravelConflict(candidate, [distant, near])).toEqual(findTravelConflict(candidate, [near, distant]));
+  expect(findTravelConflict({ ...candidate, startAt: '2026-10-13T12:30:00.000Z' }, [near, distant])).toBeNull();
+  expect(findTravelConflict(candidate, [{ ...near, endAt: '2026-10-13T12:30:00.000Z' }])?.reason).toBe('resource_overlap');
 });

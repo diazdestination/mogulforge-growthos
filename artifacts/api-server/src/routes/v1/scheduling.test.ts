@@ -11,11 +11,13 @@ import {
   usersTable,
 } from "@workspace/db";
 import { ReconcileSchedulingOperationResponse } from "@workspace/api-zod";
-import type { ManualSchedulingCommand } from "@workspace/scheduling-core";
+import { schedulingConflictExplanationSchema, type ManualSchedulingCommand } from "@workspace/scheduling-core";
 import app from "../../app";
 import { createSession } from "../../lib/auth";
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
 import {
+  getSchedulingReviewContext,
+  saveSchedulingPolicy,
   assertSchedulingActor,
   lockSchedulingConfiguration,
 } from "../../services/scheduling-policy";
@@ -48,6 +50,7 @@ async function fixture() {
     .insert(organizationsTable)
     .values({
       name: "Synthetic reconcile route",
+      timezone: "UTC",
       slug: `receipt-route-${randomUUID()}`,
     })
     .returning();
@@ -316,4 +319,40 @@ it("lost reconciliation response after COMMIT leaves its permanent fence availab
       .from(auditEventsTable)
       .where(eq(auditEventsTable.organizationId, f.org)),
   ).toHaveLength(2);
+});
+
+it('explains only a current authorized adjacent conflict without creating an operation', async () => {
+  const f = await fixture();
+  await saveSchedulingPolicy(f.actor, { expectedRevision: 0, expectedCompanyTimeZone: 'UTC', enabled: true, minimumTravelGapMinutes: 60, maxConcurrentReservations: 1, durationPresets: [] });
+  const [neighbor] = await db.insert(appointmentsTable).values({ organizationId: f.org, assignedUserId: f.user.id, type: 'other', scheduledStart: new Date('2035-01-02T10:00:00Z'), scheduledEnd: new Date('2035-01-02T11:00:00Z'), notes: 'PRIVATE NEIGHBOR NOTES' }).returning();
+  const query = { sourceKind: 'unlinked_manual' as const, reservationKind: 'appointment' as const, appointmentType: 'other' as const };
+  const context = await getSchedulingReviewContext(f.actor, query);
+  const body = { query, context, interval: { startAt: '2035-01-02T11:30:00.000Z', endAt: '2035-01-02T12:30:00.000Z', resourceUserIds: [f.user.id] } };
+  const auditBefore = await db.select().from(auditEventsTable).where(eq(auditEventsTable.organizationId, f.org));
+  const explain = (input: unknown, sid = f.sid) => fetch(`${origin}/api/v1/scheduling/conflict-explanation`, { method: 'POST', headers: { 'content-type': 'application/json', cookie: `sid=${sid}`, Origin: 'https://growth.example' }, body: JSON.stringify(input) });
+  const res = await explain(body);
+  expect(res.status).toBe(200);
+  expect(res.headers.get('cache-control')).toBe('no-store');
+  const value = schedulingConflictExplanationSchema.parse(await res.json());
+  expect(Object.keys(value).sort()).toEqual(['basis', 'conflict', 'context', 'evaluatedAt']);
+  expect(value).toMatchObject({ basis: 'current_schedule', context, conflict: { reservationKind: 'appointment', reservationId: neighbor.id, resourceUserId: f.user.id, reason: 'travel_gap', requiredGapMinutes: 60 } });
+  expect(JSON.stringify(value)).not.toContain('PRIVATE');
+  expect(schedulingConflictExplanationSchema.parse(await (await explain({ ...body, interval: { ...body.interval, startAt: '2035-01-02T10:30:00.000Z' } })).json()).conflict?.reason).toBe('resource_overlap');
+  expect(schedulingConflictExplanationSchema.parse(await (await explain({ ...body, interval: { ...body.interval, startAt: '2035-01-02T12:00:00.000Z' } })).json()).conflict).toBeNull();
+  const targetQuery = { ...query, targetKind: 'appointment' as const, targetId: neighbor.id };
+  const targetContext = await getSchedulingReviewContext(f.actor, targetQuery);
+  expect(schedulingConflictExplanationSchema.parse(await (await explain({ ...body, query: targetQuery, context: targetContext })).json()).conflict).toBeNull();
+  expect((await explain(body, 'missing-session')).status).toBe(401);
+  await db.update(appointmentsTable).set({ schedulingReservation: { formatVersion: 1, reservationRevision: 1, sourcePolicyRevision: context.policyRevision, sourcePolicyDigest: context.policyDigest!, approvedTimeZone: 'UTC', inspection: null, startAt: neighbor.scheduledStart.toISOString(), endAt: '2035-01-02T13:00:00.000Z', resourceUserIds: [f.user.id], minimumTravelGapMinutes: 60, duration: { kind: 'explicit', preset: null }, admittedAt: neighbor.createdAt.toISOString(), admittedByUserId: f.user.id, target: { kind: 'appointment', id: neighbor.id }, lastTransition: { kind: 'admission', actorUserId: f.user.id, at: neighbor.createdAt.toISOString() } }, updatedAt: neighbor.updatedAt }).where(eq(appointmentsTable.id, neighbor.id));
+  const corrupt = await explain(body); expect(corrupt.status).toBe(409); expect(JSON.stringify(await corrupt.json())).not.toContain(neighbor.id);
+  await db.update(appointmentsTable).set({ schedulingReservation: null, updatedAt: neighbor.updatedAt }).where(eq(appointmentsTable.id, neighbor.id));
+  const foreign = await fixture();
+  for (const input of [{ ...body, ignoreReservationIds: [neighbor.id] }, { ...body, query: { ...query, sourceKind: 'direct_customer', sourceId: randomUUID() } }, { ...body, actorUserId: f.user.id }, { ...body, context: { ...context, policyRevision: 90 } }, { ...body, interval: { ...body.interval, resourceUserIds: [foreign.user.id] } }, { ...body, query: { ...query, targetKind: 'appointment', targetId: randomUUID() } }, { ...body, interval: { ...body.interval, endAt: 'bad' } }]) {
+    const denied = await explain(input); expect(denied.status).toBeGreaterThanOrEqual(400); expect(JSON.stringify(await denied.json())).not.toContain(neighbor.id);
+  }
+  expect((await explain(body, foreign.sid)).status).toBeGreaterThanOrEqual(400);
+  await db.update(usersTable).set({ isActive: false }).where(eq(usersTable.id, f.user.id));
+  expect((await explain(body)).status).toBeGreaterThanOrEqual(400);
+  expect(await db.select().from(auditEventsTable).where(eq(auditEventsTable.organizationId, f.org))).toEqual(auditBefore);
+  expect(await db.select().from(appointmentsTable).where(eq(appointmentsTable.organizationId, f.org))).toEqual([neighbor]);
 });

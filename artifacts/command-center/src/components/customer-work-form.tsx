@@ -373,6 +373,7 @@ function CustomerWorkFormDraft({
   const review = useSchedulingReview({
     authority,
     identity: selection,
+    explanationScope: { reservationKind: "project", ...(projectRecord ? { targetKind: "project", targetId: projectRecord.id } : {}) },
     context,
     interval,
     initialDraft: {
@@ -991,7 +992,7 @@ function CustomerWorkFormDraft({
                     interval={interval}
                     proposal={proposal}
                     resources={[]}
-                    conflict={null}
+                    conflict={review.conflict}
                   />
                   {projectRecord && (
                     <SchedulingReservationSummary
@@ -1003,7 +1004,7 @@ function CustomerWorkFormDraft({
                       interval={interval}
                       proposal={proposal}
                       resources={[]}
-                      conflict={null}
+                      conflict={review.conflict}
                     />
                   )}
                 </>

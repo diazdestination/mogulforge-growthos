@@ -1,3 +1,4 @@
+import { activeSnapshotAgrees } from "./scheduling-policy";
 import {
   projectEstimateEmailExport,
   type EstimateEmailRetainedLedger,
@@ -865,6 +866,7 @@ export function createCustomerLifecycleExporter({
           if (org.rows.length !== 1) throw unavailable();
           const data: Record<string, Record<string, unknown>[]> = {};
           const schedulingSnapshots = new Map<string, unknown>();
+          const currentSchedulingEvidence = new Set<string>();
           const included = new Map<string, Set<unknown>>();
           const coverage: Array<{
             table: string;
@@ -876,7 +878,7 @@ export function createCustomerLifecycleExporter({
           for (const definition of CUSTOMER_EXPORT_DATASETS) {
             // All SQL identifiers are the fixed reviewed list above, never input.
             const result = await query(
-              `SELECT ${definition.fields.map((field) => `"${field}"`).join(", ")}${["appointments", "projects"].includes(definition.table) ? ', scheduling_reservation AS "_schedulingReservation"' : ""} FROM public."${definition.table}" WHERE organization_id = $1 ORDER BY id LIMIT $2`,
+              `SELECT ${definition.fields.map((field) => `"${field}"`).join(", ")}${["appointments", "projects"].includes(definition.table) ? `, scheduling_reservation AS "_schedulingReservation", ${definition.table === 'appointments' ? 'assigned_user_id' : 'crew_user_ids'} AS "_schedulingResources"` : ""} FROM public."${definition.table}" WHERE organization_id = $1 ORDER BY id LIMIT $2`,
               [organizationId, maxRows + 1],
             );
             if (result.rows.length > maxRows)
@@ -891,6 +893,14 @@ export function createCustomerLifecycleExporter({
                   `${definition.table}:${row.id}`,
                   row._schedulingReservation ?? null,
                 );
+                const parsed = reservationSnapshotSchema.safeParse(row._schedulingReservation);
+                const kind = definition.table === 'appointments' ? 'appointment' : 'project';
+                if (parsed.success && parsed.data.target.kind === kind && parsed.data.target.id === row.id && activeSnapshotAgrees(kind, {
+                  id: row.id, scheduledStart: row.scheduled_start as Date | null, scheduledEnd: row.scheduled_end as Date | null,
+                  status: row.status as string, type: row.type as string | undefined,
+                  ...(kind === 'appointment' ? { assignedUserId: row._schedulingResources as string | null } : { crewUserIds: row._schedulingResources as string[] }),
+                }, parsed.data)) currentSchedulingEvidence.add(`${definition.table}:${row.id}`);
+                delete row._schedulingResources;
                 delete row._schedulingReservation;
               }
             const links = Object.entries(definition.references ?? {});
@@ -1065,7 +1075,8 @@ export function createCustomerLifecycleExporter({
               const reservation =
                 parsed.success &&
                 parsed.data.target.kind === kind &&
-                parsed.data.target.id === row.id
+                parsed.data.target.id === row.id &&
+                currentSchedulingEvidence.has(`${table}:${row.id}`)
                   ? projectReservationExport(
                       parsed.data,
                       schedulingEvidence.context.authorizedHistoricalLinks,

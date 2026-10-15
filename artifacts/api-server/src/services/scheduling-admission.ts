@@ -134,11 +134,12 @@ function checkedEffective(
 }
 const MAX = 10000;
 /** Each physical query is bounded; the limit applies to the COMBINED logical population. */
-async function evidence(
+export async function readSchedulingEvidence(
   tx: ScheduleTransaction,
   org: string,
   candidate: EffectiveReservation,
   population: "resource" | "company" | "inspection",
+  excludeTarget = true,
 ) {
   const from = new Date(candidate.startAt),
     to = new Date(candidate.endAt),
@@ -152,7 +153,7 @@ async function evidence(
         eq(appointmentsTable.organizationId, org),
         inArray(appointmentsTable.status, ["scheduled", "confirmed"]),
         isNotNull(appointmentsTable.scheduledStart),
-        candidate.kind === "appointment"
+        excludeTarget && candidate.kind === "appointment"
           ? ne(appointmentsTable.id, candidate.id)
           : undefined,
         population === "resource"
@@ -191,7 +192,7 @@ async function evidence(
               eq(projectsTable.organizationId, org),
               inArray(projectsTable.status, ["scheduled", "in_progress"]),
               isNotNull(projectsTable.scheduledStart),
-              candidate.kind === "project"
+              excludeTarget && candidate.kind === "project"
                 ? ne(projectsTable.id, candidate.id)
                 : undefined,
               population === "resource"
@@ -358,7 +359,7 @@ export async function prepareNativeSchedulingAdmission(
   }
   candidate.savedGapMinutes =
     current.context.applicableRules.newTravelGapMinutes;
-  const neighbors = await evidence(tx, org, candidate, "resource");
+  const neighbors = await readSchedulingEvidence(tx, org, candidate, "resource");
   // All inputs have been schema/evidence validated above. Only the core domain assertion is translated.
   try {
     assertTravel(candidate, neighbors);
@@ -377,7 +378,7 @@ export async function prepareNativeSchedulingAdmission(
   const cap = current.context.applicableRules.companyCeiling;
   if (
     cap !== null &&
-    peakConcurrency(candidate, await evidence(tx, org, candidate, "company")) >
+    peakConcurrency(candidate, await readSchedulingEvidence(tx, org, candidate, "company")) >
       cap
   )
     schedulingFailure("company_capacity_conflict");
@@ -386,7 +387,7 @@ export async function prepareNativeSchedulingAdmission(
     inspection !== null &&
     peakConcurrency(
       candidate,
-      await evidence(tx, org, candidate, "inspection"),
+      await readSchedulingEvidence(tx, org, candidate, "inspection"),
     ) > inspection
   )
     schedulingFailure("inspection_capacity_conflict");

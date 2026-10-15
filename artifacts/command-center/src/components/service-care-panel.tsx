@@ -430,6 +430,7 @@ export default function ServiceCarePanel({ obligationId, editable, onChanged, on
     interval,
     initialDraft: { startAt: null, endAt: null, resourceUserIds: [] },
     transition: "admission",
+    explanationScope: { reservationKind: 'appointment', appointmentType: visitType },
   });
   const assignee = review.draft.resourceUserIds[0] ?? "";
   useEffect(() => {
@@ -849,7 +850,7 @@ export default function ServiceCarePanel({ obligationId, editable, onChanged, on
                   interval={interval}
                   proposal={review.proposal}
                   resources={[]}
-                  conflict={null}
+                  conflict={review.conflict}
                 />
               </fieldset>
               {usersError && <p role="alert">Team members could not be loaded. Refresh before booking.</p>}

@@ -1176,6 +1176,7 @@ it("reads current policy provenance, history and reservation fields in one repea
     type: "other",
     scheduledStart: new Date(snapshot.startAt),
     scheduledEnd: new Date(snapshot.endAt),
+    assignedUserId: f.owner,
     schedulingReservation: snapshot,
   });
   const foreign = await fixture();
@@ -1196,6 +1197,7 @@ it("reads current policy provenance, history and reservation fields in one repea
     leadId: lead.id,
     scheduledStart: new Date(projectSnapshot.startAt),
     scheduledEnd: new Date(projectSnapshot.endAt),
+    crewUserIds: [resource.id],
     schedulingReservation: projectSnapshot,
   });
   const original = receipt(f);
@@ -1557,4 +1559,27 @@ it("refuses combined organization scheduling metadata plus business data above 1
     ),
   ).rejects.toMatchObject({ status: 413, code: "customer_export_limit" });
   expect(queries.some((q) => q.startsWith("INSERT"))).toBe(false);
+});
+
+it.each(['endpoint', 'resources'] as const)('withholds active %s-mismatched protection before export privacy projection', async (mismatch) => {
+  const f = await fixture();
+  const appointmentId = randomUUID(), projectId = randomUUID();
+  const appointmentSnapshot = saved({ kind: 'appointment', id: appointmentId }, [f.owner]);
+  const projectSnapshot = saved({ kind: 'project', id: projectId }, [f.owner]);
+  const [lead] = await db.insert(leadsTable).values({ organizationId: f.org, contactId: f.contact }).returning();
+  await db.insert(appointmentsTable).values({ id: appointmentId, organizationId: f.org, contactId: f.contact, type: 'other', status: 'scheduled', scheduledStart: new Date(appointmentSnapshot.startAt), scheduledEnd: new Date(Date.parse(appointmentSnapshot.endAt) + (mismatch === 'endpoint' ? 60000 : 0)), assignedUserId: mismatch === 'resources' ? null : f.owner, schedulingReservation: appointmentSnapshot });
+  await db.insert(projectsTable).values({ id: projectId, organizationId: f.org, leadId: lead.id, name: 'Synthetic mismatch', status: 'scheduled', scheduledStart: new Date(projectSnapshot.startAt), scheduledEnd: new Date(Date.parse(projectSnapshot.endAt) + (mismatch === 'endpoint' ? 60000 : 0)), crewUserIds: mismatch === 'resources' ? [] : [f.owner], schedulingReservation: projectSnapshot });
+  const out = await createCustomerLifecycleExporter()(f.org, f.owner);
+  for (const table of ['appointments', 'projects'] as const) {
+    expect(out.data[table][0]).toMatchObject({ scheduling_evidence: 'invalid', scheduling_reservation: null });
+    expect(out.data[table][0]).not.toHaveProperty('_schedulingResources');
+  }
+  expect((await db.select().from(appointmentsTable).where(eq(appointmentsTable.id, appointmentId)))[0].schedulingReservation).toEqual(appointmentSnapshot);
+  expect((await db.select().from(projectsTable).where(eq(projectsTable.id, projectId)))[0].schedulingReservation).toEqual(projectSnapshot);
+  // Terminal work retains legitimate historical snapshots even after dates/staff change.
+  await db.update(appointmentsTable).set({ status: 'completed' }).where(eq(appointmentsTable.id, appointmentId));
+  await db.update(projectsTable).set({ status: 'completed' }).where(eq(projectsTable.id, projectId));
+  const terminal = await createCustomerLifecycleExporter()(f.org, f.owner);
+  expect(terminal.data.appointments[0].scheduling_evidence).toBe('versioned');
+  expect(terminal.data.projects[0].scheduling_evidence).toBe('versioned');
 });

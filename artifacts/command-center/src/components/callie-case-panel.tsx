@@ -315,6 +315,7 @@ export default function CallieCasePanel({ scopeKey, organizationId, id, editable
     interval,
     initialDraft: { startAt: null, endAt: null, resourceUserIds: [] },
     transition: "admission",
+    explanationScope: { reservationKind: 'appointment', appointmentType: visitType },
   });
   const staff = review.draft.resourceUserIds[0] ?? "";
   useEffect(() => {
@@ -644,7 +645,7 @@ export default function CallieCasePanel({ scopeKey, organizationId, id, editable
                   interval={interval}
                   proposal={review.proposal}
                   resources={[]}
-                  conflict={null}
+                  conflict={review.conflict}
                 />
               </fieldset>
               <label className="block text-sm">

@@ -75,6 +75,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /settings/scheduling-policy": "crm.read",
   "PUT /settings/scheduling-policy": "settings.manage",
   "GET /scheduling/review-context": "crm.read",
+  "POST /scheduling/conflict-explanation": "crm.read",
   "POST /scheduling/operations/reconcile": "crm.write",
   "GET /contacts/:id/detail-correction": "crm.read",
   "POST /contacts/:id/detail-corrections": "crm.write",

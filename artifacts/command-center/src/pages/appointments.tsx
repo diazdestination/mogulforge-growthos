@@ -844,6 +844,7 @@ function ApptFormModal({
     interval,
     initialDraft: draftRef.current,
     transition: 'admission',
+    explanationScope: { reservationKind: 'appointment', appointmentType: type, ...(appt ? { targetKind: 'appointment', targetId: appt.id } : {}) },
   });
   draftRef.current = review.draft;
   const endpointsUnchanged =
@@ -1149,14 +1150,14 @@ function ApptFormModal({
         await updateAppt.mutateAsync({
           id: appt.id,
           data: {
-            type,
-            status,
+            ...(type !== appt.type ? { type } : {}),
+            ...(status !== appt.status ? { status } : {}),
             notes: notes || null,
-            leadId: leadId || null,
-            contactId: contactId || null,
-            assignedUserId: review.draft.resourceUserIds[0] ?? null,
-            scheduledStart: review.draft.startAt ?? appt.scheduledStart,
-            ...(interval.endAt !== null || review.draft.endAt !== null
+            ...(leadId !== (appt.leadId ?? '') ? { leadId: leadId || null } : {}),
+            ...(contactId !== (appt.contactId ?? '') ? { contactId: contactId || null } : {}),
+            ...(!resourcesUnchanged ? { assignedUserId: review.draft.resourceUserIds[0] ?? null } : {}),
+            ...(review.draft.startAt !== interval.startAt ? { scheduledStart: review.draft.startAt ?? appt.scheduledStart } : {}),
+            ...(review.draft.endAt !== interval.endAt
               ? { scheduledEnd: review.draft.endAt }
               : {}),
             expectedUpdatedAt: appt.updatedAt,
@@ -1430,7 +1431,7 @@ function ApptFormModal({
               interval={interval}
               proposal={proposal}
               resources={resources}
-              conflict={null}
+              conflict={review.conflict}
             />
             {appt && (
               <SchedulingReservationSummary
@@ -1438,7 +1439,7 @@ function ApptFormModal({
                 interval={interval}
                 proposal={proposal}
                 resources={resources}
-                conflict={null}
+                conflict={review.conflict}
               />
             )}
             <label className="block">

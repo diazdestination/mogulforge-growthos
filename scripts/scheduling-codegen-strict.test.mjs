@@ -845,3 +845,14 @@ describe("source projection required component anchors", () => {
     ).toThrow();
   });
 });
+
+describe('closed current conflict explanation generation', () => {
+  const request = { query: { sourceKind: 'unlinked_manual', reservationKind: 'appointment', appointmentType: 'other' }, context, interval: { startAt: '2035-01-01T12:00:00.000Z', endAt: '2035-01-01T13:00:00.000Z', resourceUserIds: ['staff'] } };
+  const response = { basis: 'current_schedule', evaluatedAt: '2035-01-01T10:00:00.000Z', context, conflict: { reservationKind: 'project', reservationId: id, resourceUserId: 'staff', startAt: '2035-01-01T11:00:00.000Z', endAt: '2035-01-01T12:00:00.000Z', reason: 'travel_gap', requiredGapMinutes: 60 } };
+  it('accepts current typed evidence and rejects unknown fields at every new boundary', () => {
+    expect(generated.ExplainSchedulingConflictBody.parse(request)).toEqual(request);
+    expect(generated.ExplainSchedulingConflictResponse.parse(response)).toEqual(response);
+    for (const invalid of [{ ...request, operationId: id }, { ...request, query: { ...request.query, ignoreId: id } }, { ...request, interval: { ...request.interval, schedulingReservation: {} } }]) expect(generated.ExplainSchedulingConflictBody.safeParse(invalid).success).toBe(false);
+    for (const invalid of [{ ...response, operationId: id }, { ...response, basis: 'original_refusal' }, { ...response, conflict: { ...response.conflict, customerName: 'private' } }, { ...response, conflict: { ...response.conflict, requiredGapMinutes: 1441 } }]) expect(generated.ExplainSchedulingConflictResponse.safeParse(invalid).success).toBe(false);
+  });
+});

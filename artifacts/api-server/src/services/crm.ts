@@ -1611,12 +1611,7 @@ export async function updateAppointment(
       await assertHistoricalStaff(tx, organizationId, staff ? [staff] : []);
       if (staff && staff !== existing.assignedUserId)
         await assertOperationalStaff(tx, organizationId, [staff]);
-    } else if (
-      input.assignedUserId !== undefined ||
-      input.status !== undefined ||
-      input.scheduledStart !== undefined ||
-      input.scheduledEnd !== undefined
-    )
+    } else if (structuralTransition === "admission")
       await assertOperationalStaff(tx, organizationId, staff ? [staff] : []);
     assertScheduleInterval(next.scheduledStart, next.scheduledEnd);
     const source = await schedulingSource(tx, organizationId, {
@@ -2196,12 +2191,7 @@ export async function updateProject(
         organizationId,
         staff.filter((id) => !existing.crewUserIds.includes(id)),
       );
-    } else if (
-      input.crewUserIds !== undefined ||
-      input.status !== undefined ||
-      input.scheduledStart !== undefined ||
-      input.scheduledEnd !== undefined
-    )
+    } else if (structuralTransition === "admission")
       await assertOperationalStaff(tx, organizationId, staff);
     const start =
       input.scheduledStart === undefined
@@ -2213,6 +2203,7 @@ export async function updateProject(
         : input.scheduledEnd;
     assertScheduleInterval(start, end);
     if (
+      structuralTransition === "admission" &&
       start &&
       staff.length &&
       !end &&

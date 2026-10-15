@@ -277,6 +277,8 @@ import type {
   SaveMissedCallCarePolicy,
   SavedFilter,
   SavedFilterInput,
+  SchedulingConflictExplanation,
+  SchedulingConflictExplanationRequest,
   SchedulingReviewContext,
   ServiceCareBookingResult,
   ServiceCareCommandResult,
@@ -401,6 +403,96 @@ const withQueryKey = <T extends object, K>(
     });
   }
   return result;
+};
+
+export const getExplainSchedulingConflictUrl = () => {
+  return `/api/v1/scheduling/conflict-explanation`;
+};
+
+/**
+ * @summary Read one authorized current adjacent staff conflict; never original operation evidence
+ */
+export const explainSchedulingConflict = async (
+  schedulingConflictExplanationRequest: SchedulingConflictExplanationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<SchedulingConflictExplanation> => {
+  return customFetch<SchedulingConflictExplanation>(
+    getExplainSchedulingConflictUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(schedulingConflictExplanationRequest),
+    },
+  );
+};
+
+export const getExplainSchedulingConflictMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof explainSchedulingConflict>>,
+    TError,
+    { data: BodyType<SchedulingConflictExplanationRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof explainSchedulingConflict>>,
+  TError,
+  { data: BodyType<SchedulingConflictExplanationRequest> },
+  TContext
+> => {
+  const mutationKey = ["explainSchedulingConflict"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof explainSchedulingConflict>>,
+    { data: BodyType<SchedulingConflictExplanationRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return explainSchedulingConflict(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ExplainSchedulingConflictMutationResult = NonNullable<
+  Awaited<ReturnType<typeof explainSchedulingConflict>>
+>;
+export type ExplainSchedulingConflictMutationBody =
+  BodyType<SchedulingConflictExplanationRequest>;
+export type ExplainSchedulingConflictMutationError = ErrorType<void>;
+
+/**
+ * @summary Read one authorized current adjacent staff conflict; never original operation evidence
+ */
+export const useExplainSchedulingConflict = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof explainSchedulingConflict>>,
+    TError,
+    { data: BodyType<SchedulingConflictExplanationRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof explainSchedulingConflict>>,
+  TError,
+  { data: BodyType<SchedulingConflictExplanationRequest> },
+  TContext
+> => {
+  return useMutation(getExplainSchedulingConflictMutationOptions(options));
 };
 
 export const getGetCallieSchedulingContextUrl = (

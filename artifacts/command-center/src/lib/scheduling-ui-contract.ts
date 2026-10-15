@@ -56,6 +56,8 @@ export type AuthorizedConflict = null | {
   reservationKind: "appointment" | "project";
   reservationId: UUID;
   resourceLabel: string;
+  resourceUserId?: UserId;
+  evaluatedAt?: ISO;
   startAt: ISO;
   endAt: ISO;
   reason: string;

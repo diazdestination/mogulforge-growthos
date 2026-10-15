@@ -1,3 +1,5 @@
+import { schedulingReviewQuerySchema, type SchedulingReviewQuery } from "@workspace/scheduling-core";
+export { schedulingReviewQuerySchema, type SchedulingReviewQuery } from "@workspace/scheduling-core";
 import { createHash, randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod/v4";
@@ -288,9 +290,9 @@ export function projectSchedulingEvidence(
 }
 /** Reuse core normalization without loading policy or assigning source authority.
  * This local math candidate is never returned as a review/command source. */
-function activeSnapshotAgrees(
+export function activeSnapshotAgrees(
   kind: "appointment" | "project",
-  row: NativeRow,
+  row: { id: string; scheduledStart: Date | null; scheduledEnd: Date | null; status: string; type?: string; assignedUserId?: string | null; crewUserIds?: string[] },
   snapshot: ReservationSnapshot,
 ): boolean {
   try {
@@ -683,35 +685,6 @@ export async function setSchedulingCompanyTimeZone(
   });
 }
 
-export const schedulingReviewQuerySchema = z
-  .strictObject({
-    sourceKind: z.enum(["lead", "direct_customer", "unlinked_manual"]),
-    sourceId: uuidSchema.optional(),
-    propertyId: uuidSchema.optional(),
-    estimateId: uuidSchema.optional(),
-    reservationKind: z.enum(["appointment", "project"]),
-    appointmentType: z.enum(appointmentTypes).optional(),
-    targetKind: z.enum(["appointment", "project"]).optional(),
-    targetId: uuidSchema.optional(),
-  })
-  .superRefine((value, ctx) => {
-    if (
-      (value.sourceKind === "unlinked_manual"
-        ? value.sourceId !== undefined ||
-          value.propertyId !== undefined ||
-          value.estimateId !== undefined
-        : value.sourceId === undefined) ||
-      !!value.targetKind !== !!value.targetId ||
-      (value.targetKind && value.targetKind !== value.reservationKind) ||
-      (value.reservationKind === "project" &&
-        value.appointmentType !== undefined)
-    )
-      ctx.addIssue({
-        code: "custom",
-        message: "Choose consistent source, target and booking scope.",
-      });
-  });
-export type SchedulingReviewQuery = z.infer<typeof schedulingReviewQuerySchema>;
 async function sourceForQuery(
   tx: ScheduleTransaction,
   org: string,
@@ -838,8 +811,11 @@ export async function getSchedulingReviewContext(
   actor: SchedulingActor,
   query: SchedulingReviewQuery,
 ): Promise<SchedulingReviewContext> {
+  return db.transaction(tx => getSchedulingReviewContextInTransaction(tx, actor, query));
+}
+export async function getSchedulingReviewContextInTransaction(tx: ScheduleTransaction, actor: SchedulingActor, query: SchedulingReviewQuery): Promise<SchedulingReviewContext> {
   const parsed = schedulingReviewQuerySchema.parse(query);
-  return db.transaction(async (tx) => {
+  transactionOnly(tx);
     await lockSchedulingConfiguration(tx, actor.organizationId, false);
     await assertSchedulingActor(tx, actor, "crm.read");
     const row = parsed.targetId
@@ -940,5 +916,4 @@ export async function getSchedulingReviewContext(
       },
     );
     return { ...result.context, source };
-  });
 }

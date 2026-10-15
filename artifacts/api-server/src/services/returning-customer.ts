@@ -472,7 +472,14 @@ async function schedule(
       org,
       input.crewUserIds.filter((id) => !existing.crewUserIds.includes(id)),
     );
-  } else await assertOperationalStaff(tx, org, input.crewUserIds);
+  } else if (!existing || classifyReservationTransition(
+    nativeSchedulingCandidate("project", existing),
+    nativeSchedulingCandidate("project", { ...existing, scheduledStart: start, scheduledEnd: end, status: input.status, crewUserIds: input.crewUserIds }),
+  ) === "admission") {
+    // The immutable returning parent is checked separately. Pure preservation or
+    // removal keeps historical resources; new/material work still needs active staff.
+    await assertOperationalStaff(tx, org, input.crewUserIds);
+  }
   assertScheduleInterval(start, end);
   return { scheduledStart: start, scheduledEnd: end };
 }

@@ -5,6 +5,281 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+export type SchedulingConflictExplanationBasis = typeof SchedulingConflictExplanationBasis[keyof typeof SchedulingConflictExplanationBasis];
+
+
+export const SchedulingConflictExplanationBasis = {
+  current_schedule: 'current_schedule',
+} as const;
+
+export type SchedulingConflictExplanationContextInspectionSourceState = typeof SchedulingConflictExplanationContextInspectionSourceState[keyof typeof SchedulingConflictExplanationContextInspectionSourceState];
+
+
+export const SchedulingConflictExplanationContextInspectionSourceState = {
+  recorded: 'recorded',
+  legacy_default: 'legacy_default',
+  legacy_normalized: 'legacy_normalized',
+} as const;
+
+export type SchedulingConflictExplanationContextInspection = {
+  /** @minLength 1 */
+  ruleTimeZone: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  availabilityDigest: string;
+  sourceState: SchedulingConflictExplanationContextInspectionSourceState;
+} | null;
+
+export type SchedulingConflictExplanationContextApplicableRules = {
+  /**
+     * @minimum 0
+     * @maximum 1440
+     */
+  newTravelGapMinutes: number;
+  /**
+     * @minimum 1
+     * @maximum 100
+     */
+  companyCeiling: number | null;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  inspectionCeiling: number | null;
+};
+
+export type SchedulingConflictExplanationContextSourceSourceKind = typeof SchedulingConflictExplanationContextSourceSourceKind[keyof typeof SchedulingConflictExplanationContextSourceSourceKind];
+
+
+export const SchedulingConflictExplanationContextSourceSourceKind = {
+  lead: 'lead',
+  direct_customer: 'direct_customer',
+  unlinked_manual: 'unlinked_manual',
+} as const;
+
+export type SchedulingConflictExplanationContextSource = {
+  sourceKind: SchedulingConflictExplanationContextSourceSourceKind;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId: string | null;
+} | null;
+
+export type SchedulingConflictExplanationContext = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  policyRevision: number;
+  /** @pattern ^[a-f0-9]{64}$ */
+  policyDigest: string | null;
+  /** @minLength 1 */
+  companyTimeZone: string;
+  inspection: SchedulingConflictExplanationContextInspection;
+  applicableRules: SchedulingConflictExplanationContextApplicableRules;
+  source: SchedulingConflictExplanationContextSource;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  targetVersion: string | null;
+  /** @pattern ^[a-f0-9]{64}$ */
+  targetFingerprint: string | null;
+};
+
+export type SchedulingConflictExplanationConflictReservationKind = typeof SchedulingConflictExplanationConflictReservationKind[keyof typeof SchedulingConflictExplanationConflictReservationKind];
+
+
+export const SchedulingConflictExplanationConflictReservationKind = {
+  appointment: 'appointment',
+  project: 'project',
+} as const;
+
+export type SchedulingConflictExplanationConflictReason = typeof SchedulingConflictExplanationConflictReason[keyof typeof SchedulingConflictExplanationConflictReason];
+
+
+export const SchedulingConflictExplanationConflictReason = {
+  resource_overlap: 'resource_overlap',
+  travel_gap: 'travel_gap',
+} as const;
+
+export type SchedulingConflictExplanationConflict = {
+  reservationKind: SchedulingConflictExplanationConflictReservationKind;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  reservationId: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  resourceUserId: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  startAt: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  endAt: string;
+  reason: SchedulingConflictExplanationConflictReason;
+  /**
+     * @minimum 0
+     * @maximum 1440
+     */
+  requiredGapMinutes: number;
+} | null;
+
+export interface SchedulingConflictExplanation {
+  basis: SchedulingConflictExplanationBasis;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  evaluatedAt: string;
+  context: SchedulingConflictExplanationContext;
+  conflict: SchedulingConflictExplanationConflict;
+}
+
+export type SchedulingConflictExplanationRequestQuerySourceKind = typeof SchedulingConflictExplanationRequestQuerySourceKind[keyof typeof SchedulingConflictExplanationRequestQuerySourceKind];
+
+
+export const SchedulingConflictExplanationRequestQuerySourceKind = {
+  lead: 'lead',
+  direct_customer: 'direct_customer',
+  unlinked_manual: 'unlinked_manual',
+} as const;
+
+export type SchedulingConflictExplanationRequestQueryReservationKind = typeof SchedulingConflictExplanationRequestQueryReservationKind[keyof typeof SchedulingConflictExplanationRequestQueryReservationKind];
+
+
+export const SchedulingConflictExplanationRequestQueryReservationKind = {
+  appointment: 'appointment',
+  project: 'project',
+} as const;
+
+export type SchedulingConflictExplanationRequestQueryAppointmentType = typeof SchedulingConflictExplanationRequestQueryAppointmentType[keyof typeof SchedulingConflictExplanationRequestQueryAppointmentType];
+
+
+export const SchedulingConflictExplanationRequestQueryAppointmentType = {
+  inspection: 'inspection',
+  estimate_review: 'estimate_review',
+  production: 'production',
+  final_walkthrough: 'final_walkthrough',
+  other: 'other',
+} as const;
+
+export type SchedulingConflictExplanationRequestQueryTargetKind = typeof SchedulingConflictExplanationRequestQueryTargetKind[keyof typeof SchedulingConflictExplanationRequestQueryTargetKind];
+
+
+export const SchedulingConflictExplanationRequestQueryTargetKind = {
+  appointment: 'appointment',
+  project: 'project',
+} as const;
+
+export type SchedulingConflictExplanationRequestQuery = {
+  sourceKind: SchedulingConflictExplanationRequestQuerySourceKind;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  sourceId?: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId?: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId?: string;
+  reservationKind: SchedulingConflictExplanationRequestQueryReservationKind;
+  appointmentType?: SchedulingConflictExplanationRequestQueryAppointmentType;
+  targetKind?: SchedulingConflictExplanationRequestQueryTargetKind;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  targetId?: string;
+};
+
+export type SchedulingConflictExplanationRequestContextInspectionSourceState = typeof SchedulingConflictExplanationRequestContextInspectionSourceState[keyof typeof SchedulingConflictExplanationRequestContextInspectionSourceState];
+
+
+export const SchedulingConflictExplanationRequestContextInspectionSourceState = {
+  recorded: 'recorded',
+  legacy_default: 'legacy_default',
+  legacy_normalized: 'legacy_normalized',
+} as const;
+
+export type SchedulingConflictExplanationRequestContextInspection = {
+  /** @minLength 1 */
+  ruleTimeZone: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  availabilityDigest: string;
+  sourceState: SchedulingConflictExplanationRequestContextInspectionSourceState;
+} | null;
+
+export type SchedulingConflictExplanationRequestContextApplicableRules = {
+  /**
+     * @minimum 0
+     * @maximum 1440
+     */
+  newTravelGapMinutes: number;
+  /**
+     * @minimum 1
+     * @maximum 100
+     */
+  companyCeiling: number | null;
+  /**
+     * @minimum 1
+     * @maximum 9007199254740991
+     */
+  inspectionCeiling: number | null;
+};
+
+export type SchedulingConflictExplanationRequestContextSourceSourceKind = typeof SchedulingConflictExplanationRequestContextSourceSourceKind[keyof typeof SchedulingConflictExplanationRequestContextSourceSourceKind];
+
+
+export const SchedulingConflictExplanationRequestContextSourceSourceKind = {
+  lead: 'lead',
+  direct_customer: 'direct_customer',
+  unlinked_manual: 'unlinked_manual',
+} as const;
+
+export type SchedulingConflictExplanationRequestContextSource = {
+  sourceKind: SchedulingConflictExplanationRequestContextSourceSourceKind;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  leadId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  contactId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  propertyId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  estimateId: string | null;
+} | null;
+
+export type SchedulingConflictExplanationRequestContext = {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
+  organizationId: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     */
+  policyRevision: number;
+  /** @pattern ^[a-f0-9]{64}$ */
+  policyDigest: string | null;
+  /** @minLength 1 */
+  companyTimeZone: string;
+  inspection: SchedulingConflictExplanationRequestContextInspection;
+  applicableRules: SchedulingConflictExplanationRequestContextApplicableRules;
+  source: SchedulingConflictExplanationRequestContextSource;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  targetVersion: string | null;
+  /** @pattern ^[a-f0-9]{64}$ */
+  targetFingerprint: string | null;
+};
+
+export type SchedulingConflictExplanationRequestInterval = {
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  startAt: string;
+  /** @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$ */
+  endAt: string;
+  /**
+     * @items.minLength 1
+     * @items.maxLength 200
+     */
+  resourceUserIds: string[];
+};
+
+export interface SchedulingConflictExplanationRequest {
+  query: SchedulingConflictExplanationRequestQuery;
+  context: SchedulingConflictExplanationRequestContext;
+  interval: SchedulingConflictExplanationRequestInterval;
+}
+
 export type CallieIntakeDetailState = typeof CallieIntakeDetailState[keyof typeof CallieIntakeDetailState];
 
 

@@ -59,7 +59,7 @@ export function SchedulingReservationSummary({ companyTimeZone, interval, propos
       </>}
       {proposal && proposal.basis !== "new_admission" && <p>Recorded work is retained; no new capacity admission is requested.</p>}
       {conflict && isoSchema.safeParse(conflict.startAt).success && isoSchema.safeParse(conflict.endAt).success && <div role="alert">
-        <p>Staff resource conflict: {conflict.resourceLabel}</p>
+        <p>Current schedule explanation{conflict.evaluatedAt ? ` as of ${conflict.evaluatedAt}` : ''}. This does not establish the original refusal reason.</p><p>Staff resource conflict: {resources.find(resource => resource.id === conflict.resourceUserId)?.label ?? conflict.resourceLabel}</p>
         <p>{conflict.reservationKind} · {conflict.reservationId} · {endpoint(conflict.startAt, zone)} – {endpoint(conflict.endAt, zone)}</p>
         <p>{conflict.reason}</p>
       </div>}

@@ -8,11 +8,14 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import {
   getGetMeQueryKey,
+  explainSchedulingConflict,
   UserRole,
   type MemberProfile,
 } from "@workspace/api-client-react";
 import {
   schedulingMutationReviewSchema,
+  schedulingConflictExplanationSchema,
+  type SchedulingReviewQuery,
   schedulingPolicySchema,
   schedulingReviewContextSchema,
   validateWallTime,
@@ -24,6 +27,7 @@ import {
   freezeSchedulingValue,
 } from "@/lib/scheduling-command";
 import type {
+  AuthorizedConflict,
   IntervalInput,
   PolicyReadResult,
   SchedulingDraft,
@@ -249,6 +253,7 @@ export function useSchedulingReview({
   interval,
   initialDraft,
   transition,
+  explanationScope,
 }: {
   authority: SchedulingAuthority;
   identity: string;
@@ -256,6 +261,7 @@ export function useSchedulingReview({
   interval: IntervalInput;
   initialDraft: SchedulingDraft;
   transition: "admission" | "release" | "preserve";
+  explanationScope?: Pick<SchedulingReviewQuery, "reservationKind" | "appointmentType" | "targetKind" | "targetId">;
 }) {
   const [, render] = useState(0),
     ref = useRef<{
@@ -265,8 +271,10 @@ export function useSchedulingReview({
       review: SchedulingMutationReview | null;
       draftVersion: number;
       reviewVersion: number;
+      explanationVersion: number;
+      conflict: AuthorizedConflict;
     } | null>(null);
-  const key = JSON.stringify([identity, authority.identity, context]);
+  const key = JSON.stringify([identity, authority.identity, context, explanationScope]);
   if (!ref.current || ref.current.key !== key) {
     const draft =
       ref.current?.identity === identity
@@ -279,6 +287,8 @@ export function useSchedulingReview({
       review: null,
       draftVersion: 0,
       reviewVersion: 0,
+      explanationVersion: 0,
+      conflict: null,
     };
   }
   const token = ref.current,
@@ -291,6 +301,8 @@ export function useSchedulingReview({
     // retire the current edit callback before the first actual user change.
     if (JSON.stringify(next) === JSON.stringify(token.draft)) return;
     token.review = null;
+    token.conflict = null;
+    token.explanationVersion++;
     token.reviewVersion++;
     token.draftVersion++;
     token.draft = freezeSchedulingValue(structuredClone(next));
@@ -304,6 +316,8 @@ export function useSchedulingReview({
     )
       return;
     token.review = null;
+    token.conflict = null;
+    token.explanationVersion++;
     if (review === null) {
       token.reviewVersion++;
       render((n) => n + 1);
@@ -326,6 +340,20 @@ export function useSchedulingReview({
         validateWallTime(token.draft.endAt, parsed.endWallTime);
       } else if (parsed.endWallTime) return;
       token.review = freezeSchedulingValue(structuredClone(parsed));
+      const source = context.source;
+      if (explanationScope && source && token.draft.startAt && token.draft.endAt) {
+        const generation = token.explanationVersion;
+        const request = { query: { ...explanationScope, sourceKind: source.sourceKind, ...(source.leadId || source.contactId ? { sourceId: source.leadId ?? source.contactId! } : {}), ...(source.propertyId ? { propertyId: source.propertyId } : {}), ...(source.estimateId ? { estimateId: source.estimateId } : {}) }, context: parsed.context, interval: { startAt: token.draft.startAt, endAt: token.draft.endAt, resourceUserIds: [...token.draft.resourceUserIds] } };
+        void explainSchedulingConflict(request).then(raw => {
+          if (!current() || generation !== token.explanationVersion || draftVersion !== token.draftVersion || reviewVersion !== token.reviewVersion) return;
+          const result = schedulingConflictExplanationSchema.parse(raw);
+          if (JSON.stringify(result.context) !== JSON.stringify(parsed.context)) return;
+          const conflict = result.conflict;
+          if (conflict && (!request.interval.resourceUserIds.includes(conflict.resourceUserId) || (conflict.reservationId === request.query.targetId && conflict.reservationKind === request.query.targetKind))) return;
+          token.conflict = conflict ? { ...conflict, evaluatedAt: result.evaluatedAt, resourceLabel: 'Assigned staff', reason: conflict.reason === 'resource_overlap' ? 'Service intervals overlap for this staff resource.' : `Required adjacent travel gap: ${conflict.requiredGapMinutes} minutes.` } : null;
+          render(n => n + 1);
+        }).catch(() => { /* An unavailable explanation grants no evidence or command authority. */ });
+      }
       render((n) => n + 1);
     } catch {
       /* Invalid wall evidence never approves the draft. */
@@ -355,6 +383,7 @@ export function useSchedulingReview({
     draft,
     review,
     fields,
+    conflict: authority.allowed ? token.conflict : null,
     proposal: context
       ? buildSchedulingProposalView({ context, interval, draft, transition })
       : null,

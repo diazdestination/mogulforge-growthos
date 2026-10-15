@@ -45,7 +45,7 @@ function IntervalFields(props: SchedulingIntervalFieldsProps) {
   const [startLocal, setStartLocal] = useState(() => wallDisplay(draft.startAt, zone));
   const [endLocal, setEndLocal] = useState(() => wallDisplay(draft.endAt, zone));
   const [endEdited, setEndEdited] = useState(false);
-  const [duration, setDuration] = useState<DurationChoice>(() => ({ kind: draft.startAt === interval.startAt && draft.endAt === interval.endAt ? 'preserved_interval' : 'explicit', preset: null }));
+  const [duration, setDuration] = useState<DurationChoice>(() => ({ kind: interval.startAt !== null && draft.startAt === interval.startAt && draft.endAt === interval.endAt ? 'preserved_interval' : 'explicit', preset: null }));
   const [shiftError, setShiftError] = useState('');
   const [awaitingDraft, setAwaitingDraft] = useState<string | null>(null);
   const lastDraft = useRef(controlledDraftKey(draft));
@@ -104,7 +104,7 @@ function IntervalFields(props: SchedulingIntervalFieldsProps) {
       } catch { error = 'This interval could not be shifted. Enter valid endpoints for review.'; }
     }
     setShiftError(error);
-    const choice: DurationChoice = preserveAbsoluteEnd ? { kind: 'explicit', preset: null } : duration.kind === 'preset' ? duration : { kind: preserved ? 'preserved_interval' : 'explicit', preset: null };
+    const choice: DurationChoice = preserveAbsoluteEnd ? { kind: 'explicit', preset: null } : duration.kind === 'preset' ? duration : { kind: preserved && !endEdited && interval.startAt && (interval.endAt ?? interval.legacyEffectiveEnd) && Date.parse(preserved.endAt) - Date.parse(preserved.startAt) === Date.parse((interval.endAt ?? interval.legacyEffectiveEnd)!) - Date.parse(interval.startAt) ? 'preserved_interval' : 'explicit', preset: null };
     setDuration(choice);
     publish({ ...draft, startAt: start, endAt: end });
   }

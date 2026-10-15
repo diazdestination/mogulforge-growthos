@@ -9,6 +9,155 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Read one authorized current adjacent staff conflict; never original operation evidence
+ */
+export const explainSchedulingConflictBodyQuerySourceIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictBodyQueryPropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictBodyQueryEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictBodyQueryTargetIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictBodyContextOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictBodyContextPolicyRevisionMin = 0;
+export const explainSchedulingConflictBodyContextPolicyRevisionMax = 9007199254740991;
+
+export const explainSchedulingConflictBodyContextPolicyDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const explainSchedulingConflictBodyContextInspectionAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const explainSchedulingConflictBodyContextApplicableRulesNewTravelGapMinutesMin = 0;
+export const explainSchedulingConflictBodyContextApplicableRulesNewTravelGapMinutesMax = 1440;
+
+export const explainSchedulingConflictBodyContextApplicableRulesCompanyCeilingMax = 100;
+
+export const explainSchedulingConflictBodyContextApplicableRulesInspectionCeilingMax = 9007199254740991;
+
+export const explainSchedulingConflictBodyContextSourceLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictBodyContextSourceContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictBodyContextSourcePropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictBodyContextSourceEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictBodyContextTargetVersionRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const explainSchedulingConflictBodyContextTargetFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const explainSchedulingConflictBodyIntervalStartAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const explainSchedulingConflictBodyIntervalEndAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const explainSchedulingConflictBodyIntervalResourceUserIdsItemMax = 200;
+
+
+
+export const ExplainSchedulingConflictBody = zod.object({
+  "query": zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "sourceId": zod.uuid().regex(explainSchedulingConflictBodyQuerySourceIdRegExp).optional(),
+  "propertyId": zod.uuid().regex(explainSchedulingConflictBodyQueryPropertyIdRegExp).optional(),
+  "estimateId": zod.uuid().regex(explainSchedulingConflictBodyQueryEstimateIdRegExp).optional(),
+  "reservationKind": zod.enum(['appointment', 'project']),
+  "appointmentType": zod.enum(['inspection', 'estimate_review', 'production', 'final_walkthrough', 'other']).optional(),
+  "targetKind": zod.enum(['appointment', 'project']).optional(),
+  "targetId": zod.uuid().regex(explainSchedulingConflictBodyQueryTargetIdRegExp).optional()
+}).strict(),
+  "context": zod.object({
+  "organizationId": zod.uuid().regex(explainSchedulingConflictBodyContextOrganizationIdRegExp),
+  "policyRevision": zod.int().min(explainSchedulingConflictBodyContextPolicyRevisionMin).max(explainSchedulingConflictBodyContextPolicyRevisionMax),
+  "policyDigest": zod.string().regex(explainSchedulingConflictBodyContextPolicyDigestRegExp).nullable(),
+  "companyTimeZone": zod.string().min(1),
+  "inspection": zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(explainSchedulingConflictBodyContextInspectionAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict().nullable(),
+  "applicableRules": zod.object({
+  "newTravelGapMinutes": zod.int().min(explainSchedulingConflictBodyContextApplicableRulesNewTravelGapMinutesMin).max(explainSchedulingConflictBodyContextApplicableRulesNewTravelGapMinutesMax),
+  "companyCeiling": zod.int().min(1).max(explainSchedulingConflictBodyContextApplicableRulesCompanyCeilingMax).nullable(),
+  "inspectionCeiling": zod.int().min(1).max(explainSchedulingConflictBodyContextApplicableRulesInspectionCeilingMax).nullable()
+}).strict(),
+  "source": zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.uuid().regex(explainSchedulingConflictBodyContextSourceLeadIdRegExp).nullable(),
+  "contactId": zod.uuid().regex(explainSchedulingConflictBodyContextSourceContactIdRegExp).nullable(),
+  "propertyId": zod.uuid().regex(explainSchedulingConflictBodyContextSourcePropertyIdRegExp).nullable(),
+  "estimateId": zod.uuid().regex(explainSchedulingConflictBodyContextSourceEstimateIdRegExp).nullable()
+}).strict().nullable(),
+  "targetVersion": zod.string().regex(explainSchedulingConflictBodyContextTargetVersionRegExp).nullable(),
+  "targetFingerprint": zod.string().regex(explainSchedulingConflictBodyContextTargetFingerprintRegExp).nullable()
+}).strict(),
+  "interval": zod.object({
+  "startAt": zod.string().regex(explainSchedulingConflictBodyIntervalStartAtRegExp),
+  "endAt": zod.string().regex(explainSchedulingConflictBodyIntervalEndAtRegExp),
+  "resourceUserIds": zod.array(zod.string().min(1).max(explainSchedulingConflictBodyIntervalResourceUserIdsItemMax))
+}).strict()
+}).strict()
+
+export const explainSchedulingConflictResponseEvaluatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const explainSchedulingConflictResponseContextOrganizationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictResponseContextPolicyRevisionMin = 0;
+export const explainSchedulingConflictResponseContextPolicyRevisionMax = 9007199254740991;
+
+export const explainSchedulingConflictResponseContextPolicyDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const explainSchedulingConflictResponseContextInspectionAvailabilityDigestRegExp = new RegExp('^[a-f0-9]{64}$');
+export const explainSchedulingConflictResponseContextApplicableRulesNewTravelGapMinutesMin = 0;
+export const explainSchedulingConflictResponseContextApplicableRulesNewTravelGapMinutesMax = 1440;
+
+export const explainSchedulingConflictResponseContextApplicableRulesCompanyCeilingMax = 100;
+
+export const explainSchedulingConflictResponseContextApplicableRulesInspectionCeilingMax = 9007199254740991;
+
+export const explainSchedulingConflictResponseContextSourceLeadIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictResponseContextSourceContactIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictResponseContextSourcePropertyIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictResponseContextSourceEstimateIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictResponseContextTargetVersionRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const explainSchedulingConflictResponseContextTargetFingerprintRegExp = new RegExp('^[a-f0-9]{64}$');
+export const explainSchedulingConflictResponseConflictReservationIdRegExp = new RegExp('^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$');
+export const explainSchedulingConflictResponseConflictResourceUserIdMax = 200;
+
+export const explainSchedulingConflictResponseConflictStartAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const explainSchedulingConflictResponseConflictEndAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$');
+export const explainSchedulingConflictResponseConflictRequiredGapMinutesMin = 0;
+export const explainSchedulingConflictResponseConflictRequiredGapMinutesMax = 1440;
+
+
+
+export const ExplainSchedulingConflictResponse = zod.object({
+  "basis": zod.enum(['current_schedule']),
+  "evaluatedAt": zod.string().regex(explainSchedulingConflictResponseEvaluatedAtRegExp),
+  "context": zod.object({
+  "organizationId": zod.uuid().regex(explainSchedulingConflictResponseContextOrganizationIdRegExp),
+  "policyRevision": zod.int().min(explainSchedulingConflictResponseContextPolicyRevisionMin).max(explainSchedulingConflictResponseContextPolicyRevisionMax),
+  "policyDigest": zod.string().regex(explainSchedulingConflictResponseContextPolicyDigestRegExp).nullable(),
+  "companyTimeZone": zod.string().min(1),
+  "inspection": zod.object({
+  "ruleTimeZone": zod.string().min(1),
+  "availabilityDigest": zod.string().regex(explainSchedulingConflictResponseContextInspectionAvailabilityDigestRegExp),
+  "sourceState": zod.enum(['recorded', 'legacy_default', 'legacy_normalized'])
+}).strict().nullable(),
+  "applicableRules": zod.object({
+  "newTravelGapMinutes": zod.int().min(explainSchedulingConflictResponseContextApplicableRulesNewTravelGapMinutesMin).max(explainSchedulingConflictResponseContextApplicableRulesNewTravelGapMinutesMax),
+  "companyCeiling": zod.int().min(1).max(explainSchedulingConflictResponseContextApplicableRulesCompanyCeilingMax).nullable(),
+  "inspectionCeiling": zod.int().min(1).max(explainSchedulingConflictResponseContextApplicableRulesInspectionCeilingMax).nullable()
+}).strict(),
+  "source": zod.object({
+  "sourceKind": zod.enum(['lead', 'direct_customer', 'unlinked_manual']),
+  "leadId": zod.uuid().regex(explainSchedulingConflictResponseContextSourceLeadIdRegExp).nullable(),
+  "contactId": zod.uuid().regex(explainSchedulingConflictResponseContextSourceContactIdRegExp).nullable(),
+  "propertyId": zod.uuid().regex(explainSchedulingConflictResponseContextSourcePropertyIdRegExp).nullable(),
+  "estimateId": zod.uuid().regex(explainSchedulingConflictResponseContextSourceEstimateIdRegExp).nullable()
+}).strict().nullable(),
+  "targetVersion": zod.string().regex(explainSchedulingConflictResponseContextTargetVersionRegExp).nullable(),
+  "targetFingerprint": zod.string().regex(explainSchedulingConflictResponseContextTargetFingerprintRegExp).nullable()
+}).strict(),
+  "conflict": zod.object({
+  "reservationKind": zod.enum(['appointment', 'project']),
+  "reservationId": zod.uuid().regex(explainSchedulingConflictResponseConflictReservationIdRegExp),
+  "resourceUserId": zod.string().min(1).max(explainSchedulingConflictResponseConflictResourceUserIdMax),
+  "startAt": zod.string().regex(explainSchedulingConflictResponseConflictStartAtRegExp),
+  "endAt": zod.string().regex(explainSchedulingConflictResponseConflictEndAtRegExp),
+  "reason": zod.enum(['resource_overlap', 'travel_gap']),
+  "requiredGapMinutes": zod.int().min(explainSchedulingConflictResponseConflictRequiredGapMinutesMin).max(explainSchedulingConflictResponseConflictRequiredGapMinutesMax)
+}).strict().nullable()
+}).strict()
+
+
+/**
  * @summary Review the actual CALLIE customer, selected visit type and property against current scheduling
  */
 export const GetCallieSchedulingContextParams = zod.object({

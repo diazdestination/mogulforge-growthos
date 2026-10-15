@@ -233,6 +233,7 @@ export default function ProjectFormModal({
       resourceUserIds: project?.crewUserIds ?? [],
     },
     transition: "admission",
+    explanationScope: { reservationKind: 'project', ...(project ? { targetKind: 'project', targetId: project.id } : {}) },
   });
   let transition: "admission" | "release" | "preserve" = "admission";
   if (before)
@@ -418,11 +419,11 @@ export default function ProjectFormModal({
       try {
         await updateProject(project.id, {
           name,
-          estimateId: estimateId || null,
-          status,
-          scheduledStart: review.draft.startAt,
-          scheduledEnd: review.draft.endAt,
-          crewUserIds: review.draft.resourceUserIds,
+          ...(estimateId !== (project.estimateId ?? "") ? { estimateId: estimateId || null } : {}),
+          ...(status !== project.status ? { status } : {}),
+          ...(review.draft.startAt !== interval.startAt ? { scheduledStart: review.draft.startAt } : {}),
+          ...(review.draft.endAt !== interval.endAt ? { scheduledEnd: review.draft.endAt } : {}),
+          ...(!unchangedResources ? { crewUserIds: review.draft.resourceUserIds } : {}),
           crewNotes: crewNotes || null,
           expectedUpdatedAt: project.updatedAt,
           expectedTargetFingerprint: project.schedulingTargetFingerprint,
@@ -687,7 +688,7 @@ export default function ProjectFormModal({
               interval={interval}
               proposal={proposal}
               resources={resources}
-              conflict={null}
+              conflict={review.conflict}
             />
             {project && (
               <SchedulingReservationSummary
@@ -699,7 +700,7 @@ export default function ProjectFormModal({
                 interval={interval}
                 proposal={proposal}
                 resources={resources}
-                conflict={null}
+                conflict={review.conflict}
               />
             )}
             <label className="block">

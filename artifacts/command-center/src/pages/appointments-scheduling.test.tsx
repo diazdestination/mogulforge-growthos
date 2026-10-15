@@ -1040,9 +1040,9 @@ describe('native appointment scheduling consumer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
     await waitFor(() => expect(s.writes).toHaveLength(1));
     expect(s.writes[0]).toMatchObject({
-      assignedUserId: actor,
       notes: 'Historical note',
     });
+    expect(s.writes[0]).not.toHaveProperty('assignedUserId');
   });
   it('rejects wrong-target versioned summary without exposing historical bytes as legacy evidence', async () => {
     setup({
@@ -1392,11 +1392,11 @@ describe('native appointment scheduling consumer', () => {
       expect(s.writes[0]).toMatchObject({
         status: 'cancelled',
         assignedUserId: actor,
-        scheduledStart: row().scheduledStart,
-        scheduledEnd: row().scheduledEnd,
         expectedUpdatedAt: row().updatedAt,
         expectedTargetFingerprint: row().schedulingTargetFingerprint,
       });
+      expect(s.writes[0]).not.toHaveProperty('scheduledStart');
+      expect(s.writes[0]).not.toHaveProperty('scheduledEnd');
       expect(s.writes[0]).toHaveProperty(
         'schedulingReview.context.targetFingerprint',
         row().schedulingTargetFingerprint,

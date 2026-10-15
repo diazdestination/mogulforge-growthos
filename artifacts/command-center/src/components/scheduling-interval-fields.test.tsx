@@ -352,7 +352,7 @@ describe('controlled scheduling interval fields', () => {
     expect(state('Root review')).toBeNull();
   });
   it('preserves a three-day elapsed interval on a start-only edit', () => {
-    renderWithQuery(<Harness value={props({ draft: makeSchedulingDraft({ startAt: '2026-03-06T14:00:00.000Z', endAt: '2026-03-09T14:00:00.000Z' }), companyTimeZone: 'America/New_York', context: makeSchedulingContext({ companyTimeZone: 'America/New_York' }) })} />);
+    renderWithQuery(<Harness value={props({ interval: makeSchedulingInterval({ startAt: '2026-03-06T14:00:00.000Z', endAt: '2026-03-09T14:00:00.000Z', reservation: null, evidence: 'legacy' }), draft: makeSchedulingDraft({ startAt: '2026-03-06T14:00:00.000Z', endAt: '2026-03-09T14:00:00.000Z' }), companyTimeZone: 'America/New_York', context: makeSchedulingContext({ companyTimeZone: 'America/New_York' }) })} />);
     change('Service start', '2026-03-07T09:00');
     expect(state('Root draft').endAt).toBe('2026-03-10T14:00:00.000Z');
     review();
@@ -526,5 +526,25 @@ describe('controlled scheduling interval fields', () => {
     expect((screen.getByLabelText('Service end') as HTMLInputElement).value).toBe('2026-03-08T02:30');
     expect(state('Root review')).toBeNull();
     expect(screen.getByRole('alert').textContent).toContain('does not exist');
+  });
+});
+
+ describe('draft duration provenance regressions', () => {
+  it('shifts a new manually entered range with explicit duration provenance', () => {
+    renderWithQuery(<Harness value={props({ interval: makeSchedulingInterval({ startAt: null, endAt: null, reservation: null, legacyEffectiveEnd: null, evidence: 'legacy' }), draft: makeSchedulingDraft({ startAt: null, endAt: null }), review: null })} />);
+    change('Service start', '2035-01-01T09:00');
+    change('Service end', '2035-01-01T11:00');
+    change('Service start', '2035-01-02T10:00');
+    review();
+    expect(state('Root draft')).toMatchObject({ startAt: '2035-01-02T18:00:00.000Z', endAt: '2035-01-02T20:00:00.000Z' });
+    expect(state('Root review').duration).toEqual({ kind: 'explicit', preset: null });
+  });
+  it('shifts a resized existing range with explicit duration provenance', () => {
+    renderWithQuery(<Harness value={props()} />);
+    change('Service end', '2035-01-01T12:00');
+    change('Service start', '2035-01-02T10:00');
+    review();
+    expect(state('Root draft').endAt).toBe('2035-01-02T21:00:00.000Z');
+    expect(state('Root review').duration).toEqual({ kind: 'explicit', preset: null });
   });
 });

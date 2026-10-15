@@ -124,50 +124,9 @@ export function projectManualSchedulingReceipt(
 }
 
 // Business presentation is deliberately separate from the custody acknowledgement above.
-export const closedPolicyExportSchema = schedulingPolicySchema.omit({
-  digest: true,
-  updatedByUserId: true,
-});
-export type ClosedPolicyExport = z.infer<typeof closedPolicyExportSchema>;
-export const closedReservationExportSchema = z.strictObject({
-  reservationRevision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
-  approvedTimeZone: timeZoneSchema,
-  inspection: z.strictObject({ ruleTimeZone: timeZoneSchema }).nullable(),
-  startAt: isoSchema,
-  endAt: isoSchema,
-  resourceUserIds: z.array(userIdSchema),
-  minimumTravelGapMinutes: z.number().int().min(0).max(1440),
-  duration: durationChoiceSchema,
-  target: manualSchedulingTargetSchema,
-});
-export type ClosedReservationExport = z.infer<
-  typeof closedReservationExportSchema
->;
-export const closedBusinessSchedulingSummarySchema = z.strictObject({
-  event: z.enum([
-    "policy_updated",
-    "reservation_admitted",
-    "reservation_released",
-    "reservation_deleted",
-    "operation_committed",
-    "operation_refused",
-  ]),
-  occurredAt: isoSchema,
-  target: manualSchedulingTargetSchema
-    .extend({ available: z.boolean() })
-    .nullable(),
-  source: manualSourceRefSchema.nullable(),
-  before: z
-    .union([closedReservationExportSchema, closedPolicyExportSchema])
-    .nullable(),
-  after: z
-    .union([closedReservationExportSchema, closedPolicyExportSchema])
-    .nullable(),
-  reasonCode: manualSchedulingRefusalCodeSchema.nullable(),
-});
-export type ClosedBusinessSchedulingSummary = z.infer<
-  typeof closedBusinessSchedulingSummarySchema
->;
+export { closedPolicyExportSchema, closedReservationExportSchema, closedBusinessSchedulingSummarySchema } from "@workspace/scheduling-core";
+import { closedPolicyExportSchema, closedReservationExportSchema, closedBusinessSchedulingSummarySchema, type ClosedPolicyExport, type ClosedReservationExport, type ClosedBusinessSchedulingSummary } from "@workspace/scheduling-core";
+export type { ClosedPolicyExport, ClosedReservationExport, ClosedBusinessSchedulingSummary } from "@workspace/scheduling-core";
 export type SchedulingProjectionContext = {
   organizationId: string;
   authorizedHistoricalLinks: Set<string>;

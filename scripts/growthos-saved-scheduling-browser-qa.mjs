@@ -499,6 +499,7 @@ export async function runSavedSchedulingBrowserQA(options) {
     browserTimezone: "America/Los_Angeles",
     phases: [],
     mutations: [],
+    schedulingReads: [],
     responses: [],
     console: [],
     pageerrors: [],
@@ -540,6 +541,7 @@ export async function runSavedSchedulingBrowserQA(options) {
     "PUT /api/v1/settings/scheduling-policy",
     "POST /api/v1/appointments",
     "POST /api/v1/scheduling/operations/reconcile",
+    "POST /api/v1/scheduling/conflict-explanation",
     "PUT /api/v1/settings",
     `PATCH /api/v1/platform/orgs/${m.organizationId}`,
   ]);
@@ -1510,7 +1512,8 @@ export async function runSavedSchedulingBrowserQA(options) {
           ...started,
           ...(isLogin ? { syntheticEmail: m.actors[actorKey].email } : {}),
         };
-        report.mutations.push(entry);
+        if (req.method() === "POST" && url.pathname === "/api/v1/scheduling/conflict-explanation") report.schedulingReads.push(entry);
+        else report.mutations.push(entry);
       }
     });
     context.on("requestfailed", (req) =>
@@ -1593,7 +1596,7 @@ export async function runSavedSchedulingBrowserQA(options) {
       }
       if (
         !["GET", "HEAD", "OPTIONS"].includes(req.method()) &&
-        !["/api/auth/login", "/api/auth/logout"].includes(url.pathname)
+        !["/api/auth/login", "/api/auth/logout", "/api/v1/scheduling/conflict-explanation"].includes(url.pathname)
       )
         assert.equal(
           actorKey,
@@ -1704,6 +1707,44 @@ export async function runSavedSchedulingBrowserQA(options) {
         }
         const p = await persisted(baselines[0], "baseline");
         await layouts(p, "linked-card");
+        await p.close();
+      });
+      await checkpoint("current-conflict-explicit-review", async () => {
+        const before = await observe(), p = await newForm();
+        await fill(p, { start: "2026-10-18T08:00", end: "2026-10-18T09:00", preset: false });
+        await p.getByLabel("Service start", { exact: true }).fill("2026-10-18T10:30");
+        assert.equal(await p.getByLabel("Service end", { exact: true }).inputValue(), "2026-10-18T11:30");
+        const custodyBefore = await p.evaluate(() => JSON.stringify(Object.entries(sessionStorage).sort()));
+        const readsBefore = report.schedulingReads.length;
+        const uuidObservation = await countNativeUuidCallsDuring(p, async () => {
+          const response = p.waitForResponse(r => r.request().method() === "POST" && new URL(r.url()).pathname === "/api/v1/scheduling/conflict-explanation");
+          await review(p);
+          const read = await response; assert.equal(read.status(), 200);
+          const value = await read.json();
+          assert.deepEqual(Object.keys(value).sort(), ["basis", "conflict", "context", "evaluatedAt"]);
+          assert.equal(value.basis, "current_schedule"); assert.equal(value.conflict.reservationId, baselines[0].body.id);
+          await p.getByText(/Current schedule explanation/).waitFor();
+          assert.match(await p.getByRole("dialog").innerText(), /60 elapsed minutes/);
+          assert.match(await p.getByRole("dialog").innerText(), /This does not establish the original refusal reason/);
+          await saveEvidence("current-conflict-read", { response: value, wire: read.request().postDataJSON() });
+        });
+        assert.equal(uuidObservation.calls, 0);
+        assert.equal(report.schedulingReads.length, readsBefore + 1);
+        assert.equal(await p.evaluate(() => JSON.stringify(Object.entries(sessionStorage).sort())), custodyBefore);
+        assert.deepEqual(inventory(await observe()), inventory(before));
+        await p.getByLabel("Service start", { exact: true }).fill("2026-10-18T11:30");
+        assert.equal(await p.getByText(/Current schedule explanation/).count(), 0);
+        await saveEvidence("current-conflict-read-effects", { uuidObservation, applicationWrites: 0, custodyUnchanged: true });
+        await p.close();
+      });
+      await checkpoint("manual-create-shift-explicit-duration", async () => {
+        const p = await newForm();
+        await fill(p, { start: "2026-10-23T13:00", end: "2026-10-23T14:00", preset: false });
+        await p.getByLabel("Service start", { exact: true }).fill("2026-10-23T15:00");
+        assert.equal(await p.getByLabel("Service end", { exact: true }).inputValue(), "2026-10-23T16:00");
+        const result = await submit(p);
+        assert.deepEqual(result.wire.schedulingReview.duration, { kind: "explicit", preset: null });
+        assert.deepEqual(result.body.schedulingReservation.duration, { kind: "explicit", preset: null });
         await p.close();
       });
       for (const [i, mode] of [

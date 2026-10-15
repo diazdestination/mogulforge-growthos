@@ -30,6 +30,8 @@ const counts = {
 };
 // Independent Task6 source boundaries; do not change the twenty native counts.
 const sourceCounts = {
+  ExplainSchedulingConflictBody: 7,
+  ExplainSchedulingConflictResponse: 6,
   CreateCustomerWorkProjectBody: 12,
   CreateCustomerWorkProjectResponse: 11,
   UpdateCustomerWorkProjectBody: 10,
