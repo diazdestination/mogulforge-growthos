@@ -790,6 +790,7 @@ export async function runScheduling0019Verification(input = {}) {
   };
   let mutationBlocked = false,
     open = false,
+    effectiveWriterConfirmed = false,
     writerPid,
     finalReadAttempted = false;
   const remaining = () => {
@@ -983,6 +984,7 @@ export async function runScheduling0019Verification(input = {}) {
       ["LOCK"],
     );
     await writerView.query(IDENTITY_SQL);
+    effectiveWriterConfirmed = true;
     const before = await captureScheduling0019State(writerView, plan);
     assertScheduling0019Preserved(baseline, before, plan, "pre0019");
     proof.preimageVerified = true;
@@ -1037,9 +1039,10 @@ export async function runScheduling0019Verification(input = {}) {
       ? error.safeCode
       : "scheduling0019_verification_failure";
     // No second terminal query after dispatch or unresolved/expired work. A
-    // settled pre-terminal server/journal failure can receive one real ROLLBACK.
+    // settled failure can receive one ROLLBACK only on a confirmed TX backend.
     if (
       open &&
+      effectiveWriterConfirmed &&
       !mutationBlocked &&
       !proof.commitDispatched &&
       !proof.rollbackDispatched

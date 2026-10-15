@@ -321,6 +321,43 @@ test("writer backend drift after LOCK blocks DDL and unsafe terminal cleanup", a
   expect(queryCalls(f)).not.toContain("ROLLBACK");
   expect(result.proof.requiresOwningCleanup).toBe(true);
 });
+test.each([false, true])(
+  "LOCK error before effective identity confirmation holds without terminal cleanup (backendDrift=%s)",
+  async (backendDrift) => {
+    let activePid = 77,
+      identityReads = 0,
+      wrongBackendMutations = 0;
+    const f = transactionFixture({
+        query: async (sql, args, next) => {
+          if (sql === IDENTITY_SQL) {
+            identityReads++;
+            const response = await next(sql, args);
+            response.rows[0].pid = activePid;
+            return response;
+          }
+          if (sql.startsWith("LOCK TABLE")) {
+            if (backendDrift) activePid = 78;
+            throw Object.assign(Error("synthetic lock unavailable"), {
+              code: "55P03",
+            });
+          }
+          if (["COMMIT", "ROLLBACK"].includes(sql) && activePid !== 77)
+            wrongBackendMutations++;
+          return next(sql, args);
+        },
+      }),
+      result = await runScheduling0019Verification(f.args);
+    expect(queryCalls(f)).not.toContain("ROLLBACK");
+    expect(queryCalls(f)).not.toContain("COMMIT");
+    expect(f.ddlDispatches).toBe(0);
+    expect(identityReads).toBe(1);
+    expect(wrongBackendMutations).toBe(0);
+    expect(queryCalls(f).at(-1).startsWith("LOCK TABLE")).toBe(true);
+    expect(result.status).toBe("verification-held-no-replay");
+    expect(result.proof.rollbackAcknowledged).toBe(false);
+    expect(result.proof.requiresOwningCleanup).toBe(true);
+  },
+);
 test("RR locks precede the first SELECT so a concurrent pre-lock commit blocks DDL", async () => {
   let inTransaction = false,
     locked = false,
