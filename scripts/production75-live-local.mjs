@@ -6,7 +6,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { isDeepStrictEqual } from "node:util";
+import { isDeepStrictEqual, types } from "node:util";
 import {
   withWslDockerSession,
   localEnvironment,
@@ -36,12 +36,14 @@ import {
 } from "../reports/release-preparation-2026-10-09/schema-catalog.mjs";
 import {
   prepareOperatorPlan,
+  prepareCombinedOperatorPlan,
   operatorPlanDigest,
   production75ReaderName,
 } from "./production75-custody.mjs";
 import {
   createProduction75V1Client,
   useProduction75Credentials,
+  mergeV1OwnershipEvidence,
 } from "./production75-fly-v1.mjs";
 import {
   expectedProduction75ReaderProfile,
@@ -51,9 +53,27 @@ import {
 import { EventEmitter } from "node:events";
 import { createLiveTransport } from "./production75-live-transport.mjs";
 import { captureLiveSnapshot } from "./production75-live-observation.mjs";
-import { deriveLivePolicies } from "./production75-live-policy.mjs";
-import { executeLivePacket } from "./production75-live-runner.mjs";
-import { production75RuntimeHashes } from "./production75-live-manifest.mjs";
+import {
+  deriveLivePolicies,
+  deriveLiveScheduling0019Policy,
+} from "./production75-live-policy.mjs";
+import {
+  executeLivePacket,
+  executeSuppliedCombinedPacket,
+  validateCombinedLiveOracle,
+} from "./production75-live-runner.mjs";
+import {
+  production75RuntimeHashes,
+  combinedManifestDigest,
+} from "./production75-live-manifest.mjs";
+import {
+  buildScheduling0019Source,
+  prepareScheduling0019,
+  captureScheduling0019State,
+  assertScheduling0019Preserved,
+  runScheduling0019Verification,
+} from "./production75-scheduling0019.mjs";
+import { createScheduling0019Observer } from "./production75-scheduling0019-observer.mjs";
 import { projectLiveReader } from "./production75-live-observation.mjs";
 import { assertProduction75ReaderDelta } from "./production75-reader-delta.mjs";
 import {
@@ -82,6 +102,95 @@ const git = (p) =>
     maxBuffer: 4000000,
   });
 const json = (p) => JSON.parse(git(p));
+export function selectLocalAction(args) {
+  check(
+    args.length === 1 &&
+      ["--run-local", "--run-combined-local"].includes(args[0]),
+    "production75_operator_local_action",
+  );
+  return args[0] === "--run-local" ? "legacy" : "combined";
+}
+export function finalizeCombinedLocalProof({
+  proof,
+  oracle,
+  currentHashes,
+  candidate,
+}) {
+  check(
+    proof &&
+      typeof proof === "object" &&
+      !types.isProxy(proof) &&
+      Object.getPrototypeOf(proof) === Object.prototype,
+    "production75_operator_local_unfinished",
+  );
+  const descriptors = Object.getOwnPropertyDescriptors(proof);
+  check(
+    Reflect.ownKeys(descriptors).every(
+      (key) =>
+        typeof key === "string" &&
+        descriptors[key].enumerable &&
+        Object.hasOwn(descriptors[key], "value"),
+    ) && descriptors.status?.value === "EXECUTED",
+    "production75_operator_local_unfinished",
+  );
+  const completed = {
+    ...Object.fromEntries(
+      Object.entries(descriptors).map(([key, descriptor]) => [
+        key,
+        descriptor.value,
+      ]),
+    ),
+    status: "PASS",
+  };
+  validateCombinedLiveOracle(oracle, completed, currentHashes, candidate);
+  return completed;
+}
+/** Local fault fixture only: six exact ALTER chunks, never provider wire proof. */
+export function splitScheduling0019FaultFixture(sql) {
+  check(
+    typeof sql === "string" &&
+      Buffer.byteLength(sql) === 8126 &&
+      sha(sql) ===
+        "76e88d3410235f1b6a8a20e595b126455fd5711b46f87055b586786b28f81ca9",
+    "production75_operator_local_late_source",
+  );
+  const starts = [...sql.matchAll(/^ALTER TABLE /gm)].map((m) => m.index);
+  check(starts.length === 6, "production75_operator_local_late_source");
+  const chunks = starts.map((start, i) =>
+    sql.slice(i === 0 ? 0 : start, starts[i + 1] ?? sql.length),
+  );
+  check(
+    chunks.join("") === sql &&
+      chunks[5].startsWith(
+        'ALTER TABLE "projects" ADD CONSTRAINT "projects_scheduling_reservation_ck"',
+      ),
+    "production75_operator_local_late_source",
+  );
+  return chunks;
+}
+/** Monotonic run boundary: cleanup can start once and cannot rearm work. */
+export function createCombinedLocalBudget(now = Date.now) {
+  const workUntil = now() + 1200000;
+  let cleanupUntil = workUntil + 240000,
+    cleaning = false;
+  const remaining = () => {
+    const ms = (cleaning ? cleanupUntil : workUntil) - now();
+    check(
+      Number.isFinite(ms) && ms > 0,
+      "production75_operator_local_deadline",
+    );
+    return ms;
+  };
+  return Object.freeze({
+    remaining,
+    beginCleanup() {
+      if (!cleaning) {
+        cleanupUntil = Math.min(cleanupUntil, now() + 240000);
+        cleaning = true;
+      }
+    },
+  });
+}
 export function handleOperatorClientErrors(client, onFailure) {
   client.on("error", () => {
     try {
@@ -90,7 +199,7 @@ export function handleOperatorClientErrors(client, onFailure) {
   });
   return client;
 }
-async function docker(args, input) {
+async function docker(args, input, timeoutMs = 60000) {
   let executable = "docker";
   if (
     process.platform === "win32" &&
@@ -110,7 +219,7 @@ async function docker(args, input) {
     const timer = setTimeout(() => {
       child.kill();
       reject(new Error("local docker deadline"));
-    }, 60000);
+    }, timeoutMs);
     child.stdout.on("data", (b) => {
       size += b.length;
       if (size > 8000000) child.kill();
@@ -193,12 +302,43 @@ async function seed(c) {
       );
   }
 }
-async function run() {
+async function runLocal(combined = false, context = {}) {
+  const gitText = (...args) =>
+    execFileSync("git", args, { cwd: ROOT, windowsHide: true })
+      .toString()
+      .trim();
+  const candidate = combined
+    ? {
+        repository: "diazdestination/mogulforge-growthos",
+        commit: gitText("rev-parse", "HEAD"),
+        tree: gitText("rev-parse", "HEAD^{tree}"),
+      }
+    : null;
+  if (combined)
+    check(
+      gitText("status", "--porcelain", "--untracked-files=normal") === "",
+      "production75_operator_local_dirty",
+    );
   const runId = randomUUID(),
-    out = resolve(ROOT, "reports/authenticated-driver-2026-10-12", runId);
+    out = combined
+      ? resolve(ROOT, "work", `production75-combined-${runId}`)
+      : resolve(ROOT, "reports/authenticated-driver-2026-10-12", runId);
+  if (combined) {
+    // Check before mkdir: evidence must never dirty the frozen candidate.
+    check(
+      gitText(
+        "check-ignore",
+        "--",
+        `work/production75-combined-${runId}/native-result.json`,
+      ).length > 0,
+      "production75_operator_local_ignore",
+    );
+  }
   await mkdir(out, { recursive: true });
   const receipt = {
-    kind: "SYNTHETIC_PROXY_REAL_DRIVER_SQL",
+    kind: combined
+      ? "SYNTHETIC_PROXY_REAL_DRIVER_SQL_COMBINED"
+      : "SYNTHETIC_PROXY_REAL_DRIVER_SQL",
     runId,
     status: "FAILED",
     startedAt: new Date().toISOString(),
@@ -213,21 +353,68 @@ async function run() {
     moduleHashesBefore: hashes(),
     cases: {},
     cleanup: { clients: 0, sockets: 0, containers: 0 },
+    ...(combined
+      ? { candidate, schedulingCases: [], ownedContainers: [] }
+      : {}),
   };
+  context.out = out;
+  context.receipt = receipt;
   const containers = [],
     clients = [];
   let failed = false;
+  const budget = combined ? createCombinedLocalBudget() : null;
+  const active = () => {
+    budget?.remaining();
+  };
+  const boundedQuery = async (operation, expire) => {
+    if (!combined) return operation();
+    let timer;
+    try {
+      return await Promise.race([
+        Promise.resolve().then(operation),
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => {
+              expire();
+              reject(
+                Object.assign(Error("production75_operator_local_deadline"), {
+                  safeCode: "production75_operator_local_deadline",
+                }),
+              );
+            },
+            Math.min(15000, budget.remaining()),
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const runDocker = async (args, input) => {
+    active();
+    return docker(
+      args,
+      input,
+      combined ? Math.min(60000, budget.remaining()) : 60000,
+    );
+  };
   const { Client } = createRequire(
     resolve(ROOT, "artifacts/api-server/package.json"),
   )("pg");
   const image = JSON.parse(
-    (await docker(["image", "inspect", "postgres:16-alpine"])).toString(),
+    (await runDocker(["image", "inspect", "postgres:16-alpine"])).toString(),
   )[0];
   check(
     /^sha256:[a-f0-9]{64}$/.test(image.Id),
     "production75_operator_local_image",
   );
   receipt.imageId = image.Id;
+  if (combined)
+    check(
+      image.Id ===
+        "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+      "production75_operator_local_image_drift",
+    );
   const canonical95 = json(
       "reports/staging-observation-2026-10-10/fixtures/catalog-95.json",
     ),
@@ -249,7 +436,42 @@ async function run() {
   const source = buildProduction75Source(
     PINNED_FILES.map((p) => ({ ...p, bytes: git(p.path) })),
   );
+  if (combined)
+    for (const p of PINNED_FILES) {
+      const candidateBytes = execFileSync("git", ["show", `HEAD:${p.path}`], {
+        cwd: ROOT,
+        windowsHide: true,
+        maxBuffer: 4000000,
+      });
+      check(
+        candidateBytes.length === p.bytes && sha(candidateBytes) === p.sha256,
+        "production75_operator_local_source_drift",
+      );
+    }
+  const schedulingSource = combined
+    ? buildScheduling0019Source({
+        sourceCommit: "91b7fd2c1fd98d441848e0357954e35c9f65d688",
+        path: "reports/staging-schema-preview-2026-10-01/0019_saved-scheduling-policy.sql",
+        bytes: execFileSync(
+          "git",
+          [
+            "show",
+            "HEAD:reports/staging-schema-preview-2026-10-01/0019_saved-scheduling-policy.sql",
+          ],
+          { cwd: ROOT, windowsHide: true },
+        ),
+      })
+    : null;
+  const legacySource = {
+    sourceCommit: source.sourceCommit,
+    sourceFiles: source.sourceFiles,
+    steps: source.steps.map(({ sql, ...step }) => step),
+  };
+  let combinedOracle, combinedCatalogs, combinedManifest;
   async function box() {
+    active();
+    if (combined)
+      check(containers.length < 8, "production75_operator_local_inventory");
     const nonce = randomUUID(),
       owned = {
         runId: nonce,
@@ -258,7 +480,7 @@ async function run() {
       };
     containers.push(owned);
     owned.id = (
-      await docker([
+      await runDocker([
         "run",
         "--detach",
         "--rm",
@@ -293,7 +515,7 @@ async function run() {
     let ready = false;
     for (let i = 0; i < 45; i++) {
       try {
-        await docker([
+        await runDocker([
           "exec",
           owned.id,
           "pg_isready",
@@ -305,13 +527,15 @@ async function run() {
         ready = true;
         break;
       } catch {
+        active();
         await new Promise((r) => setTimeout(r, 500));
       }
     }
     check(ready, "production75_operator_local_ready");
     owned.port = parseLoopbackPort(
-      (await docker(["port", owned.id, "5432/tcp"])).toString(),
+      (await runDocker(["port", owned.id, "5432/tcp"])).toString(),
     );
+    owned.loopbackOnly = true;
     return owned;
   }
   async function connect(
@@ -322,6 +546,7 @@ async function run() {
     resources = null,
   ) {
     const factory = async () => {
+      active();
       const c = new Client({
         host: "127.0.0.1",
         port: b.port,
@@ -340,12 +565,16 @@ async function run() {
         c.connection?.stream?.destroy();
       });
       const query = c.query.bind(c);
-      if (resources)
+      if (resources || combined)
         c.query = async (...args) => {
-          resources.assertActive();
+          active();
+          resources?.assertActive();
           check(!c.__idleFailed, "production75_operator_local_client");
-          const value = await query(...args);
-          resources.assertActive();
+          const value = await boundedQuery(
+            () => query(...args),
+            () => c.connection?.stream?.destroy(),
+          );
+          resources?.assertActive();
           return value;
         };
       try {
@@ -402,7 +631,7 @@ async function run() {
       await end(c);
     }
   }
-  async function initialize(b) {
+  async function initialize(b, layout = 0) {
     await roleBase(b);
     const control = await connect(b, "postgres");
     try {
@@ -428,7 +657,7 @@ async function run() {
             await c.query("SET ROLE schema_admin");
             await c.query(
               git(
-                `reports/production75-recovery-2026-10-11/fixture75-${name === "fly-db" ? "fly-db" : "growthos_staging"}.sql`,
+                `reports/production75-recovery-2026-10-11/fixture75-${name === "fly-db" && layout === 0 ? "fly-db" : "growthos_staging"}.sql`,
               ).toString(),
             );
             await seed(c);
@@ -450,6 +679,7 @@ async function run() {
     }
   }
   const liveTransports = [];
+  const combinedTransportProofs = [];
   async function capture(
     b,
     readerName = null,
@@ -457,7 +687,12 @@ async function run() {
     resources = null,
   ) {
     const ownedScope =
-      resources ?? createOperatorResources({ until: Date.now() + 600000 });
+      resources ??
+      createOperatorResources({
+        until:
+          Date.now() +
+          (combined ? Math.min(600000, budget.remaining()) : 600000),
+      });
     let child = null,
       exited = false;
     const fakePid = 1000 + liveTransports.length;
@@ -465,6 +700,13 @@ async function run() {
       constructor(config) {
         super(config);
         clients.push(this);
+      }
+      async query(...args) {
+        active();
+        return boundedQuery(
+          () => super.query(...args),
+          () => this.connection?.stream?.destroy(),
+        );
       }
       async end() {
         await super.end();
@@ -536,25 +778,582 @@ async function run() {
         );
     }
   }
+  async function createFixtureReader(b, readerName) {
+    const c = await connect(b, "postgres");
+    try {
+      await c.query(
+        `CREATE ROLE ${q(readerName)} LOGIN INHERIT NOCREATEROLE NOCREATEDB NOREPLICATION NOBYPASSRLS CONNECTION LIMIT -1; GRANT reader TO ${q(readerName)} WITH ADMIN FALSE; GRANT reader TO ${q(readerName)} WITH INHERIT TRUE; GRANT reader TO ${q(readerName)} WITH SET TRUE`,
+      );
+    } finally {
+      await end(c);
+    }
+  }
+  async function seedPost75(c) {
+    const parent = (
+      await c.query(
+        "SELECT o.id AS org,c.id AS contact,u.id AS actor FROM organizations o JOIN contacts c ON c.organization_id=o.id JOIN users u ON u.organization_id=o.id ORDER BY o.slug LIMIT 1",
+      )
+    ).rows[0];
+    check(parent, "production75_operator_local_seed");
+    const { org, contact, actor } = parent;
+    const task = (
+      await c.query(
+        "INSERT INTO crm_tasks(organization_id,contact_id,title) VALUES($1,$2,'Fictional obligation') RETURNING id",
+        [org, contact],
+      )
+    ).rows[0].id;
+    const visit = (
+      await c.query(
+        "INSERT INTO appointments(organization_id,contact_id,scheduled_start) VALUES($1,$2,'2026-01-01T00:00:00Z') RETURNING id",
+        [org, contact],
+      )
+    ).rows[0].id;
+    const obligation = (
+      await c.query(
+        "INSERT INTO service_obligations(organization_id,contact_id,appointment_id,task_id,kind,equipment_label,due_at) VALUES($1,$2,$3,$4,'maintenance','Fictional unit','2026-01-02T00:00:00Z') RETURNING id",
+        [org, contact, visit, task],
+      )
+    ).rows[0].id;
+    const execution = (
+      await c.query(
+        "INSERT INTO revenue_executions(organization_id,action_key,fingerprint,kind,state,expires_at) VALUES($1,'fictional-action','fictional-fingerprint','fixture','completed','2026-01-03T00:00:00Z') RETURNING id",
+        [org],
+      )
+    ).rows[0].id;
+    await c.query(
+      "INSERT INTO revenue_execution_events(organization_id,execution_id,state,detail) VALUES($1,$2,'completed','Fictional Ω event')",
+      [org, execution],
+    );
+    const template = (
+      await c.query(
+        "INSERT INTO work_checklist_templates(organization_id,created_by_user_id) VALUES($1,$2) RETURNING id",
+        [org, actor],
+      )
+    ).rows[0].id;
+    const revision = (
+      await c.query(
+        "INSERT INTO work_checklist_revisions(organization_id,template_id,version,definition,definition_sha256,created_by_user_id) VALUES($1,$2,1,'{}',$3,$4) RETURNING id",
+        [org, template, "a".repeat(64), actor],
+      )
+    ).rows[0].id;
+    await c.query(
+      "INSERT INTO appointment_work_entries(organization_id,appointment_id,contact_id,service_obligation_id,checklist_revision_id,parent_snapshot,created_by_user_id,notes) VALUES($1,$2,$3,$4,$5,'{}',$6,'Fictional original Ω')",
+      [org, visit, contact, obligation, revision, actor],
+    );
+  }
+  const nativeLayouts = [];
+  const principalsFor = (reader) => [
+    "fly-user",
+    "growthos-staging-live",
+    "reader",
+    reader,
+  ];
+  const targetFor = (reader) => ({
+    database: "fly-db",
+    writerLogin: "fly-user",
+    writerInitialRoles: ["fly-user", "schema_admin"],
+    writerRole: "schema_admin",
+    readerLogin: reader,
+    readerRole: reader,
+    principals: principalsFor(reader),
+  });
+  function deltaPlan(layout) {
+    return prepareScheduling0019({
+      source: schedulingSource,
+      catalogs: layout.catalogs,
+      target: targetFor(layout.templateReader),
+      policyBefore: layout.policies.before,
+      policyAfter: layout.policies.after,
+      sourceBinding: { candidate, moduleManifestSha256: combinedManifest },
+    });
+  }
+  async function readDelta(layout, plan) {
+    const c = await connect(layout.box, "fly-db", layout.templateReader, true);
+    try {
+      await c.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
+      const observer = createScheduling0019Observer({
+        client: c,
+        principals: plan.target.principals,
+        catalogs: plan.catalogs,
+        identity: {
+          database: "fly-db",
+          login: layout.templateReader,
+          role: layout.templateReader,
+        },
+      });
+      return await captureScheduling0019State(observer, plan);
+    } finally {
+      try {
+        await c.query("ROLLBACK");
+      } finally {
+        await end(c);
+      }
+    }
+  }
+  async function measureCombinedOracle() {
+    const layouts = [];
+    let legacy;
+    for (let i = 0; i < 2; i++) {
+      const b = await box(),
+        reader = production75ReaderName(randomUUID());
+      await initialize(b, i);
+      await createFixtureReader(b, reader);
+      const c = await connect(b, "fly-db", "fly-user");
+      try {
+        await c.query(
+          "SET ROLE schema_admin; SET search_path=public,pg_catalog",
+        );
+        const p75 = await captureProduction75Policy(c, principalsFor(reader));
+        for (const step of source.steps.slice(0, 3)) await c.query(step.sql);
+        const p95 = await captureProduction75Policy(c, principalsFor(reader));
+        for (const step of source.steps.slice(3)) await c.query(step.sql);
+        const p142 = await captureProduction75Policy(c, principalsFor(reader));
+        if (!legacy)
+          legacy = {
+            kind: "OWNED_NATIVE_POLICY_ORACLE",
+            sourceCandidate: BASE,
+            templateReader: reader,
+            policies: { 75: p75, 95: p95, 142: p142 },
+          };
+        await seedPost75(c);
+        const before = await collectSchemaCatalog(c),
+          beforePolicy = await captureProduction75Policy(
+            c,
+            principalsFor(reader),
+          );
+        // Independently measure exact native DDL; never predict oracle catalogs.
+        await c.query("BEGIN");
+        await c.query(schedulingSource.sql);
+        const after = await collectSchemaCatalog(c),
+          afterPolicy = await captureProduction75Policy(
+            c,
+            principalsFor(reader),
+          );
+        await c.query("ROLLBACK");
+        check(
+          isDeepStrictEqual(await collectSchemaCatalog(c), before),
+          "production75_operator_local_oracle_rollback",
+        );
+        const layout = {
+          templateReader: reader,
+          catalogs: { before, after },
+          policies: { before: beforePolicy, after: afterPolicy },
+        };
+        layouts.push(layout);
+        nativeLayouts.push({ ...layout, box: b });
+      } finally {
+        await end(c);
+      }
+    }
+    const { sql, ...descriptor } = schedulingSource;
+    combinedOracle = {
+      kind: "OWNED_NATIVE_COMBINED_POLICY_ORACLE",
+      candidate,
+      legacy,
+      scheduling: {
+        source: descriptor,
+        layouts,
+        coverage: {
+          tables: 142,
+          columnsBefore: 1867,
+          columnsAfter: 1870,
+          layouts: 2,
+        },
+      },
+    };
+    combinedCatalogs = {
+      legacy: {
+        fly75: catalog75,
+        other75: otherCatalog,
+        canonical95,
+        canonical142,
+      },
+      scheduling: layouts.map((l) => l.catalogs),
+    };
+    combinedManifest = combinedManifestDigest({
+      modules: receipt.moduleHashesBefore,
+      legacySource,
+      schedulingSource: descriptor,
+      catalogs: combinedCatalogs,
+      oracle: combinedOracle,
+      candidate,
+    });
+    Object.assign(receipt, {
+      oracleSha256: sha(JSON.stringify(combinedOracle)),
+      moduleManifestSha256: combinedManifest,
+      legacySource,
+      catalogs: combinedCatalogs,
+    });
+    await writeFile(
+      resolve(out, "oracle.json"),
+      JSON.stringify(combinedOracle, null, 2) + "\n",
+      { flag: "wx" },
+    );
+  }
+  async function verifyNativeLayout(layout, index) {
+    const initialPlan = deltaPlan(layout),
+      baseline = await readDelta(layout, initialPlan);
+    const stateEvidence = (state) => ({
+      phase: state.phase,
+      identity: state.identity,
+      catalogSha256: catalogDigest(state.catalog, { physical: true }),
+      policySha256: sha(JSON.stringify(state.policy)),
+      fingerprints: state.fingerprints,
+      nullCounts: state.nullCounts,
+    });
+    await writeFile(
+      resolve(out, `layout-${index}-baseline.json`),
+      JSON.stringify(stateEvidence(baseline), null, 2) + "\n",
+      { flag: "wx" },
+    );
+    for (const table of [
+      "service_obligations",
+      "revenue_execution_events",
+      "appointment_work_entries",
+    ])
+      check(
+        BigInt(baseline.fingerprints.find((r) => r.table === table).rows) > 0n,
+        "production75_operator_local_seed",
+      );
+    const caseProof = {
+      beforeCatalogSha256: catalogDigest(layout.catalogs.before, {
+        physical: true,
+      }),
+      afterCatalogSha256: catalogDigest(layout.catalogs.after, {
+        physical: true,
+      }),
+      coverage: { tables: 142, columnsBefore: 1867, columnsAfter: 1870 },
+      sourceDispatches: { rollback: 0, lateFailure: 0, commit: 0 },
+    };
+    receipt.schedulingCases.push(caseProof);
+    const reader = await connect(
+      layout.box,
+      "fly-db",
+      layout.templateReader,
+      false,
+    );
+    try {
+      try {
+        await reader.query(
+          "UPDATE public.appointment_work_entries SET notes=notes WHERE false",
+        );
+      } catch (e) {
+        caseProof.readerWriteDenied = e.code === "42501";
+      }
+      check(
+        caseProof.readerWriteDenied,
+        "production75_operator_local_reader_write",
+      );
+    } finally {
+      await end(reader);
+    }
+    // Every table has a PK: valid duplicate full tuples are impossible. Exercise
+    // identical native row multiplicity in the original projection without DDL.
+    const admin = await connect(layout.box, "fly-db");
+    try {
+      const multiplicity = (
+        await admin.query(
+          `WITH original AS (SELECT * FROM public.appointment_work_entries LIMIT 1), duplicates AS (SELECT * FROM original UNION ALL SELECT * FROM original) SELECT (SELECT count(*) FROM original)::text AS one,(SELECT count(*) FROM duplicates)::text AS two,(SELECT md5(string_agg(md5(row_to_json(original)::text),'' ORDER BY md5(row_to_json(original)::text) COLLATE "C")) FROM original) AS single,(SELECT md5(string_agg(md5(row_to_json(duplicates)::text),'' ORDER BY md5(row_to_json(duplicates)::text) COLLATE "C")) FROM duplicates) AS multiple`,
+        )
+      ).rows[0];
+      const duplicateState = structuredClone(baseline);
+      const duplicateFingerprint = duplicateState.fingerprints.find(
+        (r) => r.table === "appointment_work_entries",
+      );
+      duplicateFingerprint.rows = multiplicity.two;
+      duplicateFingerprint.bytes = String(
+        BigInt(duplicateFingerprint.bytes) * 2n,
+      );
+      duplicateFingerprint.digest = multiplicity.multiple;
+      let duplicateRefused = false;
+      try {
+        assertScheduling0019Preserved(
+          baseline,
+          duplicateState,
+          initialPlan,
+          "pre0019",
+        );
+      } catch {
+        duplicateRefused = true;
+      }
+      caseProof.duplicateMultiplicityVerified =
+        duplicateRefused &&
+        multiplicity.one === "1" &&
+        multiplicity.two === "2" &&
+        multiplicity.single !== multiplicity.multiple;
+      caseProof.duplicateEvidence = {
+        kind: "NATIVE_ORIGINAL_ROW_UNION_ALL_PROJECTION",
+        ...multiplicity,
+        preservationRefused: duplicateRefused,
+        physicalDuplicatePkRows: false,
+      };
+      check(
+        caseProof.duplicateMultiplicityVerified,
+        "production75_operator_local_multiplicity",
+      );
+      // Commit data drift before verification, then restore only the owned row.
+      const original = (
+        await admin.query(
+          "SELECT id,notes FROM public.appointment_work_entries ORDER BY id LIMIT 1",
+        )
+      ).rows[0];
+      await admin.query(
+        "UPDATE public.appointment_work_entries SET notes='Fictional drift Ω' WHERE id=$1",
+        [original.id],
+      );
+      const drift = await readDelta(layout, initialPlan);
+      try {
+        assertScheduling0019Preserved(baseline, drift, initialPlan, "pre0019");
+      } catch {
+        caseProof.sameCountDriftRejected = isDeepStrictEqual(
+          baseline.fingerprints.map((r) => r.rows),
+          drift.fingerprints.map((r) => r.rows),
+        );
+      }
+      await admin.query(
+        "UPDATE public.appointment_work_entries SET notes=$2 WHERE id=$1",
+        [original.id, original.notes],
+      );
+      check(
+        caseProof.sameCountDriftRejected,
+        "production75_operator_local_drift",
+      );
+      // Native concurrent change is injected immediately before LOCK acquisition.
+      const concurrent = await connect(layout.box, "fly-db", "fly-user"),
+        plan = deltaPlan(layout);
+      let sourceDispatched = 0,
+        changed = false;
+      const writer = {
+        query: async (sql, args) => {
+          if (sql.startsWith("LOCK TABLE ") && !changed) {
+            changed = true;
+            await admin.query(
+              "UPDATE public.appointment_work_entries SET notes='Fictional concurrent Ω' WHERE id=$1",
+              [original.id],
+            );
+          }
+          if (sql === schedulingSource.sql) sourceDispatched++;
+          return concurrent.query(sql, args);
+        },
+      };
+      try {
+        const result = await runScheduling0019Verification({
+          writer,
+          plan,
+          baseline,
+          outcome: "rollback",
+          attemptId: randomUUID(),
+          reserve: async () => true,
+          persist: async () => {},
+          readFresh: () => readDelta(layout, plan),
+        });
+        caseProof.preLockConcurrentDriftRejected =
+          changed &&
+          sourceDispatched === 0 &&
+          result.proof.rollbackAcknowledged &&
+          !result.proof.sourceDispatched;
+        await writeFile(
+          resolve(out, `layout-${index}-concurrent-drift.json`),
+          JSON.stringify(result, null, 2) + "\n",
+          { flag: "wx" },
+        );
+      } finally {
+        await end(concurrent);
+        await admin.query(
+          "UPDATE public.appointment_work_entries SET notes=$2 WHERE id=$1",
+          [original.id, original.notes],
+        );
+      }
+      check(
+        caseProof.preLockConcurrentDriftRejected,
+        "production75_operator_local_concurrent_drift",
+      );
+    } finally {
+      await end(admin);
+    }
+    for (const kind of ["rollback", "lateFailure", "commit"]) {
+      const plan = deltaPlan(layout),
+        c = await connect(layout.box, "fly-db", "fly-user"),
+        events = [],
+        reservations = [],
+        observations = [];
+      let actualError = null,
+        postimage = false,
+        ddlAfterPostimage = 0;
+      const writer = {
+        query: async (sql, args) => {
+          if (/^(?:ALTER|CREATE|DROP)\b/.test(sql.trim()) && postimage)
+            ddlAfterPostimage++;
+          if (sql === schedulingSource.sql) {
+            caseProof.sourceDispatches[kind]++;
+            if (kind === "lateFailure") {
+              const chunks = splitScheduling0019FaultFixture(sql);
+              for (const chunk of chunks.slice(0, 5)) await c.query(chunk);
+              const update = await c.query(
+                "UPDATE public.projects SET scheduling_reservation='{}'::jsonb",
+              );
+              caseProof.faultFixture = {
+                kind: "LOCAL_SPLIT_EXACT_SIX_ALTER_FAULT_FIXTURE",
+                chunks: chunks.map((chunk) => ({
+                  bytes: Buffer.byteLength(chunk),
+                  sha256: sha(chunk),
+                })),
+                joinedSourceSha256: sha(chunks.join("")),
+                injectedUpdates: 1,
+                injectedRows: update.rowCount,
+                providerWireEquivalence: false,
+              };
+              check(
+                update.rowCount > 0,
+                "production75_operator_local_late_seed",
+              );
+              try {
+                return await c.query(chunks[5]);
+              } catch (e) {
+                actualError = {
+                  sqlState: e.code,
+                  failedConstraint: e.constraint,
+                };
+                throw e;
+              }
+            }
+          }
+          const result = await c.query(sql, args);
+          if (sql === schedulingSource.sql) postimage = true;
+          if (index === 1 && kind === "commit" && sql === "COMMIT") {
+            await end(c); // server ACK was observed here; caller deliberately loses it.
+            throw Error("synthetic lost scheduling COMMIT acknowledgment");
+          }
+          return result;
+        },
+      };
+      try {
+        const result = await runScheduling0019Verification({
+          writer,
+          plan,
+          baseline: await readDelta(layout, plan),
+          outcome: kind === "commit" ? "commit" : "rollback",
+          attemptId: randomUUID(),
+          reserve: async (intent) => {
+            reservations.push(intent);
+            return reservations.length === 1;
+          },
+          persist: async (event) => {
+            events.push(event);
+          },
+          readFresh: async () => {
+            const state = await readDelta(layout, plan);
+            observations.push(stateEvidence(state));
+            postimage ||= state.phase === "post0019";
+            return state;
+          },
+        });
+        if (kind === "lateFailure") {
+          const restored = await readDelta(layout, plan);
+          assertScheduling0019Preserved(baseline, restored, plan, "pre0019");
+          caseProof.lateFailure = {
+            result,
+            rollbackAcknowledged: result.proof.rollbackAcknowledged,
+            preimagePreserved: true,
+            ...actualError,
+          };
+          check(
+            actualError?.sqlState === "23514" &&
+              actualError.failedConstraint ===
+                "projects_scheduling_reservation_ck" &&
+              result.proof.rollbackAcknowledged,
+            "production75_operator_local_late_failure",
+          );
+        } else {
+          caseProof[kind] = result;
+          check(
+            result.status ===
+              (kind === "commit" && index === 1
+                ? "reconciled-commit-no-replay"
+                : `verified-${kind}`),
+            "production75_operator_local_delta_outcome",
+          );
+        }
+        await writeFile(
+          resolve(out, `layout-${index}-${kind}.json`),
+          JSON.stringify(
+            { result, events, reservations, observations },
+            null,
+            2,
+          ) + "\n",
+          { flag: "wx" },
+        );
+        if (kind === "commit")
+          caseProof.noDdlAfterPostimage = ddlAfterPostimage === 0;
+      } finally {
+        await end(c);
+      }
+    }
+  }
   try {
+    if (combined) {
+      await measureCombinedOracle();
+      for (let i = 0; i < nativeLayouts.length; i++)
+        await verifyNativeLayout(nativeLayouts[i], i);
+    }
     for (const scenario of ["normal", "lost-commit", "idle-client-error"]) {
+      active();
+      const transportStart = liveTransports.length;
       const sourceBox = await box();
       await initialize(sourceBox);
       const before = await capture(sourceBox),
         caseId = randomUUID(),
         readerName = production75ReaderName(caseId),
         profile = expectedProduction75ReaderProfile(readerName),
-        manifest = sha(JSON.stringify(receipt.moduleHashesBefore));
-      const plan = prepareOperatorPlan({
+        manifest = combined
+          ? combinedManifest
+          : sha(JSON.stringify(receipt.moduleHashesBefore));
+      let scheduling;
+      if (combined) {
+        const projected = projectLiveReader(before, profile),
+          policies = deriveLivePolicies({
+            baseline: projected.databases.find((d) => d.name === "fly-db")
+              .policy,
+            oracle: combinedOracle.legacy.policies,
+            readerName,
+            templateReader: combinedOracle.legacy.templateReader,
+          });
+        scheduling = {
+          source: combinedOracle.scheduling.source,
+          coverage: combinedOracle.scheduling.coverage,
+          layouts: combinedOracle.scheduling.layouts.map((l) => {
+            const p = deriveLiveScheduling0019Policy({
+              baseline142: policies.policy142,
+              oracle: l.policies,
+              readerName,
+              templateReader: l.templateReader,
+            });
+            return {
+              beforeCatalogSha256: catalogDigest(l.catalogs.before, {
+                physical: true,
+              }),
+              afterCatalogSha256: catalogDigest(l.catalogs.after, {
+                physical: true,
+              }),
+              beforePolicySha256: sha(JSON.stringify(p.before)),
+              afterPolicySha256: sha(JSON.stringify(p.after)),
+            };
+          }),
+        };
+      }
+      const plan = (
+          combined ? prepareCombinedOperatorPlan : prepareOperatorPlan
+        )({
           runId: caseId,
           backupId: "backup_local_fixture",
           sourceSnapshotSha256: production75SnapshotDigest(before),
           profileSha256: production75ProfileDigest(profile),
           moduleManifestSha256: manifest,
           preparedAt: Date.now(),
-          workMs: 600000,
-          cleanupMs: 300000,
+          workMs: combined ? Math.min(600000, budget.remaining()) : 600000,
+          cleanupMs: combined ? 240000 : 300000,
           maxCostUsdMicros: 150000,
+          ...(combined ? { candidate, scheduling } : {}),
         }),
         digest = operatorPlanDigest(plan);
       let copyBox = null,
@@ -585,7 +1384,7 @@ async function run() {
         "growthos_staging",
         "mogulforge-growthos-db",
       ]) {
-        const dump = await docker([
+        const dump = await runDocker([
           "exec",
           sourceBox.id,
           "pg_dump",
@@ -594,7 +1393,7 @@ async function run() {
           "--create",
           name,
         ]);
-        await docker(
+        await runDocker(
           [
             "exec",
             "-i",
@@ -612,6 +1411,7 @@ async function run() {
       }
 
       const fetchFn = async (url, options) => {
+        active();
         check(
           new URL(url).origin === "https://api.fly.io",
           "production75_operator_local_origin",
@@ -682,41 +1482,92 @@ async function run() {
         getAuthorization: async () => "Bearer local-only-fixture",
         organization: plan.organization,
       });
-      // Owned local oracle transaction precedes every operator invocation. No hosted SQL oracle.
-      const oracleClient = await connect(sourceBox, "fly-db");
-      let oracle;
-      try {
-        await oracleClient.query("BEGIN");
-        await oracleClient.query(
-          `CREATE ROLE ${q(readerName)} LOGIN INHERIT NOCREATEROLE NOCREATEDB NOREPLICATION NOBYPASSRLS CONNECTION LIMIT -1; GRANT reader TO ${q(readerName)} WITH ADMIN FALSE; GRANT reader TO ${q(readerName)} WITH INHERIT TRUE; GRANT reader TO ${q(readerName)} WITH SET TRUE`,
+      let refusalEvidence;
+      if (combined && scenario === "normal") {
+        const inventory = await api.listClusters();
+        let metadataRefused = false,
+          nonTargetRefused = false;
+        try {
+          mergeV1OwnershipEvidence(
+            { ...inventory[0], region: "sfo" },
+            inventory,
+          );
+        } catch {
+          metadataRefused = true;
+        }
+        const changedObservation = structuredClone(
+          projectLiveReader(before, profile),
         );
-        await oracleClient.query(
-          "SET LOCAL ROLE schema_admin; SET LOCAL search_path=public,pg_catalog",
-        );
-        const principals = [
-            "fly-user",
-            "growthos-staging-live",
-            "reader",
+        const nonTarget = changedObservation.databases.find(
+          (d) => d.name === "growthos_staging",
+        ).fingerprints[0];
+        nonTarget.digest =
+          nonTarget.digest === "f".repeat(32) ? "e".repeat(32) : "f".repeat(32);
+        try {
+          assertProduction75ReaderDelta({
+            before,
+            after: changedObservation,
             readerName,
-          ],
-          p75 = await captureProduction75Policy(oracleClient, principals);
-        for (const step of source.steps.slice(0, 3))
-          await oracleClient.query(step.sql);
-        const p95 = await captureProduction75Policy(oracleClient, principals);
-        for (const step of source.steps.slice(3))
-          await oracleClient.query(step.sql);
-        const p142 = await captureProduction75Policy(oracleClient, principals);
-        oracle = {
-          kind: "OWNED_NATIVE_POLICY_ORACLE",
-          sourceCandidate: BASE,
-          templateReader: readerName,
-          policies: { 75: p75, 95: p95, 142: p142 },
+            expectedProfile: profile,
+          });
+        } catch {
+          nonTargetRefused = true;
+        }
+        check(
+          metadataRefused &&
+            nonTargetRefused &&
+            Object.values(counts).every((n) => n === 0),
+          "production75_operator_local_refusal",
+        );
+        refusalEvidence = {
+          kind: "SUPPLIED_METADATA_AND_NATIVE_OBSERVATION_FAULTS",
+          metadataRefused,
+          nonTargetRefused,
+          nativeNonTargetDatabaseMutated: false,
+          mutationCountsAtRefusal: { ...counts },
+          sourceSnapshotSha256: production75SnapshotDigest(before),
         };
-        await oracleClient.query("ROLLBACK");
-      } finally {
-        await end(oracleClient);
       }
-      if (scenario === "normal") {
+      // Owned local oracle transaction precedes every operator invocation. No hosted SQL oracle.
+      const oracleClient = combined ? null : await connect(sourceBox, "fly-db");
+      let oracle;
+      if (combined) oracle = combinedOracle;
+      else
+        try {
+          await oracleClient.query("BEGIN");
+          await oracleClient.query(
+            `CREATE ROLE ${q(readerName)} LOGIN INHERIT NOCREATEROLE NOCREATEDB NOREPLICATION NOBYPASSRLS CONNECTION LIMIT -1; GRANT reader TO ${q(readerName)} WITH ADMIN FALSE; GRANT reader TO ${q(readerName)} WITH INHERIT TRUE; GRANT reader TO ${q(readerName)} WITH SET TRUE`,
+          );
+          await oracleClient.query(
+            "SET LOCAL ROLE schema_admin; SET LOCAL search_path=public,pg_catalog",
+          );
+          const principals = [
+              "fly-user",
+              "growthos-staging-live",
+              "reader",
+              readerName,
+            ],
+            p75 = await captureProduction75Policy(oracleClient, principals);
+          for (const step of source.steps.slice(0, 3))
+            await oracleClient.query(step.sql);
+          const p95 = await captureProduction75Policy(oracleClient, principals);
+          for (const step of source.steps.slice(3))
+            await oracleClient.query(step.sql);
+          const p142 = await captureProduction75Policy(
+            oracleClient,
+            principals,
+          );
+          oracle = {
+            kind: "OWNED_NATIVE_POLICY_ORACLE",
+            sourceCandidate: BASE,
+            templateReader: readerName,
+            policies: { 75: p75, 95: p95, 142: p142 },
+          };
+          await oracleClient.query("ROLLBACK");
+        } finally {
+          await end(oracleClient);
+        }
+      if (scenario === "normal" && !combined) {
         await writeFile(
           resolve(out, "oracle.json"),
           JSON.stringify(oracle, null, 2) + "\n",
@@ -737,6 +1588,7 @@ async function run() {
         protectedApps: async () => ({ localProtected: "unchanged" }),
         metadata: () => ({ synthetic: true }),
         openProxy: async (id, resources) => {
+          active();
           const b = id === plan.sourceCluster ? sourceBox : copyBox;
           let alive = false;
           const child = new EventEmitter();
@@ -766,7 +1618,11 @@ async function run() {
               }
             }
             async query(...args) {
-              const result = await super.query(...args);
+              active();
+              const result = await boundedQuery(
+                () => super.query(...args),
+                () => this.connection?.stream?.destroy(),
+              );
               if (
                 scenario === "lost-commit" &&
                 id !== plan.sourceCluster &&
@@ -812,7 +1668,11 @@ async function run() {
                 : kind === "children"
                   ? []
                   : alive
-                    ? { pid, created: "synthetic", executable: "synthetic-fly" }
+                    ? {
+                        pid,
+                        created: "synthetic",
+                        executable: "synthetic-fly",
+                      }
                     : null,
             Client: DriverClient,
           });
@@ -897,7 +1757,20 @@ async function run() {
         },
         oracle,
         custodyRoot: out,
-        manifestSha256: async () => sha(JSON.stringify(hashes())),
+        manifestSha256: async () =>
+          combined
+            ? combinedManifestDigest({
+                modules: hashes(),
+                legacySource,
+                schedulingSource: combinedOracle.scheduling.source,
+                catalogs: combinedCatalogs,
+                oracle: combinedOracle,
+                candidate,
+              })
+            : sha(JSON.stringify(hashes())),
+        ...(combined
+          ? { candidate, schedulingSource, currentHashes: hashes }
+          : {}),
         unprotect: async (blob) =>
           Buffer.from(
             JSON.stringify(
@@ -909,10 +1782,14 @@ async function run() {
             ),
           ),
       };
-      const result = await executeLivePacket(
+      const result = await (
+        combined ? executeSuppliedCombinedPacket : executeLivePacket
+      )(
         deps,
         {
-          kind: "UNADMITTED_LIVE_PREPARATION",
+          kind: combined
+            ? "UNADMITTED_COMBINED_LIVE_PREPARATION"
+            : "UNADMITTED_LIVE_PREPARATION",
           plan,
           planSha256: digest,
           sourceBefore: before,
@@ -934,6 +1811,37 @@ async function run() {
           physicalSha256: catalogDigest(d.catalog, { physical: true }),
         })),
       };
+      if (refusalEvidence) {
+        const unchanged = await capture(sourceBox);
+        refusalEvidence.sourceSnapshotAfterSha256 =
+          production75SnapshotDigest(unchanged);
+        check(
+          refusalEvidence.sourceSnapshotAfterSha256 ===
+            refusalEvidence.sourceSnapshotSha256,
+          "production75_operator_local_originals",
+        );
+        receipt.refusalEvidence = refusalEvidence;
+      }
+      if (combined) {
+        const observed = liveTransports
+          .slice(transportStart)
+          .map((t) => t.metadata());
+        const counters = [
+          "clients",
+          "clientsClosed",
+          "socketsClosed",
+          "proxies",
+          "proxiesClosed",
+        ];
+        combinedTransportProofs.push(
+          Object.fromEntries(
+            counters.map((key) => [
+              key,
+              observed.reduce((sum, t) => sum + t[key], 0),
+            ]),
+          ),
+        );
+      }
       check(
         result.status ===
           (scenario === "idle-client-error"
@@ -950,11 +1858,13 @@ async function run() {
       );
       for (const b of [copyBox, sourceBox])
         if (b && !b.__removed) {
+          if (combined) b.__cleanupAttempted = true;
           const proof = await cleanupProduction75Container(b, async (args) => ({
-            output: (await docker(args)).toString().trim(),
+            output: (await runDocker(args)).toString().trim(),
           }));
           check(proof.containerRemoved, "production75_operator_local_cleanup");
           b.__removed = true;
+          if (combined) b.__cleanupEvidence = proof;
           receipt.cleanup.containers++;
         }
     }
@@ -965,27 +1875,35 @@ async function run() {
       : "production75_operator_local_failure";
     receipt.sqlState = /^[A-Z0-9]{5}$/.test(e.code ?? "") ? e.code : undefined;
   } finally {
+    budget?.beginCleanup();
     for (const c of clients.filter((c) => !c.__closed))
       try {
+        active();
         await end(c);
       } catch {
         c.connection?.stream?.destroy();
         failed = true;
       }
-    for (const b of containers.filter((b) => !b.__removed))
+    for (const b of containers.filter(
+      (b) => !b.__removed && (!combined || !b.__cleanupAttempted),
+    ))
       try {
+        if (combined) b.__cleanupAttempted = true;
         const p = await cleanupProduction75Container(b, async (args) => ({
-          output: (await docker(args)).toString().trim(),
+          output: (await runDocker(args)).toString().trim(),
         }));
         if (p.containerRemoved) {
           b.__removed = true;
+          if (combined) b.__cleanupEvidence = p;
           receipt.cleanup.containers++;
         } else failed = true;
       } catch {
         failed = true;
       }
   }
-  receipt.transportProofs = liveTransports.map((t) => t.metadata());
+  receipt.transportProofs = combined
+    ? combinedTransportProofs
+    : liveTransports.map((t) => t.metadata());
   if (
     receipt.transportProofs.some(
       (t) =>
@@ -1007,6 +1925,43 @@ async function run() {
     failed = true;
   receipt.status = failed ? "FAILED" : "PASS";
   receipt.finishedAt = new Date().toISOString();
+  if (combined) {
+    receipt.containerCleanupEvidence = containers.map((b) => ({
+      runId: b.runId,
+      attempted: b.__cleanupAttempted === true,
+      proof: b.__cleanupEvidence ?? null,
+    }));
+    receipt.ownedContainers = containers.map((b) => ({
+      runId: b.runId,
+      name: b.name,
+      id: b.id,
+      removed: b.__removed === true,
+      loopbackOnly: b.loopbackOnly === true,
+    }));
+    if (!failed) {
+      try {
+        check(
+          gitText("status", "--porcelain", "--untracked-files=normal") === "" &&
+            candidate.commit === gitText("rev-parse", "HEAD") &&
+            candidate.tree === gitText("rev-parse", "HEAD^{tree}"),
+          "production75_operator_local_candidate_drift",
+        );
+        Object.assign(
+          receipt,
+          finalizeCombinedLocalProof({
+            proof: { ...receipt, status: "EXECUTED" },
+            oracle: combinedOracle,
+            currentHashes: receipt.moduleHashesAfter,
+            candidate,
+          }),
+        );
+      } catch (e) {
+        receipt.status = "FAILED";
+        receipt.failureCode =
+          e.safeCode ?? "production75_operator_local_finalization";
+      }
+    }
+  }
   await writeFile(
     resolve(out, "native-result.json"),
     JSON.stringify(receipt, null, 2) + "\n",
@@ -1014,12 +1969,34 @@ async function run() {
   );
   return receipt;
 }
+async function run(combined = false) {
+  const context = {};
+  try {
+    return await runLocal(combined, context);
+  } catch (error) {
+    const { receipt, out } = context;
+    if (!receipt || !out) throw error;
+    // Setup errors occur before any container is created; execution failures
+    // already passed through the exact-ownership finally block above.
+    receipt.status = "FAILED";
+    receipt.failureCode = /^(production75|scheduling0019)_[a-z0-9_]+$/.test(
+      error?.safeCode ?? "",
+    )
+      ? error.safeCode
+      : "production75_operator_local_failure";
+    receipt.finishedAt = new Date().toISOString();
+    if (!existsSync(resolve(out, "native-result.json")))
+      await writeFile(
+        resolve(out, "native-result.json"),
+        JSON.stringify(receipt, null, 2) + "\n",
+        { flag: "wx" },
+      );
+    return receipt;
+  }
+}
 export async function main(args = process.argv.slice(2)) {
-  check(
-    args.length === 1 && args[0] === "--run-local",
-    "production75_operator_local_action",
-  );
-  return withWslDockerSession(run);
+  const action = selectLocalAction(args);
+  return withWslDockerSession(() => run(action === "combined"));
 }
 if (
   process.argv[1] &&
