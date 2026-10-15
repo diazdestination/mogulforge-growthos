@@ -267,6 +267,7 @@ function setup(
     hold: () => {
       held = true;
     },
+    recover: () => { held = false; },
     changeProfile: (next: Partial<typeof profile>) => {
       profile = { ...profile, ...next };
     },
@@ -1528,6 +1529,199 @@ describe('native appointment scheduling consumer', () => {
     expect(screen.queryByText(genericRefusalExplanation)).toBeNull();
     expect(screen.queryByText(unsafeRefusalServerText)).toBeNull();
     expect(s.commands).toHaveLength(1);
+  });
+
+
+
+  async function committedAppointmentResponse(command: ManualSchedulingCommand, available = true) {
+    const proof = manualSchedulingAckSchema.parse(await ack(command, available));
+    return available ? Response.json({ ...row(), ...command.body, schedulingOperation: proof }) : Response.json({ error: 'Original target unavailable', code: 'manual_scheduling_target_unavailable', schedulingOperation: proof }, { status: 409 });
+  }
+  async function commitSameCustomer(s: ReturnType<typeof setup>, property = false) {
+    await open();
+    fireEvent.change(await screen.findByTestId('appointment-contact'), { target: { value: customer } });
+    if (property) {
+      await screen.findByRole('option', { name: /10 Synthetic Lane/ });
+      fireEvent.change(screen.getByRole('combobox', { name: 'Property for this new appointment' }), { target: { value: id(10) } });
+    }
+    await waitFor(() => expect(screen.getByLabelText('Service start')).toHaveProperty('disabled', false));
+    await review(); fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    await screen.findByText(/Original appointment committed/);
+    expect(s.commands).toHaveLength(1);
+  }
+  async function reviewSeparateInterval() {
+    fireEvent.change(screen.getByLabelText('Service start'), { target: { value: '2035-07-05T10:00:00.123' } });
+    fireEvent.change(screen.getByLabelText('Service end'), { target: { value: '2035-07-05T12:00:00.123' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Review interval' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', false));
+  }
+  const repeatControl = () => screen.getByRole('button', { name: 'Start a new appointment' });
+  const committedCustody = () => JSON.parse(sessionStorage.getItem(sessionStorage.key(0)!)!);
+
+  it('repeat intent: creates a distinct appointment for the exact same customer/property only after explicit intent, fresh Review and Save', async () => {
+    const s = setup({ property: true, post: command => committedAppointmentResponse(command) });
+    await commitSameCustomer(s, true);
+    const original = structuredClone(s.commands[0]), key = sessionStorage.key(0)!, bytes = sessionStorage.getItem(key)!;
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true);
+    const uuid = vi.spyOn(crypto, 'randomUUID'), writes = vi.spyOn(Storage.prototype, 'setItem');
+    fireEvent.click(repeatControl());
+    expect(s.commands).toHaveLength(1); expect(uuid).not.toHaveBeenCalled(); expect(writes).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(key)).toBe(bytes);
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true);
+    await reviewSeparateInterval(); fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    await waitFor(() => expect(s.commands).toHaveLength(2));
+    await waitFor(() => expect(committedCustody().ack?.operationId).toBe(s.commands[1].operationId));
+    expect(uuid).toHaveBeenCalledTimes(1);
+    expect(s.commands[1].operationId).not.toBe(original.operationId);
+    expect(s.commands[1].review.context.source).toEqual(original.review.context.source);
+    expect(s.commands[1].body).toMatchObject({ contactId: customer, propertyId: id(10), scheduledStart: '2035-07-05T17:00:00.123Z', scheduledEnd: '2035-07-05T19:00:00.123Z' });
+    expect(s.commands[0]).toEqual(original); expect(committedCustody().retiredOperationIds).toContain(original.operationId);
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true);
+  });
+
+  it('repeat intent: permits explicit distinct work after known committed-unavailable proof without a false original link', async () => {
+    const s = setup({ post: command => committedAppointmentResponse(command, false) }); await commitSameCustomer(s);
+    expect(screen.queryByRole('link', { name: 'Open original appointment' })).toBeNull();
+    const bytes = sessionStorage.getItem(sessionStorage.key(0)!)!;
+    fireEvent.click(repeatControl()); expect(sessionStorage.getItem(sessionStorage.key(0)!)).toBe(bytes); expect(s.commands).toHaveLength(1);
+    await reviewSeparateInterval(); fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    await waitFor(() => expect(s.commands).toHaveLength(2));
+    expect(s.commands[1].operationId).not.toBe(s.commands[0].operationId);
+    expect(s.commands[1].review.context.source).toEqual(s.commands[0].review.context.source);
+  });
+
+  it.each(['unknown', 'unavailable-unknown', 'refused', 'wrong-operation', 'wrong-hash', 'submitting'] as const)('repeat intent: keeps %s proof held without an escape control', async mode => {
+    let resolve!: (response: Response) => void; const pending = new Promise<Response>(done => { resolve = done; });
+    const s = setup({ post: async command => {
+      if (mode === 'submitting') return pending;
+      if (mode === 'unknown') throw new Error('Lost acknowledgement');
+      if (mode === 'unavailable-unknown') return Response.json({ error: 'Target absent' }, { status: 409 });
+      if (mode === 'refused') return refusalResponse(command, 'travel_conflict');
+      const proof = manualSchedulingAckSchema.parse({ ...await ack(command), ...(mode === 'wrong-operation' ? { operationId: id(99) } : { payloadSha256: 'd'.repeat(64) }) });
+      return Response.json({ ...row(), schedulingOperation: proof });
+    } });
+    await open(); await review(); fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    if (mode === 'submitting') await waitFor(() => expect(s.commands).toHaveLength(1));
+    else await screen.findByText(mode === 'refused' ? /Original appointment was refused/ : /Original appointment result is unknown/);
+    expect(screen.queryByRole('button', { name: 'Start a new appointment' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true);
+    if (mode === 'submitting') { await act(async () => { resolve(await committedAppointmentResponse(s.commands[0])); }); await screen.findByText(/Original appointment committed/); }
+    expect(s.commands).toHaveLength(1);
+  });
+
+  it('repeat intent: current context failure prevents fresh review until actual successful refresh', async () => {
+    const s = setup({ post: command => committedAppointmentResponse(command) }); await commitSameCustomer(s);
+    fireEvent.click(repeatControl()); s.hold(); fireEvent.click(screen.getByRole('button', { name: 'Refresh scheduling review' }));
+    await screen.findByText('Current scheduling review is unavailable. Refresh before changing the schedule.');
+    expect(screen.getByRole('button', { name: 'Review interval' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true); expect(s.commands).toHaveLength(1);
+    s.recover(); fireEvent.click(screen.getByRole('button', { name: 'Refresh scheduling review' }));
+    await waitFor(() => expect(screen.getByLabelText('Service start')).toHaveProperty('disabled', false));
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true);
+    await reviewSeparateInterval(); fireEvent.click(screen.getByRole('button', { name: 'Save Appt' })); await waitFor(() => expect(s.commands).toHaveLength(2));
+  });
+
+  it('repeat intent: authority epoch change and restoration in the same mounted form requires a new intent', async () => {
+    const s = setup({ post: command => committedAppointmentResponse(command) }); await commitSameCustomer(s);
+    fireEvent.click(repeatControl()); await reviewSeparateInterval();
+    const dialog = screen.getByRole('dialog'), bytes = sessionStorage.getItem(sessionStorage.key(0)!)!;
+    s.changeProfile({ organization: { id: org, name: 'Synthetic company', slug: 'synthetic', timezone: 'UTC' } });
+    await act(async () => { await s.client.refetchQueries({ queryKey: getGetMeQueryKey() }); });
+    s.changeProfile({ organization: { id: org, name: 'Synthetic company', slug: 'synthetic', timezone: 'America/Los_Angeles' } });
+    await act(async () => { await s.client.refetchQueries({ queryKey: getGetMeQueryKey() }); });
+    await screen.findByText(/Original appointment committed/);
+    expect(screen.getByRole('dialog')).toBe(dialog);
+    expect(repeatControl()).toHaveProperty('disabled', false);
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true);
+    expect(sessionStorage.getItem(sessionStorage.key(0)!)).toBe(bytes); expect(s.commands).toHaveLength(1);
+  });
+
+  it.each(['actor', 'organization', 'role', 'inactive'] as const)('repeat intent: %s revocation and restoration cannot reuse prior intent', async mode => {
+    const s = setup({ post: command => committedAppointmentResponse(command) }); await commitSameCustomer(s);
+    fireEvent.click(repeatControl()); await reviewSeparateInterval();
+    if (mode === 'actor') s.changeProfile({ id: 'other-actor' });
+    if (mode === 'organization') s.changeProfile({ organization: { id: id(98), name: 'Other', slug: 'other', timezone: 'UTC' } });
+    if (mode === 'role') s.changeProfile({ role: 'viewer' });
+    if (mode === 'inactive') s.changeProfile({ isActive: false });
+    await act(async () => { await s.client.refetchQueries({ queryKey: getGetMeQueryKey() }); });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    s.changeProfile({ id: actor, role: 'office', isActive: true, organization: { id: org, name: 'Synthetic company', slug: 'synthetic', timezone: 'America/Los_Angeles' } });
+    await act(async () => { await s.client.refetchQueries({ queryKey: getGetMeQueryKey() }); });
+    fireEvent.click(await screen.findByRole('button', { name: 'Schedule appointment' }));
+    fireEvent.change(await screen.findByTestId('appointment-contact'), { target: { value: customer } });
+    await screen.findByText(/Original appointment committed/);
+    expect(repeatControl()).toHaveProperty('disabled', false);
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true); expect(s.commands).toHaveLength(1);
+  });
+
+  it('repeat intent: changing away from the source and back requires explicit intent again', async () => {
+    const s = setup({ post: command => committedAppointmentResponse(command) }); await commitSameCustomer(s);
+    fireEvent.click(repeatControl()); await reviewSeparateInterval();
+    fireEvent.change(screen.getByTestId('appointment-contact'), { target: { value: '' } });
+    await waitFor(() => expect(screen.getByLabelText('Service start')).toHaveProperty('disabled', false));
+    fireEvent.change(screen.getByTestId('appointment-contact'), { target: { value: customer } });
+    await screen.findByText(/Original appointment committed/);
+    expect(repeatControl()).toHaveProperty('disabled', false);
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true); expect(s.commands).toHaveLength(1);
+  });
+
+  it('repeat intent: actual close/remount resets intent and explicit action restores only the untouched original property', async () => {
+    const s = setup({ property: true, post: command => committedAppointmentResponse(command) }); await commitSameCustomer(s, true);
+    fireEvent.click(repeatControl()); await reviewSeparateInterval();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' })); s.view.unmount(); s.mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Schedule appointment' }));
+    fireEvent.change(await screen.findByTestId('appointment-contact'), { target: { value: customer } });
+    await screen.findByText(/Original appointment committed/);
+    const property = screen.getByRole('combobox', { name: 'Property for this new appointment' });
+    expect(property).toHaveProperty('value', '');
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true);
+    const bytes = sessionStorage.getItem(sessionStorage.key(0)!)!, uuid = vi.spyOn(crypto, 'randomUUID'), writes = vi.spyOn(Storage.prototype, 'setItem');
+    fireEvent.click(repeatControl());
+    expect(s.commands).toHaveLength(1); expect(uuid).not.toHaveBeenCalled(); expect(writes).not.toHaveBeenCalled(); expect(sessionStorage.getItem(sessionStorage.key(0)!)).toBe(bytes);
+    await waitFor(() => expect(property).toHaveProperty('value', id(10)));
+    await waitFor(() => expect(screen.getByLabelText('Service start')).toHaveProperty('disabled', false));
+    await reviewSeparateInterval(); fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    await waitFor(() => expect(s.commands).toHaveLength(2));
+    expect(s.commands[1].body).toHaveProperty('propertyId', id(10)); expect(s.commands[1].review.context.source).toEqual(s.commands[0].review.context.source);
+  });
+
+  it('repeat intent: deferred original callback after a repeat source authority revocation cannot restore permission', async () => {
+    let resolve!: (value: Response) => void; const pending = new Promise<Response>(done => { resolve = done; }); let calls = 0;
+    const s = setup({ post: command => ++calls === 1 ? committedAppointmentResponse(command) : pending }); await commitSameCustomer(s);
+    fireEvent.click(repeatControl()); await reviewSeparateInterval(); fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    await waitFor(() => expect(s.commands).toHaveLength(2));
+    const bytes = sessionStorage.getItem(sessionStorage.key(0)!)!;
+    s.changeProfile({ organization: { id: org, name: 'Synthetic company', slug: 'synthetic', timezone: 'UTC' } });
+    await act(async () => { await s.client.refetchQueries({ queryKey: getGetMeQueryKey() }); });
+    s.changeProfile({ organization: { id: org, name: 'Synthetic company', slug: 'synthetic', timezone: 'America/Los_Angeles' } });
+    await act(async () => { await s.client.refetchQueries({ queryKey: getGetMeQueryKey() }); });
+    await screen.findByText(/Original appointment result is unknown/);
+    await act(async () => { resolve(await committedAppointmentResponse(s.commands[1])); });
+    expect(screen.getByText(/Original appointment result is unknown/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Start a new appointment' })).toBeNull();
+    expect(sessionStorage.getItem(sessionStorage.key(0)!)).toBe(bytes); expect(s.commands).toHaveLength(2);
+  });
+
+
+
+  it('repeat intent: deferred real hash cannot dispatch after close/remount revokes the initiating intent', async () => {
+    const s = setup({ post: command => committedAppointmentResponse(command) }); await commitSameCustomer(s);
+    fireEvent.click(repeatControl()); await reviewSeparateInterval();
+    const key = sessionStorage.key(0)!, bytes = sessionStorage.getItem(key)!;
+    let resume!: () => void; const pending = new Promise<void>(done => { resume = done; });
+    const digest = crypto.subtle.digest.bind(crypto.subtle);
+    const deferredDigest = vi.spyOn(crypto.subtle, 'digest').mockImplementationOnce(async (...args) => { await pending; return digest(...args); });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    await waitFor(() => expect(deferredDigest).toHaveBeenCalled());
+    expect(s.commands).toHaveLength(1); expect(sessionStorage.getItem(key)).toBe(bytes);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' })); s.view.unmount(); s.mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Schedule appointment' }));
+    fireEvent.change(await screen.findByTestId('appointment-contact'), { target: { value: customer } });
+    await screen.findByText(/Original appointment committed/);
+    expect(repeatControl()).toHaveProperty('disabled', false);
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true);
+    await act(async () => { resume(); await pending; });
+    expect(s.commands).toHaveLength(1); expect(sessionStorage.getItem(key)).toBe(bytes);
   });
 
 });

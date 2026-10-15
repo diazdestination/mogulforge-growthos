@@ -787,6 +787,13 @@ function ApptFormModal({
     appt?.updatedAt,
     appt?.schedulingTargetFingerprint,
   ]);
+  const liveSelection = useRef({ selection });
+  if (liveSelection.current.selection !== selection)
+    liveSelection.current = { selection };
+  const selectionToken = liveSelection.current;
+  const selectionIsCurrent = () =>
+    liveSelection.current === selectionToken && authority.isCurrent();
+  const pendingManual = useRef<{ operationId: string; current: () => boolean } | null>(null);
   const read = useSchedulingContext({
     authority,
     identity: selection,
@@ -982,7 +989,9 @@ function ApptFormModal({
     kind: 'appointment_create',
     sourceKey,
     dispatch: async (command) => {
-      const current = authority.isCurrent;
+      const pending = pendingManual.current;
+      const current = () => selectionIsCurrent() && !!pending &&
+        pendingManual.current === pending && pending.operationId === command.operationId && pending.current();
       if (!current() || command.kind !== 'appointment_create')
         throw new Error('Appointment authority changed');
       try {
@@ -996,7 +1005,7 @@ function ApptFormModal({
       }
     },
     reconcile: async (command) => {
-      const current = authority.isCurrent;
+      const current = selectionIsCurrent;
       if (!current()) throw new Error('Appointment authority changed');
       try {
         return await reconcileSchedulingOperation(command);
@@ -1010,6 +1019,60 @@ function ApptFormModal({
       manual.state.command.review.context.source!,
     );
     retained.original = true;
+  }
+  const [, renderRepeatIntent] = useState(0);
+  const repeatIntent = useRef<{
+    authority: string; selection: string; sourceKey: string;
+    operationId: string; acknowledgement: string;
+  } | null>(null);
+  const committed = !appt && manual.state.kind === 'committed' &&
+    manual.state.command?.kind === 'appointment_create' &&
+    manual.state.ack?.outcome === 'committed';
+  const originalSource = committed ? manual.state.command?.review.context.source : null;
+  const repeatSourceFits = !!originalSource && originalSource.sourceKind === source.sourceKind &&
+    originalSource.leadId === source.leadId && (!contactId || originalSource.contactId === contactId) &&
+    originalSource.estimateId === null && (originalSource.propertyId === source.propertyId ||
+      (!propertyTouched && propertyId === '' && source.propertyId === null));
+  const proofBinding = committed && repeatSourceFits
+    ? JSON.stringify([authority.identity, custodyIdentity, sourceKey, manual.state.command?.operationId, manual.state.ack])
+    : null;
+  const liveProof = useRef({ binding: proofBinding });
+  if (liveProof.current.binding !== proofBinding) liveProof.current = { binding: proofBinding };
+  const proofToken = liveProof.current;
+  if (repeatIntent.current && (
+    repeatIntent.current.authority !== authority.identity ||
+    repeatIntent.current.selection !== custodyIdentity ||
+    repeatIntent.current.sourceKey !== sourceKey ||
+    ['idle', 'unknown', 'refused', 'blocked_scope', 'blocked_custody'].includes(manual.state.kind) ||
+    (committed && (repeatIntent.current.operationId !== manual.state.command?.operationId ||
+      repeatIntent.current.acknowledgement !== JSON.stringify(manual.state.ack)))
+  )) repeatIntent.current = null;
+  const installedRepeat = committed && !!repeatIntent.current;
+  const repeatReady = installedRepeat && !!context?.source &&
+    manualSchedulingSourceKey(context.source) === repeatIntent.current?.sourceKey;
+  function startNewAppointment() {
+    if (!committed || !repeatSourceFits || !originalSource || !selectionIsCurrent() ||
+      liveProof.current !== proofToken || !manual.state.command || !manual.state.ack) return;
+    const originalKey = manualSchedulingSourceKey(originalSource);
+    if (originalKey !== sourceKey) return;
+    const nextProperty = originalSource.propertyId ?? '';
+    const targetSelection = JSON.stringify([
+      organizationId, actorUserId, false, leadId, contactId, nextProperty, propertyTouched,
+    ]);
+    review.invalidate();
+    repeatIntent.current = {
+      authority: authority.identity, selection: targetSelection, sourceKey: originalKey,
+      operationId: manual.state.command.operationId, acknowledgement: JSON.stringify(manual.state.ack),
+    };
+    if (nextProperty !== propertyId) {
+      // The explicit action copies only this validated original property into an
+      // untouched blank selection. Keep the same original custody key while the
+      // actual current context is read for that exact source.
+      retainedRef.current = { identity: targetSelection, sourceKey: originalKey, original: true };
+      liveSelection.current = { selection: '' };
+      setPropertyId(nextProperty);
+    }
+    renderRepeatIntent(value => value + 1);
   }
   const refreshedOperation = useRef<string | null>(null);
   useEffect(() => {
@@ -1026,7 +1089,7 @@ function ApptFormModal({
       queryKey: getListAppointmentsQueryKey(),
     });
   }, [manual.state.kind, manual.state.ack, authority.identity]);
-  const nativeHeld = !appt && manual.state.kind !== 'idle';
+  const nativeHeld = !appt && manual.state.kind !== 'idle' && !repeatReady;
   const busy =
     patchState === 'saving' ||
     (!appt &&
@@ -1044,7 +1107,7 @@ function ApptFormModal({
     discoveryBlocked ||
     busy ||
     patchState === 'unknown' ||
-    (!appt && !!manual.state.command && manual.state.kind !== 'idle');
+    (!appt && !!manual.state.command && manual.state.kind !== 'idle' && !repeatReady);
   const zone = authority.profile?.organization?.timezone ?? null;
   const proposal = context
     ? buildSchedulingProposalView({
@@ -1062,7 +1125,9 @@ function ApptFormModal({
       user.id,
   }));
   const changeSource = (change: () => void) => {
-    if (controlsLocked) return;
+    if (controlsLocked || !selectionIsCurrent()) return;
+    repeatIntent.current = null;
+    liveSelection.current = { selection: '' };
     review.invalidate();
     change();
   };
@@ -1070,7 +1135,7 @@ function ApptFormModal({
     event.preventDefault();
     if (
       locked ||
-      !authority.isCurrent() ||
+      !selectionIsCurrent() ||
       review.draft.resourceUserIds.length > 1 ||
       (!historical &&
         (!review.review || !review.current() || !review.draft.startAt))
@@ -1120,8 +1185,15 @@ function ApptFormModal({
       return;
     }
     if (!review.review || !review.draft.startAt || !review.draft.endAt) return;
+    const intentAtSave = repeatIntent.current;
+    if (committed && (!repeatReady || !intentAtSave)) return;
+    const operationId = crypto.randomUUID();
+    pendingManual.current = {
+      operationId,
+      current: () => selectionIsCurrent() && (!intentAtSave || repeatIntent.current === intentAtSave),
+    };
     await manual.submit({
-      operationId: crypto.randomUUID(),
+      operationId,
       kind: 'appointment_create',
       body: {
         type,
@@ -1205,7 +1277,9 @@ function ApptFormModal({
                 {manual.state.ack?.target?.available === false
                   ? '; its target is unavailable.'
                   : '.'}{' '}
-                Another booking is held.
+                {installedRepeat
+                  ? 'A separate appointment requires a fresh review.'
+                  : 'Another booking is held.'}
               </p>
             ) : manual.state.kind === 'refused' ? (
               <>
@@ -1259,6 +1333,17 @@ function ApptFormModal({
                 Acknowledge refusal and review a new appointment
               </button>
             )}
+            {committed && repeatSourceFits && (
+              <button
+                type="button"
+                className="min-h-11 rounded border px-3"
+                disabled={installedRepeat}
+                onClick={startNewAppointment}
+              >
+                Start a new appointment
+              </button>
+            )}
+            {installedRepeat && <p>The original remains committed. Review a fresh interval before saving a separate appointment.</p>}
           </div>
         )}
         <form
