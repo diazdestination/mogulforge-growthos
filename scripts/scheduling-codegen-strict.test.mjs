@@ -716,11 +716,11 @@ describe("accepted source contract closure and wire custody", () => {
           .success,
       ).toBe(false);
   });
-  it("is byte-idempotent and fails closed on missing/duplicated source correction anchors", () => {
+  it("is canonical-LF byte-idempotent and fails closed on missing/duplicated source correction anchors", () => {
     const spec = readFileSync(
         resolve(import.meta.dirname, "../lib/api-spec/openapi.yaml"),
         "utf8",
-      ),
+      ).replace(/\r\n/g, "\n"),
       text = readFileSync(
         resolve(import.meta.dirname, "../lib/api-zod/src/generated/api.ts"),
         "utf8",
@@ -760,6 +760,17 @@ describe("source projection required component anchors", () => {
   const spec = readFileSync(
     resolve(import.meta.dirname, "../lib/api-spec/openapi.yaml"),
     "utf8",
+  ).replace(/\r\n/g, "\n");
+  it.each(["LF", "CRLF"])(
+    "projects %s approved-spec input to exact canonical-LF bytes and remains byte-idempotent",
+    (ending) => {
+      const input = ending === "CRLF" ? spec.replace(/\n/g, "\r\n") : spec;
+      expect(input.includes("\r\n")).toBe(ending === "CRLF");
+      const projected = projectSchedulingSourceSpec(input);
+      expect(projected).toBe(spec);
+      expect(projected.includes("\r\n")).toBe(false);
+      expect(projectSchedulingSourceSpec(projected)).toBe(spec);
+    },
   );
   const required = [
     "CreateCustomerWorkProject",
