@@ -1,0 +1,105 @@
+import {test,expect,vi,beforeEach} from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {randomUUID} from 'node:crypto';
+import {deltaFixture,verificationFixture} from './production75-operator-test-support.mjs';
+import {prepareOperatorPlan,operatorPlanDigest} from './production75-custody.mjs';
+import {expectedProduction75ReaderProfile,production75ProfileDigest,production75SnapshotDigest} from './production75-reader-delta.mjs';
+import {runProduction75Operator,createOperatorResources} from './production75-operator.mjs';
+import {createProduction75V1Client} from './production75-fly-v1.mjs';
+const mocks=vi.hoisted(()=>({verify:vi.fn()}));
+vi.mock('./production75-verification.mjs',()=>({runProduction75Verification:mocks.verify}));
+beforeEach(()=>{mocks.verify.mockReset();});
+function fixture(planChanges={}){
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'production75-operator-test-')),runId=randomUUID(),readerName=`growthos-reader-${runId.replaceAll('-','')}`,d=deltaFixture(readerName),profile=expectedProduction75ReaderProfile(readerName),p=prepareOperatorPlan({runId,backupId:'backup_fixture',sourceSnapshotSha256:production75SnapshotDigest(d.before),profileSha256:production75ProfileDigest(profile),moduleManifestSha256:'a'.repeat(64),preparedAt:Date.now(),workMs:90000,cleanupMs:30000,maxCostUsdMicros:150000,...planChanges}),digest=operatorPlanDigest(p),copy={id:'abcdefghijklmnop',name:p.copyName,organization:p.organization,version:1,region:'iad',plan:'basic',status:'ready',attachedApps:[]},originals=[{...copy,id:p.sourceCluster,name:'production'},{...copy,id:p.protectedClusters[1],name:'staging',version:2}],calls=[];let created=false,deleted=false;
+ const api={listClusters:async()=>[...originals,...(created&&!deleted?[copy]:[])],getCluster:async id=>id===copy.id?(deleted?null:copy):originals.find(m=>m.id===id),listBackups:async()=>[{id:p.backupId,status:'completed',type:'full',start:new Date(p.preparedAt-120000).toISOString(),stop:new Date(p.preparedAt-60000).toISOString()}],listUsers:async()=>[],restoreCopy:async()=>{calls.push('create');created=true;return copy;},createReader:async()=>{calls.push('reader');return {name:readerName,role:'reader'};},deleteCopy:async()=>{calls.push('delete');deleted=true;return {status:202,acknowledged:true};}};
+ const callbacks={verifyIdentity:async()=>({account:p.account,organization:p.organization}),moduleManifestSha256:async()=>p.moduleManifestSha256,observeOriginals:async()=>structuredClone(d.before),observeCopy:async(_copy,{readerName:r})=>structuredClone(r?d.after:d.before),verificationContext:async()=>verificationFixture(d.after,readerName),closeResources:async()=>({closed:true}),verifyProtected:async()=>({unchanged:true})};
+ const auth={verifyOwnerApproval:async()=>({authenticated:true,kind:'owner-approval',planSha256:digest,receiptSha256:'b'.repeat(64),maxCopies:1,maxCostUsdMicros:p.maxCostUsdMicros,expiresAt:p.cleanupUntil,sourceWritesAuthorized:false}),verifyCapabilityReview:async()=>({authenticated:true,kind:'independent-capability-review',planSha256:digest,receiptSha256:'c'.repeat(64),profileSha256:p.profileSha256,sourceSnapshotSha256:p.sourceSnapshotSha256,scope:'fixed-query-observation-with-inherited-capabilities',zeroDdlClusterWideVerified:false})};
+ mocks.verify.mockImplementation(async args=>{await args.reserve({attemptId:randomUUID(),outcome:args.outcome,database:'fly-db',sourceCommit:args.plan.sourceCommit});return {status:`verified-${args.outcome}`,proof:{freshReaderVerified:true}};});
+ return {root,p,copy,d,calls,api,callbacks,auth,args:{plan:p,custodyRoot:root,api,callbacks,...auth,pause:async()=>{}},cleanup(){const r=fs.realpathSync(root);if(path.dirname(r)!==fs.realpathSync(os.tmpdir())||!path.basename(r).startsWith('production75-operator-test-'))throw new Error('owned temp refused');fs.rmSync(r,{recursive:true});}};
+}
+test('one copy/Reader, rollback then commit and owned deletion pass in order',async()=>{const f=fixture();try{const result=await runProduction75Operator(f.args);expect(result).toMatchObject({status:'verified-and-cleaned',copyDeleted:true,originalsPreserved:true,readerProfileVerified:true});expect(f.calls).toEqual(['create','reader','delete']);expect(mocks.verify).toHaveBeenCalledTimes(2);}finally{f.cleanup();}});
+
+test('opaque non-ready waits before clone/Reader/SQL then progresses to ready',async()=>{
+ const f=fixture();try{
+  let reads=0,readySeen=false;const get=f.api.getCluster,observe=f.callbacks.observeCopy,reader=f.api.createReader;
+  f.api.getCluster=async id=>{const m=await get(id);if(!m||id!==f.copy.id)return m;if(++reads<3)return {...m,status:'not-ready'};readySeen=true;return m;};
+  f.callbacks.observeCopy=async(...args)=>{expect(readySeen).toBe(true);return observe(...args);};
+  f.api.createReader=async(...args)=>{expect(readySeen).toBe(true);return reader(...args);};
+  const result=await runProduction75Operator(f.args);expect(result).toMatchObject({status:'verified-and-cleaned',copyDeleted:true,readerProfileVerified:true});expect(reads).toBeGreaterThanOrEqual(3);
+ }finally{f.cleanup();}
+});
+test('permanent opaque non-ready reaches deadline and uses only owned cleanup',async()=>{
+ const f=fixture();try{
+  let clock=f.p.preparedAt;f.args.now=()=>clock;f.args.pause=async()=>{clock=f.p.workUntil;};
+  const get=f.api.getCluster;f.api.getCluster=async id=>{const m=await get(id);return m&&id===f.copy.id?{...m,status:'not-ready'}:m;};
+  const observe=vi.fn();f.callbacks.observeCopy=observe;
+  const result=await runProduction75Operator(f.args);expect(result).toMatchObject({copyDeleted:true,resourcesClosed:true,status:'held-and-cleaned'});expect(f.calls).toEqual(['create','delete']);expect(observe).not.toHaveBeenCalled();expect(mocks.verify).not.toHaveBeenCalled();
+ }finally{f.cleanup();}
+});
+test('ambiguous creation never observes non-ready clone before reconciliation',async()=>{
+ const f=fixture();try{
+  let readySeen=false,reads=0;const restore=f.api.restoreCopy,get=f.api.getCluster,list=f.api.listClusters,observe=f.callbacks.observeCopy;
+  f.api.restoreCopy=async permit=>{await restore(permit);throw Error('lost create acknowledgment');};
+  f.api.getCluster=async id=>{const m=await get(id);if(!m||id!==f.copy.id)return m;if(++reads<3)return {...m,status:'not-ready'};readySeen=true;return m;};
+  f.api.listClusters=async()=>(await list()).map(m=>m.id===f.copy.id&&!readySeen?{...m,status:'not-ready'}:m);
+  f.callbacks.observeCopy=async(...args)=>{expect(readySeen).toBe(true);return observe(...args);};
+  const result=await runProduction75Operator(f.args);expect(result).toMatchObject({copyDeleted:true,errorCode:'production75_operator_create_unknown_no_replay'});expect(f.calls).toEqual(['create','delete']);expect(reads).toBeGreaterThanOrEqual(3);expect(mocks.verify).not.toHaveBeenCalled();
+ }finally{f.cleanup();}
+});
+test.each(['version','region','plan'])('readiness progression cannot admit %s drift',async field=>{
+ const f=fixture();try{
+  let reads=0;const get=f.api.getCluster,list=f.api.listClusters;
+  const changed=m=>reads>=2?{...m,[field]:field==='version'?2:field==='region'?'ord':'large'}:{...m,status:'not-ready'};
+  f.api.getCluster=async id=>{const m=await get(id);if(m&&id===f.copy.id){reads++;return changed(m);}return m;};
+  f.api.listClusters=async()=>(await list()).map(m=>m.id===f.copy.id?changed(m):m);
+  const observe=vi.fn(async()=>structuredClone(f.d.before));f.callbacks.observeCopy=observe;
+  const result=await runProduction75Operator(f.args);expect(result).toMatchObject({copyDeleted:true,status:'held-and-cleaned'});expect(observe).not.toHaveBeenCalled();expect(f.calls).toEqual(['create','delete']);expect(mocks.verify).not.toHaveBeenCalled();
+ }finally{f.cleanup();}
+});
+
+test.each([{httpStatus:503,safeCode:'production75_v1_rejected_unknown'},{httpStatus:200,safeCode:'production75_v1_response'},{httpStatus:422,safeCode:'production75_v1_rejected_user_name_invalid',errors:{user_name:['has invalid format']}}])('Reader failure $httpStatus survives callback normalization while owned cleanup remains',async({httpStatus,safeCode,errors})=>{
+ const f=fixture();try{
+  const live=createProduction75V1Client({organization:'adam-diaz',getAuthorization:async()=> 'Bearer fixture',fetchFn:async()=>new Response(JSON.stringify({data:{name:'private-provider-body',role:'reader'},...(errors?{errors}:{})}),{status:httpStatus})});
+  f.api.createReader=async permit=>{f.calls.push('reader');return live.createReader(permit);};
+  const result=await runProduction75Operator(f.args);
+  expect(result).toMatchObject({status:'held-and-cleaned',errorCode:'production75_operator_callback',copyDeleted:true,originalsPreserved:true,resourcesClosed:true,providerFailure:{operation:'create-reader',method:'POST',httpStatus,safeCode}});
+  expect(f.calls).toEqual(['create','reader','delete']);expect(mocks.verify).not.toHaveBeenCalled();
+  expect(JSON.stringify(result)).not.toContain('private-provider-body');
+ }finally{f.cleanup();}
+});
+
+test('work and uncertain deletion retain separate diagnostics without replay',async()=>{
+ const f=fixture();try{
+  const live=createProduction75V1Client({organization:'adam-diaz',getAuthorization:async()=> 'Bearer fixture',fetchFn:async(_url,options)=>new Response('private-provider-body',{status:options.method==='DELETE'?500:503})});
+  f.api.createReader=async permit=>{f.calls.push('reader');return live.createReader(permit);};
+  const remove=f.api.deleteCopy;f.api.deleteCopy=async permit=>{await remove(permit);return live.deleteCopy(permit);};
+  const result=await runProduction75Operator(f.args);
+  expect(result).toMatchObject({status:'held-and-cleaned',copyDeleted:true,deleteAcknowledgmentUnknown:true,providerFailure:{operation:'create-reader',httpStatus:503},cleanupProviderFailure:{operation:'delete-copy',httpStatus:500}});
+  expect(f.calls).toEqual(['create','reader','delete']);expect(mocks.verify).not.toHaveBeenCalled();
+  expect(JSON.stringify(result)).not.toContain('private-provider-body');
+ }finally{f.cleanup();}
+});
+
+test.each([['version',2],['region','ord'],['plan','premium'],['attachedApps',['customer-app']]])('explicit restore acknowledgment %s conflicts hold before copy reads but retain owned deletion',async(field,value)=>{const f=fixture();try{const restore=f.api.restoreCopy;f.api.restoreCopy=async permit=>({...await restore(permit),[field]:value});const observe=f.callbacks.observeCopy;f.callbacks.observeCopy=vi.fn(observe);const r=await runProduction75Operator(f.args);expect(r).toMatchObject({status:'held-and-cleaned',copyDeleted:true,readerProfileVerified:false});expect(f.calls).toEqual(['create','delete']);expect(f.callbacks.observeCopy).not.toHaveBeenCalled();expect(mocks.verify).not.toHaveBeenCalled();}finally{f.cleanup();}});
+
+test('measured Windows transport closure beyond ten seconds preserves verified cleanup',async()=>{vi.useFakeTimers();const f=fixture({cleanupMs:180000});try{let closes=0;f.callbacks.closeResources=async()=>{closes++;await new Promise(resolve=>setTimeout(resolve,15000));return {closed:true};};const pending=runProduction75Operator(f.args);await vi.advanceTimersByTimeAsync(31000);expect(await pending).toMatchObject({status:'verified-and-cleaned',copyDeleted:true,originalsPreserved:true,resourcesClosed:true});expect(closes).toBe(2);expect(f.calls).toEqual(['create','reader','delete']);}finally{vi.useRealTimers();f.cleanup();}});
+test('missing or foreign admission has zero provider mutations',async()=>{const f=fixture();try{f.args.verifyOwnerApproval=async()=>true;expect(await runProduction75Operator(f.args)).toMatchObject({status:'held-before-create'});expect(f.calls).toEqual([]);}finally{f.cleanup();}});
+test.each(['account','manifest','source','backup'])('wrong %s holds before create',async kind=>{const f=fixture();try{if(kind==='account')f.callbacks.verifyIdentity=async()=>({account:'foreign',organization:f.p.organization});else if(kind==='manifest')f.callbacks.moduleManifestSha256=async()=> '0'.repeat(64);else if(kind==='source')f.callbacks.observeOriginals=async()=>{const s=structuredClone(f.d.before);s.databases[0].fingerprints[0].digest='0'.repeat(32);return s;};else f.api.listBackups=async()=>[];expect(await runProduction75Operator(f.args)).toMatchObject({status:'held-before-create'});expect(f.calls).toEqual([]);}finally{f.cleanup();}});
+test('lost create acknowledgment only reconciles and cleans; it cannot create Reader or run SQL',async()=>{const f=fixture();try{const create=f.api.restoreCopy;f.api.restoreCopy=async permit=>{await create(permit);throw new Error('private lost acknowledgment');};expect(await runProduction75Operator(f.args)).toMatchObject({status:'held-and-cleaned',copyDeleted:true});expect(f.calls).toEqual(['create','delete']);expect(mocks.verify).not.toHaveBeenCalled();}finally{f.cleanup();}});
+test.each(['role','delta','rollback','commit'])('failure in %s cleans owned copy without replay',async kind=>{const f=fixture();try{if(kind==='role')f.api.createReader=async()=>{f.calls.push('reader');throw new Error('private role reply');};else if(kind==='delta')f.callbacks.observeCopy=async(_c,{readerName})=>{const s=structuredClone(readerName?f.d.after:f.d.before);if(readerName)s.databases[0].extra.roles.find(r=>r.name===readerName).create_role=true;return s;};else mocks.verify.mockImplementation(async a=>{await a.reserve({attemptId:randomUUID(),outcome:a.outcome,database:'fly-db',sourceCommit:a.plan.sourceCommit});return {status:a.outcome===kind?'verification-held-no-replay':`verified-${a.outcome}`};});expect(await runProduction75Operator(f.args)).toMatchObject({status:'held-and-cleaned',copyDeleted:true});expect(f.calls.filter(x=>x==='create')).toHaveLength(1);expect(f.calls.filter(x=>x==='reader')).toHaveLength(1);expect(f.calls.filter(x=>x==='delete')).toHaveLength(1);}finally{f.cleanup();}});
+test('source drift does not strand an owned copy and is reported',async()=>{const f=fixture();try{f.callbacks.verifyProtected=async()=>({unchanged:false});const result=await runProduction75Operator(f.args);expect(result).toMatchObject({status:'held-and-cleaned',copyDeleted:true,originalsPreserved:false});expect(f.calls.at(-1)).toBe('delete');}finally{f.cleanup();}});
+test('lost DELETE reply is reconciled with reads and never resent',async()=>{const f=fixture();try{const remove=f.api.deleteCopy;f.api.deleteCopy=async permit=>{await remove(permit);throw new Error('private delete reply');};expect(await runProduction75Operator(f.args)).toMatchObject({status:'verified-and-cleaned',copyDeleted:true});expect(f.calls.filter(x=>x==='delete')).toHaveLength(1);}finally{f.cleanup();}});
+test('unknown create with no ownership proof is reported as possible paid resource',async()=>{const f=fixture();try{f.api.restoreCopy=async()=>{f.calls.push('create');throw new Error('lost reply');};expect(await runProduction75Operator(f.args)).toMatchObject({status:'held-owner-action-required',creationAttempted:true,copyDeleted:false});expect(f.calls).toEqual(['create']);}finally{f.cleanup();}});
+test('closure runs again after final source reads',async()=>{const f=fixture();try{let closes=0;f.callbacks.closeResources=async()=>{closes++;return {closed:true};};await runProduction75Operator(f.args);expect(closes).toBe(2);}finally{f.cleanup();}});
+test('slow original observations run after owned DELETE and cannot starve it',async()=>{const f=fixture();try{let clock=f.p.preparedAt;f.args.now=()=>clock;f.callbacks.verifyProtected=async()=>{clock=f.p.cleanupUntil+1;return {unchanged:true};};const result=await runProduction75Operator(f.args);expect(f.calls.at(-1)).toBe('delete');expect(result.copyDeleted).toBe(true);expect(result.originalsPreserved).toBe(false);}finally{f.cleanup();}});
+test('expired callback cannot acquire a connection after final shutdown',async()=>{const f=fixture();let late,closes=0;try{let clock=f.p.preparedAt;f.args.now=()=>clock;f.callbacks.observeCopy=async(_c,options)=>{late=()=>options.resources.acquire(async()=>({}),async()=>{closes++;});clock=f.p.workUntil+1;return structuredClone(f.d.before);};const r=await runProduction75Operator(f.args);expect(r).toMatchObject({copyDeleted:true,resourcesClosed:true});await expect(late()).rejects.toMatchObject({safeCode:'production75_operator_resources'});expect(closes).toBe(0);}finally{f.cleanup();}});
+test('pending connection cannot report closed and is disposed when it arrives late',async()=>{let arrive,disposed=0;const r=createOperatorResources({until:Date.now()+10000}),pending=r.acquire(()=>new Promise(resolve=>{arrive=resolve;}),async()=>{disposed++;});expect(await r.drain()).toEqual({closed:false});arrive({});await expect(pending).rejects.toMatchObject({safeCode:'production75_operator_resources'});expect(disposed).toBe(1);expect(await r.drain()).toEqual({closed:true});});
+test('SQL dispatch refuses an expired operator clock',async()=>{let clock=100;const r=createOperatorResources({now:()=>clock,until:200}),query=vi.fn();clock=200;await expect(r.query({query},'COMMIT')).rejects.toMatchObject({safeCode:'production75_operator_resources'});expect(query).not.toHaveBeenCalled();});
+test('hanging shutdown is bounded and owned deletion still happens',async()=>{vi.useFakeTimers();const f=fixture({cleanupMs:180000});try{f.callbacks.closeResources=async()=>new Promise(()=>{});const pending=runProduction75Operator(f.args);await vi.advanceTimersByTimeAsync(61000);expect(f.calls).toContain('delete');await vi.advanceTimersByTimeAsync(61000);expect(await pending).toMatchObject({copyDeleted:true,resourcesClosed:false,status:'held-and-cleaned'});}finally{vi.useRealTimers();f.cleanup();}});
+test('minimum cleanup window keeps deletion time after hanging shutdown',async()=>{vi.useFakeTimers();const f=fixture({cleanupMs:10000});try{const verify=mocks.verify.getMockImplementation();mocks.verify.mockImplementation(async args=>{const result=await verify(args);if(args.outcome==='commit')vi.setSystemTime(f.p.workUntil-1);return result;});let closes=0;f.callbacks.closeResources=async()=>++closes===1?new Promise(()=>{}):{closed:true};const pending=runProduction75Operator(f.args);await vi.advanceTimersByTimeAsync(2600);expect(f.calls).toContain('delete');expect(await pending).toMatchObject({copyDeleted:true,originalsPreserved:true,status:'held-and-cleaned'});}finally{vi.useRealTimers();f.cleanup();}});
+test.each(['target-data','other-data','roles','settings','policy'])('context cannot rebaseline %s drift',async kind=>{const f=fixture();try{const context=f.callbacks.verificationContext;f.callbacks.verificationContext=async args=>{const c=await context(args);if(kind==='target-data')c.baseline.state.fingerprints[0].rows++;if(kind==='other-data')c.baseline.otherDatabases[0].fingerprints[0].rows++;if(kind==='roles')c.baseline.extra.roles[0].superuser=true;if(kind==='settings')c.baseline.extra.roleSettings.push({role:'reader',setting:'changed'});if(kind==='policy')c.plan.policies[75].ownership[0].acl='changed';return c;};const r=await runProduction75Operator(f.args);expect(r).toMatchObject({status:'held-and-cleaned',copyDeleted:true,errorCode:'production75_operator_verification_context'});expect(mocks.verify).not.toHaveBeenCalled();}finally{f.cleanup();}});
+
+test('measured53s original proof fits after deletion without widening paid requests',async()=>{const f=fixture({cleanupMs:180000});try{let clock=f.p.preparedAt,reads=0;f.args.now=()=>clock;f.callbacks.observeOriginals=async()=>{if(++reads===2){expect(f.calls.at(-1)).toBe('delete');clock+=53138;}return structuredClone(f.d.before);};const result=await runProduction75Operator(f.args);expect(result).toMatchObject({status:'verified-and-cleaned',copyDeleted:true,originalsPreserved:true,resourcesClosed:true});expect(f.calls).toEqual(['create','reader','delete']);}finally{f.cleanup();}});
+test('slow deletion retains30s bound and its dispatched effect is never replayed',async()=>{const f=fixture({cleanupMs:180000});try{let clock=f.p.preparedAt;f.args.now=()=>clock;const remove=f.api.deleteCopy;f.api.deleteCopy=async permit=>{const r=await remove(permit);clock+=35000;return r;};const result=await runProduction75Operator(f.args);expect(f.calls.filter(c=>c==='delete')).toHaveLength(1);expect(result).toMatchObject({copyDeleted:true,deleteAcknowledgmentUnknown:true});}finally{f.cleanup();}});

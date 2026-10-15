@@ -1,5 +1,15 @@
 # Next acceptance work
 
+## October15 owner-approved combined-source implementation
+
+Execute the owner-approved eight-task combined-release plan: source preservation checkpoint, exact scheduling0019 observer/verifier, stage custody/shared manifest, combined admission/operator, fresh native proof, unchanged recovery audit and full current checks/private draft candidate. ROOT integrates, scoped agents implement, independent reviewers gate each task, and GEEKOM audits the frozen evidence.
+
+Original19 SQL/0018, complete client requirements, full142 preservation and protected product/recovery inputs remain binding. Historical CI does not certify this candidate. Both contractor cards, fullG04/G06, real staff/provider/device evidence, compatible recovery/complete mutation hold, hosted rehearsal and applicable release authority remain open. No new spend, hosted/provider action, customer contact, merge to main or deployment is authorized by this source plan.
+
+## Historical source checkpoints
+
+The dated entries below retain historical receipts. The October15 execution status above supersedes their instructions that describe already completed source work as pending.
+
 ## October13 estimate-email release evidence
 
 Publish the independently reviewed estimate-email branch as a dependent draft
@@ -27,6 +37,17 @@ estimate email design was approved for detailed implementation planning in durab
 Forge files; review that plan before implementation. Do not activate
 mail providers, send live messages, add schema or reduce SMS/payment requirements
 as part of the scheduling fix. Both contractor acceptance cards remain open.
+
+## October12 next production boundary
+
+Accept the supplied-client operator source evidence in
+reports/bounded-operator-2026-10-12.md, separately from fixed PR44/8df64dc and
+PR45/283715f. Then wire/review real account/authentication/observation/connection
+drivers implementing terminal acquisition and SQL deadline guards. Authenticate
+owner/capability receipts; establish actual V1 Reader/profile/provider equivalence;
+prepare exact target/source/backup/cost/lifetime/deletion-reserve admission before
+requesting a fresh paid copy. Consumed grants stay consumed. Contractor gaps and
+both company acceptance cards remain independent requirements.
 
 ## October12 combined launch candidate — local gates passed
 

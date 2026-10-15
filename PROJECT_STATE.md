@@ -1,5 +1,15 @@
 # GrowthOS project state
 
+## October15 owner-approved combined-source implementation
+
+The owner approved design edadffad and implementation plan b198a77f on October15. ROOT has begun an isolated source integration of product P91b7fd2 and operations Oc285c47. Tasks1–13 of saved scheduling remain complete. The new eight-task combined-release implementation is in progress; combined native/recovery/release acceptance has not yet run. Main7091af8 and both original heads remain unchanged.
+
+Original19 SQL/0018, complete client requirements, full142 preservation and protected product/recovery inputs remain binding. Historical CI does not certify this candidate. Both contractor cards, fullG04/G06, real staff/provider/device evidence, compatible recovery/complete mutation hold, hosted rehearsal and applicable release authority remain open. No new spend, hosted/provider action, customer contact, merge to main or deployment is authorized by this source plan.
+
+## Historical source checkpoints
+
+The dated entries below retain historical receipts. The October15 execution status above supersedes their instructions that describe already completed source work as pending.
+
 ## October13 reviewed initial estimate email candidate
 
 Office/admin/owner staff can review the complete saved lead or returning-customer
@@ -28,6 +38,18 @@ builds and independent reviewPASS. Exact publication CI remains a separate gate.
 No schema/SQL/provider changes or deployment. G-04 configurable capacity, G-06
 estimate delivery and both company acceptance cards remain open. Read
 reports/crew-schedule-end-validation-2026-10-13.md.
+
+## October12 supplied-client copy operator
+
+Separate tooling branch agent/growthos-bounded-operator-20261012 builds on
+PR45/283715f. PR44/8df64dc remains the fixed application candidate; its exact-head
+CI38271589412 passed. Full scripts519 tests, focused87 tests and workspace types
+pass after the five independent-review corrections. Native and publication proof
+are recorded in reports/bounded-operator-2026-10-12.md when complete.
+The operator supplies durable admission/custody, pinned V1 requests, exact Reader
+delta, bound rollback/commit baselines and terminal resource cleanup. Real
+authenticated drivers, provider profile/capability acceptance and a reviewed
+paid-copy packet remain open; all20 contractor gaps remain. No hosted action ran.
 
 ## October12 combined launch candidate — local gates passed
 

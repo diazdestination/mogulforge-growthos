@@ -1,0 +1,130 @@
+{
+  "kind": "LOCAL_PRODUCTION_VERIFIER_SOURCE_ACCEPTANCE",
+  "at": "2026-10-12T20:22:26.470Z",
+  "repository": "diazdestination/mogulforge-growthos",
+  "sourceCandidate": "8df64dc72009832f93b2b491031acd1bb2afb903",
+  "implementationHead": "d3a4f36626d5312997eaf39e4a24712c829f2eae",
+  "sourceModuleGitHashesMatched": true,
+  "nativeRunId": "264da539-582b-46e6-8120-74b8b167e8f2",
+  "nativeStatus": "PASS",
+  "fullScriptsPassed": 432,
+  "focusedPassed": 77,
+  "typecheckExitCode": 0,
+  "secretLeaks": 0,
+  "review": {
+    "initialHead": "d799766a17bac07ec014908666bed6de4faf6bc0",
+    "freshContext": true,
+    "critical": 0,
+    "important": 5,
+    "importantFixed": 5,
+    "regressionsRedThenGreen": 9,
+    "minorDeferred": 0
+  },
+  "applicationAndCoreSqlChanges": [],
+  "hostedProof": false,
+  "hostedCapabilityScopeAccepted": false,
+  "providerRoleOrExtensionProof": false,
+  "productionChanges": false,
+  "files": [
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/native-result.json",
+      "sha256": "d26430fda902e18418d4326e97c1a39092cc8b1daf75046c32b05f12a844244d"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/fly-db-rollback.jsonl",
+      "sha256": "bc9453b187ffec8fc7700f780b0c18d46872cc43db299d0144e2c6c47e124847"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/fly-db-rollback-reservation.json",
+      "sha256": "786d0ea15e667380ea80220771d2b21147c50b1c5c2cf70f8faccaeb3158dba8"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/fly-db-late-failure.jsonl",
+      "sha256": "44f3af13b0716db39eb170d599a207e160d754b071cce83f201da730f0c5588b"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/fly-db-late-failure-reservation.json",
+      "sha256": "861afb458caf8642f016940596fded276b93b77e896929842a5dcb672391fbb8"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/fly-db-commit.jsonl",
+      "sha256": "466955e5111e9f882dbeba25da0cb62a835c2ef360346694a97bb4b980ac29bd"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/fly-db-commit-reservation.json",
+      "sha256": "591e2ecc7bdbbe69df371fa4bc74c0840c1090b80f8295668bcfbdd760c6224c"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/growthos_staging-rollback.jsonl",
+      "sha256": "4303c6bbe6fdaf9806c63f439d1bc812851f7c1268168539deafb7c391be63ae"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/growthos_staging-rollback-reservation.json",
+      "sha256": "4b49b85ec328863a0e5d7d326d123db98b9a15a27739ef61acaa185ac27cecb3"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/growthos_staging-late-failure.jsonl",
+      "sha256": "231cafc088fb79c4a2c963dedbcffe57a2faa14ccd7e2793fccd24664225a185"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/growthos_staging-late-failure-reservation.json",
+      "sha256": "00a634a685a4e963513bf2bf85a93913121bb77afd48f365298c757bbb66116b"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/growthos_staging-commit.jsonl",
+      "sha256": "644867209f72d5ca6b789d4f506b3cde5ad767d3ef941e853c112ed20d7c264e"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/growthos_staging-commit-reservation.json",
+      "sha256": "884238a022a0b4c04e39782bde83ef8e1724866b4aa24a4685697ce5684b62f3"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/fly-db-lost-ack-rollback.jsonl",
+      "sha256": "f027a144fad2a26054c038840fd7ee0e230832760b1b99b56b99d792b0dd3970"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/fly-db-lost-ack-rollback-reservation.json",
+      "sha256": "5193d063e8bac6339a0e55cd7b138ca2e29f97346cc156ff492d1192bba0f51f"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/fly-db-lost-ack-late-failure.jsonl",
+      "sha256": "9b830d3e4d9d3cff2453933c32b8e0a01f6c0a8a8fc8f57ef235be564961b46f"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/fly-db-lost-ack-late-failure-reservation.json",
+      "sha256": "ec5315e97a024848344ab8763ddb24eb631c3ff88755e6c417b4238036a3c48d"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/fly-db-lost-ack-commit.jsonl",
+      "sha256": "034be4d8e999db8a3bc616c6678c9957d31d21662253e07047c674937bde79b0"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/fly-db-lost-ack-commit-reservation.json",
+      "sha256": "395a021774af00e95996c1d3b08bf18421a99d4a45d10c6e745fef89718b4075"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/growthos_staging-lost-ack-rollback.jsonl",
+      "sha256": "8af5b7bd46938b1fb1ca791ed5ebad39bf661f5569a34ab9530a7b1f677dda71"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/growthos_staging-lost-ack-rollback-reservation.json",
+      "sha256": "f492df62f1000f327dfb99871b4bdbb6eb0a587beac0a1c96557a319b0f251cd"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/growthos_staging-lost-ack-late-failure.jsonl",
+      "sha256": "a2bbf76158225df4b87d0dac1891bb7d08902dc2c7668e469b9d4e39a946da93"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/growthos_staging-lost-ack-late-failure-reservation.json",
+      "sha256": "93f828d8b9877667c5e61adbe9d7f5a85e5e68bd85893f8fef198a173fb0f31a"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/growthos_staging-lost-ack-commit.jsonl",
+      "sha256": "eac11ee77e5b1dffe0b4d756131e2892904d6c011f578ef0966892a7a3bfa147"
+    },
+    {
+      "path": "reports/production-verifier-2026-10-12/264da539-582b-46e6-8120-74b8b167e8f2/growthos_staging-lost-ack-commit-reservation.json",
+      "sha256": "ddbedb2e82e2611589b199a5d14d70ece3f7430516608f0442888636bd05f46f"
+    }
+  ]
+}

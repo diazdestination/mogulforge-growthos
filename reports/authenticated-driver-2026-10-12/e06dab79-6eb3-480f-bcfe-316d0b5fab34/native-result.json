@@ -1,0 +1,472 @@
+{
+  "kind": "SYNTHETIC_PROXY_REAL_DRIVER_SQL",
+  "runId": "e06dab79-6eb3-480f-bcfe-316d0b5fab34",
+  "status": "PASS",
+  "startedAt": "2026-10-13T09:11:50.662Z",
+  "sourceCandidate": "8df64dc72009832f93b2b491031acd1bb2afb903",
+  "liveProviderCalls": false,
+  "proxyOwnershipSynthetic": true,
+  "realOwnerOrCapabilityAdmission": false,
+  "providerAuthenticationProof": false,
+  "providerExtensionBinaryProof": false,
+  "opaqueSourceSettingsProof": false,
+  "rawRowsRecorded": false,
+  "moduleHashesBefore": {
+    "scripts/production75-live-manifest.mjs": "b8aa2c997d9142f02dc7b17430abf8372fe5f576bced5bf1e069c95e1a3035d1",
+    "scripts/production75-live-transport.mjs": "c1918804e7d930c6d8ec218778c0731f4608264064f42662276ac1e086dd389b",
+    "scripts/production75-live-observation.mjs": "64f96efceb7f233928651b04859c2101345b60ba2e930c8080fc04390789ab80",
+    "scripts/production75-live-policy.mjs": "d10e60543090bc7d085c279b15b9084530d509ffc5b1049d482d3f91be6fedf4",
+    "scripts/production75-live-local.mjs": "25e7fbea0e828dc408ec3797f5f8b3f8e00cadc35dbab043b6e28e3bf66d6cb9",
+    "scripts/production75-live-admission.mjs": "5b762d9d60018357e3b33b34f0fee5ed84cb9ef440bd7e9963820d780657fde1",
+    "scripts/production75-live-runner.mjs": "f04e43eaf4913f793bad69511ba543bda4a24d5ac8a3b29b686d4566fe9c4435",
+    "scripts/production75-operator.mjs": "1429912f59564ebc5114c5de5439e716e9b329466a9f701b31f1d1ddd41eb398",
+    "scripts/production75-custody.mjs": "08c7fc740e2bfcbfc3d5ca2e25a284a4d947d290e406386f5f2c62b1e2df3c3d",
+    "scripts/production75-reader-delta.mjs": "7e8729f550ab2ee3c1528570de111a4c8547c0832cf2aa8fa97fe1cefedcf5f8",
+    "scripts/production75-fly-v1.mjs": "bdf6906f6a9823c246ff39cd3075b3129fad1c6de64641d00ae291a9eb5b4991",
+    "scripts/production75-observer.mjs": "d2653e79b0f757079fb94ce3e8baf086a6bd4ab7fd1cee5d509d38dce569f86a",
+    "scripts/production75-verification.mjs": "919efc688cc6c7aaab0b9ef00a8f2969e40c3c950ced02dbe4f7729964e881d1",
+    "scripts/production75-core.mjs": "196a28729f637b678ab9c6cd9cd55420824a8220dbce1dcdafa27abafad90858",
+    "scripts/production75-legacy-model.mjs": "773fd99772f84dee34b5f781fbde2240bae3a894e19f0dc83d53953c701f46e2",
+    "scripts/production75-source.mjs": "5d4d11280ae7bac63f8eb71a7890ad8f3b947930bc6a0368c7be6ee46bf4ad7d",
+    "scripts/production75-pins.mjs": "49659d051413a9df57ce6ab85ddd17cf108ee9f5cffdd4de935e93e8db63475e",
+    "scripts/production75-local.mjs": "495caf65ffa60c023569f402f10f3716bd3203917258ff01e7ce6cd816eb0155",
+    "scripts/local-dev.mjs": "2240b4a8d9515863ae4d455d3ed094f32d219cda4e141c166a931a667830f6a2",
+    "scripts/staging-observation-core.mjs": "83bd34e05602476959bdec552883322c83839e6d27dbbb517f2ec82e0fc2a5aa",
+    "reports/release-preparation-2026-10-09/schema-catalog.mjs": "1c05f960796b8db64a4bd45eda43825767695f43d265d70a21f2473c0407a517",
+    "pnpm-lock.yaml": "2d26669aec0ba2233e37549cb8947a9ed62021d3d7bbb23047ef96000501d315",
+    "artifacts/api-server/package.json": "a5705ee900a3f3099ba0ff33950e091bd1c31e4467f0f2b2a3416f7fa0b55934"
+  },
+  "cases": {
+    "normal": {
+      "result": {
+        "kind": "SUPPLIED_CLIENT_PRODUCTION75_OPERATOR",
+        "status": "verified-and-cleaned",
+        "creationAttempted": true,
+        "copyId": "abcdefghijklmnop",
+        "possibleCopyId": "abcdefghijklmnop",
+        "copyDeleted": true,
+        "readerProfileVerified": true,
+        "originalsPreserved": true,
+        "resourcesClosed": true,
+        "outcomes": {
+          "rollback": {
+            "status": "verified-rollback",
+            "proof": {
+              "extraPreserved": true,
+              "nonTargetDatabasesPreserved": true,
+              "zeroDdlClusterWideVerified": false,
+              "capabilityScope": "fixed-query-observation-with-inherited-capabilities"
+            },
+            "errorCode": null,
+            "stepsAcknowledged": 19
+          },
+          "commit": {
+            "status": "verified-commit",
+            "proof": {
+              "status": "verified",
+              "originalTables": 75,
+              "originalColumns": 849,
+              "newTablesEmpty": 67,
+              "defaultsVerified": 13,
+              "freshReaderVerified": true,
+              "extraPreserved": true,
+              "nonTargetDatabasesPreserved": true,
+              "zeroDdlClusterWideVerified": false,
+              "capabilityScope": "fixed-query-observation-with-inherited-capabilities"
+            },
+            "errorCode": null,
+            "stepsAcknowledged": 19
+          }
+        },
+        "sourceWritesAuthorized": false,
+        "custody": {
+          "directory": "C:\\Forge\\worktrees\\growthos-db-recovery-20261010\\reports\\authenticated-driver-2026-10-12\\e06dab79-6eb3-480f-bcfe-316d0b5fab34\\operator-2c39baf1cfdfdb91a4a37dc52de27063fd5bdc7b8f928386f3708ea5e89d9572",
+          "planSha256": "2c39baf1cfdfdb91a4a37dc52de27063fd5bdc7b8f928386f3708ea5e89d9572",
+          "reviewReceiptSha256": "21670756a873f0cf36fb4a948fdb202315340f36414f0a499711d49695ecd96b",
+          "copyId": "abcdefghijklmnop",
+          "ownership": "acknowledged",
+          "used": [
+            "copy-create",
+            "credentials-writer",
+            "reader-create",
+            "credentials-reader",
+            "upgrade-rollback",
+            "upgrade-commit",
+            "copy-delete"
+          ],
+          "reconciliationOnly": false,
+          "unusable": false,
+          "closed": false
+        }
+      },
+      "mutationCounts": {
+        "create": 1,
+        "reader": 1,
+        "delete": 1
+      },
+      "idleErrorHandled": false,
+      "sourceTables": [
+        {
+          "name": "fly-db",
+          "tables": 75,
+          "rows": 22,
+          "physicalSha256": "2ca3d8dbc10313fb7f23bab2e87f61ad13a21e925664e190c087683aad1daf55"
+        },
+        {
+          "name": "growthos_staging",
+          "tables": 75,
+          "rows": 22,
+          "physicalSha256": "2a56e08b2bd331d0eaedea2d504d3fff568bf4e6aaab2279467cf997648d2009"
+        },
+        {
+          "name": "mogulforge-growthos-db",
+          "tables": 0,
+          "rows": 0,
+          "physicalSha256": "e8daafb63eea12e5f9d04373ad855ca6f24f59f5699cf3ac6a8203dd12ddb8d5"
+        }
+      ]
+    },
+    "lost-commit": {
+      "result": {
+        "kind": "SUPPLIED_CLIENT_PRODUCTION75_OPERATOR",
+        "status": "verified-and-cleaned",
+        "creationAttempted": true,
+        "copyId": "abcdefghijklmnop",
+        "possibleCopyId": "abcdefghijklmnop",
+        "copyDeleted": true,
+        "readerProfileVerified": true,
+        "originalsPreserved": true,
+        "resourcesClosed": true,
+        "outcomes": {
+          "rollback": {
+            "status": "verified-rollback",
+            "proof": {
+              "extraPreserved": true,
+              "nonTargetDatabasesPreserved": true,
+              "zeroDdlClusterWideVerified": false,
+              "capabilityScope": "fixed-query-observation-with-inherited-capabilities"
+            },
+            "errorCode": null,
+            "stepsAcknowledged": 19
+          },
+          "commit": {
+            "status": "reconciled-commit-no-replay",
+            "proof": {
+              "status": "reconciled-committed-no-replay",
+              "originalTables": 75,
+              "originalColumns": 849,
+              "newTablesEmpty": 67,
+              "defaultsVerified": 13,
+              "freshReaderVerified": true,
+              "commitAcknowledged": false,
+              "extraPreserved": true,
+              "nonTargetDatabasesPreserved": true,
+              "zeroDdlClusterWideVerified": false,
+              "capabilityScope": "fixed-query-observation-with-inherited-capabilities"
+            },
+            "errorCode": "production75_live_query",
+            "stepsAcknowledged": 19
+          }
+        },
+        "sourceWritesAuthorized": false,
+        "custody": {
+          "directory": "C:\\Forge\\worktrees\\growthos-db-recovery-20261010\\reports\\authenticated-driver-2026-10-12\\e06dab79-6eb3-480f-bcfe-316d0b5fab34\\operator-1aeaeb4d4f02a4fa87ea76a6992598c2980b916490095033e318501f8ba0215d",
+          "planSha256": "1aeaeb4d4f02a4fa87ea76a6992598c2980b916490095033e318501f8ba0215d",
+          "reviewReceiptSha256": "f942da360889a595001dea1fb42f30efaf386f07bbe5d4d405a71be8bcfa1f8a",
+          "copyId": "abcdefghijklmnop",
+          "ownership": "acknowledged",
+          "used": [
+            "copy-create",
+            "credentials-writer",
+            "reader-create",
+            "credentials-reader",
+            "upgrade-rollback",
+            "upgrade-commit",
+            "copy-delete"
+          ],
+          "reconciliationOnly": false,
+          "unusable": false,
+          "closed": false
+        }
+      },
+      "mutationCounts": {
+        "create": 1,
+        "reader": 1,
+        "delete": 1
+      },
+      "idleErrorHandled": false,
+      "sourceTables": [
+        {
+          "name": "fly-db",
+          "tables": 75,
+          "rows": 22,
+          "physicalSha256": "2ca3d8dbc10313fb7f23bab2e87f61ad13a21e925664e190c087683aad1daf55"
+        },
+        {
+          "name": "growthos_staging",
+          "tables": 75,
+          "rows": 22,
+          "physicalSha256": "2a56e08b2bd331d0eaedea2d504d3fff568bf4e6aaab2279467cf997648d2009"
+        },
+        {
+          "name": "mogulforge-growthos-db",
+          "tables": 0,
+          "rows": 0,
+          "physicalSha256": "e8daafb63eea12e5f9d04373ad855ca6f24f59f5699cf3ac6a8203dd12ddb8d5"
+        }
+      ]
+    },
+    "idle-client-error": {
+      "result": {
+        "kind": "SUPPLIED_CLIENT_PRODUCTION75_OPERATOR",
+        "status": "held-and-cleaned",
+        "creationAttempted": true,
+        "copyId": "abcdefghijklmnop",
+        "possibleCopyId": "abcdefghijklmnop",
+        "copyDeleted": true,
+        "readerProfileVerified": false,
+        "originalsPreserved": true,
+        "resourcesClosed": true,
+        "outcomes": {},
+        "sourceWritesAuthorized": false,
+        "errorCode": "production75_operator_callback",
+        "custody": {
+          "directory": "C:\\Forge\\worktrees\\growthos-db-recovery-20261010\\reports\\authenticated-driver-2026-10-12\\e06dab79-6eb3-480f-bcfe-316d0b5fab34\\operator-efff37a1de27360a2c8e50684453dcb66aef8e1037c2ce239e7bb8335844f0cc",
+          "planSha256": "efff37a1de27360a2c8e50684453dcb66aef8e1037c2ce239e7bb8335844f0cc",
+          "reviewReceiptSha256": "e8672838cc6832d123f7bf91b3d996994e52bfce88f0b4c2d9e1ba6c6074632c",
+          "copyId": "abcdefghijklmnop",
+          "ownership": "acknowledged",
+          "used": [
+            "copy-create",
+            "credentials-writer",
+            "reader-create",
+            "credentials-reader",
+            "copy-delete"
+          ],
+          "reconciliationOnly": false,
+          "unusable": false,
+          "closed": false
+        }
+      },
+      "mutationCounts": {
+        "create": 1,
+        "reader": 1,
+        "delete": 1
+      },
+      "idleErrorHandled": true,
+      "sourceTables": [
+        {
+          "name": "fly-db",
+          "tables": 75,
+          "rows": 22,
+          "physicalSha256": "2ca3d8dbc10313fb7f23bab2e87f61ad13a21e925664e190c087683aad1daf55"
+        },
+        {
+          "name": "growthos_staging",
+          "tables": 75,
+          "rows": 22,
+          "physicalSha256": "2a56e08b2bd331d0eaedea2d504d3fff568bf4e6aaab2279467cf997648d2009"
+        },
+        {
+          "name": "mogulforge-growthos-db",
+          "tables": 0,
+          "rows": 0,
+          "physicalSha256": "e8daafb63eea12e5f9d04373ad855ca6f24f59f5699cf3ac6a8203dd12ddb8d5"
+        }
+      ]
+    }
+  },
+  "cleanup": {
+    "clients": 99,
+    "sockets": 99,
+    "containers": 6,
+    "expectedClients": 99,
+    "expectedContainers": 6
+  },
+  "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+  "oracleSha256": "5bc563d32e4bcd488cda2a77e3dd473c957618b5b34ee8b5de159943ee958476",
+  "transportProofs": [
+    {
+      "clients": 3,
+      "clientsClosed": 3,
+      "socketsClosed": 3,
+      "proxies": 1,
+      "proxiesClosed": 1,
+      "ownedAgents": 0,
+      "agentsClosed": 0,
+      "sourceCredentialsLoaded": false,
+      "privateWireGuard": true,
+      "sqlTls": false,
+      "credentialValuesRecorded": false
+    },
+    {
+      "clients": 3,
+      "clientsClosed": 3,
+      "socketsClosed": 3,
+      "proxies": 1,
+      "proxiesClosed": 1,
+      "ownedAgents": 0,
+      "agentsClosed": 0,
+      "sourceCredentialsLoaded": false,
+      "privateWireGuard": true,
+      "sqlTls": false,
+      "credentialValuesRecorded": false
+    },
+    {
+      "clients": 22,
+      "clientsClosed": 22,
+      "socketsClosed": 22,
+      "proxies": 1,
+      "proxiesClosed": 1,
+      "ownedAgents": 0,
+      "agentsClosed": 0,
+      "sourceCredentialsLoaded": false,
+      "privateWireGuard": true,
+      "sqlTls": false,
+      "credentialValuesRecorded": false
+    },
+    {
+      "clients": 3,
+      "clientsClosed": 3,
+      "socketsClosed": 3,
+      "proxies": 1,
+      "proxiesClosed": 1,
+      "ownedAgents": 0,
+      "agentsClosed": 0,
+      "sourceCredentialsLoaded": false,
+      "privateWireGuard": true,
+      "sqlTls": false,
+      "credentialValuesRecorded": false
+    },
+    {
+      "clients": 3,
+      "clientsClosed": 3,
+      "socketsClosed": 3,
+      "proxies": 1,
+      "proxiesClosed": 1,
+      "ownedAgents": 0,
+      "agentsClosed": 0,
+      "sourceCredentialsLoaded": false,
+      "privateWireGuard": true,
+      "sqlTls": false,
+      "credentialValuesRecorded": false
+    },
+    {
+      "clients": 3,
+      "clientsClosed": 3,
+      "socketsClosed": 3,
+      "proxies": 1,
+      "proxiesClosed": 1,
+      "ownedAgents": 0,
+      "agentsClosed": 0,
+      "sourceCredentialsLoaded": false,
+      "privateWireGuard": true,
+      "sqlTls": false,
+      "credentialValuesRecorded": false
+    },
+    {
+      "clients": 22,
+      "clientsClosed": 22,
+      "socketsClosed": 22,
+      "proxies": 1,
+      "proxiesClosed": 1,
+      "ownedAgents": 0,
+      "agentsClosed": 0,
+      "sourceCredentialsLoaded": false,
+      "privateWireGuard": true,
+      "sqlTls": false,
+      "credentialValuesRecorded": false
+    },
+    {
+      "clients": 3,
+      "clientsClosed": 3,
+      "socketsClosed": 3,
+      "proxies": 1,
+      "proxiesClosed": 1,
+      "ownedAgents": 0,
+      "agentsClosed": 0,
+      "sourceCredentialsLoaded": false,
+      "privateWireGuard": true,
+      "sqlTls": false,
+      "credentialValuesRecorded": false
+    },
+    {
+      "clients": 3,
+      "clientsClosed": 3,
+      "socketsClosed": 3,
+      "proxies": 1,
+      "proxiesClosed": 1,
+      "ownedAgents": 0,
+      "agentsClosed": 0,
+      "sourceCredentialsLoaded": false,
+      "privateWireGuard": true,
+      "sqlTls": false,
+      "credentialValuesRecorded": false
+    },
+    {
+      "clients": 3,
+      "clientsClosed": 3,
+      "socketsClosed": 3,
+      "proxies": 1,
+      "proxiesClosed": 1,
+      "ownedAgents": 0,
+      "agentsClosed": 0,
+      "sourceCredentialsLoaded": false,
+      "privateWireGuard": true,
+      "sqlTls": false,
+      "credentialValuesRecorded": false
+    },
+    {
+      "clients": 4,
+      "clientsClosed": 4,
+      "socketsClosed": 4,
+      "proxies": 1,
+      "proxiesClosed": 1,
+      "ownedAgents": 0,
+      "agentsClosed": 0,
+      "sourceCredentialsLoaded": false,
+      "privateWireGuard": true,
+      "sqlTls": false,
+      "credentialValuesRecorded": false
+    },
+    {
+      "clients": 3,
+      "clientsClosed": 3,
+      "socketsClosed": 3,
+      "proxies": 1,
+      "proxiesClosed": 1,
+      "ownedAgents": 0,
+      "agentsClosed": 0,
+      "sourceCredentialsLoaded": false,
+      "privateWireGuard": true,
+      "sqlTls": false,
+      "credentialValuesRecorded": false
+    }
+  ],
+  "moduleHashesAfter": {
+    "scripts/production75-live-manifest.mjs": "b8aa2c997d9142f02dc7b17430abf8372fe5f576bced5bf1e069c95e1a3035d1",
+    "scripts/production75-live-transport.mjs": "c1918804e7d930c6d8ec218778c0731f4608264064f42662276ac1e086dd389b",
+    "scripts/production75-live-observation.mjs": "64f96efceb7f233928651b04859c2101345b60ba2e930c8080fc04390789ab80",
+    "scripts/production75-live-policy.mjs": "d10e60543090bc7d085c279b15b9084530d509ffc5b1049d482d3f91be6fedf4",
+    "scripts/production75-live-local.mjs": "25e7fbea0e828dc408ec3797f5f8b3f8e00cadc35dbab043b6e28e3bf66d6cb9",
+    "scripts/production75-live-admission.mjs": "5b762d9d60018357e3b33b34f0fee5ed84cb9ef440bd7e9963820d780657fde1",
+    "scripts/production75-live-runner.mjs": "f04e43eaf4913f793bad69511ba543bda4a24d5ac8a3b29b686d4566fe9c4435",
+    "scripts/production75-operator.mjs": "1429912f59564ebc5114c5de5439e716e9b329466a9f701b31f1d1ddd41eb398",
+    "scripts/production75-custody.mjs": "08c7fc740e2bfcbfc3d5ca2e25a284a4d947d290e406386f5f2c62b1e2df3c3d",
+    "scripts/production75-reader-delta.mjs": "7e8729f550ab2ee3c1528570de111a4c8547c0832cf2aa8fa97fe1cefedcf5f8",
+    "scripts/production75-fly-v1.mjs": "bdf6906f6a9823c246ff39cd3075b3129fad1c6de64641d00ae291a9eb5b4991",
+    "scripts/production75-observer.mjs": "d2653e79b0f757079fb94ce3e8baf086a6bd4ab7fd1cee5d509d38dce569f86a",
+    "scripts/production75-verification.mjs": "919efc688cc6c7aaab0b9ef00a8f2969e40c3c950ced02dbe4f7729964e881d1",
+    "scripts/production75-core.mjs": "196a28729f637b678ab9c6cd9cd55420824a8220dbce1dcdafa27abafad90858",
+    "scripts/production75-legacy-model.mjs": "773fd99772f84dee34b5f781fbde2240bae3a894e19f0dc83d53953c701f46e2",
+    "scripts/production75-source.mjs": "5d4d11280ae7bac63f8eb71a7890ad8f3b947930bc6a0368c7be6ee46bf4ad7d",
+    "scripts/production75-pins.mjs": "49659d051413a9df57ce6ab85ddd17cf108ee9f5cffdd4de935e93e8db63475e",
+    "scripts/production75-local.mjs": "495caf65ffa60c023569f402f10f3716bd3203917258ff01e7ce6cd816eb0155",
+    "scripts/local-dev.mjs": "2240b4a8d9515863ae4d455d3ed094f32d219cda4e141c166a931a667830f6a2",
+    "scripts/staging-observation-core.mjs": "83bd34e05602476959bdec552883322c83839e6d27dbbb517f2ec82e0fc2a5aa",
+    "reports/release-preparation-2026-10-09/schema-catalog.mjs": "1c05f960796b8db64a4bd45eda43825767695f43d265d70a21f2473c0407a517",
+    "pnpm-lock.yaml": "2d26669aec0ba2233e37549cb8947a9ed62021d3d7bbb23047ef96000501d315",
+    "artifacts/api-server/package.json": "a5705ee900a3f3099ba0ff33950e091bd1c31e4467f0f2b2a3416f7fa0b55934"
+  },
+  "finishedAt": "2026-10-13T09:14:31.153Z"
+}

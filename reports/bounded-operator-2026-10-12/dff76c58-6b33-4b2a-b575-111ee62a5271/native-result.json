@@ -1,0 +1,274 @@
+{
+  "kind": "FAKE_PROVIDER_REAL_SQL_OPERATOR",
+  "runId": "dff76c58-6b33-4b2a-b575-111ee62a5271",
+  "status": "PASS",
+  "startedAt": "2026-10-12T22:23:34.004Z",
+  "sourceCandidate": "8df64dc72009832f93b2b491031acd1bb2afb903",
+  "liveProviderCalls": false,
+  "realOwnerOrCapabilityAdmission": false,
+  "providerAuthenticationProof": false,
+  "providerExtensionBinaryProof": false,
+  "opaqueSourceSettingsProof": false,
+  "rawRowsRecorded": false,
+  "moduleHashesBefore": {
+    "production75-custody.mjs": "546c6f23f010347605326ada305f36488434ebc4fd0ea7825d28cf163d648627",
+    "production75-fly-v1.mjs": "851fc167bb8a1f1ce1b1e4ba9806a680bc988ff44234e0304a825ebdfd4ec226",
+    "production75-reader-delta.mjs": "7e8729f550ab2ee3c1528570de111a4c8547c0832cf2aa8fa97fe1cefedcf5f8",
+    "production75-operator.mjs": "373cb2979fe5f18bf29fc91913b11666a4a66a8c350f45774201de0ec239cae9",
+    "production75-operator-local.mjs": "29d33fd4ee31797713dcb62974ecd71a7752b80bf507761b2b6eb60df5cced15"
+  },
+  "cases": {
+    "normal": {
+      "result": {
+        "kind": "SUPPLIED_CLIENT_PRODUCTION75_OPERATOR",
+        "status": "verified-and-cleaned",
+        "creationAttempted": true,
+        "copyId": "abcdefghijklmnop",
+        "possibleCopyId": "abcdefghijklmnop",
+        "copyDeleted": true,
+        "readerProfileVerified": true,
+        "originalsPreserved": true,
+        "resourcesClosed": true,
+        "outcomes": {
+          "rollback": {
+            "status": "verified-rollback",
+            "proof": {
+              "extraPreserved": true,
+              "nonTargetDatabasesPreserved": true,
+              "zeroDdlClusterWideVerified": false,
+              "capabilityScope": "fixed-query-observation-with-inherited-capabilities"
+            },
+            "errorCode": null,
+            "stepsAcknowledged": 19
+          },
+          "commit": {
+            "status": "verified-commit",
+            "proof": {
+              "status": "verified",
+              "originalTables": 75,
+              "originalColumns": 849,
+              "newTablesEmpty": 67,
+              "defaultsVerified": 13,
+              "freshReaderVerified": true,
+              "extraPreserved": true,
+              "nonTargetDatabasesPreserved": true,
+              "zeroDdlClusterWideVerified": false,
+              "capabilityScope": "fixed-query-observation-with-inherited-capabilities"
+            },
+            "errorCode": null,
+            "stepsAcknowledged": 19
+          }
+        },
+        "sourceWritesAuthorized": false,
+        "custody": {
+          "directory": "C:\\Forge\\worktrees\\growthos-db-recovery-20261010\\reports\\bounded-operator-2026-10-12\\dff76c58-6b33-4b2a-b575-111ee62a5271\\operator-f00020b92c31672fd23732a250da98c2ce406056d25c70c0ef3b072251434c1f",
+          "planSha256": "f00020b92c31672fd23732a250da98c2ce406056d25c70c0ef3b072251434c1f",
+          "reviewReceiptSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "copyId": "abcdefghijklmnop",
+          "ownership": "acknowledged",
+          "used": [
+            "copy-create",
+            "reader-create",
+            "credentials-reader",
+            "upgrade-rollback",
+            "credentials-writer",
+            "upgrade-commit",
+            "copy-delete"
+          ],
+          "reconciliationOnly": false,
+          "unusable": false,
+          "closed": false
+        }
+      },
+      "mutationCounts": {
+        "create": 1,
+        "reader": 1,
+        "delete": 1
+      },
+      "idleErrorHandled": false,
+      "sourceTables": [
+        {
+          "name": "fly-db",
+          "tables": 75,
+          "rows": 22,
+          "physicalSha256": "2ca3d8dbc10313fb7f23bab2e87f61ad13a21e925664e190c087683aad1daf55"
+        },
+        {
+          "name": "growthos_staging",
+          "tables": 75,
+          "rows": 22,
+          "physicalSha256": "2a56e08b2bd331d0eaedea2d504d3fff568bf4e6aaab2279467cf997648d2009"
+        },
+        {
+          "name": "mogulforge-growthos-db",
+          "tables": 0,
+          "rows": 0,
+          "physicalSha256": "e8daafb63eea12e5f9d04373ad855ca6f24f59f5699cf3ac6a8203dd12ddb8d5"
+        }
+      ]
+    },
+    "lost-commit": {
+      "result": {
+        "kind": "SUPPLIED_CLIENT_PRODUCTION75_OPERATOR",
+        "status": "verified-and-cleaned",
+        "creationAttempted": true,
+        "copyId": "abcdefghijklmnop",
+        "possibleCopyId": "abcdefghijklmnop",
+        "copyDeleted": true,
+        "readerProfileVerified": true,
+        "originalsPreserved": true,
+        "resourcesClosed": true,
+        "outcomes": {
+          "rollback": {
+            "status": "verified-rollback",
+            "proof": {
+              "extraPreserved": true,
+              "nonTargetDatabasesPreserved": true,
+              "zeroDdlClusterWideVerified": false,
+              "capabilityScope": "fixed-query-observation-with-inherited-capabilities"
+            },
+            "errorCode": null,
+            "stepsAcknowledged": 19
+          },
+          "commit": {
+            "status": "reconciled-commit-no-replay",
+            "proof": {
+              "status": "reconciled-committed-no-replay",
+              "originalTables": 75,
+              "originalColumns": 849,
+              "newTablesEmpty": 67,
+              "defaultsVerified": 13,
+              "freshReaderVerified": true,
+              "commitAcknowledged": false,
+              "extraPreserved": true,
+              "nonTargetDatabasesPreserved": true,
+              "zeroDdlClusterWideVerified": false,
+              "capabilityScope": "fixed-query-observation-with-inherited-capabilities"
+            },
+            "errorCode": "production75_database_or_journal_failure",
+            "stepsAcknowledged": 19
+          }
+        },
+        "sourceWritesAuthorized": false,
+        "custody": {
+          "directory": "C:\\Forge\\worktrees\\growthos-db-recovery-20261010\\reports\\bounded-operator-2026-10-12\\dff76c58-6b33-4b2a-b575-111ee62a5271\\operator-07df46173c0cf3fb33485d6ecc74644641654c8c9474fb4eb93804cb54953b22",
+          "planSha256": "07df46173c0cf3fb33485d6ecc74644641654c8c9474fb4eb93804cb54953b22",
+          "reviewReceiptSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "copyId": "abcdefghijklmnop",
+          "ownership": "acknowledged",
+          "used": [
+            "copy-create",
+            "reader-create",
+            "credentials-reader",
+            "upgrade-rollback",
+            "credentials-writer",
+            "upgrade-commit",
+            "copy-delete"
+          ],
+          "reconciliationOnly": false,
+          "unusable": false,
+          "closed": false
+        }
+      },
+      "mutationCounts": {
+        "create": 1,
+        "reader": 1,
+        "delete": 1
+      },
+      "idleErrorHandled": false,
+      "sourceTables": [
+        {
+          "name": "fly-db",
+          "tables": 75,
+          "rows": 22,
+          "physicalSha256": "2ca3d8dbc10313fb7f23bab2e87f61ad13a21e925664e190c087683aad1daf55"
+        },
+        {
+          "name": "growthos_staging",
+          "tables": 75,
+          "rows": 22,
+          "physicalSha256": "2a56e08b2bd331d0eaedea2d504d3fff568bf4e6aaab2279467cf997648d2009"
+        },
+        {
+          "name": "mogulforge-growthos-db",
+          "tables": 0,
+          "rows": 0,
+          "physicalSha256": "e8daafb63eea12e5f9d04373ad855ca6f24f59f5699cf3ac6a8203dd12ddb8d5"
+        }
+      ]
+    },
+    "idle-client-error": {
+      "result": {
+        "kind": "SUPPLIED_CLIENT_PRODUCTION75_OPERATOR",
+        "status": "held-and-cleaned",
+        "creationAttempted": true,
+        "copyId": "abcdefghijklmnop",
+        "possibleCopyId": "abcdefghijklmnop",
+        "copyDeleted": true,
+        "readerProfileVerified": false,
+        "originalsPreserved": true,
+        "resourcesClosed": true,
+        "outcomes": {},
+        "sourceWritesAuthorized": false,
+        "errorCode": "production75_operator_callback",
+        "custody": {
+          "directory": "C:\\Forge\\worktrees\\growthos-db-recovery-20261010\\reports\\bounded-operator-2026-10-12\\dff76c58-6b33-4b2a-b575-111ee62a5271\\operator-de07aced963f389ff8f1e8286f858ca1908423d21041200ddf12d55f9dbcd1c0",
+          "planSha256": "de07aced963f389ff8f1e8286f858ca1908423d21041200ddf12d55f9dbcd1c0",
+          "reviewReceiptSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "copyId": "abcdefghijklmnop",
+          "ownership": "acknowledged",
+          "used": [
+            "copy-create",
+            "reader-create",
+            "copy-delete"
+          ],
+          "reconciliationOnly": false,
+          "unusable": false,
+          "closed": false
+        }
+      },
+      "mutationCounts": {
+        "create": 1,
+        "reader": 1,
+        "delete": 1
+      },
+      "idleErrorHandled": true,
+      "sourceTables": [
+        {
+          "name": "fly-db",
+          "tables": 75,
+          "rows": 22,
+          "physicalSha256": "2ca3d8dbc10313fb7f23bab2e87f61ad13a21e925664e190c087683aad1daf55"
+        },
+        {
+          "name": "growthos_staging",
+          "tables": 75,
+          "rows": 22,
+          "physicalSha256": "2a56e08b2bd331d0eaedea2d504d3fff568bf4e6aaab2279467cf997648d2009"
+        },
+        {
+          "name": "mogulforge-growthos-db",
+          "tables": 0,
+          "rows": 0,
+          "physicalSha256": "e8daafb63eea12e5f9d04373ad855ca6f24f59f5699cf3ac6a8203dd12ddb8d5"
+        }
+      ]
+    }
+  },
+  "cleanup": {
+    "clients": 107,
+    "sockets": 107,
+    "containers": 6,
+    "expectedClients": 107,
+    "expectedContainers": 6
+  },
+  "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+  "moduleHashesAfter": {
+    "production75-custody.mjs": "546c6f23f010347605326ada305f36488434ebc4fd0ea7825d28cf163d648627",
+    "production75-fly-v1.mjs": "851fc167bb8a1f1ce1b1e4ba9806a680bc988ff44234e0304a825ebdfd4ec226",
+    "production75-reader-delta.mjs": "7e8729f550ab2ee3c1528570de111a4c8547c0832cf2aa8fa97fe1cefedcf5f8",
+    "production75-operator.mjs": "373cb2979fe5f18bf29fc91913b11666a4a66a8c350f45774201de0ec239cae9",
+    "production75-operator-local.mjs": "29d33fd4ee31797713dcb62974ecd71a7752b80bf507761b2b6eb60df5cced15"
+  },
+  "finishedAt": "2026-10-12T22:25:27.172Z"
+}
