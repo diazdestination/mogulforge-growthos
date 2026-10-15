@@ -125,7 +125,9 @@ async function databaseTests(files = []) {
     });
     // The schema target is constructed only from this run's owned container.
     await command('pnpm', ['--filter', '@workspace/db', 'run', 'push-force'], { env });
-    if (!files.length) await command('pnpm', ['-r', '--filter', '!@workspace/api-server', '--if-present', 'run', 'test'], { env });
+    // Serialize workspace suites and cap Vitest workers to match this run's
+    // two-CPU database; concurrent suites can contend on unchanged timing gates.
+    if (!files.length) await command('pnpm', ['-r', '--workspace-concurrency=1', '--filter', '!@workspace/api-server', '--if-present', 'run', 'test', '--maxWorkers=2'], { env });
     // Match the disposable database's two CPUs and avoid unrelated fixture
     // files competing for its resources. Race tests still open their own
     // independent PostgreSQL clients inside each file.
