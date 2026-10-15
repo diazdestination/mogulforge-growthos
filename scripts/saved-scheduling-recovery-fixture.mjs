@@ -7,8 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { tsImport } from 'tsx/esm/api';
 import { readVerifiedSchedulingPredecessors, verifySqlPin } from './saved-scheduling-schema-preview.mjs';
 
-export const SCHEDULING_PRODUCTION_BASE = '5f80131a0d4b91be2e55d4eeb3d9145a99bf822c';
-export const SCHEDULING_PRODUCTION_TREE = 'effe897dd5531c21b24360522d8a76520a43a466';
+export const SCHEDULING_PRODUCTION_BASE = '2a62bf754204b7a218249acba6abe32e656d2ce1';
+export const SCHEDULING_PRODUCTION_TREE = 'dc7a1895f43dc992d24c0908f8d5feae74c74f6f';
 const root = fileURLToPath(new URL('../', import.meta.url));
 export const schedulingHash = value => createHash('sha256').update(typeof value === 'string' || Buffer.isBuffer(value) ? value : JSON.stringify(value)).digest('hex');
 const ident = value => { assert.match(value,/^[a-z_][a-z0-9_]*$/); return `"${value}"`; };
@@ -288,6 +288,7 @@ export async function probeSchedulingThroughApp(origin,database,state,mode) {
   assert.ok(['reduced','disabled'].includes(mode));
   if(mode==='disabled') await savePolicy(api,5,false,[]);
   const current=await api('GET','/settings/scheduling-policy'); assert.equal(current.policy.enabled,mode==='reduced');
+  if(mode==='reduced') assert.equal(current.policy.minimumTravelGapMinutes,5);
   const cases=[];
   for(const [targetKind,targetId] of [['appointment',state.appointmentId],['project',state.projectId]]) {
     const table=targetKind==='appointment'?'appointments':'projects';
