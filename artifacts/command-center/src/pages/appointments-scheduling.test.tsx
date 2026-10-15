@@ -17,6 +17,7 @@ import { Router } from 'wouter';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   companyDayBounds,
+  manualSchedulingAckSchema,
   type ManualSchedulingCommand,
 } from '@workspace/scheduling-core';
 import {
@@ -1401,4 +1402,132 @@ describe('native appointment scheduling consumer', () => {
       );
     },
   );
+
+
+  const refusalExplanations = [
+    ['travel_conflict', 'The original appointment conflicts with assigned staff work or the required travel gap. Acknowledge this refusal, then review a different interval or assignment.'],
+    ['company_capacity_conflict', 'The original appointment would exceed the company reservation limit. Acknowledge this refusal, then review a different interval.'],
+    ['inspection_capacity_conflict', 'The original appointment would exceed the inspection reservation limit. Acknowledge this refusal, then review a different interval.'],
+    ['stale_scheduling_review', 'The scheduling rules or appointment details changed after the original review. Acknowledge this refusal, refresh scheduling review, then review the appointment again.'],
+  ] as const;
+  const genericRefusalExplanation = 'The original appointment could not be admitted for the reviewed request. Acknowledge this refusal before reviewing a new appointment.';
+  const unsafeRefusalServerText = 'UNSAFE_REFUSAL_SERVER_TEXT';
+  async function refusalResponse(command: ManualSchedulingCommand, refusalCode: string) {
+    const proof = manualSchedulingAckSchema.parse({
+      ...await ack(command), outcome: 'no_commit_refused', target: null, refusalCode,
+    });
+    return Response.json({ error: unsafeRefusalServerText, code: 'manual_scheduling_refused', schedulingOperation: proof }, { status: 409 });
+  }
+
+  it.each(refusalExplanations)('explains retained %s refusal from the actual closed acknowledgement', async (code, explanation) => {
+    const s = setup({ post: command => refusalResponse(command, code) });
+    await open(); await review();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    await screen.findByText(/Original appointment was refused with authoritative no-commit proof. Its original operation remains terminal./);
+    expect(screen.getByText(explanation)).toBeTruthy();
+    expect(screen.queryByText(unsafeRefusalServerText)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Acknowledge refusal and review a new appointment' })).toBeTruthy();
+    const saved = JSON.parse(sessionStorage.getItem(sessionStorage.key(0)!)!);
+    expect(Object.keys(saved.ack).sort()).toEqual(['operationId', 'organizationId', 'actorUserId', 'kind', 'source', 'payloadSha256', 'outcome', 'target', 'refusalCode'].sort());
+    expect(saved.ack.refusalCode).toBe(code);
+    expect(s.commands).toHaveLength(1);
+  });
+
+  it('uses a safe retained refusal fallback without rendering unknown code or server text', async () => {
+    const unsafeCode = 'UNSAFE_UNKNOWN_REFUSAL_CODE<script>private</script>';
+    const s = setup({ post: command => refusalResponse(command, unsafeCode) });
+    await open(); await review();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    await screen.findByText(/Original appointment was refused/);
+    expect(screen.getByText(genericRefusalExplanation)).toBeTruthy();
+    expect(screen.queryByText(unsafeCode)).toBeNull();
+    expect(screen.queryByText(unsafeRefusalServerText)).toBeNull();
+    expect(s.commands).toHaveLength(1);
+  });
+
+  it('restores the retained refusal reason after failed current GET and actual remount/reselection', async () => {
+    const s = setup({ post: command => refusalResponse(command, 'travel_conflict') });
+    await open();
+    fireEvent.change(await screen.findByTestId('appointment-contact'), { target: { value: customer } });
+    await waitFor(() => expect(screen.getByLabelText('Service start')).toHaveProperty('disabled', false));
+    await review();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    await screen.findByText(/Original appointment was refused/);
+    expect(screen.getByText(refusalExplanations[0][1])).toBeTruthy();
+    const key = sessionStorage.key(0)!, bytes = sessionStorage.getItem(key)!, original = structuredClone(s.commands[0]);
+    expect(original.review.context.source).toEqual({ sourceKind: 'direct_customer', leadId: null, contactId: customer, propertyId: null, estimateId: null });
+    s.hold();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh scheduling review' }));
+    await screen.findByText('Current scheduling review is unavailable. Refresh before changing the schedule.');
+    expect(screen.getByText(refusalExplanations[0][1])).toBeTruthy();
+    expect(sessionStorage.getItem(key)).toBe(bytes);
+    s.view.unmount(); s.mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Schedule appointment' }));
+    await screen.findByText('Current scheduling review is unavailable. Refresh before changing the schedule.');
+    expect(screen.queryByText(refusalExplanations[0][1])).toBeNull();
+    fireEvent.change(await screen.findByTestId('appointment-contact'), { target: { value: customer } });
+    await screen.findByText(/Original appointment was refused/);
+    expect(screen.getByText(refusalExplanations[0][1])).toBeTruthy();
+    expect(sessionStorage.getItem(key)).toBe(bytes);
+    expect(JSON.parse(sessionStorage.getItem(key)!).command).toEqual(original);
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true);
+    expect(s.commands).toHaveLength(1);
+    expect(s.reconciled).toHaveLength(0);
+  });
+
+  it('keeps the explained refusal terminal until explicit acknowledgement and a new deliberate review', async () => {
+    const s = setup({ post: command => refusalResponse(command, 'company_capacity_conflict') });
+    await open(); await review();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    await screen.findByText(/Original appointment was refused/);
+    expect(screen.getByText(refusalExplanations[1][1])).toBeTruthy();
+    const original = structuredClone(s.commands[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    expect(s.commands).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Acknowledge refusal and review a new appointment' }));
+    expect(screen.queryByText(refusalExplanations[1][1])).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true);
+    const retained = JSON.parse(sessionStorage.getItem(sessionStorage.key(0)!)!);
+    expect(retained.command).toEqual(original);
+    expect(retained.ack.outcome).toBe('no_commit_refused');
+    expect(retained.refusalAcknowledged).toBe(true);
+    await review();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    await waitFor(() => expect(s.commands).toHaveLength(2));
+    await screen.findByText(/Original appointment was refused/);
+    expect(s.commands[1].operationId).not.toBe(original.operationId);
+    expect(JSON.parse(sessionStorage.getItem(sessionStorage.key(0)!)!).retiredOperationIds).toContain(original.operationId);
+  });
+
+  it.each(['operationId', 'payloadSha256'] as const)('does not trust a retained refusal explanation with mismatched %s', async field => {
+    const s = setup({ post: async command => {
+      const proof = manualSchedulingAckSchema.parse({ ...await ack(command), outcome: 'no_commit_refused', target: null, refusalCode: 'travel_conflict', [field]: field === 'operationId' ? id(99) : 'd'.repeat(64) });
+      return Response.json({ error: unsafeRefusalServerText, code: 'manual_scheduling_refused', schedulingOperation: proof }, { status: 409 });
+    } });
+    await open(); await review();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    await screen.findByText(/Original appointment result is unknown/);
+    expect(screen.queryByText(refusalExplanations[0][1])).toBeNull();
+    expect(screen.queryByText(genericRefusalExplanation)).toBeNull();
+    expect(screen.queryByText(unsafeRefusalServerText)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Acknowledge refusal and review a new appointment' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', true);
+    expect(s.commands).toHaveLength(1);
+  });
+
+  it('does not relax the closed ACK schema to trust an absent refusal code', async () => {
+    const s = setup({ post: async command => {
+      const { refusalCode: omitted, ...proof } = { ...await ack(command), outcome: 'no_commit_refused', target: null };
+      expect(manualSchedulingAckSchema.safeParse(proof).success).toBe(false);
+      return Response.json({ error: unsafeRefusalServerText, code: 'manual_scheduling_refused', schedulingOperation: proof }, { status: 409 });
+    } });
+    await open(); await review();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
+    await screen.findByText(/Original appointment result is unknown/);
+    expect(screen.queryByText(genericRefusalExplanation)).toBeNull();
+    expect(screen.queryByText(unsafeRefusalServerText)).toBeNull();
+    expect(s.commands).toHaveLength(1);
+  });
+
 });
