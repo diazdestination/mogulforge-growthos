@@ -72,6 +72,9 @@ jobs:
         run: node --test examples/website-connection/adapter.test.mjs examples/website-connection/operations.test.mjs
 
       - name: Run TypeScript checks
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          pnpm_config_workspace_concurrency: "1"
         run: pnpm run typecheck
 
       - name: Build Command Center
