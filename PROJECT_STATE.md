@@ -1,3 +1,7 @@
+# Current combined release source contract — 2026-10-15
+
+The owner-approved P91b7fd2/Oc285c47 integration now uses separate legacy75→95→142 and scheduling0019 stages. See reports/combined-release-integration-2026-10-15.md and reports/combined-release-recovery-2026-10-15.md. Exact current task/native/recovery/CI acceptance is recorded externally at C:/Forge/artifacts/growthos-release-integration-20261015/execution-current.json and its final attestation; this tracked procedure is frozen before those runs and makes no future pass claim. All13 saved-scheduling source tasks atP remain accepted. Main7091, API/library and eight protected inputs retain their own strict source checks. Hosted Reader, compatible recovery-or-complete-hold, fullG04/G06 and both real contractor replacement cards remain required. No source/local action implies new spend, hosted preparation/migration, activation, deployment, merge or launch authority.
+
 # GrowthOS project state
 
 ## October15 owner-approved combined-source implementation

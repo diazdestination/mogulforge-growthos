@@ -1,3 +1,7 @@
+# Current combined recovery operator — 2026-10-15
+
+See reports/combined-release-recovery-2026-10-15.md for the separate0019 full142 stage, exact frozen-source native8-container proof, supplied local composition and explicit future prepare-combined/execute-combined modes. The legacy commands below remain historical/legacy-only. Native combined preparation/execution requires completed current proof and the applicable separate provider/price/owner/capability authority; this source plan runs neither command against Fly. Actual gate status is external to the frozen source.
+
 # GrowthOS operating entry points
 
 ## Local development actions — October 10 UTC

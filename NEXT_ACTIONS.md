@@ -1,3 +1,9 @@
+# Current combined release acceptance sequence — 2026-10-15
+
+Follow the newest external execution-current.json under C:/Forge/artifacts/growthos-release-integration-20261015; execute only the next unaccepted approved task. The frozen procedures are reports/combined-release-integration-2026-10-15.md and reports/combined-release-recovery-2026-10-15.md. Remaining gates are the reviewed8-container native oracle, unchanged actual-artifact contractor recovery and exact GEEKOM C01–C20 audit, then normal full tests/types/both builds/parity/scans/final review/private draft/CI. Record their actual hashes and outcomes externally without a new source commit merely to add a pass statement.
+
+After source acceptance, actual supported hosted Reader/rehearsal, compatible writable recovery-or-complete-hold, fullG04/G06 and both contractors configuration/import/staff/provider/device/cutover still require their own evidence and applicable authority. Keep original failures/consumed grants/retained cleanup restrictions visible.
+
 # Next acceptance work
 
 ## October15 owner-approved combined-source implementation
