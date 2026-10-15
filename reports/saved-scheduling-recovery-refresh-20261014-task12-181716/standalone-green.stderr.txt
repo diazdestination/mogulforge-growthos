@@ -1,0 +1,9 @@
+
+  ...rver\.contractor-recovery-cMEJiM\contractor-recovery-entry.mjs   18.1mb
+  artifacts\api-server\.contractor-recovery-cMEJiM\pino-worker.mjs   154.7kb
+  artifacts\api-server\.contractor-recovery-cMEJiM\pino-file.mjs     143.2kb
+  artifacts\api-server\.contractor-recovery-cMEJiM\pino-pretty.mjs   115.9kb
+  ...pi-server\.contractor-recovery-cMEJiM\thread-stream-worker.mjs    7.7kb
+  ...and 5 more output files...
+
+Done in 1310ms

@@ -1,0 +1,25 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+stderr | contractor-recovery-drill.test.mjs > upgrades the full prior schema, restores both synthetic companies, boots a read-only real app and preserves uncertainty/holds
+RECOVERY_FAILURE_RECEIPTS [{"check":"contractor_recovery_failed","progress":{"failure":"assertion"},"cleanup":[{"kind":"database","mode":"source","closed":true}]}]
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  contractor-recovery-drill.test.mjs > upgrades the full prior schema, restores both synthetic companies, boots a read-only real app and preserves uncertainty/holds
+AssertionError: accepted production source must remain exact
+
+82749 !== 0
+
+
+- Expected
++ Received
+
+- 0
++ 82749
+
+ ❯ runContractorRecoveryDrill contractor-recovery-drill.mjs:294:12
+
+ ❯ contractor-recovery-drill.test.mjs:7:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
