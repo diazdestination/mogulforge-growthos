@@ -8,6 +8,7 @@ import { mockApi, sampleMe } from '@/test/mock-api';
 import { approvedView, contactId, orgId, serviceId, smsPage, smsReply, standingPreview, standingView, versionTime } from '@/test/service-standing-fixtures';
 import { makeSchedulingContext } from '@/test/scheduling-ui-fixtures';
 import { serviceCareSchedulingReadSchema } from '../../../api-server/src/services/service-care-booking-contract';
+import { schedulingConflictExplanationRequestSchema } from '@workspace/scheduling-core';
 const emptyWatch = () => Response.json({ items: [], hasMore: false, unmonitoredCount: 0, held: false });
 
 describe('customer service desk status', () => {
@@ -128,7 +129,16 @@ async function openCareDraft() {
   fireEvent.click(screen.getByRole('button', { name: 'Review interval' }));
   fireEvent.click(screen.getByLabelText(/The customer confirmed this exact time/));
   expect(screen.getByRole('button', { name: 'Book confirmed visit' })).toHaveProperty('disabled', false);
-  expect(posts()).toHaveLength(0);
+  // Explicit review may read the current schedule, but cannot book or send any other command.
+  expect(posts()).toHaveLength(1);
+  expect(String(posts()[0][0])).toBe('/api/v1/scheduling/conflict-explanation');
+  const review = care().scheduling.review;
+  if (review.state !== 'ready') throw new Error('Expected the unchanged ready scheduling fixture.');
+  expect(schedulingConflictExplanationRequestSchema.parse(JSON.parse(String(posts()[0][1]?.body)))).toEqual({
+    query: { sourceKind: 'direct_customer', sourceId: contactId, reservationKind: 'appointment', appointmentType: 'inspection' },
+    context: review.context,
+    interval: { startAt: '2035-01-02T10:00:00.000Z', endAt: '2035-01-02T11:00:00.000Z', resourceUserIds: ['staff'] },
+  });
 }
 async function prepareStandingReview() {
   fireEvent.click(screen.getByRole('button', { name: 'Review automatic series reminders' })); await screen.findByText('Standing reminders are off');

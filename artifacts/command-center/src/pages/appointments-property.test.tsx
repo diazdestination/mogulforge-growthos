@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import Appointments from './appointments';
 import { makePolicyReadResult } from '@/test/scheduling-ui-fixtures';
 import { mockApi, sampleMe } from '@/test/mock-api';
+import { schedulingConflictExplanationRequestSchema } from '@workspace/scheduling-core';
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const organizationId = id(1), contactId = id(2), otherContactId = id(3), leadId = id(4);
@@ -55,11 +56,16 @@ function chooseProperty(n: number) { fireEvent.change(picker(), { target: { valu
 async function save(fetch: ReturnType<typeof mockApi>) {
   await waitFor(() => expect(screen.getByRole('button', { name: 'Review interval' })).toHaveProperty('disabled', false));
   await userEvent.click(screen.getByRole('button', { name: 'Review interval' }));
+  const reviewPosts = fetch.mock.calls.filter(([, init]) => init?.method === 'POST');
+  expect(reviewPosts).toHaveLength(1);
+  expect(String(reviewPosts[0][0])).toBe('/api/v1/scheduling/conflict-explanation');
+  expect(schedulingConflictExplanationRequestSchema.parse(JSON.parse(String(reviewPosts[0][1]?.body))).interval).toEqual({ startAt: '2035-07-01T10:00:00.000Z', endAt: '2035-07-01T12:00:00.000Z', resourceUserIds: [] });
   await waitFor(() => expect(screen.getByRole('button', { name: 'Save Appt' })).toHaveProperty('disabled', false));
   fireEvent.click(screen.getByRole('button', { name: 'Save Appt' }));
-  await waitFor(() => expect(fetch.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true));
-  const call = fetch.mock.calls.find(([, init]) => init?.method === 'POST')!;
-  expect(String(call[0])).toBe('/api/v1/appointments');
+  const appointmentPosts = () => fetch.mock.calls.filter(([url, init]) => String(url) === '/api/v1/appointments' && init?.method === 'POST');
+  await waitFor(() => expect(appointmentPosts()).toHaveLength(1));
+  expect(fetch.mock.calls.filter(([, init]) => init?.method === 'POST').map(([url]) => String(url))).toEqual(['/api/v1/scheduling/conflict-explanation', '/api/v1/appointments']);
+  const call = appointmentPosts()[0];
   return JSON.parse(String(call[1]?.body));
 }
 afterEach(() => { cleanup(); sessionStorage.clear(); window.history.replaceState(null, '', '/'); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
@@ -75,7 +81,7 @@ describe('explicit properties on new manual appointments', () => {
     expect(screen.getByText('Optional. Choose a property only for this new appointment. Existing visits and their notes are not changed.')).toBeTruthy();
     const body = await save(fetch);
     expect(body).toMatchObject({ contactId, propertyId: null }); expect(body).not.toHaveProperty('leadId');
-    expect(fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+    expect(fetch.mock.calls.filter(([url, init]) => String(url) === '/api/v1/appointments' && init?.method === 'POST')).toHaveLength(1);
   });
 
   it('submits a deliberately selected property from a later page without inventing a lead', async () => {
@@ -187,8 +193,8 @@ describe('explicit properties on new manual appointments', () => {
     const [url, request] = fetch.mock.calls.find(([, init]) => init?.method === 'PATCH')!;
     expect(String(url)).toBe(`/api/v1/appointments/${id(5)}`);
     const body = JSON.parse(String(request?.body));
-    expect(body).toMatchObject({ notes: nativeAppointment().notes, expectedUpdatedAt: nativeAppointment().updatedAt, scheduledStart: nativeAppointment().scheduledStart, scheduledEnd: nativeAppointment().scheduledEnd, contactId });
-    expect(body).not.toHaveProperty('propertyId');
+    expect(body).toEqual({ notes: nativeAppointment().notes, expectedUpdatedAt: nativeAppointment().updatedAt });
+    for (const key of ['propertyId', 'contactId', 'leadId', 'assignedUserId', 'scheduledStart', 'scheduledEnd', 'type', 'status', 'schedulingReview', 'expectedTargetFingerprint']) expect(body).not.toHaveProperty(key);
     expect(fetch.mock.calls.some(([url]) => String(url).includes('/workspace/properties'))).toBe(false);
   });
 

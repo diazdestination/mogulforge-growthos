@@ -40,8 +40,8 @@ describe('contractor schedule forms', () => {
     await waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PATCH')).toBe(true));
     const [, init] = fetchMock.mock.calls.find(([, init]) => init?.method === 'PATCH')!;
     const body = JSON.parse(String(init?.body));
-    expect(body).toMatchObject({ assignedUserId: null, scheduledStart: item.scheduledStart, scheduledEnd: item.scheduledEnd, expectedUpdatedAt: item.updatedAt, expectedTargetFingerprint: item.schedulingTargetFingerprint });
-    expect(body).not.toHaveProperty('schedulingReview');
+    expect(body).toEqual({ notes: item.notes, assignedUserId: null, expectedUpdatedAt: item.updatedAt, expectedTargetFingerprint: item.schedulingTargetFingerprint });
+    for (const key of ['scheduledStart', 'scheduledEnd', 'contactId', 'leadId', 'propertyId', 'type', 'status', 'schedulingReview']) expect(body).not.toHaveProperty(key);
   });
   it('keeps proven pure unassignment eligible when current scheduling reads fail', async () => {
     const { fetch, item } = appointmentSetup(true);
@@ -53,8 +53,8 @@ describe('contractor schedule forms', () => {
     await waitFor(() => expect(fetch.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(1));
     const [, init] = fetch.mock.calls.find(([, init]) => init?.method === 'PATCH')!;
     const body = JSON.parse(String(init?.body));
-    expect(body).toMatchObject({ assignedUserId: null, scheduledStart: item.scheduledStart, scheduledEnd: item.scheduledEnd, expectedUpdatedAt: item.updatedAt, expectedTargetFingerprint: item.schedulingTargetFingerprint });
-    expect(body).not.toHaveProperty('schedulingReview');
+    expect(body).toEqual({ notes: item.notes, assignedUserId: null, expectedUpdatedAt: item.updatedAt, expectedTargetFingerprint: item.schedulingTargetFingerprint });
+    for (const key of ['scheduledStart', 'scheduledEnd', 'contactId', 'leadId', 'propertyId', 'type', 'status', 'schedulingReview']) expect(body).not.toHaveProperty(key);
   });
   it('requires fresh company-zone review for a material start change while retaining explicit unassignment and optimistic proof', async () => {
     const { fetch, item, context } = appointmentSetup();
