@@ -364,6 +364,73 @@ function deltaProof(r, outcome, reconciled = false) {
     p.requiresOwningCleanup === reconciled
   );
 }
+function assertCombinedNativeStorage(proof, code) {
+  const storage = {
+    type: "tmpfs",
+    destination: "/var/lib/postgresql/data",
+    sizeBytes: 536870912,
+    writable: true,
+    volumeMounts: 0,
+  };
+  const inventory = proof.storageInventory;
+  check(
+    inventory &&
+      isDeepStrictEqual(Object.keys(inventory).sort(), [
+        "after",
+        "before",
+        "unchanged",
+      ]) &&
+      inventory.unchanged === true &&
+      isDeepStrictEqual(inventory.before, inventory.after),
+    code,
+  );
+  for (const names of [inventory.before, inventory.after]) {
+    check(
+      Array.isArray(names) &&
+        names.length <= 10000 &&
+        names.every(
+          (name) =>
+            typeof name === "string" &&
+            /^[A-Za-z0-9][A-Za-z0-9_.-]{0,254}$/.test(name),
+        ) &&
+        new Set(names).size === names.length &&
+        isDeepStrictEqual(names, [...names].sort()) &&
+        names.reduce((bytes, name) => bytes + Buffer.byteLength(name) + 1, 0) <=
+          1048576,
+      code,
+    );
+  }
+  check(
+    Array.isArray(proof.storageMountEvidence) &&
+      proof.storageMountEvidence.length === 8,
+    code,
+  );
+  const mounts = new Map(
+    proof.storageMountEvidence.map((entry) => [entry.id, entry]),
+  );
+  check(mounts.size === 8, code);
+  for (const owned of proof.ownedContainers) {
+    check(isDeepStrictEqual(owned.storage, storage), code);
+    const evidence = mounts.get(owned.id);
+    const configured = {
+      Type: "tmpfs",
+      Target: storage.destination,
+      TmpfsOptions: { SizeBytes: storage.sizeBytes, Mode: 448 },
+    };
+    if (Object.hasOwn(evidence?.HostConfig?.Mounts?.[0] ?? {}, "ReadOnly"))
+      configured.ReadOnly = false;
+    check(
+      isDeepStrictEqual(evidence, {
+        runId: owned.runId,
+        name: owned.name,
+        id: owned.id,
+        Mounts: [{ Type: "tmpfs", Destination: storage.destination, RW: true }],
+        HostConfig: { Mounts: [configured] },
+      }),
+      code,
+    );
+  }
+}
 export function validateCombinedLiveOracle(
   rawOracle,
   rawProof,
@@ -484,6 +551,7 @@ export function validateCombinedLiveOracle(
           c.clients,
       code,
     );
+    assertCombinedNativeStorage(proof, code);
     for (const key of ["normal", "lost-commit", "idle-client-error"]) {
       const test = proof.cases?.[key],
         r = test?.result;

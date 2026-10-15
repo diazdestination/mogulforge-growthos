@@ -247,7 +247,15 @@ export async function makeCombinedFixture() {
       id: String(i + 1).repeat(64),
       removed: true,
       loopbackOnly: true,
+      storage: {
+        type: "tmpfs",
+        destination: "/var/lib/postgresql/data",
+        sizeBytes: 536870912,
+        writable: true,
+        volumeMounts: 0,
+      },
     })),
+    storageInventory: { before: [], after: [], unchanged: true },
     transportProofs: Array.from({ length: 3 }, () => ({
       clients: 2,
       clientsClosed: 2,
@@ -307,6 +315,26 @@ export async function makeCombinedFixture() {
       preLockConcurrentDriftRejected: true,
     })),
   };
+  proof.storageMountEvidence = proof.ownedContainers.map(
+    ({ runId, name, id }) => ({
+      runId,
+      name,
+      id,
+      Mounts: [
+        { Type: "tmpfs", Destination: "/var/lib/postgresql/data", RW: true },
+      ],
+      HostConfig: {
+        Mounts: [
+          {
+            Type: "tmpfs",
+            Target: "/var/lib/postgresql/data",
+            ReadOnly: false,
+            TmpfsOptions: { SizeBytes: 536870912, Mode: 448 },
+          },
+        ],
+      },
+    }),
+  );
   return {
     fixtures,
     source,

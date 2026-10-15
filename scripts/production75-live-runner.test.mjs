@@ -17,6 +17,134 @@ const validateCombined = (...args) => {
     throw Error("not_implemented_combined_oracle");
   return combinedRunner.validateCombinedLiveOracle(...args);
 };
+function withSyntheticStorage(p) {
+  for (const owned of p.ownedContainers)
+    owned.storage = {
+      type: "tmpfs",
+      destination: "/var/lib/postgresql/data",
+      sizeBytes: 536870912,
+      writable: true,
+      volumeMounts: 0,
+    };
+  p.storageMountEvidence = p.ownedContainers.map(({ runId, name, id }) => ({
+    runId,
+    name,
+    id,
+    Mounts: [
+      { Type: "tmpfs", Destination: "/var/lib/postgresql/data", RW: true },
+    ],
+    HostConfig: {
+      Mounts: [
+        {
+          Type: "tmpfs",
+          Target: "/var/lib/postgresql/data",
+          ReadOnly: false,
+          TmpfsOptions: { SizeBytes: 536870912, Mode: 448 },
+        },
+      ],
+    },
+  }));
+  p.storageInventory = {
+    before: ["synthetic-existing"],
+    after: ["synthetic-existing"],
+    unchanged: true,
+  };
+  return p;
+}
+test.each([false, true])(
+  "finished combined storage accepts complete synthetic selected evidence (ReadOnly omitted %s)",
+  (omitReadOnly) => {
+    const f = combinedRunnerFixture,
+      p = withSyntheticStorage(structuredClone(f.proof));
+    if (omitReadOnly)
+      for (const e of p.storageMountEvidence)
+        delete e.HostConfig.Mounts[0].ReadOnly;
+    expect(validateCombined(f.oracle, p, f.modules, f.candidate)).toEqual(
+      f.oracle,
+    );
+  },
+);
+test.each([
+  "missing-storage",
+  "volume-storage",
+  "read-only-storage",
+  "wrong-storage-size",
+  "wrong-storage-target",
+  "extra-storage-field",
+  "missing-mount-evidence",
+  "missing-last-mount",
+  "duplicate-mount-identity",
+  "wrong-mount-binding",
+  "actual-volume",
+  "extra-actual-mount",
+  "actual-read-only",
+  "configured-bind",
+  "configured-read-only",
+  "configured-size",
+  "configured-mode",
+  "extra-configured-mount",
+  "extra-retained-field",
+  "missing-inventory",
+  "changed-inventory",
+  "false-unchanged",
+  "duplicate-inventory",
+  "invalid-inventory",
+  "unsorted-inventory",
+  "oversized-inventory",
+  "overcount-inventory",
+  "extra-inventory-field",
+])("finished combined storage refuses %s", (kind) => {
+  const f = combinedRunnerFixture,
+    p = withSyntheticStorage(structuredClone(f.proof));
+  const c = p.ownedContainers[7],
+    e = p.storageMountEvidence[7],
+    v = p.storageInventory;
+  if (kind === "missing-storage") delete c.storage;
+  if (kind === "volume-storage") c.storage.volumeMounts = 1;
+  if (kind === "read-only-storage") c.storage.writable = false;
+  if (kind === "wrong-storage-size") c.storage.sizeBytes++;
+  if (kind === "wrong-storage-target") c.storage.destination = "/other";
+  if (kind === "extra-storage-field") c.storage.unverified = true;
+  if (kind === "missing-mount-evidence") delete p.storageMountEvidence;
+  if (kind === "missing-last-mount") p.storageMountEvidence.pop();
+  if (kind === "duplicate-mount-identity")
+    p.storageMountEvidence[7] = structuredClone(p.storageMountEvidence[0]);
+  if (kind === "wrong-mount-binding") e.runId = p.ownedContainers[0].runId;
+  if (kind === "actual-volume") e.Mounts[0].Type = "volume";
+  if (kind === "extra-actual-mount")
+    e.Mounts.push({ Type: "volume", Destination: "/other", RW: true });
+  if (kind === "actual-read-only") e.Mounts[0].RW = false;
+  if (kind === "configured-bind") e.HostConfig.Mounts[0].Type = "bind";
+  if (kind === "configured-read-only") e.HostConfig.Mounts[0].ReadOnly = true;
+  if (kind === "configured-size")
+    e.HostConfig.Mounts[0].TmpfsOptions.SizeBytes++;
+  if (kind === "configured-mode")
+    e.HostConfig.Mounts[0].TmpfsOptions.Mode = 511;
+  if (kind === "extra-configured-mount")
+    e.HostConfig.Mounts.push(structuredClone(e.HostConfig.Mounts[0]));
+  if (kind === "extra-retained-field")
+    e.HostConfig.Mounts[0].Source = "unverified";
+  if (kind === "missing-inventory") delete p.storageInventory;
+  if (kind === "changed-inventory") v.after.push("synthetic-new");
+  if (kind === "false-unchanged") v.unchanged = false;
+  if (kind === "duplicate-inventory") v.before = v.after = ["same", "same"];
+  if (kind === "invalid-inventory") v.before = v.after = ["../not-a-volume"];
+  if (kind === "unsorted-inventory") v.before = v.after = ["z", "a"];
+  if (kind === "oversized-inventory")
+    v.before = v.after = Array.from(
+      { length: 5000 },
+      (_, i) => `v${String(i).padStart(5, "0")}${"x".repeat(249)}`,
+    );
+  if (kind === "overcount-inventory")
+    v.before = v.after = Array.from(
+      { length: 10001 },
+      (_, i) => `v${String(i).padStart(5, "0")}`,
+    );
+  if (kind === "extra-inventory-field") v.unverified = true;
+  expect(() => validateCombined(f.oracle, p, f.modules, f.candidate)).toThrow(
+    /production75_combined_live_oracle/,
+  );
+});
 test("combined oracle validates full two-layout finished synthetic contract without relabeling legacy proof", () => {
   const f = combinedRunnerFixture;
   expect(validateCombined(f.oracle, f.proof, f.modules, f.candidate)).toEqual(
