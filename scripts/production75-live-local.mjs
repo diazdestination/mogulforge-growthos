@@ -206,6 +206,110 @@ export async function cleanupCombinedLocalContainer(identity, command) {
     ),
   );
 }
+const PGDATA = "/var/lib/postgresql/data",
+  TMPFS_BYTES = 536870912;
+export function production75LocalStorageArguments(combined) {
+  return combined
+    ? [
+        "--mount",
+        "type=tmpfs,destination=/var/lib/postgresql/data,tmpfs-size=536870912,tmpfs-mode=0700",
+      ]
+    : [];
+}
+export function inspectCombinedLocalStorage(inspection, identity) {
+  const code = "production75_operator_local_storage";
+  check(
+    inspection?.Id === identity.id &&
+      inspection.Name === `/${identity.name}` &&
+      inspection.Config?.Labels?.["com.forge.local-test"] === identity.runId &&
+      inspection.Config.Labels["com.forge.fixture-purpose"] ===
+        "production75-local",
+    code,
+  );
+  check(
+    Array.isArray(inspection.Mounts) &&
+      inspection.Mounts.length === 1 &&
+      Array.isArray(inspection.HostConfig?.Mounts) &&
+      inspection.HostConfig.Mounts.length === 1,
+    code,
+  );
+  const mount = inspection.Mounts[0],
+    configured = inspection.HostConfig.Mounts[0];
+  check(
+    mount?.Type === "tmpfs" &&
+      mount.Destination === PGDATA &&
+      mount.RW === true &&
+      configured?.Type === "tmpfs" &&
+      configured.Target === PGDATA &&
+      (configured.ReadOnly === undefined || configured.ReadOnly === false) &&
+      configured.TmpfsOptions?.SizeBytes === TMPFS_BYTES &&
+      configured.TmpfsOptions.Mode === 448,
+    code,
+  );
+  return {
+    storage: {
+      type: mount.Type,
+      destination: mount.Destination,
+      sizeBytes: configured.TmpfsOptions.SizeBytes,
+      writable: mount.RW,
+      volumeMounts: inspection.Mounts.filter((m) => m.Type === "volume").length,
+    },
+    mountEvidence: {
+      Mounts: [
+        { Type: mount.Type, Destination: mount.Destination, RW: mount.RW },
+      ],
+      HostConfig: {
+        Mounts: [
+          {
+            Type: configured.Type,
+            Target: configured.Target,
+            ...(configured.ReadOnly === undefined
+              ? {}
+              : { ReadOnly: configured.ReadOnly }),
+            TmpfsOptions: {
+              SizeBytes: configured.TmpfsOptions.SizeBytes,
+              Mode: configured.TmpfsOptions.Mode,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+const volumeName = (value) =>
+  typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.-]{0,254}$/.test(value);
+const volumeNamesValid = (names) =>
+  Array.isArray(names) &&
+  names.length <= 10000 &&
+  Object.keys(names).length === names.length &&
+  names.every(
+    (name, i) => volumeName(name) && (i === 0 || names[i - 1] < name),
+  );
+export function readCombinedLocalVolumeNames(output) {
+  const code = "production75_operator_local_storage_inventory";
+  check(
+    typeof output === "string" && Buffer.byteLength(output) <= 1048576,
+    code,
+  );
+  const names =
+    output === "" ? [] : output.replace(/\r?\n$/, "").split(/\r?\n/);
+  check(
+    names.length <= 10000 &&
+      names.every(volumeName) &&
+      new Set(names).size === names.length,
+    code,
+  );
+  return names.sort();
+}
+export function assertCombinedLocalStorageInventory(before, after) {
+  check(
+    volumeNamesValid(before) &&
+      volumeNamesValid(after) &&
+      isDeepStrictEqual(before, after),
+    "production75_operator_local_storage_inventory",
+  );
+  return { before: [...before], after: [...after], unchanged: true };
+}
 export function handleOperatorClientErrors(client, onFailure) {
   client.on("error", () => {
     try {
@@ -377,6 +481,7 @@ async function runLocal(combined = false, context = {}) {
   context.receipt = receipt;
   const containers = [],
     clients = [];
+  let storageBefore = null;
   let failed = false;
   const budget = combined ? createCombinedLocalBudget() : null;
   const active = () => {
@@ -488,7 +593,10 @@ async function runLocal(combined = false, context = {}) {
   async function box() {
     active();
     if (combined)
-      check(containers.length < 8, "production75_operator_local_inventory");
+      check(
+        containers.length < 8 && storageBefore !== null,
+        "production75_operator_local_inventory",
+      );
     const nonce = randomUUID(),
       owned = {
         runId: nonce,
@@ -512,6 +620,7 @@ async function runLocal(combined = false, context = {}) {
         "2g",
         "--cpus",
         "2",
+        ...production75LocalStorageArguments(combined),
         "--publish",
         "127.0.0.1::5432",
         "--env",
@@ -529,6 +638,16 @@ async function runLocal(combined = false, context = {}) {
       /^[a-f0-9]{64}$/.test(owned.id),
       "production75_operator_local_container",
     );
+    if (combined) {
+      const inspection = JSON.parse(
+        (await runDocker(["inspect", owned.id])).toString(),
+      );
+      check(
+        Array.isArray(inspection) && inspection.length === 1,
+        "production75_operator_local_storage",
+      );
+      Object.assign(owned, inspectCombinedLocalStorage(inspection[0], owned));
+    }
     let ready = false;
     for (let i = 0; i < 45; i++) {
       try {
@@ -1309,6 +1428,9 @@ async function runLocal(combined = false, context = {}) {
   }
   try {
     if (combined) {
+      storageBefore = readCombinedLocalVolumeNames(
+        (await runDocker(["volume", "ls", "--format", "{{.Name}}"])).toString(),
+      );
       await measureCombinedOracle();
       for (let i = 0; i < nativeLayouts.length; i++)
         await verifyNativeLayout(nativeLayouts[i], i);
@@ -1925,6 +2047,27 @@ async function runLocal(combined = false, context = {}) {
       } catch {
         failed = true;
       }
+    if (combined) {
+      try {
+        const after = readCombinedLocalVolumeNames(
+          (
+            await runDocker(["volume", "ls", "--format", "{{.Name}}"])
+          ).toString(),
+        );
+        receipt.storageInventory = {
+          before: storageBefore,
+          after,
+          unchanged: false,
+        };
+        receipt.storageInventory = assertCombinedLocalStorageInventory(
+          storageBefore,
+          after,
+        );
+      } catch {
+        failed = true;
+        receipt.failureCode ??= "production75_operator_local_storage_inventory";
+      }
+    }
   }
   receipt.transportProofs = combined
     ? combinedTransportProofs
@@ -1951,6 +2094,12 @@ async function runLocal(combined = false, context = {}) {
   receipt.status = failed ? "FAILED" : "PASS";
   receipt.finishedAt = new Date().toISOString();
   if (combined) {
+    receipt.storageMountEvidence = containers.map((b) => ({
+      runId: b.runId,
+      name: b.name,
+      id: b.id,
+      ...b.mountEvidence,
+    }));
     receipt.containerCleanupEvidence = containers.map((b) => ({
       runId: b.runId,
       attempted: b.__cleanupAttempted === true,
@@ -1962,6 +2111,7 @@ async function runLocal(combined = false, context = {}) {
       id: b.id,
       removed: b.__removed === true,
       loopbackOnly: b.loopbackOnly === true,
+      storage: b.storage,
     }));
     if (!failed) {
       try {

@@ -170,6 +170,159 @@ test("combined cleanup never retries an actual rejected removal in the reserved 
   ]);
 });
 
+const storageIdentity = {
+  id: "b".repeat(64),
+  runId: "87654321-1234-4123-8123-123456789012",
+  name: "production75-local-123-87654321",
+};
+const storageInspection = () => ({
+  Id: storageIdentity.id,
+  Name: `/${storageIdentity.name}`,
+  Config: {
+    Env: ["FICTIONAL_PRIVATE=must-never-be-retained"],
+    Labels: {
+      "com.forge.local-test": storageIdentity.runId,
+      "com.forge.fixture-purpose": "production75-local",
+    },
+  },
+  Mounts: [
+    {
+      Type: "tmpfs",
+      Source: "",
+      Destination: "/var/lib/postgresql/data",
+      RW: true,
+      Propagation: "",
+    },
+  ],
+  HostConfig: {
+    Mounts: [
+      {
+        Type: "tmpfs",
+        Target: "/var/lib/postgresql/data",
+        ReadOnly: false,
+        TmpfsOptions: { SizeBytes: 536870912, Mode: 448 },
+      },
+    ],
+  },
+});
+
+test("combined container arguments explicitly replace implicit PGDATA volumes within the existing memory cap", () => {
+  expect(typeof local.production75LocalStorageArguments).toBe("function");
+  expect(local.production75LocalStorageArguments(false)).toEqual([]);
+  expect(local.production75LocalStorageArguments(true)).toEqual([
+    "--mount",
+    "type=tmpfs,destination=/var/lib/postgresql/data,tmpfs-size=536870912,tmpfs-mode=0700",
+  ]);
+});
+
+test("actual owned tmpfs inspection produces bounded storage and only selected redacted mount evidence", () => {
+  expect(typeof local.inspectCombinedLocalStorage).toBe("function");
+  const actual = local.inspectCombinedLocalStorage(
+    storageInspection(),
+    storageIdentity,
+  );
+  expect(actual.storage).toEqual({
+    type: "tmpfs",
+    destination: "/var/lib/postgresql/data",
+    sizeBytes: 536870912,
+    writable: true,
+    volumeMounts: 0,
+  });
+  expect(actual.mountEvidence.Mounts).toEqual([
+    { Type: "tmpfs", Destination: "/var/lib/postgresql/data", RW: true },
+  ]);
+  expect(actual.mountEvidence.HostConfig.Mounts[0].TmpfsOptions).toEqual({
+    SizeBytes: 536870912,
+    Mode: 448,
+  });
+  expect(JSON.stringify(actual)).not.toContain("FICTIONAL_PRIVATE");
+  expect(JSON.stringify(actual)).not.toContain('"Env"');
+});
+
+test.each([
+  "implicit-volume",
+  "wrong-destination",
+  "wrong-size",
+  "read-only",
+  "configured-read-only",
+  "bind",
+  "wrong-mode",
+  "missing-config",
+  "wrong-owner",
+])("pre-SQL storage admission refuses %s", (kind) => {
+  const actual = storageInspection();
+  if (kind === "implicit-volume") actual.Mounts[0].Type = "volume";
+  if (kind === "wrong-destination")
+    actual.Mounts[0].Destination = actual.HostConfig.Mounts[0].Target =
+      "/other";
+  if (kind === "wrong-size")
+    actual.HostConfig.Mounts[0].TmpfsOptions.SizeBytes++;
+  if (kind === "read-only") actual.Mounts[0].RW = false;
+  if (kind === "configured-read-only")
+    actual.HostConfig.Mounts[0].ReadOnly = true;
+  if (kind === "bind")
+    actual.Mounts.push({ Type: "bind", Destination: "/other", RW: true });
+  if (kind === "wrong-mode")
+    actual.HostConfig.Mounts[0].TmpfsOptions.Mode = 511;
+  if (kind === "missing-config") actual.HostConfig.Mounts = [];
+  if (kind === "wrong-owner")
+    actual.Config.Labels["com.forge.local-test"] =
+      "ffffffff-1234-4123-8123-123456789012";
+  expect(() =>
+    local.inspectCombinedLocalStorage(actual, storageIdentity),
+  ).toThrow(/production75_operator_local_storage/);
+});
+
+test("native volume inventory normalizes actual CLI order and admits unchanged unique bounded names", () => {
+  expect(typeof local.readCombinedLocalVolumeNames).toBe("function");
+  expect(typeof local.assertCombinedLocalStorageInventory).toBe("function");
+  const before = local.readCombinedLocalVolumeNames("existing-b\nexisting-a\n");
+  const after = local.readCombinedLocalVolumeNames(
+    "existing-a\r\nexisting-b\r\n",
+  );
+  expect(local.assertCombinedLocalStorageInventory(before, after)).toEqual({
+    before: ["existing-a", "existing-b"],
+    after: ["existing-a", "existing-b"],
+    unchanged: true,
+  });
+});
+
+test.each([
+  "changed",
+  "duplicate",
+  "invalid-name",
+  "too-many",
+  "too-long",
+  "unsorted",
+])(
+  "storage inventory admission refuses %s without resource mutation",
+  (kind) => {
+    const before = ["existing-a"],
+      after = ["existing-a"];
+    if (kind === "changed") after.push("unexpected-anonymous-volume");
+    if (kind === "duplicate") after.push("existing-a");
+    if (kind === "invalid-name") after[0] = "../volume";
+    if (kind === "too-many")
+      after.push(
+        ...Array.from(
+          { length: 10000 },
+          (_, i) => `v${String(i).padStart(5, "0")}`,
+        ),
+      );
+    if (kind === "too-long") after[0] = "a".repeat(256);
+    if (kind === "unsorted") {
+      before.push("existing-b");
+      after.push("existing-0");
+    }
+    // Equal malformed inventories must still refuse; equality alone cannot
+    // stand in for name, uniqueness, bounds or strict-order validation.
+    if (kind !== "changed") before.splice(0, before.length, ...after);
+    expect(() =>
+      local.assertCombinedLocalStorageInventory(before, after),
+    ).toThrow(/production75_operator_local_storage/);
+  },
+);
+
 test.each([
   "unfinished",
   "layout",
