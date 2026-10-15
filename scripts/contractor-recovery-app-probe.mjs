@@ -258,6 +258,12 @@ try {
   assert.equal(mutation.status, 405); await mutation.arrayBuffer();
   const callieMutation = await fetch(`${origin}/api/v1/communications/callie/${callie.intake}/office-action`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: '{}' });
   assert.equal(callieMutation.status, 405); await callieMutation.arrayBuffer();
+  // Explanation is logically read-only, but restore inspection still denies POST.
+  check = 'restored_scheduling_explanation_post_rejected';
+  const explanation = await fetch(`${origin}/api/v1/scheduling/conflict-explanation`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: '{}' });
+  assert.equal(explanation.status, 405);
+  assert.equal(explanation.ok, false);
+  assert.deepEqual(await explanation.json(), { error: 'Restore drill permits read-only inspection only' });
   let receptionReadChecks = 0;
   for (const [index, slug] of CALLIE_CONVERSATION_RECOVERY_SLUGS.entries()) {
     const reception = callieConversationFixtureIds(slug);
@@ -376,7 +382,7 @@ try {
     const write=await fetch(`${origin}/api/v1/customer-work/projects`,{method:'POST',headers:{...workHeaders,'content-type':'application/json'},body:'{}'});assert.equal(write.status,405);await write.arrayBuffer();
     assert.equal(databaseFailed,false);
   }
-  process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, readOnlySchedulingHeldVerified:true, tenantBoundariesVerified: true, customerWorkspaceVerified: true, callieConversationReadVerified: true, workdayReadVerified: true, returningCustomerReadVerified:true, returningV3UnknownReadVerified:true, readChecks: good.length + receptionReadChecks + workdayReadChecks + returningReadChecks, writeBlocked: true })}\n`);
+  process.stdout.write(`${JSON.stringify({ appBootVerified: true, readOnlyDatabaseVerified: true, readOnlySchedulingHeldVerified:true, restoredSchedulingExplanationPostStatus: explanation.status, restoredSchedulingExplanationSucceeded: explanation.ok, tenantBoundariesVerified: true, customerWorkspaceVerified: true, callieConversationReadVerified: true, workdayReadVerified: true, returningCustomerReadVerified:true, returningV3UnknownReadVerified:true, readChecks: good.length + receptionReadChecks + workdayReadChecks + returningReadChecks, writeBlocked: true })}\n`);
   }
 } catch (error) {
   // No response body, URL with credentials, SQL parameters or record content.

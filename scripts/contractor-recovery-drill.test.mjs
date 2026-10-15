@@ -41,6 +41,8 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.tableCounts.invoices).toBe(8);
   expect(result.tableCounts.invoice_receipt_allocations).toBe(10);
   expect(result.readChecks).toBe(91);
+  expect(result.restoredSchedulingExplanationPostStatus).toBe(405);
+  expect(result.restoredSchedulingExplanationSucceeded).toBe(false);
   expect(result.workdayConstraintChecks).toBe(16);
   expect(result.workdayCapturedHistoryPreserved).toBe(true);
   expect(result.workdayImmutableRevisionPreserved).toBe(true);

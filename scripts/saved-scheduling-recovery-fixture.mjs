@@ -7,8 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { tsImport } from 'tsx/esm/api';
 import { readVerifiedSchedulingPredecessors, verifySqlPin } from './saved-scheduling-schema-preview.mjs';
 
-export const SCHEDULING_PRODUCTION_BASE = '2901da320e41a47e77cc86e97d2c2f59fffa824d';
-export const SCHEDULING_PRODUCTION_TREE = 'f858832a833233ecf2f3844ad6222f0e6bbdcc8d';
+export const SCHEDULING_PRODUCTION_BASE = 'f56e6cef452b5b564838a72202c0d37cd2caf384';
+export const SCHEDULING_PRODUCTION_TREE = '3e55c4fc984f64ac1fe187f109bf4323d0586a5e';
 const root = fileURLToPath(new URL('../', import.meta.url));
 export const schedulingHash = value => createHash('sha256').update(typeof value === 'string' || Buffer.isBuffer(value) ? value : JSON.stringify(value)).digest('hex');
 const ident = value => { assert.match(value,/^[a-z_][a-z0-9_]*$/); return `"${value}"`; };
