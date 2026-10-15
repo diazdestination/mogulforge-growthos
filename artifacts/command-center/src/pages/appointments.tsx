@@ -613,6 +613,20 @@ function companyLabel(
     return 'Company time unavailable';
   }
 }
+function appointmentRefusalExplanation(code?: string | null): string {
+  switch (code) {
+    case 'travel_conflict':
+      return 'The original appointment conflicts with assigned staff work or the required travel gap. Acknowledge this refusal, then review a different interval or assignment.';
+    case 'company_capacity_conflict':
+      return 'The original appointment would exceed the company reservation limit. Acknowledge this refusal, then review a different interval.';
+    case 'inspection_capacity_conflict':
+      return 'The original appointment would exceed the inspection reservation limit. Acknowledge this refusal, then review a different interval.';
+    case 'stale_scheduling_review':
+      return 'The scheduling rules or appointment details changed after the original review. Acknowledge this refusal, refresh scheduling review, then review the appointment again.';
+    default:
+      return 'The original appointment could not be admitted for the reviewed request. Acknowledge this refusal before reviewing a new appointment.';
+  }
+}
 function appointmentInterval(appt?: Appointment | null): IntervalInput {
   const raw = appt?.schedulingReservation;
   const parsed = reservationSnapshotSchema.safeParse(raw);
@@ -1194,10 +1208,13 @@ function ApptFormModal({
                 Another booking is held.
               </p>
             ) : manual.state.kind === 'refused' ? (
-              <p>
-                Original appointment was refused with authoritative no-commit
-                proof. Its original operation remains terminal.
-              </p>
+              <>
+                <p>
+                  Original appointment was refused with authoritative no-commit
+                  proof. Its original operation remains terminal.
+                </p>
+                <p>{appointmentRefusalExplanation(manual.state.ack?.refusalCode)}</p>
+              </>
             ) : busy ? (
               <p>Retaining and checking the original appointment command…</p>
             ) : null}
