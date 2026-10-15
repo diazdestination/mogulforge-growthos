@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { z } from "zod";
+import { closedPolicyExportSchema, closedBusinessSchedulingSummarySchema } from "@workspace/scheduling-core";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,17 +14,29 @@ const statusSchema = z.object({
   deletionPerformed: z.literal(false), billingChanged: z.literal(false),
 }).refine((status) => status.automationAllowed === (status.state === "active") &&
   (status.state !== "offboarding_requested" || Boolean(status.requestId && status.requestedAt)));
+const exportDatasets = ["contacts", "properties", "customer_work_roots", "leads", "estimates", "projects", "crm_tasks", "appointments", "service_obligations", "activities", "service_watch_cases", "consent_records", "suppressions", "value_entries", "invoices", "invoice_receipt_allocations", "invoice_operations", "financial_migration_items", "revenue_executions", "revenue_execution_events", "stored_objects", "property_assets", "work_checklist_templates", "work_checklist_revisions", "appointment_work_completions", "appointment_work_entries", "appointment_work_photos", "estimate_email_receipts"] as const;
+const exportDigest = z.string().regex(/^[a-f0-9]{64}$/);
+const exportCount = z.number().int().min(0).max(2000);
 const exportSchema = z.object({
   format: z.literal("growthos-core-customer-export"), version: z.literal(1), exportId: z.string().uuid(),
-  generatedAt: z.string(), organization: z.object({ id: z.string().uuid(), name: z.string(), slug: z.string(), created_at: z.string() }),
+  generatedAt: z.string(), organization: z.object({ id: z.string().uuid(), name: z.string(), slug: z.string(), created_at: z.string(),
+    schedulingPolicy: closedPolicyExportSchema.nullable(), schedulingHistory: z.array(closedBusinessSchedulingSummarySchema).max(2000),
+  }),
   manifest: z.object({ scope: z.literal("core_customer_records"), completeAccountExport: z.literal(false), deletionPerformed: z.literal(false),
     rowsPerTableLimit: z.literal(2000), byteLimit: z.literal(10 * 1024 * 1024),
-    tables: z.array(z.object({ table: z.string(), fields: z.array(z.string()), count: z.number().int().min(0).max(2000), withheldInvalidLinks: z.number().int().min(0) })).length(18),
-    exclusions: z.array(z.string()), dataSha256: z.string().regex(/^[a-f0-9]{64}$/), followUp: z.string(),
+    tables: z.array(z.object({ table: z.enum(exportDatasets), fields: z.array(z.string()), count: exportCount, withheldInvalidLinks: z.number().int().min(0) })).length(exportDatasets.length),
+    schedulingPolicy: z.strictObject({ state: z.enum(["unconfigured", "invalid", "versioned"]) }),
+    schedulingHistory: z.strictObject({ count: exportCount, withheldInvalidLinks: exportCount, withheldInvalidRecords: exportCount }),
+    schedulingPolicySha256: exportDigest, schedulingHistorySha256: exportDigest,
+    exclusions: z.array(z.string()), dataSha256: exportDigest, followUp: z.string(),
   }), data: z.record(z.string(), z.array(z.record(z.string(), z.unknown()))),
-}).refine(({ data, manifest }) => new Set(manifest.tables.map((table) => table.table)).size === 18 &&
-  Object.keys(data).length === 18 && manifest.tables.every((table) => data[table.table]?.length === table.count &&
+}).refine(({ data, manifest, organization }) => new Set(manifest.tables.map((table) => table.table)).size === exportDatasets.length &&
+  Object.keys(data).length === exportDatasets.length && exportDatasets.every(table => Object.hasOwn(data, table)) &&
+  (manifest.schedulingPolicy.state === "versioned") === (organization.schedulingPolicy !== null) &&
+  manifest.schedulingHistory.count === organization.schedulingHistory.length &&
+  manifest.tables.every((table) => data[table.table]?.length === table.count &&
     data[table.table].every((row) => Object.keys(row).every((field) => table.fields.includes(field)))));
+
 type Status = z.infer<typeof statusSchema>;
 type Action = "pause" | "resume" | "request_offboarding" | "cancel_offboarding";
 type Operation = "status" | "export" | "transition";
@@ -125,7 +138,7 @@ function CompanyControls() {
         <details className="text-sm">
           <summary className="cursor-pointer font-medium underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">Included records and limits</summary>
           <div className="max-w-prose space-y-2 pt-3 text-muted-foreground">
-            <p>The 18 datasets cover contacts, properties, leads, estimates, projects, tasks, appointments, warranty and recurring service records, invoices and their receipt allocations and history, activity text, consent, suppressions, value entries, execution receipts and events, and stored-media metadata.</p>
+            <p>The 28 datasets cover contacts, properties, leads, estimates, projects, tasks, appointments, warranty and recurring service records, invoices and their receipt allocations and history, activity text, consent, suppressions, value entries, execution receipts and events, and stored-media metadata.</p>
             <p>Up to 2,000 records per dataset and 10 MB before formatting. Larger exports fail without producing a partial file. Records with unverified relationships are withheld and counted in the file.</p>
             <p>Passwords, tokens, API keys, opaque metadata and staff identities are excluded. Photo files, full email conversations, website submissions, automation queues, provider copies, backups and other account tables need operator review.</p>
             <p>Ask your GrowthOS operator for an expanded export covering any excluded data you need.</p>

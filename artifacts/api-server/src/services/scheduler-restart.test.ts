@@ -86,7 +86,9 @@ it("restarts after a real worker crash without repeating its committed effect an
           name: "bundle-workspace-typescript",
           setup(builder) {
             builder.onResolve(
-              { filter: /^(@workspace\/|drizzle-zod$)/ },
+              // Keep the nested Temporal runtime closure in the child bundle;
+              // its pnpm-only resolution context is lost at the cache output.
+              { filter: /^(@workspace\/|drizzle-zod$|@js-temporal\/polyfill$|jsbi$)/ },
               (args) => ({
                 path: require.resolve(args.path, { paths: [args.resolveDir] }),
               }),

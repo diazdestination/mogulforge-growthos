@@ -423,3 +423,65 @@ describe("getInspectionAvailability sanitization", () => {
     expect(avail.blackoutDates).toEqual(["2026-12-25"]);
   });
 });
+
+describe("shared inspection offer population", () => {
+  const availability = { ...DEFAULT_INSPECTION_AVAILABILITY, timezone: "UTC", days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], windows: [{ startHour: 9, endHour: 11 }], blackoutDates: [] };
+  it("does not count a different appointment type as inspection capacity", async () => {
+    const org = await makeOrg({ ...availability, maxBookingsPerWindow: 1 });
+    const [slot] = await generateInspectionSlots(org);
+    await db.insert(appointmentsTable).values({ organizationId: org, type: "other", status: "scheduled", scheduledStart: new Date(slot.start), scheduledEnd: new Date(slot.end) });
+    expect((await generateInspectionSlots(org)).map(x => x.start)).toContain(slot.start);
+  });
+  it("finds an inspection that started before now and still spans the offered window", async () => {
+    const org = await makeOrg({ ...availability, maxBookingsPerWindow: 1 });
+    const [slot] = await generateInspectionSlots(org);
+    await db.insert(appointmentsTable).values({ organizationId: org, type: "inspection", status: "confirmed", scheduledStart: new Date(Date.now() - 86400000), scheduledEnd: new Date(slot.end) });
+    expect((await generateInspectionSlots(org)).map(x => x.start)).not.toContain(slot.start);
+  });
+  it("uses true peak for the same offer and final insertion", async () => {
+    const org = await makeOrg({ ...availability, maxBookingsPerWindow: 2 });
+    const [slot] = await generateInspectionSlots(org);
+    const middle = new Date((Date.parse(slot.start) + Date.parse(slot.end)) / 2);
+    await db.insert(appointmentsTable).values([
+      { organizationId: org, type: "inspection", status: "scheduled", scheduledStart: new Date(slot.start), scheduledEnd: middle },
+      { organizationId: org, type: "inspection", status: "confirmed", scheduledStart: middle, scheduledEnd: new Date(slot.end) },
+    ]);
+    expect((await generateInspectionSlots(org)).map(x => x.start)).toContain(slot.start);
+    expect(await bookInspectionSlot({ organizationId: org, slot })).not.toBeNull();
+  });
+});
+
+describe("exact independent rule-zone calendar windows",()=>{
+  afterEach(()=>vi.useRealTimers());
+  const everyDay=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  it.each([{now:"2035-03-10T12:00:00Z",date:"2035-03-11",start:2,end:4},{now:"2035-11-03T12:00:00Z",date:"2035-11-04",start:1,end:3}])("skips gap/fold endpoints on $date while retaining ordinary windows",async({now,date,start,end})=>{
+    vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date(now));
+    const org=await makeOrg({timezone:"America/New_York",days:everyDay,windows:[{startHour:start,endHour:end},{startHour:9,endHour:11}],blackoutDates:[],maxBookingsPerWindow:2});
+    const slots=await generateInspectionSlots(org),sameDay=slots.filter(slot=>localParts(new Date(slot.start),"America/New_York").date===date);
+    expect(sameDay).toHaveLength(1);expect(localParts(new Date(sameDay[0].start),"America/New_York").hour).toBe(9);
+    expect(await bookInspectionSlot({organizationId:org,slot:sameDay[0]})).not.toBeNull();
+  });
+  it("retains independent rule-zone midnight endpoints and company-zone labels",async()=>{
+    vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date("2035-01-01T12:00:00Z"));
+    const org=await makeOrg({timezone:"Asia/Kolkata",days:everyDay,windows:[{startHour:22,endHour:24}],blackoutDates:[],maxBookingsPerWindow:2});
+    await db.update(organizationsTable).set({timezone:"America/Los_Angeles"}).where(eq(organizationsTable.id,org));
+    const [slot]=await generateInspectionSlots(org);
+    expect(slot).toMatchObject({start:"2035-01-02T16:30:00.000Z",end:"2035-01-02T18:30:00.000Z"});
+    expect(slot.label).toBe("Tue, Jan 2, 8:30 AM–10:30 AM (America/Los_Angeles; inspection rules: Asia/Kolkata)");
+    expect(await bookInspectionSlot({organizationId:org,slot})).not.toBeNull();
+    for(const delta of [1,1000,60000])expect(await bookInspectionSlot({organizationId:org,slot:{start:new Date(Date.parse(slot.start)+delta).toISOString(),end:new Date(Date.parse(slot.end)+delta).toISOString()}})).toBeNull();
+  });
+  it("offers only the fourteenth local date when the first thirteen are blacked out",async()=>{
+    vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date("2035-01-01T23:30:00Z"));
+    const org=await makeOrg({timezone:"Asia/Kolkata",days:everyDay,windows:[{startHour:9,endHour:11}],blackoutDates:Array.from({length:13},(_,i)=>`2035-01-${String(i+3).padStart(2,"0")}`),maxBookingsPerWindow:2});
+    const slots=await generateInspectionSlots(org);expect(slots.map(slot=>localParts(new Date(slot.start),"Asia/Kolkata").date)).toEqual(["2035-01-16"]);
+  });
+  it("uses the legacy two-hour effective end and active inspection statuses only",async()=>{
+    const org=await makeOrg({timezone:"UTC",days:everyDay,windows:[{startHour:9,endHour:11}],blackoutDates:[],maxBookingsPerWindow:1}),[slot]=await generateInspectionSlots(org);
+    const [legacy]=await db.insert(appointmentsTable).values({organizationId:org,type:"inspection",status:"scheduled",scheduledStart:new Date(slot.start),scheduledEnd:null}).returning();
+    expect((await generateInspectionSlots(org)).map(x=>x.start)).not.toContain(slot.start);
+    await db.update(appointmentsTable).set({status:"no_show"}).where(eq(appointmentsTable.id,legacy.id));
+    expect((await generateInspectionSlots(org)).map(x=>x.start)).toContain(slot.start);
+    expect(await bookInspectionSlot({organizationId:org,slot})).not.toBeNull();
+  });
+});

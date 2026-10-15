@@ -1,0 +1,66 @@
+{
+  "capturedAt": "2026-10-15T01:17:57.623Z",
+  "phase": "old-pin-red-clean-pre-edit",
+  "productionSource": {
+    "commit": "2a62bf754204b7a218249acba6abe32e656d2ce1",
+    "tree": "dc7a1895f43dc992d24c0908f8d5feae74c74f6f"
+  },
+  "harness": {
+    "commit": "2a62bf754204b7a218249acba6abe32e656d2ce1",
+    "tree": "dc7a1895f43dc992d24c0908f8d5feae74c74f6f",
+    "dirtyScope": [],
+    "trackedDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "productScopeDiffBytes": 0,
+  "oldPinProductScopeDiffBytes": 82749,
+  "sourceFiles": [
+    {
+      "path": "scripts/saved-scheduling-recovery-fixture.mjs",
+      "gitBlob": "307be2347485a82703f225a5c7dda5182943c369",
+      "gitSha256": "89e960e9db7d40fbc6bfa4891ea85ce5cb4b871c2bfd68afa56d2ebb532c52e1",
+      "workingSha256": "198dd4432bed4e4f8fa44a927ed0eebbc2d14e515286f9a5d9a4ec2c57306519"
+    },
+    {
+      "path": "scripts/contractor-recovery-drill.mjs",
+      "gitBlob": "febe0f6e0691f3aa809f3d470b8d7973aaaac29d",
+      "gitSha256": "06bfaab57255357ab249ff5c82785c305dc51e8a09eb58b5e5a54a2e9e98ccae",
+      "workingSha256": "e5f9f09e9c95faa12e35ce9f48b5a4f868b7c592b5ea4112c60531eddfc5bc38"
+    },
+    {
+      "path": "scripts/contractor-recovery-app-probe.mjs",
+      "gitBlob": "80e63b56ce4b22e536e4a8131f9064e49a83a5e0",
+      "gitSha256": "b44db46d9088eeda6bc937ffe6c5f3bddfc0c3178857848137880817646fce9f",
+      "workingSha256": "bff23c748f3000e696dc7cfe0421596d4d3ccdd2673ac9f31d51c0b7b2fcdd19"
+    },
+    {
+      "path": "scripts/release-schema.mjs",
+      "gitBlob": "94dd2afa4dd6cb349e93cc4af40ce0f47a489c25",
+      "gitSha256": "d2ddfc8c040144632e949117d1dcb851d678d6c1626f56344e448d065c5b79b8",
+      "workingSha256": "4eebd5977ef899e8d4105f5dccf98338a40bf543ffb025d0346d2b95efeaa73b"
+    },
+    {
+      "path": "artifacts/api-server/build.mjs",
+      "gitBlob": "1c730d91d09f651e0ac6eeafcff7eff8cac68f44",
+      "gitSha256": "7a630e8c1e0df733f518f9d6b4ee51966c47f580fe7e129460ad80a950f147fc",
+      "workingSha256": "2639e7104a5005e8abcae9b54b5a198ecc7db72b578f4391a21eb2657e253cf6"
+    },
+    {
+      "path": "artifacts/api-server/build-identity.mjs",
+      "gitBlob": "ab91f01a6cce56bf317863c9d7879ed4fb9e01a8",
+      "gitSha256": "88b5c1ef603f8d953e83c14a53ed6876b39fd8dc8f18ee8ac17b405ffbadea14",
+      "workingSha256": "d904c927a4b7019b34e9af1cf50546f5e1cde6935f57ebccd7789b36686ca50c"
+    },
+    {
+      "path": "artifacts/api-server/scripts/contractor-recovery-entry.ts",
+      "gitBlob": "33f484ec1bc75202b18b42d883638e50791fe6bd",
+      "gitSha256": "cc98de0cca7c586aa38b09c1bea734056938cd9474152872b8eb6eae421a2b5d",
+      "workingSha256": "3fd6c60fac0e140a011aa4b83db3413e5c04ac84f47ec29293efb0321cb54244"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "gitBlob": "14f8cb317178369bd995cb25258bf9d4529b5c82",
+      "gitSha256": "1ce9d652f019f2c906a0d0952cd3571761062214629a08253ec99777dd477c06",
+      "workingSha256": "e2ec957648e72701ca0db297dc2f1b2f250762643dfdddd44ad51db440973b2e"
+    }
+  ]
+}

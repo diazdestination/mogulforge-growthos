@@ -86,6 +86,9 @@ export const workProject = (
   crewUserIds: [],
   crewNotes: "Original crew notes",
   completedAt: null,
+  schedulingReservation: null,
+  schedulingEvidence: "legacy",
+  schedulingTargetFingerprint: "a".repeat(64),
   ...dates,
   ...overrides,
 });

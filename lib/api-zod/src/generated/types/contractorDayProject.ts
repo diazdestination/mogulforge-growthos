@@ -5,6 +5,8 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+import type { ContractorDayProjectSchedulingEvidence } from './contractorDayProjectSchedulingEvidence';
+import type { ReservationSnapshot } from './reservationSnapshot';
 
 export interface ContractorDayProject {
   id: string;
@@ -20,4 +22,15 @@ export interface ContractorDayProject {
   scheduledEnd: Date | null;
   customerWorkId?: string | null;
   contactId?: string;
+  schedulingReservation?: ReservationSnapshot | null;
+  schedulingEvidence?: ContractorDayProjectSchedulingEvidence;
+  /** @pattern ^[a-f0-9]{64}$ */
+  schedulingTargetFingerprint?: string;
+  schedulingCompanyTimeZone?: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @nullable
+     */
+  schedulingPolicyRevision?: number | null;
 }

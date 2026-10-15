@@ -1,4 +1,6 @@
-import { jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { check, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import type { SchedulingPolicy } from "@workspace/scheduling-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { organizationsTable } from "./organizations";
@@ -407,6 +409,7 @@ export const orgSettingsTable = pgTable(
       .default([]),
     leadScoring: jsonb("lead_scoring").$type<LeadScoringSettings | null>(),
     inspectionAvailability: jsonb("inspection_availability").$type<InspectionAvailabilitySettings | null>(),
+    schedulingPolicy: jsonb("scheduling_policy").$type<SchedulingPolicy>(),
     appointmentReminder: jsonb("appointment_reminder").$type<Partial<AppointmentReminderSettings> | null>(),
     aiInstructions: text("ai_instructions"),
     /**
@@ -444,13 +447,41 @@ export const orgSettingsTable = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (table) => [uniqueIndex("org_settings_org_idx").on(table.organizationId)],
+  (table) => [
+    uniqueIndex("org_settings_org_idx").on(table.organizationId),
+    // SQL protects the envelope's types and technical bounds. Core/admission
+    // validates closed keys, uniqueness, canonical zones/digests and provenance.
+    check("org_settings_scheduling_policy_ck", sql`${table.schedulingPolicy} is null or coalesce((
+      jsonb_typeof(${table.schedulingPolicy}) = 'object'
+      and ${table.schedulingPolicy}->'formatVersion' = '1'::jsonb
+      and case when jsonb_typeof(${table.schedulingPolicy}->'revision') = 'number' then
+        (${table.schedulingPolicy}->>'revision')::numeric between 1 and 9007199254740991
+        and trunc((${table.schedulingPolicy}->>'revision')::numeric) = (${table.schedulingPolicy}->>'revision')::numeric else false end
+      and jsonb_typeof(${table.schedulingPolicy}->'enabled') = 'boolean'
+      and jsonb_typeof(${table.schedulingPolicy}->'timeZone') = 'string'
+      and case when jsonb_typeof(${table.schedulingPolicy}->'minimumTravelGapMinutes') = 'number' then
+        (${table.schedulingPolicy}->>'minimumTravelGapMinutes')::numeric between 0 and 1440
+        and trunc((${table.schedulingPolicy}->>'minimumTravelGapMinutes')::numeric) = (${table.schedulingPolicy}->>'minimumTravelGapMinutes')::numeric else false end
+      and case when jsonb_typeof(${table.schedulingPolicy}->'maxConcurrentReservations') = 'null' then true
+        when jsonb_typeof(${table.schedulingPolicy}->'maxConcurrentReservations') = 'number' then
+        (${table.schedulingPolicy}->>'maxConcurrentReservations')::numeric between 1 and 100
+        and trunc((${table.schedulingPolicy}->>'maxConcurrentReservations')::numeric) = (${table.schedulingPolicy}->>'maxConcurrentReservations')::numeric else false end
+      and case when jsonb_typeof(${table.schedulingPolicy}->'durationPresets') = 'array' then
+        jsonb_array_length(${table.schedulingPolicy}->'durationPresets') <= 50
+        and jsonb_array_length(jsonb_path_query_array(${table.schedulingPolicy}->'durationPresets', 'strict $[*] ? (@.type() == "object" && exists(@.id ? (@.type() == "string")) && exists(@.label ? (@.type() == "string" && @ like_regex "^.{1,80}$" flag "s" && !(@ like_regex "^[[:space:]]*$"))) && exists(@.elapsedMinutes ? (@.type() == "number" && @ >= 1 && @ <= 1440 && @ % 1 == 0)))', '{}'::jsonb, true)) = jsonb_array_length(${table.schedulingPolicy}->'durationPresets')
+        else false end
+      and jsonb_typeof(${table.schedulingPolicy}->'digest') = 'string'
+      and jsonb_typeof(${table.schedulingPolicy}->'updatedAt') = 'string'
+      and jsonb_typeof(${table.schedulingPolicy}->'updatedByUserId') = 'string'
+    ), false)`),
+  ],
 );
 
 export const insertOrgSettingsSchema = createInsertSchema(orgSettingsTable).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  schedulingPolicy: true,
 });
 export type InsertOrgSettings = z.infer<typeof insertOrgSettingsSchema>;
 export type OrgSettings = typeof orgSettingsTable.$inferSelect;

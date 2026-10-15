@@ -7,7 +7,7 @@ const userId = 'synthetic-export-owner';
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
-function clientFixture(block?: 'authorization' | 'audit' | 'commit' | 'cleanup', revoked = false) {
+function clientFixture(block?: 'authorization' | 'audit' | 'commit' | 'cleanup' | 'scheduling-policy' | 'scheduling-history', revoked = false) {
   const queries: string[] = [];
   const end = vi.fn(async () => { if (block === 'cleanup') await new Promise(() => undefined); });
   const client = {
@@ -15,6 +15,7 @@ function clientFixture(block?: 'authorization' | 'audit' | 'commit' | 'cleanup',
     query: vi.fn(async (input: { text: string; values: unknown[] }) => {
       const text = input.text; queries.push(text);
       if ((block === 'authorization' && text.endsWith('FOR SHARE')) || (block === 'audit' && text.startsWith('INSERT')) || (block === 'commit' && text === 'COMMIT')) await new Promise(() => undefined);
+      if ((block === 'scheduling-policy' && text.includes('FROM public.org_settings')) || (block === 'scheduling-history' && text.includes('action=ANY'))) await new Promise(() => undefined);
       if (text.startsWith('SELECT id FROM public.users')) return { rows: revoked && text.endsWith('FOR SHARE') ? [] : [{ id: userId }] };
       if (text.startsWith('SELECT id, name')) return { rows: [{ id: orgId, name: 'Synthetic export company', slug: 'synthetic-export', created_at: new Date(0) }] };
       return { rows: [] };
@@ -44,6 +45,13 @@ it.each(['authorization', 'audit', 'commit'] as const)('bounds a stalled post-sn
   await assertion;
   expect(fixture.queries).toContain('ROLLBACK');
   expect(fixture.end).toHaveBeenCalledTimes(1);
+});
+
+it.each(['scheduling-policy','scheduling-history'] as const)('bounds stalled %s snapshot reads and emits no successful export audit',async phase=>{
+  const fixture=clientFixture(phase);const result=createCustomerLifecycleExporter({createClient:()=>fixture.client})(orgId,userId);
+  const assertion=expect(result).rejects.toMatchObject({status:503,code:'customer_export_unavailable'});
+  await vi.advanceTimersByTimeAsync(20_000);await assertion;
+  expect(fixture.queries.some(q=>q.startsWith('INSERT'))).toBe(false);expect(fixture.end).toHaveBeenCalledTimes(1);
 });
 
 it('withholds the export and audit when the manager was revoked after the snapshot', async () => {

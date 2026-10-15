@@ -35,6 +35,10 @@ describe("closed workday business export",()=>{
     const {client}=fixture();
     const result=await createCustomerLifecycleExporter({createClient:()=>client as never})(id(1),"synthetic-owner");
     expect(result.manifest.tables).toHaveLength(28);
+    expect(result.data.appointments[0].scheduling_evidence).toBe("legacy");
+    expect(result.data.appointments[0].scheduling_reservation).toBeNull();
+    expect(result.organization.schedulingPolicy).toBeNull();
+    expect(result.manifest.schedulingHistorySha256).toBe(createHash("sha256").update(JSON.stringify(result.organization.schedulingHistory)).digest("hex"));
     expect(result.manifest.tables.map(row=>row.table)).toContain("customer_work_roots");
     expect(result.manifest.tables.map(row=>row.table)).not.toContain("customer_work_commands");
     expect(result.data.property_assets).toHaveLength(1);

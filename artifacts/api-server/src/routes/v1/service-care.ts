@@ -10,10 +10,10 @@ const base = "/service-obligations/:id/care";
 router.use([base, `${base}/reminder`, `${base}/response`, `${base}/book`], contractorMutation);
 router.get(base, requireMember("crm.read"), async (req, res) => {
   const id = z.uuid().safeParse(req.params.id);
-  const query = z.object({ channel: z.enum(["email", "sms"]).optional() }).strict().safeParse(req.query);
+  const query = z.object({ channel: z.enum(["email", "sms"]).optional(), appointmentType: z.enum(["inspection", "other"]).optional() }).strict().safeParse(req.query);
   if (!id.success || !query.success) { res.status(400).json({ error: "Choose a valid service and channel." }); return; }
   res.set("Cache-Control", "no-store");
-  res.json(await getServiceCare(req.member!.organizationId, id.data, query.data.channel));
+  res.json(await getServiceCare(req.member!.organizationId, id.data, query.data.channel, { actorUserId: req.member!.user.id, appointmentType: query.data.appointmentType }));
 });
 for (const [suffix, schema, work] of [
   ["reminder", approveServiceCareSchema, approveServiceCare],

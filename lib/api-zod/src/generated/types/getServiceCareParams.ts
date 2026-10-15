@@ -5,8 +5,10 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+import type { GetServiceCareAppointmentType } from './getServiceCareAppointmentType';
 import type { GetServiceCareChannel } from './getServiceCareChannel';
 
 export type GetServiceCareParams = {
 channel?: GetServiceCareChannel;
+appointmentType?: GetServiceCareAppointmentType;
 };

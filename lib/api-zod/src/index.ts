@@ -1,5 +1,7 @@
 export * from "./generated/api";
 export * from "./generated/types";
+export type { GetCallieSchedulingContextParams } from "./generated/types/getCallieSchedulingContextParams";
+export { GetCallieSchedulingContextParams as GetCallieSchedulingContextPathParams } from "./generated/api";
 // Orval names this path validator the same as its generated query-argument
 // type. Keep the public query type and expose the path validator explicitly.
 export type { GetServiceCareParams } from "./generated/types/getServiceCareParams";

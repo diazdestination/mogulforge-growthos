@@ -1,0 +1,10 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides", "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+  ...rver\.contractor-recovery-S7cYxZ\contractor-recovery-entry.mjs   18.1mb
+  ...tifacts\api-server\.contractor-recovery-S7cYxZ\pino-worker.mjs  154.9kb
+  ..\artifacts\api-server\.contractor-recovery-S7cYxZ\pino-file.mjs  143.4kb
+  ...tifacts\api-server\.contractor-recovery-S7cYxZ\pino-pretty.mjs  116.1kb
+  ...pi-server\.contractor-recovery-S7cYxZ\thread-stream-worker.mjs    7.7kb
+  ...and 5 more output files...
+
+Done in 1550ms

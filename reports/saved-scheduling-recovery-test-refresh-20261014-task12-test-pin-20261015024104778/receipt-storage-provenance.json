@@ -1,0 +1,187 @@
+{
+  "purpose": "Original executed raw receipt bytes are distinct from normalized Git text bytes. For differences, decode originalRawBase64 and verify raw sha256. For identical original/Git bytes, git show reproduces original bytes even if a later Windows working checkout applies CRLF. No original receipt was rewritten.",
+  "receipts": [
+    {
+      "path": "fixture-source-gitleaks.exit.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "gitBytes": 2,
+      "gitSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "fixture-source-gitleaks.json",
+      "bytes": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "gitBlob": "fe51488c7066f6687ef680d6bfaa4f7768ef205c",
+      "gitBytes": 3,
+      "gitSha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "path": "fixture-source-gitleaks.stderr.txt",
+      "bytes": 79,
+      "sha256": "d807ff304528ffb82bc734f10486f39579541aec9f3d967f08b9590a70f7ccc4",
+      "gitBlob": "f0e4456e9750209e9037e9b989ed932248a50670",
+      "gitBytes": 79,
+      "gitSha256": "d807ff304528ffb82bc734f10486f39579541aec9f3d967f08b9590a70f7ccc4"
+    },
+    {
+      "path": "fixture-source-gitleaks.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "gitBytes": 0,
+      "gitSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 838054,
+      "sha256": "5bed66a382a81f5faadcd26fb4a16cc055456f5e5e9aecac67774f8ff9cab67a",
+      "gitBlob": "d38d92f589a82d559558e697be2d2268bf57d998",
+      "gitBytes": 838054,
+      "gitSha256": "5bed66a382a81f5faadcd26fb4a16cc055456f5e5e9aecac67774f8ff9cab67a"
+    },
+    {
+      "path": "new-receipts-gitleaks.exit.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "gitBytes": 2,
+      "gitSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "new-receipts-gitleaks.json",
+      "bytes": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "gitBlob": "fe51488c7066f6687ef680d6bfaa4f7768ef205c",
+      "gitBytes": 3,
+      "gitSha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "path": "new-receipts-gitleaks.stderr.txt",
+      "bytes": 80,
+      "sha256": "8334ba01ea321fc98c50731a5c795f45b2df73c6fbfc03c7353ae1c348cbc75f",
+      "gitBlob": "4d8a3aa6aebdbff08b03e733fe1bdda34f542f2d",
+      "gitBytes": 80,
+      "gitSha256": "8334ba01ea321fc98c50731a5c795f45b2df73c6fbfc03c7353ae1c348cbc75f"
+    },
+    {
+      "path": "new-receipts-gitleaks.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "gitBytes": 0,
+      "gitSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "old-pin-provenance.json",
+      "bytes": 1954,
+      "sha256": "a92991d99b3bebf6cbd3f3690e04c508eb1c91d819645cffbf9b5cc1cbd42c43",
+      "gitBlob": "a2d1fd65009b5db2ce04cf1558e4a88ef8ba13ef",
+      "gitBytes": 1954,
+      "gitSha256": "a92991d99b3bebf6cbd3f3690e04c508eb1c91d819645cffbf9b5cc1cbd42c43"
+    },
+    {
+      "path": "old-pin-red.exit.txt",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "gitBytes": 2,
+      "gitSha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "old-pin-red.stderr.txt",
+      "bytes": 37,
+      "sha256": "e05c0a61f25b1dcc1e1ff37d91009db998b30d81b27ee02ff1d56a005e409887",
+      "gitBlob": "01a8511de48bb97c3a6463b7887ca900052798cc",
+      "gitBytes": 37,
+      "gitSha256": "e05c0a61f25b1dcc1e1ff37d91009db998b30d81b27ee02ff1d56a005e409887"
+    },
+    {
+      "path": "old-pin-red.stdout.jsonl",
+      "bytes": 136,
+      "sha256": "e9610f3f69f919e3e594003a3edb1686a7491e9f0475a29c9fb86b1bf8173c64",
+      "gitBlob": "ab4dfa9651e6af914a7cc509f35192fc4af33f3f",
+      "gitBytes": 136,
+      "gitSha256": "e9610f3f69f919e3e594003a3edb1686a7491e9f0475a29c9fb86b1bf8173c64"
+    },
+    {
+      "path": "old-pin-test-red.exit.txt",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+      "gitBlob": "d00491fd7e5bb6fa28c517a0bb32b8b506539d4d",
+      "gitBytes": 2,
+      "gitSha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "old-pin-test-red.stderr.txt",
+      "bytes": 876,
+      "sha256": "bc494378d43083246e6bd5bd2ccd00869f6e8c8754a6153568ad832e89c8b93f",
+      "gitBlob": "01f410e5681e6f132db39a56a736e5c5fe7fd876",
+      "gitBytes": 876,
+      "gitSha256": "bc494378d43083246e6bd5bd2ccd00869f6e8c8754a6153568ad832e89c8b93f"
+    },
+    {
+      "path": "old-pin-test-red.stdout.txt",
+      "bytes": 457,
+      "sha256": "e0b56e7a541de76c30f6fe5850654a220bb8b3d794532116f41327c0dfa625e9",
+      "gitBlob": "b13a3679420f5ce4dc8f63fa959094695fc8ace6",
+      "gitBytes": 457,
+      "gitSha256": "e0b56e7a541de76c30f6fe5850654a220bb8b3d794532116f41327c0dfa625e9"
+    },
+    {
+      "path": "recovery-suites-green.exit.txt",
+      "bytes": 3,
+      "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "gitBytes": 2,
+      "gitSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "originalRawBase64": "MA0K",
+      "storageDifference": "Git text EOL normalization; original raw bytes retained in this base64 envelope"
+    },
+    {
+      "path": "recovery-suites-green.stderr.txt",
+      "bytes": 655,
+      "sha256": "f494496dbd78c82d84a759092c4e02177f91e74374df574d8f9a57e859626de5",
+      "gitBlob": "548a75b4b01aaacb2e8e5a413db7a3f7f29efe47",
+      "gitBytes": 645,
+      "gitSha256": "3dfc82b5f3af3e865ce58f3f572001d4e18f75ad4196f8092041c7df21f13ed0",
+      "originalRawBase64": "W1dBUk5dIFRoZSAicG5wbSIgZmllbGQgaW4gcGFja2FnZS5qc29uIGlzIG5vIGxvbmdlciByZWFkIGJ5IHBucG0uIFRoZSBmb2xsb3dpbmcga2V5cyB3ZXJlIGlnbm9yZWQ6ICJwbnBtLm92ZXJyaWRlcyIsICJwbnBtLm9ubHlCdWlsdERlcGVuZGVuY2llcyIuIFNlZSBodHRwczovL3BucG0uaW8vc2V0dGluZ3MgZm9yIHRoZSBuZXcgaG9tZSBvZiBlYWNoIHNldHRpbmcuDQoNCiAgLi4ucnZlclwuY29udHJhY3Rvci1yZWNvdmVyeS1IeUpLUWtcY29udHJhY3Rvci1yZWNvdmVyeS1lbnRyeS5tanMgICAxOC4xbWINCiAgLi4udGlmYWN0c1xhcGktc2VydmVyXC5jb250cmFjdG9yLXJlY292ZXJ5LUh5SktRa1xwaW5vLXdvcmtlci5tanMgIDE1NC45a2INCiAgLi5cYXJ0aWZhY3RzXGFwaS1zZXJ2ZXJcLmNvbnRyYWN0b3ItcmVjb3ZlcnktSHlKS1FrXHBpbm8tZmlsZS5tanMgIDE0My40a2INCiAgLi4udGlmYWN0c1xhcGktc2VydmVyXC5jb250cmFjdG9yLXJlY292ZXJ5LUh5SktRa1xwaW5vLXByZXR0eS5tanMgIDExNi4xa2INCiAgLi4ucGktc2VydmVyXC5jb250cmFjdG9yLXJlY292ZXJ5LUh5SktRa1x0aHJlYWQtc3RyZWFtLXdvcmtlci5tanMgICAgNy43a2INCiAgLi4uYW5kIDUgbW9yZSBvdXRwdXQgZmlsZXMuLi4NCg0KRG9uZSBpbiAxNDc2bXMNCg==",
+      "storageDifference": "Git text EOL normalization; original raw bytes retained in this base64 envelope"
+    },
+    {
+      "path": "recovery-suites-green.stdout.txt",
+      "bytes": 261,
+      "sha256": "4a163ec73a2bdd2ad1dd6d816d0f4ea8f7229336990042f3693537f90099ab70",
+      "gitBlob": "c5374e9dcbd7195dcae1acfb906491cb682c960f",
+      "gitBytes": 252,
+      "gitSha256": "338e4e7c729fbeeecedca1415a964b50c0f8436e9c91ad5c99bd7d2431573370",
+      "originalRawBase64": "DQogUlVOICB2NC4xLjEwIEM6L0ZvcmdlL3dvcmt0cmVlcy9ncm93dGhvcy1yZWNvdmVyeS10ZXN0LXBpbi0yMDI2MTAxNC9zY3JpcHRzDQoNCg0KIFRlc3QgRmlsZXMgIDMgcGFzc2VkICgzKQ0KICAgICAgVGVzdHMgIDM0IHBhc3NlZCAoMzQpDQogICBTdGFydCBhdCAgMTk6Mzg6NDENCiAgIER1cmF0aW9uICA3NS44MXMgKHRyYW5zZm9ybSAyNzdtcywgc2V0dXAgMG1zLCBpbXBvcnQgODA1bXMsIHRlc3RzIDExOS44N3MsIGVudmlyb25tZW50IDBtcykNCg0K",
+      "storageDifference": "Git text EOL normalization; original raw bytes retained in this base64 envelope"
+    },
+    {
+      "path": "standalone-green.exit.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "gitBlob": "573541ac9702dd3969c9bc859d2b91ec1f7e6e56",
+      "gitBytes": 2,
+      "gitSha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "standalone-green.stderr.txt",
+      "bytes": 434,
+      "sha256": "4b24a320f6f8c383486f7a1b2139e93b6677acedf8a5e5c103f2a29f820f4272",
+      "gitBlob": "49dff8eecd9f9d9149b6b23cff9009b6f50d1074",
+      "gitBytes": 434,
+      "gitSha256": "4b24a320f6f8c383486f7a1b2139e93b6677acedf8a5e5c103f2a29f820f4272"
+    },
+    {
+      "path": "standalone-green.stdout.jsonl",
+      "bytes": 23415,
+      "sha256": "f15b609f4cc38c50dffc3ed789fde252c06f16141f84679300f01c237c0f8557",
+      "gitBlob": "d4b75c03a2dba17556f65f8be1f1da9674186356",
+      "gitBytes": 23415,
+      "gitSha256": "f15b609f4cc38c50dffc3ed789fde252c06f16141f84679300f01c237c0f8557"
+    }
+  ]
+}

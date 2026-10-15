@@ -2,8 +2,8 @@
  * Task/contact/estimate/property form modals must surface a destructive
  * toast when the primary create call fails, and stay open so the user can
  * retry (same pattern as the project form modal). The appointment modal
- * surfaces an inline error instead — covered here too so no save form can
- * fail silently.
+ * surfaces an inline held result and retains its original command when a
+ * create result is unverified — covered here too so no save form fails silently.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
@@ -18,6 +18,9 @@ import { memoryLocation } from 'wouter/memory-location';
 import { Toaster } from '@/components/ui/toaster';
 import { renderWithQuery } from '@/test/render';
 import { mockApi, sampleLead } from '@/test/mock-api';
+import { makePolicyReadResult } from '@/test/scheduling-ui-fixtures';
+import { schedulingPolicySchema, schedulingReviewContextSchema, type ManualSchedulingCommand } from '@workspace/scheduling-core';
+import { manualSchedulingSourceKey, parseManualSchedulingCustody } from '@/lib/scheduling-command';
 
 function failPost(endpoint: string, message: string) {
   return (method: string, path: string) =>
@@ -30,13 +33,14 @@ function failPost(endpoint: string, message: string) {
 }
 
 function renderPage(page: React.ReactElement, handler: (method: string, path: string) => Response | undefined) {
-  mockApi('admin', { handler });
+  const fetch = mockApi('admin', { handler });
   renderWithQuery(
     <>
       {page}
       <Toaster />
     </>,
   );
+  return fetch;
 }
 
 function modalRoot(): HTMLElement {
@@ -48,6 +52,7 @@ function modalRoot(): HTMLElement {
 
 afterEach(() => {
   cleanup();
+  sessionStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -123,9 +128,16 @@ describe('save forms never fail silently', () => {
     expect(screen.getByRole('button', { name: /save property/i })).toBeTruthy();
   });
 
-  it('appointment form surfaces the failure inline and stays open when create fails', async () => {
+  it('appointment form surfaces an unverified create inline, stays open and retains the original without retry', async () => {
     const failCreate = failPost('/api/v1/appointments', 'appointment boom');
-    renderPage(<AppointmentsPage />, (method, path) => {
+    const organizationId = '11111111-1111-4111-8111-111111111111';
+    const value = makePolicyReadResult();
+    const context = schedulingReviewContextSchema.parse({ ...value.context, organizationId, companyTimeZone: 'UTC', source: { sourceKind: 'unlinked_manual', leadId: null, contactId: null, propertyId: null, estimateId: null }, targetVersion: null, targetFingerprint: null });
+    const policy = schedulingPolicySchema.parse({ ...value.policy, timeZone: 'UTC' });
+    const fetch = renderPage(<AppointmentsPage />, (method, path) => {
+      if (path.endsWith('/api/v1/me')) return Response.json({ id: 'u1', email: 'staff@example.invalid', firstName: 'Synthetic', lastName: 'Staff', role: 'admin', isActive: true, organization: { id: organizationId, name: 'Synthetic company', slug: 'synthetic', timezone: 'UTC' } });
+      if (path.endsWith('/api/v1/scheduling/review-context')) return Response.json(context);
+      if (path.endsWith('/api/v1/settings/scheduling-policy')) return Response.json({ policy, context: { ...context, source: null, inspection: null, applicableRules: { ...context.applicableRules, inspectionCeiling: null } } });
       if (method === 'GET' && path.endsWith('/api/v1/settings/inspection-availability')) {
         return new Response(
           JSON.stringify({
@@ -141,14 +153,42 @@ describe('save forms never fail silently', () => {
     });
 
     fireEvent.click(await screen.findByTestId('add-appointment'));
-    const modal = modalRoot();
-    const start = modal.querySelector('input[type="datetime-local"]') as HTMLInputElement;
-    expect(start).toBeTruthy();
-    fireEvent.change(start, { target: { value: '2030-06-01T10:00' } });
+    await waitFor(() => expect(screen.getByLabelText('Service start')).toHaveProperty('disabled', false));
+    fireEvent.change(screen.getByLabelText('Service start'), { target: { value: '2030-06-01T10:00' } });
+    fireEvent.change(screen.getByLabelText('Service end'), { target: { value: '2030-06-01T11:00' } });
+    const creates = () => fetch.mock.calls.filter(([url, init]) => String(url).split('?')[0].endsWith('/api/v1/appointments') && init?.method === 'POST');
+    expect(screen.getByRole('button', { name: /save appt/i })).toHaveProperty('disabled', true);
+    expect(creates()).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Review interval' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /save appt/i })).toHaveProperty('disabled', false));
     fireEvent.click(screen.getByRole('button', { name: /save appt/i }));
 
-    await waitFor(() => expect(screen.getByText(/appointment boom/i)).toBeTruthy());
-    expect(screen.getByRole('button', { name: /save appt/i })).toBeTruthy();
+    expect(await screen.findByText(/Original appointment result is unknown/)).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'New Appointment' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /save appt/i })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Reconcile original appointment' })).toBeTruthy();
+    expect(creates()).toHaveLength(1);
+    const submitted = JSON.parse(String(creates()[0][1]?.body));
+    const { operationId, schedulingReview, ...body } = submitted;
+    const original: ManualSchedulingCommand = { operationId, kind: 'appointment_create', body, review: schedulingReview };
+    const sourceKey = manualSchedulingSourceKey(context.source!);
+    const key = `growthos.scheduling.pending.v1:${organizationId}:u1:appointment_create:${sourceKey}`;
+    const bytes = sessionStorage.getItem(key)!;
+    const saved = await parseManualSchedulingCustody(bytes, { organizationId, actorUserId: 'u1' }, 'appointment_create', sourceKey);
+    expect(saved.command).toEqual(original);
+    expect(saved.ack).toBeNull();
+    expect(original.body).toMatchObject({ scheduledStart: '2030-06-01T10:00:00.000Z', scheduledEnd: '2030-06-01T11:00:00.000Z', propertyId: null });
+    expect(original.review.context).toEqual(context);
+    fireEvent.click(screen.getByRole('button', { name: /save appt/i }));
+    const readsBefore = fetch.mock.calls.filter(([url]) => String(url).includes('/scheduling/review-context')).length;
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh scheduling review' }));
+    await waitFor(() => expect(fetch.mock.calls.filter(([url]) => String(url).includes('/scheduling/review-context')).length).toBeGreaterThan(readsBefore));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(await screen.findByTestId('add-appointment'));
+    expect(await screen.findByText(/Original appointment result is unknown/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /save appt/i })).toHaveProperty('disabled', true);
+    expect(sessionStorage.getItem(key)).toBe(bytes);
+    expect(creates()).toHaveLength(1);
   });
 
   it('lead note composer shows a destructive toast and keeps the note text when save fails', async () => {

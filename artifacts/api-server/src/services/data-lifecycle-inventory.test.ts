@@ -40,6 +40,12 @@ describe("explicit lifecycle schema coverage", () => {
   it("classifies every current source table without automatically adopting new tables", () => {
     expect(source).toHaveLength(142);
     expect(DATA_LIFECYCLE_CATALOG).toHaveLength(142);
+    expect(DATA_LIFECYCLE_CATALOG.find(e=>e.table==="audit_events")).toMatchObject({category:"audit",ownership:"direct_org",selector:"organization_id"});
+    expect(DATA_LIFECYCLE_CATALOG.find(e=>e.table==="org_settings")).toMatchObject({category:"configuration",ownership:"direct_org",selector:"organization_id"});
+    for (const table of ["appointments","projects","org_settings"]) {
+      const row=source.find(e=>e.name===table)!;
+      expect(row.columns.find(column=>column.name===(table==="org_settings"?"scheduling_policy":"scheduling_reservation"))).toMatchObject({type:"jsonb",notNull:false});
+    }
     expect(DATA_LIFECYCLE_CATALOG.find(e => e.table === "staff_lead_alert_coverage")).toEqual({
       table: "staff_lead_alert_coverage", category: "communications", ownership: "direct_org", selector: "organization_id",
     });

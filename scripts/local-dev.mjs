@@ -2,7 +2,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, win32 } from 'node:path';
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export function localEnvironment(source = process.env) {
@@ -77,10 +77,15 @@ export async function withWslDockerSession(operation, {
 async function command(program, args, { env = localEnvironment(), capture = false, cwd = root } = {}) {
   if (process.platform === 'win32' && program === 'pnpm') {
     const paths = execFileSync('where.exe', ['pnpm'], { env, encoding: 'utf8', windowsHide: true }).trim().split(/\r?\n/);
-    const launcher = paths.find(path => path.endsWith('.cmd'));
-    const cli = launcher && ['pnpm.mjs', 'pnpm.cjs'].map(name => resolve(dirname(launcher), 'node_modules/pnpm/bin', name)).find(existsSync);
-    if (!cli) throw new Error('Cannot resolve the installed pnpm Node.js launcher.');
-    program = process.execPath; args = [cli, ...args];
+    const cli = paths.filter(path => /\.cmd$/i.test(path)).flatMap(launcher =>
+      ['pnpm.mjs', 'pnpm.cjs'].map(name => win32.resolve(win32.dirname(launcher), 'node_modules/pnpm/bin', name))).find(existsSync);
+    if (cli) { program = process.execPath; args = [cli, ...args]; }
+    else {
+      // Winget can expose native pnpm beside an incomplete .cmd fallback.
+      const executable = paths.find(path => win32.basename(path).toLowerCase() === 'pnpm.exe' && existsSync(path));
+      if (!executable) throw new Error('Cannot resolve the installed pnpm Node.js launcher or native executable.');
+      program = executable;
+    }
   }
   if (process.platform === 'win32' && program === 'docker' && existsSync('C:/Forge/tools/local-dev/docker-wsl.mjs')) {
     program = process.execPath; args = ['C:/Forge/tools/local-dev/docker-wsl.mjs', ...args];
@@ -125,7 +130,9 @@ async function databaseTests(files = []) {
     });
     // The schema target is constructed only from this run's owned container.
     await command('pnpm', ['--filter', '@workspace/db', 'run', 'push-force'], { env });
-    if (!files.length) await command('pnpm', ['-r', '--filter', '!@workspace/api-server', '--if-present', 'run', 'test'], { env });
+    // Serialize workspace suites and cap Vitest workers to match this run's
+    // two-CPU database; concurrent suites can contend on unchanged timing gates.
+    if (!files.length) await command('pnpm', ['-r', '--workspace-concurrency=1', '--filter', '!@workspace/api-server', '--if-present', 'run', 'test', '--maxWorkers=2'], { env });
     // Match the disposable database's two CPUs and avoid unrelated fixture
     // files competing for its resources. Race tests still open their own
     // independent PostgreSQL clients inside each file.

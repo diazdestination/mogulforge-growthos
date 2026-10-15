@@ -9,7 +9,9 @@ import {
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { getGetMeQueryKey } from "@workspace/api-client-react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { webcrypto } from "node:crypto";
+import { makeSchedulingContext } from "@/test/scheduling-ui-fixtures";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import Estimates from "./estimates";
@@ -33,6 +35,55 @@ import {
   workProperties,
   workPropertyRow,
 } from "@/test/customer-work-fixtures";
+
+beforeEach(() => {
+  Object.defineProperty(globalThis, "crypto", {
+    configurable: true,
+    value: webcrypto,
+  });
+});
+function schedulingRead(input: RequestInfo | URL) {
+  const url = new URL(
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url,
+          "http://localhost",
+        );
+  const context = makeSchedulingContext({
+    organizationId: org,
+    policyRevision: 0,
+    policyDigest: null,
+    inspection: null,
+    applicableRules: {
+      newTravelGapMinutes: 0,
+      companyCeiling: null,
+      inspectionCeiling: null,
+    },
+    source: {
+      sourceKind: "direct_customer",
+      leadId: null,
+      contactId: url.searchParams.get("sourceId") ?? contact,
+      propertyId: url.searchParams.get("propertyId"),
+      estimateId: url.searchParams.get("estimateId"),
+    },
+    targetVersion: url.searchParams.has("targetId")
+      ? workProject().updatedAt
+      : null,
+    targetFingerprint: url.searchParams.has("targetId")
+      ? workProject().schedulingTargetFingerprint
+      : null,
+  });
+  if (url.pathname.endsWith("/scheduling/review-context")) return json(context);
+  if (url.pathname.endsWith("/settings/scheduling-policy"))
+    return json({ policy: null, context });
+}
+async function reviewJob() {
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Review unscheduled job" }),
+  );
+}
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 type Request = { url: URL; method: string; body: Record<string, any> };
@@ -69,6 +120,8 @@ function setup(
         body: init?.body ? JSON.parse(String(init.body)) : {},
       };
       requests.push(request);
+      const scheduling = schedulingRead(input);
+      if (scheduling) return scheduling;
       const changed = await override?.(request);
       if (changed) return changed;
       const path = request.url.pathname;
@@ -266,9 +319,11 @@ describe("native existing-customer work", () => {
     await act(async () => {
       await api.client.invalidateQueries({ queryKey: getGetMeQueryKey() });
     });
+    await waitFor(() =>
     expect(screen.getByLabelText("Estimate title")).toHaveProperty(
       "value",
       "Annual return service",
+    ),
     );
     expect(chosen()).toHaveProperty("checked", true);
     expect(reviewed()).toHaveProperty("checked", true);
@@ -346,9 +401,11 @@ describe("native existing-customer work", () => {
     const first = writes(api.requests)[0];
     fireEvent.click(screen.getByRole("button", { name: "Close work form" }));
     fireEvent.click(screen.getByRole("button", { name: "New Estimate" }));
+    await waitFor(() =>
     expect(screen.getByLabelText("Estimate title")).toHaveProperty(
       "value",
       "Annual return service",
+    ),
     );
     expect(writes(api.requests)).toHaveLength(1);
     fireEvent.click(
@@ -437,11 +494,51 @@ describe("native existing-customer work", () => {
     expect(write.url.pathname).toContain("/customer-work/");
   });
   it("creates a direct job from existing customer with explicit null property, no estimate or lead stage effect", async () => {
-    const api = setup("projects", fresh, (request) =>
+    const api = setup("projects", fresh, async (request) =>
       request.url.pathname === "/api/v1/customer-work/projects"
         ? json({
             organizationId: org,
             project: workProject({ name: request.body.name }),
+            commandOutcome: {
+              formatVersion: 1,
+              organizationId: org,
+              actorUserId: workMember.id,
+              requestId: request.body.requestId,
+              action: "project_created",
+              payloadSha256: (await import("node:crypto"))
+                .createHash("sha256")
+                .update(
+                  JSON.stringify(
+                    {
+                      action: "project_created",
+                      actorUserId: workMember.id,
+                      targetId: null,
+                      input: (
+                        await import("../../../api-server/src/services/returning-customer-contract")
+                      ).createCustomerWorkProjectSchema.parse(request.body),
+                    },
+                    (_key, value) =>
+                      value &&
+                      typeof value === "object" &&
+                      !Array.isArray(value)
+                        ? Object.fromEntries(
+                            Object.entries(value)
+                              .filter(([, item]) => item !== undefined)
+                              .sort(([a], [b]) => a.localeCompare(b)),
+                          )
+                        : value,
+                  ),
+                )
+                .digest("hex"),
+              customerWorkId: root,
+              target: {
+                kind: "project",
+                id: workProject().id,
+                available: true,
+              },
+              resultWorkVersion: 1,
+              outcome: "committed",
+            },
             command: {
               requestId: request.body.requestId,
               action: "project_created",
@@ -453,12 +550,13 @@ describe("native existing-customer work", () => {
           })
         : undefined,
     );
-    await screen.findByRole("option", { name: /704 Fictional Lane/ });
+  await screen.findByRole("option", { name: /704 Fictional Lane/ });
     fireEvent.change(screen.getByLabelText("Job name"), {
       target: { value: "Existing customer job" },
     });
     fireEvent.click(chosen());
     fireEvent.click(reviewed());
+    await reviewJob();
     fireEvent.click(screen.getByRole("button", { name: "Save customer job" }));
     await screen.findByText("Native job saved");
     const [write] = writes(api.requests);
@@ -609,11 +707,53 @@ describe("native existing-customer work", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const scheduling = schedulingRead(input);
+        if (scheduling) return scheduling;
         if (init?.method === "POST") {
           body = JSON.parse(String(init.body));
           return json({
             organizationId: org,
             project: workProject({ estimateId: accepted.id }),
+            commandOutcome: {
+              formatVersion: 1,
+              organizationId: org,
+              actorUserId: workMember.id,
+              requestId: body.requestId,
+              action: "project_created",
+              payloadSha256: (await import("node:crypto"))
+                .createHash("sha256")
+                .update(
+                  JSON.stringify(
+                    {
+                      action: "project_created",
+                      actorUserId: workMember.id,
+                      targetId: null,
+                      input: (
+                        await import("../../../api-server/src/services/returning-customer-contract")
+                      ).createCustomerWorkProjectSchema.parse(body),
+                    },
+                    (_key, value) =>
+                      value &&
+                      typeof value === "object" &&
+                      !Array.isArray(value)
+                        ? Object.fromEntries(
+                            Object.entries(value)
+                              .filter(([, item]) => item !== undefined)
+                              .sort(([a], [b]) => a.localeCompare(b)),
+                          )
+                        : value,
+                  ),
+                )
+                .digest("hex"),
+              customerWorkId: root,
+              target: {
+                kind: "project",
+                id: workProject().id,
+                available: true,
+              },
+              resultWorkVersion: 1,
+              outcome: "committed",
+            },
             command: {
               requestId: body.requestId,
               action: "project_created",
@@ -630,6 +770,7 @@ describe("native existing-customer work", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
+    client.setQueryData(getGetMeQueryKey(), workMember);
     render(
       <QueryClientProvider client={client}>
         <Router>
@@ -647,6 +788,7 @@ describe("native existing-customer work", () => {
       </QueryClientProvider>,
     );
     fireEvent.click(reviewed());
+    await reviewJob();
     fireEvent.click(screen.getByRole("button", { name: "Save customer job" }));
     await screen.findByText("Native job saved");
     expect(body.source).toEqual({
@@ -672,6 +814,8 @@ describe("native existing-customer work", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const scheduling = schedulingRead(_input);
+        if (scheduling) return scheduling;
         if (init?.method !== "POST") return json([]);
         const body = JSON.parse(String(init.body));
         submitted.push(body);
@@ -679,6 +823,40 @@ describe("native existing-customer work", () => {
         return json({
           organizationId: org,
           project: workProject({ estimateId: accepted.id, workVersion: 3 }),
+          commandOutcome: {
+            formatVersion: 1,
+            organizationId: org,
+            actorUserId: workMember.id,
+            requestId: body.requestId,
+            action: "project_created",
+            payloadSha256: (await import("node:crypto"))
+              .createHash("sha256")
+              .update(
+                JSON.stringify(
+                  {
+                    action: "project_created",
+                    actorUserId: workMember.id,
+                    targetId: null,
+                    input: (
+                      await import("../../../api-server/src/services/returning-customer-contract")
+                    ).createCustomerWorkProjectSchema.parse(body),
+                  },
+                  (_key, value) =>
+                    value && typeof value === "object" && !Array.isArray(value)
+                      ? Object.fromEntries(
+                          Object.entries(value)
+                            .filter(([, item]) => item !== undefined)
+                            .sort(([a], [b]) => a.localeCompare(b)),
+                        )
+                      : value,
+                ),
+              )
+              .digest("hex"),
+            customerWorkId: root,
+            target: { kind: "project", id: workProject().id, available: true },
+            resultWorkVersion: 1,
+            outcome: "committed",
+          },
           command: {
             requestId: body.requestId,
             action: "project_created",
@@ -693,6 +871,7 @@ describe("native existing-customer work", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
+    client.setQueryData(getGetMeQueryKey(), workMember);
     const form = (estimate: ReturnType<typeof workEstimate>) => (
       <QueryClientProvider client={client}>
         <Router>
@@ -711,13 +890,14 @@ describe("native existing-customer work", () => {
     );
     const view = render(form(accepted));
     fireEvent.click(reviewed());
+    await reviewJob();
     fireEvent.click(screen.getByRole("button", { name: "Save customer job" }));
     await screen.findByRole("button", {
       name: "Reconcile original work request",
     });
     view.rerender(form(unrelated));
     expect(
-      screen.getByRole("region", { name: "Original submitted source" })
+      (await screen.findByRole("region", { name: "Original submitted source" }))
         .textContent,
     ).toContain(accepted.id);
     expect(
@@ -753,242 +933,54 @@ describe("native existing-customer work", () => {
   );
 });
 
-describe("explicit stale accepted-estimate conversion recovery", () => {
-  const reloadName = "Discard my edits and load latest accepted estimate";
-  const accepted = () =>
-    workEstimate({
-      status: "accepted",
-      workVersion: 2,
-      acceptedAt: "2026-10-01T12:00:00Z",
+describe("unproven returning-project errors retain original custody", () => {
+  it.each([
+    "customer_work_version_changed",
+    "customer_work_request_conflict",
+    "customer_work_source_changed",
+  ])(
+    "holds %s after refresh and remount without creating a new request",
+    async (code) => {
+      const api = setup("projects", fresh, (request) =>
+        request.method === "POST"
+          ? json({ code, error: "Unproven original result" }, 409)
+          : undefined,
+      );
+  await screen.findByRole("option", { name: /704 Fictional Lane/ });
+      fireEvent.change(screen.getByLabelText("Job name"), {
+        target: { value: "Original reviewed job" },
+      });
+      fireEvent.click(chosen());
+      fireEvent.click(reviewed());
+      await reviewJob();
+    fireEvent.click(screen.getByRole("button", { name: "Save customer job" }));
+    await screen.findByRole("button", {
+      name: "Reconcile original work request",
     });
-  const latest = () =>
-    workEstimate({
-      status: "accepted",
-      workVersion: 3,
-      title: "Explicitly reloaded accepted scope",
-      acceptedAt: "2026-10-01T12:00:00Z",
-    });
-  function conversion(read: () => Response | Promise<Response>) {
-    const requests: Request[] = [];
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const request = {
-          url: new URL(
-            typeof input === "string"
-              ? input
-              : input instanceof URL
-                ? input.href
-                : input.url,
-            "http://localhost",
-          ),
-          method: init?.method || "GET",
-          body: init?.body ? JSON.parse(String(init.body)) : {},
-        };
-        requests.push(request);
-        if (request.method === "POST") {
-          if (writes(requests).length === 1)
-            return json(
-              {
-                code: "customer_work_version_changed",
-                error: "Estimate version changed",
-              },
-              409,
-            );
-          return json({
-            organizationId: org,
-            project: workProject({ estimateId: accepted().id }),
-            command: {
-              requestId: request.body.requestId,
-              action: "project_created",
-              customerWorkId: root,
-              targetId: workProject().id,
-              version: 1,
-              duplicate: false,
-            },
-          });
-        }
-        if (request.url.pathname === `/api/v1/estimates/${accepted().id}`)
-          return read();
-        return json([]);
+      const original = writes(api.requests)[0].body;
+      expect(
+        screen.queryByRole("button", { name: /Discard my edits/ }),
+      ).toBeNull();
+      fireEvent.click(
+        screen.getByRole("button", { name: "Refresh scheduling review" }),
+      );
+      expect(writes(api.requests)).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Close work form" }));
+      fireEvent.click(screen.getByRole("button", { name: "New Project" }));
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Reconcile original work request",
       }),
     );
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    client.setQueryData(getGetMeQueryKey(), workMember);
-    const form = (estimate: ReturnType<typeof workEstimate>) => (
-      <QueryClientProvider client={client}>
-        <Router>
-          <CustomerWorkForm
-            kind="projects"
-            actor={{
-              id: workMember.id,
-              organizationId: org,
-              scopeKey: memberAuthorityScope(workMember),
-            }}
-            fromEstimate={estimate}
-            onClose={vi.fn()}
-          />
-        </Router>
-      </QueryClientProvider>
-    );
-    const view = render(form(accepted()));
-    return {
-      requests,
-      client,
-      view,
-      rerender: (estimate: ReturnType<typeof workEstimate>) =>
-        view.rerender(form(estimate)),
-    };
-  }
-  async function refuse() {
-    fireEvent.change(screen.getByLabelText("Job name"), {
-      target: { value: "Human unsaved conversion draft" },
-    });
-    fireEvent.click(reviewed());
-    fireEvent.click(screen.getByRole("button", { name: "Save customer job" }));
-    await screen.findByRole("button", { name: reloadName });
-  }
-  it("loads exact accepted version 3 only on explicit discard, renews review and submits that version instead of stale version 2", async () => {
-    const api = conversion(() => json(latest()));
-    await refuse();
-    api.rerender(latest());
-    expect(screen.getByLabelText("Job name")).toHaveProperty(
-      "value",
-      "Human unsaved conversion draft",
-    );
-    expect(screen.getByText(/Accepted estimate:/).textContent).toContain(
-      "saved version 2",
-    );
-    expect(
-      api.requests.filter((request) =>
-        request.url.pathname.endsWith(`/estimates/${accepted().id}`),
-      ),
-    ).toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: reloadName }));
-    await waitFor(() =>
-      expect(screen.getByLabelText("Job name")).toHaveProperty(
-        "value",
-        latest().title,
-      ),
-    );
-    expect(screen.getByText(/Accepted estimate:/).textContent).toContain(
-      "saved version 3",
-    );
-    expect(reviewed()).toHaveProperty("checked", false);
-    expect(writes(api.requests)).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "Save customer job" }));
-    expect(writes(api.requests)).toHaveLength(1);
-    fireEvent.click(reviewed());
-    fireEvent.click(screen.getByRole("button", { name: "Save customer job" }));
-    await screen.findByText("Native job saved");
-    const [old, revised] = writes(api.requests);
-    expect(old.body.source).toEqual({
-      kind: "estimate",
-      estimateId: accepted().id,
-      expectedWorkVersion: 2,
-    });
-    expect(revised.body.source).toEqual({
-      kind: "estimate",
-      estimateId: accepted().id,
-      expectedWorkVersion: 3,
-    });
-    expect(revised.body.requestId).not.toBe(old.body.requestId);
-  });
-  it.each([
-    ["estimate", { id: id(789) }],
-    ["company", { organizationId: id(789) }],
-    ["work root", { customerWorkId: id(789) }],
-    ["customer", { contactId: id(789) }],
-    ["property", { propertyId: id(789) }],
-    ["acceptance state", { status: "draft" as const }],
-  ])(
-    "refuses a reloaded changed %s without discarding the draft or unlocking conversion",
-    async (_label, changed) => {
-      const api = conversion(() => json({ ...latest(), ...changed }));
-      await refuse();
-      fireEvent.click(screen.getByRole("button", { name: reloadName }));
-      await screen.findByText(
-        "The exact current work record could not be verified. Your draft remains unchanged.",
-      );
-      expect(screen.getByLabelText("Job name")).toHaveProperty(
-        "value",
-        "Human unsaved conversion draft",
-      );
-      expect(screen.getByText(/Accepted estimate:/).textContent).toContain(
-        "saved version 2",
-      );
+      await waitFor(() => expect(writes(api.requests)).toHaveLength(2));
+      expect(writes(api.requests)[1].body).toEqual(original);
       expect(
         screen
           .getByRole("button", { name: "Save customer job" })
           .matches(":disabled"),
       ).toBe(true);
-      expect(writes(api.requests)).toHaveLength(1);
     },
   );
-  it("ignores the late reload after current member authority changes", async () => {
-    let release!: (response: Response) => void;
-    const api = conversion(
-      () =>
-        new Promise<Response>((resolve) => {
-          release = resolve;
-        }),
-    );
-    await refuse();
-    fireEvent.click(screen.getByRole("button", { name: reloadName }));
-    await waitFor(() => expect(release).toBeDefined());
-    await act(async () => {
-      api.client.setQueryData(getGetMeQueryKey(), {
-        ...workMember,
-        role: "viewer",
-      });
-      release(json(latest()));
-    });
-    expect(screen.getByLabelText("Job name")).toHaveProperty(
-      "value",
-      "Human unsaved conversion draft",
-    );
-    expect(screen.getByText(/Accepted estimate:/).textContent).toContain(
-      "saved version 2",
-    );
-    expect(writes(api.requests)).toHaveLength(1);
-  });
-  it("cannot populate a replacement conversion after the original target unmounts", async () => {
-    let release!: (response: Response) => void;
-    const api = conversion(
-      () =>
-        new Promise<Response>((resolve) => {
-          release = resolve;
-        }),
-    );
-    await refuse();
-    fireEvent.click(screen.getByRole("button", { name: reloadName }));
-    await waitFor(() => expect(release).toBeDefined());
-    const replacement = workEstimate({
-      id: id(799),
-      customerWorkId: id(798),
-      status: "accepted",
-      workVersion: 7,
-      title: "Different exact estimate",
-    });
-    api.rerender(replacement);
-    fireEvent.change(screen.getByLabelText("Job name"), {
-      target: { value: "Replacement human draft" },
-    });
-    await act(async () => {
-      release(json(latest()));
-    });
-    expect(screen.getByLabelText("Job name")).toHaveProperty(
-      "value",
-      "Replacement human draft",
-    );
-    expect(screen.getByText(/Accepted estimate:/).textContent).toContain(
-      "Different exact estimate · saved version 7",
-    );
-    expect(screen.queryByRole("button", { name: reloadName })).toBeNull();
-    expect(writes(api.requests)).toHaveLength(1);
-  });
 });
 
 describe("existing customer native invoices and corrections", () => {

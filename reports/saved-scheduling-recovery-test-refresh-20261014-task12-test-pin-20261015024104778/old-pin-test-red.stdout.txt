@@ -1,0 +1,11 @@
+
+ RUN  v4.1.10 C:/Forge/worktrees/growthos-recovery-test-pin-20261014/scripts
+
+ ❯ contractor-recovery-drill.test.mjs (1 test | 1 failed) 10956ms
+   × upgrades the full prior schema, restores both synthetic companies, boots a read-only real app and preserves uncertainty/holds 10954ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  19:37:19
+   Duration  11.69s (transform 215ms, setup 0ms, import 555ms, tests 10.96s, environment 0ms)
+

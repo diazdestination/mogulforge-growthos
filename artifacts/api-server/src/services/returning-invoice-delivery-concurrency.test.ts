@@ -185,6 +185,37 @@ async function blockedBy(blocker: number, pattern: string) {
     `Actual independent PostgreSQL row/writer barrier not observed: ${pattern}`,
   );
 }
+async function settingsBlockedByLifecycle(blocker: number, org: string) {
+  // Ordinary settings writers now acquire this lifecycle lock before UPDATE.
+  // Prove the exact bigint advisory identity and the actual admitting holder;
+  // an unrelated advisory waiter or a row lock is not this writer barrier.
+  for (let i = 0; i < 150; i++) {
+    const { rows } = await pool.query(
+      `WITH lifecycle AS (SELECT hashtextextended($2,0) AS key)
+       SELECT activity.pid
+       FROM pg_stat_activity activity
+       JOIN pg_locks waiting ON waiting.pid=activity.pid
+       JOIN pg_locks held ON held.locktype=waiting.locktype
+         AND held.database=waiting.database AND held.classid=waiting.classid
+         AND held.objid=waiting.objid AND held.objsubid=waiting.objsubid
+       CROSS JOIN lifecycle
+       WHERE held.pid=$1::int AND held.granted AND NOT waiting.granted
+         AND held.locktype='advisory' AND held.mode='ExclusiveLock'
+         AND waiting.mode='ExclusiveLock' AND held.objsubid=1
+         AND held.classid=((lifecycle.key >> 32) & 4294967295)::oid
+         AND held.objid=(lifecycle.key & 4294967295)::oid
+         AND $1::int=ANY(pg_blocking_pids(activity.pid))
+         AND activity.query ILIKE 'SELECT pg_advisory_xact_lock(hashtextextended(%'`,
+      [blocker, `customer-lifecycle:${org}`],
+    );
+    if (rows.length) {
+      expect(rows).toHaveLength(1);
+      return Number(rows[0].pid);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw Error("Actual settings writer lifecycle advisory barrier not observed");
+}
 async function barrier(
   table: string,
   timing: "BEFORE INSERT" | "AFTER UPDATE",
@@ -310,7 +341,7 @@ realPg(
         blockedBy(admitting, '%update "contacts"%'),
         blockedBy(admitting, '%from "properties"%for update%'),
         blockedBy(admitting, '%update "users"%'),
-        blockedBy(admitting, '%update "org_settings"%'),
+        settingsBlockedByLifecycle(admitting, f.org),
         blockedBy(admitting, '%insert into "email_sender_preferences"%'),
       ]);
       expect(new Set([b.pid, admitting, ...writers]).size).toBe(7);

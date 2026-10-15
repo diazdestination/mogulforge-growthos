@@ -1,5 +1,7 @@
 import {
+  check,
   index,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -7,6 +9,8 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import type { ReservationSnapshot } from "@workspace/scheduling-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./auth";
@@ -33,6 +37,7 @@ export const appointmentsTable = pgTable(
       withTimezone: true,
     }).notNull(),
     scheduledEnd: timestamp("scheduled_end", { withTimezone: true }),
+    schedulingReservation: jsonb("scheduling_reservation").$type<ReservationSnapshot>(),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -43,6 +48,30 @@ export const appointmentsTable = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
+    check("appointments_scheduling_reservation_ck", sql`${table.schedulingReservation} is null or coalesce((
+      jsonb_typeof(${table.schedulingReservation}) = 'object'
+      and ${table.schedulingReservation}->'formatVersion' = '1'::jsonb
+      and case when jsonb_typeof(${table.schedulingReservation}->'reservationRevision') = 'number' then
+        (${table.schedulingReservation}->>'reservationRevision')::numeric between 1 and 9007199254740991
+        and trunc((${table.schedulingReservation}->>'reservationRevision')::numeric) = (${table.schedulingReservation}->>'reservationRevision')::numeric else false end
+      and case when jsonb_typeof(${table.schedulingReservation}->'sourcePolicyRevision') = 'number' then
+        (${table.schedulingReservation}->>'sourcePolicyRevision')::numeric between 1 and 9007199254740991
+        and trunc((${table.schedulingReservation}->>'sourcePolicyRevision')::numeric) = (${table.schedulingReservation}->>'sourcePolicyRevision')::numeric else false end
+      and jsonb_typeof(${table.schedulingReservation}->'sourcePolicyDigest') = 'string'
+      and jsonb_typeof(${table.schedulingReservation}->'approvedTimeZone') = 'string'
+      and jsonb_typeof(${table.schedulingReservation}->'inspection') in ('null', 'object')
+      and jsonb_typeof(${table.schedulingReservation}->'startAt') = 'string'
+      and jsonb_typeof(${table.schedulingReservation}->'endAt') = 'string'
+      and jsonb_typeof(${table.schedulingReservation}->'resourceUserIds') = 'array'
+      and case when jsonb_typeof(${table.schedulingReservation}->'minimumTravelGapMinutes') = 'number' then
+        (${table.schedulingReservation}->>'minimumTravelGapMinutes')::numeric between 0 and 1440
+        and trunc((${table.schedulingReservation}->>'minimumTravelGapMinutes')::numeric) = (${table.schedulingReservation}->>'minimumTravelGapMinutes')::numeric else false end
+      and jsonb_typeof(${table.schedulingReservation}->'duration') = 'object'
+      and jsonb_typeof(${table.schedulingReservation}->'admittedAt') = 'string'
+      and jsonb_typeof(${table.schedulingReservation}->'admittedByUserId') in ('null', 'string')
+      and jsonb_typeof(${table.schedulingReservation}->'target') = 'object'
+      and jsonb_typeof(${table.schedulingReservation}->'lastTransition') = 'object'
+    ), false)`),
     unique("appointments_org_id_uq").on(table.organizationId, table.id),
     index("appointments_org_start_idx").on(
       table.organizationId,
@@ -57,6 +86,6 @@ export const appointmentsTable = pgTable(
 
 export const insertAppointmentSchema = createInsertSchema(
   appointmentsTable,
-).omit({ id: true, createdAt: true, updatedAt: true });
+).omit({ id: true, createdAt: true, updatedAt: true, schedulingReservation: true });
 export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
 export type Appointment = typeof appointmentsTable.$inferSelect;

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CustomerWorkProjectMutationCommand } from './customerWorkProjectMutationCommand';
+import type { CustomerWorkProjectMutationCommandOutcome } from './customerWorkProjectMutationCommandOutcome';
 import type { CustomerWorkProjectMutationProject } from './customerWorkProjectMutationProject';
 
 export interface CustomerWorkProjectMutation {
@@ -13,4 +14,5 @@ export interface CustomerWorkProjectMutation {
   organizationId: string;
   project: CustomerWorkProjectMutationProject;
   command: CustomerWorkProjectMutationCommand;
+  commandOutcome: CustomerWorkProjectMutationCommandOutcome;
 }

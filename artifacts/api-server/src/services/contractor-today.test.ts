@@ -29,9 +29,10 @@ type Tenant = {
 const tenants: Tenant[] = [];
 let server: Server, base: string;
 async function setZone(org: string, zone: string) {
-  await db.execute(sql`INSERT INTO org_settings (organization_id,inspection_availability)
-    VALUES (${org},${JSON.stringify({ timezone: zone })}::jsonb)
-    ON CONFLICT (organization_id) DO UPDATE SET inspection_availability=excluded.inspection_availability`);
+  await db
+    .update(organizationsTable)
+    .set({ timezone: zone })
+    .where(eq(organizationsTable.id, org));
 }
 beforeAll(async () => {
   for (const name of ["A", "B"]) {
@@ -96,9 +97,9 @@ const day = (
 ) => getContractorToday(t.org, t.owner, input);
 
 describe("contractor workday snapshot", () => {
-  it("reads a UTC fallback without creating settings and defaults staff to their own work", async () => {
+  it("reads the company zone without creating settings and defaults staff to their own work", async () => {
     const t = tenants[0];
-    expect((await day(t)).timeZoneSource).toBe("utc_fallback");
+    expect((await day(t)).timeZoneSource).toBe("configured");
     expect(
       (
         await db.execute(
@@ -132,10 +133,7 @@ describe("contractor workday snapshot", () => {
       ).date,
     ).toBe("2026-03-07");
     await setZone(t.org, "invalid/not-a-timezone");
-    expect(await day(t)).toMatchObject({
-      timeZone: "UTC",
-      timeZoneSource: "utc_fallback",
-    });
+    await expect(day(t)).rejects.toMatchObject({ status: 409 });
     await setZone(t.org, "America/New_York");
   });
   it("finds old overdue work outside a newest-200 page and reports accurate bounded totals", async () => {
@@ -150,22 +148,18 @@ describe("contractor workday snapshot", () => {
         assignedUserId: t.owner,
       })
       .returning();
-    await db
-      .insert(crmTasksTable)
-      .values(
-        Array.from({ length: 220 }, (_, i) => ({
-          organizationId: t.org,
-          title: `New ${i}`,
-          dueAt: new Date("2026-03-08T12:00:00Z"),
-        })),
-      );
-    await db
-      .insert(crmTasksTable)
-      .values({
+    await db.insert(crmTasksTable).values(
+      Array.from({ length: 220 }, (_, i) => ({
         organizationId: t.org,
-        title: "Future",
-        dueAt: new Date("2026-03-09T04:00:00Z"),
-      });
+        title: `New ${i}`,
+        dueAt: new Date("2026-03-08T12:00:00Z"),
+      })),
+    );
+    await db.insert(crmTasksTable).values({
+      organizationId: t.org,
+      title: "Future",
+      dueAt: new Date("2026-03-09T04:00:00Z"),
+    });
     const result = await day(t);
     expect(result.tasks.total).toBe(221);
     expect(result.tasks.truncated).toBe(true);
@@ -326,16 +320,14 @@ describe("contractor workday snapshot", () => {
         assignedUserId: t.rep,
       })
       .returning();
-    await db
-      .insert(serviceObligationsTable)
-      .values({
-        organizationId: t.org,
-        contactId: t.contact,
-        taskId: task.id,
-        kind: "maintenance",
-        equipmentLabel: "Furnace",
-        dueAt: new Date("2026-03-08T12:00:00Z"),
-      });
+    await db.insert(serviceObligationsTable).values({
+      organizationId: t.org,
+      contactId: t.contact,
+      taskId: task.id,
+      kind: "maintenance",
+      equipmentLabel: "Furnace",
+      dueAt: new Date("2026-03-08T12:00:00Z"),
+    });
     const result = await getContractorToday(t.org, t.rep, {
       date: "2026-03-08",
     });
@@ -358,13 +350,11 @@ describe("contractor workday snapshot", () => {
     await expect(
       getContractorToday(t.org, foreign.owner),
     ).rejects.toMatchObject({ status: 403 });
-    await db
-      .insert(crmTasksTable)
-      .values({
-        organizationId: t.org,
-        title: "PRIVATE_CROSS_TENANT",
-        leadId: foreign.lead,
-      });
+    await db.insert(crmTasksTable).values({
+      organizationId: t.org,
+      title: "PRIVATE_CROSS_TENANT",
+      leadId: foreign.lead,
+    });
     expect(JSON.stringify(await day(t))).not.toContain("PRIVATE_CROSS_TENANT");
     expect(JSON.stringify(await day(t))).not.toContain(foreign.contact);
     await db

@@ -1,0 +1,18 @@
+﻿{"pid":18468,"parentPid":26744,"containersCreated":0,"kind":"external_observer_created","volumesCreated":0,"creationTime":"\/Date(1792037250156)\/","at":"2026-10-15T04:07:32.0709433Z","baselineBuildDirectories":[]}
+{"kind":"owned_process_observed","executable":"C:\\Program Files\\nodejs\\node.exe","at":"2026-10-15T04:07:32.3091699Z","pid":24300,"parentPid":26744,"creationTime":"\/Date(1792037250144)\/"}
+{"kind":"owned_process_observed","executable":"C:\\Forge\\worktrees\\growthos-recovery-test-pin-20261014\\node_modules\\.pnpm\\@esbuild+win32-x64@0.27.3\\node_modules\\@esbuild\\win32-x64\\esbuild.exe","at":"2026-10-15T04:07:41.8607208Z","pid":9848,"parentPid":24300,"creationTime":"\/Date(1792037261747)\/"}
+{"kind":"owned_process_observed","executable":"C:\\Program Files\\nodejs\\node.exe","at":"2026-10-15T04:07:43.1605932Z","pid":31416,"parentPid":24300,"creationTime":"\/Date(1792037262986)\/"}
+{"path":"C:\\Forge\\worktrees\\growthos-recovery-test-pin-20261014\\artifacts\\api-server\\.contractor-recovery-VtkTyj","kind":"owned_build_directory_observed","at":"2026-10-15T04:07:43.1769539Z","resolvedPath":"C:\\Forge\\worktrees\\growthos-recovery-test-pin-20261014\\artifacts\\api-server\\.contractor-recovery-VtkTyj","attributes":"Directory","creationTime":"\/Date(1792037262831)\/"}
+{"kind":"owned_process_observed","executable":"C:\\Program Files\\nodejs\\node.exe","at":"2026-10-15T04:07:48.9108641Z","pid":9708,"parentPid":24300,"creationTime":"\/Date(1792037268774)\/"}
+{"kind":"owned_process_observed","executable":"C:\\Program Files\\nodejs\\node.exe","at":"2026-10-15T04:07:53.4113071Z","pid":11520,"parentPid":24300,"creationTime":"\/Date(1792037272890)\/"}
+{"kind":"owned_process_observed","executable":"C:\\Program Files\\nodejs\\node.exe","at":"2026-10-15T04:07:56.5992844Z","pid":24704,"parentPid":24300,"creationTime":"\/Date(1792037275990)\/"}
+{"kind":"owned_process_observed","executable":"C:\\Program Files\\nodejs\\node.exe","at":"2026-10-15T04:07:58.5391588Z","pid":30080,"parentPid":24300,"creationTime":"\/Date(1792037278357)\/"}
+{"pid":24300,"originalProcessAbsent":true,"creationTime":"\/Date(1792037250144)\/","at":"2026-10-15T04:08:04.3369248Z","kind":"owned_process_final_check"}
+{"pid":31416,"originalProcessAbsent":true,"creationTime":"\/Date(1792037262986)\/","at":"2026-10-15T04:08:04.4404605Z","kind":"owned_process_final_check"}
+{"pid":9708,"originalProcessAbsent":true,"creationTime":"\/Date(1792037268774)\/","at":"2026-10-15T04:08:04.5471043Z","kind":"owned_process_final_check"}
+{"pid":11520,"originalProcessAbsent":true,"creationTime":"\/Date(1792037272890)\/","at":"2026-10-15T04:08:04.6457287Z","kind":"owned_process_final_check"}
+{"pid":24704,"originalProcessAbsent":true,"creationTime":"\/Date(1792037275990)\/","at":"2026-10-15T04:08:04.7767359Z","kind":"owned_process_final_check"}
+{"pid":30080,"originalProcessAbsent":true,"creationTime":"\/Date(1792037278357)\/","at":"2026-10-15T04:08:04.8924060Z","kind":"owned_process_final_check"}
+{"pid":9848,"originalProcessAbsent":true,"creationTime":"\/Date(1792037261747)\/","at":"2026-10-15T04:08:05.0018274Z","kind":"owned_process_final_check"}
+{"path":"C:\\Forge\\worktrees\\growthos-recovery-test-pin-20261014\\artifacts\\api-server\\.contractor-recovery-VtkTyj","at":"2026-10-15T04:08:05.0110954Z","absent":true,"creationTime":"\/Date(1792037262831)\/","kind":"owned_build_directory_final_check"}
+{"ownedBuildDirectoryCount":1,"kind":"external_observer_complete","at":"2026-10-15T04:08:05.0110954Z","ownedProcessCount":7,"limit":"Polling records observed processes; short-lived build helpers may finish between polls. No runtime injection or mutation.","pid":18468}

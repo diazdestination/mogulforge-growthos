@@ -1,0 +1,13 @@
+{
+  "name": "@workspace/scheduling-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "vitest run --config vitest.config.ts" },
+  "dependencies": {
+    "@js-temporal/polyfill": "0.5.1",
+    "zod": "catalog:"
+  },
+  "devDependencies": { "vitest": "4.1.10" }
+}

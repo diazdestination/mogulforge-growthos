@@ -5,16 +5,25 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+import type { CallieBookingRequestSchedulingReview } from './callieBookingRequestSchedulingReview';
 import type { CallieBookingRequestType } from './callieBookingRequestType';
 
 export interface CallieBookingRequest {
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   requestId: string;
-  /** @minimum 1 */
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @exclusiveMinimum
+     */
   expectedVersion: number;
   /** @pattern ^[a-f0-9]{64}$ */
   expectedFingerprint: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   contactId: string;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   leadId: string | null;
+  /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   propertyId: string | null;
   /**
      * @minLength 1
@@ -22,12 +31,21 @@ export interface CallieBookingRequest {
      */
   assignedUserId: string;
   type: CallieBookingRequestType;
-  scheduledStart: Date;
-  scheduledEnd: Date;
+  /**
+     * Original ISO datetime string; preserve spelling and fractional precision for source command custody.
+     * @pattern ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+     */
+  scheduledStart: string;
+  /**
+     * Original ISO datetime string; preserve spelling and fractional precision for source command custody.
+     * @pattern ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+     */
+  scheduledEnd: string;
   /**
      * @minLength 10
      * @maxLength 1000
      */
   confirmationNote: string;
   customerConfirmed: true;
+  schedulingReview?: CallieBookingRequestSchedulingReview;
 }
