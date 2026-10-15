@@ -112,6 +112,80 @@ test("combined preparation rejects absent native coverage before provider observ
   expect(api.listClusters).not.toHaveBeenCalled();
   expect(transport.verifyIdentity).not.toHaveBeenCalled();
 });
+test.each([
+  "absent-counts",
+  "negative-counts",
+  "fractional-counts",
+  "zero-clients",
+  "zero-proxies",
+  "unbounded-counts",
+  "insufficient-client-total",
+  "missing-scenario-transport",
+])("finished combined proof refuses invalid transport evidence: %s", (kind) => {
+  const f = combinedRunnerFixture,
+    p = structuredClone(f.proof);
+  const t = p.transportProofs[0];
+  if (kind === "absent-counts") p.transportProofs = [{}];
+  if (kind === "negative-counts") Object.keys(t).forEach((k) => (t[k] = -1));
+  if (kind === "fractional-counts") Object.keys(t).forEach((k) => (t[k] = 1.5));
+  if (kind === "zero-clients")
+    t.clients = t.clientsClosed = t.socketsClosed = 0;
+  if (kind === "zero-proxies") t.proxies = t.proxiesClosed = 0;
+  if (kind === "unbounded-counts")
+    Object.keys(t).forEach((k) => (t[k] = Number.MAX_SAFE_INTEGER));
+  if (kind === "insufficient-client-total")
+    p.cleanup.clients = p.cleanup.sockets = p.cleanup.expectedClients = 1;
+  if (kind === "missing-scenario-transport") p.transportProofs.pop();
+  expect(() => validateCombined(f.oracle, p, f.modules, f.candidate)).toThrow(
+    /production75_combined_live_oracle/,
+  );
+});
+test.each([
+  "reservation",
+  "begin-dispatched",
+  "begin-ack",
+  "journal",
+  "closure",
+  "owning-cleanup",
+  "opposite-terminal",
+  "reconciled-closure",
+  "reconciled-cleanup",
+])(
+  "finished combined proof refuses contradictory scheduling evidence: %s",
+  (kind) => {
+    const f = combinedRunnerFixture,
+      p = structuredClone(f.proof);
+    const q = p.schedulingCases[0].commit.proof;
+    if (kind === "reservation") q.reservationConfirmed = false;
+    if (kind === "begin-dispatched") q.beginDispatched = false;
+    if (kind === "begin-ack") q.beginAcknowledged = false;
+    if (kind === "journal") q.journalConfirmed = false;
+    if (kind === "closure") q.transactionClosure = "not-opened";
+    if (kind === "owning-cleanup") q.requiresOwningCleanup = true;
+    if (kind === "opposite-terminal") q.rollbackDispatched = true;
+    if (kind === "reconciled-closure")
+      p.schedulingCases[1].commit.proof.transactionClosure =
+        "acknowledged-rollback";
+    if (kind === "reconciled-cleanup")
+      p.schedulingCases[1].commit.proof.requiresOwningCleanup = false;
+    expect(() => validateCombined(f.oracle, p, f.modules, f.candidate)).toThrow(
+      /production75_combined_live_oracle/,
+    );
+  },
+);
+test.each(["normal", "lost-commit"])(
+  "source-copy %s scheduling outcomes bind the same baseline",
+  (key) => {
+    const f = combinedRunnerFixture,
+      p = structuredClone(f.proof);
+    p.cases[key].result.outcomes.scheduling.commit.baselineSha256 = "e".repeat(
+      64,
+    );
+    expect(() => validateCombined(f.oracle, p, f.modules, f.candidate)).toThrow(
+      /production75_combined_live_oracle/,
+    );
+  },
+);
 function combinedDepsFixture() {
   const f = combinedRunnerFixture;
   return {

@@ -1,6 +1,7 @@
 import { test, expect, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import { createOperatorResources } from "./production75-operator.mjs";
+import { guardCombinedSchedulingWriter } from "./production75-live-runner.mjs";
 import {
   createLiveTransport,
   liveEnvironment,
@@ -8,7 +9,7 @@ import {
 } from "./production75-live-transport.mjs";
 const credential = "fm1r_" + "A".repeat(40),
   config = `access_token: ${credential},${"B".repeat(40)}\n`;
-function fixture({ fetchFn } = {}) {
+function fixture({ fetchFn, queryFn } = {}) {
   let alive = false,
     closed = false;
   const child = new EventEmitter();
@@ -50,7 +51,8 @@ function fixture({ fetchFn } = {}) {
       };
     }
     async connect() {}
-    async query() {
+    async query(...args) {
+      if (queryFn) return queryFn(...args);
       return { rows: [] };
     }
     async end() {
@@ -207,6 +209,154 @@ test("raw dependency errors are rebuilt without private cause/message", async ()
     expect(e.cause).toBeUndefined();
   }
 });
+test.each([true, false])(
+  "settled server classification is scheduling-only opt-in: %s",
+  async (enabled) => {
+    const calls = [],
+      f = fixture({
+        queryFn: async (sql) => {
+          calls.push(sql);
+          if (sql === "ROLLBACK") return { command: "ROLLBACK" };
+          throw Object.assign(new Error("private row and credential"), {
+            code: "23514",
+            severity: "ERROR",
+            constraint: "private_constraint",
+            detail: "private data",
+          });
+        },
+      }),
+      r = createOperatorResources({ until: Date.now() + 10000 });
+    try {
+      await f.transport.verifyIdentity();
+      const p = await f.transport.openProxy("abcdefghijklmnop", r);
+      const client = await f.transport.connect(
+        p,
+        "fly-db",
+        { user: "fly-user", password: "fixture" },
+        { readonly: false, resources: r, settledServerErrors: enabled },
+      );
+      const writer = guardCombinedSchedulingWriter({
+        writer: client,
+        resources: r,
+        verifyProtected: async () => {},
+      });
+      let observed;
+      try {
+        await writer.query("ALTER TABLE fixture");
+      } catch (e) {
+        observed = e;
+      }
+      expect(observed.message).toBe("production75_live_query");
+      expect(observed.code).toBe(enabled ? "23514" : undefined);
+      expect(observed.severity).toBe(enabled ? "ERROR" : undefined);
+      expect(observed.detail).toBeUndefined();
+      expect(observed.constraint).toBeUndefined();
+      expect(observed.cause).toBeUndefined();
+      expect(JSON.stringify(observed)).not.toContain("private");
+      if (enabled)
+        expect(await writer.query("ROLLBACK")).toEqual({ command: "ROLLBACK" });
+      expect(calls).toEqual(
+        enabled ? ["ALTER TABLE fixture", "ROLLBACK"] : ["ALTER TABLE fixture"],
+      );
+    } finally {
+      expect(await r.drain()).toEqual({ closed: true });
+    }
+  },
+);
+test.each([
+  ["08006", "ERROR"],
+  ["57P01", "ERROR"],
+  ["23514", "FATAL"],
+  ["23514", "PANIC"],
+  ["23514", undefined],
+  ["private", "ERROR"],
+])(
+  "uncertain server error %s/%s remains generic with scheduling opt-in",
+  async (code, severity) => {
+    const f = fixture({
+        queryFn: async () => {
+          throw Object.assign(new Error("private"), { code, severity });
+        },
+      }),
+      r = createOperatorResources({ until: Date.now() + 10000 });
+    try {
+      await f.transport.verifyIdentity();
+      const p = await f.transport.openProxy("abcdefghijklmnop", r);
+      const client = await f.transport.connect(
+        p,
+        "fly-db",
+        { user: "fly-user", password: "fixture" },
+        { readonly: false, resources: r, settledServerErrors: true },
+      );
+      await expect(client.query("ALTER TABLE fixture")).rejects.toMatchObject({
+        safeCode: "production75_live_query",
+      });
+      try {
+        await client.query("ALTER TABLE fixture");
+      } catch (e) {
+        expect(e.code).toBeUndefined();
+        expect(e.severity).toBeUndefined();
+      }
+    } finally {
+      expect(await r.drain()).toEqual({ closed: true });
+    }
+  },
+);
+test.each(["accessor", "proxy", "closed-socket", "aborted-resources"])(
+  "settled classification refuses %s without evaluating error hooks",
+  async (kind) => {
+    let hooks = 0,
+      client;
+    const r = createOperatorResources({ until: Date.now() + 10000 });
+    const f = fixture({
+      queryFn: async () => {
+        const error = Object.assign(new Error("private"), {
+          code: "23514",
+          severity: "ERROR",
+        });
+        if (kind === "accessor")
+          Object.defineProperty(error, "code", {
+            get() {
+              hooks++;
+              return "23514";
+            },
+          });
+        if (kind === "closed-socket") client.connection.stream.destroy();
+        if (kind === "aborted-resources") r.abort();
+        throw kind === "proxy"
+          ? new Proxy(error, {
+              getOwnPropertyDescriptor() {
+                hooks++;
+                throw Error("private");
+              },
+            })
+          : error;
+      },
+    });
+    try {
+      await f.transport.verifyIdentity();
+      const p = await f.transport.openProxy("abcdefghijklmnop", r);
+      client = await f.transport.connect(
+        p,
+        "fly-db",
+        { user: "fly-user", password: "fixture" },
+        { readonly: false, resources: r, settledServerErrors: true },
+      );
+      let observed;
+      try {
+        await client.query("ALTER TABLE fixture");
+      } catch (e) {
+        observed = e;
+      }
+      expect(observed.code).toBeUndefined();
+      expect(observed.severity).toBeUndefined();
+      expect(observed.message).not.toContain("private");
+      expect(hooks).toBe(0);
+    } finally {
+      expect(await r.drain()).toEqual({ closed: true });
+    }
+  },
+);
 test.each(["kzpwm0j18eg04nv3", "zp2wjrejd2zodn4q"])(
   "writable session on protected %s is refused",
   async (cluster) => {
@@ -301,7 +451,10 @@ test("failed writer cannot kill independent Reader reconciliation", async () => 
     reader = await f.transport.connect(
       p,
       "fly-db",
-      { user: "growthos-reader-abcdef01234546789abcdef012345678", password: "fixture" },
+      {
+        user: "growthos-reader-abcdef01234546789abcdef012345678",
+        password: "fixture",
+      },
       { readonly: true, resources: r },
     );
   writer.emit("error", new Error("synthetic connection loss"));

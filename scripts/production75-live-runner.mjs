@@ -339,17 +339,29 @@ function deltaProof(r, outcome, reconciled = false) {
     p.originalColumns === 1867 &&
     p.newColumns === 3 &&
     p.nullColumnsVerified === 3 &&
+    p.reservationConfirmed === true &&
+    p.beginDispatched === true &&
+    p.beginAcknowledged === true &&
     p.freshReaderVerified === true &&
     p.preimageVerified === true &&
     p.postimageVerified === true &&
     p.sourceDispatched === true &&
     p.sourceAcknowledged === true &&
     (outcome === "rollback"
-      ? p.rollbackAcknowledged === true
-      : p.commitDispatched === true &&
+      ? p.rollbackDispatched === true &&
+        p.rollbackAcknowledged === true &&
+        p.commitDispatched === false &&
+        p.commitAcknowledged === false
+      : p.rollbackDispatched === false &&
+        p.rollbackAcknowledged === false &&
+        p.commitDispatched === true &&
         (reconciled
           ? p.commitAcknowledged === false
-          : p.commitAcknowledged === true))
+          : p.commitAcknowledged === true)) &&
+    p.journalConfirmed === !reconciled &&
+    p.transactionClosure ===
+      (reconciled ? "unconfirmed" : `acknowledged-${outcome}`) &&
+    p.requiresOwningCleanup === reconciled
   );
 }
 export function validateCombinedLiveOracle(
@@ -452,13 +464,24 @@ export function validateCombinedLiveOracle(
             x.removed === true &&
             x.loopbackOnly === true,
         ) &&
-        proof.transportProofs?.length > 0 &&
+        proof.transportProofs?.length === 3 &&
         proof.transportProofs.every(
           (t) =>
+            [
+              t.clients,
+              t.clientsClosed,
+              t.socketsClosed,
+              t.proxies,
+              t.proxiesClosed,
+            ].every(
+              (n) => Number.isSafeInteger(n) && n > 0 && n <= c.clients,
+            ) &&
             t.clients === t.clientsClosed &&
             t.clients === t.socketsClosed &&
             t.proxies === t.proxiesClosed,
-        ),
+        ) &&
+        proof.transportProofs.reduce((total, t) => total + t.clients, 0) <=
+          c.clients,
       code,
     );
     for (const key of ["normal", "lost-commit", "idle-client-error"]) {
@@ -489,7 +512,9 @@ export function validateCombinedLiveOracle(
           ) &&
           deltaProof(r.outcomes.scheduling?.rollback, "rollback") &&
           (deltaProof(r.outcomes.scheduling?.commit, "commit") ||
-            deltaProof(r.outcomes.scheduling?.commit, "commit", true)),
+            deltaProof(r.outcomes.scheduling?.commit, "commit", true)) &&
+          r.outcomes.scheduling.rollback.baselineSha256 ===
+            r.outcomes.scheduling.commit.baselineSha256,
         code,
       );
       if (key === "lost-commit")
@@ -1231,7 +1256,7 @@ async function executePacket(
           p,
           "fly-db",
           await credentials(copy, custody, "writer"),
-          { readonly: false, resources },
+          { readonly: false, resources, settledServerErrors: true },
         ),
         reader = await transport.connect(
           p,

@@ -2,7 +2,7 @@
 import { createHash, randomInt } from "node:crypto";
 import { readFileSync, lstatSync } from "node:fs";
 import { execFile, spawn } from "node:child_process";
-import { promisify } from "node:util";
+import { promisify, types } from "node:util";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
@@ -554,7 +554,7 @@ export function createLiveTransport({
     proxy,
     database,
     credentials,
-    { readonly, resources } = {},
+    { readonly, resources, settledServerErrors = false } = {},
   ) {
     const owned = proxyOwners.get(proxy);
     check(
@@ -565,6 +565,7 @@ export function createLiveTransport({
           database,
         ) &&
         typeof readonly === "boolean" &&
+        typeof settledServerErrors === "boolean" &&
         resources?.acquire &&
         credentials &&
         /^[a-z_][a-z0-9_-]{0,62}$/.test(credentials.user) &&
@@ -635,7 +636,34 @@ export function createLiveTransport({
             resources.assertActive();
             return value;
           } catch (e) {
-            throw fail(errors.get(e) ?? "production75_live_query");
+            const sanitized = fail(errors.get(e) ?? "production75_live_query");
+            // Only the new scheduling writer opts into settled ERROR metadata.
+            // Raw messages, row/constraint details and causes never cross here.
+            if (
+              settledServerErrors &&
+              !failed &&
+              client.connection?.stream?.destroyed === false &&
+              e &&
+              typeof e === "object" &&
+              !types.isProxy(e)
+            ) {
+              const code = Object.getOwnPropertyDescriptor(e, "code")?.value;
+              const severity = Object.getOwnPropertyDescriptor(
+                e,
+                "severity",
+              )?.value;
+              if (
+                typeof code === "string" &&
+                /^[0-9A-Z]{5}$/.test(code) &&
+                !/^(00|01|02|08)/.test(code) &&
+                !["57P01", "57P02", "57P03"].includes(code) &&
+                severity === "ERROR"
+              ) {
+                resources.assertActive();
+                Object.assign(sanitized, { code, severity });
+              }
+            }
+            throw sanitized;
           }
         };
         client.__driverClose = end;

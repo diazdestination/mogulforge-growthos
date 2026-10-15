@@ -248,15 +248,13 @@ export async function makeCombinedFixture() {
       removed: true,
       loopbackOnly: true,
     })),
-    transportProofs: [
-      {
-        clients: 2,
-        clientsClosed: 2,
-        socketsClosed: 2,
-        proxies: 1,
-        proxiesClosed: 1,
-      },
-    ],
+    transportProofs: Array.from({ length: 3 }, () => ({
+      clients: 2,
+      clientsClosed: 2,
+      socketsClosed: 2,
+      proxies: 1,
+      proxiesClosed: 1,
+    })),
     cases: {
       normal: {
         result: caseResult(false),
