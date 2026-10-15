@@ -56,6 +56,9 @@ const PRE = new Set([
   "307fee292bc66d8f9fe11858d9cd8fe2c2983a59563ba867d6ebf50504f3ef6e",
   "2ed9500b5fb077a19aa16003bd346f8369a1b1cb3da8ea8f9a396265b6410f7b",
 ]);
+const verificationAttempts = new Set(),
+  verificationPlans = new WeakSet(),
+  verificationWriters = new WeakSet();
 const ADDED = Object.freeze([
   [
     "appointments",
@@ -642,4 +645,436 @@ export async function captureScheduling0019State(observer, plan) {
   const state = { phase, identity, catalog, fingerprints, policy, nullCounts };
   validateState(state, plan, phase);
   return state;
+}
+
+// The binding intentionally excludes transient Reader identity/PID. Custody
+// consumes this exact immutable intent instead of inventing a second formula.
+function bindSchedulingBaseline(baseline, plan) {
+  assertScheduling0019Preserved(baseline, baseline, plan, "pre0019");
+  const catalogSha256 = catalogDigest(baseline.catalog, { physical: true }),
+    policySha256 = sha(JSON.stringify(baseline.policy));
+  const fingerprints = [...baseline.fingerprints]
+    .sort((a, b) => (a.table < b.table ? -1 : a.table > b.table ? 1 : 0))
+    .map(({ table, rows, bytes, digest }) => ({ table, rows, bytes, digest }));
+  return freeze({
+    baselineSha256: sha(
+      JSON.stringify({
+        phase: "pre0019",
+        catalogSha256,
+        fingerprints,
+        policySha256,
+        nullCounts: {},
+      }),
+    ),
+    catalogSha256,
+    policySha256,
+  });
+}
+function verificationReader(state, plan, baseline, writerPid) {
+  const i = state?.identity,
+    t = plan.target;
+  check(
+    i?.database === t.database &&
+      i.login === t.readerLogin &&
+      i.role === t.readerRole &&
+      i.read_only === "on" &&
+      i.isolation === "repeatable read" &&
+      i.version === baseline.identity.version &&
+      Number.isInteger(i.pid) &&
+      i.pid > 0 &&
+      (writerPid === undefined || i.pid !== writerPid),
+    "verification_reader",
+  );
+}
+/** One supplied-client transaction. Caller owns admission, clients and cleanup. */
+export async function runScheduling0019Verification(input = {}) {
+  check(
+    input &&
+      keys(
+        input,
+        "writer,plan,baseline,outcome,attemptId,reserve,persist,readFresh" +
+          (Object.hasOwn(input, "now") ? ",now" : ""),
+      ),
+    "verification_input",
+  );
+  const {
+    writer,
+    plan,
+    outcome,
+    attemptId,
+    reserve,
+    persist,
+    readFresh,
+    now = Date.now,
+  } = input;
+  const writerQuery = writer?.query;
+  check(
+    plans.has(plan) &&
+      planSources.has(plan) &&
+      typeof writerQuery === "function" &&
+      ["rollback", "commit"].includes(outcome) &&
+      typeof reserve === "function" &&
+      typeof persist === "function" &&
+      typeof readFresh === "function" &&
+      typeof now === "function" &&
+      /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(
+        attemptId ?? "",
+      ),
+    "verification_input",
+  );
+  // All input snapshots, callbacks and branding are fixed before the first await.
+  assertScheduling0019Preserved(
+    input.baseline,
+    input.baseline,
+    plan,
+    "pre0019",
+  );
+  let baseline;
+  try {
+    baseline = freeze(structuredClone(input.baseline));
+  } catch {
+    check(false, "verification_input");
+  }
+  verificationReader(baseline, plan, baseline);
+  const binding = bindSchedulingBaseline(baseline, plan),
+    source = planSources.get(plan);
+  check(
+    !verificationAttempts.has(attemptId) &&
+      !verificationPlans.has(plan) &&
+      !verificationWriters.has(writer),
+    "verification_replay",
+  );
+  verificationAttempts.add(attemptId);
+  verificationPlans.add(plan);
+  verificationWriters.add(writer);
+  const started = now();
+  check(Number.isFinite(started), "verification_input");
+  const deadline = started + 240000;
+  const proof = {
+    originalTables: 142,
+    originalColumns: 1867,
+    newColumns: 3,
+    nullColumnsVerified: 0,
+    reservationConfirmed: false,
+    beginDispatched: false,
+    beginAcknowledged: false,
+    sourceDispatched: false,
+    sourceAcknowledged: false,
+    commitDispatched: false,
+    commitAcknowledged: false,
+    rollbackDispatched: false,
+    rollbackAcknowledged: false,
+    freshReaderVerified: false,
+    journalConfirmed: false,
+    preimageVerified: false,
+    postimageVerified: false,
+    transactionClosure: "not-opened",
+    requiresOwningCleanup: false,
+  };
+  const result = {
+    kind: "SCHEDULING0019_VERIFICATION",
+    status: "failed-or-held",
+    attemptId,
+    baselineSha256: binding.baselineSha256,
+    sourceSha256: source.sha256,
+    proof,
+    errorCode: null,
+  };
+  const faultCodes = new WeakMap();
+  const fault = (code) => {
+    const error = Object.assign(Error(`scheduling0019_verification_${code}`), {
+      safeCode: `scheduling0019_verification_${code}`,
+    });
+    faultCodes.set(error, code);
+    return error;
+  };
+  let mutationBlocked = false,
+    open = false,
+    writerPid,
+    finalReadAttempted = false;
+  const remaining = () => {
+    const ms = deadline - now();
+    if (!Number.isFinite(ms) || ms <= 0) {
+      mutationBlocked = true;
+      throw fault("deadline");
+    }
+    return ms;
+  };
+  async function bounded(operation, cap, kind) {
+    let timer;
+    const ms = Math.min(cap, remaining()),
+      until = now() + ms;
+    try {
+      const value = await Promise.race([
+        Promise.resolve().then(() => {
+          remaining();
+          return operation();
+        }),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            mutationBlocked = true;
+            reject(fault("timeout"));
+          }, ms);
+        }),
+      ]);
+      if (now() >= until) {
+        mutationBlocked = true;
+        throw fault("deadline");
+      }
+      remaining();
+      return value;
+    } catch (error) {
+      if (faultCodes.has(error)) throw error;
+      if (kind === "query") {
+        // Only an actual settled PostgreSQL error permits transaction cleanup.
+        const code = error?.code,
+          known =
+            typeof code === "string" &&
+            /^[0-9A-Z]{5}$/.test(code) &&
+            !code.startsWith("08") &&
+            !["57P01", "57P02", "57P03"].includes(code) &&
+            !["FATAL", "PANIC"].includes(error?.severity);
+        if (!known) mutationBlocked = true;
+      }
+      throw fault(kind === "query" ? "database" : "callback");
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  const query = (sql, args, onDispatch) =>
+    bounded(
+      () => {
+        onDispatch?.();
+        return writerQuery.call(writer, sql, args);
+      },
+      15000,
+      "query",
+    );
+  const journal = (event) =>
+    bounded(() => persist(freeze(event)), 5000, "journal");
+  const acknowledge = (response, commands) => {
+    const responses = Array.isArray(response) ? response : [response];
+    if (
+      responses.length !== commands.length ||
+      responses.some((r, i) => r?.command !== commands[i])
+    ) {
+      mutationBlocked = true;
+      throw fault("ack");
+    }
+  };
+  function writerIdentity(row, inTransaction) {
+    const valid =
+      row &&
+      row.database === plan.target.database &&
+      row.login === plan.target.writerLogin &&
+      (inTransaction
+        ? row.role === plan.target.writerRole
+        : plan.target.writerInitialRoles.includes(row.role)) &&
+      row.version === baseline.identity.version &&
+      Number.isInteger(row.pid) &&
+      row.pid > 0 &&
+      (writerPid === undefined || row.pid === writerPid) &&
+      row.read_only === "off" &&
+      (!inTransaction || row.isolation === "repeatable read");
+    if (!valid) {
+      mutationBlocked = true;
+      throw fault("writer_identity");
+    }
+  }
+  const writerView = {
+    query: async (sql, args) => {
+      const response = await query(sql, args);
+      if (sql === IDENTITY_SQL) {
+        if (response.rows?.length !== 1) {
+          mutationBlocked = true;
+          throw fault("writer_identity");
+        }
+        writerIdentity(response.rows[0], true);
+      }
+      return response;
+    },
+  };
+  async function observe(final = false) {
+    if (final) finalReadAttempted = true;
+    const state = await bounded(
+      () => readFresh(),
+      Math.min(240000, remaining()),
+      "reader",
+    );
+    verificationReader(state, plan, baseline, writerPid);
+    assertScheduling0019Preserved(baseline, state, plan, state.phase);
+    return state;
+  }
+  const finish = () => {
+    proof.requiresOwningCleanup =
+      proof.beginDispatched &&
+      !(proof.commitAcknowledged || proof.rollbackAcknowledged);
+    return freeze(result);
+  };
+  try {
+    const initialReader = await observe();
+    if (initialReader.phase === "post0019") {
+      proof.freshReaderVerified = true;
+      proof.postimageVerified = true;
+      proof.nullColumnsVerified = 3;
+      result.status =
+        outcome === "commit"
+          ? "reconciled-commit-no-replay"
+          : "verification-held-no-replay";
+      result.errorCode = "scheduling0019_verification_already_applied";
+      return finish();
+    }
+    const initial = (await query(IDENTITY_SQL)).rows;
+    check(initial?.length === 1, "verification_writer");
+    writerIdentity(initial[0], false);
+    writerPid = initial[0].pid;
+    verificationReader(initialReader, plan, baseline, writerPid);
+    const intent = freeze({
+      kind: "SCHEDULING0019_TRANSACTION_RESERVATION",
+      attemptId,
+      database: plan.target.database,
+      sourceCommit: source.sourceCommit,
+      sourceSha256: source.sha256,
+      ...binding,
+      moduleManifestSha256: plan.sourceBinding.moduleManifestSha256,
+      candidate: plan.sourceBinding.candidate,
+      outcome,
+    });
+    if ((await bounded(() => reserve(intent), 5000, "reservation")) !== true)
+      throw fault("reservation");
+    proof.reservationConfirmed = true;
+    await journal({ phase: "begin-intent" });
+    acknowledge(
+      await query("BEGIN ISOLATION LEVEL REPEATABLE READ", undefined, () => {
+        proof.beginDispatched = true;
+        proof.transactionClosure = "unconfirmed";
+      }),
+      ["BEGIN"],
+    );
+    open = true;
+    proof.beginAcknowledged = true;
+    const settings = [
+      "SET LOCAL statement_timeout='15000ms'",
+      "SET LOCAL lock_timeout='3000ms'",
+      "SET LOCAL idle_in_transaction_session_timeout='20000ms'",
+      "SET LOCAL search_path=public,pg_catalog",
+      "SET LOCAL timezone='UTC'",
+      "SET LOCAL datestyle='ISO,YMD'",
+      "SET LOCAL intervalstyle='postgres'",
+      "SET LOCAL extra_float_digits=3",
+      "SET LOCAL bytea_output='hex'",
+      "SET LOCAL row_security=off",
+      `SET LOCAL ROLE "${plan.target.writerRole}"`,
+    ];
+    acknowledge(
+      await query(settings.join("; ")),
+      settings.map(() => "SET"),
+    );
+    await journal({ phase: "begin-ack", pid: writerPid });
+    await writerView.query(IDENTITY_SQL);
+    acknowledge(
+      await query(
+        `LOCK TABLE ${plan.catalogs.before.tables
+          .map((t) => `public.${q(t.name)}`)
+          .sort()
+          .join(",")} IN ACCESS EXCLUSIVE MODE`,
+      ),
+      ["LOCK"],
+    );
+    const before = await captureScheduling0019State(writerView, plan);
+    assertScheduling0019Preserved(baseline, before, plan, "pre0019");
+    proof.preimageVerified = true;
+    await journal({
+      phase: "step-intent",
+      path: source.path,
+      sha256: source.sha256,
+    });
+    acknowledge(
+      await query(source.sql, undefined, () => {
+        proof.sourceDispatched = true;
+      }),
+      Array(6).fill("ALTER"),
+    );
+    proof.sourceAcknowledged = true;
+    await journal({ phase: "step-ack", path: source.path });
+    const after = await captureScheduling0019State(writerView, plan);
+    assertScheduling0019Preserved(baseline, after, plan, "post0019");
+    proof.postimageVerified = true;
+    proof.nullColumnsVerified = 3;
+    await journal({
+      phase: "precommit-verified",
+      proof: {
+        originalTables: 142,
+        originalColumns: 1867,
+        newColumns: 3,
+        nullColumnsVerified: 3,
+      },
+    });
+    await journal({ phase: `${outcome}-intent` });
+    acknowledge(
+      await query(outcome.toUpperCase(), undefined, () => {
+        proof[`${outcome}Dispatched`] = true;
+      }),
+      [outcome.toUpperCase()],
+    );
+    proof[`${outcome}Acknowledged`] = true;
+    proof.transactionClosure = `acknowledged-${outcome}`;
+    open = false;
+    await journal({ phase: `${outcome}-ack` });
+    proof.journalConfirmed = true;
+    const observed = await observe(true);
+    check(
+      observed.phase === (outcome === "commit" ? "post0019" : "pre0019"),
+      "verification_reader_phase",
+    );
+    proof.freshReaderVerified = true;
+    result.status = `verified-${outcome}`;
+    return finish();
+  } catch (error) {
+    result.errorCode = /^scheduling0019_[a-z_]+$/.test(error?.safeCode ?? "")
+      ? error.safeCode
+      : "scheduling0019_verification_failure";
+    // No second terminal query after dispatch or unresolved/expired work. A
+    // settled pre-terminal server/journal failure can receive one real ROLLBACK.
+    if (
+      open &&
+      !mutationBlocked &&
+      !proof.commitDispatched &&
+      !proof.rollbackDispatched
+    ) {
+      try {
+        acknowledge(
+          await query("ROLLBACK", undefined, () => {
+            proof.rollbackDispatched = true;
+          }),
+          ["ROLLBACK"],
+        );
+        proof.rollbackAcknowledged = true;
+        proof.transactionClosure = "acknowledged-rollback";
+        open = false;
+        await journal({ phase: "rollback-ack", afterFailure: true });
+      } catch {}
+    }
+    if (proof.beginDispatched && !finalReadAttempted) {
+      try {
+        const observed = await observe(true);
+        proof.freshReaderVerified = true;
+        if (proof.commitDispatched && observed.phase === "post0019") {
+          proof.postimageVerified = true;
+          proof.nullColumnsVerified = 3;
+          result.status = "reconciled-commit-no-replay";
+        } else if (
+          mutationBlocked ||
+          !proof.rollbackAcknowledged ||
+          proof.commitDispatched ||
+          (!proof.sourceAcknowledged && proof.rollbackDispatched === false)
+        )
+          result.status = "verification-held-no-replay";
+      } catch {
+        result.status = "verification-held-no-replay";
+      }
+    } else if (proof.beginDispatched)
+      result.status = "verification-held-no-replay";
+    return finish();
+  }
 }

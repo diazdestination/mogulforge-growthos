@@ -1,10 +1,21 @@
-import { beforeAll, test, expect } from "vitest";
+import { beforeAll, test, expect, vi } from "vitest";
+import { createHash, randomUUID } from "node:crypto";
 import {
   buildScheduling0019Source,
   prepareScheduling0019,
   captureScheduling0019State,
   assertScheduling0019Preserved,
+  runScheduling0019Verification,
 } from "./production75-scheduling0019.mjs";
+import {
+  IDENTITY_SQL,
+  OWNERSHIP_SQL,
+  PRODUCTION75_PRIVILEGE_QUERIES,
+} from "./production75-core.mjs";
+import {
+  CATALOG_QUERIES,
+  catalogDigest,
+} from "../reports/release-preparation-2026-10-09/schema-catalog.mjs";
 import {
   makeScheduling0019Fixture,
   withScheduling0019Database,
@@ -44,6 +55,542 @@ test.each([0, 1])(
     expect(JSON.stringify(plan)).not.toContain("ALTER TABLE");
   },
 );
+
+// Transport-boundary transaction model. Catalog/data expectations come only
+// from independently executed T2 fixtures; native transactions remain T6 proof.
+function transactionFixture(options = {}) {
+  const f = fixtures[0],
+    baseline = structuredClone(f.before),
+    plan = prepareScheduling0019(input(f));
+  const calls = [],
+    events = [],
+    reservations = [];
+  let transaction = false,
+    phase = "pre0019",
+    committed = "pre0019",
+    readerCalls = 0,
+    ddlDispatches = 0;
+  const writerIdentity = {
+    ...baseline.identity,
+    login: "fly-user",
+    role: "schema_admin",
+    pid: 77,
+    read_only: "off",
+    isolation: "read committed",
+  };
+  const state = () => (phase === "post0019" ? f.after : f.before);
+  const writer = {
+    query: async (sql, args) => {
+      calls.push(["query", sql]);
+      if (options.query) return options.query(sql, args, defaultQuery);
+      return defaultQuery(sql, args);
+    },
+  };
+  async function defaultQuery(sql, args) {
+    if (sql === IDENTITY_SQL)
+      return {
+        rows: [
+          {
+            ...writerIdentity,
+            isolation: transaction ? "repeatable read" : "read committed",
+            ...options.writerIdentity,
+          },
+        ],
+      };
+    if (sql === "BEGIN ISOLATION LEVEL REPEATABLE READ") {
+      transaction = true;
+      return options.beginAck ?? { command: "BEGIN" };
+    }
+    if (sql.startsWith("SET LOCAL "))
+      return sql
+        .split(";")
+        .filter((s) => s.trim())
+        .map(() => ({ command: "SET" }));
+    if (sql.startsWith("LOCK TABLE ")) return { command: "LOCK" };
+    if (sql === f.sourceInput.bytes.toString("utf8")) {
+      ddlDispatches++;
+      phase = "post0019";
+      if (options.sourceError) throw options.sourceError;
+      return (
+        options.sourceAck ??
+        Array.from({ length: 6 }, () => ({ command: "ALTER" }))
+      );
+    }
+    if (sql === "COMMIT") {
+      transaction = false;
+      committed = phase;
+      if (options.commitError) throw options.commitError;
+      return options.commitAck ?? { command: "COMMIT" };
+    }
+    if (sql === "ROLLBACK") {
+      transaction = false;
+      phase = "pre0019";
+      if (options.rollbackError) throw options.rollbackError;
+      return options.rollbackAck ?? { command: "ROLLBACK" };
+    }
+    const catalogKey = Object.keys(CATALOG_QUERIES).find(
+      (k) => CATALOG_QUERIES[k] === sql,
+    );
+    if (catalogKey) {
+      const catalog = structuredClone(state().catalog);
+      if (options.partialAfter && phase === "post0019") catalog.columns.pop();
+      return { rows: catalog[catalogKey] };
+    }
+    if (sql === OWNERSHIP_SQL)
+      return { rows: structuredClone(state().policy.ownership) };
+    const policyKey = Object.keys(PRODUCTION75_PRIVILEGE_QUERIES).find(
+      (k) => PRODUCTION75_PRIVILEGE_QUERIES[k] === sql,
+    );
+    if (policyKey)
+      return { rows: structuredClone(state().policy.privileges[policyKey]) };
+    const table = /FROM public\."([a-z_]+)"/.exec(sql)?.[1],
+      fingerprint = state().fingerprints.find((x) => x.table === table);
+    if (sql.includes("AS mismatches")) return { rows: [{ mismatches: "0" }] };
+    if (fingerprint && sql.includes("AS bytes FROM"))
+      return { rows: [{ rows: fingerprint.rows, bytes: fingerprint.bytes }] };
+    if (fingerprint && sql.includes("AS hashes"))
+      return { rows: [{ rows: fingerprint.rows, digest: fingerprint.digest }] };
+    throw Error("unexpected synthetic dispatch");
+  }
+  const args = {
+    writer,
+    plan,
+    baseline,
+    outcome: options.outcome ?? "rollback",
+    attemptId: randomUUID(),
+    reserve: async (intent) => {
+      calls.push(["reserve"]);
+      reservations.push(intent);
+      return options.reserve ? options.reserve(intent) : true;
+    },
+    persist: async (event) => {
+      calls.push(["persist", event.phase]);
+      events.push(event);
+      if (options.persist) return options.persist(event);
+    },
+    readFresh: async () => {
+      calls.push(["readFresh"]);
+      readerCalls++;
+      if (options.readFresh) return options.readFresh(readerCalls);
+      const s = structuredClone(committed === "post0019" ? f.after : f.before);
+      s.identity.pid = 88 + readerCalls;
+      return s;
+    },
+    ...(options.now ? { now: options.now } : {}),
+  };
+  return {
+    args,
+    calls,
+    events,
+    reservations,
+    writer,
+    plan,
+    baseline,
+    get ddlDispatches() {
+      return ddlDispatches;
+    },
+  };
+}
+const queryCalls = (f) =>
+  f.calls.filter((c) => c[0] === "query").map((c) => c[1]);
+test.each(["rollback", "commit"])(
+  "transaction %s reserves durably, dispatches exact SQL once, and verifies independent Reader",
+  async (outcome) => {
+    const f = transactionFixture({ outcome }),
+      result = await runScheduling0019Verification(f.args);
+    expect(result.status).toBe(`verified-${outcome}`);
+    expect(f.ddlDispatches).toBe(1);
+    expect(f.calls.findIndex((c) => c[0] === "reserve")).toBeLessThan(
+      f.calls.findIndex(
+        (c) => c[1] === "BEGIN ISOLATION LEVEL REPEATABLE READ",
+      ),
+    );
+    expect(queryCalls(f).filter((s) => s.includes("ALTER TABLE"))).toEqual([
+      fixtures[0].sourceInput.bytes.toString("utf8"),
+    ]);
+    const end = queryCalls(f).indexOf(outcome.toUpperCase());
+    expect(
+      queryCalls(f)
+        .slice(0, end)
+        .filter((s) => s.includes("AS mismatches")),
+    ).toHaveLength(3);
+    expect(f.events.map((e) => e.phase)).toEqual([
+      "begin-intent",
+      "begin-ack",
+      "step-intent",
+      "step-ack",
+      "precommit-verified",
+      `${outcome}-intent`,
+      `${outcome}-ack`,
+    ]);
+    expect(result.proof.freshReaderVerified).toBe(true);
+    expect(result.proof.transactionClosure).toBe(`acknowledged-${outcome}`);
+    expect(JSON.stringify(result)).not.toContain("ALTER TABLE");
+    expect(JSON.stringify(result)).not.toContain("Preserve Ω");
+  },
+);
+test("reservation binds exact stable baseline digests and never serializes SQL or ephemeral identity", async () => {
+  const f = transactionFixture(),
+    result = await runScheduling0019Verification(f.args),
+    intent = f.reservations[0],
+    base = fixtures[0].before;
+  const digest = (v) =>
+      createHash("sha256").update(JSON.stringify(v)).digest("hex"),
+    catalogSha256 = catalogDigest(base.catalog, { physical: true }),
+    policySha256 = digest(base.policy),
+    fingerprints = [...base.fingerprints]
+      .sort((a, b) => (a.table < b.table ? -1 : a.table > b.table ? 1 : 0))
+      .map(({ table, rows, bytes, digest }) => ({
+        table,
+        rows,
+        bytes,
+        digest,
+      }));
+  const baselineSha256 = digest({
+    phase: "pre0019",
+    catalogSha256,
+    fingerprints,
+    policySha256,
+    nullCounts: {},
+  });
+  expect(intent).toEqual({
+    kind: "SCHEDULING0019_TRANSACTION_RESERVATION",
+    attemptId: f.args.attemptId,
+    database: "fly-db",
+    sourceCommit: fixtures[0].sourceInput.sourceCommit,
+    sourceSha256:
+      "76e88d3410235f1b6a8a20e595b126455fd5711b46f87055b586786b28f81ca9",
+    baselineSha256,
+    catalogSha256,
+    policySha256,
+    moduleManifestSha256: f.plan.sourceBinding.moduleManifestSha256,
+    candidate: f.plan.sourceBinding.candidate,
+    outcome: "rollback",
+  });
+  expect(Object.isFrozen(intent.candidate)).toBe(true);
+  expect(result.baselineSha256).toBe(baselineSha256);
+});
+test("baseline and callback references are captured before the first await", async () => {
+  const f = transactionFixture(),
+    original = f.args.persist,
+    pending = runScheduling0019Verification(f.args);
+  f.args.baseline.fingerprints[0].digest = "a".repeat(32);
+  f.args.persist = () => {
+    throw Error("mutated callback");
+  };
+  f.writer.query = () => {
+    throw Error("mutated writer method");
+  };
+  const result = await pending;
+  expect(result.status).toBe("verified-rollback");
+  expect(f.events).toHaveLength(7);
+  expect(original).not.toBe(f.args.persist);
+});
+test("constructor rejects callback accessors before invoking hooks or consuming attempts", async () => {
+  const f = transactionFixture();
+  let reads = 0;
+  const args = { ...f.args };
+  Object.defineProperty(args, "persist", {
+    enumerable: true,
+    get: () => {
+      reads++;
+      return f.args.persist;
+    },
+  });
+  await expect(runScheduling0019Verification(args)).rejects.toMatchObject({
+    safeCode: "scheduling0019_verification_input",
+  });
+  expect(reads).toBe(0);
+  expect(f.calls).toHaveLength(0);
+});
+test("writer backend drift holds before LOCK or DDL without a terminal mutation on the wrong backend", async () => {
+  let identities = 0;
+  const f = transactionFixture({
+      query: async (sql, args, next) => {
+        const response = await next(sql, args);
+        if (sql === IDENTITY_SQL && ++identities > 1) response.rows[0].pid = 78;
+        return response;
+      },
+    }),
+    result = await runScheduling0019Verification(f.args);
+  expect(result.status).toBe("verification-held-no-replay");
+  expect(f.ddlDispatches).toBe(0);
+  expect(queryCalls(f).some((s) => s.startsWith("LOCK TABLE"))).toBe(false);
+  expect(queryCalls(f)).not.toContain("ROLLBACK");
+  expect(result.proof.requiresOwningCleanup).toBe(true);
+});
+test("reservation denial and persistence failure before BEGIN never dispatch DDL", async () => {
+  for (const options of [
+    { reserve: async () => false },
+    {
+      persist: async () => {
+        throw Error("private journal detail");
+      },
+    },
+  ]) {
+    const f = transactionFixture(options),
+      result = await runScheduling0019Verification(f.args);
+    expect(result.status).toBe("failed-or-held");
+    expect(f.ddlDispatches).toBe(0);
+    expect(queryCalls(f)).not.toContain(
+      "BEGIN ISOLATION LEVEL REPEATABLE READ",
+    );
+    expect(JSON.stringify(result)).not.toContain("private journal");
+  }
+});
+test("late sixth statement error rolls the actual transaction back and never dispatches a down migration", async () => {
+  const f = transactionFixture({
+      sourceError: Object.assign(Error("private sixth CHECK"), {
+        code: "23514",
+      }),
+    }),
+    result = await runScheduling0019Verification(f.args);
+  expect(f.ddlDispatches).toBe(1);
+  expect(queryCalls(f)).toContain("ROLLBACK");
+  expect(queryCalls(f).filter((s) => s.includes("DROP"))).toEqual([]);
+  expect(result.status).toBe("failed-or-held");
+  expect(result.proof.rollbackAcknowledged).toBe(true);
+  expect(JSON.stringify(result)).not.toContain("private sixth");
+});
+test.each([
+  { beginAck: {} },
+  { sourceAck: [{ command: "ALTER" }] },
+  { sourceAck: Array.from({ length: 6 }, () => ({ command: "SELECT" })) },
+  { commitAck: { command: "ROLLBACK" }, outcome: "commit" },
+  { rollbackAck: { command: "COMMIT" } },
+])(
+  "missing/contradictory ACK %j cannot verify the requested transaction",
+  async (options) => {
+    const f = transactionFixture(options),
+      result = await runScheduling0019Verification(f.args);
+    expect(result.status).not.toBe(`verified-${f.args.outcome}`);
+    expect(f.ddlDispatches).toBeLessThanOrEqual(1);
+  },
+);
+test("lost COMMIT reconciles through independent full post-state with no replay", async () => {
+  const f = transactionFixture({
+      outcome: "commit",
+      commitError: Error("lost COMMIT private"),
+    }),
+    result = await runScheduling0019Verification(f.args);
+  expect(result.status).toBe("reconciled-commit-no-replay");
+  expect(result.proof.commitAcknowledged).toBe(false);
+  expect(result.proof.freshReaderVerified).toBe(true);
+  expect(f.ddlDispatches).toBe(1);
+  expect(queryCalls(f)).not.toContain("ROLLBACK");
+  await expect(
+    runScheduling0019Verification({ ...f.args, attemptId: randomUUID() }),
+  ).rejects.toMatchObject({ safeCode: "scheduling0019_verification_replay" });
+  expect(f.ddlDispatches).toBe(1);
+});
+test("lost ROLLBACK stays held even when Reader sees the original preimage", async () => {
+  const f = transactionFixture({ rollbackError: Error("lost ROLLBACK") }),
+    result = await runScheduling0019Verification(f.args);
+  expect(result.status).toBe("verification-held-no-replay");
+  expect(result.proof.rollbackAcknowledged).toBe(false);
+  expect(queryCalls(f).filter((s) => s === "ROLLBACK")).toHaveLength(1);
+  expect(f.ddlDispatches).toBe(1);
+});
+test.each([
+  { database: "other-db" },
+  { login: "fly-user", role: "schema_admin", read_only: "off" },
+  { pid: 77 },
+  { isolation: "read committed" },
+  { version: 160015 },
+])("fresh Reader identity %j cannot complete verification", async (change) => {
+  const f = transactionFixture({
+      readFresh: async (n) => {
+        const state = structuredClone(fixtures[0].before);
+        state.identity.pid = 89;
+        if (n > 1) Object.assign(state.identity, change);
+        return state;
+      },
+    }),
+    result = await runScheduling0019Verification(f.args);
+  expect(result.status).toBe("verification-held-no-replay");
+  expect(f.ddlDispatches).toBe(1);
+});
+test.each(["post0019", "partial"])(
+  "already observed %s never acquires a new ALTER reservation",
+  async (phase) => {
+    const f = transactionFixture({
+        outcome: "commit",
+        readFresh: async () => {
+          const s = structuredClone(fixtures[0].after);
+          s.identity.pid = 89;
+          if (phase === "partial") s.catalog.columns.pop();
+          return s;
+        },
+      }),
+      result = await runScheduling0019Verification(f.args);
+    expect(f.reservations).toHaveLength(0);
+    expect(f.ddlDispatches).toBe(0);
+    expect(result.status).toBe(
+      phase === "post0019" ? "reconciled-commit-no-replay" : "failed-or-held",
+    );
+  },
+);
+test("partial after-DDL catalog causes rollback rather than a terminal commit", async () => {
+  const f = transactionFixture({ outcome: "commit", partialAfter: true }),
+    result = await runScheduling0019Verification(f.args);
+  expect(result.status).toBe("failed-or-held");
+  expect(queryCalls(f)).toContain("ROLLBACK");
+  expect(queryCalls(f)).not.toContain("COMMIT");
+});
+test.each(["step-ack", "commit-ack"])(
+  "persistence rejection at %s cannot erase dispatch or ACK evidence",
+  async (failure) => {
+    const f = transactionFixture({
+        outcome: "commit",
+        persist: async (event) => {
+          if (event.phase === failure)
+            throw Error("private persistence detail");
+        },
+      }),
+      result = await runScheduling0019Verification(f.args);
+    expect(f.ddlDispatches).toBe(1);
+    expect(result.status).toBe(
+      failure === "commit-ack"
+        ? "reconciled-commit-no-replay"
+        : "failed-or-held",
+    );
+    expect(result.proof.commitAcknowledged).toBe(failure === "commit-ack");
+    expect(queryCalls(f).filter((s) => s === "ROLLBACK")).toHaveLength(
+      failure === "commit-ack" ? 0 : 1,
+    );
+  },
+);
+test("late source response holds without queueing another mutation", async () => {
+  let clock = 0;
+  const f = transactionFixture({
+      now: () => clock,
+      query: async (sql, args, next) => {
+        const result = await next(sql, args);
+        if (sql === fixtures[0].sourceInput.bytes.toString("utf8"))
+          clock = 15001;
+        return result;
+      },
+    }),
+    result = await runScheduling0019Verification(f.args);
+  expect(result.status).toBe("verification-held-no-replay");
+  expect(f.ddlDispatches).toBe(1);
+  expect(queryCalls(f)).not.toContain("ROLLBACK");
+  expect(queryCalls(f)).not.toContain("COMMIT");
+  expect(result.proof.requiresOwningCleanup).toBe(true);
+});
+test("unresolved source timeout does not close owner socket or enqueue rollback after late resolution", async () => {
+  vi.useFakeTimers();
+  let resolve;
+  let destroyed = 0;
+  try {
+    const f = transactionFixture({
+      query: async (sql, args, next) => {
+        const value = await next(sql, args);
+        if (sql === fixtures[0].sourceInput.bytes.toString("utf8"))
+          return new Promise((r) => {
+            resolve = () => r(value);
+          });
+        return value;
+      },
+    });
+    f.writer.connection = { stream: { destroy: () => destroyed++ } };
+    const pending = runScheduling0019Verification(f.args);
+    pending.catch(() => {});
+    await vi.advanceTimersByTimeAsync(15001);
+    const result = await pending;
+    expect(result.status).toBe("verification-held-no-replay");
+    const length = f.calls.length;
+    resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(f.calls).toHaveLength(length);
+    expect(queryCalls(f)).not.toContain("ROLLBACK");
+    expect(destroyed).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+test("unresolved journal callback after DDL holds without rollback or late progression", async () => {
+  vi.useFakeTimers();
+  let release;
+  try {
+    const f = transactionFixture({
+        persist: async (event) => {
+          if (event.phase === "step-ack")
+            return new Promise((resolve) => {
+              release = resolve;
+            });
+        },
+      }),
+      pending = runScheduling0019Verification(f.args);
+    pending.catch(() => {});
+    await vi.advanceTimersByTimeAsync(5001);
+    const result = await pending;
+    expect(result.status).toBe("verification-held-no-replay");
+    expect(result.proof.sourceAcknowledged).toBe(true);
+    expect(result.proof.journalConfirmed).toBe(false);
+    expect(f.ddlDispatches).toBe(1);
+    expect(queryCalls(f)).not.toContain("ROLLBACK");
+    const length = f.calls.length;
+    release();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(f.calls).toHaveLength(length);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+test("late reservation and already applied rollback never BEGIN or rearm", async () => {
+  let clock = 0;
+  const late = transactionFixture({
+      now: () => clock,
+      reserve: async () => {
+        clock = 5001;
+        return true;
+      },
+    }),
+    lateResult = await runScheduling0019Verification(late.args);
+  expect(lateResult.status).toBe("failed-or-held");
+  expect(queryCalls(late)).not.toContain(
+    "BEGIN ISOLATION LEVEL REPEATABLE READ",
+  );
+  const applied = transactionFixture({
+      readFresh: async () => structuredClone(fixtures[0].after),
+    }),
+    result = await runScheduling0019Verification(applied.args);
+  expect(result.status).toBe("verification-held-no-replay");
+  expect(applied.reservations).toHaveLength(0);
+  expect(applied.ddlDispatches).toBe(0);
+});
+test("one-use guards bind attempt, writer and plan independently", async () => {
+  const original = transactionFixture();
+  await runScheduling0019Verification(original.args);
+  for (const field of ["attemptId", "writer", "plan"]) {
+    const next = transactionFixture();
+    next.args[field] = original.args[field];
+    await expect(
+      runScheduling0019Verification(next.args),
+    ).rejects.toMatchObject({ safeCode: "scheduling0019_verification_replay" });
+    expect(next.calls).toHaveLength(0);
+  }
+});
+test("changed full142 Reader data prevents successful rollback acceptance", async () => {
+  const f = transactionFixture({
+      readFresh: async (n) => {
+        const state = structuredClone(fixtures[0].before);
+        state.identity.pid = 89;
+        if (n > 1)
+          state.fingerprints.find(
+            (x) => x.table === "appointment_work_entries",
+          ).digest = "a".repeat(32);
+        return state;
+      },
+    }),
+    result = await runScheduling0019Verification(f.args);
+  expect(result.status).toBe("verification-held-no-replay");
+  expect(result.proof.rollbackAcknowledged).toBe(true);
+  expect(result.proof.freshReaderVerified).toBe(false);
+});
 test("source rejects byte drift, CRLF, wrong source/path and unknown keys", () => {
   const f = fixtures[0];
   for (const change of [
