@@ -45,6 +45,74 @@ const inventory = (o) =>
 const added = (before, after, key) =>
   after[key].filter((r) => !before[key].some((b) => b.id === r.id));
 
+// Deliberately exact: the generic terminal acknowledgement is not a reason.
+export const REFUSAL_EXPLANATIONS = Object.freeze({
+  travel_conflict:
+    "The original appointment conflicts with assigned staff work or the required travel gap. Acknowledge this refusal, then review a different interval or assignment.",
+  company_capacity_conflict:
+    "The original appointment would exceed the company reservation limit. Acknowledge this refusal, then review a different interval.",
+  inspection_capacity_conflict:
+    "The original appointment would exceed the inspection reservation limit. Acknowledge this refusal, then review a different interval.",
+});
+
+export async function assertVisibleRefusalReason(page, code) {
+  assert.ok(
+    Object.hasOwn(REFUSAL_EXPLANATIONS, code),
+    "Unspecified refusal oracle",
+  );
+  const expected = REFUSAL_EXPLANATIONS[code];
+  const reason = page.getByRole("dialog").getByText(expected, { exact: true });
+  await reason.waitFor({ state: "visible", timeout: 5000 });
+  await reason.scrollIntoViewIfNeeded();
+  assert.equal((await reason.innerText()).trim(), expected);
+  return expected;
+}
+
+export async function fillExistingSameSourceInterval(
+  page,
+  { contactId, propertyId, start, presetLabel, resourceLabel },
+) {
+  const dialog = page.getByRole("dialog");
+  const assertSource = async () => {
+    assert.equal(
+      await dialog.getByTestId("appointment-contact").inputValue(),
+      contactId,
+    );
+    assert.equal(
+      await dialog
+        .getByRole("combobox", { name: /^Property for this new appointment/ })
+        .inputValue(),
+      propertyId,
+    );
+  };
+  await assertSource();
+  const type = await dialog
+    .getByLabel("Appointment type", { exact: true })
+    .inputValue();
+  // A remounted form has its own current type. Selecting type/source again
+  // revokes the explicit intent; edit only the reviewed interval and resources.
+  // Native fill waits for an enabled field; never force or unlock it.
+  await dialog.getByLabel("Service start", { exact: true }).fill(start);
+  await dialog
+    .getByRole("combobox", { name: /^Duration preset/ })
+    .selectOption({ label: presetLabel });
+  await dialog
+    .getByRole("checkbox", { name: resourceLabel, exact: true })
+    .check();
+  await assertSource();
+  assert.equal(
+    await dialog.getByLabel("Appointment type", { exact: true }).inputValue(),
+    type,
+  );
+  return {
+    type,
+    start: await dialog
+      .getByLabel("Service start", { exact: true })
+      .inputValue(),
+    end: await dialog.getByLabel("Service end", { exact: true }).inputValue(),
+  };
+}
+
 export const INDEX_FONT_STYLESHEET_URL =
   "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap";
 const requestBinding = [
@@ -1087,22 +1155,29 @@ export async function runSavedSchedulingBrowserQA(options) {
           .isDisabled(),
         true,
       );
-      const text = await page.getByRole("dialog").innerText();
-      const reason = {
-        travel_conflict:
-          /travel conflict|travel gap.*conflict|insufficient.*travel/i,
-        company_capacity_conflict:
-          /company.*(full|conflict|exceed|capacity.*reached)/i,
-        inspection_capacity_conflict:
-          /inspection.*(full|conflict|exceed|capacity.*reached)/i,
-      }[refusal];
-      if (reason && !reason.test(text))
+      const code = body.schedulingOperation.refusalCode; // assertEffects bound this ACK to the exact original.
+      try {
+        const visibleReason = await assertVisibleRefusalReason(page, code);
+        await saveEvidence(`${phase}-${wire.operationId}-refusal-ui`, {
+          operationId: wire.operationId,
+          payloadSha256: body.schedulingOperation.payloadSha256,
+          refusalCode: code,
+          visibleReason,
+        });
+        await page.screenshot({
+          path: path.join(
+            reportDir,
+            `${phase}-${wire.operationId}-refusal-ui.png`,
+          ),
+        });
+      } catch (error) {
         recordFinding(
           phase,
           new Error(
-            `PRODUCT RED: terminal ${refusal} is not distinguished in visible refusal UI; accepted host passes conflict=null and displays generic no-commit text`,
+            `Refusal UI assertion failed for original ${wire.operationId}, code ${code}: expected its exact visible typed explanation. ${error.message}`,
           ),
         );
+      }
     } else if (!lost)
       await page
         .getByText("Original appointment committed.", { exact: false })
@@ -1184,10 +1259,20 @@ export async function runSavedSchedulingBrowserQA(options) {
       false,
       "Old interval review cannot authorize a new booking",
     );
-    await fill(page, { start: "2026-10-30T09:00" });
+    const repeatFields = await fillExistingSameSourceInterval(page, {
+      contactId: m.contactId,
+      propertyId: m.propertyId,
+      start: "2026-10-30T09:00",
+      presetLabel: "FICTIONAL one hour · 60 elapsed minutes",
+      resourceLabel: m.resources[0].label,
+    });
+    await settled(page);
     assert.equal(count("/api/v1/appointments"), createCount);
     assert.deepEqual(await custody(page, original.wire.operationId), prior);
     const next = await submit(page); // Explicit fresh Review interval, then one Save.
+    assert.equal(next.wire.type, repeatFields.type);
+    assert.equal(next.body.type, repeatFields.type);
+    assert.equal(next.after.target[0].type, repeatFields.type);
     assert.notEqual(next.wire.operationId, original.wire.operationId);
     assert.ok(
       !storedOriginal.retiredOperationIds.includes(next.wire.operationId),
@@ -1235,6 +1320,7 @@ export async function runSavedSchedulingBrowserQA(options) {
       createCountAfter: count("/api/v1/appointments"),
       reconcileCount,
       uuidObservation,
+      repeatFields,
     });
   }
   async function policy({ gap, enabled = true, cap = null }) {
