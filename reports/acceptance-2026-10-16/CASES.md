@@ -133,7 +133,7 @@ engineering classification cannot waive either company's actual required workflo
 ## Re-running locally
 
 ```powershell
-cd C:\Forge\worktrees\growthos-claude-acceptance-20261016
+cd C:\Forge\worktrees\growthos-acceptance-guardfix-20261016
 node scripts/local-dev.mjs setup
 # From committed clean reviewed harness source; builds both API and frontend.
 # Credentials/site keys remain in the owning runtime process, never in evidence.
