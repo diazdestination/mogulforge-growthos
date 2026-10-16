@@ -177,7 +177,7 @@ export async function ensureDefaultPlaybook(
         ),
       );
     if (existing) return;
-    const legacy = await isLegacyDefaultOrg(organizationId);
+    const legacy = await isLegacyDefaultOrg(organizationId, tx);
     await tx.insert(playbooksTable).values({
       organizationId,
       name: DEFAULT_PLAYBOOK_NAME,
