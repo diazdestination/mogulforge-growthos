@@ -166,7 +166,7 @@ const painless = {
   invoices: [
     { key: "inv-park", customer: "park", title: "TEST - Pipe boot replacement", issue: true, paidInFull: false,
       lines: [["Pipe boot replacement", 2, 9500], ["Labor and seal", 1, 23500]] },
-    { key: "inv-harper-2019", customer: "harper", title: "TEST - 2019 roof replacement (prior job, for history)", issue: true, paidInFull: true, payRef: "TEST check #2210",
+    { key: "inv-harper-prior", customer: "harper", title: "TEST - 2019 roof replacement (prior job, for history)", issue: true, paidInFull: true, payRef: "TEST check #2210",
       lines: [["Roof replacement, 24 squares (prior job)", 1, 1420000]] },
   ],
   serviceAgreements: [
