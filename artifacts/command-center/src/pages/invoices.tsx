@@ -764,7 +764,7 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
               </div>
             </header>
             {invoice.contactId && <Link className={invoiceButton} href={customerWorkspacePath(invoice.contactId, actor.organizationId, 'invoices')!}>Customer invoice history</Link>}
-            {invoice.customerWorkId && <p className="break-words text-sm text-muted-foreground">Existing-customer work · {invoice.customerWorkId}. Receipt accounting is isolated to this work, not this customer’s other jobs.</p>}
+            {invoice.customerWorkId && <p className="break-words text-sm text-muted-foreground">Existing-customer work. Receipt accounting is isolated to this work, not this customer’s other jobs.</p>}
             {actor.manage &&
               invoice.status === "draft" &&
               !editing &&

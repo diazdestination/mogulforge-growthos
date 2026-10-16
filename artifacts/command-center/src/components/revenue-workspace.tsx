@@ -1489,7 +1489,7 @@ export function ValueLedger({
               >
                 {e.sourceReference}
               </Link> : e.contactId && e.organizationId && customerWorkspacePath(e.contactId, e.organizationId, 'invoices') ? <Link className="block break-words text-primary hover:underline" href={customerWorkspacePath(e.contactId, e.organizationId, 'invoices')!}>{e.sourceReference}</Link> : <span className="block break-words">{e.sourceReference}</span>}
-              {e.customerWorkId && <p className="break-all text-xs text-muted-foreground">Existing-customer work: {e.customerWorkId}</p>}
+              {e.customerWorkId && <p className="break-all text-xs text-muted-foreground">Existing-customer work</p>}
               {e.refundOfValueEntryId && <p className="break-all text-xs text-muted-foreground">External refund correction of receipt {e.refundOfValueEntryId}; no money moved.</p>}
               <p className="text-xs text-muted-foreground">
                 {e.kind.replaceAll("_", " ")} ·{" "}

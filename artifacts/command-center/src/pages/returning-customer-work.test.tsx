@@ -984,6 +984,39 @@ describe("unproven returning-project errors retain original custody", () => {
 });
 
 describe("existing customer native invoices and corrections", () => {
+  it.each(["draft", "issued"] as const)(
+    "hides the internal work ID in a %s invoice label while preserving its customer history and receipt boundary",
+    async (status) => {
+      const invoice = workInvoice({
+        status,
+        invoiceNumber: status === "issued" ? "SYN-100" : null,
+        issuedAt: status === "issued" ? "2026-10-01T00:00:00Z" : null,
+      });
+      const api = setup("invoices", `/${invoice.id}?organizationId=${org}`);
+      api.state.invoice = invoice;
+
+      const label = await screen.findByText(/Receipt accounting is isolated to this work/);
+      expect(label.textContent).toContain("Existing-customer work");
+      expect(label.textContent).not.toContain(root);
+      expect(label.textContent).toContain("not this customer’s other jobs");
+      expect(screen.getByText(/Synthetic service work · Version 1/)).toBeTruthy();
+      expect(screen.getByRole("heading", { name: status === "issued" ? "SYN-100" : "Draft invoice" })).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Customer invoice history" }).getAttribute("href"))
+        .toBe(`/contacts/${contact}?organizationId=${org}&section=invoices`);
+      expect(writes(api.requests)).toHaveLength(0);
+      expect(api.requests.some(request => request.url.pathname.endsWith("/leads/null"))).toBe(false);
+    },
+  );
+  it("does not show a work label or customer history for an invoice response from another company", async () => {
+    const invoice = workInvoice({ organizationId: id(799) });
+    const api = setup("invoices", `/${invoice.id}?organizationId=${org}`);
+    api.state.invoice = invoice;
+
+    await screen.findByRole("heading", { name: "This invoice could not load" });
+    expect(screen.queryByText(/Existing-customer work/)).toBeNull();
+    expect(screen.queryByRole("link", { name: "Customer invoice history" })).toBeNull();
+    expect(writes(api.requests)).toHaveLength(0);
+  });
   it("requires a fresh explicit customer/property review after changing invoice source mode", async () => {
     const api = setup("invoices", fresh);
     await screen.findByRole("option", { name: /704 Fictional Lane/ });
