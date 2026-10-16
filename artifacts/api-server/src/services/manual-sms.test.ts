@@ -14,11 +14,12 @@ import {
   suppressionsTable,
   usersTable,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import manualSmsRouter from "../routes/v1/manual-sms";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+import * as crm from "./crm";
 import {
   buildManualSmsTemplates,
   getManualSmsDrafts,
@@ -290,7 +291,7 @@ describe("inquiry-scoped SMS consent from a website inquiry", () => {
     }));
     const [lead] = await db.select().from(leadsTable).where(eq(leadsTable.id, saved.leadId));
     const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, lead.contactId!));
-    return { orgId: org.id, owner, leadId: lead.id, contact };
+    return { orgId: org.id, owner, site, receiptId: saved.receiptId, leadId: lead.id, contact };
   }
   const drafts = (f: { orgId: string; leadId: string }) =>
     getManualSmsDrafts({ organizationId: f.orgId, leadId: f.leadId, staffFirstName: "Sam" });
@@ -358,5 +359,92 @@ describe("inquiry-scoped SMS consent from a website inquiry", () => {
   it("stays blocked when the inquiry did not consent to SMS", async () => {
     const f = await inquiryFixture(["phone", "email"]);
     expect(await drafts(f)).toMatchObject({ allowed: false, reason: "no_sms_consent" });
+  });
+
+  // GAP-02 I1: only the capture activity written by intake, in the receipt's own
+  // transaction, is phone authority. Staff-writable timeline rows never are.
+  type InquiryFixture = Awaited<ReturnType<typeof inquiryFixture>>;
+  const blockedNoConsent = { allowed: false, reason: "no_sms_consent" };
+  const originalCapture = async (f: InquiryFixture) => {
+    const rows = await db.select().from(activitiesTable).where(and(
+      eq(activitiesTable.organizationId, f.orgId), eq(activitiesTable.type, "lead_captured"),
+    ));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ leadId: f.leadId, contactId: f.contact.id, actorUserId: null });
+    return rows[0];
+  };
+  // Exactly what POST /leads/:id/activities writes for a crm.write member.
+  const staffCapture = (f: InquiryFixture, leadId: string, phone: string, smartSiteId: string) =>
+    crm.createActivity(f.orgId, {
+      leadId, contactId: f.contact.id, actorUserId: f.owner.id, type: "lead_captured", title: "Inquiry",
+      body: null, metadata: { smartSiteId, receiptId: f.receiptId, submittedContact: { name: "Avery Visitor", phone } },
+    });
+
+  it("rejects the reviewed merge + changed phone + staff replacement capture sequence", async () => {
+    const f = await inquiryFixture(["sms"]);
+    expect((await drafts(f))?.allowed).toBe(true);
+    const [survivor] = await db.insert(leadsTable).values({ organizationId: f.orgId, contactId: f.contact.id }).returning();
+    expect(await crm.mergeLeads(f.orgId, survivor.id, f.leadId, f.owner.id)).toMatchObject({ ok: true });
+    // The authentic capture moved to the survivor; the receipt stayed on the source.
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
+    expect(await drafts({ orgId: f.orgId, leadId: survivor.id })).toMatchObject(blockedNoConsent);
+    await crm.updateContact(f.orgId, f.contact.id, { phone: "404-555-0166" });
+    await staffCapture(f, f.leadId, "404-555-0166", randomUUID());
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
+    await staffCapture(f, f.leadId, "404-555-0166", f.site.id);
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
+    expect(await drafts({ orgId: f.orgId, leadId: survivor.id })).toMatchObject(blockedNoConsent);
+  });
+
+  it("rejects a staff replacement capture naming a replaced phone while the original remains", async () => {
+    const f = await inquiryFixture(["sms"]);
+    await originalCapture(f);
+    await crm.updateContact(f.orgId, f.contact.id, { phone: "404-555-0166" });
+    await staffCapture(f, f.leadId, "404-555-0166", f.site.id);
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
+    // Restoring the inquiry phone restores the genuine authority; the staff row adds none.
+    await crm.updateContact(f.orgId, f.contact.id, { phone: "404-555-0177" });
+    expect((await drafts(f))?.allowed).toBe(true);
+  });
+
+  it("fails closed when the original capture evidence is missing", async () => {
+    const f = await inquiryFixture(["sms"]);
+    const original = await originalCapture(f);
+    await db.delete(activitiesTable).where(eq(activitiesTable.id, original.id));
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
+    // A later actor-less copy is not intake evidence either: it was not written with the receipt.
+    await db.insert(activitiesTable).values({
+      organizationId: f.orgId, leadId: f.leadId, contactId: f.contact.id, type: "lead_captured",
+      title: original.title, body: original.body, metadata: original.metadata,
+      occurredAt: original.occurredAt, createdAt: new Date(original.createdAt.getTime() + 60_000),
+    });
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
+  });
+
+  it.each([
+    ["moved to another lead", "lead"],
+    ["moved to another contact", "contact"],
+    ["bound to another site", "site"],
+    ["duplicated (ambiguous)", "duplicate"],
+  ] as const)("fails closed when the original capture is %s", async (_label, change) => {
+    const f = await inquiryFixture(["sms"]);
+    const original = await originalCapture(f);
+    expect((await drafts(f))?.allowed).toBe(true);
+    if (change === "lead") {
+      const [other] = await db.insert(leadsTable).values({ organizationId: f.orgId, contactId: f.contact.id }).returning();
+      await db.update(activitiesTable).set({ leadId: other.id }).where(eq(activitiesTable.id, original.id));
+    } else if (change === "contact") {
+      const [other] = await db.insert(contactsTable).values({ organizationId: f.orgId, firstName: "Other", phone: "404-555-0177" }).returning();
+      await db.update(activitiesTable).set({ contactId: other.id }).where(eq(activitiesTable.id, original.id));
+    } else if (change === "site") {
+      await db.update(activitiesTable).set({ metadata: { ...original.metadata, smartSiteId: randomUUID() } })
+        .where(eq(activitiesTable.id, original.id));
+    } else {
+      // Exact copy in SQL, keeping created_at to the microsecond.
+      await db.execute(sql`insert into activities (organization_id, lead_id, contact_id, actor_user_id, type, title, body, metadata, occurred_at, created_at)
+        select organization_id, lead_id, contact_id, actor_user_id, type, title, body, metadata, occurred_at, created_at
+        from activities where id = ${original.id}`);
+    }
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
   });
 });

@@ -31,7 +31,7 @@ import {
   type Suppression,
   type SuppressionReason,
 } from "@workspace/db";
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import { isSafeMailbox } from "./providers";
 import { getSendingHours } from "./settings";
@@ -176,8 +176,10 @@ export async function hasChannelConsent(
  * `respond-to-this-inquiry`); intake deliberately writes no contact-wide
  * consent record. This reads that receipt for exactly one lead and grants only
  * when: the receipt belongs to this lead and contact, it lists `sms`, the
- * contact's current phone is the phone given in the inquiry (from the capture
- * activity written in the same intake transaction), and no SMS revocation was
+ * contact's current phone is the phone given in the inquiry (from the single
+ * actor-less capture activity intake wrote in the receipt's own transaction,
+ * still on this lead, contact and site; staff timeline rows are never
+ * authority, and missing, moved or duplicated evidence fails closed), and no SMS revocation was
  * recorded at or after the inquiry. Callers must be staff-initiated manual
  * replies; automated, sequence and marketing paths never call this.
  */
@@ -191,6 +193,7 @@ export async function hasInquirySmsReplyConsent(
   const [receipt] = await reader
     .select({
       id: smartSiteSubmissionsTable.id,
+      siteId: smartSiteSubmissionsTable.siteId,
       consent: smartSiteSubmissionsTable.consent,
       createdAt: smartSiteSubmissionsTable.createdAt,
     })
@@ -210,18 +213,42 @@ export async function hasInquirySmsReplyConsent(
   if (consent.scope !== "respond-to-this-inquiry") return false;
   if (!Array.isArray(consent.channels) || !consent.channels.includes("sms")) return false;
 
-  const [captured] = await reader
-    .select({ metadata: activitiesTable.metadata })
+  // The inquiry phone comes ONLY from the capture row intake wrote in the
+  // receipt's own transaction: no actor (every staff/API activity write stamps
+  // the member) and a server-default created_at equal to the receipt's (both are
+  // that transaction's now(); no route accepts created_at). A metadata receiptId
+  // alone is staff-writable through the generic activity endpoint and is never
+  // authority. Any candidate is fetched regardless of its current lead so that a
+  // duplicate anywhere is ambiguous, and one that was merged/moved fails closed.
+  const candidates = await reader
+    .select({
+      leadId: activitiesTable.leadId,
+      contactId: activitiesTable.contactId,
+      metadata: activitiesTable.metadata,
+    })
     .from(activitiesTable)
+    // Compare timestamps in SQL: a JS Date would drop PostgreSQL microseconds.
+    .innerJoin(smartSiteSubmissionsTable, and(
+      eq(smartSiteSubmissionsTable.id, receipt.id),
+      eq(smartSiteSubmissionsTable.organizationId, organizationId),
+      eq(smartSiteSubmissionsTable.createdAt, activitiesTable.createdAt),
+    ))
     .where(and(
       eq(activitiesTable.organizationId, organizationId),
-      eq(activitiesTable.leadId, leadId),
       eq(activitiesTable.type, "lead_captured"),
+      isNull(activitiesTable.actorUserId),
       sql`${activitiesTable.metadata}->>'receiptId' = ${receipt.id}`,
     ))
-    .limit(1);
-  const submitted = (captured?.metadata as { submittedContact?: { phone?: unknown } } | undefined)
-    ?.submittedContact?.phone;
+    .limit(2);
+  if (candidates.length !== 1) return false;
+  const [captured] = candidates;
+  if (captured.leadId !== leadId || captured.contactId !== contact.id) return false;
+  const evidence = captured.metadata as {
+    smartSiteId?: unknown;
+    submittedContact?: { phone?: unknown };
+  };
+  if (evidence.smartSiteId !== receipt.siteId) return false;
+  const submitted = evidence.submittedContact?.phone;
   if (typeof submitted !== "string") return false;
   const inquiryPhone = normalizePhone(submitted);
   if (inquiryPhone.length < 10 || inquiryPhone !== normalizePhone(contact.phone)) return false;
