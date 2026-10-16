@@ -1,0 +1,210 @@
+{
+  "version": 1,
+  "purpose": "Exact local inquiry-consent source successor layered over the unchanged approved launch-gap proof. Source identity only; no runtime, CI, hosted or release grant.",
+  "releaseEligible": false,
+  "predecessor": {
+    "descriptorPath": "reports/c1-launch-gap-integration-amendment-2026-10-16.json",
+    "descriptorSha256": "d9c9d8106c7567e99d53cb5a45cd6270f6e3b22b79b4f20bb6bf1b111cc9c136",
+    "integration": {
+      "sourceCommit": "4e2d5252b934d652c659eb2e03c3fa7d4e22cc12",
+      "sourceTree": "cb4c8861f28331288fc307fd4000b155a9dc8635",
+      "scope": {
+        "count": 2123,
+        "sha256": "f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472"
+      }
+    }
+  },
+  "scopePaths": [
+    "artifacts/api-server",
+    "lib"
+  ],
+  "sources": [
+    {
+      "key": "launchGapProof",
+      "sourceCommit": "90d61a6fde60f6871dce1d665e1bfed3fa3ccad6",
+      "sourceTree": "51c3acddc180f7f35a8181d0d43c1e65ddd4439f",
+      "parents": [
+        "4e2d5252b934d652c659eb2e03c3fa7d4e22cc12"
+      ],
+      "scope": {
+        "count": 2123,
+        "sha256": "f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472"
+      }
+    },
+    {
+      "key": "base",
+      "sourceCommit": "adc95346032b65ac82e37962cb91e8807da6e587",
+      "sourceTree": "f05be49a4cc9cfa619352b4053bd24bb1925dda1",
+      "parents": [
+        "42ab66efd551b36ddba6b73d53e6fb962d6712e3",
+        "90d61a6fde60f6871dce1d665e1bfed3fa3ccad6"
+      ],
+      "scope": {
+        "count": 2123,
+        "sha256": "f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472"
+      }
+    },
+    {
+      "key": "componentParent",
+      "sourceCommit": "bf9631e6d427800d1dfddc6b5db016f7087a1287",
+      "sourceTree": "cee6d2f9a5e01f1a6ef7a8c5d870602b5ad14a3e",
+      "parents": [
+        "02306ef8654ae00fcc4c13a3f0fe24248aa415d6"
+      ],
+      "scope": {
+        "count": 2117,
+        "sha256": "9801d2dd6bfb247fc6e0f3378d4dbad2fdbe2a6ad06a2ffd6096c71150acc2b1"
+      }
+    },
+    {
+      "key": "component",
+      "sourceCommit": "70fdaec3d4d81ac62ac4a241ca51aec01dc84780",
+      "sourceTree": "e7ebcc1963f00cda9e7dd42d26cd8aecf9da9d98",
+      "parents": [
+        "bf9631e6d427800d1dfddc6b5db016f7087a1287"
+      ],
+      "scope": {
+        "count": 2117,
+        "sha256": "f501676d568ec396b899dabc90bedd3f16c1b8a2e5e009d909a4571c0dee0bff"
+      }
+    },
+    {
+      "key": "integration",
+      "sourceCommit": "975ad3a2529c909885abdf70371054505f124162",
+      "sourceTree": "8b19f0c045a53848e14880efd1c5c70350387d77",
+      "parents": [
+        "adc95346032b65ac82e37962cb91e8807da6e587",
+        "70fdaec3d4d81ac62ac4a241ca51aec01dc84780"
+      ],
+      "scope": {
+        "count": 2123,
+        "sha256": "c0519f20f3cf8e0e26ac1aa6d19701e4c587450fd82d6c4d8b359070703ef497"
+      }
+    }
+  ],
+  "integration": {
+    "sourceCommit": "975ad3a2529c909885abdf70371054505f124162",
+    "sourceTree": "8b19f0c045a53848e14880efd1c5c70350387d77",
+    "scope": {
+      "count": 2123,
+      "sha256": "c0519f20f3cf8e0e26ac1aa6d19701e4c587450fd82d6c4d8b359070703ef497"
+    }
+  },
+  "changes": [
+    {
+      "path": "artifacts/api-server/src/services/manual-sms.test.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/manual-sms.test.ts",
+        "mode": "100644",
+        "blob": "a8cf72380f50cc8cd7e9c2a73890ed4141dc21d9"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "d77a41b3984904bb4b60ae4bc64aea9fc418a4ce"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/manual-sms.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/manual-sms.ts",
+        "mode": "100644",
+        "blob": "b6864922e933380c19507c1294fcc1e77aded6ad"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "60b971d65cf0b276b005b85a6c283fe3ceb9d557"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/send-gate.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/send-gate.ts",
+        "mode": "100644",
+        "blob": "3f0907bd48cc0f5f1ebc2f0973aece4543f12567"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "34b81534c815b379819efd534258947121a7d779"
+      }
+    }
+  ],
+  "originalBlobs": [
+    {
+      "path": "artifacts/api-server/src/services/manual-sms.test.ts",
+      "mode": "100644",
+      "blob": "a8cf72380f50cc8cd7e9c2a73890ed4141dc21d9",
+      "bytes": 13120,
+      "sha256": "cf9b1a7ee55d6748f14e46ea9717ee4d2d38da80a18009ed3ec3dde00eacfb07"
+    },
+    {
+      "path": "artifacts/api-server/src/services/manual-sms.ts",
+      "mode": "100644",
+      "blob": "b6864922e933380c19507c1294fcc1e77aded6ad",
+      "bytes": 5242,
+      "sha256": "86c5fc9c2539d210b90ca47226e991708e914463fa7ee7af5b4169acf98e2723"
+    },
+    {
+      "path": "artifacts/api-server/src/services/send-gate.ts",
+      "mode": "100644",
+      "blob": "3f0907bd48cc0f5f1ebc2f0973aece4543f12567",
+      "bytes": 23210,
+      "sha256": "41cbfba3dd53a6467eb16209d8c5752e9bc75ae1507eefd9ac25abf5c90844ca"
+    }
+  ],
+  "reviewedBlobs": [
+    {
+      "path": "artifacts/api-server/src/services/manual-sms.test.ts",
+      "mode": "100644",
+      "blob": "d77a41b3984904bb4b60ae4bc64aea9fc418a4ce",
+      "bytes": 25055,
+      "sha256": "605821741a7b54a0ed0b42e1e91960a1dd8f715861205338eb94da7ae84020da"
+    },
+    {
+      "path": "artifacts/api-server/src/services/manual-sms.ts",
+      "mode": "100644",
+      "blob": "1eb41a698c820ef41b7c7d430b3b01e3bb4fbd9b",
+      "bytes": 6175,
+      "sha256": "ae394bfddf77e748d9df2e7c07f6d065d8196f83d74ebe55aa85d61f9249de9c"
+    },
+    {
+      "path": "artifacts/api-server/src/services/send-gate.ts",
+      "mode": "100644",
+      "blob": "34b81534c815b379819efd534258947121a7d779",
+      "bytes": 28253,
+      "sha256": "da7f57c88b18859f4efffe15a0223eef53fdf1ebb74757b823cedeccce15e602"
+    }
+  ],
+  "currentBlobs": [
+    {
+      "path": "artifacts/api-server/src/services/manual-sms.test.ts",
+      "mode": "100644",
+      "blob": "d77a41b3984904bb4b60ae4bc64aea9fc418a4ce",
+      "bytes": 25055,
+      "sha256": "605821741a7b54a0ed0b42e1e91960a1dd8f715861205338eb94da7ae84020da"
+    },
+    {
+      "path": "artifacts/api-server/src/services/manual-sms.ts",
+      "mode": "100644",
+      "blob": "60b971d65cf0b276b005b85a6c283fe3ceb9d557",
+      "bytes": 5434,
+      "sha256": "440ee488085706cefeeab039077b8fa4b1bf364d7d9814480bfdbd06625e2777"
+    },
+    {
+      "path": "artifacts/api-server/src/services/send-gate.ts",
+      "mode": "100644",
+      "blob": "34b81534c815b379819efd534258947121a7d779",
+      "bytes": 28253,
+      "sha256": "da7f57c88b18859f4efffe15a0223eef53fdf1ebb74757b823cedeccce15e602"
+    }
+  ],
+  "composition": {
+    "path": "artifacts/api-server/src/services/manual-sms.ts",
+    "predecessor": "base",
+    "component": "component",
+    "mode": "100644",
+    "blob": "60b971d65cf0b276b005b85a6c283fe3ceb9d557",
+    "bytes": 5434,
+    "sha256": "440ee488085706cefeeab039077b8fa4b1bf364d7d9814480bfdbd06625e2777",
+    "method": "Complete predecessor body plus exactly the reviewed GAP02 gate-call segment; retain G11 shared normalized-phone source byte-for-byte."
+  }
+}

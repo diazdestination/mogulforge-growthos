@@ -34,6 +34,13 @@ const LAUNCH_GAP_PATHS = [
   'artifacts/api-server/src/services/smart-site-intake-phone.test.ts',
   'artifacts/api-server/src/services/smart-sites.ts',
 ];
+const inquiryAmendmentPath = 'reports/c1-inquiry-consent-integration-amendment-2026-10-16.json';
+const inquiryAmendmentSha256 = '05dbc2101e6d7e9993031a9fbab3d9bd9ba41093377a47ec6b98bbafd3ce61b1';
+const INQUIRY_PATHS = [
+  'artifacts/api-server/src/services/manual-sms.test.ts',
+  'artifacts/api-server/src/services/manual-sms.ts',
+  'artifacts/api-server/src/services/send-gate.ts',
+];
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const json = bytes => JSON.parse(Buffer.from(bytes).toString('utf8'));
 const sorted = entries => [...entries].sort((a,b) => Buffer.compare(Buffer.from(a.path),Buffer.from(b.path)));
@@ -71,6 +78,10 @@ function checkedLaunchGapAmendment(bytes) {
   assert.equal(hash(bytes),launchGapAmendmentSha256,'C1 reviewed launch-gap amendment changed');
   return json(bytes);
 }
+function checkedInquiryAmendment(bytes) {
+  assert.equal(hash(bytes),inquiryAmendmentSha256,'C1 reviewed inquiry amendment changed');
+  return json(bytes);
+}
 /** Applies the reviewed amendment to the exact C1 overlay map; only test-only paths may change. */
 export function applyC1TestOnlyAmendment(expected, changes) {
   const next=new Map(expected);
@@ -106,6 +117,28 @@ export function applyC1LaunchGapAmendment(expected, changes) {
   }
   return next;
 }
+/** The production inquiry successor is separate from every historical/test-only contract. */
+export function applyC1InquiryAmendment(expected, changes) {
+  assert.equal(new Set(changes.map(change=>change.path)).size,changes.length,'C1 inquiry duplicate path');
+  assert.deepEqual(sorted(changes).map(change=>change.path),INQUIRY_PATHS,'C1 inquiry path coverage changed');
+  const next=new Map(expected);
+  for(const change of changes){
+    assert.deepEqual(next.get(change.path)??null,change.before,'C1 inquiry base path changed');
+    assert.ok(change.after,'C1 inquiry reviewed successor cannot delete source');
+    next.set(change.path,{path:change.path,...change.after});
+  }
+  return next;
+}
+/** Reconstruct a complete source body; no product code is imported or executed. */
+export function composeC1InquiryManualSms(predecessorBytes,componentBytes) {
+  const predecessor=Buffer.from(predecessorBytes).toString('utf8'),component=Buffer.from(componentBytes).toString('utf8');
+  const common='  // This requested-service reply is human-reviewed, not automated outreach.\n';
+  const oldCall='  const gate = await checkSendEligibility({\n    organizationId: input.organizationId,\n    contact: row.contact,\n    channel: "sms",\n    kind: "transactional",\n  });';
+  const newCall='  // A website inquiry\'s own SMS consent counts only for THIS lead and the\n  // phone given in that inquiry; it never becomes contact-wide consent.\n  const gate = await checkSendEligibility({\n    organizationId: input.organizationId,\n    contact: row.contact,\n    channel: "sms",\n    kind: "transactional",\n    manualInquiryReplyLeadId: input.leadId,\n  });';
+  assert.equal(predecessor.split(common+oldCall).length,2,'C1 inquiry composition predecessor anchor changed');
+  assert.equal(component.split(common+newCall).length,2,'C1 inquiry composition component scope changed');
+  return Buffer.from(predecessor.replace(common+oldCall,common+newCall));
+}
 function lineage(commit) {
   const ancestor=spawnSync('git',['-C',root,'merge-base','--is-ancestor',commit,'HEAD'],{windowsHide:true});
   assert.ok(ancestor.status===0||ancestor.status===1,'C1 lineage could not be read');
@@ -116,6 +149,7 @@ export function loadC1SourceSnapshot() {
   const amendment=git('show',`:${amendmentPath}`),a=checkedAmendment(amendment);
   const smartSiteAmendment=git('show',`:${smartSiteAmendmentPath}`),s=checkedSmartSiteAmendment(smartSiteAmendment);
   const launchGapAmendment=git('show',`:${launchGapAmendmentPath}`),g=checkedLaunchGapAmendment(launchGapAmendment);
+  const inquiryAmendment=git('show',`:${inquiryAmendmentPath}`),i=checkedInquiryAmendment(inquiryAmendment);
   const index=parseC1Index(git('ls-files','--stage'));
   const indexed = new Map(index.map(row=>[row.path,row]));
   const rows = pins => pins.map(pin=>({path:pin.path,...indexed.get(pin.path),bytes:git('show',`:${pin.path}`)}));
@@ -126,7 +160,7 @@ export function loadC1SourceSnapshot() {
   const ancestor=spawnSync('git',['-C',root,'merge-base','--is-ancestor',d.overlay.sourceCommit,'HEAD'],{windowsHide:true});
   assert.ok(ancestor.status===0||ancestor.status===1,'C1 lineage could not be read');
   const gapAuxiliaryPaths=g.auxiliary.flatMap(group=>group.paths);
-  const protectedPaths=[...new Set([descriptorPath,amendmentPath,smartSiteAmendmentPath,launchGapAmendmentPath,...gapAuxiliaryPaths,...s.auxiliary.paths,...d.scopePaths,...d.originalProtected.map(p=>p.path),...d.sql.map(p=>p.path),...d.runtime.map(p=>p.path),...d.approvals.map(p=>p.path),'scripts/c1-source-preservation.mjs','scripts/c1-source-preservation.test.mjs','scripts/production75-combined-source.test.mjs'])];
+  const protectedPaths=[...new Set([descriptorPath,amendmentPath,smartSiteAmendmentPath,launchGapAmendmentPath,inquiryAmendmentPath,...gapAuxiliaryPaths,...s.auxiliary.paths,...d.scopePaths,...d.originalProtected.map(p=>p.path),...d.sql.map(p=>p.path),...d.runtime.map(p=>p.path),...d.approvals.map(p=>p.path),'scripts/c1-source-preservation.mjs','scripts/c1-source-preservation.test.mjs','scripts/production75-combined-source.test.mjs'])];
   return {
     descriptor,
     legacyManifest:git('show',`${d.overlay.sourceCommit}:${d.legacyManifest.path}`),
@@ -171,7 +205,8 @@ export function loadC1SourceSnapshot() {
       isAncestor:lineage(source.sourceCommit),
       product:treeEntries(source.sourceCommit,d.scopePaths),
     })),
-    launchGapCurrent:rows(g.currentBlobs),
+    // The approved launch-gap current bytes are now immutable predecessor evidence.
+    launchGapCurrent:historicalRows(g.integration.sourceCommit,g.currentBlobs),
     launchGapReviewed:g.changes.map((change,index)=>historicalRows(g.sources.find(source=>source.key===change.origin).sourceCommit,[g.currentBlobs[index]])[0]),
     launchGapAuxiliary:g.auxiliary.map(group=>({key:group.key,
       reviewedProduct:treeEntries(g.sources.find(source=>source.key===group.source).sourceCommit,group.paths),
@@ -179,6 +214,18 @@ export function loadC1SourceSnapshot() {
       currentBytes:rows(group.blobs),
     })),
     launchGapAuxiliaryUntracked:git('ls-files','--others','-z','--',...gapAuxiliaryPaths).toString('utf8').split('\0').filter(path=>path.endsWith('.mjs')).join('\n'),
+    inquiryAmendment,
+    inquirySources:i.sources.map(source=>({key:source.key,
+      commit:text('rev-parse',`${source.sourceCommit}^{commit}`),
+      tree:text('rev-parse',`${source.sourceCommit}^{tree}`),
+      parents:text('show','-s','--format=%P',source.sourceCommit).split(' '),
+      isAncestor:lineage(source.sourceCommit),
+      product:treeEntries(source.sourceCommit,d.scopePaths),
+    })),
+    inquiryPredecessorProduct:treeEntries(i.sources.find(source=>source.key==='base').sourceCommit,d.scopePaths),
+    inquiryOriginal:historicalRows(i.sources.find(source=>source.key==='base').sourceCommit,i.originalBlobs),
+    inquiryReviewed:historicalRows(i.sources.find(source=>source.key==='component').sourceCommit,i.reviewedBlobs),
+    inquiryCurrent:rows(i.currentBlobs),
     historicalProtected:d.originalProtected.map(pin=>({path:pin.path,bytes:git('cat-file','blob',pin.blob)})),
     historicalProduct:d.originalProductBlobs.map(pin=>({path:pin.path,bytes:git('cat-file','blob',pin.blob)})),
     currentProductBytes:rows(d.currentProductBlobs),
@@ -249,6 +296,46 @@ function verifyLaunchGap(snapshot,composed,smartSiteDescriptor,scopePaths) {
   assert.equal(snapshot.launchGapAuxiliaryUntracked,'','C1 launch-gap untracked auxiliary executable source is not reviewed');
   return {...g.integration,changedPaths:g.changes.map(change=>change.path),integration:g.integration,auxiliaryScopes:g.auxiliary.map(group=>group.scope),amendmentSha256:launchGapAmendmentSha256,releaseEligible:false};
 }
+function verifyInquiry(snapshot,launchGap,scopePaths) {
+  const i=checkedInquiryAmendment(snapshot.inquiryAmendment);
+  assert.equal(i.releaseEligible,false,'C1 inquiry amendment cannot grant release');
+  assert.deepEqual(i.predecessor,{descriptorPath:launchGapAmendmentPath,descriptorSha256:launchGapAmendmentSha256,integration:launchGap.integration},'C1 inquiry predecessor changed');
+  assert.deepEqual(i.scopePaths,scopePaths,'C1 inquiry scope paths changed');
+  assert.deepEqual(snapshot.inquirySources.map(source=>source.key),i.sources.map(source=>source.key),'C1 inquiry source identity coverage changed');
+  for(const [index,pin] of i.sources.entries()){
+    const actual=snapshot.inquirySources[index];
+    assert.equal(actual.commit,pin.sourceCommit,'C1 inquiry commit changed');
+    assert.equal(actual.tree,pin.sourceTree,'C1 inquiry tree changed');
+    assert.deepEqual(actual.parents,pin.parents,'C1 inquiry non-squash parents changed');
+    assert.equal(actual.isAncestor,true,'C1 inquiry reviewed lineage changed');
+    assert.deepEqual(scope(actual.product),pin.scope,'C1 inquiry historical complete product map changed');
+  }
+  const sources=new Map(snapshot.inquirySources.map(source=>[source.key,source]));
+  assert.deepEqual(sorted(sources.get('base').product),sorted(snapshot.inquiryPredecessorProduct),'C1 inquiry predecessor source map changed');
+  assert.deepEqual(sorted(sources.get('launchGapProof').product),sorted(snapshot.inquiryPredecessorProduct),'C1 inquiry approved launch-gap proof source map changed');
+  const expected=applyC1InquiryAmendment(new Map(snapshot.inquiryPredecessorProduct.map(row=>[row.path,row])),i.changes);
+  assert.deepEqual(sorted(sources.get('integration').product),sorted([...expected.values()]),'C1 inquiry reviewed integration differs from the complete source union');
+  assert.deepEqual(sorted(snapshot.currentProduct),sorted([...expected.values()]),'C1 launch-gap inquiry current product differs from the complete source union');
+  assert.deepEqual(scope(snapshot.currentProduct),i.integration.scope,'C1 inquiry current complete scope changed');
+  for(const key of ['originalBlobs','reviewedBlobs','currentBlobs'])assert.deepEqual(i[key].map(pin=>pin.path),INQUIRY_PATHS,'C1 inquiry pinned path coverage changed');
+  for(const [index,change] of i.changes.entries()){
+    const {path,mode,blob}=i.originalBlobs[index];
+    assert.deepEqual({path,mode,blob},change.before,'C1 inquiry historical pin changed');
+    const reviewed=i.reviewedBlobs[index];
+    assert.deepEqual(sources.get('component').product.find(row=>row.path===change.path),{path:reviewed.path,mode:reviewed.mode,blob:reviewed.blob},'C1 inquiry component provenance changed');
+    if(change.path!==i.composition.path)assert.deepEqual({mode:reviewed.mode,blob:reviewed.blob},change.after,'C1 inquiry disjoint reviewed component changed');
+  }
+  verifyIndexedRows(snapshot.inquiryOriginal,i.originalBlobs);
+  verifyIndexedRows(snapshot.inquiryReviewed,i.reviewedBlobs);
+  verifyIndexedRows(snapshot.inquiryCurrent,i.currentBlobs);
+  const {predecessor,component,method,...compositionPin}=i.composition;
+  assert.equal(predecessor,'base','C1 inquiry composition predecessor changed');
+  assert.equal(component,'component','C1 inquiry composition source changed');
+  assert.deepEqual(compositionPin,i.currentBlobs.find(pin=>pin.path===i.composition.path),'C1 inquiry exact composition pin changed');
+  const body=rows=>rows.find(row=>row.path===i.composition.path).bytes;
+  assert.deepEqual(composeC1InquiryManualSms(body(snapshot.inquiryOriginal),body(snapshot.inquiryReviewed)),Buffer.from(body(snapshot.inquiryCurrent)),'C1 inquiry complete G11+GAP02 manual-SMS composition changed');
+  return {integration:i.integration,changedPaths:i.changes.map(change=>change.path),amendmentSha256:inquiryAmendmentSha256,releaseEligible:false};
+}
 export function verifyC1SourceSnapshot(snapshot) {
   const d=checkedDescriptor(snapshot.descriptor);
   assert.equal(hash(snapshot.legacyManifest),d.legacyManifest.sha256,'C1 historical manifest changed');
@@ -305,7 +392,9 @@ export function verifyC1SourceSnapshot(snapshot) {
   const composed=applyC1SmartSiteAmendment(amended,s.changes);
   assert.deepEqual(sorted(snapshot.integrationProduct),sorted([...composed.values()]),'C1 integration source differs from the reviewed B+D composition');
   assert.deepEqual(scope(snapshot.integrationProduct),s.integration.scope,'C1 integration scope changed');
-  const launchGapAmendment=verifyLaunchGap(snapshot,composed,s,d.scopePaths);
+  // Re-run the unchanged launch-gap contract against its exact historical predecessor view.
+  const launchGapAmendment=verifyLaunchGap({...snapshot,currentProduct:snapshot.inquiryPredecessorProduct},composed,s,d.scopePaths);
+  const inquiryConsentAmendment=verifyInquiry(snapshot,launchGapAmendment,d.scopePaths);
   assert.deepEqual(s.originalBlobs.map(pin=>pin.path),s.changes.filter(change=>change.before).map(change=>change.path),'C1 Smart Site original coverage changed');
   assert.deepEqual(s.currentBlobs.map(pin=>pin.path),SMART_SITE_PATHS,'C1 Smart Site current coverage changed');
   verifyRows(snapshot.smartSiteOriginal,s.originalBlobs.map(({mode,...pin})=>pin));
@@ -328,6 +417,6 @@ export function verifyC1SourceSnapshot(snapshot) {
   assert.equal(snapshot.auxiliaryUntracked,'','C1 untracked auxiliary executable source is not reviewed');
   return {legacy:d.legacy,overlay:d.overlay,changedProductPaths:d.changes.map(change=>change.path),amendedProof:d.amendedDrill,descriptorSha256,
     testOnlyAmendment:{...a.amendment,changedPaths:a.changes.map(change=>change.path),amendmentSha256},
-    smartSiteAmendment:{...s.smartSite,changedPaths:s.changes.map(change=>change.path),reviewedB:s.reviewedB,integration:s.integration,auxiliaryScope:s.auxiliary.scope,amendmentSha256:smartSiteAmendmentSha256},launchGapAmendment,currentScope:launchGapAmendment.integration.scope,releaseEligible:false};
+    smartSiteAmendment:{...s.smartSite,changedPaths:s.changes.map(change=>change.path),reviewedB:s.reviewedB,integration:s.integration,auxiliaryScope:s.auxiliary.scope,amendmentSha256:smartSiteAmendmentSha256},launchGapAmendment,inquiryConsentAmendment,currentScope:inquiryConsentAmendment.integration.scope,releaseEligible:false};
 }
 export const assertC1SourcePreserved = () => verifyC1SourceSnapshot(loadC1SourceSnapshot());

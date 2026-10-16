@@ -48,7 +48,8 @@ describe('exact C1 source preservation overlay', () => {
     expect(result.smartSiteAmendment.integration.sourceCommit).toBe('08c97d7b76ce8e4668c04dc1fcbde9089a709bbe');
     expect(result.smartSiteAmendment.auxiliaryScope.count).toBe(3);
     expect(result.smartSiteAmendment.integration.scope).toEqual({count:2120,sha256:'99a7972dbcb95bf3bc32190bcb0deac1a18c6b59907f8e0184d8e0983fd5b254'});
-    expect(result.currentScope).toEqual({count:2123,sha256:'f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472'});
+    expect(result.launchGapAmendment.integration.scope).toEqual({count:2123,sha256:'f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472'});
+    expect(result.currentScope).toEqual({count:2123,sha256:'c0519f20f3cf8e0e26ac1aa6d19701e4c587450fd82d6c4d8b359070703ef497'});
     expect(result.testOnlyAmendment.changedPaths).toHaveLength(7);
     expect(result.testOnlyAmendment.changedPaths.every(path=>/^artifacts\/api-server\/src\/.*(?:\.test\.ts|test-helpers\/[^/]+\.ts)$/.test(path))).toBe(true);
     expect(result.releaseEligible).toBe(false);
@@ -206,6 +207,103 @@ describe('exact C1 source preservation overlay', () => {
       expect(snapshot.untracked).not.toContain(relative);
       expect(verifyC1SourceSnapshot(snapshot).releaseEligible).toBe(false);
     });
+  });
+});
+
+describe('separate exact inquiry-consent successor', () => {
+  it('accepts GAP02 over the historical launch-gap proof with a separately pinned complete current map', () => {
+    const result=verifyC1SourceSnapshot(original);
+    expect(result.inquiryConsentAmendment.integration.sourceCommit).toBe('975ad3a2529c909885abdf70371054505f124162');
+    expect(result.inquiryConsentAmendment.integration.sourceTree).toBe('8b19f0c045a53848e14880efd1c5c70350387d77');
+    expect(result.inquiryConsentAmendment.changedPaths).toEqual([
+      'artifacts/api-server/src/services/manual-sms.test.ts',
+      'artifacts/api-server/src/services/manual-sms.ts',
+      'artifacts/api-server/src/services/send-gate.ts',
+    ]);
+    expect(result.inquiryConsentAmendment.releaseEligible).toBe(false);
+    expect(result.launchGapAmendment.integration.scope.sha256).toBe('f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472');
+    expect(result.currentScope.sha256).toBe('c0519f20f3cf8e0e26ac1aa6d19701e4c587450fd82d6c4d8b359070703ef497');
+    expect(result.releaseEligible).toBe(false);
+  });
+  it.each(['inquiryAmendment','inquiryOriginal','inquiryReviewed','inquiryCurrent'])('refuses same-size altered %s bytes', key => {
+    const snapshot=copy();expect(snapshot[key]).toBeDefined();
+    const bytes=key==='inquiryAmendment'?snapshot[key]:snapshot[key][0].bytes;bytes[0]^=1;
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/changed/);
+  });
+  it.each(['commit','tree','parents','isAncestor','product'])('refuses changed %s for every inquiry component, parent, proof and merge', field => {
+    expect(original.inquirySources).toBeDefined();
+    for(let index=0;index<original.inquirySources.length;index++){
+      const snapshot=copy(),source=snapshot.inquirySources[index];
+      if(field==='commit'||field==='tree')source[field]='0'.repeat(40);
+      if(field==='parents')source.parents=[...source.parents,'0'.repeat(40)];
+      if(field==='isAncestor')source.isAncestor=false;
+      if(field==='product')source.product[0].blob='0'.repeat(40);
+      expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow();
+    }
+  });
+  it.each(['missing','duplicate','extra'])('refuses %s inquiry source identity coverage', mutation => {
+    const snapshot=copy();expect(snapshot.inquirySources).toBeDefined();
+    if(mutation==='missing')snapshot.inquirySources.pop();
+    if(mutation==='duplicate')snapshot.inquirySources.push(snapshot.inquirySources[0]);
+    if(mutation==='extra')snapshot.inquirySources.push({...snapshot.inquirySources[0],key:'unreviewed'});
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/inquiry/);
+  });
+  it.each(['inquiryOriginal','inquiryReviewed','inquiryCurrent'])('refuses missing, extra, duplicate, mode and blob drift in %s pins', key => {
+    expect(original[key]).toBeDefined();
+    for(const mutation of ['missing','extra','duplicate','mode','blob']){
+      const snapshot=copy(),rows=snapshot[key];
+      if(mutation==='missing')rows.pop();
+      if(mutation==='extra')rows.push({...rows[0],path:'lib/unreviewed.ts'});
+      if(mutation==='duplicate')rows.push(rows[0]);
+      if(mutation==='mode')rows[0].mode='100755';
+      if(mutation==='blob')rows[0].blob='0'.repeat(40);
+      expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/coverage|changed/);
+    }
+  });
+  it('refuses the old complete map even though its path count is unchanged', () => {
+    const snapshot=copy();expect(snapshot.inquiryPredecessorProduct).toBeDefined();
+    snapshot.currentProduct=structuredClone(snapshot.inquiryPredecessorProduct);
+    expect(snapshot.currentProduct).toHaveLength(2123);
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/inquiry/);
+  });
+  it('refuses an altered historical predecessor map independently of the new current map', () => {
+    const snapshot=copy();expect(snapshot.inquiryPredecessorProduct).toBeDefined();
+    snapshot.inquiryPredecessorProduct[0].mode='100755';
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/launch-gap/);
+  });
+  it('refuses substituting current manual-SMS bytes for historical bytes or historical bytes for current bytes', () => {
+    expect(original.inquiryCurrent).toBeDefined();
+    const manual=rows=>rows.find(row=>row.path.endsWith('/manual-sms.ts'));
+    for(const [target,source] of [['inquiryOriginal','inquiryCurrent'],['inquiryCurrent','inquiryOriginal'],['launchGapCurrent','inquiryCurrent']]){
+      const snapshot=copy();Object.assign(manual(snapshot[target]),structuredClone(manual(snapshot[source])));
+      expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/changed|byte count/);
+    }
+  });
+  it('accepts only the exact three-path inquiry successor and refuses stale, missing, duplicate, extra and deleted changes', () => {
+    expect(original.inquiryAmendment).toBeDefined();
+    const descriptor=JSON.parse(Buffer.from(original.inquiryAmendment).toString());
+    const base=new Map(original.inquiryPredecessorProduct.map(row=>[row.path,row]));
+    const apply=changes=>sourceProof.applyC1InquiryAmendment(base,changes);
+    expect([...apply(descriptor.changes).values()]).toHaveLength(2123);
+    const stale=structuredClone(descriptor.changes);stale[0].before.blob='0'.repeat(40);
+    expect(()=>apply(stale)).toThrow(/base path changed/);
+    expect(()=>apply(descriptor.changes.slice(1))).toThrow(/coverage/);
+    expect(()=>apply([...descriptor.changes,descriptor.changes[0]])).toThrow(/duplicate/);
+    expect(()=>apply([...descriptor.changes,{...descriptor.changes[0],path:'lib/unreviewed.ts'}])).toThrow(/coverage/);
+    const deleted=structuredClone(descriptor.changes);deleted[0].after=null;
+    expect(()=>apply(deleted)).toThrow(/cannot delete/);
+  });
+  it('reconstructs the exact combined manual-SMS body from immutable G11 predecessor and GAP02 bodies', () => {
+    expect(original.inquiryOriginal).toBeDefined();
+    const body=rows=>rows.find(row=>row.path.endsWith('/manual-sms.ts')).bytes;
+    expect(sourceProof.composeC1InquiryManualSms(body(original.inquiryOriginal),body(original.inquiryReviewed))).toEqual(Buffer.from(body(original.inquiryCurrent)));
+    for(const kind of ['missing_predecessor_anchor','duplicate_predecessor_anchor','missing_component_scope']){
+      let predecessor=Buffer.from(body(original.inquiryOriginal)).toString(),component=Buffer.from(body(original.inquiryReviewed)).toString();
+      if(kind==='missing_predecessor_anchor')predecessor=predecessor.replace('  const gate = await checkSendEligibility({','  const gate = await otherGate({');
+      if(kind==='duplicate_predecessor_anchor')predecessor+=predecessor;
+      if(kind==='missing_component_scope')component=component.replace('manualInquiryReplyLeadId: input.leadId','manualInquiryReplyLeadId: otherLeadId');
+      expect(()=>sourceProof.composeC1InquiryManualSms(Buffer.from(predecessor),Buffer.from(component))).toThrow(/composition/);
+    }
   });
 });
 

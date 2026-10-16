@@ -49,7 +49,7 @@ test('a same-size altered protected buffer fails the same preservation check', (
   assert.throws(() => checkBytes(altered, pin), /exact Git bytes/);
 });
 
-test('complete API and library index equals the exact reviewed launch-gap successor of C1+B+D', () => {
+test('complete API and library index equals the exact reviewed inquiry successor of the launch-gap proof', () => {
   const entries = git('ls-files', '--stage', '--', ...manifest.scope.paths).toString().trim().split('\n').map(line => {
     const [meta, path] = line.split('\t');
     const [mode, blob, stage] = meta.split(' ');
@@ -62,8 +62,9 @@ test('complete API and library index equals the exact reviewed launch-gap succes
   assert.equal(proof.testOnlyAmendment.scope.count,2119);
   assert.equal(proof.smartSiteAmendment.scope.count,2118);
   assert.deepEqual(proof.smartSiteAmendment.integration.scope,{count:2120,sha256:'99a7972dbcb95bf3bc32190bcb0deac1a18c6b59907f8e0184d8e0983fd5b254'});
+  assert.deepEqual(proof.launchGapAmendment.integration.scope,{count:2123,sha256:'f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472'});
   assert.equal(entries.length,2123);
-  assert.equal(proof.currentScope.sha256,'f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472');
+  assert.equal(proof.currentScope.sha256,'c0519f20f3cf8e0e26ac1aa6d19701e4c587450fd82d6c4d8b359070703ef497');
   assert.equal(entries.length,proof.currentScope.count);
   assert.equal(sha(JSON.stringify(entries)),proof.currentScope.sha256);
   assert.equal(proof.releaseEligible,false);
