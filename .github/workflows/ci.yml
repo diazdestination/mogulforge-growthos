@@ -15,7 +15,7 @@ jobs:
   validate:
     name: Test, typecheck, and build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     services:
       postgres:
@@ -64,6 +64,22 @@ jobs:
 
       - name: Apply test database schema
         run: pnpm --filter @workspace/db run push-force
+
+      - name: Record bounded test runner resources
+        run: |
+          node --input-type=module <<'NODE'
+          import os from "node:os";
+          console.log(JSON.stringify({
+            node: process.version,
+            platform: process.platform,
+            architecture: process.arch,
+            availableParallelism: os.availableParallelism(),
+            cpuCount: os.cpus().length,
+            totalMemoryBytes: os.totalmem(),
+            freeMemoryBytes: os.freemem(),
+            loadAverage: os.loadavg(),
+          }, null, 2));
+          NODE
 
       - name: Run all test suites
         run: pnpm -r --if-present run test

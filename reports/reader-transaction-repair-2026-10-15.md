@@ -6,7 +6,7 @@ The approved hosted rehearsal verified restored-copy Reader creation/profile acc
 
 Both the legacy and scheduling verification callbacks opened a repeatable-read, read-only transaction on the main Reader before capturing two other databases through separate connections. Their connection and observation time consumed the main Reader's existing 20-second idle-in-transaction budget. A delayed other-database capture could terminate the main session; its subsequent rollback could also mask the observation's original error.
 
-The repair completes those other-database captures before opening the main Reader transaction. Main state and extras still share their original read-only transaction. Existing identity, capability, phase, preserved-data and protected-app checks remain intact. There is no increase to timeouts, writer permissions, mutation admission, deadlines or cleanup authority.
+The repair completes those other-database captures before opening the main Reader transaction. Main state and extras still share their original read-only transaction. Existing identity, capability, phase, preserved-data and protected-app checks remain intact. Production timeouts, writer permissions, mutation admission, deadlines and cleanup authority are unchanged.
 
 ## Verification
 
@@ -14,7 +14,13 @@ The repair completes those other-database captures before opening the main Reade
 - Full scripts suite:54files,1,091passed,0failed.
 - Independent source review: approved; no Critical or Important findings. Reviewed runner SHA256 `76393502f82d7c4b3086233d5446900a692835da6280d4bcbda1b370d09c6e2c`.
 - Real local PostgreSQL16: both old callbacks fail with server SQLSTATE25P03 during an actual21-second delay on another connection. Both fixed callbacks finish successfully and remain usable, with one begin/rollback each and zero writer calls. All8clients close; the labeled tmpfs container is absent and WSL session closed. Receipt: `native-reader-timing-03.json`.
-- Full workspace TypeScript checks passed. A refreshed combined native oracle and CI remain pending; each result must be read from its actual new receipt.
+- Full workspace TypeScript checks passed. Combined native proof at `119470b` passed and was independently accepted, with its console-wrapper exit-code limitation retained. This later CI-only change needs a newly matching native result and CI; earlier results are not repinned.
+
+## Bounded CI timing correction
+
+Two unchanged-source CI attempts at `119470b` reached the existing 30-minute job limit. The second log retained all five failed preparation/approval tests' actual exceptions: each exceeded the scripts suite's 10-second test timeout. These paths do not invoke the changed Reader callbacks. Unchanged suites also ran substantially slower than the earlier candidate's green CI; an infrastructure cause remains unproven.
+
+The scripts suite now allows 20 seconds per test, matching the existing API/UI default. The CI job allows 45 minutes for all test, build and parity checks. A bounded pre-test diagnostic records Node, platform, architecture, CPU availability, memory and load averages without environment values. Assertions, skips, test fixtures, worker concurrency and production deadlines are unchanged. If failures persist within these bounds, investigate their actual traces rather than increasing limits again.
 
 Evidence is retained under `C:/Forge/artifacts/growthos-live-preflight-20261015/`: `reader-transaction-red-02.log`, `reader-transaction-green.log`, `reader-transaction-scripts.log`, `reader-transaction-review.md`, and separately numbered native attempts. The earlier CRLF test-harness failure and native setup failures remain separate historical receipts.
 
