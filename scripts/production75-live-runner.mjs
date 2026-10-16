@@ -1210,6 +1210,14 @@ async function executePacket(
         return writeQuery(...args);
       };
       const readFresh = async () => {
+        // Other connections must not consume this Reader's idle-transaction budget.
+        const other = await snapshot(
+          copy.id,
+          await credentials(copy, custody, "reader"),
+          resources,
+          readerName,
+          ["growthos_staging", "mogulforge-growthos-db"],
+        );
         await reader.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
         try {
           const observer = createProduction75Observer({
@@ -1224,14 +1232,7 @@ async function executePacket(
               },
             }),
             state = await captureProduction75State(observer, corePlan),
-            extra = await captureProduction75Extras(observer),
-            other = await snapshot(
-              copy.id,
-              await credentials(copy, custody, "reader"),
-              resources,
-              readerName,
-              ["growthos_staging", "mogulforge-growthos-db"],
-            );
+            extra = await captureProduction75Extras(observer);
           const evidence = {
             state,
             extra,
@@ -1340,6 +1341,13 @@ async function executePacket(
       });
       const readFresh = async () => {
         await verifyLiveProtectedApps(transport, packet.protectedApps);
+        const others = await snapshot(
+          copy.id,
+          await credentials(copy, custody, "reader"),
+          resources,
+          readerName,
+          ["growthos_staging", "mogulforge-growthos-db"],
+        );
         await reader.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
         try {
           const observer = createScheduling0019Observer({
@@ -1354,13 +1362,6 @@ async function executePacket(
             }),
             state = await captureScheduling0019State(observer, deltaPlan),
             extra = await captureProduction75Extras(observer),
-            others = await snapshot(
-              copy.id,
-              await credentials(copy, custody, "reader"),
-              resources,
-              readerName,
-              ["growthos_staging", "mogulforge-growthos-db"],
-            ),
             capabilities = assertLegacyReaderCapabilities(state.policy, {
               readerLogin: readerName,
               readerRole: readerName,
