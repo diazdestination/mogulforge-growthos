@@ -15,22 +15,24 @@ Steps, in order:
 
 1. **Lock the app off.** Stop it and switch off automatic wake-up, so no one and
    nothing can change the old database during the move. We check that it really
-   is off, and that nothing is connected to the old database, before the copy,
-   after the check and just before the switch. We also write down exactly which
-   app version and settings are running today, so we can go back to them.
+   is off, and that nothing unexpected is connected to the old database, at the
+   start and again before the copy, after the check and just before the switch.
+   We also write down exactly which app version and settings are running today.
 2. Confirm Fly has a fresh backup of the old database, taken after the lock.
 3. Create the new database (a paid Fly resource).
-4. Copy the records. The copy is checked record by record before it is saved.
-   If anything differs, nothing is saved. The tool only works on the two exact
-   databases we name in advance, and refuses anything else.
-5. A second, independent check compares old and new again.
-6. Check that the app's login on the new database can read and write
-   everything it needs.
-7. Give the app the new database's login. This is the password change you
+4. Write down, and have Codex review, the exact two databases, logins and
+   database version involved. The copy tool refuses to run against anything
+   else, and refuses if something unexpected is connected to the old database.
+5. Copy the records. The copy is checked record by record before it is saved.
+   If anything differs, nothing is saved.
+6. A second, independent check compares old and new again.
+7. A tool checks that the app's login on the new database can read and write
+   every table it needs.
+8. Give the app the new database's login. This is the password change you
    already approved: new login, and the old one is retired later.
-8. Start the new app version privately and check sign-in, both companies'
+9. Start the new app version privately and check sign-in, both companies'
    records, leads, estimates, projects, invoices and scheduling.
-9. Open it up for use.
+10. Open it up for use.
 
 If the connection drops at the exact moment the copy is saved, we may not know
 whether it saved. In that case we never just try again. We run the check, which
@@ -38,29 +40,34 @@ tells us "saved", "not saved", or "stop and ask Adam".
 
 ## How long it takes, and the impact on customers
 
-- The copy and the check took about 10 seconds on a practice run with test data.
-  Over the internet to Fly, expect 1 to 5 minutes.
-- The whole session, including creating the database and the checks, takes
-  about 45 to 60 minutes.
-- Production is switched off today and is not serving customers, so the impact
-  on customers is effectively none.
+- On a practice run with test data, the copy and the check took about 10
+  seconds. Against Fly, we **estimate** 1 to 5 minutes; this has not been
+  measured.
+- We estimate the whole session at about 45 to 60 minutes.
+- Codex must confirm production's state at the time of the move. A dated note
+  from October 16 saw production running, so we cannot assume no one is using
+  it. Any users would be locked out for the session.
 
 ## If something goes wrong (going back)
 
 - **When we go back:** any failed check, wrong record counts, the app not
   working properly, or you asking us to.
-- **How:** switch the app off again, then put back **the old app version, its old
-  settings and the old database** together. The new app version cannot run on
-  the old database, so all three go back as a set. Before the app is open for
-  use, this takes about **5 to 10 minutes** and loses nothing, because the old
-  database was never touched.
-- **After the app is open for use**, people may have entered new information
-  that exists only in the new database. Going back would lose it. So we do not
-  go back automatically. We switch the app off, list exactly what changed, and
-  ask you to choose:
+- **Before the new app version has started:** nothing has changed on the new
+  database. We put back the old app version, its old settings and the old
+  database together. The new app version cannot run on the old database, so
+  all three go back as a set.
+- **What "going back" means:** the app is left **switched off safely** on the
+  old setup. Nothing is lost. We have not yet proven that today's old app
+  version runs correctly again, so we will not promise it is back in service
+  until it passes its own checks. We will not quote how long this takes until
+  it has been rehearsed.
+- **Once the new app version has started, even privately:** signing in and
+  testing already write to the new database, and real use adds more. Going
+  back would lose those changes. So we switch the app off, list every table
+  that changed, and ask you to decide for each one:
   - fix the problem on the new database (usually best);
   - carefully copy the new information back first (separate, reviewed work);
-  - or knowingly accept losing it.
+  - or knowingly accept losing it, even if it is only test sign-ins.
 
 ## Cost
 

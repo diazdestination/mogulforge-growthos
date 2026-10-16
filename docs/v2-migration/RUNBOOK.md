@@ -10,6 +10,7 @@ Fly. The tooling has only been tested on local stand-ins.
 | Script | Purpose |
 | --- | --- |
 | `scripts/v2-migration/copy-to-v2.mjs --execute` | Reads V1 in one `REPEATABLE READ READ ONLY` snapshot. Refuses a non-empty target. In one target transaction it rebuilds the exact legacy-75 schema from the live V1 catalog, copies every row, adds FKs, then applies the reviewed SQL. It verifies the result and commits only if everything matches. Prints a JSON summary with counts, hashes and timings, never row values. |
+| `scripts/v2-migration/app-privileges.mjs` | Go/no-go for the app login: every expected table (reviewed 142 inventory) checked for SELECT, INSERT, UPDATE and DELETE separately by OID, plus CONNECT, schema USAGE and enum USAGE. Exit 0 only with zero gaps. |
 | `scripts/v2-migration/compare.mjs` | Independent check after the copy, using fresh read-only snapshots on both sides. Exit 0 `MATCH`, 1 `MISMATCH`/`FAILED`, 2 `TARGET_EMPTY`. Also used to reconcile an uncertain COMMIT. |
 
 Schema route and why: the target is produced by **the same reviewed SQL that
@@ -64,16 +65,39 @@ Reconcile `UNKNOWN_OUTCOME` (or any doubt) with `compare.mjs`, same URLs, writer
 - anything else (`MISMATCH`, `FAILED`, partial objects) => **STOP**. Preserve the copy and compare
   JSON, keep V1 frozen and the app on V1, escalate to Adam. No destructive reset of an unresolved target.
 
-**Identity pins (mandatory, fail closed).** Run `copy-to-v2.mjs --identify` (read-only; prints
-`<system_identifier>/<database>` for each side, no data). Record both values in the execution
-packet. Every `--execute` and every `compare.mjs` run must set `SOURCE_IDENTITY` and
-`TARGET_IDENTITY`. The tools refuse with:
-- `v2_identity_pin_required` if a pin is missing;
-- `v2_identity_unavailable` if `pg_control_system()` cannot be read (no override exists; use a
-  login that can read it);
-- `v2_source_identity_mismatch` / `v2_target_identity_mismatch` if a pin is wrong;
-- `v2_source_target_same_database` if both sides are the same.
-The copy re-reads the target identity immediately before COMMIT.
+**Admission manifest (mandatory, fail closed).** Both tools require `V2_MANIFEST`, a nonsecret JSON
+file reviewed in the execution packet. Run `copy-to-v2.mjs --identify` (read-only, no data) against
+the real endpoints. It prints a **draft** with the observed facts (cluster system identifier,
+database, session login, effective role, PG major) and the observed source sessions. The
+reviewer fills in `target.ownerRole` and `allowedSourceSessions` (exact `usename` +
+`application_name` of reviewed non-writers only, for example monitoring). Observed sessions are
+never allowed automatically. Values must come from the providers; never invent them.
+
+```json
+{ "source": { "systemIdentifier": "...", "database": "fly-db", "sessionUser": "...", "currentUser": "...", "pgMajor": 16 },
+  "target": { "systemIdentifier": "...", "database": "...", "sessionUser": "...", "ownerRole": "...", "pgMajor": 16 },
+  "allowedSourceSessions": [] }
+```
+
+Before any target mutation the copy refuses on any of the following:
+- **Manifest:** missing or invalid (`v2_manifest_required` / `v2_manifest_invalid`), including any
+  PG major other than 16.
+- **Identity:** unreadable (`v2_identity_unavailable`, no override). The **same cluster** system
+  identifier on both sides (`v2_same_cluster`) is refused regardless of database names or URL
+  spelling.
+- **Facts:** any database, login, source effective role or PG major that differs from the manifest
+  (`v2_<side>_<field>_mismatch`).
+- **Target contents:** a non-empty target (`v2_target_not_empty`: relations, standalone types,
+  routines or schemas other than `public` that are not extension-owned).
+- **Source sessions:** a source login that cannot observe other sessions (`v2_source_sessions_unobservable`;
+  the reader needs `pg_read_all_stats` or `pg_monitor` in addition to `pg_read_all_data`), or any
+  client session on the source database outside the allowlist (`v2_source_unexpected_sessions`).
+
+Inside the transaction it requires membership in `ownerRole` and verifies `current_user = ownerRole`
+after `SET LOCAL ROLE`. Immediately before COMMIT it rechecks the target facts, the owner role and
+the source sessions. The summary's `admitted` and `sourceSessions` fields bind the receipt to these
+facts. The session check is a gate, not containment: the external writer freeze (step 1) must stay
+in force through final compare and cutover.
 
 **Error output** contains only our safe codes, our own name/count details, and for PostgreSQL
 errors the SQLSTATE plus schema/table/column/constraint names. PostgreSQL message/detail/hint text,
@@ -81,20 +105,24 @@ which can contain key or row values, is never printed.
 
 ## Local test evidence (2026-10-16, Windows + WSL Docker, postgres:16-alpine)
 
-`cd scripts && node node_modules/vitest/vitest.mjs run v2-migration/`: **10/10 pass**. With
-`production75-core`, `production75-source` and `production75-scheduling0019` it is 72/72. Two
+`cd scripts && node node_modules/vitest/vitest.mjs run v2-migration/`: **14/14 pass**. With
+`production75-core`, `production75-source` and `production75-scheduling0019` (4 files) it is 105/105. Two
 containers, `claude-v2mig-src-*` and `claude-v2mig-dst-*` (127.0.0.1 only, `--rm`), are removed
 afterwards. Synthetic data: 46 rows across 12 legacy tables in 2 fictional tenants. It covers bytea
 with NUL, text[] with commas/quotes, timestamp without time zone, JSON null vs SQL NULL, Unicode,
 and held/unknown-effect scheduled actions. Fault injection covers a lost COMMIT acknowledgement
 (=> `UNKNOWN_OUTCOME`, then compare `MATCH`, retry refused), a failure before COMMIT
-(=> `FAILED`, target empty, compare `TARGET_EMPTY`), unreadable, missing or wrong identity pins
-(=> refused, nothing written), and a real duplicate-key error (=> output holds no key values).
+(=> `FAILED`, target empty, compare `TARGET_EMPTY`), admission refusals (unreadable identity,
+missing manifest, same cluster/different database, URL alias, wrong database/login/role/owner role,
+PG 17), unexpected and late source sessions, a source login blind to sessions, non-empty targets
+(routine, composite type, extra schema), app-privilege gaps (SELECT-only and wholly inaccessible
+tables), connection cleanup on setup failure, and a real duplicate-key error (=> output holds no
+key values).
 
 Measured locally: copy 6.4–7.7 s (connect 1.4, source read 0.4–0.6, rebuild+copy 1.9–2.4,
 upgrade SQL 2.3–2.9, verify+commit 0.4), compare 2.2–2.3 s. Production `fly-db` held 65 rows at
 the Oct 11 baseline. Each statement over a tunnel pays network latency (about 300 round trips), so
-plan **1 to 5 minutes** for copy plus compare.
+estimate **1 to 5 minutes** for copy plus compare (an estimate, not measured against Fly).
 
 ## Known V1 facts (dated receipts, not fresh provider checks)
 
@@ -120,8 +148,11 @@ plan **1 to 5 minutes** for copy plus compare.
    (digest/name only). **Fly secrets cannot be read back after overwrite.**
 3. The app image/commit to start on V2 is pinned and contains the 0019 code (#63 tip `02306ef` or
    its merged equivalent).
-4. A V1 login that can read `fly-db`, preferably a dedicated `pg_read_all_data` reader. The tool
-   enforces read-only regardless.
+4. A V1 login that can read `fly-db` and observe all sessions: a dedicated reader with
+   `pg_read_all_data` plus `pg_read_all_stats` (or `pg_monitor`). The tool enforces read-only
+   regardless, and refuses a login that cannot see other sessions.
+7. **Admission manifest reviewed** (see **Admission manifest**), with both cluster system
+   identifiers different.
 5. **V2 inventory recorded:** PG major is 16 (no-go on any other major without a separate decision).
    Encoding equals V1. Locale/collation are recorded; a difference requires an explicit decision,
    not a default accept. The extension list, its owners and grants are reviewed, and nothing
@@ -151,7 +182,8 @@ this runbook verbatim.
      account for each one (monitoring, PgBouncer server connections). No session may hold writer
      privileges.
    - Repeat both checks immediately before step 5, after step 6, and immediately before step 7.
-     Any change => stop. The copy's `sourceOtherSessions` is a point-in-time count only.
+     Any change => stop. The copy's own session gate (before mutation and before COMMIT) does not
+     replace this external containment.
    - Confirm the outbound/scheduler hold remains in place.
    - **Record the rollback configuration** (needed because V1 is the legacy 75-table layout and the
      PR63 image expects 142 tables plus 0019, so the new image cannot run on V1):
@@ -172,46 +204,44 @@ this runbook verbatim.
      - `SELECT current_user, session_user;`
      - `SELECT r.rolname, m.rolname AS member_of FROM pg_auth_members a JOIN pg_roles r ON r.oid=a.member JOIN pg_roles m ON m.oid=a.roleid WHERE r.rolname=current_user;`
        must show the intended owner role (proposed mapping: login like `fly-user` -> `schema_admin`).
-     - `SET ROLE <owner-role>; RESET ROLE;` succeeds (required if `TARGET_OWNER_ROLE` is used).
+     - `SET ROLE <owner-role>; RESET ROLE;` succeeds (the copy also enforces this).
      - `SELECT nspowner::regrole, has_schema_privilege('<owner-role>','public','CREATE') FROM pg_namespace WHERE nspname='public';`
        must be true.
      - `has_database_privilege('<app-login>', current_database(), 'CONNECT')` must be true.
 4. **Tunnels** (local only). Example: `fly mpg proxy <v2-id> --local-port 16432` plus the V1
    access path on another port. The copy and compare **must use direct PostgreSQL connections**,
    not PgBouncer. They need one long session transaction.
-5. **Copy.** Repeat the step 1 checks first. Pin identities first (see **Identity pins**).
+5. **Copy.** Repeat the step 1 checks first.
    ```powershell
    $env:SOURCE_DATABASE_URL = '<V1 read-only URL via tunnel>'   # from custody; never echoed
    $env:TARGET_DATABASE_URL = '<V2 owner-capable URL via tunnel>'
-   node scripts/v2-migration/copy-to-v2.mjs --identify > identities.json   # record in packet
-   $env:SOURCE_IDENTITY = '<source value from packet>'
-   $env:TARGET_IDENTITY = '<target value from packet>'
-   $env:TARGET_OWNER_ROLE   = '<owner role verified in 3b, e.g. schema_admin>'
+   node scripts/v2-migration/copy-to-v2.mjs --identify > manifest-draft.json   # review, complete, store in packet
+   $env:V2_MANIFEST = '<path to the reviewed manifest>'
    node scripts/v2-migration/copy-to-v2.mjs --execute > copy-summary.json; $LASTEXITCODE
    ```
    Go only on exit 0 / `COMMITTED`, `verification.ok`, and 142 `tables` rows all `match`. For any
    other outcome follow **Copy outcomes** above. Exit 3 is never a retry.
-6. **Compare.** `node scripts/v2-migration/compare.mjs > compare.json`, with the same four variables. Go only on exit 0 /
+6. **Compare.** `node scripts/v2-migration/compare.mjs > compare.json`, with the same three variables. Go only on exit 0 /
    `MATCH`. Review `warnings` (for example `database_locale_differs`) against the precondition 5
    decision. Keep both JSON files and the backup id as evidence; they contain no row values.
    Repeat the step 1 checks.
 7. **App privileges (go/no-go before the secret changes).** As the **app login** on V2:
-   - If the app login is not the table owner and does not inherit it: run
-     `SELECT count(*) FROM information_schema.tables t WHERE table_schema='public' AND NOT (has_table_privilege(current_user, format('public.%I',t.table_name), 'SELECT,INSERT,UPDATE,DELETE'));`
-     It must be **0**.
-   - Also check `has_schema_privilege(current_user,'public','USAGE')` and usage of the public enum
-     types: `SELECT count(*) FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typtype='e' AND NOT has_type_privilege(current_user,t.oid,'USAGE');`
-     must be 0.
-   - Prove read/write inside `BEGIN; ... ROLLBACK;` (for example insert and delete a fictional row
-     in a leaf table, then ROLLBACK). Do not infer grants from role names or from owner-level copy
-     success. There are no application sequences.
+   `$env:APP_DATABASE_URL = '<V2 URL as the app login>'; node scripts/v2-migration/app-privileges.mjs > app-privileges.json`.
+   It must exit 0 with `status: OK`. The tool checks the expected inventory (the reviewed 142 tables
+   and 15 enum types), not what the login happens to see. Each table is looked up by OID and
+   SELECT, INSERT, UPDATE and DELETE are checked separately. CONNECT, schema USAGE and enum USAGE
+   are checked too, and public tables outside the inventory are reported. Do not use
+   `information_schema` or a comma-separated `has_table_privilege` list: those miss inaccessible
+   tables and pass when ANY listed privilege exists. Grants, if needed, belong in the reviewed
+   execution packet, not this tooling. There are no application sequences.
 8. **Rotate the credential and repoint.** Write the V2 app URL as a **direct** PostgreSQL
    connection, or a pooler verified to be in **session** mode. Transaction-mode PgBouncer is not
    allowed: the scheduler holds a session advisory lock (`pg_try_advisory_lock` /
    `pg_advisory_unlock`, `artifacts/api-server/src/services/scheduler-runtime.ts:64,141`).
    Example: `fly secrets set DATABASE_URL='<V2 app URL>' -a mogulforge-growthos --stage`.
    The V1 credential stays valid for rollback until acceptance.
-9. **Start privately.** Start one Machine with the pinned image (example:
+9. **Start privately.** **Write accounting starts here:** from this first V2 app start, every write on
+   V2 (including sign-in sessions and any acceptance edits) counts for rollback B below. Start one Machine with the pinned image (example:
    `fly secrets deploy -a mogulforge-growthos` / `fly machine start <id>`). Keep autostart off,
    public routing closed, `AUTO_MIGRATE` unset/false, and the outbound hold on.
 10. **Health and workflow checks.**
@@ -221,8 +251,8 @@ this runbook verbatim.
     - `scheduled_actions` statuses are unchanged (no held or unknown effect replays).
     - Exactly one scheduler holds its advisory lock.
     - No SQL errors in logs for 10 minutes.
-11. **Open traffic** as Adam approved: re-enable autostart and routing. **From this moment V2
-    holds new writes and V1 is stale.**
+11. **Open traffic** as Adam approved: re-enable autostart and routing. Customer writes now land
+    on V2 as well.
 12. **After acceptance** (Adam confirms, suggested at least 7 days):
     - Retire the old V1 login (rotate or revoke `fly-user` and the reader). Confirm V1 refuses the
       old credential and V2 stays healthy.
@@ -236,46 +266,55 @@ Rollback is **old image + old config + V1 URL**, never just repointing `DATABASE
 image expects the 142-table + 0019 schema and is not compatible with V1's legacy 75-table layout.
 Use the image digest and config recorded in step 1.
 
-**A. Before traffic opened (step 11 not done).** V2 has had no customer writes.
-1. Freeze V2 writers: disable autostart and stop every app Machine. Verify with the same positive
-   checks as step 1, now on V2: Machines all stopped, and zero `fly-user`/app client sessions on V2.
-2. `fly secrets set DATABASE_URL='<V1 URL from custody, re-verified in precondition 2>' -a mogulforge-growthos --stage`,
-   plus any other secret/config values that changed at cutover (compare with the recorded config).
-3. Redeploy the **recorded pre-cutover image digest** with the recorded config. Example:
+**A. Before the first V2 app start (step 9 not done).** Nothing has written to V2.
+1. Keep (or put back) the writer freeze. Verify V2 has no app client sessions.
+2. Restore old image + old config + V1 URL. Example:
+   `fly secrets set DATABASE_URL='<V1 URL from custody, re-verified in precondition 2>' -a mogulforge-growthos --stage`,
+   plus any other changed secret/config values, then
    `fly deploy -a mogulforge-growthos --image <recorded-image@sha256:digest>` (flags unverified).
    Confirm every Machine runs that digest.
-4. Start privately and run the health check against V1. Expected **5 to 10 minutes**. V1 was never
-   written.
-5. Keep V2 intact for diagnosis. Delete it only with approval.
+3. **Default outcome: stopped maintenance.** The app stays stopped on the old binding. That the
+   recorded pre-cutover image works with V1's legacy-75 layout is **not proven by this tooling**
+   (no local old-image/V1 rehearsal exists). Start it only if Adam asks, and then only as a
+   separate observed check; do not claim service is restored until its health/sign-in checks pass.
+4. Keep V2 intact for diagnosis. Delete it only with approval.
 
-**B. After traffic opened.** V2 may hold writes that V1 does not have. Repointing alone would
-silently drop them, so it is **not** a default rollback.
-1. Freeze V2 writers exactly as in A.1, and verify it.
-2. Measure what changed since the copy. Run `compare.mjs` against V1 as the source: any `table`
-   problems list the tables with post-cutover writes.
-3. **Stop for an owner decision** with that list. The options are:
+**B. After the first V2 app start (step 9 or later).** V2 may hold writes that V1 does not have.
+These include owner sign-in sessions from step 10 (`auth.ts` inserts/updates/deletes `sessions`),
+any acceptance edits, and customer writes after step 11. Repointing alone would silently drop them.
+1. Freeze V2 writers: disable autostart and stop every app Machine. Verify with the same positive
+   checks as step 1, now on V2: Machines all stopped, and zero app client sessions on V2.
+2. Measure what changed since the copy. Run `compare.mjs` with V1 as the source and V2 as the
+   target (same manifest): the `table` and `new_table_not_empty` problems list every table with
+   writes since the copy.
+3. **Preserve before reverting.** Keep V2 intact and record that list with the evidence.
+4. **Stop for an owner decision.** Every listed table must be named, including `sessions`. Each
+   one needs an explicit disposition:
    - (a) fix forward on V2 (preferred);
-   - (b) a reviewed forward-copy of those writes into V1 before repointing (not provided by this
-     tooling; needs its own review);
-   - (c) Adam explicitly accepts losing the named data entered since cutover.
-   Only after (b) is verified or (c) is approved: restore old image + old config + V1 URL as in
-   A.2–A.4. Note that any forward-copy into V1 must respect the legacy 75-table layout; data held
-   only in the 67 new tables or the added columns has no place in V1.
+   - (b) a reviewed forward-copy into V1 (not provided by this tooling; needs its own review; it
+     must respect the legacy-75 layout, and data held only in the 67 new tables or added columns
+     has no place in V1);
+   - (c) Adam explicitly accepts discarding the named data. This includes disposable TEST/session
+     rows; even those are listed and accepted, not assumed harmless.
+5. Only after (b) is verified or (c) is approved: continue as in A.2–A.4.
+
+**Durations are estimates until rehearsed.** No rollback has been timed. Plan the window to allow
+for stopped maintenance.
 
 ## Go / no-go summary
 
 | Check | Go |
 | --- | --- |
-| Writer freeze | All Machines stopped with autostart off, verified; zero writer sessions on V1; rechecked at steps 5, 6 and 7 |
+| Writer freeze | All Machines stopped with autostart off, verified with current evidence at execution (the dated Oct 16 receipt saw production STARTED at 18:32 UTC); zero unexpected sessions on V1; rechecked at steps 5, 6 and 7 |
 | Rollback config | Pre-cutover image digest, app config and secret digests recorded |
-| Identity pins | `--identify` values recorded; both tools run with `SOURCE_IDENTITY`/`TARGET_IDENTITY` |
+| Admission manifest | Reviewed from `--identify`; distinct clusters, PG 16, owner role and session allowlist set; both tools run with `V2_MANIFEST` |
 | Rollback credential | Recovered V1 URL freshly authenticates as `fly-user`/`schema_admin` on `fly-db` |
 | V1 backup | Completed, newer than the freeze |
 | V2 inventory | PG 16, same encoding, locale decided, extensions reviewed, `public` empty |
 | V2 roles | Membership, SET ROLE, schema CREATE and CONNECT shown (step 3b) |
 | Copy | Exit 0 `COMMITTED` and `verification.ok`; 75 preserved + 67 new-empty all `match`. Exit 3 => reconcile, never retry |
 | Compare | Exit 0, `MATCH`, catalog 142/1870 |
-| App privileges | Zero missing table/type privileges; rollback-only read/write proof (step 7) |
+| App privileges | `app-privileges.mjs` exit 0 / `OK` as the app login (step 7) |
 | Connection | Direct, or verified session-mode pool. Never transaction-mode PgBouncer |
 | App | Health OK, sign-in OK, counts equal, one scheduler lock, no SQL errors for 10 min |
 
