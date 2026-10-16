@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { writeFileSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, rmdirSync, writeFileSync, unlinkSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import * as sourceProof from './c1-source-preservation.mjs';
 import { applyC1TestOnlyAmendment, loadC1SourceSnapshot, parseC1Index, verifyC1SourceSnapshot } from './c1-source-preservation.mjs';
@@ -8,6 +9,23 @@ let original;
 // Native Windows Git process startup can exceed Vitest's 10-second hook default.
 beforeAll(() => { original = loadC1SourceSnapshot(); }, 30000);
 const copy = () => structuredClone(original);
+// Mirrors the independent ignored-source probe, using an exclusive temporary file.
+function withIgnoredAuxiliaryFile(extension, run) {
+  const directory=fileURLToPath(new URL('./smart-sites/tmp/',import.meta.url));
+  const relative=`scripts/smart-sites/tmp/c1-unreviewed-${process.pid}.${extension}`;
+  const path=fileURLToPath(new URL(`../${relative}`,import.meta.url));
+  const createdDirectory=!existsSync(directory);
+  mkdirSync(directory,{recursive:true});
+  writeFileSync(path,'// synthetic ignored auxiliary input\n',{flag:'wx'});
+  try {
+    const root=fileURLToPath(new URL('../',import.meta.url));
+    expect(execFileSync('git',['-C',root,'check-ignore','--',relative],{windowsHide:true}).toString().trim()).toBe(relative);
+    run(relative);
+  } finally {
+    unlinkSync(path);
+    if(createdDirectory)rmdirSync(directory);
+  }
+}
 describe('exact C1 source preservation overlay', () => {
   it('keeps original acceptance separate from the exact current product scope', () => {
     const result = verifyC1SourceSnapshot(original);
@@ -173,5 +191,19 @@ describe('exact C1 source preservation overlay', () => {
       expect(snapshot.untracked).toContain(`scripts/smart-sites/c1-unreviewed-${process.pid}.mjs`);
       expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/untracked scoped source/);
     } finally { unlinkSync(path); }
+  });
+  it('refuses an ignored nested fourth auxiliary .mjs source', () => {
+    withIgnoredAuxiliaryFile('mjs',relative=>{
+      const snapshot=loadC1SourceSnapshot();
+      expect(snapshot.untracked).not.toContain(relative);
+      expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/untracked auxiliary executable source/);
+    });
+  });
+  it('permits an ignored auxiliary log outside the executable source boundary', () => {
+    withIgnoredAuxiliaryFile('log',relative=>{
+      const snapshot=loadC1SourceSnapshot();
+      expect(snapshot.untracked).not.toContain(relative);
+      expect(verifyC1SourceSnapshot(snapshot).releaseEligible).toBe(false);
+    });
   });
 });

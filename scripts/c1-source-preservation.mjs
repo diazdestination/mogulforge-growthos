@@ -133,6 +133,8 @@ export function loadC1SourceSnapshot() {
     currentProtected:rows(d.originalProtected),sql:rows(d.sql),runtime:rows(d.runtime),approvals:rows(d.approvals),
     workingDiff:git('diff','--name-only','--',d.legacyManifest.path,...protectedPaths).toString(),
     untracked:git('ls-files','--others','--exclude-standard','--',d.legacyManifest.path,...protectedPaths).toString(),
+    // Auxiliary executable source is in scope even beneath Git-ignored directories.
+    auxiliaryUntracked:git('ls-files','--others','-z','--',...s.auxiliary.paths).toString('utf8').split('\0').filter(path=>path.endsWith('.mjs')).join('\n'),
   };
 }
 function verifyBytes(actual,pin) {
@@ -227,6 +229,7 @@ export function verifyC1SourceSnapshot(snapshot) {
   verifyRows(snapshot.sql,d.sql);verifyRows(snapshot.runtime,d.runtime);verifyRows(snapshot.approvals,d.approvals);
   assert.equal(snapshot.workingDiff,'','C1 scoped worktree differs from its index');
   assert.equal(snapshot.untracked,'','C1 untracked scoped source is not reviewed');
+  assert.equal(snapshot.auxiliaryUntracked,'','C1 untracked auxiliary executable source is not reviewed');
   return {legacy:d.legacy,overlay:d.overlay,changedProductPaths:d.changes.map(change=>change.path),amendedProof:d.amendedDrill,descriptorSha256,
     testOnlyAmendment:{...a.amendment,changedPaths:a.changes.map(change=>change.path),amendmentSha256},
     smartSiteAmendment:{...s.smartSite,changedPaths:s.changes.map(change=>change.path),reviewedB:s.reviewedB,integration:s.integration,auxiliaryScope:s.auxiliary.scope,amendmentSha256:smartSiteAmendmentSha256},currentScope:s.integration.scope,releaseEligible:false};
