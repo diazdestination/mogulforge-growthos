@@ -4,6 +4,8 @@ import type { AddressInfo } from "node:net";
 import {
   analyticsEventsTable,
   appointmentsTable,
+  auditEventsTable,
+  customerLifecycleTable,
   db,
   estimatesTable,
   leadsTable,
@@ -470,5 +472,223 @@ describe("consent-first Smart Site acquisition measurement", () => {
         .from(smartSiteSubmissionsTable)
         .where(eq(smartSiteSubmissionsTable.leadId, saved.leadId)),
     ).toHaveLength(1);
+  });
+});
+
+describe("lead intake keeps the lead when measurement cannot be stored", () => {
+  let dropOrgId: string;
+  let dropOwnerId: string;
+  let dropSession: string;
+  const dropAuth = (path: string, body?: unknown, method = "GET") =>
+    auth(path, body, method, dropSession);
+  const newSite = async (label: string) => {
+    const created = await json<{ id: string; secret: string }>(
+      await dropAuth(
+        "/smart-sites",
+        {
+          name: `Measurement drop ${label}`,
+          siteKey: `drop-${label}-${randomUUID()}`,
+          profile: "roofing-exteriors",
+        },
+        "POST",
+      ),
+    );
+    expect((await enableSite(created, dropSession)).status).toBe(200);
+    return created;
+  };
+  const measuredLead = (policyVersion = "smart-sites-analytics-v1") => {
+    const visitorId = randomUUID();
+    return {
+      visitorId,
+      payload: {
+        schemaVersion: 1,
+        requestId: randomUUID(),
+        contact: {
+          name: "Measurement Drop Homeowner",
+          email: `drop-${randomUUID()}@example.test`,
+        },
+        project: {
+          serviceCode: "siding",
+          postalCode: "30115",
+          timing: "planning",
+        },
+        consent: {
+          contact: true,
+          analytics: true,
+          policyVersion: "painless-project-inquiry-v1",
+          channels: ["email"],
+        },
+        attribution: { source: "google", landingPath: "/services" },
+        measurement: { visitorId, sessionId: randomUUID(), policyVersion },
+      },
+    };
+  };
+  const leadSavedAudit = async (leadId: string) => {
+    const [row] = await db
+      .select()
+      .from(auditEventsTable)
+      .where(
+        and(
+          eq(auditEventsTable.entityId, leadId),
+          eq(auditEventsTable.action, "smart_site.lead_saved"),
+        ),
+      );
+    return row;
+  };
+
+  beforeAll(async () => {
+    const [org] = await db
+      .insert(organizationsTable)
+      .values({
+        name: "Measurement drop test",
+        slug: `measurement-drop-${randomUUID()}`,
+      })
+      .returning();
+    dropOrgId = org.id;
+    const [owner] = await db
+      .insert(usersTable)
+      .values({
+        organizationId: org.id,
+        role: "admin",
+        email: `measurement-drop-${randomUUID()}@example.test`,
+      })
+      .returning();
+    dropOwnerId = owner.id;
+    dropSession = await createSession({
+      user: {
+        id: owner.id,
+        email: owner.email,
+        firstName: null,
+        lastName: null,
+        profileImageUrl: null,
+      },
+      access_token: "test-only",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+    });
+  });
+  afterAll(async () => {
+    await deleteTestOrgs(dropOrgId);
+  });
+
+  it("saves the lead without measurement when site analytics is off and records only the drop reason", async () => {
+    const target = await newSite("disabled");
+    const { visitorId, payload } = measuredLead();
+    const res = await publicRequest("intake", target, payload);
+    expect(res.status).toBe(201);
+    const saved = await json<{
+      status: string;
+      leadId: string;
+      receiptId: string;
+      measurementDropped?: string;
+    }>(res);
+    expect(saved).toMatchObject({
+      status: "saved",
+      measurementDropped: "analytics_disabled",
+    });
+    const [lead] = await db
+      .select()
+      .from(leadsTable)
+      .where(eq(leadsTable.id, saved.leadId));
+    expect(lead.anonymousId).toBeNull();
+    expect(
+      await db
+        .select()
+        .from(analyticsEventsTable)
+        .where(eq(analyticsEventsTable.smartSiteId, target.id)),
+    ).toHaveLength(0);
+    const audit = await leadSavedAudit(saved.leadId);
+    expect(audit.metadata).toMatchObject({
+      receiptId: saved.receiptId,
+      measurementDropped: "analytics_disabled",
+    });
+    expect(JSON.stringify(audit.metadata)).not.toContain(visitorId);
+    const replay = await publicRequest("intake", target, payload);
+    expect(replay.status).toBe(200);
+    expect(await json(replay)).toMatchObject({
+      receiptId: saved.receiptId,
+      duplicate: true,
+    });
+  });
+
+  it("saves the lead without measurement when the browser sent a stale policy version", async () => {
+    const target = await newSite("stale");
+    expect(
+      (
+        await dropAuth(
+          `/smart-sites/${target.id}/measurement`,
+          { enabled: true, retentionDays: 30 },
+          "PATCH",
+        )
+      ).status,
+    ).toBe(200);
+    const { visitorId, payload } = measuredLead("smart-sites-analytics-v0");
+    const res = await publicRequest("intake", target, payload);
+    expect(res.status).toBe(201);
+    const saved = await json<{
+      leadId: string;
+      measurementDropped?: string;
+    }>(res);
+    expect(saved.measurementDropped).toBe("analytics_policy_version_mismatch");
+    expect(
+      await db
+        .select()
+        .from(analyticsEventsTable)
+        .where(eq(analyticsEventsTable.smartSiteId, target.id)),
+    ).toHaveLength(0);
+    const audit = await leadSavedAudit(saved.leadId);
+    expect(audit.metadata).toMatchObject({
+      measurementDropped: "analytics_policy_version_mismatch",
+    });
+    expect(JSON.stringify(audit.metadata)).not.toContain(visitorId);
+    expect(JSON.stringify(audit.metadata)).not.toContain(
+      "smart-sites-analytics-v0",
+    );
+  });
+
+  it("still stores matching measurement and reports no drop", async () => {
+    const target = await newSite("matching");
+    await dropAuth(
+      `/smart-sites/${target.id}/measurement`,
+      { enabled: true, retentionDays: 30 },
+      "PATCH",
+    );
+    const { visitorId, payload } = measuredLead();
+    const res = await publicRequest("intake", target, payload);
+    expect(res.status).toBe(201);
+    const saved = await json<Record<string, unknown>>(res);
+    expect(saved).not.toHaveProperty("measurementDropped");
+    const [lead] = await db
+      .select()
+      .from(leadsTable)
+      .where(eq(leadsTable.id, saved.leadId as string));
+    expect(lead.anonymousId).toBe(visitorId);
+    const audit = await leadSavedAudit(saved.leadId as string);
+    expect(audit.metadata).not.toHaveProperty("measurementDropped");
+  });
+
+  it("keeps capture-disabled 503 and lifecycle-paused 423 for measured leads", async () => {
+    const target = await newSite("guards");
+    expect(
+      (await dropAuth(`/smart-sites/${target.id}`, { isActive: false }, "PATCH"))
+        .status,
+    ).toBe(200);
+    const disabled = await publicRequest("intake", target, measuredLead().payload);
+    expect(disabled.status).toBe(503);
+    expect(await json(disabled)).toMatchObject({
+      error: "site_capture_disabled",
+    });
+    expect((await enableSite(target, dropSession)).status).toBe(200);
+    await db.insert(customerLifecycleTable).values({
+      organizationId: dropOrgId,
+      state: "paused",
+      version: 1,
+      reason: "Synthetic measurement-drop pause",
+      updatedByUserId: dropOwnerId,
+    });
+    const paused = await publicRequest("intake", target, measuredLead().payload);
+    expect(paused.status).toBe(423);
+    expect(await json(paused)).toMatchObject({
+      error: "customer_lifecycle_paused",
+    });
   });
 });
