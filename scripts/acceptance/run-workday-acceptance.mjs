@@ -40,7 +40,10 @@ import {
   appointmentLink,
   withRestoredPolicy,
 } from "./guards.mjs";
-import { observeCompletedVisitUi } from "./completion-ui.mjs";
+import {
+  observeCompletedVisitUi,
+  recordCompletedVisitUi,
+} from "./completion-ui.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let target, manifest, rec;
@@ -702,213 +705,218 @@ async function runCompany(browser, company, runtimeSecrets) {
   });
 
   // ---- Checklist approval + visit completion ----
-  await step("H-G", "visit work", async () => {
-    if (!s.lineageReady || !s.appointment?.id)
-      throw Error("visit_lineage_required");
-    const catalog = await api(a, "GET", "/api/v1/work-checklists");
-    const starter = (catalog.json?.starters ?? []).find(
-      (x) => x.definition?.trade === P.serviceTrade,
-    );
-    if (!starter) throw Error("trade_starter_required");
-    const definition = {
-      ...starter.definition,
-      name: `TEST ${starter.definition.name}`,
-    };
-    const created = await api(a, "POST", "/api/v1/work-checklists", {
-      requestId: uuid(),
-      definition,
-      baselineId: starter.id,
-    });
-    const tpl = created.json?.template;
-    const preview = await api(
-      a,
-      "POST",
-      `/api/v1/work-checklists/${tpl?.id}/preview`,
-      { expectedVersion: tpl?.version, revisionId: tpl?.latestRevision?.id },
-    );
-    const approve = await api(
-      a,
-      "POST",
-      `/api/v1/work-checklists/${tpl?.id}/approve`,
-      {
+  await step(
+    company.key === "painless" ? "P-G" : "H-G",
+    "visit work",
+    async () => {
+      if (!s.lineageReady || !s.appointment?.id)
+        throw Error("visit_lineage_required");
+      const catalog = await api(a, "GET", "/api/v1/work-checklists");
+      const starter = (catalog.json?.starters ?? []).find(
+        (x) => x.definition?.trade === P.serviceTrade,
+      );
+      if (!starter) throw Error("trade_starter_required");
+      const definition = {
+        ...starter.definition,
+        name: `TEST ${starter.definition.name}`,
+      };
+      const created = await api(a, "POST", "/api/v1/work-checklists", {
         requestId: uuid(),
-        previewToken: preview.json?.previewToken,
-        confirmed: true,
-      },
-    );
-    rec.record(
-      company.key === "painless" ? "P-G" : "H-F",
-      ok(approve) ? "PASS" : "FAIL",
-      `${company.name}: company checklist created from starter, previewed and approved: create ${created.status}, preview ${preview.status}, approve ${brief(approve)}`,
-      [],
-      { company: company.name, step: "checklist" },
-    );
-    const work = await api(
-      a,
-      "GET",
-      `/api/v1/appointments/${s.appointment.id}/work`,
-    );
-    const entry = await api(
-      a,
-      "POST",
-      `/api/v1/appointments/${s.appointment.id}/work/entries`,
-      {
-        requestId: uuid(),
-        expectedAppointmentUpdatedAt: work.json?.appointment?.updatedAt,
-        checklistRevisionId: tpl?.latestRevision?.id,
-        assetId: s.assetId ?? null,
-        serviceObligationId: null,
-      },
-    );
-    const e =
-      entry.json?.entry ??
-      entry.json?.work?.entries?.[0] ??
-      (entry.json?.entries ?? [])[0];
-    const answers = definition.items.map((item) =>
-      item.kind === "photo"
-        ? {
-            itemKey: item.key,
-            result: "not_applicable",
-            value: null,
-            reason: "TEST run: no photo taken",
-          }
-        : item.kind === "text"
-          ? {
-              itemKey: item.key,
-              result: "done",
-              value: "TEST observation recorded by automation",
-              reason: null,
-            }
-          : item.kind === "number"
-            ? { itemKey: item.key, result: "done", value: 1, reason: null }
-            : { itemKey: item.key, result: "done", value: null, reason: null },
-    );
-    const saved = await api(
-      a,
-      "PATCH",
-      `/api/v1/appointments/${s.appointment.id}/work/entries/${e?.id}`,
-      {
-        requestId: uuid(),
-        expectedVersion: e?.version,
-        answers,
-        notes: "TEST notes",
-      },
-    );
-    const savedEntry =
-      saved.json?.entry ??
-      saved.json?.work?.entries?.find?.((x) => x.id === e?.id) ??
-      e;
-    rec.record(
-      company.key === "painless" ? "P-G" : "H-F",
-      ok(entry) && ok(saved) ? "PASS" : "FAIL",
-      `${company.name}: visit work entry prepared for exact asset (${entry.status}) and answers saved (${brief(saved)})`,
-      [],
-      { company: company.name, step: "entry" },
-    );
-    await a.goto(
-      BASE_URL + appointmentLink(company.organizationId, s.appointment.id),
-    );
-    await a.waitForLoadState("networkidle").catch(() => {});
-    const work2 = await api(
-      a,
-      "GET",
-      `/api/v1/appointments/${s.appointment.id}/work`,
-    );
-    const entries = (work2.json?.entries ?? []).map((x) => ({
-      id: x.id,
-      version: x.version,
-    }));
-    const cp = await api(
-      a,
-      "POST",
-      `/api/v1/appointments/${s.appointment.id}/work/completion-preview`,
-      {
-        expectedAppointmentUpdatedAt: work2.json?.appointment?.updatedAt,
-        entries,
-        serviceObligationIds: [],
-        performedAt: new Date(Date.now() - 60_000).toISOString(),
-        summary: "TEST visit completed by acceptance automation",
-        outcome: "completed",
-        followup: null,
-      },
-    );
-    const completionRequestId = uuid();
-    const done = await api(
-      a,
-      "POST",
-      `/api/v1/appointments/${s.appointment.id}/work/complete`,
-      {
-        requestId: completionRequestId,
-        previewToken: cp.json?.previewToken,
-        confirmed: true,
-      },
-    );
-    rec.record(
-      company.key === "painless" ? "P-G" : "H-G",
-      ok(cp) && ok(done) ? "PASS" : "FAIL",
-      `${company.name}: API completion only: preview ${brief(cp)}; complete ${brief(done)}`,
-      [],
-      {
-        company: company.name,
-        step: "complete-api",
-        savedEntryVersion: savedEntry?.version,
-        apiStatus: done.status,
-      },
-    );
-    await preflightPage(a, company, staffA);
-    const ui = await observeCompletedVisitUi(a, {
-      origin: BASE_URL,
-      organizationId: company.organizationId,
-      appointmentId: s.appointment.id,
-      contactId: s.contactId,
-      propertyId: s.propertyId,
-      assetId: s.assetId,
-      entryId: e?.id,
-      checklistRevisionId: tpl?.latestRevision?.id,
-      checklistName: definition.name,
-      assetLabel: P.assetLabel,
-      customerLabel: intakeBody.contact.name,
-      completionId: done.json?.work?.completion?.id,
-      completionRequestId,
-      updatedAt: done.json?.work?.appointment?.updatedAt,
-      performerUserId: staffA.id,
-      summary: "TEST visit completed by acceptance automation",
-    });
-    rec.record(
-      company.key === "painless" ? "P-G" : "H-G",
-      ui.status,
-      `${company.name}: exact selected visit and recorded completion UI: ${ui.reason}`,
-      [await shot(a, `${tag}-06-visit`)],
-      {
-        company: company.name,
-        step: "complete-ui",
-        uiStatus: ui.status,
-        partial:
-          "Synthetic visible UI correlated to fresh exact-visit reads; no physical photo or company acceptance claim.",
-      },
-    );
-    s.completionId = done.json?.work?.completion?.id;
-    if (s.completionId) {
-      const corr = await api(
+        definition,
+        baselineId: starter.id,
+      });
+      const tpl = created.json?.template;
+      const preview = await api(
         a,
         "POST",
-        `/api/v1/appointments/${s.appointment.id}/work/completions/${s.completionId}/corrections`,
-        { requestId: uuid(), note: "TEST note-only correction" },
+        `/api/v1/work-checklists/${tpl?.id}/preview`,
+        { expectedVersion: tpl?.version, revisionId: tpl?.latestRevision?.id },
+      );
+      const approve = await api(
+        a,
+        "POST",
+        `/api/v1/work-checklists/${tpl?.id}/approve`,
+        {
+          requestId: uuid(),
+          previewToken: preview.json?.previewToken,
+          confirmed: true,
+        },
       );
       rec.record(
-        company.key === "painless" ? "P-H" : "H-H",
-        ok(corr) ? "PASS" : "FAIL",
-        `${company.name}: completed evidence accepts note-only correction ${brief(corr)}`,
+        company.key === "painless" ? "P-G" : "H-F",
+        ok(approve) ? "PASS" : "FAIL",
+        `${company.name}: company checklist created from starter, previewed and approved: create ${created.status}, preview ${preview.status}, approve ${brief(approve)}`,
+        [],
+        { company: company.name, step: "checklist" },
+      );
+      const work = await api(
+        a,
+        "GET",
+        `/api/v1/appointments/${s.appointment.id}/work`,
+      );
+      const entry = await api(
+        a,
+        "POST",
+        `/api/v1/appointments/${s.appointment.id}/work/entries`,
+        {
+          requestId: uuid(),
+          expectedAppointmentUpdatedAt: work.json?.appointment?.updatedAt,
+          checklistRevisionId: tpl?.latestRevision?.id,
+          assetId: s.assetId ?? null,
+          serviceObligationId: null,
+        },
+      );
+      const e =
+        entry.json?.entry ??
+        entry.json?.work?.entries?.[0] ??
+        (entry.json?.entries ?? [])[0];
+      const answers = definition.items.map((item) =>
+        item.kind === "photo"
+          ? {
+              itemKey: item.key,
+              result: "not_applicable",
+              value: null,
+              reason: "TEST run: no photo taken",
+            }
+          : item.kind === "text"
+            ? {
+                itemKey: item.key,
+                result: "done",
+                value: "TEST observation recorded by automation",
+                reason: null,
+              }
+            : item.kind === "number"
+              ? { itemKey: item.key, result: "done", value: 1, reason: null }
+              : {
+                  itemKey: item.key,
+                  result: "done",
+                  value: null,
+                  reason: null,
+                },
+      );
+      const saved = await api(
+        a,
+        "PATCH",
+        `/api/v1/appointments/${s.appointment.id}/work/entries/${e?.id}`,
+        {
+          requestId: uuid(),
+          expectedVersion: e?.version,
+          answers,
+          notes: "TEST notes",
+        },
+      );
+      const savedEntry =
+        saved.json?.entry ??
+        saved.json?.work?.entries?.find?.((x) => x.id === e?.id) ??
+        e;
+      rec.record(
+        company.key === "painless" ? "P-G" : "H-F",
+        ok(entry) && ok(saved) ? "PASS" : "FAIL",
+        `${company.name}: visit work entry prepared for exact asset (${entry.status}) and answers saved (${brief(saved)})`,
+        [],
+        { company: company.name, step: "entry" },
+      );
+      await a.goto(
+        BASE_URL + appointmentLink(company.organizationId, s.appointment.id),
+      );
+      await a.waitForLoadState("networkidle").catch(() => {});
+      const work2 = await api(
+        a,
+        "GET",
+        `/api/v1/appointments/${s.appointment.id}/work`,
+      );
+      const entries = (work2.json?.entries ?? []).map((x) => ({
+        id: x.id,
+        version: x.version,
+      }));
+      const performedAt = new Date(Date.now() - 60_000).toISOString();
+      const cp = await api(
+        a,
+        "POST",
+        `/api/v1/appointments/${s.appointment.id}/work/completion-preview`,
+        {
+          expectedAppointmentUpdatedAt: work2.json?.appointment?.updatedAt,
+          entries,
+          serviceObligationIds: [],
+          performedAt,
+          summary: "TEST visit completed by acceptance automation",
+          outcome: "completed",
+          followup: null,
+        },
+      );
+      const completionRequestId = uuid();
+      const done = await api(
+        a,
+        "POST",
+        `/api/v1/appointments/${s.appointment.id}/work/complete`,
+        {
+          requestId: completionRequestId,
+          previewToken: cp.json?.previewToken,
+          confirmed: true,
+        },
+      );
+      rec.record(
+        company.key === "painless" ? "P-G" : "H-G",
+        ok(cp) && ok(done) ? "PASS" : "FAIL",
+        `${company.name}: API completion only: preview ${brief(cp)}; complete ${brief(done)}`,
         [],
         {
           company: company.name,
-          step: "correction",
-          partial:
-            "Asset/address-change hold and cancel/reprepare not automated.",
+          step: "complete-api",
+          savedEntryVersion: savedEntry?.version,
+          apiStatus: done.status,
         },
       );
-    }
-  });
+      const uiExpected = {
+        origin: BASE_URL,
+        organizationId: company.organizationId,
+        appointmentId: s.appointment.id,
+        contactId: s.contactId,
+        propertyId: s.propertyId,
+        assetId: s.assetId,
+        entryId: e?.id,
+        checklistRevisionId: tpl?.latestRevision?.id,
+        checklistName: definition.name,
+        assetLabel: P.assetLabel,
+        customerLabel: intakeBody.contact.name,
+        completionId: done.json?.work?.completion?.id,
+        completionRequestId,
+        updatedAt: done.json?.work?.appointment?.updatedAt,
+        performedAt,
+        recordedAt: done.json?.work?.completion?.recordedAt,
+        performerUserId: staffA.id,
+        summary: "TEST visit completed by acceptance automation",
+      };
+      await recordCompletedVisitUi({
+        company,
+        record: (...args) => rec.record(...args),
+        preflight: () => preflightPage(a, company, staffA),
+        observe: () => observeCompletedVisitUi(a, uiExpected),
+        screenshot: () => shot(a, `${tag}-06-visit`),
+      });
+      s.completionId = done.json?.work?.completion?.id;
+      if (s.completionId) {
+        const corr = await api(
+          a,
+          "POST",
+          `/api/v1/appointments/${s.appointment.id}/work/completions/${s.completionId}/corrections`,
+          { requestId: uuid(), note: "TEST note-only correction" },
+        );
+        rec.record(
+          company.key === "painless" ? "P-H" : "H-H",
+          ok(corr) ? "PASS" : "FAIL",
+          `${company.name}: completed evidence accepts note-only correction ${brief(corr)}`,
+          [],
+          {
+            company: company.name,
+            step: "correction",
+            partial:
+              "Asset/address-change hold and cancel/reprepare not automated.",
+          },
+        );
+      }
+    },
+  );
 
   // ---- Invoice with equipment/warranty, issue, held delivery preview, partial receipt ----
   await step("P-I", "invoice", async () => {

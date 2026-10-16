@@ -131,18 +131,30 @@ It first refreshes the admitted staff context, then navigates to the exact
 organization-bound appointment and explicitly opens its read-only Visit work
 disclosure. Fresh GET responses caused by those actions must match this run's
 company, appointment, customer, property, completion request, completion ID,
-finalized entry, checklist revision and asset. The selected card must visibly
+finalized entry, checklist revision and asset. The submitted performed time is
+captured once; it and the acknowledged recorded time must match the fresh work
+read as exact ISO instants. Their unique visible values must match the existing
+renderer in the page's own locale/time zone and display precision. Each response
+must belong to a matching request observed to start in the intended main frame
+after its action boundary; an earlier in-flight request cannot qualify. Request
+listeners are removed after success or failure. The selected card must visibly
 show completed status and the exact customer link. Its own work panel must show
 the customer, completed native status, finalized asset/checklist entry, and the
 recorded completion summary, outcome, performer and one-entry count. Invalid or
 foreign links, stale/unrelated responses, hidden/missing panels and mismatches
 fail the attempted UI check. A schedule row or screenshot alone cannot pass it.
+Preflight, observation and screenshot failures retain an explicit UI failure
+under the current company's P-G/H-G case and rethrow the original error to the
+existing fatal safety handler; the separate API result remains preserved.
 
 API completion and UI display remain separate recorded subchecks. This is a
 future assertion capability, not an executed acceptance result. Actual staging
 run `c39de1f7-5c91-4a3a-a655-a1f81aba1b37` retains both original completion UI
 `NOT_RUN` records, its API results, screenshots and all other results unchanged.
 No new hosted run, physical photo, real device or company acceptance is claimed.
+The first source attempt `67d6815` and its producer receipt remain frozen with
+the independent three-finding `CHANGES_REQUIRED` review. The descendant source
+correction requires its own independent review and actual authorized execution.
 
 Contractor card/bank collection (G-01 and deposit collection) is explicitly
 owner-DEFERRED for initial launch under AGENTS.md. It is not required for the

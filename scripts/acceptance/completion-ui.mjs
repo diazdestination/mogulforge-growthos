@@ -5,6 +5,10 @@ const uuid = (value) =>
   /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(value);
 const one = (values, expected) =>
   Array.isArray(values) && values.length === 1 && values[0] === expected;
+const instant = (value) =>
+  typeof value === "string" &&
+  Number.isFinite(Date.parse(value)) &&
+  new Date(value).toISOString() === value;
 const requireThat = (condition, reason) => {
   if (!condition) throw Error(reason);
 };
@@ -31,7 +35,7 @@ function expectedTarget(e) {
       ].every(
         (key) => typeof e[key] === "string" && e[key].trim().length > 0,
       ) &&
-      Number.isFinite(Date.parse(e.updatedAt)),
+      [e.updatedAt, e.performedAt, e.recordedAt].every(instant),
     "run_identity_missing",
   );
   const origin = new URL(e.origin);
@@ -108,6 +112,8 @@ export function completedVisitUiClaim(e, o) {
         c.nativeAppointmentStatus === "completed" &&
         c.outcome === "completed" &&
         c.summary === e.summary &&
+        c.performedAt === e.performedAt &&
+        c.recordedAt === e.recordedAt &&
         c.performerUserId === e.performerUserId &&
         c.entries?.length === 1 &&
         c.entries[0].id === e.entryId &&
@@ -148,6 +154,12 @@ export function completedVisitUiClaim(e, o) {
         v.completionSummary === e.summary &&
         one(v.completionOutcome, "completed") &&
         one(v.completionPerformer, e.performerUserId) &&
+        v.expectedTimeLabels?.performedAt === e.performedAt &&
+        v.expectedTimeLabels.recordedAt === e.recordedAt &&
+        typeof v.expectedTimeLabels.performedText === "string" &&
+        typeof v.expectedTimeLabels.recordedText === "string" &&
+        one(v.completionPerformedAt, v.expectedTimeLabels.performedText) &&
+        one(v.completionRecordedAt, v.expectedTimeLabels.recordedText) &&
         v.completionEntryCount ===
           "1 saved work entry · native visit marked completed.",
       "required_completion_ui_missing",
@@ -175,7 +187,7 @@ export function completedVisitUiClaim(e, o) {
 
 // Executed inside the selected section by Playwright. Read only visible content
 // from that section; schedule rows elsewhere on the page cannot satisfy it.
-export function readCompletedVisitDom(root) {
+export function readCompletedVisitDom(root, expected) {
   const visible = (el) =>
     !!el &&
     el.getClientRects().length > 0 &&
@@ -257,6 +269,22 @@ export function readCompletedVisitDom(root) {
       completion?.querySelector(":scope > dl"),
       "Performer",
     ),
+    completionPerformedAt: fields(
+      completion?.querySelector(":scope > dl"),
+      "Work performed",
+    ),
+    completionRecordedAt: fields(
+      completion?.querySelector(":scope > dl"),
+      "Recorded",
+    ),
+    // This function is serialized into the page. Use its own Date/Intl realm,
+    // matching the existing product renderer's locale/time zone and precision.
+    expectedTimeLabels: {
+      performedAt: expected?.performedAt,
+      recordedAt: expected?.recordedAt,
+      performedText: new Date(expected?.performedAt).toLocaleString(),
+      recordedText: new Date(expected?.recordedAt).toLocaleString(),
+    },
     completionEntryCount: [
       ...(completion?.querySelectorAll(":scope > p") ?? []),
     ]
@@ -281,30 +309,56 @@ export function readCompletedVisitDom(root) {
   };
 }
 
-/** Only navigation and opening the read-only disclosure. Response listeners are
- * installed before their triggering action, so earlier API calls cannot count. */
+/** Only navigation and opening the read-only disclosure. Each response must
+ * belong to a matching main-frame request observed to start after the action
+ * boundary, not merely a response that arrives after listener registration. */
 export async function observeCompletedVisitUi(page, expected) {
   try {
     const target = expectedTarget(expected);
     const read = async (url, action) => {
-      const pending = page
-        .waitForResponse(
-          (response) =>
-            response.url() === url && response.request().method() === "GET",
-          { timeout: 10_000 },
-        )
-        .catch(() => null);
-      await action();
-      const response = await pending;
-      if (!response) throw Error("missing_ui_response");
-      return {
-        url: response.url(),
-        method: response.request().method(),
-        status: response.status(),
-        redirected: response.request().redirectedFrom() !== null,
-        fromServiceWorker: response.fromServiceWorker(),
-        json: await response.json(),
+      const started = new WeakSet(),
+        frame = page.mainFrame();
+      let actionStarted = false;
+      const requestStarted = (request) => {
+        try {
+          if (
+            actionStarted &&
+            request.url() === url &&
+            request.method() === "GET" &&
+            request.frame() === frame
+          )
+            started.add(request);
+        } catch {
+          /* Service-worker/detached-frame requests cannot qualify. */
+        }
       };
+      page.on("request", requestStarted);
+      try {
+        const pending = page
+          .waitForResponse(
+            (response) =>
+              response.url() === url &&
+              response.request().method() === "GET" &&
+              started.has(response.request()),
+            { timeout: 10_000 },
+          )
+          .catch(() => null);
+        actionStarted = true;
+        await action();
+        const response = await pending;
+        if (!response) throw Error("missing_ui_response");
+        return {
+          url: response.url(),
+          method: response.request().method(),
+          status: response.status(),
+          redirected: response.request().redirectedFrom() !== null,
+          fromServiceWorker: response.fromServiceWorker(),
+          json: await response.json(),
+        };
+      } finally {
+        actionStarted = false;
+        page.off("request", requestStarted);
+      }
     };
     const detail = await read(
       `${expected.origin}/api/v1/appointments/${expected.appointmentId}`,
@@ -329,9 +383,58 @@ export async function observeCompletedVisitUi(page, expected) {
       url: page.url(),
       detail,
       work,
-      visible: await selected.evaluate(readCompletedVisitDom),
+      visible: await selected.evaluate(readCompletedVisitDom, {
+        performedAt: expected.performedAt,
+        recordedAt: expected.recordedAt,
+      }),
     });
   } catch {
     return { status: "FAIL", reason: "completion_ui_observation_failed" };
+  }
+}
+
+/** The actual runner's attempted-UI recording boundary. Retain a company-scoped
+ * failure even if preflight, observation or evidence capture throws. Rethrowing
+ * the original error preserves the enclosing runner's fatal safety handling. */
+export async function recordCompletedVisitUi({
+  company,
+  record,
+  preflight,
+  observe,
+  screenshot,
+}) {
+  const caseId = company.key === "painless" ? "P-G" : "H-G";
+  try {
+    await preflight();
+    const ui = await observe();
+    const evidence = [await screenshot()];
+    record(
+      caseId,
+      ui.status,
+      `${company.name}: exact selected visit and recorded completion UI: ${ui.reason}`,
+      evidence,
+      {
+        company: company.name,
+        step: "complete-ui",
+        uiStatus: ui.status,
+        partial:
+          "Synthetic visible UI correlated to fresh exact-visit reads; no physical photo or company acceptance claim.",
+      },
+    );
+    return ui;
+  } catch (error) {
+    record(
+      caseId,
+      "FAIL",
+      `${company.name}: attempted completion UI could not verify or retain its required evidence`,
+      [],
+      {
+        company: company.name,
+        step: "complete-ui",
+        uiStatus: "FAIL",
+        scriptError: true,
+      },
+    );
+    throw error;
   }
 }

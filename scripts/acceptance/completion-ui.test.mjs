@@ -1,6 +1,7 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { EventEmitter } from "node:events";
 
 // jsdom is already a dev dependency of this workspace package. Resolve there;
 // local verification may supply NODE_PATH for an existing dependency runtime.
@@ -24,6 +25,8 @@ function fixture() {
     completionRequestId: id(8),
     checklistRevisionId: id(9),
     updatedAt: "2026-10-16T21:50:00.000Z",
+    performedAt: "2026-10-16T21:49:00.123Z",
+    recordedAt: "2026-10-16T21:50:00.456Z",
     performerUserId: id(10),
     summary: "TEST visit completed by acceptance automation",
     customerLabel: "TEST HVAC Inquirer",
@@ -90,6 +93,8 @@ function fixture() {
           nativeAppointmentStatus: "completed",
           outcome: "completed",
           performerUserId: id(10),
+          performedAt: "2026-10-16T21:49:00.123Z",
+          recordedAt: "2026-10-16T21:50:00.456Z",
           summary: "TEST visit completed by acceptance automation",
           entries: [{ id: id(6), assetId: id(5), checklistRevisionId: id(9) }],
         },
@@ -109,6 +114,14 @@ function fixture() {
       completionSummary: "TEST visit completed by acceptance automation",
       completionOutcome: ["completed"],
       completionPerformer: [id(10)],
+      completionPerformedAt: ["10/16/2026, 2:49:00 PM"],
+      completionRecordedAt: ["10/16/2026, 2:50:00 PM"],
+      expectedTimeLabels: {
+        performedAt: "2026-10-16T21:49:00.123Z",
+        recordedAt: "2026-10-16T21:50:00.456Z",
+        performedText: "10/16/2026, 2:49:00 PM",
+        recordedText: "10/16/2026, 2:50:00 PM",
+      },
       completionEntryCount:
         "1 saved work entry · native visit marked completed.",
       refusalVisible: false,
@@ -457,7 +470,10 @@ const markup = `
         <section aria-label="Recorded work completion"><h4>Recorded work completion</h4>
           <p>Immutable staff-recorded evidence — not customer acceptance.</p>
           <p class="whitespace-pre-wrap">TEST visit completed by acceptance automation</p>
-          <dl><div><dt>Outcome: </dt><dd>completed</dd></div><div><dt>Performer: </dt><dd>00000000-0000-4000-8000-000000000010</dd></div></dl>
+          <dl><div><dt>Outcome: </dt><dd>completed</dd></div><div><dt>Performer: </dt><dd>00000000-0000-4000-8000-000000000010</dd></div>
+            <div><dt>Work performed: </dt><dd>placeholder performed time</dd></div>
+            <div><dt>Recorded: </dt><dd>placeholder recorded time</dd></div>
+          </dl>
           <p>1 saved work entry · native visit marked completed.</p>
         </section>
       </section>
@@ -466,7 +482,7 @@ const markup = `
   <section aria-label="Schedule"><p>Completed</p><p>TEST unrelated customer</p></section>`;
 
 async function inDom(action) {
-  const dom = new JSDOM(markup),
+  const dom = new JSDOM(markup, { runScripts: "outside-only" }),
     oldStyle = globalThis.getComputedStyle;
   // jsdom has no layout engine. Supply geometry only; the production extractor
   // still checks the actual CSS visibility/display/opacity through ancestors.
@@ -484,6 +500,7 @@ async function inDom(action) {
     el.style.opacity = "1";
   });
   globalThis.getComputedStyle = dom.window.getComputedStyle.bind(dom.window);
+  setVisibleTimes(dom.window.document);
   try {
     return await action(dom.window.document);
   } finally {
@@ -492,19 +509,35 @@ async function inDom(action) {
   }
 }
 
+function timeElement(doc, label) {
+  return [...doc.querySelectorAll('[aria-label="Recorded work completion"] dt')]
+    .find((dt) => dt.textContent.trim().replace(/:$/, "") === label)
+    ?.parentElement.querySelector("dd");
+}
+function setVisibleTimes(doc) {
+  timeElement(doc, "Work performed").textContent = new doc.defaultView.Date(
+    "2026-10-16T21:49:00.123Z",
+  ).toLocaleString();
+  timeElement(doc, "Recorded").textContent = new doc.defaultView.Date(
+    "2026-10-16T21:50:00.456Z",
+  ).toLocaleString();
+}
+function readDom(doc, expected) {
+  return doc.defaultView.eval(`(${ui.readCompletedVisitDom.toString()})`)(
+    doc.querySelector('[aria-label="Selected appointment"]'),
+    expected,
+  );
+}
+
 test("projects the selected actual DOM and ignores an unrelated schedule Completed label", async () =>
   inDom((doc) => {
     const f = fixture();
-    f.observation.visible = ui.readCompletedVisitDom(
-      doc.querySelector('[aria-label="Selected appointment"]'),
-    );
+    f.observation.visible = readDom(doc, f.expected);
     assert.equal(claim(f.expected, f.observation).status, "PASS");
     doc.querySelector(
       '[aria-label="Selected appointment"] > dl dd',
     ).textContent = "Scheduled";
-    f.observation.visible = ui.readCompletedVisitDom(
-      doc.querySelector('[aria-label="Selected appointment"]'),
-    );
+    f.observation.visible = readDom(doc, f.expected);
     assert.equal(claim(f.expected, f.observation).status, "FAIL");
   }));
 
@@ -560,47 +593,83 @@ for (const [name, change] of [
     inDom((doc) => {
       const f = fixture();
       change(doc);
-      f.observation.visible = ui.readCompletedVisitDom(
-        doc.querySelector('[aria-label="Selected appointment"]'),
-      );
+      f.observation.visible = readDom(doc, f.expected);
       assert.equal(claim(f.expected, f.observation).status, "FAIL");
     }));
 
 // Only the transport/Playwright boundary is doubled. The collector, response
 // binding, real DOM projection and acceptance predicate all execute unchanged.
-function controlledPage(doc, f, changeWork = () => {}) {
+function controlledPage(doc, f, changeWork = () => {}, options = {}) {
   let url = origin + "/",
     pending = [],
     opened = false;
+  const requestEvents = new EventEmitter(),
+    mainFrame = {},
+    requests = new Map();
+  function requestFor(value) {
+    let request = requests.get(value);
+    if (!request) {
+      request = {
+        url: () => value.url,
+        method: () => value.method,
+        redirectedFrom: () => null,
+        frame: () => (options.foreignFrame ? {} : mainFrame),
+      };
+      requests.set(value, request);
+    }
+    return request;
+  }
   function emit(value) {
+    const request = requestFor(value);
+    if (
+      (value === f.observation.detail
+        ? options.startDetail
+        : options.startWork) !== false
+    )
+      requestEvents.emit("request", request);
     const response = {
       url: () => value.url,
       status: () => value.status,
-      request: () => ({
-        method: () => value.method,
-        redirectedFrom: () => null,
-      }),
+      request: () => request,
       fromServiceWorker: () => false,
       json: async () => structuredClone(value.json),
     };
-    for (const waiter of pending)
+    for (const waiter of pending) {
+      if (options.oldResponseFirst) {
+        const older = {
+          ...response,
+          request: () => ({ ...request }),
+          json: async () => {
+            const body = structuredClone(value.json);
+            if (body.completion) body.completion.requestId = id(99);
+            else body.appointment.status = "scheduled";
+            return body;
+          },
+        };
+        if (waiter.predicate(older)) {
+          clearTimeout(waiter.timer);
+          waiter.resolve(older);
+        }
+      }
       if (waiter.predicate(response)) {
         clearTimeout(waiter.timer);
         waiter.resolve(response);
       }
+    }
   }
   const selected = {
     waitFor: async () => {},
-    getByRole(role, options) {
-      if (role === "button" && options.name === "Open visit work")
+    getByRole(role, roleOptions) {
+      if (role === "button" && roleOptions.name === "Open visit work")
         return {
           click: async () => {
+            if (options.throwClick) throw Error("disclosure_failed");
             opened = true;
             changeWork(f.observation.work);
             emit(f.observation.work);
           },
         };
-      if (role === "region" && options.name === "Recorded work completion")
+      if (role === "region" && roleOptions.name === "Recorded work completion")
         return {
           waitFor: async () => {
             if (!opened) throw Error("work_not_open");
@@ -608,12 +677,27 @@ function controlledPage(doc, f, changeWork = () => {}) {
         };
       throw Error("unexpected_selected_locator");
     },
-    evaluate: async (fn) =>
-      fn(doc.querySelector('[aria-label="Selected appointment"]')),
+    evaluate: async (fn, argument) =>
+      doc.defaultView.eval(`(${fn.toString()})`)(
+        doc.querySelector('[aria-label="Selected appointment"]'),
+        argument,
+      ),
   };
   return {
+    requestEvents,
+    mainFrame: () => mainFrame,
+    on: (...args) => requestEvents.on(...args),
+    off: (...args) => requestEvents.off(...args),
     url: () => url,
     waitForResponse(predicate) {
+      if (options.throwWait) throw Error("response_wait_setup_failed");
+      if (options.armRequestEvent)
+        requestEvents.emit(
+          "request",
+          requestFor(
+            pending.length === 0 ? f.observation.detail : f.observation.work,
+          ),
+        );
       return new Promise((resolve, reject) => {
         const waiter = {
           predicate,
@@ -624,6 +708,7 @@ function controlledPage(doc, f, changeWork = () => {}) {
       });
     },
     goto: async (target) => {
+      if (options.throwGoto) throw Error("navigation_failed");
       url = target;
       emit(f.observation.detail);
     },
@@ -673,3 +758,227 @@ test("observer cannot substitute an earlier or unrelated response for the fresh 
       "FAIL",
     );
   }));
+
+test("rejects stale visible performed/recorded times despite current exact API timestamps", async () =>
+  inDom((doc) => {
+    const f = fixture();
+    f.expected.performedAt = "2026-10-16T21:49:00.123Z";
+    f.expected.recordedAt = "2026-10-16T21:50:00.456Z";
+    f.observation.work.json.completion.performedAt = f.expected.performedAt;
+    f.observation.work.json.completion.recordedAt = f.expected.recordedAt;
+    const dl = doc.querySelector(
+      '[aria-label="Recorded work completion"] > dl',
+    );
+    timeElement(doc, "Work performed").textContent = "1/1/1900, 12:00:00 AM";
+    timeElement(doc, "Recorded").textContent = "1/1/1900, 12:00:00 AM";
+    dl.querySelectorAll("*").forEach((el) => {
+      el.style.opacity = "1";
+    });
+    f.observation.visible = readDom(doc, f.expected);
+    assert.equal(claim(f.expected, f.observation).status, "FAIL");
+  }));
+
+for (const [name, options] of [
+  ["pre-existing matching detail request", { startDetail: false }],
+  ["pre-existing matching work request", { startWork: false }],
+  ["matching requests from another frame", { foreignFrame: true }],
+  [
+    "request event before action begins",
+    { armRequestEvent: true, startDetail: false },
+  ],
+  ["failed navigation", { throwGoto: true }],
+  ["failed disclosure click", { throwClick: true }],
+  ["response listener setup throws", { throwWait: true }],
+])
+  test(`observer rejects ${name} and removes request listeners`, async () =>
+    inDom(async (doc) => {
+      const f = fixture(),
+        page = controlledPage(doc, f, () => {}, options);
+      assert.equal(
+        (await ui.observeCompletedVisitUi(page, f.expected)).status,
+        "FAIL",
+      );
+      assert.equal(page.requestEvents.listenerCount("request"), 0);
+    }));
+
+test("observer ignores an older response but still reaches a legitimate action-created request", async () =>
+  inDom(async (doc) => {
+    const f = fixture(),
+      page = controlledPage(doc, f, () => {}, { oldResponseFirst: true });
+    assert.equal(
+      (await ui.observeCompletedVisitUi(page, f.expected)).status,
+      "PASS",
+    );
+    assert.equal(page.requestEvents.listenerCount("request"), 0);
+  }));
+
+for (const [name, change] of [
+  [
+    "missing acknowledged performedAt",
+    (f) => {
+      delete f.expected.performedAt;
+    },
+  ],
+  [
+    "malformed acknowledged recordedAt",
+    (f) => {
+      f.expected.recordedAt = "not-a-time";
+    },
+  ],
+  [
+    "fresh performedAt differs by a millisecond",
+    (f) => {
+      f.observation.work.json.completion.performedAt =
+        "2026-10-16T21:49:00.124Z";
+    },
+  ],
+  [
+    "fresh recordedAt differs by a millisecond",
+    (f) => {
+      f.observation.work.json.completion.recordedAt =
+        "2026-10-16T21:50:00.457Z";
+    },
+  ],
+])
+  test(`pure timestamp comparison rejects ${name}`, () => {
+    const f = fixture();
+    change(f);
+    assert.equal(claim(f.expected, f.observation).status, "FAIL");
+  });
+
+for (const label of ["Work performed", "Recorded"])
+  for (const problem of [
+    "missing",
+    "malformed",
+    "duplicated",
+    "hidden",
+    "stale",
+  ]) {
+    test(`actual DOM and observer reject ${problem} ${label} timestamp`, async () =>
+      inDom(async (doc) => {
+        const f = fixture(),
+          element = timeElement(doc, label);
+        if (problem === "missing") element.parentElement.remove();
+        if (problem === "malformed") element.textContent = "Invalid Date";
+        if (problem === "duplicated")
+          element.parentElement.after(element.parentElement.cloneNode(true));
+        if (problem === "hidden") element.style.display = "none";
+        if (problem === "stale") element.textContent = "1/1/1900, 12:00:00 AM";
+        f.observation.visible = readDom(doc, f.expected);
+        assert.equal(claim(f.expected, f.observation).status, "FAIL");
+        const page = controlledPage(doc, f);
+        assert.equal(
+          (await ui.observeCompletedVisitUi(page, f.expected)).status,
+          "FAIL",
+        );
+        assert.equal(page.requestEvents.listenerCount("request"), 0);
+      }));
+  }
+
+test("DOM and observer compare timestamp display in the page realm and its locale/time zone", async () =>
+  inDom(async (doc) => {
+    const f = fixture(),
+      intrinsic = doc.defaultView.Date.prototype.toLocaleString;
+    doc.defaultView.Date.prototype.toLocaleString = function () {
+      return intrinsic.call(this, "de-DE", { timeZone: "Europe/Berlin" });
+    };
+    setVisibleTimes(doc);
+    const page = controlledPage(doc, f);
+    assert.equal(
+      (await ui.observeCompletedVisitUi(page, f.expected)).status,
+      "PASS",
+    );
+    f.observation.visible = readDom(doc, f.expected);
+    assert.deepEqual(
+      [...f.observation.visible.completionPerformedAt],
+      ["16.10.2026, 23:49:00"],
+    );
+    assert.deepEqual(
+      [...f.observation.visible.completionRecordedAt],
+      ["16.10.2026, 23:50:00"],
+    );
+    assert.equal(page.requestEvents.listenerCount("request"), 0);
+  }));
+
+for (const key of ["painless", "css"])
+  for (const boundary of ["preflight", "observation", "screenshot"]) {
+    test(`${key} preserves API PASS and attributes ${boundary} failure to its attempted completion UI`, async () => {
+      assert.equal(
+        typeof ui.recordCompletedVisitUi,
+        "function",
+        "async completion UI recording boundary is missing",
+      );
+      const caseId = key === "painless" ? "P-G" : "H-G";
+      const prior = { caseIds: caseId, status: "PASS", step: "complete-api" },
+        records = [prior];
+      const error = Object.assign(
+        Error(
+          boundary === "preflight" ? "observed_session" : "image_write_failed",
+        ),
+        {
+          code:
+            boundary === "preflight"
+              ? "observed_session"
+              : "image_write_failed",
+        },
+      );
+      await assert.rejects(
+        ui.recordCompletedVisitUi({
+          company: { key, name: `TEST ${key}` },
+          record: (caseIds, status, _label, evidence, extra) =>
+            records.push({ caseIds, status, evidence, ...extra }),
+          preflight: async () => {
+            if (boundary === "preflight") throw error;
+          },
+          observe: async () => {
+            if (boundary === "observation") throw error;
+            return { status: "PASS", reason: "exact_completed_visit_visible" };
+          },
+          screenshot: async () => {
+            if (boundary === "screenshot") throw error;
+            return "test.png";
+          },
+        }),
+        (failure) => failure === error,
+      );
+      assert.equal(records[0], prior);
+      assert.equal(records.length, 2);
+      assert.equal(records[1].caseIds, caseId);
+      assert.equal(records[1].status, "FAIL");
+      assert.equal(records[1].step, "complete-ui");
+      assert.deepEqual(records[1].evidence, []);
+    });
+  }
+
+for (const key of ["painless", "css"])
+  for (const status of ["PASS", "FAIL"])
+    test(`${key} records the separate observed UI ${status} with its retained evidence`, async () => {
+      const rows = [],
+        caseId = key === "painless" ? "P-G" : "H-G";
+      await ui.recordCompletedVisitUi({
+        company: { key, name: `TEST ${key}` },
+        record: (caseIds, uiStatus, _label, evidence, extra) =>
+          rows.push({ caseIds, status: uiStatus, evidence, ...extra }),
+        preflight: async () => {},
+        observe: async () => ({
+          status,
+          reason:
+            status === "PASS"
+              ? "exact_completed_visit_visible"
+              : "required_completion_ui_missing",
+        }),
+        screenshot: async () => "synthetic-ui.png",
+      });
+      assert.deepEqual(rows, [
+        {
+          caseIds: caseId,
+          status,
+          evidence: ["synthetic-ui.png"],
+          company: `TEST ${key}`,
+          step: "complete-ui",
+          uiStatus: status,
+          partial:
+            "Synthetic visible UI correlated to fresh exact-visit reads; no physical photo or company acceptance claim.",
+        },
+      ]);
+    });
