@@ -1,7 +1,8 @@
 // Pure admission for ROOT/provider or disposable-local observations. No IO.
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
-export const STAGING_STOP_AT = "2026-10-16T22:00:00Z";
+export const STAGING_STOP_AT = "2026-10-18T04:00:00Z";
+export const STAGING_SETUP_END_AT = "2026-10-16T22:00:00Z";
 export const PROOF_MAX_AGE_MS = 5 * 60_000;
 export const proofHash = (x) =>
   createHash("sha256").update(JSON.stringify(x)).digest("hex");
@@ -203,13 +204,15 @@ export function validateExecutionProof(plan, now = Date.now()) {
     const stop = Date.parse(p.runtime.stopAt),
       upper = Date.parse(p.runtime.anchorUpperAt),
       cap = p.runtime.capSeconds;
-    // Current reviewed revision cannot admit an extension. A future executed
-    // extension needs a separately reviewed finite receipt/continuity contract.
+    // Runtime availability and this setup's dispatch window are independent.
+    // A later verified runtime stop never extends setup authority or proof life.
     check(
       Number.isFinite(stop) &&
         stop <= Date.parse(STAGING_STOP_AT) &&
         expires <= stop &&
+        expires <= Date.parse(STAGING_SETUP_END_AT) &&
         now < stop &&
+        now < Date.parse(STAGING_SETUP_END_AT) &&
         p.runtime.taskNextUtc === p.runtime.stopAt &&
         Number.isFinite(upper) &&
         upper <= observed &&

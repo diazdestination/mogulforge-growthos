@@ -56,12 +56,15 @@ verifiedReceiptSha256, anchorSha256
 
 ROOT supplies actual, independently reviewed provider/catalog observations and
 verified receipt/continuity hashes. Config hashes must agree; the fixed anchor
-upper time plus actual cap must end by the actual task stop. This revision caps
-staging stop and proof expiry at **2026-10-16T22:00:00Z**. It deliberately has no
-extension boolean or assumed October 18 deadline. A future extension requires
-actual successful execution/continuity proof and a separately reviewed finite
-source/contract update. A prepared or `reconciliation_required` window is not a
-successful extension and does not release this seeder.
+upper time plus actual cap must end by the actual task stop. Verified runtime
+availability may end no later than **2026-10-18T04:00:00Z**, with exact native-task
+equality and the existing receipt/continuity bindings. Setup dispatch and proof
+expiry remain capped at **2026-10-16T22:00:00Z**: proof expiry must be at or before
+that cutoff, and current time must be strictly before it. The five-minute proof
+freshness/lifetime checks remain. A later runtime stop grants no extra dispatch
+time. There is no extension boolean or assumed successful execution. A prepared
+or `reconciliation_required` window does not release this seeder. The site-key
+helper and all other setup gates retain their separately fixed 22Z bounds.
 
 The application has no endpoint for proving provider config, native Task state,
 or the hosted catalog. ROOT owns that short-lived external responsibility and
