@@ -1,4 +1,5 @@
-import { createECDH, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { createVapidTestKeyPair } from "../test-helpers/vapid-test-keys";
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { contactsTable, crmTasksTable, db, leadsTable, organizationsTable, serviceObligationsTable,
@@ -11,7 +12,7 @@ import { transitionCustomerLifecycle } from "./customer-lifecycle";
 import { createSession, deleteSession } from "../lib/auth";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 
-const key = createECDH("prime256v1"); key.generateKeys();
+const key = createVapidTestKeyPair().ecdh;
 let org: string, otherOrg: string, owner: string, otherOwner: string, sid: string, contact: string, service: string, task: string;
 const policy = (enabled = true) => ({ enabled: true, serviceAlertsEnabled: enabled, timezone: "America/New_York", days: [1, 2, 3, 4, 5, 6],
   opensAt: "09:00", closesAt: "18:00", businessHoursUserIds: [owner], afterHoursUserIds: [owner] });
