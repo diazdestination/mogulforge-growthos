@@ -1,4 +1,4 @@
-import { createECDH } from "node:crypto";
+import { createVapidTestKeyPair } from "../test-helpers/vapid-test-keys";
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ lookup: vi.fn(), request: vi.fn() }));
@@ -6,7 +6,7 @@ vi.mock("node:dns/promises", () => ({ lookup: mocks.lookup }));
 vi.mock("node:https", () => ({ request: mocks.request }));
 import { isPublicPushAddress, sendStaffPush, StaffPushDispatchBlockedError } from "./staff-push-transport";
 
-const key = createECDH("prime256v1"); key.generateKeys();
+const key = createVapidTestKeyPair().ecdh;
 const device = { endpoint: `https://web.push.apple.com/${"a".repeat(32)}`, keys: {
   p256dh: key.getPublicKey().toString("base64url"), auth: Buffer.alloc(16, 1).toString("base64url"),
 } };

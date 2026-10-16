@@ -1,4 +1,5 @@
-import { createECDH, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { createVapidTestKeyPair } from "../test-helpers/vapid-test-keys";
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -211,7 +212,7 @@ describe("reviewed missed-call recovery", () => {
     expect((await row()).state).toBe("indeterminate"); expect((await records())[0].state).toBe("indeterminate"); expect(provider).not.toHaveBeenCalled();
   });
   it("creates one canonical lead push only inside the reviewed new-lead transaction", async () => {
-    const key = createECDH("prime256v1"); key.generateKeys();
+    const key = createVapidTestKeyPair().ecdh;
     vi.stubEnv("WEB_PUSH_ENABLED", "true"); vi.stubEnv("OAUTH_TOKEN_ENCRYPTION_KEY", "a".repeat(64));
     vi.stubEnv("WEB_PUSH_VAPID_PUBLIC_KEY", key.getPublicKey().toString("base64url"));
     vi.stubEnv("WEB_PUSH_VAPID_PRIVATE_KEY", key.getPrivateKey().toString("base64url"));

@@ -35,6 +35,9 @@ export class SmartSiteError extends Error {
   }
 }
 const hash = (v: string) => createHash("sha256").update(v).digest("hex");
+export type SmartSiteMeasurementDropReason =
+  | "analytics_disabled"
+  | "analytics_policy_version_mismatch";
 const publicFields = {
   id: smartSitesTable.id,
   name: smartSitesTable.name,
@@ -406,14 +409,20 @@ export async function captureSmartSiteInquiry(
       .for("share");
     if (!currentSite?.isActive || currentSite.keyHash !== site.keyHash)
       throw new SmartSiteError("site_capture_disabled", 503);
-    const measurement = input.measurement;
-    if (measurement && !currentSite.analyticsEnabled)
-      throw new SmartSiteError("site_measurement_disabled", 503);
-    if (
-      measurement &&
-      measurement.policyVersion !== currentSite.analyticsPolicyVersion
-    )
-      throw new SmartSiteError("analytics_policy_version_mismatch", 409);
+    // A lead is never lost because of optional measurement. When analytics is off for
+    // this site, or the browser consented under a stale policy version, the lead is
+    // saved WITHOUT any measurement (no visitor link, no lead_saved event) and only the
+    // drop reason is recorded. Raw measurement values are never stored or echoed.
+    const measurementDropped: SmartSiteMeasurementDropReason | undefined =
+      !input.measurement
+        ? undefined
+        : !currentSite.analyticsEnabled
+          ? "analytics_disabled"
+          : input.measurement.policyVersion !==
+              currentSite.analyticsPolicyVersion
+            ? "analytics_policy_version_mismatch"
+            : undefined;
+    const measurement = measurementDropped ? undefined : input.measurement;
     const [receipt] = await tx
       .select()
       .from(smartSiteSubmissionsTable)
@@ -671,6 +680,7 @@ export async function captureSmartSiteInquiry(
         siteId: site.id,
         receiptId: saved.id,
         serviceCode: p.serviceCode,
+        ...(measurementDropped ? { measurementDropped } : {}),
       },
     });
     return {
@@ -679,6 +689,7 @@ export async function captureSmartSiteInquiry(
       receiptId: saved.id,
       duplicate: false,
       notification: "staff-inbox" as const,
+      ...(measurementDropped ? { measurementDropped } : {}),
     };
   });
 }

@@ -1,0 +1,158 @@
+{
+  "version": 1,
+  "purpose": "Exact reviewed Smart Site source successor composed with the separately reviewed test-only fixture amendment. Source identity only.",
+  "releaseEligible": false,
+  "baseOverlay": {
+    "descriptorPath": "reports/c1-source-preservation-2026-10-16.json",
+    "descriptorSha256": "6d64fb78992d82fae67eb6d258cf3fbf1e8ea23b4ca11929d9b95b985679348c",
+    "sourceCommit": "54cffe4c1552ae306781632202da19bb0fe88f4a",
+    "sourceTree": "e6ced6079e2a2c79352c9fdf44c9c3970ebe262a",
+    "scope": {
+      "count": 2117,
+      "sha256": "4cf023465c1eedfa749c01cb6304ea60ffe1bae4ef9f007139efbfe51d85b237"
+    }
+  },
+  "testOnlyAmendment": {
+    "descriptorPath": "reports/c1-test-fixture-amendment-2026-10-16.json",
+    "descriptorSha256": "dfb91466d876ecdfb2fd4457dbb8427ce2f3b0571e9ae620c58d0849b94316a0",
+    "sourceCommit": "2f79a3180dc08d14a187674b806d98607349c4d1",
+    "sourceTree": "ce322ac062981b9420cf813598e942f66d915a1c",
+    "scope": {
+      "count": 2119,
+      "sha256": "fe1ecc0be420dd08b8d87c0b0f46eab796142e3141cc01f19f093a8b0d5fe41e"
+    }
+  },
+  "reviewedB": {
+    "sourceCommit": "308952e2abd0c97d4edc4274538af12a7134677a",
+    "sourceTree": "4962089d4b2859ef9dfb4f2b2c02885b5303c235",
+    "scope": {
+      "count": 2119,
+      "sha256": "fe1ecc0be420dd08b8d87c0b0f46eab796142e3141cc01f19f093a8b0d5fe41e"
+    }
+  },
+  "smartSite": {
+    "sourceCommit": "b7f34c70638f9f664a23817021324d26b7ed8ca6",
+    "sourceTree": "8aa71a245a97ef0c9f01c71afd8e1d29156e289f",
+    "scope": {
+      "count": 2118,
+      "sha256": "a017cf3a0996f8bd127ac9d804e6eb328d96032e49ff6fd955f77246e94ef480"
+    }
+  },
+  "integration": {
+    "sourceCommit": "08c97d7b76ce8e4668c04dc1fcbde9089a709bbe",
+    "sourceTree": "bd3acb8c9912c4aebd81bfe2c1ac240fc158ed70",
+    "scope": {
+      "count": 2120,
+      "sha256": "99a7972dbcb95bf3bc32190bcb0deac1a18c6b59907f8e0184d8e0983fd5b254"
+    }
+  },
+  "scopePaths": [
+    "artifacts/api-server",
+    "lib"
+  ],
+  "changes": [
+    {
+      "path": "artifacts/api-server/src/routes/v1/smart-site-acquisition.test.ts",
+      "before": {
+        "path": "artifacts/api-server/src/routes/v1/smart-site-acquisition.test.ts",
+        "mode": "100644",
+        "blob": "ec57504b78ac688ed61b429a700d3ff138ae050e"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "e27514d9e1ff826a79700ff488b6fe460a447b84"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/smart-site-hookup-scripts.test.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "ccddb11dc94020b68aa716391a20468cbcc22df6"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/smart-sites.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/smart-sites.ts",
+        "mode": "100644",
+        "blob": "c1c6e532fbed264eaef648a369ee533bfd905fb0"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "9b13dc788fdd5fd0733e9c951b5ac97353ca4517"
+      }
+    }
+  ],
+  "originalBlobs": [
+    {
+      "path": "artifacts/api-server/src/routes/v1/smart-site-acquisition.test.ts",
+      "mode": "100644",
+      "blob": "ec57504b78ac688ed61b429a700d3ff138ae050e",
+      "bytes": 13031,
+      "sha256": "eae4868d1af385cf5628317b581082f10bc62cb5f42e5b0648029094782e7d13"
+    },
+    {
+      "path": "artifacts/api-server/src/services/smart-sites.ts",
+      "mode": "100644",
+      "blob": "c1c6e532fbed264eaef648a369ee533bfd905fb0",
+      "bytes": 43410,
+      "sha256": "50f6ecd8abe3a4b7507659a6c553f3b442297e0c62064d6e09e41ab229a0df4b"
+    }
+  ],
+  "currentBlobs": [
+    {
+      "path": "artifacts/api-server/src/routes/v1/smart-site-acquisition.test.ts",
+      "mode": "100644",
+      "blob": "e27514d9e1ff826a79700ff488b6fe460a447b84",
+      "bytes": 20190,
+      "sha256": "9bbf95d09b4c21158edd21ea80c24246ba73fc93e7735d6a17828ba20ed3bdeb"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/smart-site-hookup-scripts.test.ts",
+      "mode": "100644",
+      "blob": "ccddb11dc94020b68aa716391a20468cbcc22df6",
+      "bytes": 37636,
+      "sha256": "bdf15d3bcdf86f1e311fe4e391536e2fbe41263e2ef3d807caff4e5f103e7b1e"
+    },
+    {
+      "path": "artifacts/api-server/src/services/smart-sites.ts",
+      "mode": "100644",
+      "blob": "9b13dc788fdd5fd0733e9c951b5ac97353ca4517",
+      "bytes": 44086,
+      "sha256": "fb4f78ad334b2bba02e3895ffbd4f9610d7c9889c4d747860c317a8be85d7180"
+    }
+  ],
+  "auxiliary": {
+    "paths": [
+      "scripts/smart-sites"
+    ],
+    "scope": {
+      "count": 3,
+      "sha256": "55d792c5537d36112d99f42e36118524a4c8fc415e2f46fa96f1a37982d2a069"
+    },
+    "blobs": [
+      {
+        "path": "scripts/smart-sites/acceptance-lead.mjs",
+        "mode": "100644",
+        "blob": "d6659fcc9d331f690e0a494b51b4444a90cdffbe",
+        "bytes": 27875,
+        "sha256": "0f165ef50285c15a559a0d1e021a43c5fc90e087a46adc1f32be7782c31c2167"
+      },
+      {
+        "path": "scripts/smart-sites/common.mjs",
+        "mode": "100644",
+        "blob": "b7f8826c0a2511b05bab237126b0b9135485b2c2",
+        "bytes": 7106,
+        "sha256": "2bda65404c5065a6756422bf102385284a86b6149631c7212f7b46cb1dd10f25"
+      },
+      {
+        "path": "scripts/smart-sites/provision-site.mjs",
+        "mode": "100644",
+        "blob": "76306ec76bad218b13a48fce375f0fe2024d6b09",
+        "bytes": 17517,
+        "sha256": "9f6eb2e2b5ed149788cac4e2d7012296dd1c73563dd64e00d64bbe8e065ebed8"
+      }
+    ]
+  }
+}
