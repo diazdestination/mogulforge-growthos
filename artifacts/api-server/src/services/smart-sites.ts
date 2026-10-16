@@ -24,6 +24,7 @@ import { hasPermission } from "../lib/permissions";
 import { getCustomerLifecycleStatus } from "./customer-lifecycle";
 import { customerWorkHeld } from "./customer-lifecycle-runtime";
 import { acceptedStaffCondition } from "./accepted-staff";
+import { normalizeSmsPhone } from "./phone-number";
 
 export class SmartSiteError extends Error {
   constructor(
@@ -538,6 +539,13 @@ export async function captureSmartSiteInquiry(
         : undefined,
     });
     const urgency = p.timing === "urgent" ? "high" : "normal";
+    // GAP-11: same verdict as manual SMS. Keep the lead and the submitted
+    // number; flag it so staff confirm it before calling or texting.
+    const phoneNeedsReview = Boolean(
+      input.contact.phone && !normalizeSmsPhone(input.contact.phone),
+    );
+    const phoneReviewNote =
+      "The phone number given is not a valid US/Canada number; confirm it before calling or texting.";
     // A new request is a new project inquiry, even for an existing contact. Retries use requestId.
     const [lead] = await tx
       .insert(leadsTable)
@@ -634,7 +642,9 @@ export async function captureSmartSiteInquiry(
       `Service: ${service[1]} · Timing: ${p.timing}`,
       p.postalCode ? `Property ZIP: ${p.postalCode}` : null,
       `Submitted by: ${input.contact.name}`,
-      input.contact.phone ? `Callback: ${input.contact.phone}` : null,
+      input.contact.phone
+        ? `Callback: ${input.contact.phone}${phoneNeedsReview ? " (needs review: not a valid US/Canada number)" : ""}`
+        : null,
       input.contact.email ? `Email: ${input.contact.email}` : null,
     ]
       .filter(Boolean)
@@ -658,6 +668,7 @@ export async function captureSmartSiteInquiry(
         state: p.state,
         submittedContact: input.contact,
         consent,
+        ...(phoneNeedsReview ? { phoneNeedsReview: true } : {}),
       },
     });
     await tx.insert(crmTasksTable).values({
@@ -666,7 +677,8 @@ export async function captureSmartSiteInquiry(
       contactId: contact.id,
       title: `Review ${service[1].toLowerCase()} inquiry`,
       description:
-        "Contact permission covers this inquiry only. Assign an owner and record the follow-up; no email, SMS, appointment or dispatch has been sent or confirmed.",
+        "Contact permission covers this inquiry only. Assign an owner and record the follow-up; no email, SMS, appointment or dispatch has been sent or confirmed." +
+        (phoneNeedsReview ? ` ${phoneReviewNote}` : ""),
       sourceEvent: "smart_site.lead_saved",
       priority: urgency,
       dueAt: responseDueAt,
@@ -681,6 +693,7 @@ export async function captureSmartSiteInquiry(
         receiptId: saved.id,
         serviceCode: p.serviceCode,
         ...(measurementDropped ? { measurementDropped } : {}),
+        ...(phoneNeedsReview ? { phoneNeedsReview: true } : {}),
       },
     });
     return {
