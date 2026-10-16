@@ -309,9 +309,10 @@ export function readCompletedVisitDom(root, expected) {
   };
 }
 
-/** Only navigation and opening the read-only disclosure. Each response must
- * belong to a matching main-frame request observed to start after the action
- * boundary, not merely a response that arrives after listener registration. */
+/** Only navigation and opening the read-only disclosure. A matching main-frame
+ * request's event must be observed after the action boundary, and its reported
+ * browser start must not precede the sampled pre-action browser clock. This
+ * measured bound and event order do not establish causation by the action. */
 export async function observeCompletedVisitUi(page, expected) {
   try {
     const target = expectedTarget(expected);
@@ -334,19 +335,38 @@ export async function observeCompletedVisitUi(page, expected) {
       };
       page.on("request", requestStarted);
       try {
+        const browserSample = await page.evaluate(
+          () => performance.timeOrigin + performance.now(),
+        );
+        if (!Number.isFinite(browserSample) || browserSample <= 0)
+          throw Error("browser_clock_unavailable");
+        // Playwright documents epoch milliseconds, populated by the response.
+        // Compare in the browser epoch domain; Node's wall clock is not used.
+        const timely = (request) => {
+          try {
+            const start = request.timing().startTime;
+            return (
+              Number.isFinite(start) && start > 0 && start >= browserSample
+            );
+          } catch {
+            return false;
+          }
+        };
         const pending = page
           .waitForResponse(
             (response) =>
               response.url() === url &&
               response.request().method() === "GET" &&
-              started.has(response.request()),
+              started.has(response.request()) &&
+              timely(response.request()),
             { timeout: 10_000 },
           )
           .catch(() => null);
         actionStarted = true;
         await action();
         const response = await pending;
-        if (!response) throw Error("missing_ui_response");
+        if (!response || !timely(response.request()))
+          throw Error("missing_timely_ui_response");
         return {
           url: response.url(),
           method: response.request().method(),

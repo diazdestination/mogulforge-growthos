@@ -606,6 +606,17 @@ function controlledPage(doc, f, changeWork = () => {}, options = {}) {
   const requestEvents = new EventEmitter(),
     mainFrame = {},
     requests = new Map();
+  const browserNow = () =>
+    doc.defaultView.performance.timeOrigin + doc.defaultView.performance.now();
+  // The installed Playwright1.63 transport uses these two setImmediate
+  // dispatch directions (independently retained in the R2 queued-event probe).
+  // No browser is launched here; this is a controlled protocol schedule.
+  const clientConnection = { dispatch: (message) => message() };
+  const dispatcherConnection = { dispatch: (message) => message() };
+  dispatcherConnection.onmessage = (message) =>
+    setImmediate(() => clientConnection.dispatch(message));
+  clientConnection.onmessage = (message) =>
+    setImmediate(() => dispatcherConnection.dispatch(message));
   function requestFor(value) {
     let request = requests.get(value);
     if (!request) {
@@ -614,19 +625,70 @@ function controlledPage(doc, f, changeWork = () => {}, options = {}) {
         method: () => value.method,
         redirectedFrom: () => null,
         frame: () => (options.foreignFrame ? {} : mainFrame),
+        _actualStart:
+          Object.hasOwn(options, "timingStart") &&
+          (!options.timingScope ||
+            options.timingScope ===
+              (value === f.observation.detail ? "detail" : "work"))
+            ? options.timingStart
+            : browserNow(),
+        _timing: { startTime: 0 },
+        timing() {
+          return this._timing;
+        },
       };
       requests.set(value, request);
     }
     return request;
   }
+  if (options.precreatedScope)
+    requestFor(
+      options.precreatedScope === "detail"
+        ? f.observation.detail
+        : f.observation.work,
+    );
   function emit(value) {
     const request = requestFor(value);
+    const dispatch = (message) =>
+      options.queuedTransport
+        ? dispatcherConnection.onmessage(message)
+        : message();
+    if (options.oldBeforeCurrent) {
+      const olderRequest = {
+        ...request,
+        _timing: { startTime: 0 },
+        timing() {
+          return this._timing;
+        },
+      };
+      const olderResponse = {
+        url: () => value.url,
+        status: () => value.status,
+        request: () => olderRequest,
+        fromServiceWorker: () => false,
+        json: async () => {
+          const body = structuredClone(value.json);
+          if (body.completion) body.completion.requestId = id(99);
+          else body.appointment.status = "scheduled";
+          return body;
+        },
+      };
+      dispatch(() => requestEvents.emit("request", olderRequest));
+      dispatch(() => {
+        olderRequest._timing.startTime = request._actualStart - 1000;
+        for (const waiter of pending)
+          if (waiter.predicate(olderResponse)) {
+            clearTimeout(waiter.timer);
+            waiter.resolve(olderResponse);
+          }
+      });
+    }
     if (
       (value === f.observation.detail
         ? options.startDetail
         : options.startWork) !== false
     )
-      requestEvents.emit("request", request);
+      dispatch(() => requestEvents.emit("request", request));
     const response = {
       url: () => value.url,
       status: () => value.status,
@@ -634,28 +696,31 @@ function controlledPage(doc, f, changeWork = () => {}, options = {}) {
       fromServiceWorker: () => false,
       json: async () => structuredClone(value.json),
     };
-    for (const waiter of pending) {
-      if (options.oldResponseFirst) {
-        const older = {
-          ...response,
-          request: () => ({ ...request }),
-          json: async () => {
-            const body = structuredClone(value.json);
-            if (body.completion) body.completion.requestId = id(99);
-            else body.appointment.status = "scheduled";
-            return body;
-          },
-        };
-        if (waiter.predicate(older)) {
+    dispatch(() => {
+      request._timing.startTime = request._actualStart;
+      for (const waiter of pending) {
+        if (options.oldResponseFirst) {
+          const older = {
+            ...response,
+            request: () => ({ ...request }),
+            json: async () => {
+              const body = structuredClone(value.json);
+              if (body.completion) body.completion.requestId = id(99);
+              else body.appointment.status = "scheduled";
+              return body;
+            },
+          };
+          if (waiter.predicate(older)) {
+            clearTimeout(waiter.timer);
+            waiter.resolve(older);
+          }
+        }
+        if (waiter.predicate(response)) {
           clearTimeout(waiter.timer);
-          waiter.resolve(older);
+          waiter.resolve(response);
         }
       }
-      if (waiter.predicate(response)) {
-        clearTimeout(waiter.timer);
-        waiter.resolve(response);
-      }
-    }
+    });
   }
   const selected = {
     waitFor: async () => {},
@@ -664,9 +729,19 @@ function controlledPage(doc, f, changeWork = () => {}, options = {}) {
         return {
           click: async () => {
             if (options.throwClick) throw Error("disclosure_failed");
-            opened = true;
-            changeWork(f.observation.work);
-            emit(f.observation.work);
+            const action = () => {
+              opened = true;
+              changeWork(f.observation.work);
+              emit(f.observation.work);
+            };
+            if (options.queuedTransport)
+              return new Promise((resolve) =>
+                clientConnection.onmessage(() => {
+                  action();
+                  dispatcherConnection.onmessage(resolve);
+                }),
+              );
+            action();
           },
         };
       if (role === "region" && roleOptions.name === "Recorded work completion")
@@ -689,6 +764,11 @@ function controlledPage(doc, f, changeWork = () => {}, options = {}) {
     on: (...args) => requestEvents.on(...args),
     off: (...args) => requestEvents.off(...args),
     url: () => url,
+    evaluate: async (fn) => {
+      if (options.throwClock) throw Error("clock_sample_failed");
+      if (Object.hasOwn(options, "clockSample")) return options.clockSample;
+      return doc.defaultView.eval(`(${fn.toString()})`)();
+    },
     waitForResponse(predicate) {
       if (options.throwWait) throw Error("response_wait_setup_failed");
       if (options.armRequestEvent)
@@ -710,6 +790,13 @@ function controlledPage(doc, f, changeWork = () => {}, options = {}) {
     goto: async (target) => {
       if (options.throwGoto) throw Error("navigation_failed");
       url = target;
+      if (options.queuedTransport)
+        return new Promise((resolve) =>
+          clientConnection.onmessage(() => {
+            emit(f.observation.detail);
+            dispatcherConnection.onmessage(resolve);
+          }),
+        );
       emit(f.observation.detail);
     },
     getByRole: (role, options) => {
@@ -719,6 +806,118 @@ function controlledPage(doc, f, changeWork = () => {}, options = {}) {
     },
   };
 }
+
+for (const scope of ["detail", "work"])
+  test(`rejects a pre-existing ${scope} request whose issue event is queued after the action`, async () =>
+    inDom(async (doc) => {
+      const oldStart =
+        doc.defaultView.performance.timeOrigin +
+        doc.defaultView.performance.now() -
+        1000;
+      const f = fixture(),
+        page = controlledPage(doc, f, () => {}, {
+          queuedTransport: true,
+          precreatedScope: scope,
+          timingScope: scope,
+          timingStart: oldStart,
+        });
+      assert.equal(
+        (await ui.observeCompletedVisitUi(page, f.expected)).status,
+        "FAIL",
+      );
+      assert.equal(page.requestEvents.listenerCount("request"), 0);
+    }));
+
+for (const [name, timingStart] of [
+  ["unavailable", undefined],
+  ["zero", 0],
+  ["negative", -1],
+  ["NaN", NaN],
+  ["infinite", Infinity],
+  ["string", "1792188000000"],
+]) {
+  test(`rejects ${name} response request timing and cleans up`, async () =>
+    inDom(async (doc) => {
+      const f = fixture(),
+        page = controlledPage(doc, f, () => {}, { timingStart });
+      assert.equal(
+        (await ui.observeCompletedVisitUi(page, f.expected)).status,
+        "FAIL",
+      );
+      assert.equal(page.requestEvents.listenerCount("request"), 0);
+    }));
+}
+for (const [name, clockSample] of [
+  ["unavailable", undefined],
+  ["zero", 0],
+  ["negative", -1],
+  ["NaN", NaN],
+  ["infinite", Infinity],
+  ["string", "1792188000000"],
+]) {
+  test(`rejects ${name} browser clock sample and cleans up`, async () =>
+    inDom(async (doc) => {
+      const f = fixture(),
+        page = controlledPage(doc, f, () => {}, { clockSample });
+      assert.equal(
+        (await ui.observeCompletedVisitUi(page, f.expected)).status,
+        "FAIL",
+      );
+      assert.equal(page.requestEvents.listenerCount("request"), 0);
+    }));
+}
+test("rejects a thrown browser clock sample and removes its listener", async () =>
+  inDom(async (doc) => {
+    const f = fixture(),
+      page = controlledPage(doc, f, () => {}, { throwClock: true });
+    assert.equal(
+      (await ui.observeCompletedVisitUi(page, f.expected)).status,
+      "FAIL",
+    );
+    assert.equal(page.requestEvents.listenerCount("request"), 0);
+  }));
+for (const [name, timingStart, wanted] of [
+  ["before the fractional browser sample", 1700000000000.25, "FAIL"],
+  ["equal to the browser sample", 1700000000000.5, "PASS"],
+  ["after the browser sample", 1700000000000.75, "PASS"],
+]) {
+  test(`compares request start ${name} without using the Node clock`, async () =>
+    inDom(async (doc) => {
+      const f = fixture(),
+        page = controlledPage(doc, f, () => {}, {
+          clockSample: 1700000000000.5,
+          timingStart,
+        });
+      assert.equal(
+        (await ui.observeCompletedVisitUi(page, f.expected)).status,
+        wanted,
+      );
+      assert.equal(page.requestEvents.listenerCount("request"), 0);
+    }));
+}
+test("accepts current requests through the installed setImmediate transport schedule", async () =>
+  inDom(async (doc) => {
+    const f = fixture(),
+      page = controlledPage(doc, f, () => {}, { queuedTransport: true });
+    assert.equal(
+      (await ui.observeCompletedVisitUi(page, f.expected)).status,
+      "PASS",
+    );
+    assert.equal(page.requestEvents.listenerCount("request"), 0);
+  }));
+test("ignores a queued old matching start and consumes a later current request through the transport schedule", async () =>
+  inDom(async (doc) => {
+    const f = fixture(),
+      page = controlledPage(doc, f, () => {}, {
+        queuedTransport: true,
+        oldBeforeCurrent: true,
+      });
+    assert.equal(
+      (await ui.observeCompletedVisitUi(page, f.expected)).status,
+      "PASS",
+    );
+    assert.equal(page.requestEvents.listenerCount("request"), 0);
+  }));
 test("observer binds fresh exact responses to the visible selected visit after opening its work", async () =>
   inDom(async (doc) => {
     const f = fixture();
