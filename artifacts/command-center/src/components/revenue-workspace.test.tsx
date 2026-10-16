@@ -60,7 +60,12 @@ const ledger = () => ({
 it('labels returning receipts separately, links exact customer history and never fabricates acquisition evidence', async () => {
   const organizationId = '00000000-0000-4000-8000-000000000001', contactId = '00000000-0000-4000-8000-000000000002', customerWorkId = '00000000-0000-4000-8000-000000000003';
   mockApi('owner', { handler: (_method, path) => path.endsWith('/revenue/value') ? response({ ...ledger(), entryCount: 2, receiptEntryCount: 2, netReceiptsCents: 7500, entries: [{ id: 'receipt', organizationId, contactId, leadId: null, customerWorkId, refundOfValueEntryId: null, kind: 'payment', amountCents: 10000, sourceReference: 'ACTUAL-RECORDED-CHECK', occurredAt: '2026-10-01T00:00:00Z' }, { id: 'refund', organizationId, contactId, leadId: null, customerWorkId, refundOfValueEntryId: 'receipt', kind: 'refund', amountCents: 2500, sourceReference: 'ACTUAL-EXTERNAL-CORRECTION', occurredAt: '2026-10-02T00:00:00Z' }], sourceBreakdown: [{ source: 'lead', entryCount: 0, netReceiptsCents: 0, netDirectCostsCents: 0 }, { source: 'customer_work', entryCount: 2, netReceiptsCents: 7500, netDirectCostsCents: 0 }] }) : undefined });
-  renderWithQuery(<ValueLedger />); await screen.findByText('Existing-customer work'); expect(screen.getByText(/Returning work is not new acquisition/)).toBeTruthy(); expect(screen.getByText(/External refund correction of receipt receipt/)).toBeTruthy(); expect(screen.getByRole('link', { name: 'ACTUAL-RECORDED-CHECK' }).getAttribute('href')).toBe(`/contacts/${contactId}?organizationId=${organizationId}&section=invoices`); expect(document.querySelector('a[href*="leads/null"]')).toBeNull(); expect(screen.getByText('Not available')).toBeTruthy();
+  renderWithQuery(<ValueLedger />); await screen.findByRole('heading', { name: 'Existing-customer work' }); expect(screen.getByText(/Returning work is not new acquisition/)).toBeTruthy(); expect(screen.getByText(/External refund correction of receipt receipt/)).toBeTruthy(); expect(screen.getByRole('link', { name: 'ACTUAL-RECORDED-CHECK' }).getAttribute('href')).toBe(`/contacts/${contactId}?organizationId=${organizationId}&section=invoices`); expect(document.querySelector('a[href*="leads/null"]')).toBeNull(); expect(screen.getByText('Not available')).toBeTruthy();
+  expect(document.body.textContent).not.toContain(customerWorkId);
+  expect(screen.getAllByText('Existing-customer work', { selector: 'p' })).toHaveLength(2);
+  expect(screen.getByRole('link', { name: 'ACTUAL-EXTERNAL-CORRECTION' }).getAttribute('href')).toBe(`/contacts/${contactId}?organizationId=${organizationId}&section=invoices`);
+  expect(screen.getByText('$100.00')).toBeTruthy();
+  expect(screen.getByText('$25.00')).toBeTruthy();
 });
 afterEach(() => {
   cleanup();
