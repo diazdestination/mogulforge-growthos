@@ -8,9 +8,10 @@ import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
-import { root, connect, beginSourceSnapshot, loadReviewedPlan, captureSource, legacySchemaSql } from './lib.mjs';
-import { copyToV2 } from './copy-to-v2.mjs';
-import { compare } from './compare.mjs';
+import { createRequire } from 'node:module';
+import { root, connect, beginSourceSnapshot, loadReviewedPlan, captureSource, legacySchemaSql, safeError } from './lib.mjs';
+import { copyToV2, identify, EXIT_CODES } from './copy-to-v2.mjs';
+import { compare, EXIT_CODES as COMPARE_EXIT_CODES } from './compare.mjs';
 
 const FIXTURES = resolve(root, 'reports/production75-recovery-2026-10-11');
 const LAYOUTS = { 'fly-db': 'fly-db', growthos_staging: 'legacy_staging' }; // layout -> source database
@@ -87,7 +88,7 @@ beforeAll(async () => {
     const c = await connect(url(srcPort, db, 'fly-user', USER_PW), 'claude-v2mig-seed');
     try { await c.query('SET ROLE schema_admin'); await c.query(fixtureSql(layout)); await seed(c); } finally { await c.end(); }
   }
-  for (const db of ['tgt_happy', 'tgt_layout2', 'tgt_nonempty', 'tgt_corrupt'])
+  for (const db of ['tgt_happy', 'tgt_layout2', 'tgt_nonempty', 'tgt_corrupt', 'tgt_lost_ack', 'tgt_pre_commit', 'tgt_identity'])
     await admin(dstPort, 'control', `CREATE DATABASE ${db} OWNER schema_admin`);
   timings.containersAndSeedMs = Date.now() - t0;
 }, 180000);
@@ -102,6 +103,10 @@ afterAll(async () => {
 
 const src = (layout = 'fly-db') => url(srcPort, LAYOUTS[layout], 'growthos-reader', READER_PW);
 const dst = db => url(dstPort, db, 'fly-user', USER_PW);
+// Every run pins both identities, as the operator does with --identify.
+const pins = async (sourceUrl, targetUrl) => { const i = await identify({ sourceUrl, targetUrl }); return { sourceIdentity: i.source, targetIdentity: i.target }; };
+const copy = async opts => copyToV2({ ...(await pins(opts.sourceUrl, opts.targetUrl)), ...opts });
+const cmp = async opts => compare({ ...(await pins(opts.sourceUrl, opts.targetUrl)), ...opts });
 
 test('rebuilt legacy schema SQL is byte-identical to the reviewed production75 fixtures', () => {
   for (const layout of Object.keys(LAYOUTS)) assert.equal(legacySchemaSql(catalog75(layout)), fixtureSql(layout));
@@ -109,9 +114,11 @@ test('rebuilt legacy schema SQL is byte-identical to the reviewed production75 f
 
 test('happy path: copy commits, 75 tables match by count and fingerprint, compare passes', async () => {
   const t0 = Date.now();
-  const r = await copyToV2({ sourceUrl: src(), targetUrl: dst('tgt_happy'), ownerRole: 'schema_admin' });
+  const r = await copy({ sourceUrl: src(), targetUrl: dst('tgt_happy'), ownerRole: 'schema_admin' });
   timings.copyMs = Date.now() - t0; timings.copyBreakdownMs = r.timingsMs;
   assert.equal(r.status, 'COMMITTED', JSON.stringify(r.verification.problems));
+  assert.deepEqual(r.identityCheck, { source: (await identify({ sourceUrl: src(), targetUrl: dst('tgt_happy') })).source, target: (await identify({ sourceUrl: src(), targetUrl: dst('tgt_happy') })).target });
+  assert.match(r.identityCheck.target, /^\d+\/tgt_happy$/); // least-privilege logins can read pg_control_system here
   assert.equal(r.stepsApplied.length, 20);
   assert.equal(r.rowsCopied, 46);
   assert.deepEqual(r.verification.catalog.tables, 142);
@@ -121,11 +128,11 @@ test('happy path: copy commits, 75 tables match by count and fingerprint, compar
   assert.ok(r.tables.every(t => t.match));
   assert.ok(!JSON.stringify(r).includes('Fictional'), 'summary must not contain row values');
   const t1 = Date.now();
-  const cmp = await compare({ sourceUrl: src(), targetUrl: dst('tgt_happy') });
+  const cmpResult = await cmp({ sourceUrl: src(), targetUrl: dst('tgt_happy') });
   timings.compareMs = Date.now() - t1;
-  assert.equal(cmp.status, 'MATCH', JSON.stringify(cmp.problems));
-  assert.equal(cmp.totals.sourceRows, 46);
-  assert.equal(cmp.addedColumnsChecked, 16);
+  assert.equal(cmpResult.status, 'MATCH', JSON.stringify(cmpResult.problems));
+  assert.equal(cmpResult.totals.sourceRows, 46);
+  assert.equal(cmpResult.addedColumnsChecked, 16);
   // Objects are owned by the requested role, and the app login can use them.
   const c = await connect(dst('tgt_happy'), 'claude-v2mig-check');
   try {
@@ -135,17 +142,17 @@ test('happy path: copy commits, 75 tables match by count and fingerprint, compar
 }, 120000);
 
 test('second physical legacy layout also copies and compares cleanly', async () => {
-  const r = await copyToV2({ sourceUrl: src('growthos_staging'), targetUrl: dst('tgt_layout2') });
+  const r = await copy({ sourceUrl: src('growthos_staging'), targetUrl: dst('tgt_layout2') });
   assert.equal(r.status, 'COMMITTED');
-  assert.equal((await compare({ sourceUrl: src('growthos_staging'), targetUrl: dst('tgt_layout2') })).status, 'MATCH');
+  assert.equal((await cmp({ sourceUrl: src('growthos_staging'), targetUrl: dst('tgt_layout2') })).status, 'MATCH');
 }, 120000);
 
 test('non-empty target is refused before anything is written', async () => {
   await admin(dstPort, 'tgt_nonempty', 'CREATE TABLE stray(id int)');
-  await assert.rejects(copyToV2({ sourceUrl: src(), targetUrl: dst('tgt_nonempty') }), e => e.safeCode === 'v2_target_not_empty');
+  await assert.rejects(copy({ sourceUrl: src(), targetUrl: dst('tgt_nonempty') }), e => e.safeCode === 'v2_target_not_empty');
   const tables = (await admin(dstPort, 'tgt_nonempty', "SELECT tablename FROM pg_tables WHERE schemaname='public'")).rows.map(r => r.tablename);
   assert.deepEqual(tables, ['stray']);
-  await assert.rejects(copyToV2({ sourceUrl: src(), targetUrl: src() }), e => e.safeCode === 'v2_source_target_must_differ');
+  await assert.rejects(copy({ sourceUrl: src(), targetUrl: src() }), e => e.safeCode === 'v2_source_target_must_differ');
 }, 60000);
 
 test('source cannot be modified: READ ONLY snapshot refuses writes and data is unchanged after copy', async () => {
@@ -165,15 +172,15 @@ test('source cannot be modified: READ ONLY snapshot refuses writes and data is u
   const snapshot = async () => { const s = await connect(src(), 'claude-v2mig-fp'); try { await beginSourceSnapshot(s); return (await captureSource(s, plan)).tables; } finally { await s.end(); } };
   const before = await snapshot();
   await admin(dstPort, 'control', 'CREATE DATABASE tgt_ro OWNER schema_admin');
-  assert.equal((await copyToV2({ sourceUrl: src(), targetUrl: dst('tgt_ro') })).status, 'COMMITTED');
+  assert.equal((await copy({ sourceUrl: src(), targetUrl: dst('tgt_ro') })).status, 'COMMITTED');
   assert.deepEqual(await snapshot(), before);
 }, 120000);
 
 test('compare detects a corrupted target row, a lost row and a stray row in a new table (CLI exits 1)', async () => {
-  assert.equal((await copyToV2({ sourceUrl: src(), targetUrl: dst('tgt_corrupt') })).status, 'COMMITTED');
+  assert.equal((await copy({ sourceUrl: src(), targetUrl: dst('tgt_corrupt') })).status, 'COMMITTED');
   // Same row count, one changed value.
   await admin(dstPort, 'tgt_corrupt', "UPDATE contacts SET first_name = first_name || ' ' WHERE first_name = 'Fictional contact 1.2'");
-  let r = await compare({ sourceUrl: src(), targetUrl: dst('tgt_corrupt') });
+  let r = await cmp({ sourceUrl: src(), targetUrl: dst('tgt_corrupt') });
   assert.equal(r.status, 'MISMATCH');
   assert.deepEqual(r.problems, [{ check: 'table', table: 'contacts' }]);
   const row = r.tables.find(t => t.table === 'contacts');
@@ -182,15 +189,82 @@ test('compare detects a corrupted target row, a lost row and a stray row in a ne
   await admin(dstPort, 'tgt_corrupt', "UPDATE org_settings SET lead_scoring = NULL WHERE lead_scoring = 'null'::jsonb");
   await admin(dstPort, 'tgt_corrupt', "DELETE FROM sessions WHERE sid = 'fictional-session-2'");
   await admin(dstPort, 'tgt_corrupt', "INSERT INTO invoice_sequences(organization_id) SELECT id FROM organizations LIMIT 1");
-  r = await compare({ sourceUrl: src(), targetUrl: dst('tgt_corrupt') });
+  r = await cmp({ sourceUrl: src(), targetUrl: dst('tgt_corrupt') });
   assert.deepEqual(r.problems.map(p => `${p.check}:${p.table}`).sort(),
     ['new_table_not_empty:invoice_sequences', 'table:contacts', 'table:org_settings', 'table:sessions']);
   // CLI: exit status 1 and no row values in output.
   const child = spawn(process.execPath, [resolve(root, 'scripts/v2-migration/compare.mjs')], {
-    env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, SOURCE_DATABASE_URL: src(), TARGET_DATABASE_URL: dst('tgt_corrupt') }, windowsHide: true });
+    env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, SOURCE_DATABASE_URL: src(), TARGET_DATABASE_URL: dst('tgt_corrupt'),
+      SOURCE_IDENTITY: (await pins(src(), dst('tgt_corrupt'))).sourceIdentity, TARGET_IDENTITY: (await pins(src(), dst('tgt_corrupt'))).targetIdentity }, windowsHide: true });
   let out = ''; child.stdout.on('data', d => { out += d; });
   const code = await new Promise(done => child.on('close', done));
   assert.equal(code, 1);
   assert.equal(JSON.parse(out).status, 'MISMATCH');
   assert.ok(!out.includes('Fictional') && !out.includes(USER_PW) && !out.includes(READER_PW));
 }, 120000);
+
+/** Fault injection on the real pg client used by copy-to-v2 (target connection only). */
+async function withTargetFault(fault, fn) {
+  const pg = createRequire(resolve(root, 'artifacts/api-server/package.json'))('pg');
+  const original = pg.Client.prototype.query;
+  pg.Client.prototype.query = async function (...args) {
+    const target = this.connectionParameters.application_name === 'growthos-v2-copy-target';
+    if (target && fault === 'identity' && typeof args[0] === 'string' && args[0].includes('pg_control_system')) throw Object.assign(new Error('synthetic permission denied'), { code: '42501' });
+    // 'before': connection lost while the last reviewed step (0019) runs, i.e. before COMMIT is sent.
+    if (target && fault === 'before' && typeof args[0] === 'string' && args[0].includes('ADD COLUMN "scheduling_policy"')) throw Object.assign(new Error('synthetic pre-commit loss'), { code: '08006' });
+    if (target && args[0] === 'COMMIT') {
+      const result = await original.apply(this, args);
+      if (fault === 'after') throw Object.assign(new Error('synthetic lost commit acknowledgement'), { code: '08006' });
+      return result;
+    }
+    return original.apply(this, args);
+  };
+  try { return await fn(); } finally { pg.Client.prototype.query = original; }
+}
+const publicTables = async db => Number((await admin(dstPort, db, "SELECT count(*) AS n FROM pg_tables WHERE schemaname='public'")).rows[0].n);
+
+test('lost COMMIT acknowledgement reports UNKNOWN_OUTCOME (exit 3), never FAILED; compare reconciles to MATCH; no retry', async () => {
+  const r = await withTargetFault('after', () => copy({ sourceUrl: src(), targetUrl: dst('tgt_lost_ack') }));
+  assert.equal(r.status, 'UNKNOWN_OUTCOME');
+  assert.equal(r.commitSent, true);
+  assert.equal(EXIT_CODES[r.status], 3);
+  assert.match(r.reconcile, /compare.mjs/);
+  assert.equal(r.error.sqlstate, '08006');
+  assert.equal(await publicTables('tgt_lost_ack'), 142); // it did commit
+  assert.equal((await cmp({ sourceUrl: src(), targetUrl: dst('tgt_lost_ack') })).status, 'MATCH');
+  await assert.rejects(copy({ sourceUrl: src(), targetUrl: dst('tgt_lost_ack') }), e => e.safeCode === 'v2_target_not_empty');
+}, 120000);
+
+test('failure before COMMIT is FAILED with commitSent=false; target stays empty and compare says TARGET_EMPTY', async () => {
+  await assert.rejects(withTargetFault('before', () => copy({ sourceUrl: src(), targetUrl: dst('tgt_pre_commit') })),
+    e => e.code === '08006' && e.commitSent === false);
+  assert.equal(await publicTables('tgt_pre_commit'), 0);
+  const cmpResult = await cmp({ sourceUrl: src(), targetUrl: dst('tgt_pre_commit') });
+  assert.equal(cmpResult.status, 'TARGET_EMPTY');
+  assert.equal(COMPARE_EXIT_CODES[cmpResult.status], 2);
+}, 120000);
+
+test('identity checks are mandatory and fail closed: unreadable, unpinned, wrong pin', async () => {
+  // Unreadable identity: refused, no override exists.
+  await assert.rejects(withTargetFault('identity', () => copy({ sourceUrl: src(), targetUrl: dst('tgt_identity') })), e => e.safeCode === 'v2_identity_unavailable');
+  // Missing pins.
+  await assert.rejects(copyToV2({ sourceUrl: src(), targetUrl: dst('tgt_identity') }), e => e.safeCode === 'v2_identity_pin_required');
+  await assert.rejects(compare({ sourceUrl: src(), targetUrl: dst('tgt_identity') }), e => e.safeCode === 'v2_identity_pin_required');
+  // Pinned to a different (empty) target than the one connected.
+  const wrong = await pins(src(), dst('tgt_pre_commit'));
+  await assert.rejects(copyToV2({ sourceUrl: src(), targetUrl: dst('tgt_identity'), ...wrong }), e => e.safeCode === 'v2_target_identity_mismatch');
+  await assert.rejects(copyToV2({ sourceUrl: src(), targetUrl: dst('tgt_identity'), ...wrong, sourceIdentity: wrong.targetIdentity }), e => e.safeCode === 'v2_source_identity_mismatch' || e.safeCode === 'v2_target_identity_mismatch');
+  assert.equal(await publicTables('tgt_identity'), 0);
+  // Correct pins succeed.
+  assert.equal((await copy({ sourceUrl: src(), targetUrl: dst('tgt_identity') })).status, 'COMMITTED');
+}, 120000);
+
+test('error output never contains PostgreSQL detail/message values, only codes and object names', async () => {
+  let caught;
+  try { await admin(srcPort, 'fly-db', "INSERT INTO organizations(name,slug) VALUES('Fictional dup','synthetic-v2-1')"); } catch (e) { caught = e; }
+  assert.ok(caught?.detail?.includes('synthetic-v2-1')); // pg itself puts key values in detail
+  const out = JSON.stringify(safeError(caught));
+  assert.ok(!out.includes('synthetic-v2-1') && !out.includes('Fictional'));
+  assert.deepEqual(JSON.parse(out), { code: 'v2_unexpected_error', sqlstate: '23505', schema: 'public', table: 'organizations', constraint: JSON.parse(out).constraint });
+  assert.match(JSON.parse(out).constraint, /^[a-z0-9_]+$/);
+});

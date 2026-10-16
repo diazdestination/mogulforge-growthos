@@ -21,7 +21,8 @@ import { deriveProduction75Catalogs, ORIGINAL_DEFAULTS } from '../production75-c
 import { buildScheduling0019Source, assertScheduling0019Catalogs } from '../production75-scheduling0019.mjs';
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-export const fail = (code, detail) => { throw Object.assign(new Error(code), { safeCode: code, detail }); };
+// v2Detail carries only names/counts we construct; PostgreSQL's own e.detail (which can hold key values) is never output.
+export const fail = (code, detail) => { throw Object.assign(new Error(code), { safeCode: code, v2Detail: detail }); };
 export const check = (ok, code, detail) => { if (!ok) fail(code, detail); };
 const sha = v => createHash('sha256').update(v).digest('hex');
 export const q = v => { check(typeof v === 'string' && /^[a-z_][a-z0-9_]*$/.test(v), 'v2_identifier_invalid'); return `"${v}"`; };
@@ -103,7 +104,7 @@ export function expectedCatalogs(source75, plan) {
 }
 export function assertFinalCatalog(expected142, actual) {
   try { assertScheduling0019Catalogs({ before: expected142, after: actual }); }
-  catch (e) { fail('v2_target_catalog_mismatch', catalogDifferences(actual, expected142).slice(0, 20)); }
+  catch { fail('v2_target_catalog_mismatch', catalogDifferences(actual, expected142).slice(0, 20)); }
 }
 export function assertCatalogEqual(actual, expected, code) {
   if (!isDeepStrictEqual(actual, expected)) fail(code, catalogDifferences(actual, expected, { physical: true }).slice(0, 20));
@@ -156,7 +157,7 @@ export async function captureSource(client, plan) {
 export async function verifyTarget(client, source) {
   const catalog = await collectSchemaCatalog(client);
   const problems = [];
-  try { assertFinalCatalog(source.catalog142, catalog); } catch (e) { problems.push({ check: 'catalog', detail: e.detail }); }
+  try { assertFinalCatalog(source.catalog142, catalog); } catch (e) { problems.push({ check: 'catalog', detail: e.v2Detail }); }
   const original = new Set(source.catalog.tables.map(t => t.name));
   const tables = [];
   for (const s of source.tables) {
@@ -211,6 +212,35 @@ export const isEmptyTargetSql = `SELECT
     AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid='pg_type'::regclass AND d.objid=t.oid AND d.deptype='e')
     AND NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.oid=t.typrelid)) AS types`;
 
-export const safeError = e => ({ code: /^v2_[a-z0-9_]+$/.test(e?.safeCode ?? '') ? e.safeCode : (/^(production75|scheduling0019)_[a-z0-9_]+$/.test(e?.safeCode ?? '') ? e.safeCode : 'v2_unexpected_error'),
-  ...(e?.detail ? { detail: e.detail } : {}), ...(e?.code && /^[0-9A-Z]{5}$/.test(e.code) ? { sqlstate: e.code } : {}) });
+/** Error output: our safe code + our own name/count detail, or for PostgreSQL errors only the
+ * SQLSTATE and object names. Never message, detail, hint, where or parameter values. */
+export function safeError(e) {
+  const ours = /^(v2|production75|scheduling0019)_[a-z0-9_]+$/.test(e?.safeCode ?? '');
+  const out = { code: ours ? e.safeCode : 'v2_unexpected_error' };
+  if (ours && e.v2Detail !== undefined) out.detail = e.v2Detail;
+  if (/^[0-9A-Z]{5}$/.test(e?.code ?? '')) {
+    out.sqlstate = e.code;
+    for (const k of ['schema', 'table', 'column', 'constraint'])
+      if (typeof e[k] === 'string' && /^[A-Za-z0-9_$-]{1,63}$/.test(e[k])) out[k] = e[k];
+  }
+  return out;
+}
+
+/** Cluster+database identity "<system_identifier>/<database>". Fails closed if unreadable. */
+export async function readIdentity(client) {
+  let row;
+  try { row = (await client.query('SELECT system_identifier::text AS s, current_database() AS d FROM pg_control_system()')).rows[0]; }
+  catch { fail('v2_identity_unavailable'); }
+  check(/^\d+$/.test(row?.s ?? '') && typeof row.d === 'string' && row.d.length > 0, 'v2_identity_unavailable');
+  return `${row.s}/${row.d}`;
+}
+/** Both identities must be pinned by the operator (from --identify, recorded in the packet) and match. */
+export async function assertPinnedIdentities(source, target, pins = {}) {
+  check(typeof pins.source === 'string' && typeof pins.target === 'string' && pins.source && pins.target, 'v2_identity_pin_required');
+  const [s, t] = [await readIdentity(source), await readIdentity(target)];
+  check(s !== t, 'v2_source_target_same_database');
+  check(s === pins.source, 'v2_source_identity_mismatch');
+  check(t === pins.target, 'v2_target_identity_mismatch');
+  return { source: s, target: t };
+}
 export { sha, catalogDigest };
