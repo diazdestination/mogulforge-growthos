@@ -50,6 +50,19 @@ records; it does not delete the customer's inquiry.
 - Collection ignores obvious crawler/monitor user agents. Privacy erasure remains
   available even when the user agent is automated.
 
+## Lead intake never fails on measurement (October 16, 2026 — NEEDS OWNER OK)
+
+Measurement is optional; the inquiry is not. When a lead arrives with a `measurement`
+block but the site's analytics is off, or the browser consented under a stale policy
+version, GrowthOS saves the lead **without** the measurement: no visitor link on the lead,
+no `lead_saved` analytics event, and no measurement values stored. The `201` receipt and
+the `smart_site.lead_saved` audit metadata carry only `measurementDropped:
+"analytics_disabled" | "analytics_policy_version_mismatch"`. Previously these leads were
+rejected with `503 site_measurement_disabled` / `409 analytics_policy_version_mismatch`.
+Paused companies (`423 customer_lifecycle_paused`) and disabled capture
+(`503 site_capture_disabled`) are unchanged, and the acquisition-events route still
+rejects events for a disabled site or stale policy.
+
 ## Truthful metrics
 
 - `Consented visitors`: distinct first-party browser identifiers, not unique humans.
