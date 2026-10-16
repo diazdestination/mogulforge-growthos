@@ -1,0 +1,417 @@
+{
+  "version": 1,
+  "purpose": "Exact local source-identity successor for the separately reviewed GAP16/GAP11/A/GAP10 union. No runtime, hosted, CI or release authority.",
+  "releaseEligible": false,
+  "predecessor": {
+    "descriptorPath": "reports/c1-smart-site-integration-amendment-2026-10-16.json",
+    "descriptorSha256": "33325232de76de2c2a9bc82e9bc9b8e263e346ce3c2c391fb6cca19f06498242",
+    "integration": {
+      "sourceCommit": "08c97d7b76ce8e4668c04dc1fcbde9089a709bbe",
+      "sourceTree": "bd3acb8c9912c4aebd81bfe2c1ac240fc158ed70",
+      "scope": {
+        "count": 2120,
+        "sha256": "99a7972dbcb95bf3bc32190bcb0deac1a18c6b59907f8e0184d8e0983fd5b254"
+      }
+    }
+  },
+  "scopePaths": [
+    "artifacts/api-server",
+    "lib"
+  ],
+  "sources": [
+    {
+      "key": "base",
+      "sourceCommit": "b0040bc8276f2ac883874210e863bc3791ee418b",
+      "sourceTree": "312e1e177dd6b2432f36ff2ce6f448c00da9b2fa",
+      "parents": [
+        "8cf1ecf8cbed40dd1af4d3a29a716dfc4f1c1f46"
+      ],
+      "scope": {
+        "count": 2120,
+        "sha256": "99a7972dbcb95bf3bc32190bcb0deac1a18c6b59907f8e0184d8e0983fd5b254"
+      }
+    },
+    {
+      "key": "gap16",
+      "sourceCommit": "67cd972d772de8a396dadcbb646c4a0bcc183522",
+      "sourceTree": "3951820d684b6e306f6509795b9cb4a0d7c3369c",
+      "parents": [
+        "ed066493c3945c0b52b84bb70a08e03556c96786"
+      ],
+      "scope": {
+        "count": 2118,
+        "sha256": "0aee806b4052161a16f5be3d4693b823810dfc36ca4625591ced922b02e69c49"
+      }
+    },
+    {
+      "key": "gap11",
+      "sourceCommit": "4ba03c841dec4a2f4dd35964c6475f9c7291019c",
+      "sourceTree": "cddc7ab9c93dc39dd142f85a96987e5cbcd72daa",
+      "parents": [
+        "02306ef8654ae00fcc4c13a3f0fe24248aa415d6"
+      ],
+      "scope": {
+        "count": 2119,
+        "sha256": "6a99a9c7d1f6477279ed6925f58e2a3368b6ec0b489c24f89258be0baa776321"
+      }
+    },
+    {
+      "key": "tooling",
+      "sourceCommit": "95ba00465ea9d06188d50b5932517ae1275025a3",
+      "sourceTree": "65e63edd0b69accb90ba813b8e667d5b661596e9",
+      "parents": [
+        "8b9d8e13c9f79948ddf29b50a8d40acdf704ced9"
+      ],
+      "scope": {
+        "count": 2117,
+        "sha256": "4cf023465c1eedfa749c01cb6304ea60ffe1bae4ef9f007139efbfe51d85b237"
+      }
+    },
+    {
+      "key": "gap10",
+      "sourceCommit": "612928966fbaa9bec43812b7f5c494ee58f1b4b5",
+      "sourceTree": "f12bd72d66bc20b63b90f9faa7e46ada66759e08",
+      "parents": [
+        "02306ef8654ae00fcc4c13a3f0fe24248aa415d6"
+      ],
+      "scope": {
+        "count": 2117,
+        "sha256": "4cf023465c1eedfa749c01cb6304ea60ffe1bae4ef9f007139efbfe51d85b237"
+      }
+    },
+    {
+      "key": "mergeGap16",
+      "sourceCommit": "32a5506ea9389c6809802a0b6a1f487f248dbcd7",
+      "sourceTree": "841aae90d8369405bb1aa62e387165c6d5fd6fe6",
+      "parents": [
+        "b0040bc8276f2ac883874210e863bc3791ee418b",
+        "67cd972d772de8a396dadcbb646c4a0bcc183522"
+      ],
+      "scope": {
+        "count": 2121,
+        "sha256": "d87f1ccf9d4abf6e83b5c63da05ba63a02cc694395a466a27f9f01a9d6a0ee03"
+      }
+    },
+    {
+      "key": "mergeGap11",
+      "sourceCommit": "ea17a52ab1e7f64fd51bf0e3ade4ac3bad1c77cc",
+      "sourceTree": "2dddcee7b8dacb6dd0b53690007d46f998496942",
+      "parents": [
+        "32a5506ea9389c6809802a0b6a1f487f248dbcd7",
+        "4ba03c841dec4a2f4dd35964c6475f9c7291019c"
+      ],
+      "scope": {
+        "count": 2123,
+        "sha256": "f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472"
+      }
+    },
+    {
+      "key": "mergeTooling",
+      "sourceCommit": "0e9245d13792decc27748780aa5a7da68b0c1a01",
+      "sourceTree": "07d414abda4a6a18d77865c61ff117a61accd2a2",
+      "parents": [
+        "ea17a52ab1e7f64fd51bf0e3ade4ac3bad1c77cc",
+        "95ba00465ea9d06188d50b5932517ae1275025a3"
+      ],
+      "scope": {
+        "count": 2123,
+        "sha256": "f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472"
+      }
+    },
+    {
+      "key": "integration",
+      "sourceCommit": "4e2d5252b934d652c659eb2e03c3fa7d4e22cc12",
+      "sourceTree": "cb4c8861f28331288fc307fd4000b155a9dc8635",
+      "parents": [
+        "0e9245d13792decc27748780aa5a7da68b0c1a01",
+        "612928966fbaa9bec43812b7f5c494ee58f1b4b5"
+      ],
+      "scope": {
+        "count": 2123,
+        "sha256": "f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472"
+      }
+    }
+  ],
+  "integration": {
+    "sourceCommit": "4e2d5252b934d652c659eb2e03c3fa7d4e22cc12",
+    "sourceTree": "cb4c8861f28331288fc307fd4000b155a9dc8635",
+    "scope": {
+      "count": 2123,
+      "sha256": "f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472"
+    }
+  },
+  "changes": [
+    {
+      "path": "artifacts/api-server/src/lib/orgFlavor.ts",
+      "before": {
+        "path": "artifacts/api-server/src/lib/orgFlavor.ts",
+        "mode": "100644",
+        "blob": "6bff0855366fad3009998e6e5dfa424b1ab724a4"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "2d567d1ef56baa091bbe9fc64fc468e5bac26ede"
+      },
+      "origin": "gap16"
+    },
+    {
+      "path": "artifacts/api-server/src/services/automation.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/automation.ts",
+        "mode": "100644",
+        "blob": "1c8225e1f7e3a275a5c6dba9c1828d20cfff65bd"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "8526dd57a2bae58d8ecf9be25882cc3701098a63"
+      },
+      "origin": "gap16"
+    },
+    {
+      "path": "artifacts/api-server/src/services/manual-sms.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/manual-sms.ts",
+        "mode": "100644",
+        "blob": "08190b2068f4a0a4b0228d08136ff69868b5609f"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "b6864922e933380c19507c1294fcc1e77aded6ad"
+      },
+      "origin": "gap11"
+    },
+    {
+      "path": "artifacts/api-server/src/services/phone-number.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "3d705662b88c661a966e9307bd6d719490999af9"
+      },
+      "origin": "gap11"
+    },
+    {
+      "path": "artifacts/api-server/src/services/playbooks-single-connection.test.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "b37da5db13be3690e4560140c0d5e51545e66bfd"
+      },
+      "origin": "gap16"
+    },
+    {
+      "path": "artifacts/api-server/src/services/playbooks.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/playbooks.ts",
+        "mode": "100644",
+        "blob": "6c959e6e4b434d156d4e1269f6d3402591da592a"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "9703b1c5296f207a4c4abbb7dc90b142fa2e3ee4"
+      },
+      "origin": "gap16"
+    },
+    {
+      "path": "artifacts/api-server/src/services/smart-site-intake-phone.test.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "8659f9a6663c13b98bf010e9f7a22cf6abdbc432"
+      },
+      "origin": "gap11"
+    },
+    {
+      "path": "artifacts/api-server/src/services/smart-sites.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/smart-sites.ts",
+        "mode": "100644",
+        "blob": "9b13dc788fdd5fd0733e9c951b5ac97353ca4517"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "178a5666209263a72fbfcbc24e78f22bfdec363d"
+      },
+      "origin": "mergeGap11"
+    }
+  ],
+  "currentBlobs": [
+    {
+      "path": "artifacts/api-server/src/lib/orgFlavor.ts",
+      "mode": "100644",
+      "blob": "2d567d1ef56baa091bbe9fc64fc468e5bac26ede",
+      "bytes": 1442,
+      "sha256": "08626792158a07b578ff864081d6bec2889ef34ee71aadb787fc0932031843dd"
+    },
+    {
+      "path": "artifacts/api-server/src/services/automation.ts",
+      "mode": "100644",
+      "blob": "8526dd57a2bae58d8ecf9be25882cc3701098a63",
+      "bytes": 80693,
+      "sha256": "7337986389bba11b81f906f568e5a915ca6a6710cd4dade06a8fa8d379e67aa4"
+    },
+    {
+      "path": "artifacts/api-server/src/services/manual-sms.ts",
+      "mode": "100644",
+      "blob": "b6864922e933380c19507c1294fcc1e77aded6ad",
+      "bytes": 5242,
+      "sha256": "86c5fc9c2539d210b90ca47226e991708e914463fa7ee7af5b4169acf98e2723"
+    },
+    {
+      "path": "artifacts/api-server/src/services/phone-number.ts",
+      "mode": "100644",
+      "blob": "3d705662b88c661a966e9307bd6d719490999af9",
+      "bytes": 1079,
+      "sha256": "58e4c5ad1e9067dddf93df13f0918d3ddd6a9363db50e5d23f2ea7f70a011144"
+    },
+    {
+      "path": "artifacts/api-server/src/services/playbooks-single-connection.test.ts",
+      "mode": "100644",
+      "blob": "b37da5db13be3690e4560140c0d5e51545e66bfd",
+      "bytes": 5184,
+      "sha256": "749035e69cc086b8b61917bead008f68fdbb0cfef885e37e1f6e6e165c24e9bf"
+    },
+    {
+      "path": "artifacts/api-server/src/services/playbooks.ts",
+      "mode": "100644",
+      "blob": "9703b1c5296f207a4c4abbb7dc90b142fa2e3ee4",
+      "bytes": 53680,
+      "sha256": "bda3a7ed5ffe50b1354211264568bd552e83e003c342fb95464b3aca844928fd"
+    },
+    {
+      "path": "artifacts/api-server/src/services/smart-site-intake-phone.test.ts",
+      "mode": "100644",
+      "blob": "8659f9a6663c13b98bf010e9f7a22cf6abdbc432",
+      "bytes": 5087,
+      "sha256": "3cb970e494eec4f3a4813792085ed5fc5c74c6c7db3966ca04f8bcb0bae4e8d5"
+    },
+    {
+      "path": "artifacts/api-server/src/services/smart-sites.ts",
+      "mode": "100644",
+      "blob": "178a5666209263a72fbfcbc24e78f22bfdec363d",
+      "bytes": 44807,
+      "sha256": "8d4ffc354bff30ac43f44ccf7000ea953db2946b778f4b72f180cf9712001b12"
+    }
+  ],
+  "resolution": {
+    "path": "artifacts/api-server/src/services/smart-sites.ts",
+    "mode": "100644",
+    "blob": "178a5666209263a72fbfcbc24e78f22bfdec363d",
+    "bytes": 44807,
+    "sha256": "8d4ffc354bff30ac43f44ccf7000ea953db2946b778f4b72f180cf9712001b12",
+    "origin": "mergeGap11",
+    "review": "C:/Forge/artifacts/growthos-launch-codex-20261016/reviews/gap-composition-0e9245d-review.md",
+    "preserves": [
+      "measurementDropped",
+      "phoneNeedsReview"
+    ]
+  },
+  "auxiliary": [
+    {
+      "key": "tooling",
+      "source": "tooling",
+      "paths": [
+        "docs/v2-migration",
+        "scripts/v2-migration"
+      ],
+      "scope": {
+        "count": 7,
+        "sha256": "8cfedc44483490f725cbf7399470807fe9855f4fbef78a4c56c62dcfdca633f2"
+      },
+      "blobs": [
+        {
+          "path": "docs/v2-migration/CUTOVER-PLAN-FOR-ADAM.md",
+          "mode": "100644",
+          "blob": "51a283b0e89afcc16970f10d89ef7b193b7baf98",
+          "bytes": 4393,
+          "sha256": "81c37747cc441b5ff998163321994c5e1d043f443369682f34d710e5f6a754cb"
+        },
+        {
+          "path": "docs/v2-migration/RUNBOOK.md",
+          "mode": "100644",
+          "blob": "d0b76f86513cb623ca6e9aedbafa5a9037a778d7",
+          "bytes": 24540,
+          "sha256": "b72ef934f65a7b4d97bd9158b103a8efa295fbba67c7dcae026cf2fb3d6ed22a"
+        },
+        {
+          "path": "scripts/v2-migration/app-privileges.mjs",
+          "mode": "100644",
+          "blob": "ee8f72bde6b83a006623807a64d06eacac58c2db",
+          "bytes": 3782,
+          "sha256": "3b349a87d8708d2ec679ab8d8a81f2ba23665f5a4a48261d5492b93e4cf3cd3b"
+        },
+        {
+          "path": "scripts/v2-migration/compare.mjs",
+          "mode": "100644",
+          "blob": "912a64049dcd1f66d73411be40bd2e9acb9baa44",
+          "bytes": 4110,
+          "sha256": "8a1786c4024a098e9d2308d6bf6d16eec67168ac8de669afcf4ed53c801dd2e8"
+        },
+        {
+          "path": "scripts/v2-migration/copy-to-v2.mjs",
+          "mode": "100644",
+          "blob": "13b9554843dab47c2f9b575d93283ce103138819",
+          "bytes": 10413,
+          "sha256": "1f6d12d480f0bf38ee3c1135f7e760467cf3e76df76629bcecd499aaefe2df9b"
+        },
+        {
+          "path": "scripts/v2-migration/lib.mjs",
+          "mode": "100644",
+          "blob": "945dc72ae85896f02cb74c3eb0cd330af48d345f",
+          "bytes": 20515,
+          "sha256": "83e0d178a0ce9c69491ad952208e730f394a0640ff1cca36499dc6263adc326f"
+        },
+        {
+          "path": "scripts/v2-migration/v2-migration.test.mjs",
+          "mode": "100644",
+          "blob": "08d6229dfc283a0d1ca5e90c02e5261d8822be46",
+          "bytes": 29345,
+          "sha256": "636243180a82704af1f4322ad2a1bb250a28d80a42b2973fe2e259c26344ee9a"
+        }
+      ]
+    },
+    {
+      "key": "gap10",
+      "source": "gap10",
+      "paths": [
+        "artifacts/command-center/src/components/revenue-workspace.test.tsx",
+        "artifacts/command-center/src/components/revenue-workspace.tsx",
+        "artifacts/command-center/src/pages/invoices.tsx",
+        "artifacts/command-center/src/pages/returning-customer-work.test.tsx"
+      ],
+      "scope": {
+        "count": 4,
+        "sha256": "98153ed80e35bb192912559884648bfbf87fa488141171067441ec719d0e99e8"
+      },
+      "blobs": [
+        {
+          "path": "artifacts/command-center/src/components/revenue-workspace.test.tsx",
+          "mode": "100644",
+          "blob": "83b74025feabd79ef30b639122dfcbc3c1a3afd8",
+          "bytes": 24583,
+          "sha256": "3658ddaeffab9a879d2f07c60aafb65c234355821bdf06f31607195eda26c2d8"
+        },
+        {
+          "path": "artifacts/command-center/src/components/revenue-workspace.tsx",
+          "mode": "100644",
+          "blob": "a74e2984e86bd20381f548fa28e6252be8465c81",
+          "bytes": 62516,
+          "sha256": "cc066080595c221ccfbac058cf2947c8b36112b0673eb3cce8fc617bafd67f79"
+        },
+        {
+          "path": "artifacts/command-center/src/pages/invoices.tsx",
+          "mode": "100644",
+          "blob": "a1bf3d800c1910a279037e332f27d2a09cc408c5",
+          "bytes": 44675,
+          "sha256": "72adc9e5d0bee2f7c87c0f1cb72caad2250935182dab90f344b3a19959d133a0"
+        },
+        {
+          "path": "artifacts/command-center/src/pages/returning-customer-work.test.tsx",
+          "mode": "100644",
+          "blob": "7a37ed19c00809e1512e2ed03dc74c343364a96c",
+          "bytes": 46400,
+          "sha256": "6628f3b4a981a12c595b70012895c588ad4e2f46f1a2f67215a0d8f914cec340"
+        }
+      ]
+    }
+  ]
+}

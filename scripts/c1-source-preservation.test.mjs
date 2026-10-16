@@ -47,7 +47,8 @@ describe('exact C1 source preservation overlay', () => {
     expect(result.smartSiteAmendment.reviewedB.sourceCommit).toBe('308952e2abd0c97d4edc4274538af12a7134677a');
     expect(result.smartSiteAmendment.integration.sourceCommit).toBe('08c97d7b76ce8e4668c04dc1fcbde9089a709bbe');
     expect(result.smartSiteAmendment.auxiliaryScope.count).toBe(3);
-    expect(result.currentScope).toEqual({count:2120,sha256:'99a7972dbcb95bf3bc32190bcb0deac1a18c6b59907f8e0184d8e0983fd5b254'});
+    expect(result.smartSiteAmendment.integration.scope).toEqual({count:2120,sha256:'99a7972dbcb95bf3bc32190bcb0deac1a18c6b59907f8e0184d8e0983fd5b254'});
+    expect(result.currentScope).toEqual({count:2123,sha256:'f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472'});
     expect(result.testOnlyAmendment.changedPaths).toHaveLength(7);
     expect(result.testOnlyAmendment.changedPaths.every(path=>/^artifacts\/api-server\/src\/.*(?:\.test\.ts|test-helpers\/[^/]+\.ts)$/.test(path))).toBe(true);
     expect(result.releaseEligible).toBe(false);
@@ -205,5 +206,108 @@ describe('exact C1 source preservation overlay', () => {
       expect(snapshot.untracked).not.toContain(relative);
       expect(verifyC1SourceSnapshot(snapshot).releaseEligible).toBe(false);
     });
+  });
+});
+
+describe('separate exact reviewed launch-gap successor', () => {
+  it('accepts the complete reviewed successor while retaining historical D bytes and all source lineages', () => {
+    const result=verifyC1SourceSnapshot(original);
+    expect(result.launchGapAmendment.integration.sourceCommit).toBe('4e2d5252b934d652c659eb2e03c3fa7d4e22cc12');
+    expect(result.launchGapAmendment.integration.sourceTree).toBe('cb4c8861f28331288fc307fd4000b155a9dc8635');
+    expect(result.launchGapAmendment.changedPaths).toHaveLength(8);
+    expect(result.launchGapAmendment.auxiliaryScopes.map(row=>row.count)).toEqual([7,4]);
+    expect(result.launchGapAmendment.releaseEligible).toBe(false);
+    const historical=original.smartSiteCurrent.find(row=>row.path.endsWith('/smart-sites.ts'));
+    const current=original.launchGapCurrent.find(row=>row.path.endsWith('/smart-sites.ts'));
+    expect(historical.blob).toBe('9b13dc788fdd5fd0733e9c951b5ac97353ca4517');
+    expect(current.blob).toBe('178a5666209263a72fbfcbc24e78f22bfdec363d');
+    expect(result.releaseEligible).toBe(false);
+  });
+  it.each(['launchGapAmendment','launchGapCurrent','launchGapReviewed'])('refuses same-size altered %s successor bytes', key => {
+    const snapshot=copy();expect(snapshot[key]).toBeDefined();
+    const bytes=key==='launchGapAmendment'?snapshot[key]:snapshot[key][0].bytes;
+    bytes[0]^=1;
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/changed/);
+  });
+  it.each(['commit','tree','parents','isAncestor','product'])('refuses changed %s for every reviewed component and merge', field => {
+    expect(original.launchGapSources).toBeDefined();
+    for(let index=0;index<original.launchGapSources.length;index++){
+      const snapshot=copy(),source=snapshot.launchGapSources[index];
+      if(field==='commit'||field==='tree')source[field]='0'.repeat(40);
+      if(field==='parents')source.parents=[...source.parents].reverse().concat('0'.repeat(40));
+      if(field==='isAncestor')source.isAncestor=false;
+      if(field==='product')source.product[0].blob='0'.repeat(40);
+      expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/launch-gap/);
+    }
+  });
+  it.each(['missing','duplicate','extra'])('refuses %s reviewed source identity coverage', mutation => {
+    const snapshot=copy();expect(snapshot.launchGapSources).toBeDefined();
+    if(mutation==='missing')snapshot.launchGapSources.pop();
+    if(mutation==='duplicate')snapshot.launchGapSources.push(snapshot.launchGapSources[0]);
+    if(mutation==='extra')snapshot.launchGapSources.push({...snapshot.launchGapSources[0],key:'unreviewed'});
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/launch-gap/);
+  });
+  it.each(['launchGapCurrent','launchGapReviewed'])('refuses missing, extra, mode and blob drift in %s pins', key => {
+    expect(original[key]).toBeDefined();
+    for(const mutation of ['missing','extra','mode','blob']){
+      const snapshot=copy(),rows=snapshot[key];
+      if(mutation==='missing')rows.pop();
+      if(mutation==='extra')rows.push(rows[0]);
+      if(mutation==='mode')rows[0].mode='100755';
+      if(mutation==='blob')rows[0].blob='0'.repeat(40);
+      expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/coverage|changed/);
+    }
+  });
+  it.each(['reviewedProduct','currentProduct','currentBytes'])('refuses auxiliary %s source drift in both A and GAP10', field => {
+    expect(original.launchGapAuxiliary).toBeDefined();
+    for(let group=0;group<2;group++)for(const mutation of ['missing','extra','duplicate','mode','blob','same_size_bytes']){
+      if(field!=='currentBytes'&&mutation==='same_size_bytes')continue;
+      const snapshot=copy(),rows=snapshot.launchGapAuxiliary[group][field];
+      if(mutation==='missing')rows.pop();
+      if(mutation==='extra')rows.push({...rows[0],path:'scripts/v2-migration/unreviewed.mjs'});
+      if(mutation==='duplicate')rows.push(rows[0]);
+      if(mutation==='mode')rows[0].mode='100755';
+      if(mutation==='blob')rows[0].blob='0'.repeat(40);
+      if(mutation==='same_size_bytes')rows[0].bytes[0]^=1;
+      expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/auxiliary|coverage|changed/);
+    }
+  });
+  it('refuses a predecessor current map even when the historical D source remains exact', () => {
+    const snapshot=copy();snapshot.currentProduct=structuredClone(snapshot.integrationProduct);
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/launch-gap/);
+  });
+  it('refuses an ignored executable beneath the new A auxiliary source boundary', () => {
+    const directory=fileURLToPath(new URL('./v2-migration/tmp/',import.meta.url));
+    const relative=`scripts/v2-migration/tmp/c1-unreviewed-${process.pid}.mjs`;
+    const path=fileURLToPath(new URL(`../${relative}`,import.meta.url));
+    const created=!existsSync(directory);mkdirSync(directory,{recursive:true});
+    writeFileSync(path,'// synthetic ignored source\n',{flag:'wx'});
+    try {
+      const snapshot=loadC1SourceSnapshot();
+      expect(snapshot.launchGapAuxiliaryUntracked).toContain(relative);
+      expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/launch-gap untracked auxiliary executable/);
+    } finally { unlinkSync(path);if(created)rmdirSync(directory); }
+  });
+  it('the launch-gap amendment refuses stale, missing, duplicate, extra and deleted production changes', () => {
+    expect(original.launchGapAmendment).toBeDefined();
+    const descriptor=JSON.parse(Buffer.from(original.launchGapAmendment).toString());
+    const base=new Map(original.integrationProduct.map(row=>[row.path,row]));
+    const apply=changes=>sourceProof.applyC1LaunchGapAmendment(base,changes);
+    expect([...apply(descriptor.changes).values()]).toHaveLength(2123);
+    const stale=structuredClone(descriptor.changes);stale[0].before.blob='0'.repeat(40);
+    expect(()=>apply(stale)).toThrow(/base path changed/);
+    expect(()=>apply(descriptor.changes.slice(1))).toThrow(/coverage/);
+    expect(()=>apply([...descriptor.changes,descriptor.changes[0]])).toThrow(/duplicate/);
+    expect(()=>apply([...descriptor.changes,{...descriptor.changes[0],path:'lib/unreviewed.ts'}])).toThrow(/coverage/);
+    const deleted=structuredClone(descriptor.changes);deleted[0].after=null;
+    expect(()=>apply(deleted)).toThrow(/cannot delete/);
+  });
+  it('pins the exact reviewed conflict result and refuses either missing audit field', () => {
+    expect(original.launchGapCurrent).toBeDefined();
+    for(const field of ['measurementDropped','phoneNeedsReview']){
+      const snapshot=copy(),row=snapshot.launchGapCurrent.find(row=>row.path.endsWith('/smart-sites.ts'));
+      row.bytes=Buffer.from(Buffer.from(row.bytes).toString().replace(field,'_'.repeat(field.length)));
+      expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/changed/);
+    }
   });
 });
