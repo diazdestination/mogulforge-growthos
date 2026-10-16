@@ -63,6 +63,17 @@ Minor). This branch fixes it in test code only (see below).
    `createVapidTestKeyPair()` retries until the private scalar is 32 bytes. Five
    suites use it, and a new unit test runs 4,096 draws. `staff-push-policy.ts`
    (production validation) is unchanged and stays fail-closed.
+3. **C1 test-only amendment** (`adbf04a`, `2fbbeff`). The exact C1 preservation proof
+   scopes `artifacts/api-server` and `lib`, test files included, so the VAPID
+   change has to be pinned. It is pinned in a new
+   `reports/c1-test-fixture-amendment-2026-10-16.json`, whose SHA-256 is pinned in
+   `scripts/c1-source-preservation.mjs`. The amendment covers 7 paths, scope 2,119,
+   and the amendment commit `2f79a31`.
+   - The C1 descriptor and all its pins are unchanged.
+   - The proof still checks the historical overlay commit `54cffe4` exactly.
+   - It now also requires the amendment commit's lineage, tree and scope.
+   - It allows only `*.test.ts(x)` and `src/test-helpers/*.ts` paths in the amendment.
+   - The current index must equal the overlay plus the amendment.
 
 Net effect against `main` once hygiene is on top: 879 files changed, adding 433,792
 lines and deleting 36,096 (it was 2,280,846 added without hygiene). Of the 67
@@ -71,26 +82,36 @@ archived files, 23 (≈2.07 MB) were already on `main`. The merge removes them f
 
 ## Recommended merge method
 
-**Squash-merge the hygiene head (stack + hygiene) into `main` as one commit.** Then
-`main`'s new history never contains the 44 evidence files the stack introduced
-(≈57 MB), so clones and blame stay small. The stack branches keep the full
-per-commit history and the archive keeps the bytes.
+**Use a non-squash merge commit of the hygiene head (stack #60→#63 plus this branch)
+into `main`.** Do not squash or rebase.
 
-Alternative: a merge commit of the hygiene head. The tree ends up identical, but
-`main`'s history then carries the ≈57 MB of stack-introduced evidence for good.
-Use it only if per-commit history on `main` matters more than repository size.
-Either way, do **not** merge #60–#63 without the hygiene commits on top.
-Rewriting history to purge blobs already on `main` is a separate owner decision.
+The repo's proofs need the reviewed SHAs to stay reachable from the merged head:
+- `scripts/c1-source-preservation.mjs` requires the C1 overlay commit `54cffe4` and
+  the amendment commit `2f79a31` to be ancestors of HEAD.
+- Receipts and CI evidence cite exact stack SHAs.
+
+`54cffe4` is not an ancestor of `main` (`7091af8`). A single-parent squash would
+drop it from the lineage and fail the proof even with the right tree.
+
+Consequence: the moved evidence files leave `main`'s **tree** but stay in `main`'s
+**git history**. That covers the ≈57 MB the stack introduced and the ≈2.07 MB
+already on `main`. Clones still download those blobs. Removing them from history
+would need a rewrite, which is a separate owner decision and is not proposed here.
+
+Do **not** merge #60–#63 without the hygiene commits on top.
 
 ## Checklist for Codex
 
 - [ ] CI is green on the exact final head (stack + hygiene), including types, both builds, Docker parity and cleanup; record the run ID and pass count
 - [ ] The tested tree equals the reviewed head tree
 - [ ] Schema is still 142 tables; no new tables or migrations (scope freeze)
-- [ ] The 19 original SQL pins (0000–0018, `scripts/production75-pins.mjs`) and the 0019 scheduling SQL (20 total) are byte-unchanged; the hygiene diff touches nothing under `lib/db`, `reports/staging-schema-preview-*/*.sql`, `scripts/` or `.github/`
-- [ ] C1 descriptor `reports/c1-source-preservation-2026-10-16.json` and `reports/combined-release-preservation-2026-10-15.json` are unchanged (and the C1 test passes)
+- [ ] The 19 original SQL pins (0000–0018, `scripts/production75-pins.mjs`) and the 0019 scheduling SQL (20 total) are byte-unchanged; the hygiene diff touches nothing under `lib/db`, `reports/staging-schema-preview-*/*.sql` or `.github/`
+  - In `scripts/` it changes only the C1 proof (`c1-source-preservation.mjs` and its test) and `production75-combined-source.test.mjs`
+- [ ] C1 descriptor `reports/c1-source-preservation-2026-10-16.json` and `reports/combined-release-preservation-2026-10-15.json` are byte-unchanged
+  - The only change to the product scope (`artifacts/api-server`, `lib`) is the 7-path test-only amendment pinned by `reports/c1-test-fixture-amendment-2026-10-16.json`
+  - `verifyC1SourceSnapshot(loadC1SourceSnapshot())` passes at the exact final head, as do the C1, contractor-recovery-drill and combined-source tests
 - [ ] Secret scan is clean on the final head (Gitleaks 8.30.1 on the hygiene commits found no leaks locally; rerun on the merge head)
 - [ ] `reports/EVIDENCE-INDEX.md` and `reports/evidence-index.json` exist; spot-check SHA-256 for a few archived files under `C:\Forge\artifacts\growthos-evidence-archive`
 - [ ] Package A inputs are present in the tree: `schema-catalog.mjs`, 0019 SQL, `catalog-95/142.json`, `fixture75-*.sql`, `catalog75-*.json`
-- [ ] Merge method is a squash (or an explicitly chosen merge commit), and Adam approved the merge to `main`
+- [ ] Merge method is a non-squash merge commit that keeps `54cffe4`, `2f79a31` and every reviewed stack SHA reachable, and Adam approved the merge to `main`
 - [ ] Nothing hosted is implied: no deploy, provider activation, real send, production change or public launch comes with this merge
