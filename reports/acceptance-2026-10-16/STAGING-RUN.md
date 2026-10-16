@@ -1,143 +1,144 @@
-# Staging run: contractor acceptance automation (package C)
+# Package C: reviewed TEST execution contract
 
-Run this only against the staging URL that Codex published in the progress log of
-`C:\Forge\CODEX_REQUEST_GROWTHOS_LAUNCH_DIVISION_2026-10-16.md` or in its handoff.
+The original ef52778 local API slice and pre-repair staging smoke are historical
+evidence. Their artifacts remain unchanged. They do not establish today's schema,
+provider holds, complete company acceptance or permission to run this successor.
+ROOT supplies fresh fixtures, attestation and execution authorization after source
+review. This document grants none of those actions.
 
-As of October 16, 2026 that URL is `https://mogulforge-growthos-staging.fly.dev`:
+`lib.mjs` accepts only exact parsed origins `http://127.0.0.1:4192`,
+`http://127.0.0.1:4193`, or `https://mogulforge-growthos-staging.fly.dev`.
+Production Fly aliases, HTTP staging, custom ports, paths, credentials, query and
+fragment components are refused. `STAGING_HOST_ALLOW` has no effect.
 
-- PR63 `02306ef` image
-- outbound holds on
-- auto-stop at 15:00 PDT
+## Manifest and actual read-only admission
 
-Never point these scripts at production. `lib.mjs` refuses any host that is not
-loopback or listed in `STAGING_HOST_ALLOW`, and it refuses production-looking
-hosts.
+The staging CLI requires `ACCEPTANCE_MANIFEST` and its exact file-byte SHA256 in
+`ACCEPTANCE_MANIFEST_SHA256`. ROOT reviews/pins those bytes. It must contain no
+password, site secret, cookie or saved browser state. Keys are resolved from only
+`TEST_PAINLESS_SITE_KEY` / `TEST_CSS_SITE_KEY` in process memory; staff sign-in
+modules read Credential Manager into memory. Each module's file-byte SHA256 is
+bound in its staff entry and checked before import.
 
-## 0. Gate: schema compatibility (currently FAILING)
+The manifest shape enforced by `guards.mjs` is:
 
-Run the read-only smoke first:
-
-```powershell
-cd C:\Forge\worktrees\growthos-claude-acceptance-20261016
-$env:BASE_URL = 'https://mogulforge-growthos-staging.fly.dev'
-$env:STAGING_HOST_ALLOW = 'mogulforge-growthos-staging.fly.dev'
-node scripts/acceptance/staging-smoke.mjs
+```text
+kind: GROWTHOS_ACCEPTANCE_EXECUTION_V1
+runId: fresh UUID (also the immutable evidence directory identity)
+origin: exact approved origin
+preparedAt / expiresAt: finite current window, at most 15 minutes
+reviewedBy: ROOT
+source: { commit: exact harness HEAD, tree: exact HEAD tree, clean: true }
+companies: exactly painless and css, distinct TEST organizations/sites/staff:
+  { key, name: TEST..., slug: test-..., organizationId, siteId,
+    siteName: TEST...,
+    staff: [{ id, role, last, credentialModule: file:///...,
+              credentialModuleSha256: exact module byte hash }, ...] }
+  Painless: owner + owner; CSS: owner + office; all accepted active staff.
+attestation: ROOT's fresh nonsecret read-only provider/fixture receipt:
+  { kind: ROOT_PROVIDER_READ_ONLY, observedAt, stopAt,
+    origin, app: mogulforge-growthos-staging,
+    configSha256, imageSha256,
+    release: { sha, builtAt, environment: staging },
+    frontendIndexSha256: exact deployed index.html response-byte hash,
+    schema: { database: growthos_staging, cluster: zp2wjrejd2zodn4q,
+              tables: 142, columns: 1870, catalogSha256 },
+    holds: { outbound: true, scheduler: false, communications: false,
+             stagingOutboundApproved: false, recipientAllowlistEmpty: true },
+    fixturesSha256: SHA256(JSON.stringify(companies)) }
+attestationSha256: SHA256(JSON.stringify(attestation))
 ```
 
-The smoke signs in the Codex TEST owner and makes GET requests only. It keeps the
-credential in memory and saves no storageState, trace or video. It writes
-`C:\Forge\artifacts\growthos-launch-claude-20261016\acceptance\staging-smoke-results.json`.
+SHA fields are lowercase hex (40 for source commit/tree/release SHA; 64 for
+SHA256). Freshness is limited by both manifest expiry and ten minutes after the
+attestation. Expiry cannot exceed the actual attested staging stop window.
+Missing, stale, mismatched or secret-bearing input holds before browser launch.
+Manifest facts are safety inputs. Their authority/provenance comes from ROOT's
+reviewed attestation and file-byte pin, not a caller's environment label.
 
-**Proceed only when every READ and PAGE row is PASS.** On October 16 these
-returned 500 because migration 0019 is missing (GAPS.md GAP-01):
+Before any business mutation, both browser staff sessions must pass existing
+read-only `/api/readyz`, `/api/v1/session`, `/api/v1/me`, `/api/v1/smart-sites` and
+`/api/v1/users` reads. The actual release, fetched frontend bytes, exact actor,
+role, non-platform-admin status, TEST organization name/slug/ID, tenant-scoped
+site ID/name, and accepted staff roster must match. No new product API is used.
+The application does not expose all provider holds/schema facts; those remain
+ROOT-attested, never inferred from a browser page. Login is the necessary
+authentication-only exception: it requires the validated manifest and exact
+origin before sign-in; business writes remain blocked until session admission.
 
-- `/api/v1/settings`
-- `/onboarding`
-- `/contractor/today`
-- `/appointments`
-- `/projects`
+Every API and public-intake mutation rechecks the signed-in session, origin,
+expiry and fixture token. Browser request interception applies the same boundary
+to form submits. Delivery/send, dispatch, DELETE and platform mutations are not
+part of the workday slice. Public intake/check calls must use the admitted site.
+Temporary after-hours policy changes restore their original TEST policy in a
+`finally` path; a failure is reported, never silently graded PASS.
 
-Do not work around it. Applying 0019 is a ROOT decision under the scope freeze.
+## Fixture setup and permission truth
 
-## 1. TEST record setup (Codex, platform admin, staging only)
+ROOT coordinates separately authorized setup; this workday runner does not
+provision companies, issue/rotate keys or change memberships. The selected
+cross-organization `/platform/clients/.../key` setup route needs platform admin.
+Owner/admin users with `settings.manage` can create/manage their own tenant's
+sites and rotate their own keys through ordinary tenant routes. An office user
+does not gain that permission. Do not require platform administration merely to
+manage an owner's own site key, or put two client companies in one organization.
 
-Only Codex can do this setup. The staging TEST owner is not a platform admin,
-and site keys need a platform admin. Create **TEST-labeled records only**,
-through the same normal API the local runtime uses (`scripts/acceptance/acceptance-runtime.mjs`,
-`provisionTestCompanies`).
+Use TEST labels and fictional values only. Hours/timezones/checklists are TEST
+placeholders until recorded company decisions. Creating real customer records,
+enabling a sender/provider, making real sends or extending the staging window
+requires its separate authorization. No cleanup deletion is implemented.
 
-1. **Create two TEST companies.**
-   - Call `POST /api/v1/platform/clients` once per company, as a platform admin,
-     with `Origin` equal to the staging origin.
-   - Painless:
-     `{requestId:<uuid>, name:"TEST Painless Roofing", slug:"test-painless-roofing", profile:"roofing-exteriors", timezone:"America/New_York", responseTargetMinutes:30, confirmed:true}`
-   - CSS:
-     `{…, name:"TEST Climate Simulation Solutions", slug:"test-climate-simulation-solutions", profile:"hvac", timezone:"America/New_York" (placeholder until O-15)}`
-2. **Issue each TEST site key** with
-   `POST /api/v1/platform/clients/:orgId/sites/:siteId/key`, body
-   `{confirmed:true, expectedVersion:1}`.
-   - Store each `secret` in Windows Credential Manager, or pass it via an env var
-     (for example `TEST_PAINLESS_SITE_KEY` and `TEST_CSS_SITE_KEY`).
-   - Never put it in a file in Git.
-3. **Provision two accepted TEST staff per company** with the same method used for
-   the existing TEST owner (`provision-test-owner.mjs`):
-   - Painless: Owner A and Owner B, both `owner`.
-   - CSS: Owner-Tech (`owner`) and Office Lead (`office`).
-   - Use `@example.invalid` emails and Credential Manager targets.
-   - Expose a sign-in module per staff member, like `test-owner-auth.mjs`.
-4. **Write the staging manifest** to the private artifact folder, never to Git.
-   Use the same shape as `local-runtime-manifest.json`, with credential modules
-   instead of passwords:
+## Authorized execution and evidence
 
-```json
-{
-  "environment": "STAGING mogulforge-growthos-staging (TEST records only)",
-  "companies": [
-    { "key": "painless", "name": "TEST Painless Roofing", "organizationId": "…", "siteId": "…",
-      "siteKeyEnv": "TEST_PAINLESS_SITE_KEY",
-      "staff": [
-        { "id": "<userId>", "last": "Painless Owner A", "credentialModule": "file:///C:/Forge/artifacts/…/painless-owner-a-auth.mjs", "signInExport": "signInTestOwner" },
-        { "id": "<userId>", "last": "Painless Owner B", "credentialModule": "file:///…/painless-owner-b-auth.mjs" } ] },
-    { "key": "css", "name": "TEST Climate Simulation Solutions", "…": "same shape" }
-  ]
-}
-```
-
-Do not create demo companies or any non-TEST records. Each company's
-`timezone`/hours policy in the run is a TEST placeholder and does not record a
-company decision.
-
-## 2. Run the same automation against staging
-
-Run this only after step 0 is all PASS and step 1 is done:
+After ROOT explicitly authorizes the fresh manifest's execution:
 
 ```powershell
-cd C:\Forge\worktrees\growthos-claude-acceptance-20261016
 $env:BASE_URL = 'https://mogulforge-growthos-staging.fly.dev'
-$env:STAGING_HOST_ALLOW = 'mogulforge-growthos-staging.fly.dev'
-$env:ACCEPTANCE_MANIFEST = 'C:\Forge\artifacts\growthos-launch-claude-20261016\acceptance\staging-manifest.json'
-$env:TEST_PAINLESS_SITE_KEY = '<from Credential Manager, in-memory only>'
-$env:TEST_CSS_SITE_KEY = '<from Credential Manager, in-memory only>'
+$env:ACCEPTANCE_MANIFEST = '<ROOT fresh nonsecret manifest path>'
+$env:ACCEPTANCE_MANIFEST_SHA256 = '<ROOT reviewed exact file-byte SHA256>'
+# ROOT injects site secrets into the two named process variables in memory.
 node scripts/acceptance/run-workday-acceptance.mjs
 ```
 
-The results go to `…\acceptance\workday-staging-results.json` and the screenshots
-to `…\acceptance\screenshots\`. The script does the following:
+The read-only `staging-smoke.mjs` uses the same bound manifest and first staff
+member, then GET/page observations only after authentication. Its sign-in is not
+a business mutation. This source correction itself ran neither command.
 
-- It never calls `/delivery/send`. It stops at the email preview.
-- It changes the TEST staff-alert policy temporarily for the after-hours routing
-  check, then restores it.
-- It creates TEST customers, leads, visits, assets, checklists, invoices,
-  receipts and service records inside the two TEST orgs only.
+Each execution creates a new exclusive
+`C:/Forge/artifacts/growthos-launch-codex-20261016/acceptance-guardfix/run-<runId>/`.
+Existing run IDs/results/screenshots are never overwritten. JSON headers bind
+harness commit/tree, actual reviewed deployment release, frontend byte hash,
+schema attestation and fixture identities. Arbitrary response/credential extras
+are excluded. No storageState, browser recording, HAR or video is saved.
 
-Staging data is disposable. Do not try to delete it from the scripts.
+The corrected link includes organizationId and appointmentId. Completion API
+responses are recorded as API observations. A refreshed image has a separate
+UI subclaim: invalid-link state is a harness FAIL; otherwise completed-UI proof
+is honestly NOT_RUN until a real settled UI assertion is added and executed.
+Screenshots alone never turn it into PASS. The historical 17 API-slice case
+passes are not mechanically reduced or converted to product completion FAILs.
 
-## 3. Expected staging differences from local
+## Disposable local run
 
-| Item | Local | Staging |
-| --- | --- | --- |
-| Alert coverage outcomes | `no_eligible_device` (no devices) | `no_eligible_device`, because web push is disabled. A queued push needs O-11 and real iPhones (device-only). |
-| Email previews (G06-01, N-03, standing reminders) | BLOCKED: no sender | BLOCKED until an approved Gmail/Microsoft TEST sender is connected (O-04/O-05) **and** an approved recipient is on `STAGING_EMAIL_RECIPIENT_ALLOWLIST`. Even then, the script only previews. A real send needs Adam's per-send approval. |
-| Manual SMS drafts (P-D/H-K) | FAIL (GAP-02) | Expected to FAIL the same way until GAP-02 is decided |
+After committing/reviewing the harness source and setting up local dependencies,
+`node scripts/acceptance/acceptance-runtime.mjs --run` creates a new isolated local
+runtime and runs the harness in the same process. The runtime builds both API
+and frontend from its clean source into its owned temporary cache, captures the
+actual schema/release/index identities, creates a local fixture manifest with
+`LOCAL_RUNTIME_READ_ONLY` / runtimeId, and keeps credentials/site keys in memory.
+Only the nonsecret public manifest is written. There is no password/key-bearing
+manifest for a second process. Without `--run`, it starts the owned local runtime
+but does not execute the workday chain. Existing listeners are preserved.
 
-## 4. Still not automatable (device or people only)
+Static ownership/cleanup code and pure guard tests do not prove teardown after
+forced termination, process crashes or setup faults. That limit remains open.
 
-These need real devices, providers or people:
+## Separate acceptance boundaries
 
-- iPhone install, lock-screen, Focus, offline and tap-through cases (P-01…P-10)
-- CALLIE and voice cases (V-01…V-12)
-- Twilio SMS S-01…S-08, plus handset send for S-09
-- mailbox receipt, reply and revocation (E-01…E-10)
-- real HCP export reconciliation (P-A/H-A with O-12/O-13)
-- unassisted workdays (P-L/H-L)
-- growth/nurture (P-K)
-
-Record them with `RESULT-TEMPLATE.md` against the exact deployed release.
-
-## 5. After the run
-
-1. Append one dated line to the request file's progress log with the PASS, FAIL,
-   BLOCKED and NOT-RUN counts.
-2. Update the Staging column in `CASES.md`.
-3. Stop staging when the window ends, if Codex requires it. Codex owns the stop
-   step (`stop-staging.mjs`).
+Keep all nine STATE rulings: current schema/backup belongs to operator evidence;
+provider/inbox/phone/device paths need real authorized proof; synthetic customer
+CSV is not full history/balance migration; real company inputs remain required;
+engineering P2 is not a company waiver; card/bank collection is owner-deferred
+while signed scope/invoices/delivery/balances/external receipts stay separate;
+unautomated UI/concurrency/date boundaries remain open; crash cleanup is unproven;
+C2/cutover/CI/merge/billing/launch have their own authority and evidence.
