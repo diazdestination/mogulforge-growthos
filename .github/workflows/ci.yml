@@ -81,8 +81,13 @@ jobs:
           }, null, 2));
           NODE
 
-      - name: Run all test suites
-        run: pnpm -r --if-present run test
+      # Keep the two-CPU runner's database cleanup hooks isolated from other
+      # workspace suites. One worker preserves the previously effective limit.
+      - name: Run non-API test suites sequentially
+        run: pnpm -r --workspace-concurrency=1 --filter '!@workspace/api-server' --if-present run test --maxWorkers=1
+
+      - name: Run API test suite in isolation
+        run: pnpm --filter @workspace/api-server run test --maxWorkers=1
 
       - name: Verify reusable website delivery adapter
         run: node --test examples/website-connection/adapter.test.mjs examples/website-connection/operations.test.mjs
