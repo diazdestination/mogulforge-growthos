@@ -1,4 +1,5 @@
-import { createECDH, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { createVapidTestKeyPair } from "../test-helpers/vapid-test-keys";
 import { type Server } from "node:http";
 import { type AddressInfo } from "node:net";
 import { db, contactsTable, leadsTable, organizationsTable, usersTable, sessionsTable, staffPushDeliveriesTable as deliveries,
@@ -22,7 +23,7 @@ import { createSession, deleteSession } from "../lib/auth";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import app from "../app";
 
-const key = createECDH("prime256v1"); key.generateKeys();
+const key = createVapidTestKeyPair().ecdh;
 const device = () => ({ endpoint: `https://web.push.apple.com/${randomUUID().replaceAll("-", "")}`,
   keys: { p256dh: key.getPublicKey().toString("base64url"), auth: Buffer.alloc(16, 1).toString("base64url") } });
 let server: Server, base: string;

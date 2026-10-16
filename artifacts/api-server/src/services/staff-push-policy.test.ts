@@ -1,11 +1,11 @@
-import { createECDH } from "node:crypto";
+import { createVapidTestKeyPair } from "../test-helpers/vapid-test-keys";
 import { describe, expect, it } from "vitest";
 import { isPushEndpointAllowed, pushConfiguration, pushSubscriptionSchema, staffLeadPayload, staffPushAllowed,
   staffPushPolicySchema, staffPushRecipients } from "./staff-push-policy";
 
 const policy = { enabled: true, timezone: "America/New_York", days: [1, 2, 3, 4, 5, 6], opensAt: "09:00", closesAt: "18:00",
   businessHoursUserIds: ["owner-a", "owner-b"], afterHoursUserIds: ["owner-a"] };
-const key = createECDH("prime256v1"); key.generateKeys();
+const key = createVapidTestKeyPair().ecdh;
 const configured: NodeJS.ProcessEnv = { WEB_PUSH_ENABLED: "true", GROWTHOS_OUTBOUND_HOLD: "false",
   WEB_PUSH_VAPID_PUBLIC_KEY: key.getPublicKey().toString("base64url"), WEB_PUSH_VAPID_PRIVATE_KEY: key.getPrivateKey().toString("base64url"),
   WEB_PUSH_VAPID_SUBJECT: "mailto:operator@example.invalid", OAUTH_TOKEN_ENCRYPTION_KEY: "a".repeat(64) };
@@ -33,7 +33,7 @@ describe("staff notification hours and opt-in configuration", () => {
       { GROWTHOS_OUTBOUND_HOLD: "no" }, { WEB_PUSH_VAPID_PRIVATE_KEY: "not-a-key" }, { OAUTH_TOKEN_ENCRYPTION_KEY: "" }]) {
       expect(staffPushAllowed("owner-a", { ...configured, ...change })).toBe(false);
     }
-    const other = createECDH("prime256v1"); other.generateKeys();
+    const other = createVapidTestKeyPair().ecdh;
     expect(pushConfiguration({ ...configured, WEB_PUSH_VAPID_PRIVATE_KEY: other.getPrivateKey().toString("base64url") })).toBe(null);
   });
   it.each(["FLY_APP_NAME", "APP_ORIGIN", "GROWTHOS_ENVIRONMENT"])("staging is exact-user allowlisted through %s", (flag) => {
