@@ -194,3 +194,24 @@ set up per device once you're live.
 
 **What does it cost?** Point them to the pricing you've already agreed to share;
 nothing in this demo is billed.
+
+---
+
+## Operator notes (for whoever loads the practice data)
+
+- The practice data is pinned to **Saturday, October 17, 2026** (company time
+  zone America/New_York). Re-running the loader never moves an existing visit
+  to another day; if anything differs from the reviewed data it stops with
+  **HOLD** and changes nothing.
+- Local rehearsal: start `node scripts/demo/demo-runtime.mjs`, then pass the
+  manifest path it prints to
+  `node scripts/demo/seed-soft-onboarding.mjs --base-url http://127.0.0.1:<port> --local-manifest <path> [--apply] [--verify]`.
+- Staging needs a reviewed `--execution-manifest` with the exact company,
+  owner and staff IDs, the deployed release SHA and a hold check from the last
+  6 hours. Without it the loader refuses. It never creates companies or users.
+- A run only counts as done when it ends **APPLIED** with read-back PASS and,
+  with `--verify`, every expected name visible on every page. Any other ending
+  (BLOCKED, HOLD, INCOMPLETE, UNKNOWN) exits nonzero: stop and ask before the
+  call rather than demoing partial data.
+- Each run writes its own folder under `soft-onboarding/runs/` (receipt,
+  screenshots, hash list). Older receipts are kept as they were.

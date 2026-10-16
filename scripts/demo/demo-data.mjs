@@ -6,6 +6,11 @@
 //
 // Times are wall-clock times in the company time zone on a day offset from the
 // demo date (day 0 = demo day). The seeder converts them to instants.
+//
+// The reviewed demo date is frozen. Staging runs must use exactly this date
+// (and each company's reviewed time zone below); only the disposable local
+// runtime may rehearse on another date. Existing visits are never relabeled.
+export const DEMO_DATE = "2026-10-17";
 
 const css = {
   key: "css",

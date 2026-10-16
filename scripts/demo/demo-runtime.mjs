@@ -12,9 +12,12 @@
 // normal platform-admin API (POST /api/v1/platform/clients), issues each TEST
 // smart-site key through the normal API, and inserts one owner and one staff
 // login per company directly as a LOCAL stand-in for invitation acceptance
-// (invitation email is held). It then writes a local manifest (IDs plus
-// disposable local logins and site keys) to the OS temp folder, never to Git
-// or to the shared artifacts folder. Everything is destroyed when it exits.
+// (invitation email is held). It then writes an instance-owned local manifest
+// (IDs plus disposable local logins and site keys) into a fresh private temp
+// directory bound to this runtime's port, never to Git or to the shared
+// artifacts folder. The file is created exclusively (never overwritten) and
+// only this instance's own file is removed when it exits. DEMO_LOCAL_MANIFEST
+// may name an exact path, which must not already exist.
 //
 // The product's synthetic preview server only permits loopback ports 4192 and
 // 4193. This runner takes the first free one (or DEMO_PORT) and refuses to
@@ -22,12 +25,12 @@
 import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
 import { randomBytes, randomUUID, scryptSync } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import net from "node:net";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DEMO_COMPANIES } from "./demo-data.mjs";
+import { createOwnedManifest, removeOwnedManifest } from "./runtime-manifest.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const api = path.join(root, "artifacts/api-server");
@@ -39,8 +42,6 @@ const { PGLiteSocketServer } = await load("@electric-sql/pglite-socket");
 const pg = (await load("pg")).default;
 const { buildAll } = await import(pathToFileURL(path.join(api, "build.mjs")).href);
 
-export const LOCAL_MANIFEST =
-  process.env.DEMO_LOCAL_MANIFEST ?? path.join(os.tmpdir(), "growthos-soft-onboarding-local-manifest.json");
 // Disposable, local-only credentials. They exist only inside this process's
 // in-memory database and are never valid anywhere else.
 const PLATFORM_LOGIN = { email: "demo-platform-local@example.com", password: `Local-${randomBytes(9).toString("hex")}!` };
@@ -134,6 +135,8 @@ async function provisionDemoCompanies(connectionString) {
       companies.push({
         key: company.key,
         name: company.name,
+        slug: company.slug,
+        timezone: company.timezone,
         organizationId,
         siteId,
         siteKey: key.json?.apiKey ?? key.json?.key ?? key.json?.secret ?? null,
@@ -150,6 +153,8 @@ async function provisionDemoCompanies(connectionString) {
 const storage = await PGlite.create();
 const socket = new PGLiteSocketServer({ db: storage, host: "127.0.0.1", port: 0, maxConnections: 20 });
 let child;
+let manifest = null;
+const HOLDS = { COMMUNICATIONS_ENABLED: "false", GROWTHOS_OUTBOUND_HOLD: "true", SCHEDULER_AUTOSTART: "false" };
 const cacheRoot = path.join(api, "node_modules/.cache");
 await mkdir(cacheRoot, { recursive: true });
 const buildDir = await mkdtemp(path.join(cacheRoot, "demo-runtime-"));
@@ -169,9 +174,7 @@ try {
     OBJECT_STORAGE_PROVIDER: "postgres",
     AUTO_MIGRATE: "false",
     LOG_LEVEL: "warn",
-    COMMUNICATIONS_ENABLED: "false",
-    GROWTHOS_OUTBOUND_HOLD: "true",
-    SCHEDULER_AUTOSTART: "false",
+    ...HOLDS,
     RUNTIME_SYNTHETIC_PREVIEW: "loopback-only",
     EMAIL_INTELLIGENCE_ENCRYPTION_KEY: randomBytes(32).toString("hex"),
   });
@@ -204,20 +207,28 @@ try {
   }
   if (!healthy) throw new Error("Demo runtime did not become healthy");
   const companies = await provisionDemoCompanies(env.DATABASE_URL);
-  await writeFile(LOCAL_MANIFEST, JSON.stringify({
-    environment: "LOCAL disposable runtime (in-memory PGlite, loopback only, outbound hold on, communications disabled)",
-    createdAt: new Date().toISOString(),
+  manifest = await createOwnedManifest({
+    port: PORT,
     origin: ORIGIN,
-    companies,
-    note: "Local disposable logins and site keys only; destroyed when the runtime exits. Do not copy into artifacts or Git.",
-  }, null, 2) + "\n");
-  console.log(`[demo-runtime] READY ${ORIGIN} manifest=${LOCAL_MANIFEST}`);
+    file: process.env.DEMO_LOCAL_MANIFEST,
+    payload: {
+      kind: "growthos-soft-onboarding-local-manifest",
+      environment: "LOCAL disposable runtime (in-memory PGlite, loopback only, outbound hold on, communications disabled)",
+      createdAt: new Date().toISOString(),
+      // Set by this process itself; these are the holds the API child runs with.
+      holds: HOLDS,
+      companies,
+      note: "Local disposable logins and site keys only; destroyed when the runtime exits. Do not copy into artifacts or Git.",
+    },
+  });
+  console.log(`[demo-runtime] READY ${ORIGIN} manifest=${manifest.file}`);
   for (const c of companies) console.log(`[demo-runtime] ${c.name}: org=${c.organizationId} site=${c.siteId} key=${c.siteKeyIssueStatus}`);
   const status = await exited;
   if (status) process.exitCode = status;
 } finally {
   if (child && child.exitCode === null && child.signalCode === null) child.kill();
-  await rm(LOCAL_MANIFEST, { force: true }).catch(() => {});
+  // Only this instance's own manifest; never another runtime's file.
+  if (manifest) await removeOwnedManifest(manifest).catch(() => {});
   await socket.stop().catch(() => {});
   await storage.close().catch(() => {});
   if (path.dirname(buildDir) !== cacheRoot) throw new Error("Unexpected runtime artifact path");
