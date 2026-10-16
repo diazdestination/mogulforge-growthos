@@ -1,0 +1,625 @@
+{
+  "schemaVersion": 1,
+  "kind": "exact_local_c1_source_overlay_not_a_release_grant",
+  "legacyManifest": {
+    "path": "reports/combined-release-preservation-2026-10-15.json",
+    "sha256": "259eb8658261e6182df9841e81941e53f17f7b538ec7da64fb483362c85e9d85"
+  },
+  "scopePaths": [
+    "artifacts/api-server",
+    "lib"
+  ],
+  "legacy": {
+    "sourceCommit": "f56e6cef452b5b564838a72202c0d37cd2caf384",
+    "sourceTree": "3e55c4fc984f64ac1fe187f109bf4323d0586a5e",
+    "scope": {
+      "count": 2115,
+      "sha256": "a1131335d2d44c1204d36a2c1115350cd704782baecda2a3a94d2b4d9e78184c"
+    }
+  },
+  "overlay": {
+    "sourceCommit": "54cffe4c1552ae306781632202da19bb0fe88f4a",
+    "sourceTree": "e6ced6079e2a2c79352c9fdf44c9c3970ebe262a",
+    "scope": {
+      "count": 2117,
+      "sha256": "4cf023465c1eedfa749c01cb6304ea60ffe1bae4ef9f007139efbfe51d85b237"
+    }
+  },
+  "changes": [
+    {
+      "path": "artifacts/api-server/src/services/callie-ack-transport.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/callie-ack-transport.ts",
+        "mode": "100644",
+        "blob": "7bc222fc2a6a40511a33a94ee00d8d5a3f0a7538"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "72b049333ecfa454f497939e935348023dfa06e1"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/callie-runtime.test.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/callie-runtime.test.ts",
+        "mode": "100644",
+        "blob": "57927727d5776a485675d96b76754eb518dc9cf2"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "820782b048c4506e61cf8adc2a591a329bdd550f"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/service-sms.test.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/service-sms.test.ts",
+        "mode": "100644",
+        "blob": "9888e1744ef20d9f8c701df28ab261b1aaebc406"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "c8c56eb2118263337cbca3f52170b5602387b184"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/sms-carrier-transport.test.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "212721f98427a195f67be5115bebad698c7a6a0f"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/sms-carrier-transport.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "bc27c1d3326da9d64b2498bb37126b4b62bb964f"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/twilio-delivery.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/twilio-delivery.ts",
+        "mode": "100644",
+        "blob": "37d5857227615d5ddd01a37881c50c4ad53c0011"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "854dc446bff5e4442491d3c821aadb647fcb5cba"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/twilio-dispatch-guard.test.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/twilio-dispatch-guard.test.ts",
+        "mode": "100644",
+        "blob": "0314741dfba7c1a505d3c9ae9dc57b0f056e363a"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "594beacd62bd5b0d9751ac688582c23727865c49"
+      }
+    }
+  ],
+  "originalProductBlobs": [
+    {
+      "path": "artifacts/api-server/src/services/callie-ack-transport.ts",
+      "mode": "100644",
+      "blob": "7bc222fc2a6a40511a33a94ee00d8d5a3f0a7538",
+      "bytes": 1096,
+      "sha256": "9def9c620fa4d131686f2724b5ee589b0027fe8cfa054a64e813d5ac4027457b"
+    },
+    {
+      "path": "artifacts/api-server/src/services/callie-runtime.test.ts",
+      "mode": "100644",
+      "blob": "57927727d5776a485675d96b76754eb518dc9cf2",
+      "bytes": 29386,
+      "sha256": "f7bf2823dc7e1c3a129ec6042c037beb86406118802e3a8a2178d9b5914698a4"
+    },
+    {
+      "path": "artifacts/api-server/src/services/service-sms.test.ts",
+      "mode": "100644",
+      "blob": "9888e1744ef20d9f8c701df28ab261b1aaebc406",
+      "bytes": 31111,
+      "sha256": "f2a84739b68d6b4804ef3f26415e2f92e2b3bca1174088c31087af1327a145a6"
+    },
+    {
+      "path": "artifacts/api-server/src/services/twilio-delivery.ts",
+      "mode": "100644",
+      "blob": "37d5857227615d5ddd01a37881c50c4ad53c0011",
+      "bytes": 11659,
+      "sha256": "94b6ef4730050c303685c05260b4c98f8b571bee3ba2bb3f3e7775e38cbd5a4c"
+    },
+    {
+      "path": "artifacts/api-server/src/services/twilio-dispatch-guard.test.ts",
+      "mode": "100644",
+      "blob": "0314741dfba7c1a505d3c9ae9dc57b0f056e363a",
+      "bytes": 5184,
+      "sha256": "2be694b7ab39784b307d673c8dfbf8ef368243273cc07798120f0ebb8e0348bb"
+    }
+  ],
+  "currentProductBlobs": [
+    {
+      "path": "artifacts/api-server/src/services/callie-ack-transport.ts",
+      "mode": "100644",
+      "blob": "72b049333ecfa454f497939e935348023dfa06e1",
+      "bytes": 995,
+      "sha256": "4fae9b86bbb4d33f1fdf4b838317e958a842cc8146acf6d9e65ad32cf242dd90"
+    },
+    {
+      "path": "artifacts/api-server/src/services/callie-runtime.test.ts",
+      "mode": "100644",
+      "blob": "820782b048c4506e61cf8adc2a591a329bdd550f",
+      "bytes": 31577,
+      "sha256": "fb2e0323d509112ddce613b8e37c0fe6b2dd9dc74b058f29676d92e6ff2f7980"
+    },
+    {
+      "path": "artifacts/api-server/src/services/service-sms.test.ts",
+      "mode": "100644",
+      "blob": "c8c56eb2118263337cbca3f52170b5602387b184",
+      "bytes": 33739,
+      "sha256": "5b01b3a128042eaa59bac81fad2681202f0dad3bc7ab0c16201d7fc55c522e63"
+    },
+    {
+      "path": "artifacts/api-server/src/services/sms-carrier-transport.test.ts",
+      "mode": "100644",
+      "blob": "212721f98427a195f67be5115bebad698c7a6a0f",
+      "bytes": 8247,
+      "sha256": "d5dacdd6c83863c23ed41716772bbcce204d2d319b76e1af0ab8265d237859e7"
+    },
+    {
+      "path": "artifacts/api-server/src/services/sms-carrier-transport.ts",
+      "mode": "100644",
+      "blob": "bc27c1d3326da9d64b2498bb37126b4b62bb964f",
+      "bytes": 1793,
+      "sha256": "242e6c47729f65e5d1b7eb94551f448af88590592171bcf560a1de9eb5936522"
+    },
+    {
+      "path": "artifacts/api-server/src/services/twilio-delivery.ts",
+      "mode": "100644",
+      "blob": "854dc446bff5e4442491d3c821aadb647fcb5cba",
+      "bytes": 11555,
+      "sha256": "2ef6f3d37c1745e87c7e6cf41bca3b466a8ffed89707b89a21fee258928fc431"
+    },
+    {
+      "path": "artifacts/api-server/src/services/twilio-dispatch-guard.test.ts",
+      "mode": "100644",
+      "blob": "594beacd62bd5b0d9751ac688582c23727865c49",
+      "bytes": 11053,
+      "sha256": "32ef0cd0d0d899847de0e9fe035b87e88a011c0a330eef67589644dd0903c1f8"
+    }
+  ],
+  "originalProtected": [
+    {
+      "path": "scripts/saved-scheduling-recovery-fixture.mjs",
+      "blob": "1666e4da09da8b771c88e54a1c155049c0fc3d37",
+      "bytes": 34156,
+      "sha256": "d02a6b29dc099d284414717c0e6eae3fa381c6dff84a0f734f5235cff305771d"
+    },
+    {
+      "path": "scripts/contractor-recovery-drill.mjs",
+      "blob": "febe0f6e0691f3aa809f3d470b8d7973aaaac29d",
+      "bytes": 37572,
+      "sha256": "06bfaab57255357ab249ff5c82785c305dc51e8a09eb58b5e5a54a2e9e98ccae"
+    },
+    {
+      "path": "scripts/contractor-recovery-app-probe.mjs",
+      "blob": "1dde18dc04f5639e425222e021a9577cf2c4531d",
+      "bytes": 35572,
+      "sha256": "a51cd3a498720c406b69c2f65b041a6e4639e515d04cb87ae67257c1aebda94e"
+    },
+    {
+      "path": "scripts/release-schema.mjs",
+      "blob": "94dd2afa4dd6cb349e93cc4af40ce0f47a489c25",
+      "bytes": 3610,
+      "sha256": "d2ddfc8c040144632e949117d1dcb851d678d6c1626f56344e448d065c5b79b8"
+    },
+    {
+      "path": "artifacts/api-server/build.mjs",
+      "blob": "1c730d91d09f651e0ac6eeafcff7eff8cac68f44",
+      "bytes": 4327,
+      "sha256": "7a630e8c1e0df733f518f9d6b4ee51966c47f580fe7e129460ad80a950f147fc"
+    },
+    {
+      "path": "artifacts/api-server/build-identity.mjs",
+      "blob": "ab91f01a6cce56bf317863c9d7879ed4fb9e01a8",
+      "bytes": 2131,
+      "sha256": "88b5c1ef603f8d953e83c14a53ed6876b39fd8dc8f18ee8ac17b405ffbadea14"
+    },
+    {
+      "path": "artifacts/api-server/scripts/contractor-recovery-entry.ts",
+      "blob": "33f484ec1bc75202b18b42d883638e50791fe6bd",
+      "bytes": 155,
+      "sha256": "cc98de0cca7c586aa38b09c1bea734056938cd9474152872b8eb6eae421a2b5d"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "blob": "14f8cb317178369bd995cb25258bf9d4529b5c82",
+      "bytes": 306022,
+      "sha256": "1ce9d652f019f2c906a0d0952cd3571761062214629a08253ec99777dd477c06"
+    }
+  ],
+  "amendedDrill": {
+    "path": "scripts/contractor-recovery-drill.mjs",
+    "mode": "100644",
+    "blob": "a545aee81670ff6c587cfa6f8aefbcb589ca82ff",
+    "bytes": 40064,
+    "sha256": "2a66cc6a882240bd1c256cb94bce35b8c6935484361d18df8f335f6aad813ebe"
+  },
+  "sql": [
+    {
+      "path": "reports/staging-schema-preview-2026-09-30/0000_isolated-staging-initial.sql",
+      "mode": "100644",
+      "blob": "5644d92a83072f587326c72dc28d0609cf36ebf0",
+      "bytes": 116856,
+      "sha256": "b27d33a59a8a0f083fefe3271936d197309db5d683bd4254bbd28d7bc7315a10"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-09-30/0001_pilot-email-sender.sql",
+      "mode": "100644",
+      "blob": "907a565a033fa0813579805103595ddf83acf171",
+      "bytes": 318,
+      "sha256": "8d2d49f344e4900e5304d1f7b23ce23b929121f9af04362d50902a692605883f"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0002_mobile-microsoft-pilot.sql",
+      "mode": "100644",
+      "blob": "5b3365348ce948022a084cdb2a4f47d93c544695",
+      "bytes": 5182,
+      "sha256": "eec075e1009718e9307a0e88b905098749b337211abc87f0bfdb49c38c5138d0"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0003_swarm-foundation.sql",
+      "mode": "100644",
+      "blob": "041ce1cb26150ddc023bcd67af3722f543f526ac",
+      "bytes": 1064,
+      "sha256": "dac2d1782d71d89e7f14ae1dc73d06a9e094b25a77a1c3ea6e5abbd5b1ba44fc"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0004_beta-operations.sql",
+      "mode": "100644",
+      "blob": "12ffbc8ca1a9547a8df8c1e6b9c89b12f9ca059a",
+      "bytes": 3713,
+      "sha256": "2f4a87900b0e2f6b7c85f4ac177d2d64c44ac49c40fbd4f429777ec71b2b6e95"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0005_contractor-operations.sql",
+      "mode": "100644",
+      "blob": "a6b79beab1fbf987727725428b5db57eac714b6c",
+      "bytes": 5224,
+      "sha256": "8cd09ae5ce8f6fc19a4a89cd80fa728dc9dc68918f4e87c86a3d2bede3ea10d8"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0006_native-contractor-day.sql",
+      "mode": "100644",
+      "blob": "43b72e0adb1f134823f2c1c5887e2f7067ee7e9e",
+      "bytes": 8008,
+      "sha256": "4406ec9b61bedfdf2fd172272fbb7782f863b023eeb3d0ff28a867f1a6ca9c80"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0007_customer-care.sql",
+      "mode": "100644",
+      "blob": "e4a8639958e02b4016273fe26b21ec31f8fb253f",
+      "bytes": 3748,
+      "sha256": "028297f0c78268dad1c42815513b633f9b1cb742f5a1bf5605dab1006e8dabcb"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0008_operations-wave.sql",
+      "mode": "100644",
+      "blob": "ead39a61e4045cfafa5647a3579d60b8d8bd6887",
+      "bytes": 16278,
+      "sha256": "33dcb364229ab9bf8a05270cae9b17e4052fdbd1ed2db0fb83d050cd1acb36f6"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0009_launch-communications.sql",
+      "mode": "100644",
+      "blob": "128186e40b1981cc29cb1d131d13df3fc87e069d",
+      "bytes": 15004,
+      "sha256": "813d3fca929f462644d7399f5314ff4e358f24ff05817f9f7851f290a8ff89ca"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0010_lead-replies.sql",
+      "mode": "100644",
+      "blob": "51a4d525c07fd1b1fc33a83d22d6ac8b05de51a5",
+      "bytes": 3976,
+      "sha256": "f385f2a11f08f709788395a937ced3a3508af9aa1d570064106182f520085717"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0011_invoice-recovery.sql",
+      "mode": "100644",
+      "blob": "d77c5089c70e095e0330de664f31b029fc973a7c",
+      "bytes": 5882,
+      "sha256": "c9491ff8eef505d8e784e004cf97af7192cefa9701f5fa2eeb3d599e6a0de063"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0012_callie-intake.sql",
+      "mode": "100644",
+      "blob": "0641160fd787155ece8902dc48b0be3a2855c6ca",
+      "bytes": 11938,
+      "sha256": "ef48cf4d68d3da7aeb97acf4c5a97c06152c2f7eae2d4319c4aa2153cb7ce480"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0013_standing-service.sql",
+      "mode": "100644",
+      "blob": "ea54ae2b5d3382ced10c9c945f962cf493137f12",
+      "bytes": 15206,
+      "sha256": "010c13b648a442f34801b9c30f5dde6f824cce0f897d7a98866e8f8a4a1beb39"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0014_source-nurture.sql",
+      "mode": "100644",
+      "blob": "bd680d2a60b7d401a2e2b99afae34fa818f64da4",
+      "bytes": 17176,
+      "sha256": "958aebae4e5509acd28892b0b30a9413bfe8c9ddebed868a2f7a0defaec3b83e"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0015_callie-conversation.sql",
+      "mode": "100644",
+      "blob": "7968b34f5c038fe5f23c231dcc70124d3256184d",
+      "bytes": 12455,
+      "sha256": "8b75fecb5250a5e9920fac2e7bcd9b734a3ba8f20c8a78d21f66f4853639dc33"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0016_contractor-workday.sql",
+      "mode": "100644",
+      "blob": "8ecb20a2afc539e86ccf78dc1b2190deef2cb187",
+      "bytes": 15706,
+      "sha256": "aa15f891c013ce6a5e71107d973f04ee3cc4c46ca6030e54ac4490cf52147b89"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0017_returning-customer-work.sql",
+      "mode": "100644",
+      "blob": "7757de441e89cfb06d67be10c6137590ccb87773",
+      "bytes": 9675,
+      "sha256": "d6d0319830a26ab9387a6ef5952dd5409adb4feeac76a8a2d71d78c7e0e07da8"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0018_lead-alert-coverage.sql",
+      "mode": "100644",
+      "blob": "2eeb0539b6574533b5b3a0c4446b7197afe3d527",
+      "bytes": 2335,
+      "sha256": "b5c6425dc7942460e4d734e14f971e8fc062b1bdfe292d69d22a88e34be587a1"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0019_saved-scheduling-policy.sql",
+      "mode": "100644",
+      "blob": "f242fadd3659439fa6bd9fae72d8f92cb63cda51",
+      "bytes": 8126,
+      "sha256": "76e88d3410235f1b6a8a20e595b126455fd5711b46f87055b586786b28f81ca9"
+    }
+  ],
+  "runtime": [
+    {
+      "path": "scripts/production75-live-manifest.mjs",
+      "mode": "100644",
+      "blob": "74eaa6444f0ea50aefc8e8bc10e3f04ee34e19a7",
+      "bytes": 7585,
+      "sha256": "3601d189317d55d4adca555acc77d28bbebb40f0630d6010f19ccf7627ea0e15"
+    },
+    {
+      "path": "scripts/production75-live-transport.mjs",
+      "mode": "100644",
+      "blob": "60b394f10995e9ed2c3b761d7102a94dbd7309c9",
+      "bytes": 26724,
+      "sha256": "b0345f97383b991547e79e4b9114ff9aba3d15b060287ff874c82a662660ab03"
+    },
+    {
+      "path": "scripts/production75-live-observation.mjs",
+      "mode": "100644",
+      "blob": "e9312f625ef5e167e993bc4fcdc026e258958858",
+      "bytes": 9079,
+      "sha256": "cef44deb2d0a39f0e3dbda2e10945712cd5e070c7d01e34a2ebab09e8b89992a"
+    },
+    {
+      "path": "scripts/production75-live-policy.mjs",
+      "mode": "100644",
+      "blob": "80b5501c23f915aaf0e5ede636e482f7c9fcd854",
+      "bytes": 10766,
+      "sha256": "be555c5feb731ea782e05e66e0f5da55ee167526f5280cd17de2a0b16f2782fa"
+    },
+    {
+      "path": "scripts/production75-live-local.mjs",
+      "mode": "100644",
+      "blob": "4cb961e84b888d601b7a92c3ab307c7754594877",
+      "bytes": 73677,
+      "sha256": "f519cf93b706e150e039d52a48140d96e649bafc1969fcc083a9e5c40473b8ce"
+    },
+    {
+      "path": "scripts/production75-live-admission.mjs",
+      "mode": "100644",
+      "blob": "1e39f9a8c4c93a344e5cb16acd7aca9b9c79bb2d",
+      "bytes": 5382,
+      "sha256": "5b762d9d60018357e3b33b34f0fee5ed84cb9ef440bd7e9963820d780657fde1"
+    },
+    {
+      "path": "scripts/production75-live-runner.mjs",
+      "mode": "100644",
+      "blob": "a0e791c57c89ec1cc2e0d3b4918ce63a78492bbb",
+      "bytes": 56031,
+      "sha256": "fa8fb8f89e1d605659cf99d72f9afa259ff11a38063197726ba20cd7ff0590ed"
+    },
+    {
+      "path": "scripts/production75-safe-diagnostics.mjs",
+      "mode": "100644",
+      "blob": "ea7a635d06cfe17a74bc28db7a52b5112f794704",
+      "bytes": 4359,
+      "sha256": "3e87a3ac30077e3442636930b0f49f1f30d25b5aa1e74194ecb52b1d2de32356"
+    },
+    {
+      "path": "scripts/production75-operator.mjs",
+      "mode": "100644",
+      "blob": "565a854f595325d86e1fc9d212bf8d841bf7b61b",
+      "bytes": 35448,
+      "sha256": "4e433788279ead5ef98c0e2572f2d74728773e9b3b5d388786d6a1ee1db5e27d"
+    },
+    {
+      "path": "scripts/production75-custody.mjs",
+      "mode": "100644",
+      "blob": "ecd20fdd3bb58f8b4cf96f69d6811daa856b378a",
+      "bytes": 42668,
+      "sha256": "90a9fbf9d52a1c64e153679859d7a7c50fe012db943df3909e897817f5073b2b"
+    },
+    {
+      "path": "scripts/production75-reader-delta.mjs",
+      "mode": "100644",
+      "blob": "b18576c92175521b0f009889de009a584e0305c8",
+      "bytes": 6513,
+      "sha256": "21faadda70ddd5b2de0ada5545eadf67b6bc3aeb7a146c0c7e7c5843bb7ec86b"
+    },
+    {
+      "path": "scripts/production75-fly-v1.mjs",
+      "mode": "100644",
+      "blob": "65d19a417dd6e69c0aa0e6adaa9607b6f5ce0e4f",
+      "bytes": 16570,
+      "sha256": "85c1c9c20fdbad2d31571620e7517f7afc0355d3905a0672182e976c1e9b89c0"
+    },
+    {
+      "path": "scripts/production75-observer.mjs",
+      "mode": "100644",
+      "blob": "fbe586de3e1891740f57a90a42a1397ab5d49b0e",
+      "bytes": 8462,
+      "sha256": "f3444627b6c6e3278abbc5c1ae0ae185d554ea67832287677c292843ec5bb9b6"
+    },
+    {
+      "path": "scripts/production75-verification.mjs",
+      "mode": "100644",
+      "blob": "ad52fb94e4ce7893e1effd25aa64792c783c8ca4",
+      "bytes": 6911,
+      "sha256": "919efc688cc6c7aaab0b9ef00a8f2969e40c3c950ced02dbe4f7729964e881d1"
+    },
+    {
+      "path": "scripts/production75-scheduling0019.mjs",
+      "mode": "100644",
+      "blob": "2867ab81c011a612cb5e765cfc9be8cc246e5c63",
+      "bytes": 34947,
+      "sha256": "d74e00d7127a4a3817faa1ebe4f2d83147571aa6633578fc8bf73b22d113387b"
+    },
+    {
+      "path": "scripts/production75-scheduling0019-observer.mjs",
+      "mode": "100644",
+      "blob": "437a63c7fa1451546c3e3db164e728a2239a0d76",
+      "bytes": 7043,
+      "sha256": "899a06653025ef1e448c5bda08e077515d2ce0dc0eea5d0c178c23689321be93"
+    },
+    {
+      "path": "scripts/production75-core.mjs",
+      "mode": "100644",
+      "blob": "ef23ae1ef10b4f7abb7e6c922c48593dae61c1cf",
+      "bytes": 22960,
+      "sha256": "196a28729f637b678ab9c6cd9cd55420824a8220dbce1dcdafa27abafad90858"
+    },
+    {
+      "path": "scripts/production75-legacy-model.mjs",
+      "mode": "100644",
+      "blob": "92ce4c0bd3dcd1fdde2545dcfb3bc2e5ced0c395",
+      "bytes": 16145,
+      "sha256": "773fd99772f84dee34b5f781fbde2240bae3a894e19f0dc83d53953c701f46e2"
+    },
+    {
+      "path": "scripts/production75-source.mjs",
+      "mode": "100644",
+      "blob": "34ba3e0a3e5a29e515926629e027ac22666f50b1",
+      "bytes": 3193,
+      "sha256": "5d4d11280ae7bac63f8eb71a7890ad8f3b947930bc6a0368c7be6ee46bf4ad7d"
+    },
+    {
+      "path": "scripts/production75-pins.mjs",
+      "mode": "100644",
+      "blob": "778ce09a643faa9fb3a5932d0a96afd925b8e281",
+      "bytes": 3883,
+      "sha256": "49659d051413a9df57ce6ab85ddd17cf108ee9f5cffdd4de935e93e8db63475e"
+    },
+    {
+      "path": "scripts/production75-local.mjs",
+      "mode": "100644",
+      "blob": "665000140a371fd755ce64dd64cc1277ebff02ef",
+      "bytes": 32496,
+      "sha256": "495caf65ffa60c023569f402f10f3716bd3203917258ff01e7ce6cd816eb0155"
+    },
+    {
+      "path": "scripts/local-dev.mjs",
+      "mode": "100644",
+      "blob": "32507a1b21c18d872c6ed4b0ad9e37b0e5ca4979",
+      "bytes": 10288,
+      "sha256": "77e6991d0d37f3e8b3d40e77ea196a4db90fca5deaf9fb5724696468bde2445f"
+    },
+    {
+      "path": "scripts/staging-observation-core.mjs",
+      "mode": "100644",
+      "blob": "71f97f2251d840af7d98832d6f7fe6af91376232",
+      "bytes": 30170,
+      "sha256": "83bd34e05602476959bdec552883322c83839e6d27dbbb517f2ec82e0fc2a5aa"
+    },
+    {
+      "path": "reports/release-preparation-2026-10-09/schema-catalog.mjs",
+      "mode": "100644",
+      "blob": "d8e08e59c8848b8ec7c19d81e8408424b96c155c",
+      "bytes": 8282,
+      "sha256": "1c05f960796b8db64a4bd45eda43825767695f43d265d70a21f2473c0407a517"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "mode": "100644",
+      "blob": "14f8cb317178369bd995cb25258bf9d4529b5c82",
+      "bytes": 306022,
+      "sha256": "1ce9d652f019f2c906a0d0952cd3571761062214629a08253ec99777dd477c06"
+    },
+    {
+      "path": "artifacts/api-server/package.json",
+      "mode": "100644",
+      "blob": "bbe35ebf0b11e33e6238f8512d9d3e978f07ecc9",
+      "bytes": 1791,
+      "sha256": "b798222fff9d3c40bf8ca68b254d4074bccba674c3f447a1085b15b70da029c0"
+    }
+  ],
+  "approvals": [
+    {
+      "path": "docs/superpowers/specs/2026-10-15-combined-release-design.md",
+      "mode": "100644",
+      "blob": "281e0d5647f3b22b451b0518941e24f18f8d6f90",
+      "bytes": 17163,
+      "sha256": "edadffad4fc17251f1741e48e4505db45767f494f50c4117b65c7de64f1c2204"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-15-combined-release.md",
+      "mode": "100644",
+      "blob": "e0f0b09d92218d9533a5d00b3d87c0899efe5653",
+      "bytes": 40396,
+      "sha256": "b198a77fec33d12c97c3a79e6bac3c0f94ea270bdb7c63b5814f2718115154cb"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-16-communications-compatibility-design.md",
+      "mode": "100644",
+      "blob": "cad8a028853e5d7b7b98fa3996cc7cbad342b5d3",
+      "bytes": 23506,
+      "sha256": "35990ac4b0fe4090bb5588da5b3926589a1f850a74272e7999c24aea80eb5cb1"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-10-16-voice-compatibility-annex.md",
+      "mode": "100644",
+      "blob": "5da5c059520b74fbf06a4ec23f2b39ab7001247b",
+      "bytes": 18518,
+      "sha256": "30e5a63503950d740178b8de096d8ce9e0d640b203ec21b9960cd3d7a1a92983"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-16-sms-carrier-boundary.md",
+      "mode": "100644",
+      "blob": "5508f935067ad16913a1e87d286fd9f35ff7e582",
+      "bytes": 21994,
+      "sha256": "43ed5d86ac640bda6cb872db8a572e28722e82d28a162f81ebb34e6d82874d37"
+    }
+  ],
+  "releaseEligible": false,
+  "originalProtectedModes": {
+    "scripts/saved-scheduling-recovery-fixture.mjs": "100644",
+    "scripts/contractor-recovery-drill.mjs": "100644",
+    "scripts/contractor-recovery-app-probe.mjs": "100644",
+    "scripts/release-schema.mjs": "100644",
+    "artifacts/api-server/build.mjs": "100644",
+    "artifacts/api-server/build-identity.mjs": "100644",
+    "artifacts/api-server/scripts/contractor-recovery-entry.ts": "100644",
+    "pnpm-lock.yaml": "100644"
+  }
+}

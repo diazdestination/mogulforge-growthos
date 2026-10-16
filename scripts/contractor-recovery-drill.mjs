@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tsImport } from 'tsx/esm/api';
@@ -26,6 +26,7 @@ import { returningCustomerIds, seedReturningCustomerRecovery, assertReturningCus
 import { seedLeadAlertCoverage, assertLeadAlertCoverage, assertLeadAlertCoverageConstraints } from './lead-alert-coverage-recovery-fixture.mjs';
 import { applySchedulingRecoveryDelta, seedSchedulingPrerequisites, captureSchedulingState, SCHEDULING_PRODUCTION_BASE, SCHEDULING_PRODUCTION_TREE } from './saved-scheduling-recovery-fixture.mjs';
 import { evaluateSavedSchedulingRollback } from './release-schema.mjs';
+import { assertC1SourcePreserved } from './c1-source-preservation.mjs';
 
 const requireApi = createRequire(new URL('../artifacts/api-server/package.json', import.meta.url));
 const requireDb = createRequire(new URL('../lib/db/package.json', import.meta.url));
@@ -56,12 +57,17 @@ function ownedBuild(output) {
   const artifactRoot = resolve(root, 'artifacts/api-server');
   if (dirname(output) !== artifactRoot || !basename(output).startsWith('.contractor-recovery-')) throw new Error('contractor_build_path_invalid');
 }
-async function artifactFiles(output) {
-  ownedBuild(output);
+function ownedStaging(output) {
+  const scratchRoot = resolve(root, 'artifacts/api-server/tmp');
+  if (dirname(output) !== scratchRoot || !basename(output).startsWith('.contractor-recovery-')) throw new Error('contractor_build_stage_path_invalid');
+}
+async function artifactFiles(output,staged=false) {
+  if(staged) ownedStaging(output); else ownedBuild(output);
+  assert.equal(await readFile(join(output,'.gitignore'),'utf8'),'*\n','contractor derived output marker changed');
   const entries=await readdir(output,{withFileTypes:true}), files=[];
   for(const entry of entries.sort((a,b)=>a.name.localeCompare(b.name))) {
     assert.ok(entry.isFile()&&!entry.isSymbolicLink());
-    if(entry.name==='scheduling-fixture.json') continue;
+    if(entry.name==='scheduling-fixture.json'||entry.name==='.gitignore') continue;
     const bytes=await readFile(join(output,entry.name)); files.push({path:entry.name,bytes:bytes.length,sha256:sha(bytes)});
   }
   assert.ok(files.some(f=>f.path==='contractor-recovery-entry.mjs'));
@@ -69,11 +75,12 @@ async function artifactFiles(output) {
   return files;
 }
 async function recoverySourceFiles() {
-  const paths=['scripts/saved-scheduling-recovery-fixture.mjs','scripts/contractor-recovery-drill.mjs','scripts/contractor-recovery-app-probe.mjs','scripts/release-schema.mjs','artifacts/api-server/build.mjs','artifacts/api-server/build-identity.mjs','artifacts/api-server/scripts/contractor-recovery-entry.ts','pnpm-lock.yaml'];
+  const paths=['scripts/saved-scheduling-recovery-fixture.mjs','scripts/contractor-recovery-drill.mjs','scripts/contractor-recovery-app-probe.mjs','scripts/release-schema.mjs','artifacts/api-server/build.mjs','artifacts/api-server/build-identity.mjs','artifacts/api-server/scripts/contractor-recovery-entry.ts','pnpm-lock.yaml','scripts/c1-source-preservation.mjs','reports/c1-source-preservation-2026-10-16.json'];
   return Promise.all(paths.map(async path=>({path,sha256:sha(await readFile(join(root,path)))})));
 }
-async function probeApp(database, output, files, cleanup, mode='reader', fixtureSha256) {
+async function probeApp(database, output, files, cleanup, mode='reader', fixtureSha256,workerOutput) {
   ownedBuild(output); assert.deepEqual(await artifactFiles(output),files);
+  assert.deepEqual(await artifactFiles(workerOutput,true),files,'compiled worker inputs changed before probe');
   let socket;
   const receipt={kind:'app_child',mode,socketStopped:false,childExited:false}; cleanup.push(receipt);
   try {
@@ -116,12 +123,13 @@ async function probeApp(database, output, files, cleanup, mode='reader', fixture
   } finally {
     await socket?.stop(); receipt.socketStopped=true;
     if(mode==='seed') await database.exec('RESET SESSION AUTHORIZATION; SET default_transaction_read_only=off');
+    assert.deepEqual(await artifactFiles(workerOutput,true),files,'compiled worker inputs changed during probe');
   }
 }
 
 export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
   const startedAt = Date.now();
-  const source = await PGlite.create(); let restored,output,evidence;
+  const source = await PGlite.create(); let restored,output,stagingOutput,publicationStage,evidence;
   const cleanup=[],clones=[],progress={};
   try {
     assert.equal(execFileSync('git',['rev-parse',`${SCHEDULING_PRODUCTION_BASE}^{tree}`],{cwd:root,encoding:'utf8',windowsHide:true}).trim(),SCHEDULING_PRODUCTION_TREE);
@@ -290,17 +298,31 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     // Preserve every original fixture before adding independent scheduling tenants.
     await seedSchedulingPrerequisites(source);
     await source.exec('CREATE ROLE contractor_recovery_writer; GRANT USAGE ON SCHEMA public TO contractor_recovery_writer; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO contractor_recovery_writer; GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO contractor_recovery_writer;');
-    const productDiff=execFileSync('git',['diff',SCHEDULING_PRODUCTION_BASE,'--','artifacts/api-server','lib'],{cwd:root,windowsHide:true});
-    assert.equal(productDiff.length,0,'accepted production source must remain exact');
+    const sourcePreservation=assertC1SourcePreserved();
     const artifactRoot=resolve(root,'artifacts/api-server');
-    output=await mkdtemp(join(artifactRoot,'.contractor-recovery-')); ownedBuild(output);
+    // Preserve esbuild's absolute worker paths under ignored tmp. Publish an
+    // identical, self-ignored bundle at the unchanged probe's API-child path.
+    const scratchRoot=join(artifactRoot,'tmp');
+    await mkdir(scratchRoot,{recursive:true});
+    const scratch=await lstat(scratchRoot);
+    assert.ok(scratch.isDirectory()&&!scratch.isSymbolicLink(),'contractor scratch must be an ordinary owned directory');
+    stagingOutput=await mkdtemp(join(scratchRoot,'.contractor-recovery-')); ownedStaging(stagingOutput);
     const sourceFiles=await recoverySourceFiles();
     const checkout={commit:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8',windowsHide:true}).trim(),tree:execFileSync('git',['rev-parse','HEAD^{tree}'],{cwd:root,encoding:'utf8',windowsHide:true}).trim(),dirtyScope:execFileSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8',windowsHide:true}).trim().split(/\r?\n/).filter(Boolean),trackedDiffSha256:sha(execFileSync('git',['diff','--binary','--','.'],{cwd:root,windowsHide:true,maxBuffer:20*1024*1024}))};
     const runtime={node:process.version,platform:process.platform,architecture:process.arch,postgres:(await source.query('SELECT version() AS version')).rows[0].version};
-    await buildAll({entryPoint:join(artifactRoot,'scripts/contractor-recovery-entry.ts'),outDir:output});
+    await buildAll({entryPoint:join(artifactRoot,'scripts/contractor-recovery-entry.ts'),outDir:stagingOutput});
+    await writeFile(join(stagingOutput,'.gitignore'),'*\n',{flag:'wx'});
+    publicationStage=await mkdtemp(join(scratchRoot,'.contractor-recovery-')); ownedStaging(publicationStage);
+    await cp(stagingOutput,publicationStage,{recursive:true});
+    const publishedOutput=join(artifactRoot,basename(publicationStage)); ownedBuild(publishedOutput);
+    await assert.rejects(lstat(publishedOutput),{code:'ENOENT'});
+    await rename(publicationStage,publishedOutput);
+    output=publishedOutput;publicationStage=undefined;
+    assert.deepEqual(assertC1SourcePreserved(),sourcePreservation,'C1 source changed during the frozen artifact build');
     const files=await artifactFiles(output),artifactSha256=sha(JSON.stringify(files));
-    const seed=await probeApp(source,output,files,cleanup,'seed');
-    Object.assign(progress,{seed,artifact:{files,artifactSha256},sourceCommit:SCHEDULING_PRODUCTION_BASE,sourceTree:SCHEDULING_PRODUCTION_TREE,schema:schedulingSchema,checkout,runtime,sourceFiles});
+    assert.deepEqual(await artifactFiles(stagingOutput,true),files,'published artifact differs from compiled worker inputs');
+    const seed=await probeApp(source,output,files,cleanup,'seed',undefined,stagingOutput);
+    Object.assign(progress,{seed,artifact:{files,artifactSha256,workerFilesVerified:true},sourceCommit:checkout.commit,sourceTree:checkout.tree,legacySourceCommit:SCHEDULING_PRODUCTION_BASE,legacySourceTree:SCHEDULING_PRODUCTION_TREE,sourcePreservation,schema:schedulingSchema,checkout,runtime,sourceFiles});
     const schedulingBefore=await captureSchedulingState(source);
     const baseline = await fingerprints(source);
     progress.tableCounts=Object.fromEntries(Object.entries(baseline.tables).filter(([,value])=>value.count).map(([table,value])=>[table,value.count]));
@@ -336,19 +358,20 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     for(const mode of ['reconcile','reduced','disabled']) {
       const database=await PGlite.create({loadDataDir:snapshot}); clones.push({database,mode});
       assert.deepEqual(await fingerprints(database),baseline);
-      outcomes[mode]=await probeApp(database,output,files,cleanup,mode,seed.fixtureSha256);
+      outcomes[mode]=await probeApp(database,output,files,cleanup,mode,seed.fixtureSha256,stagingOutput);
       assert.deepEqual(outcomes[mode].artifactBuildStamp,seed.artifactBuildStamp);
       outcomes[mode].startingFingerprint=baseline.sha256;
     }
-    const app = await probeApp(restored,output,files,cleanup);
+    const app = await probeApp(restored,output,files,cleanup,'reader',undefined,stagingOutput);
     assert.deepEqual(await fingerprints(restored), baseline);
     assert.deepEqual(await recoverySourceFiles(),sourceFiles,'recovery source changed during the frozen artifact probe');
-    const identity={sourceCommit:SCHEDULING_PRODUCTION_BASE,sourceTree:SCHEDULING_PRODUCTION_TREE,schemaSha256:schedulingSchema.schemaSha256,sqlSha256:schedulingSchema.sqlSha256,fixtureSha256:seed.fixtureSha256};
+    const identity={sourceCommit:checkout.commit,sourceTree:checkout.tree,schemaSha256:schedulingSchema.schemaSha256,sqlSha256:schedulingSchema.sqlSha256,fixtureSha256:seed.fixtureSha256};
     evidence = {
       check: 'contractor_synthetic_upgrade_restore', engine: 'PGlite embedded PostgreSQL',
       // Report the source captured before this call created bundle/sidecar files.
       commit: checkout.commit, trackedDiffSha256:checkout.trackedDiffSha256,
       candidateCommitted:checkout.dirtyScope.length===0,
+      sourcePreservation,
       migrations, tableCount: Object.keys(expected).length, previousTableCount: Object.keys(beforeUpgrade.tables).length,
       sourceFingerprint: baseline.sha256, restoredFingerprint: baseline.sha256,
       snapshotSha256: sha(Buffer.from(await snapshot.arrayBuffer())),
@@ -385,7 +408,7 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       providerCalls: 0, managedBackupRestoreVerified: false, productionRpoRtoEstablished: false,
       scheduling:{schema:schedulingSchema,originalStatePreserved:true,...outcomes.reconcile,
         priorFixtureTableCounts:Object.fromEntries(['customer_work_roots','customer_work_commands','callie_policy_revisions','callie_intakes'].map(table=>[table,guardBaseline.tables[table].count])),
-        identity,artifact:{...identity,files,artifactSha256},
+        identity,artifact:{...identity,files,artifactSha256,workerFilesVerified:true},
         enforcement:{...identity,artifactSha256,engine:'PGlite embedded PostgreSQL',restoredFingerprint:baseline.sha256,cases:[...outcomes.reduced.cases,...outcomes.disabled.cases],providerCalls:0,cleanupVerified:false},
         sourceFiles,checkout,runtime,restoredClones:Object.fromEntries(Object.entries(outcomes).map(([mode,result])=>[mode,result.startingFingerprint])),
         artifactBuildStamp:seed.artifactBuildStamp,
@@ -403,6 +426,10 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     if(output) {
       const receipt={kind:'build',name:basename(output),removed:false};cleanup.push(receipt);
       try {ownedBuild(output);await rm(output,{recursive:true,force:true});receipt.removed=true;} catch {receipt.failure='owned_build_cleanup_failed';}
+    }
+    for(const stage of [stagingOutput,publicationStage].filter(Boolean)) {
+      const receipt={kind:'build_stage',name:basename(stage),removed:false};cleanup.push(receipt);
+      try {ownedStaging(stage);await rm(stage,{recursive:true,force:true});receipt.removed=true;} catch {receipt.failure='owned_build_stage_cleanup_failed';}
     }
     const cleanupFailed=cleanup.some(r=>r.kind==='app_child'?!r.childExited||!r.socketStopped:r.kind==='database'?!r.closed:!r.removed);
     if(!evidence||cleanupFailed) emit(JSON.stringify({check:'contractor_recovery_failed',progress,cleanup}));
