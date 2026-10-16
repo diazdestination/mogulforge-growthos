@@ -91,7 +91,7 @@ beforeAll(async () => {
     try { await c.query('SET ROLE schema_admin'); await c.query(fixtureSql(layout)); await seed(c); } finally { await c.end(); }
   }
   await admin(srcPort, 'control', 'CREATE DATABASE tgt_same_cluster OWNER schema_admin');
-  for (const db of ['tgt_happy', 'tgt_layout2', 'tgt_nonempty', 'tgt_corrupt', 'tgt_lost_ack', 'tgt_pre_commit', 'tgt_identity', 'tgt_sessions', 'tgt_late_writer', 'tgt_objects'])
+  for (const db of ['tgt_happy', 'tgt_layout2', 'tgt_nonempty', 'tgt_corrupt', 'tgt_lost_ack', 'tgt_pre_commit', 'tgt_identity', 'tgt_sessions', 'tgt_late_writer', 'tgt_objects', 'tgt_added_col'])
     await admin(dstPort, 'control', `CREATE DATABASE ${db} OWNER schema_admin`);
   timings.containersAndSeedMs = Date.now() - t0;
 }, 180000);
@@ -201,6 +201,7 @@ test('compare detects a corrupted target row, a lost row and a stray row in a ne
   r = await cmp({ sourceUrl: src(), targetUrl: dst('tgt_corrupt') });
   assert.deepEqual(r.problems.map(p => `${p.check}:${p.table}`).sort(),
     ['new_table_not_empty:invoice_sequences', 'table:contacts', 'table:org_settings', 'table:sessions']);
+  assert.deepEqual(r.writeInventory, { changedTables: ['contacts', 'invoice_sequences', 'org_settings', 'sessions'], complete: true, unclassified: [] });
   // CLI: exit status 1 and no row values in output.
   const manifestPath = resolve(tmpdir(), `claude-v2mig-manifest-${runId}.json`);
   writeFileSync(manifestPath, JSON.stringify(await manifestFor(src(), dst('tgt_corrupt'))));
@@ -352,6 +353,18 @@ test('setup failures never strand connections (connect and identify)', async () 
     assert.equal(ends, 2); // failed target client and the already-open source client
   } finally { Object.assign(pg.Client.prototype, original); }
 }, 60000);
+
+test('rollback write inventory lists a table whose only change is a 0019 added column', async () => {
+  assert.equal((await copy({ sourceUrl: src(), targetUrl: dst('tgt_added_col') })).status, 'COMMITTED');
+  const policy = { formatVersion: 1, revision: 1, enabled: false, timeZone: 'UTC', minimumTravelGapMinutes: 0,
+    maxConcurrentReservations: null, durationPresets: [], digest: 'fictional-policy', updatedAt: '2026-10-16T00:00:00Z', updatedByUserId: 'fictional-user-1-1' };
+  await admin(dstPort, 'tgt_added_col', 'UPDATE org_settings SET scheduling_policy = $1::jsonb', [JSON.stringify(policy)]);
+  const r = await cmp({ sourceUrl: src(), targetUrl: dst('tgt_added_col') });
+  assert.equal(r.status, 'MISMATCH');
+  assert.ok(r.tables.find(t => t.table === 'org_settings').match); // legacy-column fingerprint alone would miss it
+  assert.deepEqual(r.problems, [{ check: 'added_column_default', table: 'org_settings', column: 'scheduling_policy' }]);
+  assert.deepEqual(r.writeInventory, { changedTables: ['org_settings'], complete: true, unclassified: [] });
+}, 120000);
 
 test('error output never contains PostgreSQL detail/message values, only codes and object names', async () => {
   let caught;

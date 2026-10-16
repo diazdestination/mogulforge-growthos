@@ -39,7 +39,13 @@ export async function compare({ sourceUrl, targetUrl, manifest } = {}) {
     const snap = await captureSource(source, plan);
     const report = await verifyTarget(target, snap);
     await Promise.all([source.query('ROLLBACK'), target.query('ROLLBACK')]);
-    return { status: report.ok ? 'MATCH' : 'MISMATCH', identities, layoutSha256: snap.layout, ...report,
+    // Rollback write inventory: every table named by ANY table-bearing problem (fingerprint/count,
+    // added-column value, new-table rows, missing added column, ...). Problems without a table
+    // (catalog, sequences, encoding, ...) make the inventory incomplete: rollback stays on HOLD.
+    const unclassified = report.problems.filter(p => !p.table).map(p => p.check);
+    const writeInventory = { changedTables: [...new Set(report.problems.filter(p => p.table).map(p => p.table))].sort(),
+      complete: unclassified.length === 0, unclassified };
+    return { status: report.ok ? 'MATCH' : 'MISMATCH', identities, layoutSha256: snap.layout, ...report, writeInventory,
       totals: { preservedTables: report.tables.filter(t => t.kind === 'preserved').length,
         newEmptyTables: report.tables.filter(t => t.kind === 'new-empty').length,
         sourceRows: snap.tables.reduce((n, t) => n + t.rows, 0) },

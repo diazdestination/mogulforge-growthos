@@ -105,8 +105,8 @@ which can contain key or row values, is never printed.
 
 ## Local test evidence (2026-10-16, Windows + WSL Docker, postgres:16-alpine)
 
-`cd scripts && node node_modules/vitest/vitest.mjs run v2-migration/`: **14/14 pass**. With
-`production75-core`, `production75-source` and `production75-scheduling0019` (4 files) it is 105/105. Two
+`cd scripts && node node_modules/vitest/vitest.mjs run v2-migration/`: **15/15 pass**. With
+`production75-core`, `production75-source` and `production75-scheduling0019` (4 files) it is 106/106. Two
 containers, `claude-v2mig-src-*` and `claude-v2mig-dst-*` (127.0.0.1 only, `--rm`), are removed
 afterwards. Synthetic data: 46 rows across 12 legacy tables in 2 fictional tenants. It covers bytea
 with NUL, text[] with commas/quotes, timestamp without time zone, JSON null vs SQL NULL, Unicode,
@@ -285,9 +285,16 @@ any acceptance edits, and customer writes after step 11. Repointing alone would 
 1. Freeze V2 writers: disable autostart and stop every app Machine. Verify with the same positive
    checks as step 1, now on V2: Machines all stopped, and zero app client sessions on V2.
 2. Measure what changed since the copy. Run `compare.mjs` with V1 as the source and V2 as the
-   target (same manifest): the `table` and `new_table_not_empty` problems list every table with
-   writes since the copy.
-3. **Preserve before reverting.** Keep V2 intact and record that list with the evidence.
+   target (same manifest). Use its `writeInventory.changedTables`. This is the deduplicated list of
+   every table named by **any** table-bearing problem: legacy fingerprint/count (`table`), values
+   in columns added by the upgrade, including the 0019 scheduling columns (`added_column_default`),
+   rows in new tables (`new_table_not_empty`), `added_column_missing`, and any future table-scoped
+   kind. Do not filter by problem kind.
+   **HOLD** (no revert, escalate) if compare exits `FAILED`, or if `writeInventory.complete` is
+   false (catalog, sequences, encoding or other problems without a table). An empty list proves
+   nothing in that case.
+3. **Preserve before reverting.** Keep V2 intact and record `writeInventory` and the full compare
+   JSON with the evidence.
 4. **Stop for an owner decision.** Every listed table must be named, including `sessions`. Each
    one needs an explicit disposition:
    - (a) fix forward on V2 (preferred);
