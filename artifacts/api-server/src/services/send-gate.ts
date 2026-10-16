@@ -25,12 +25,13 @@ import {
   contactsTable,
   db,
   leadsTable,
+  smartSiteSubmissionsTable,
   suppressionsTable,
   type SendingHoursSettings,
   type Suppression,
   type SuppressionReason,
 } from "@workspace/db";
-import { and, asc, desc, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import { isSafeMailbox } from "./providers";
 import { getSendingHours } from "./settings";
@@ -169,6 +170,103 @@ export async function hasChannelConsent(
   return Boolean(row?.granted);
 }
 
+/**
+ * Inquiry-scoped SMS consent (GAP-02). A Smart Site visitor who ticked `sms`
+ * consented to replies about THAT inquiry only (receipt scope
+ * `respond-to-this-inquiry`); intake deliberately writes no contact-wide
+ * consent record. This reads that receipt for exactly one lead and grants only
+ * when: the receipt belongs to this lead and contact, it lists `sms`, the
+ * contact's current phone is the phone given in the inquiry (from the single
+ * actor-less capture activity intake wrote in the receipt's own transaction,
+ * still on this lead, contact and site; staff timeline rows are never
+ * authority, and missing, moved or duplicated evidence fails closed), and no SMS revocation was
+ * recorded at or after the inquiry. Callers must be staff-initiated manual
+ * replies; automated, sequence and marketing paths never call this.
+ */
+export async function hasInquirySmsReplyConsent(
+  organizationId: string,
+  leadId: string,
+  contact: { id: string; phone?: string | null },
+  reader: Pick<typeof db, "select"> = db,
+): Promise<boolean> {
+  if (!contact.phone) return false;
+  const [receipt] = await reader
+    .select({
+      id: smartSiteSubmissionsTable.id,
+      siteId: smartSiteSubmissionsTable.siteId,
+      consent: smartSiteSubmissionsTable.consent,
+      createdAt: smartSiteSubmissionsTable.createdAt,
+    })
+    .from(smartSiteSubmissionsTable)
+    .innerJoin(leadsTable, and(
+      eq(leadsTable.id, smartSiteSubmissionsTable.leadId),
+      eq(leadsTable.organizationId, organizationId),
+      eq(leadsTable.contactId, contact.id),
+    ))
+    .where(and(
+      eq(smartSiteSubmissionsTable.organizationId, organizationId),
+      eq(smartSiteSubmissionsTable.leadId, leadId),
+    ))
+    .limit(1);
+  if (!receipt) return false;
+  const consent = receipt.consent as { scope?: unknown; channels?: unknown };
+  if (consent.scope !== "respond-to-this-inquiry") return false;
+  if (!Array.isArray(consent.channels) || !consent.channels.includes("sms")) return false;
+
+  // The inquiry phone comes ONLY from the capture row intake wrote in the
+  // receipt's own transaction: no actor (every staff/API activity write stamps
+  // the member) and a server-default created_at equal to the receipt's (both are
+  // that transaction's now(); no route accepts created_at). A metadata receiptId
+  // alone is staff-writable through the generic activity endpoint and is never
+  // authority. Any candidate is fetched regardless of its current lead so that a
+  // duplicate anywhere is ambiguous, and one that was merged/moved fails closed.
+  const candidates = await reader
+    .select({
+      leadId: activitiesTable.leadId,
+      contactId: activitiesTable.contactId,
+      metadata: activitiesTable.metadata,
+    })
+    .from(activitiesTable)
+    // Compare timestamps in SQL: a JS Date would drop PostgreSQL microseconds.
+    .innerJoin(smartSiteSubmissionsTable, and(
+      eq(smartSiteSubmissionsTable.id, receipt.id),
+      eq(smartSiteSubmissionsTable.organizationId, organizationId),
+      eq(smartSiteSubmissionsTable.createdAt, activitiesTable.createdAt),
+    ))
+    .where(and(
+      eq(activitiesTable.organizationId, organizationId),
+      eq(activitiesTable.type, "lead_captured"),
+      isNull(activitiesTable.actorUserId),
+      sql`${activitiesTable.metadata}->>'receiptId' = ${receipt.id}`,
+    ))
+    .limit(2);
+  if (candidates.length !== 1) return false;
+  const [captured] = candidates;
+  if (captured.leadId !== leadId || captured.contactId !== contact.id) return false;
+  const evidence = captured.metadata as {
+    smartSiteId?: unknown;
+    submittedContact?: { phone?: unknown };
+  };
+  if (evidence.smartSiteId !== receipt.siteId) return false;
+  const submitted = evidence.submittedContact?.phone;
+  if (typeof submitted !== "string") return false;
+  const inquiryPhone = normalizePhone(submitted);
+  if (inquiryPhone.length < 10 || inquiryPhone !== normalizePhone(contact.phone)) return false;
+
+  const [revoked] = await reader
+    .select({ id: consentRecordsTable.id })
+    .from(consentRecordsTable)
+    .where(and(
+      eq(consentRecordsTable.organizationId, organizationId),
+      eq(consentRecordsTable.contactId, contact.id),
+      eq(consentRecordsTable.channel, "sms"),
+      eq(consentRecordsTable.granted, false),
+      gte(consentRecordsTable.recordedAt, receipt.createdAt),
+    ))
+    .limit(1);
+  return !revoked;
+}
+
 // ---------------------------------------------------------------------------
 // Quiet hours
 // ---------------------------------------------------------------------------
@@ -242,6 +340,12 @@ export interface SendGateInput {
   touchLogicalKey?: string;
   /** Persisted, exact finite source-nurture step; the server rereads authority. */
   sourceNurtureStepId?: string;
+  /**
+   * ONLY for a staff-initiated manual reply about this exact lead (manual-sms).
+   * Lets that inquiry's own SMS consent satisfy step 4. Automated, sequence,
+   * playbook and marketing paths must never set it.
+   */
+  manualInquiryReplyLeadId?: string;
 }
 
 export async function checkSendEligibility(
@@ -288,8 +392,14 @@ export async function checkSendEligibility(
 
   // 4. Channel consent — SMS is opt-in on every path (matches existing
   //    behavior); email outreach is opt-out via the suppression list.
+  //    A staff-initiated manual reply may instead rely on the exact inquiry's
+  //    own SMS consent; it is never available to outreach.
   if (channel === "sms" && !(await hasChannelConsent(organizationId, contact.id, "sms", reader))) {
-    return { ok: false, outcome: "blocked", reason: "no_sms_consent" };
+    const inquiryReply =
+      kind === "transactional" &&
+      input.manualInquiryReplyLeadId &&
+      (await hasInquirySmsReplyConsent(organizationId, input.manualInquiryReplyLeadId, contact, reader));
+    if (!inquiryReply) return { ok: false, outcome: "blocked", reason: "no_sms_consent" };
   }
 
   if (kind !== "outreach") return { ok: true };

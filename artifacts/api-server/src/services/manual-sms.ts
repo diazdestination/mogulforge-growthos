@@ -101,11 +101,14 @@ export async function getManualSmsDrafts(input: {
   // Explicit SMS consent, hard do-not-contact flags and address-level STOP
   // suppressions still apply. A manual draft never creates or implies consent.
   // This requested-service reply is human-reviewed, not automated outreach.
+  // A website inquiry's own SMS consent counts only for THIS lead and the
+  // phone given in that inquiry; it never becomes contact-wide consent.
   const gate = await checkSendEligibility({
     organizationId: input.organizationId,
     contact: row.contact,
     channel: "sms",
     kind: "transactional",
+    manualInquiryReplyLeadId: input.leadId,
   });
   if (!gate.ok) return blocked(gate.reason);
   return {
