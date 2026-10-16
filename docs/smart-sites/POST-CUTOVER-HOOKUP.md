@@ -146,8 +146,18 @@ Run Painless and CSS one at a time. Do not start the second until the first pass
    They are **allowed** only after the owner-approved provider activation.
 6. **Required: one labeled TEST lead through the real deployed website** (Adam's go, owners
    warned beforehand). The hookup is accepted only after this step.
-   1. Submit the site's real form. Use name `TEST GrowthOS Acceptance`, a reserved
-      `example.test` email, and a message starting `TEST lead`.
+   1. Submit the site's real form with **exactly** these values (cleanup requires every one;
+      they are `WEBSITE_TEST_INPUTS` in `acceptance-lead.mjs` and a test checks them):
+      - Name: `TEST GrowthOS Acceptance`
+      - Email: `growthos-acceptance+painless-20261017@example.test` (Painless) or
+        `growthos-acceptance+css-20261017@example.test` (CSS). Use the run date in place of
+        `20261017`; only lowercase letters, digits and `-` between `+` and `@`.
+      - Phone (required by both forms): an unused fictional `404-555-01XX` number. Do not
+        reuse one: cleanup refuses a contact that has another lead.
+      - Message / notes: `TEST lead - GrowthOS website hookup acceptance (website). Not a customer. Please ignore; it will be deleted.`
+        Painless sends it verbatim as the inquiry summary; CSS appends it as the final
+        `Notes:` line after its own form title lines. Both satisfy cleanup.
+      - Leave the optional analytics box unchecked. Use any ZIP/service; no address.
    2. Confirm the site shows "saved" with the GrowthOS reference.
    3. Confirm the site outbox row for that request is `saved`, with the same receipt UUID.
    4. Read the same request and receipt back in GrowthOS: lead, office task and alert
@@ -232,8 +242,15 @@ DATABASE_URL=... node scripts/smart-sites/acceptance-lead.mjs cleanup --env stag
 ```
 
 Website-form TEST leads (section 2 step 6) have no submit report. The database owner reads
-their IDs from GrowthOS and checks the TEST markers by hand before running the same
-command.
+their lead, request, receipt, task and contact IDs from GrowthOS and runs the same command.
+The script itself checks the markers above; nobody edits a record to make it pass.
+
+Cleanup also refuses with `staff_work_present` (and deletes nothing) when staff touched
+the TEST lead: the intake task is no longer open, untouched and unassigned with its
+original text; the lead was claimed, assigned or moved out of `new`; or the contact was
+edited. Any other record on the lead or contact (a note, follow-up, appointment, estimate,
+invoice) refuses with `downstream_work_present`. The report lists what was found.
+Resolve it with the office first; never delete staff work to make cleanup pass.
 
 ## 6. Staging TEST variant (run first)
 

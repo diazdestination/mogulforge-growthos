@@ -55,6 +55,39 @@ export const TEST_CONTACT_NAME = "TEST GrowthOS Acceptance";
 export const TEST_EMAIL_PREFIX = "growthos-acceptance+";
 export const TEST_EMAIL_DOMAIN = "@example.test";
 export const TEST_SUMMARY_PREFIX = "TEST lead - GrowthOS website hookup acceptance";
+/** Exact text the intake service writes on the office task it creates. */
+export const INTAKE_TASK_DESCRIPTION =
+  "Contact permission covers this inquiry only. Assign an owner and record the follow-up; no email, SMS, appointment or dispatch has been sent or confirmed.";
+
+/**
+ * The exact values to type into a real website form for the required website TEST
+ * lead (docs/smart-sites/POST-CUTOVER-HOOKUP.md quotes these verbatim, and a test
+ * checks that they satisfy isAcceptanceFixture after each site's field mapping).
+ * Painless sends the message verbatim as the summary; CSS prefixes its own form
+ * title lines and adds the message as a final "Notes: ..." line.
+ */
+export const WEBSITE_TEST_INPUTS = {
+  name: "TEST GrowthOS Acceptance",
+  emailPattern: "growthos-acceptance+<site>-<yyyymmdd>@example.test",
+  phone: "Unused fictional 404-555-01XX number (cleanup refuses a contact with other leads)",
+  message: `${TEST_SUMMARY_PREFIX} (website). Not a customer. Please ignore; it will be deleted.`,
+};
+
+/** Strict TEST provenance: exact name, reserved acceptance address, exact message marker. */
+export function isAcceptanceFixture({ firstName, lastName, email, summary }) {
+  const fullName = [firstName, lastName].filter(Boolean).join(" ");
+  const mail = String(email ?? "");
+  const text = String(summary ?? "");
+  const local = mail.slice(TEST_EMAIL_PREFIX.length, mail.length - TEST_EMAIL_DOMAIN.length);
+  return (
+    fullName === TEST_CONTACT_NAME &&
+    mail.startsWith(TEST_EMAIL_PREFIX) &&
+    mail.endsWith(TEST_EMAIL_DOMAIN) &&
+    /^[a-z0-9-]{1,40}$/.test(local) &&
+    // Script/Painless: the message is the summary. CSS: the message is its final Notes line.
+    (text.startsWith(TEST_SUMMARY_PREFIX) || text.includes(`\nNotes: ${TEST_SUMMARY_PREFIX}`))
+  );
+}
 const SITE_SECRET = /^ss_[a-f0-9]{64}$/;
 
 export function acceptancePayload({ requestId = randomUUID(), siteLabel = "site", serviceCode = "not-sure", postalCode } = {}) {
@@ -395,12 +428,12 @@ export async function cleanup(argv, { environment, stdout, pgModule }) {
     );
     const lead = rows[0];
     if (!lead) throw new OperatorError("not_found", "No lead with that ID and receipt request ID");
-    const fullName = [lead.first_name, lead.last_name].filter(Boolean).join(" ");
-    const isTest =
-      fullName === TEST_CONTACT_NAME &&
-      String(lead.email ?? "").startsWith(TEST_EMAIL_PREFIX) &&
-      String(lead.email ?? "").endsWith(TEST_EMAIL_DOMAIN) &&
-      String(lead.summary ?? "").startsWith(TEST_SUMMARY_PREFIX);
+    const isTest = isAcceptanceFixture({
+      firstName: lead.first_name,
+      lastName: lead.last_name,
+      email: lead.email,
+      summary: lead.summary,
+    });
     if (!isTest) throw new OperatorError("not_a_test_lead", "Refusing: this lead does not carry every TEST marker");
     if (lead.receipt_id !== flags["receipt-id"] || lead.contact_id !== flags["contact-id"])
       throw new OperatorError("fixture_mismatch", "Refusing: receipt/contact IDs differ from the submit report");
@@ -415,6 +448,45 @@ export async function cleanup(argv, { environment, stdout, pgModule }) {
     out.receiptId = lead.receipt_id;
     out.contactId = lead.contact_id;
     out.taskId = flags["task-id"];
+
+    // Only rows still exactly as intake created them may be deleted. Anything staff
+    // did (task worked/completed/assigned/edited, lead claimed or moved, contact
+    // edited) is reported and the whole cleanup is refused before any DELETE.
+    const state = (
+      await client.query(
+        `SELECT t.status AS task_status, t.assigned_user_id AS task_assigned, t.completed_at AS task_completed,
+                t.description AS task_description, t.title AS task_title,
+                (t.updated_at = t.created_at) AS task_untouched,
+                l.status AS lead_status, l.assigned_user_id AS lead_assigned,
+                (l.updated_at = l.created_at) AS lead_untouched,
+                (c.updated_at = c.created_at) AS contact_untouched
+           FROM crm_tasks t
+           JOIN leads l ON l.id = t.lead_id AND l.organization_id = t.organization_id
+           JOIN contacts c ON c.id = l.contact_id AND c.organization_id = l.organization_id
+          WHERE t.id = $1 AND t.organization_id = $2 AND t.lead_id = $3
+            AND t.source_event = 'smart_site.lead_saved'
+          FOR UPDATE OF t`,
+        [flags["task-id"], lead.organization_id, lead.lead_id],
+      )
+    ).rows[0];
+    if (!state) throw new OperatorError("fixture_mismatch", "Refusing: --task-id is not this TEST lead's intake task");
+    const staffWork = [];
+    if (state.task_status !== "open") staffWork.push(`task_status:${state.task_status}`);
+    if (state.task_completed) staffWork.push("task_completed");
+    if (state.task_assigned) staffWork.push("task_assigned");
+    if (state.task_description !== INTAKE_TASK_DESCRIPTION) staffWork.push("task_description_changed");
+    if (!/^Review .+ inquiry$/.test(state.task_title ?? "")) staffWork.push("task_title_changed");
+    if (state.task_untouched !== true) staffWork.push("task_modified");
+    if (state.lead_status !== "new") staffWork.push(`lead_status:${state.lead_status}`);
+    if (state.lead_assigned) staffWork.push("lead_assigned");
+    if (state.lead_untouched !== true) staffWork.push("lead_modified");
+    if (state.contact_untouched !== true) staffWork.push("contact_modified");
+    if (staffWork.length)
+      throw new OperatorError(
+        "staff_work_present",
+        `Refusing: staff worked on the TEST lead (${staffWork.join(", ")}); nothing was deleted. Review it with the office first.`,
+        { staffWork },
+      );
 
     const ctx = {
       organizationId: lead.organization_id,
@@ -489,6 +561,7 @@ export async function main(argv = process.argv.slice(2), io = {}) {
     report(ctx.stderr, {
       error: error.code ?? "unexpected",
       message: error instanceof OperatorError ? error.message : "Unexpected failure (details suppressed)",
+      ...(error instanceof OperatorError && error.details ? error.details : {}),
     });
     return 1;
   }

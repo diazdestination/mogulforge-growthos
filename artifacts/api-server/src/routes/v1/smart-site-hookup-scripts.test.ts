@@ -1,9 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import {
   appointmentsTable,
   contactsTable,
+  crmTasksTable,
   db,
   leadsTable,
   organizationsTable,
@@ -441,6 +443,107 @@ describe("provision-site.mjs against the local API", () => {
     ).toHaveLength(0);
   });
 
+  const idsFor = async (leadId: string) => {
+    const [receipt] = await db.select().from(smartSiteSubmissionsTable).where(eq(smartSiteSubmissionsTable.leadId, leadId));
+    const [lead] = await db.select().from(leadsTable).where(eq(leadsTable.id, leadId));
+    const [task] = await db.select().from(crmTasksTable).where(eq(crmTasksTable.leadId, leadId));
+    return {
+      task,
+      args: [
+        "--lead-id", leadId, "--request-id", receipt.requestId, "--receipt-id", receipt.id,
+        "--task-id", task.id, "--contact-id", lead.contactId!, "--expected-organization-id", orgId,
+      ],
+    };
+  };
+
+  it("refuses cleanup when staff worked the TEST lead's task, and preserves everything", async () => {
+    const submitted = await run(
+      acceptanceMain,
+      ["submit", "--api", base, "--company", COMPANY, "--site-label", "painless"],
+      { GROWTHOS_SITE_ID: siteId, GROWTHOS_SITE_SECRET: secret },
+    );
+    expect(submitted.exitCode).toBe(0);
+    const out = JSON.parse(submitted.stdout);
+    const { args, task } = await idsFor(out.leadId);
+    // What the ordinary task update path allows: complete it and add a note.
+    await db
+      .update(crmTasksTable)
+      .set({
+        status: "done",
+        completedAt: new Date(),
+        description: `${task.description}\nStaff note: called, no answer.`,
+        updatedAt: new Date(Date.now() + 1000),
+      })
+      .where(eq(crmTasksTable.id, task.id));
+    const refused = await run(acceptanceMain, ["cleanup", ...args, "--apply"], {
+      DATABASE_URL: process.env.DATABASE_URL,
+    });
+    expect(refused.exitCode).toBe(1);
+    const report = JSON.parse(refused.stderr);
+    expect(report).toMatchObject({ error: "staff_work_present" });
+    expect(report.staffWork).toEqual(
+      expect.arrayContaining(["task_status:done", "task_completed", "task_description_changed", "task_modified"]),
+    );
+    const [kept] = await db.select().from(crmTasksTable).where(eq(crmTasksTable.id, task.id));
+    expect(kept.description).toContain("Staff note");
+    expect(await db.select().from(leadsTable).where(eq(leadsTable.id, out.leadId))).toHaveLength(1);
+    expect(await db.select().from(contactsTable).where(eq(contactsTable.id, out.contactId))).toHaveLength(1);
+    expect(
+      await db.select().from(smartSiteSubmissionsTable).where(eq(smartSiteSubmissionsTable.id, out.receiptId)),
+    ).toHaveLength(1);
+  });
+
+  it("the documented website TEST inputs pass cleanup after each site's field mapping", async () => {
+    const mod = await import(scriptUrl("acceptance-lead.mjs"));
+    const doc = readFileSync(
+      new URL("../../../../../docs/smart-sites/POST-CUTOVER-HOOKUP.md", import.meta.url),
+      "utf8",
+    ).replace(/\s+/g, " ");
+    const inputs = mod.WEBSITE_TEST_INPUTS as { name: string; message: string };
+    const emails = {
+      painless: "growthos-acceptance+painless-20261017@example.test",
+      css: "growthos-acceptance+css-20261017@example.test",
+    };
+    for (const value of [inputs.name, inputs.message, emails.painless, emails.css])
+      expect(doc).toContain(value);
+    const [first, ...rest] = inputs.name.split(" ");
+    // Painless: notes -> summary verbatim. CSS: form title lines, then "Notes: <message>".
+    const summaries = {
+      painless: inputs.message,
+      css: `[CSS website] Service call request\nRequest type: Book a service call (request only; office confirms)\nIssue: Not sure\nNotes: ${inputs.message}`,
+    };
+    for (const site of ["painless", "css"] as const)
+      expect(
+        mod.isAcceptanceFixture({ firstName: first, lastName: rest.join(" "), email: emails[site], summary: summaries[site] }),
+      ).toBe(true);
+    // The earlier, looser runbook wording must not pass.
+    expect(
+      mod.isAcceptanceFixture({ firstName: first, lastName: rest.join(" "), email: "acceptance@example.test", summary: "TEST lead from website form" }),
+    ).toBe(false);
+
+    // Real DB: a CSS-shaped website lead (phone, channels, title lines) is removable.
+    const requestId = randomUUID();
+    const res = await fetch(`${base}/api/v1/public/smart-sites/${siteId}/intake`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        schemaVersion: 1,
+        requestId,
+        contact: { name: inputs.name, email: emails.css, phone: "404-555-0142" },
+        project: { serviceCode: "not-sure", postalCode: "30115", timing: "unsure", summary: summaries.css },
+        consent: { contact: true, policyVersion: "css-service-request-v1", channels: ["phone", "email"] },
+      }),
+    });
+    expect(res.status).toBe(201);
+    const { leadId } = (await res.json()) as { leadId: string };
+    const { args } = await idsFor(leadId);
+    const cleaned = await run(acceptanceMain, ["cleanup", ...args, "--apply"], {
+      DATABASE_URL: process.env.DATABASE_URL,
+    });
+    expect(cleaned.exitCode).toBe(0);
+    expect(JSON.parse(cleaned.stdout)).toMatchObject({ committed: true, deleted: { leads: 1, contacts: 1 } });
+  });
+
   it("cleanup refuses a lead that is not a labeled TEST lead", async () => {
     const requestId = randomUUID();
     const res = await fetch(`${base}/api/v1/public/smart-sites/${siteId}/intake`, {
@@ -725,6 +828,15 @@ describe("hookup scripts failure paths (in-memory HTTP/SQL substitutes, no netwo
                   other_leads: 0,
                 },
               ],
+            };
+          if (sql.includes("task_untouched"))
+            return {
+              rows: [{
+                task_status: "open", task_assigned: null, task_completed: null,
+                task_description: "Contact permission covers this inquiry only. Assign an owner and record the follow-up; no email, SMS, appointment or dispatch has been sent or confirmed.",
+                task_title: "Review help choosing a service inquiry", task_untouched: true,
+                lead_status: "new", lead_assigned: null, lead_untouched: true, contact_untouched: true,
+              }],
             };
           if (sql.includes("pg_constraint")) return { rows: downstream };
           if (sql.includes("::text = $1")) return { rows: [{ n: 1 }] };
