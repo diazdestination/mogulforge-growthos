@@ -1,8 +1,12 @@
 import { beforeAll, describe, expect, it } from 'vitest';
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import * as sourceProof from './c1-source-preservation.mjs';
 import { applyC1TestOnlyAmendment, loadC1SourceSnapshot, parseC1Index, verifyC1SourceSnapshot } from './c1-source-preservation.mjs';
 
 let original;
-beforeAll(() => { original = loadC1SourceSnapshot(); });
+// Native Windows Git process startup can exceed Vitest's 10-second hook default.
+beforeAll(() => { original = loadC1SourceSnapshot(); }, 30000);
 const copy = () => structuredClone(original);
 describe('exact C1 source preservation overlay', () => {
   it('keeps original acceptance separate from the exact current product scope', () => {
@@ -15,7 +19,17 @@ describe('exact C1 source preservation overlay', () => {
     expect(result.changedProductPaths).toHaveLength(7);
     expect(result.testOnlyAmendment.sourceCommit).toBe('2f79a3180dc08d14a187674b806d98607349c4d1');
     expect(result.testOnlyAmendment.scope.count).toBe(2119);
-    expect(result.currentScope).toEqual(result.testOnlyAmendment.scope);
+    expect(result.smartSiteAmendment.sourceCommit).toBe('b7f34c70638f9f664a23817021324d26b7ed8ca6');
+    expect(result.smartSiteAmendment.scope).toEqual({count:2118,sha256:'a017cf3a0996f8bd127ac9d804e6eb328d96032e49ff6fd955f77246e94ef480'});
+    expect(result.smartSiteAmendment.changedPaths).toEqual([
+      'artifacts/api-server/src/routes/v1/smart-site-acquisition.test.ts',
+      'artifacts/api-server/src/routes/v1/smart-site-hookup-scripts.test.ts',
+      'artifacts/api-server/src/services/smart-sites.ts',
+    ]);
+    expect(result.smartSiteAmendment.reviewedB.sourceCommit).toBe('308952e2abd0c97d4edc4274538af12a7134677a');
+    expect(result.smartSiteAmendment.integration.sourceCommit).toBe('08c97d7b76ce8e4668c04dc1fcbde9089a709bbe');
+    expect(result.smartSiteAmendment.auxiliaryScope.count).toBe(3);
+    expect(result.currentScope).toEqual({count:2120,sha256:'99a7972dbcb95bf3bc32190bcb0deac1a18c6b59907f8e0184d8e0983fd5b254'});
     expect(result.testOnlyAmendment.changedPaths).toHaveLength(7);
     expect(result.testOnlyAmendment.changedPaths.every(path=>/^artifacts\/api-server\/src\/.*(?:\.test\.ts|test-helpers\/[^/]+\.ts)$/.test(path))).toBe(true);
     expect(result.releaseEligible).toBe(false);
@@ -91,5 +105,73 @@ describe('exact C1 source preservation overlay', () => {
     expect(()=>applyC1TestOnlyAmendment(new Map(),[change])).toThrow(/base path changed/);
     expect(()=>applyC1TestOnlyAmendment(new Map([[path,row]]),[change,change])).toThrow(/duplicate path/);
     expect(applyC1TestOnlyAmendment(new Map([[path,row]]),[change]).get(path)).toEqual({path,mode:'100644',blob:'2'.repeat(40)});
+  });
+  it.each(['smartSiteAmendment','smartSiteOriginal','smartSiteCurrent','smartSiteAuxiliary'])('refuses same-size altered %s bytes', key => {
+    const snapshot=copy(),bytes=key==='smartSiteAmendment'?snapshot[key]:snapshot[key][0].bytes;
+    bytes[0]^=1;
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/changed/);
+  });
+  it.each(['reviewedBCommit','reviewedBTree','smartSiteCommit','smartSiteTree','integrationCommit','integrationTree'])('refuses changed %s identity', key => {
+    const snapshot=copy();snapshot[key]='0'.repeat(40);
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/changed/);
+  });
+  it.each(['reviewedBIsAncestor','smartSiteIsAncestor','integrationIsAncestor'])('refuses lost %s ancestry', key => {
+    const snapshot=copy();snapshot[key]=false;
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/lineage/);
+  });
+  it.each(['reviewedBProduct','smartSiteProduct','integrationProduct'])('refuses historical %s map drift', key => {
+    const snapshot=copy();snapshot[key][0].blob='0'.repeat(40);
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/differs/);
+  });
+  it.each(['smartSiteAuxiliaryProduct','integrationAuxiliaryProduct','currentAuxiliaryProduct'])('refuses extra, missing, duplicate, changed blob or changed mode in %s', key => {
+    for(const mutation of ['extra','missing','duplicate','blob','mode']){
+      const snapshot=copy(),rows=snapshot[key];
+      if(mutation==='extra')rows.push({...rows[0],path:'scripts/smart-sites/fourth.mjs'});
+      if(mutation==='missing')rows.pop();
+      if(mutation==='duplicate')rows.push({...rows[0]});
+      if(mutation==='blob')rows[0].blob='0'.repeat(40);
+      if(mutation==='mode')rows[0].mode='100755';
+      expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/auxiliary/);
+    }
+  });
+  it.each(['smartSiteCurrent','smartSiteAuxiliary'])('refuses missing pinned blobs and mode or blob drift in %s', key => {
+    for(const mutation of ['missing','mode','blob']){
+      const snapshot=copy(),rows=snapshot[key];
+      if(mutation==='missing')rows.pop();
+      if(mutation==='mode')rows[0].mode='100755';
+      if(mutation==='blob')rows[0].blob='0'.repeat(40);
+      expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/coverage|changed/);
+    }
+  });
+  it('the Smart Site rule accepts only the exact three reviewed paths and refuses stale, missing, duplicate and extra changes', () => {
+    const changes=[
+      {path:'artifacts/api-server/src/routes/v1/smart-site-acquisition.test.ts',before:{path:'artifacts/api-server/src/routes/v1/smart-site-acquisition.test.ts',mode:'100644',blob:'ec57504b78ac688ed61b429a700d3ff138ae050e'},after:{mode:'100644',blob:'e27514d9e1ff826a79700ff488b6fe460a447b84'}},
+      {path:'artifacts/api-server/src/routes/v1/smart-site-hookup-scripts.test.ts',before:null,after:{mode:'100644',blob:'ccddb11dc94020b68aa716391a20468cbcc22df6'}},
+      {path:'artifacts/api-server/src/services/smart-sites.ts',before:{path:'artifacts/api-server/src/services/smart-sites.ts',mode:'100644',blob:'c1c6e532fbed264eaef648a369ee533bfd905fb0'},after:{mode:'100644',blob:'9b13dc788fdd5fd0733e9c951b5ac97353ca4517'}},
+    ];
+    const base=new Map(changes.filter(change=>change.before).map(change=>[change.path,change.before]));
+    const apply=changes=>sourceProof.applyC1SmartSiteAmendment(base,changes);
+    const applied=apply(changes);
+    expect(changes.map(change=>applied.get(change.path))).toEqual(changes.map(change=>({path:change.path,...change.after})));
+    const stale=structuredClone(changes);stale[0].before.blob='0'.repeat(40);
+    expect(()=>apply(stale)).toThrow(/base path changed/);
+    expect(()=>apply(changes.slice(1))).toThrow(/coverage/);
+    expect(()=>apply([...changes,changes[0]])).toThrow(/duplicate/);
+    expect(()=>apply([...changes,{...changes[0],path:'artifacts/api-server/src/services/unreviewed.ts'}])).toThrow(/coverage/);
+    const replacement=structuredClone(changes);replacement[0].path='artifacts/api-server/src/services/unreviewed.ts';
+    expect(()=>apply(replacement)).toThrow(/coverage/);
+  });
+  it('refuses unstaged auxiliary CLI source', () => {
+    const snapshot=copy();snapshot.workingDiff='scripts/smart-sites/common.mjs\n';
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/worktree/);
+  });
+  it('loads and refuses a fourth untracked auxiliary CLI source', () => {
+    const path=fileURLToPath(new URL(`./smart-sites/c1-unreviewed-${process.pid}.mjs`,import.meta.url));
+    writeFileSync(path,'// synthetic unreviewed source\n',{flag:'wx'});
+    try {
+      const snapshot=loadC1SourceSnapshot();
+      expect(snapshot.untracked).toContain(`scripts/smart-sites/c1-unreviewed-${process.pid}.mjs`);
+      expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/untracked scoped source/);
+    } finally { unlinkSync(path); }
   });
 });

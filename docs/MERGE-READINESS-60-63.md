@@ -73,7 +73,30 @@ Minor). This branch fixes it in test code only (see below).
    - The proof still checks the historical overlay commit `54cffe4` exactly.
    - It now also requires the amendment commit's lineage, tree and scope.
    - It allows only `*.test.ts(x)` and `src/test-helpers/*.ts` paths in the amendment.
-   - The current index must equal the overlay plus the amendment.
+   - B's historical product map must equal the overlay plus that amendment.
+
+The proposed root integration also includes the separately reviewed Smart Site
+source from D (`b7f34c70638f9f664a23817021324d26b7ed8ca6`, tree
+`8aa71a245a97ef0c9f01c71afd8e1d29156e289f`). Its production change is governed
+by the separate hash-pinned
+`reports/c1-smart-site-integration-amendment-2026-10-16.json`; the seven-path B
+amendment and its test-only rule are unchanged. The successor first proves D's
+historical 2,118-entry map against the original 2,117-entry C1 overlay, then
+applies the same three exact, disjoint changes to B's independently proved
+2,119-entry map. The complete current API/library scope must have 2,120 entries,
+SHA-256 `99a7972dbcb95bf3bc32190bcb0deac1a18c6b59907f8e0184d8e0983fd5b254`.
+It also pins the complete three-file `scripts/smart-sites` map and exact CLI
+bytes/modes; extra tracked or untracked CLI source and unstaged changes fail.
+
+The descriptor binds B `308952e2abd0c97d4edc4274538af12a7134677a` / tree
+`4962089d4b2859ef9dfb4f2b2c02885b5303c235`, D above, and the proposed ancestry
+preserving source merge M `08c97d7b76ce8e4668c04dc1fcbde9089a709bbe` / tree
+`bd3acb8c9912c4aebd81bfe2c1ac240fc158ed70`. All three must remain ancestors of
+HEAD. M predates this proof extension, avoiding a self-referential commit pin.
+The one-time generator and immutable source maps are external review evidence at
+`C:\Forge\artifacts\growthos-launch-codex-20261016\integration-proof`. This local
+proposed integration still needs fresh independent review and full exact-head CI;
+the successor grants no release eligibility or hosted/provider authority.
 
 Net effect against `main` once hygiene is on top: 879 files changed, adding 433,792
 lines and deleting 36,096 (it was 2,280,846 added without hygiene). Of the 67
@@ -87,7 +110,8 @@ into `main`.** Do not squash or rebase.
 
 The repo's proofs need the reviewed SHAs to stay reachable from the merged head:
 - `scripts/c1-source-preservation.mjs` requires the C1 overlay commit `54cffe4` and
-  the amendment commit `2f79a31` to be ancestors of HEAD.
+  the amendment commit `2f79a31` to be ancestors of HEAD. The separate Smart Site
+  successor also requires the exact reviewed B, D and proposed M identities above.
 - Receipts and CI evidence cite exact stack SHAs.
 
 `54cffe4` is not an ancestor of `main` (`7091af8`). A single-parent squash would
@@ -108,10 +132,11 @@ Do **not** merge #60–#63 without the hygiene commits on top.
 - [ ] The 19 original SQL pins (0000–0018, `scripts/production75-pins.mjs`) and the 0019 scheduling SQL (20 total) are byte-unchanged; the hygiene diff touches nothing under `lib/db`, `reports/staging-schema-preview-*/*.sql` or `.github/`
   - In `scripts/` it changes only the C1 proof (`c1-source-preservation.mjs` and its test) and `production75-combined-source.test.mjs`
 - [ ] C1 descriptor `reports/c1-source-preservation-2026-10-16.json` and `reports/combined-release-preservation-2026-10-15.json` are byte-unchanged
-  - The only change to the product scope (`artifacts/api-server`, `lib`) is the 7-path test-only amendment pinned by `reports/c1-test-fixture-amendment-2026-10-16.json`
+  - The product scope (`artifacts/api-server`, `lib`) equals the unchanged C1 overlay plus the 7-path test-only B amendment and the exact 3-path D successor; all three historical maps remain independently checked
+  - The complete `scripts/smart-sites` scope contains exactly the three reviewed CLI files with pinned bytes, blobs and modes; no extra tracked/untracked source or unstaged changes
   - `verifyC1SourceSnapshot(loadC1SourceSnapshot())` passes at the exact final head, as do the C1, contractor-recovery-drill and combined-source tests
 - [ ] Secret scan is clean on the final head (Gitleaks 8.30.1 on the hygiene commits found no leaks locally; rerun on the merge head)
 - [ ] `reports/EVIDENCE-INDEX.md` and `reports/evidence-index.json` exist; spot-check SHA-256 for a few archived files under `C:\Forge\artifacts\growthos-evidence-archive`
 - [ ] Package A inputs are present in the tree: `schema-catalog.mjs`, 0019 SQL, `catalog-95/142.json`, `fixture75-*.sql`, `catalog75-*.json`
-- [ ] Merge method is a non-squash merge commit that keeps `54cffe4`, `2f79a31` and every reviewed stack SHA reachable, and Adam approved the merge to `main`
+- [ ] Merge method is a non-squash merge commit that keeps `54cffe4`, `2f79a31`, reviewed B/D, proposed M and every reviewed stack SHA reachable, and Adam approved the merge to `main`
 - [ ] Nothing hosted is implied: no deploy, provider activation, real send, production change or public launch comes with this merge
