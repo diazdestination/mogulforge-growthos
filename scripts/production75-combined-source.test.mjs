@@ -49,7 +49,7 @@ test('a same-size altered protected buffer fails the same preservation check', (
   assert.throws(() => checkBytes(altered, pin), /exact Git bytes/);
 });
 
-test('complete API and library index equals only the exact separately reviewed C1 overlay', () => {
+test('complete API and library index equals only the exact C1 overlay plus its reviewed test-only amendment', () => {
   const entries = git('ls-files', '--stage', '--', ...manifest.scope.paths).toString().trim().split('\n').map(line => {
     const [meta, path] = line.split('\t');
     const [mode, blob, stage] = meta.split(' ');
@@ -58,8 +58,10 @@ test('complete API and library index equals only the exact separately reviewed C
   }).sort((a, b) => Buffer.compare(Buffer.from(a.path), Buffer.from(b.path)));
   const proof=assertC1SourcePreserved();
   assert.equal(manifest.scope.count,2115);
-  assert.equal(entries.length,2117);
-  assert.equal(sha(JSON.stringify(entries)),proof.overlay.scope.sha256);
+  assert.equal(proof.overlay.scope.count,2117);
+  assert.equal(entries.length,2119);
+  assert.equal(entries.length,proof.currentScope.count);
+  assert.equal(sha(JSON.stringify(entries)),proof.currentScope.sha256);
   assert.equal(proof.releaseEligible,false);
   assert.equal(git('diff', '--name-only', '--', ...manifest.scope.paths).toString(), '');
 });

@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "kind": "exact_local_c1_test_only_amendment_not_a_release_grant",
+  "purpose": "Test-only VAPID fixture fix: tests generate a canonical 32-byte P-256 private scalar so the unchanged fail-closed staff push validator never sees a 31-byte random key (CI ruling CI-R1). No production, schema, SQL or runtime source changes.",
+  "baseOverlay": {
+    "descriptorPath": "reports/c1-source-preservation-2026-10-16.json",
+    "descriptorSha256": "6d64fb78992d82fae67eb6d258cf3fbf1e8ea23b4ca11929d9b95b985679348c",
+    "sourceCommit": "54cffe4c1552ae306781632202da19bb0fe88f4a",
+    "sourceTree": "e6ced6079e2a2c79352c9fdf44c9c3970ebe262a",
+    "scope": {
+      "count": 2117,
+      "sha256": "4cf023465c1eedfa749c01cb6304ea60ffe1bae4ef9f007139efbfe51d85b237"
+    }
+  },
+  "amendment": {
+    "sourceCommit": "2f79a3180dc08d14a187674b806d98607349c4d1",
+    "sourceTree": "ce322ac062981b9420cf813598e942f66d915a1c",
+    "scope": {
+      "count": 2119,
+      "sha256": "fe1ecc0be420dd08b8d87c0b0f46eab796142e3141cc01f19f093a8b0d5fe41e"
+    }
+  },
+  "changes": [
+    {
+      "path": "artifacts/api-server/src/services/missed-call-care.test.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/missed-call-care.test.ts",
+        "mode": "100644",
+        "blob": "b5def1f284c9728d08e8bc5ed6a39c21c68ac013"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "36edc45f667fb7e95cde0c63d6437a7721e2feff"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/staff-push-policy.test.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/staff-push-policy.test.ts",
+        "mode": "100644",
+        "blob": "a89c6fece88cd8b83e2378d1c91295f190ab647e"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "3c3ed6958a8ec92e6e9d8cdff127133625b28788"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/staff-push-transport.test.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/staff-push-transport.test.ts",
+        "mode": "100644",
+        "blob": "ffd86650152f6b86a366f01fc8a1d4e3f27fb7a4"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "8f7c54430f11f7770c9a27424d7ce51f21aa453a"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/staff-push.test.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/staff-push.test.ts",
+        "mode": "100644",
+        "blob": "30b4ae56303829f9b0feabe341d46307413db343"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "6790f73711d420c0c7de25c5c842eca85cd90035"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/staff-service-push.test.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/staff-service-push.test.ts",
+        "mode": "100644",
+        "blob": "a556ea61af58693aee5789460fdbfee9f1a19e83"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "5760f2be7f536e06b9b946c0328ae2f797b8a832"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/test-helpers/vapid-test-keys.test.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "918a10fb971a17623b562d9db57c729384f37a05"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/test-helpers/vapid-test-keys.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "c8522a2edb90ac5503e4a6435c9e88405e74676c"
+      }
+    }
+  ],
+  "originalBlobs": [
+    {
+      "path": "artifacts/api-server/src/services/missed-call-care.test.ts",
+      "mode": "100644",
+      "blob": "b5def1f284c9728d08e8bc5ed6a39c21c68ac013",
+      "bytes": 19711,
+      "sha256": "4e2a5f81e2c3ffafcd2b9db405dc78a2cd3943d361838a31258343bca01f62df"
+    },
+    {
+      "path": "artifacts/api-server/src/services/staff-push-policy.test.ts",
+      "mode": "100644",
+      "blob": "a89c6fece88cd8b83e2378d1c91295f190ab647e",
+      "bytes": 5952,
+      "sha256": "2357f07b62dbd188d742e10978762bb6a946d5cff7363dcd0e13ac461a8598c1"
+    },
+    {
+      "path": "artifacts/api-server/src/services/staff-push-transport.test.ts",
+      "mode": "100644",
+      "blob": "ffd86650152f6b86a366f01fc8a1d4e3f27fb7a4",
+      "bytes": 8072,
+      "sha256": "c87b38d87237b1e202f5d5af65cb52ac5368261f9ddf478930ca0416a23e5c54"
+    },
+    {
+      "path": "artifacts/api-server/src/services/staff-push.test.ts",
+      "mode": "100644",
+      "blob": "30b4ae56303829f9b0feabe341d46307413db343",
+      "bytes": 18849,
+      "sha256": "3603c280f3b6353f8d7bc065303f9c5ef3a49a9095b9ec676e2876ce65ebc3b9"
+    },
+    {
+      "path": "artifacts/api-server/src/services/staff-service-push.test.ts",
+      "mode": "100644",
+      "blob": "a556ea61af58693aee5789460fdbfee9f1a19e83",
+      "bytes": 9736,
+      "sha256": "06e7c7d9500856021512da3809b005663608742524c2169a9dae82aba38f6696"
+    }
+  ],
+  "currentBlobs": [
+    {
+      "path": "artifacts/api-server/src/services/missed-call-care.test.ts",
+      "mode": "100644",
+      "blob": "36edc45f667fb7e95cde0c63d6437a7721e2feff",
+      "bytes": 19758,
+      "sha256": "c207aefb1db50eb450a69c08bea85c03aa3144fa6c9c470860231c87be64691e"
+    },
+    {
+      "path": "artifacts/api-server/src/services/staff-push-policy.test.ts",
+      "mode": "100644",
+      "blob": "3c3ed6958a8ec92e6e9d8cdff127133625b28788",
+      "bytes": 5952,
+      "sha256": "9d2211c4e50eea2ec8062312b248ad9df08e0a558ace02d23a36040826e6cb65"
+    },
+    {
+      "path": "artifacts/api-server/src/services/staff-push-transport.test.ts",
+      "mode": "100644",
+      "blob": "8f7c54430f11f7770c9a27424d7ce51f21aa453a",
+      "bytes": 8089,
+      "sha256": "469481eb591d3e0846ac94bffa5d8e11466b3dcd958106216d71a76d49d7900f"
+    },
+    {
+      "path": "artifacts/api-server/src/services/staff-push.test.ts",
+      "mode": "100644",
+      "blob": "6790f73711d420c0c7de25c5c842eca85cd90035",
+      "bytes": 18896,
+      "sha256": "b9fb4738069b4703d5cc2b53cfd98e9831e45df9f13d6ba45a58583ba4e322e8"
+    },
+    {
+      "path": "artifacts/api-server/src/services/staff-service-push.test.ts",
+      "mode": "100644",
+      "blob": "5760f2be7f536e06b9b946c0328ae2f797b8a832",
+      "bytes": 9783,
+      "sha256": "24c0ee5d75b273168814e939f5689733d7079e90d42fadd4f8103e87d0a008fc"
+    },
+    {
+      "path": "artifacts/api-server/src/test-helpers/vapid-test-keys.test.ts",
+      "mode": "100644",
+      "blob": "918a10fb971a17623b562d9db57c729384f37a05",
+      "bytes": 1570,
+      "sha256": "958b266fe035aae668e7407aaf6c8923610a4da8f06fcfffe4faebf1c8287921"
+    },
+    {
+      "path": "artifacts/api-server/src/test-helpers/vapid-test-keys.ts",
+      "mode": "100644",
+      "blob": "c8522a2edb90ac5503e4a6435c9e88405e74676c",
+      "bytes": 980,
+      "sha256": "c9b6c192237b1c9077ee7050c0c956d8f717d7ca6aaf4692f7840b9c5c30e3a6"
+    }
+  ],
+  "releaseEligible": false
+}
