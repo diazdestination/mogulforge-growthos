@@ -29,16 +29,18 @@ import {
   automationsTable,
   db,
   organizationsTable,
+  playbookEnrollmentsTable,
   playbooksTable,
   pool,
+  scheduledActionsTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 import { clearLegacyOrgCache } from "../lib/orgFlavor";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
-import { ensureDefaultAutomations } from "./automation";
+import { ensureDefaultAutomations, runEvent } from "./automation";
 import * as crm from "./crm";
-import { autoEnrollLead, DEFAULT_PLAYBOOK_SEED_KEY, ensureDefaultPlaybook } from "./playbooks";
+import { DEFAULT_PLAYBOOK_SEED_KEY, ensureDefaultPlaybook } from "./playbooks";
 
 const orgIds: string[] = [];
 
@@ -76,7 +78,7 @@ describe("default seeding on a single-connection pool (GAP-16)", () => {
     expect(rows.map((r) => r.seedKey)).toEqual([DEFAULT_PLAYBOOK_SEED_KEY]);
   });
 
-  it("lead.created auto-enrollment completes for a fresh org", async () => {
+  it("lead.created event enrolls the lead and schedules its first step for a fresh org", async () => {
     const orgId = await freshOrg();
     const contact = await crm.createContact(orgId, {
       firstName: "Single",
@@ -84,13 +86,52 @@ describe("default seeding on a single-connection pool (GAP-16)", () => {
       email: `${randomUUID()}@example.invalid`,
     });
     const lead = await crm.createLead(orgId, { contactId: contact.id });
+    expect(lead).toBeTruthy();
+    // Cold cache: the event path itself must perform the org-flavor lookup.
     clearLegacyOrgCache();
-    await autoEnrollLead(orgId, lead!.id);
-    const rows = await db
-      .select({ id: playbooksTable.id })
+
+    // The real event entry point; emitAutomationEvent is a fire-and-forget wrapper of it.
+    await runEvent(orgId, "lead.created", { leadId: lead!.id, contactId: contact.id });
+
+    const [playbook] = await db
+      .select()
       .from(playbooksTable)
       .where(eq(playbooksTable.organizationId, orgId));
-    expect(rows).toHaveLength(1);
+    expect(playbook.seedKey).toBe(DEFAULT_PLAYBOOK_SEED_KEY);
+
+    // autoEnrollLead catches downstream failures and returns null, so the proof
+    // is the committed enrollment row and its queued first step.
+    const enrollments = await db
+      .select()
+      .from(playbookEnrollmentsTable)
+      .where(eq(playbookEnrollmentsTable.organizationId, orgId));
+    expect(enrollments).toHaveLength(1);
+    const [enrollment] = enrollments;
+    expect(enrollment).toMatchObject({
+      organizationId: orgId,
+      leadId: lead!.id,
+      playbookId: playbook.id,
+      status: "active",
+      currentStep: 0,
+    });
+    expect(enrollment.nextRunAt).toBeInstanceOf(Date);
+
+    const actions = await db
+      .select()
+      .from(scheduledActionsTable)
+      .where(eq(scheduledActionsTable.organizationId, orgId));
+    expect(actions).toHaveLength(1);
+    const [next] = actions;
+    expect(next).toMatchObject({
+      organizationId: orgId,
+      status: "pending",
+      action: {
+        type: "playbook_step",
+        params: { enrollmentId: enrollment.id, stepIndex: 0 },
+      },
+      context: { leadId: lead!.id },
+    });
+    expect(next.runAt.getTime()).toBe(enrollment.nextRunAt!.getTime());
   });
 
   it("ensureDefaultAutomations seeds a fresh org without a second connection", async () => {
