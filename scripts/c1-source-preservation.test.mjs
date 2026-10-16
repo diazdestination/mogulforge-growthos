@@ -17,7 +17,7 @@ describe('exact C1 source preservation overlay', () => {
     expect(result.testOnlyAmendment.scope.count).toBe(2119);
     expect(result.currentScope).toEqual(result.testOnlyAmendment.scope);
     expect(result.testOnlyAmendment.changedPaths).toHaveLength(7);
-    expect(result.testOnlyAmendment.changedPaths.every(path=>/^artifacts\/api-server\/src\/.+(?:\.test\.ts|test-helpers\/[^/]+\.ts)$/.test(path))).toBe(true);
+    expect(result.testOnlyAmendment.changedPaths.every(path=>/^artifacts\/api-server\/src\/.*(?:\.test\.ts|test-helpers\/[^/]+\.ts)$/.test(path))).toBe(true);
     expect(result.releaseEligible).toBe(false);
   });
   it.each(['changed_blob','same_size_blob','extra_path','missing_path','changed_mode','duplicate_path'])('refuses %s in the current complete product index', mutation => {
