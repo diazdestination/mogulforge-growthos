@@ -58,6 +58,11 @@ import {
 } from "./production75-observer.mjs";
 import { assertLegacyReaderCapabilities } from "./production75-legacy-model.mjs";
 import {
+  withProduction75Stage,
+  recordProduction75Secondary,
+  registerProduction75SafeError,
+} from "./production75-safe-diagnostics.mjs";
+import {
   buildProduction75Source,
   assertProduction75Source,
 } from "./production75-source.mjs";
@@ -74,7 +79,11 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), ".."),
 const sha = (v) => createHash("sha256").update(v).digest("hex"),
   digest = (v) => sha(JSON.stringify(v));
 const check = (v, code) => {
-  if (!v) throw Object.assign(new Error(code), { safeCode: code });
+  if (!v)
+    throw registerProduction75SafeError(
+      Object.assign(new Error(code), { safeCode: code }),
+      code,
+    );
 };
 const freeze = (v) => {
   if (v && typeof v === "object") {
@@ -1211,14 +1220,22 @@ async function executePacket(
       };
       const readFresh = async () => {
         // Other connections must not consume this Reader's idle-transaction budget.
-        const other = await snapshot(
-          copy.id,
-          await credentials(copy, custody, "reader"),
-          resources,
-          readerName,
-          ["growthos_staging", "mogulforge-growthos-db"],
+        const other = await withProduction75Stage(
+          "legacy-reader-other-databases",
+          async () =>
+            snapshot(
+              copy.id,
+              await credentials(copy, custody, "reader"),
+              resources,
+              readerName,
+              ["growthos_staging", "mogulforge-growthos-db"],
+            ),
         );
-        await reader.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
+        await withProduction75Stage("legacy-reader-begin", () =>
+          reader.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY"),
+        );
+        let observationFailed = false,
+          primaryFailure;
         try {
           const observer = createProduction75Observer({
               client: reader,
@@ -1231,16 +1248,24 @@ async function executePacket(
                 role: readerName,
               },
             }),
-            state = await captureProduction75State(observer, corePlan),
-            extra = await captureProduction75Extras(observer);
+            state = await withProduction75Stage("legacy-reader-state", () =>
+              captureProduction75State(observer, corePlan),
+            ),
+            extra = await withProduction75Stage("legacy-reader-extras", () =>
+              captureProduction75Extras(observer),
+            );
           const evidence = {
             state,
             extra,
-            capabilities: assertLegacyReaderCapabilities(state.policy, {
-              readerLogin: readerName,
-              readerRole: readerName,
-              writerRole: "schema_admin",
-            }),
+            capabilities: await withProduction75Stage(
+              "legacy-reader-capabilities",
+              () =>
+                assertLegacyReaderCapabilities(state.policy, {
+                  readerLogin: readerName,
+                  readerRole: readerName,
+                  writerRole: "schema_admin",
+                }),
+            ),
             otherDatabases: other.databases.map(({ identity, ...d }) => d),
           };
           if (combinedMode && state.phase === 142) {
@@ -1254,8 +1279,25 @@ async function executePacket(
             );
           }
           return evidence;
+        } catch (error) {
+          observationFailed = true;
+          primaryFailure = error;
+          throw error;
         } finally {
-          if (!resources.signal.aborted) await reader.query("ROLLBACK");
+          if (!resources.signal.aborted) {
+            try {
+              await withProduction75Stage("legacy-reader-rollback", () =>
+                reader.query("ROLLBACK"),
+              );
+            } catch (secondary) {
+              if (!observationFailed) throw secondary;
+              recordProduction75Secondary(
+                primaryFailure,
+                secondary,
+                "legacy-reader-rollback",
+              );
+            }
+          }
         }
       };
       const baseline = await readFresh();
@@ -1340,15 +1382,25 @@ async function executePacket(
           verifyLiveProtectedApps(transport, packet.protectedApps),
       });
       const readFresh = async () => {
-        await verifyLiveProtectedApps(transport, packet.protectedApps);
-        const others = await snapshot(
-          copy.id,
-          await credentials(copy, custody, "reader"),
-          resources,
-          readerName,
-          ["growthos_staging", "mogulforge-growthos-db"],
+        await withProduction75Stage("scheduling-reader-protected", () =>
+          verifyLiveProtectedApps(transport, packet.protectedApps),
         );
-        await reader.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
+        const others = await withProduction75Stage(
+          "scheduling-reader-other-databases",
+          async () =>
+            snapshot(
+              copy.id,
+              await credentials(copy, custody, "reader"),
+              resources,
+              readerName,
+              ["growthos_staging", "mogulforge-growthos-db"],
+            ),
+        );
+        await withProduction75Stage("scheduling-reader-begin", () =>
+          reader.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY"),
+        );
+        let observationFailed = false,
+          primaryFailure;
         try {
           const observer = createScheduling0019Observer({
               client: reader,
@@ -1360,25 +1412,56 @@ async function executePacket(
                 role: readerName,
               },
             }),
-            state = await captureScheduling0019State(observer, deltaPlan),
-            extra = await captureProduction75Extras(observer),
-            capabilities = assertLegacyReaderCapabilities(state.policy, {
-              readerLogin: readerName,
-              readerRole: readerName,
-              writerRole: "schema_admin",
-            });
-          check(
-            isDeepStrictEqual(extra, committedProtected.extra) &&
-              isDeepStrictEqual(
-                others.databases.map(({ identity, ...d }) => d),
-                committedProtected.otherDatabases,
-              ) &&
-              isDeepStrictEqual(capabilities, committedProtected.capabilities),
-            "production75_combined_protected",
+            state = await withProduction75Stage("scheduling-reader-state", () =>
+              captureScheduling0019State(observer, deltaPlan),
+            ),
+            extra = await withProduction75Stage(
+              "scheduling-reader-extras",
+              () => captureProduction75Extras(observer),
+            ),
+            capabilities = await withProduction75Stage(
+              "scheduling-reader-capabilities",
+              () =>
+                assertLegacyReaderCapabilities(state.policy, {
+                  readerLogin: readerName,
+                  readerRole: readerName,
+                  writerRole: "schema_admin",
+                }),
+            );
+          await withProduction75Stage("scheduling-reader-invariants", () =>
+            check(
+              isDeepStrictEqual(extra, committedProtected.extra) &&
+                isDeepStrictEqual(
+                  others.databases.map(({ identity, ...d }) => d),
+                  committedProtected.otherDatabases,
+                ) &&
+                isDeepStrictEqual(
+                  capabilities,
+                  committedProtected.capabilities,
+                ),
+              "production75_combined_protected",
+            ),
           );
           return state;
+        } catch (error) {
+          observationFailed = true;
+          primaryFailure = error;
+          throw error;
         } finally {
-          if (!resources.signal.aborted) await reader.query("ROLLBACK");
+          if (!resources.signal.aborted) {
+            try {
+              await withProduction75Stage("scheduling-reader-rollback", () =>
+                reader.query("ROLLBACK"),
+              );
+            } catch (secondary) {
+              if (!observationFailed) throw secondary;
+              recordProduction75Secondary(
+                primaryFailure,
+                secondary,
+                "scheduling-reader-rollback",
+              );
+            }
+          }
         }
       };
       return {

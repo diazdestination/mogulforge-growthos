@@ -6,6 +6,11 @@ import { isDeepStrictEqual } from "node:util";
 import { deltaFixture } from "../production75-operator-test-support.mjs";
 import { assertProduction75ReaderDelta } from "../production75-reader-delta.mjs";
 import { assertLegacyReaderCapabilities } from "../production75-legacy-model.mjs";
+import {
+  withProduction75Stage,
+  recordProduction75Secondary,
+  registerProduction75SafeError,
+} from "../production75-safe-diagnostics.mjs";
 
 export function readerTimingCase({
   kind,
@@ -14,7 +19,9 @@ export function readerTimingCase({
   actualReader,
   captureOthers,
   mainFailure,
+  failMain = false,
   otherFailure,
+  rollbackFailure,
 } = {}) {
   if (!["legacy", "scheduling"].includes(kind))
     throw Error("invalid_test_kind");
@@ -77,6 +84,7 @@ export function readerTimingCase({
       }
       if (sql === "ROLLBACK") {
         metrics.rollback++;
+        if (rollbackFailure) throw rollbackFailure;
         if (
           !actualReader &&
           metrics.transactionOpen &&
@@ -114,10 +122,13 @@ export function readerTimingCase({
     policy: app.policy,
   };
   const captureMain = async () => {
-    if (mainFailure) throw mainFailure;
+    if (failMain || mainFailure) throw mainFailure;
     return state;
   };
   const env = {
+    withProduction75Stage,
+    recordProduction75Secondary,
+    registerProduction75SafeError,
     verifyLiveProtectedApps: async () => true,
     transport: {
       connect: async (_proxy, _database, _credentials, options) =>

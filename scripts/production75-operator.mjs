@@ -23,7 +23,16 @@ import {
   assertScheduling0019Preserved,
 } from "./production75-scheduling0019.mjs";
 import { catalogDigest } from "../reports/release-preparation-2026-10-09/schema-catalog.mjs";
-const error = (code) => Object.assign(new Error(code), { safeCode: code });
+import {
+  registerProduction75SafeError,
+  production75Diagnostic,
+} from "./production75-safe-diagnostics.mjs";
+export { production75Diagnostic } from "./production75-safe-diagnostics.mjs";
+const error = (code) =>
+  registerProduction75SafeError(
+    Object.assign(new Error(code), { safeCode: code }),
+    code,
+  );
 const check = (v, code) => {
   if (!v) throw error(code);
 };
@@ -450,7 +459,11 @@ export async function runProduction75Operator({
       now,
       until: plan.cleanupUntil,
     });
-    const call = async (fn, until = plan.workUntil) => {
+    const call = async (
+      fn,
+      until = plan.workUntil,
+      stage = "operator-callback",
+    ) => {
       let timer;
       const deadline = Math.min(until, now() + 240000);
       try {
@@ -480,6 +493,11 @@ export async function runProduction75Operator({
         const diagnostic = production75V1FailureMetadata(e);
         if (diagnostic && !result.providerFailure)
           result.providerFailure = diagnostic;
+        if (!result.callbackFailure)
+          result.callbackFailure = Object.freeze({
+            callback: stage,
+            ...production75Diagnostic(e, stage),
+          });
         throw error("production75_operator_callback");
       } finally {
         clearTimeout(timer);
@@ -671,17 +689,20 @@ export async function runProduction75Operator({
     custody.verifyProfile(delta.profileSha256);
     result.readerProfileVerified = true;
     for (const outcome of ["rollback", "commit"]) {
-      let ctx = await call((scope) =>
-        callbacks.verificationContext({
-          copy,
-          readerName: plan.readerName,
-          outcome,
-          afterReader,
-          delta,
-          custody,
-          plan,
-          ...scope,
-        }),
+      let ctx = await call(
+        (scope) =>
+          callbacks.verificationContext({
+            copy,
+            readerName: plan.readerName,
+            outcome,
+            afterReader,
+            delta,
+            custody,
+            plan,
+            ...scope,
+          }),
+        plan.workUntil,
+        "legacy-context",
       );
       check(
         ctx?.plan?.target?.database === "fly-db" &&
@@ -758,16 +779,19 @@ export async function runProduction75Operator({
       let baseline = null;
       const usedWriters = new WeakSet();
       for (const outcome of ["rollback", "commit"]) {
-        const supplied = await call((scope) =>
-            callbacks.schedulingContext({
-              copy,
-              readerName: plan.readerName,
-              outcome,
-              baseline,
-              custody,
-              plan,
-              ...scope,
-            }),
+        const supplied = await call(
+            (scope) =>
+              callbacks.schedulingContext({
+                copy,
+                readerName: plan.readerName,
+                outcome,
+                baseline,
+                custody,
+                plan,
+                ...scope,
+              }),
+            plan.workUntil,
+            "scheduling-context",
           ),
           ctx = bindSchedulingContext(supplied, plan, baseline);
         check(

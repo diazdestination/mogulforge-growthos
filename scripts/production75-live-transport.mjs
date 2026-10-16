@@ -6,6 +6,12 @@ import { promisify, types } from "node:util";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+import {
+  registerProduction75SafeError,
+  recordProduction75DriverFailure,
+  recordProduction75Secondary,
+  withProduction75Stage,
+} from "./production75-safe-diagnostics.mjs";
 const FLY = "C:/Forge/tools/flyctl/0.4.115/flyctl.exe",
   BINARY_SHA =
     "498db0f2211bc43ac8c86fc1d62009b660417536b874dc74ed67edf58dd76be9";
@@ -15,7 +21,10 @@ const SOURCE = "kzpwm0j18eg04nv3",
 const errors = new WeakMap(),
   proxyOwners = new WeakMap();
 const fail = (code) => {
-  const e = Object.assign(new Error(code), { safeCode: code });
+  const e = registerProduction75SafeError(
+    Object.assign(new Error(code), { safeCode: code }),
+    code,
+  );
   errors.set(e, code);
   return e;
 };
@@ -605,7 +614,8 @@ export function createLiveTransport({
         });
         counts.clients++;
         let ending = null,
-          failed = false;
+          failed = false,
+          idleFailure = null;
         const end = () =>
           (ending ??= (async () => {
             try {
@@ -623,20 +633,27 @@ export function createLiveTransport({
             }
           })());
         closers.add(end);
-        client.on("error", () => {
+        client.on("error", (driverError) => {
           failed = true;
+          idleFailure ??= recordProduction75DriverFailure(
+            fail("production75_live_client"),
+            driverError,
+          );
           client.connection?.stream?.destroy();
         });
         const query = client.query.bind(client);
         client.query = async (...args) => {
-          check(!failed, "production75_live_client");
+          if (failed) throw idleFailure ?? fail("production75_live_client");
           resources.assertActive();
           try {
             const value = await query(...args);
             resources.assertActive();
             return value;
           } catch (e) {
-            const sanitized = fail(errors.get(e) ?? "production75_live_query");
+            const sanitized = recordProduction75DriverFailure(
+              fail(errors.get(e) ?? "production75_live_query"),
+              e,
+            );
             // Only the new scheduling writer opts into settled ERROR metadata.
             // Raw messages, row/constraint details and causes never cross here.
             if (
@@ -668,16 +685,26 @@ export function createLiveTransport({
         };
         client.__driverClose = end;
         try {
-          await bounded(
-            () => client.connect(),
-            Math.max(1, Math.min(10000, resources.deadline - now())),
-            now,
+          await withProduction75Stage("transport-connect", () =>
+            bounded(
+              () => client.connect(),
+              Math.max(1, Math.min(10000, resources.deadline - now())),
+              now,
+            ),
           );
           resources.assertActive();
           return client;
         } catch (e) {
-          await end();
-          throw fail(errors.get(e) ?? "production75_live_client");
+          const primary = recordProduction75DriverFailure(
+            fail(errors.get(e) ?? "production75_live_client"),
+            e,
+          );
+          try {
+            await end();
+          } catch (secondary) {
+            recordProduction75Secondary(primary, secondary, "transport-close");
+          }
+          throw primary;
         }
       },
       (client) => {

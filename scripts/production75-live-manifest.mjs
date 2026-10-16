@@ -12,6 +12,7 @@ export const PRODUCTION75_RUNTIME_FILES = Object.freeze([
     "live-local",
     "live-admission",
     "live-runner",
+    "safe-diagnostics",
     "operator",
     "custody",
     "reader-delta",

@@ -1,5 +1,6 @@
 /** Closed supplied-client Reader observer. Caller owns its read-only transaction. */
 import { isDeepStrictEqual } from "node:util";
+import { transferProduction75Diagnostic } from "./production75-safe-diagnostics.mjs";
 import { CATALOG_QUERIES } from "../reports/release-preparation-2026-10-09/schema-catalog.mjs";
 import {
   PRODUCTION75_PRIVILEGE_QUERIES,
@@ -168,7 +169,7 @@ export function createScheduling0019Observer(input = {}) {
       return r;
     } catch (e) {
       unusable = true;
-      throw safe(errors.get(e) ?? "database");
+      throw transferProduction75Diagnostic(safe(errors.get(e) ?? "database"), e);
     } finally {
       clearTimeout(timer);
     }

@@ -1,5 +1,9 @@
 import { test, expect, vi } from "vitest";
-import { EventEmitter } from "node:events";
+import { createLiveTransportFixture } from "./test-support/live-transport-fixture.mjs";
+import {
+  production75Diagnostic,
+  withProduction75Stage,
+} from "./production75-safe-diagnostics.mjs";
 import { createOperatorResources } from "./production75-operator.mjs";
 import { guardCombinedSchedulingWriter } from "./production75-live-runner.mjs";
 import {
@@ -9,71 +13,201 @@ import {
 } from "./production75-live-transport.mjs";
 const credential = "fm1r_" + "A".repeat(40),
   config = `access_token: ${credential},${"B".repeat(40)}\n`;
-function fixture({ fetchFn, queryFn } = {}) {
-  let alive = false,
-    closed = false;
-  const child = new EventEmitter();
-  child.pid = 123;
-  child.stdout = new EventEmitter();
-  child.stdout.resume = () => {};
-  child.stderr = { resume() {} };
-  child.kill = () => {
-    alive = false;
-    closed = true;
-    queueMicrotask(() => child.emit("close", 0));
-    return true;
-  };
-  const runFile = vi.fn(async (args) =>
-    args[0] === "auth" ? "diazdestination@gmail.com\n" : "",
-  );
-  const inspect = vi.fn(async (kind, id) =>
-    kind === "listener"
-      ? alive
-        ? [{ pid: 123, address: "127.0.0.1" }]
-        : []
-      : kind === "children"
-        ? []
-        : closed
-          ? null
-          : { pid: id, created: "fixed", executable: "fly" },
-  );
-  class Client extends EventEmitter {
-    constructor(c) {
-      super();
-      this.config = c;
-      this.connection = {
-        stream: {
-          destroyed: false,
-          destroy() {
-            this.destroyed = true;
-          },
-        },
-      };
+const fixture = createLiveTransportFixture;
+
+test("late idle errors stay bound to their originating client and sealed stage", async () => {
+  const f = fixture(),
+    resources = createOperatorResources({ until: Date.now() + 10000 });
+  try {
+    await f.transport.verifyIdentity();
+    const proxy = await f.transport.openProxy("abcdefghijklmnop", resources);
+    const connect = () =>
+      f.transport.connect(
+        proxy,
+        "fly-db",
+        { user: "fly-user", password: "fixture" },
+        { readonly: true, resources },
+      );
+    const first = await connect(),
+      second = await connect();
+    first.emit("error", { code: "25P03" });
+    second.emit("error", { code: "08006" });
+    let a, b;
+    try {
+      await withProduction75Stage("legacy-reader-state", () =>
+        first.query("SELECT 1"),
+      );
+    } catch (error) {
+      a = error;
     }
-    async connect() {}
-    async query(...args) {
-      if (queryFn) return queryFn(...args);
-      return { rows: [] };
+    try {
+      await withProduction75Stage("scheduling-reader-state", () =>
+        second.query("SELECT 1"),
+      );
+    } catch (error) {
+      b = error;
     }
-    async end() {
-      this.connection.stream.destroy();
-    }
+    const snapshot = production75Diagnostic(a);
+    first.emit("error", { code: "23514" });
+    try {
+      await withProduction75Stage("scheduling-context", () =>
+        first.query("SELECT 1"),
+      );
+    } catch {}
+    expect(production75Diagnostic(a)).toEqual(snapshot);
+    expect(snapshot).toEqual({
+      stage: "legacy-reader-state",
+      safeCode: "production75_live_client",
+      sqlState: "25P03",
+    });
+    expect(production75Diagnostic(b)).toEqual({
+      stage: "scheduling-reader-state",
+      safeCode: "production75_live_client",
+      sqlState: "08006",
+    });
+  } finally {
+    expect(await resources.drain()).toEqual({ closed: true });
   }
-  const transport = createLiveTransport({
-    fetchFn,
-    runFile,
-    spawnChild: () => {
-      alive = true;
-      return child;
+});
+
+test("connect failure survives a later closure failure without certifying cleanup", async () => {
+  const f = fixture(),
+    resources = createOperatorResources({ until: Date.now() + 10000 });
+  let socket;
+  f.Client.prototype.connect = async function () {
+    socket = this.connection.stream;
+    socket.destroy = () => {
+      socket.destroyed = true;
+      throw Error("synthetic close failure");
+    };
+    throw Object.assign(Error("synthetic primary connect failure"), {
+      code: "08006",
+    });
+  };
+  f.Client.prototype.end = async function () {};
+  await f.transport.verifyIdentity();
+  const proxy = await f.transport.openProxy("abcdefghijklmnop", resources);
+  let failure;
+  try {
+    await f.transport.connect(
+      proxy,
+      "fly-db",
+      { user: "fly-user", password: "fixture" },
+      { readonly: true, resources },
+    );
+  } catch (error) {
+    failure = error;
+  }
+  expect(production75Diagnostic(failure)).toEqual({
+    stage: "transport-connect",
+    safeCode: "production75_live_client",
+    sqlState: "08006",
+    secondary: {
+      stage: "transport-close",
+      safeCode: "production75_diagnostic_unknown",
     },
-    readCredentialConfig: async () => config,
-    inspect,
-    Client,
-    choosePort: () => 16487,
-    pause: async () => {},
   });
-  return { transport, runFile, inspect, Client, child };
-}
+  expect(socket.destroyed).toBe(true);
+  expect(f.transport.metadata().clientsClosed).toBe(0);
+  await resources.drain();
+  await expect(f.transport.close()).rejects.toThrow("synthetic close failure");
+  expect(JSON.stringify(production75Diagnostic(failure))).not.toContain(
+    "synthetic",
+  );
+});
+
+test.each([false, true])(
+  "idle SQLSTATE stays diagnostic-only with scheduling opt-in %s",
+  async (settledServerErrors) => {
+    const f = fixture(),
+      resources = createOperatorResources({ until: Date.now() + 10000 });
+    await f.transport.verifyIdentity();
+    const proxy = await f.transport.openProxy("abcdefghijklmnop", resources);
+    const client = await f.transport.connect(
+      proxy,
+      "fly-db",
+      { user: "fly-user", password: "fixture" },
+      { readonly: true, settledServerErrors, resources },
+    );
+    client.emit(
+      "error",
+      Object.assign(Error("synthetic private row and credential"), {
+        code: "25P03",
+        severity: "FATAL",
+        detail: "synthetic private detail",
+      }),
+    );
+    let failure;
+    try {
+      await withProduction75Stage("legacy-context", () =>
+        withProduction75Stage("legacy-reader-state", () =>
+          client.query("SELECT 1"),
+        ),
+      );
+    } catch (error) {
+      failure = error;
+    }
+    expect(production75Diagnostic(failure)).toEqual({
+      stage: "legacy-reader-state",
+      safeCode: "production75_live_client",
+      sqlState: "25P03",
+    });
+    expect(failure.code).toBeUndefined();
+    expect(failure.severity).toBeUndefined();
+    expect(client.connection.stream.destroyed).toBe(true);
+    expect(JSON.stringify(production75Diagnostic(failure))).not.toContain(
+      "private",
+    );
+    expect(await resources.drain()).toEqual({ closed: true });
+    expect(f.transport.metadata()).toMatchObject({
+      clients: 1,
+      clientsClosed: 1,
+      socketsClosed: 1,
+    });
+  },
+);
+
+test.each(["23514", "08006"])(
+  "query SQLSTATE %s is retained without turning uncertain failure into settled rejection",
+  async (code) => {
+    const f = fixture({
+      queryFn: async () => {
+        throw Object.assign(Error("synthetic private data"), {
+          code,
+          severity: "FATAL",
+        });
+      },
+    });
+    const resources = createOperatorResources({ until: Date.now() + 10000 });
+    try {
+      await f.transport.verifyIdentity();
+      const proxy = await f.transport.openProxy("abcdefghijklmnop", resources);
+      const client = await f.transport.connect(
+        proxy,
+        "fly-db",
+        { user: "fly-user", password: "fixture" },
+        { readonly: false, settledServerErrors: true, resources },
+      );
+      let failure;
+      try {
+        await withProduction75Stage("scheduling-reader-state", () =>
+          client.query("SELECT 1"),
+        );
+      } catch (error) {
+        failure = error;
+      }
+      expect(production75Diagnostic(failure)).toEqual({
+        stage: "scheduling-reader-state",
+        safeCode: "production75_live_query",
+        sqlState: code,
+      });
+      expect(failure.code).toBeUndefined();
+      expect(failure.severity).toBeUndefined();
+    } finally {
+      expect(await resources.drain()).toEqual({ closed: true });
+    }
+  },
+);
 test("sanitized environment removes provider/PG overrides and isolates the agent", () => {
   const e = liveEnvironment({
     PATH: "path",

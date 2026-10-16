@@ -27,6 +27,11 @@ import {
   createOperatorResources,
 } from "./production75-operator.mjs";
 import { createProduction75V1Client } from "./production75-fly-v1.mjs";
+import { createLiveTransportFixture } from "./test-support/live-transport-fixture.mjs";
+import { withProduction75Stage } from "./production75-safe-diagnostics.mjs";
+import { createProduction75Observer } from "./production75-observer.mjs";
+import { createScheduling0019Observer } from "./production75-scheduling0019-observer.mjs";
+import { IDENTITY_SQL } from "./production75-core.mjs";
 const mocks = vi.hoisted(() => ({ verify: vi.fn(), scheduling: vi.fn() }));
 vi.mock("./production75-verification.mjs", () => ({
   runProduction75Verification: mocks.verify,
@@ -545,6 +550,240 @@ function fixture(planChanges = {}) {
     },
   };
 }
+
+test("idle driver failure crosses real transport and operator boundaries as bounded evidence with owned cleanup", async () => {
+  const f = fixture(),
+    live = createLiveTransportFixture();
+  f.callbacks.verificationContext = async ({ resources }) => {
+    await live.transport.verifyIdentity();
+    const proxy = await live.transport.openProxy("abcdefghijklmnop", resources);
+    const client = await live.transport.connect(
+      proxy,
+      "fly-db",
+      { user: "fly-user", password: "fixture" },
+      { readonly: true, resources },
+    );
+    client.emit(
+      "error",
+      Object.assign(Error("synthetic private credential and customer row"), {
+        code: "25P03",
+        severity: "FATAL",
+        detail: "synthetic private row",
+      }),
+    );
+    return withProduction75Stage("legacy-reader-state", () =>
+      client.query("SELECT 1"),
+    );
+  };
+  f.callbacks.closeResources = () => live.transport.close();
+  try {
+    const result = await runProduction75Operator(f.args);
+    expect(result.callbackFailure).toEqual({
+      callback: "legacy-context",
+      stage: "legacy-reader-state",
+      safeCode: "production75_live_client",
+      sqlState: "25P03",
+    });
+    expect(result.status).toBe("held-and-cleaned");
+    expect(result.resourcesClosed).toBe(true);
+    expect(result.outcomes).toEqual({});
+    expect(f.calls).toEqual(["create", "reader", "delete"]);
+    expect(live.transport.metadata()).toMatchObject({
+      clients: 1,
+      clientsClosed: 1,
+      socketsClosed: 1,
+      proxies: 1,
+      proxiesClosed: 1,
+    });
+    expect(JSON.stringify(result)).not.toContain("synthetic private");
+  } finally {
+    f.cleanup();
+  }
+});
+
+test.each(["legacy", "scheduling"])(
+  "%s observer preserves transport diagnostics through the real operator result after successful rollback",
+  async (kind) => {
+    const f = kind === "legacy" ? fixture() : await v2Fixture();
+    const live = createLiveTransportFixture({
+      queryFn: async (sql) => {
+        if (sql === "ROLLBACK") return { rows: [] };
+        throw Object.assign(Error("synthetic private database detail"), {
+          code: "42501",
+          severity: "ERROR",
+        });
+      },
+    });
+    const callback =
+      kind === "legacy" ? "verificationContext" : "schedulingContext";
+    f.callbacks[callback] = async ({ resources }) => {
+      await live.transport.verifyIdentity();
+      const proxy = await live.transport.openProxy(
+        "abcdefghijklmnop",
+        resources,
+      );
+      const client = await live.transport.connect(
+        proxy,
+        "fly-db",
+        { user: "fly-user", password: "fixture" },
+        { readonly: true, resources },
+      );
+      const identity = {
+        database: "fly-db",
+        login: f.p.readerName,
+        role: f.p.readerName,
+      };
+      const principals = ["fly-user", f.p.readerName];
+      const observer =
+        kind === "legacy"
+          ? createProduction75Observer({
+              client,
+              principals,
+              identity,
+              catalog75: combinedOperatorFixture.catalogs.legacy.fly75,
+              catalog142: JSON.parse(
+                fs.readFileSync(
+                  new URL(
+                    "../reports/production75-recovery-2026-10-11/catalog142-fly-db.json",
+                    import.meta.url,
+                  ),
+                ),
+              ),
+            })
+          : createScheduling0019Observer({
+              client,
+              principals,
+              identity,
+              catalogs: f.schedulingState.catalogs,
+            });
+      try {
+        return await withProduction75Stage(`${kind}-reader-state`, () =>
+          observer.query(IDENTITY_SQL),
+        );
+      } catch (error) {
+        expect(error.safeCode).toBe(
+          kind === "legacy"
+            ? "production75_observer_database"
+            : "scheduling0019_observer_database",
+        );
+        expect(error).not.toHaveProperty("code");
+        expect(error).not.toHaveProperty("severity");
+        throw error;
+      } finally {
+        await client.query("ROLLBACK");
+      }
+    };
+    f.callbacks.closeResources = () => live.transport.close();
+    try {
+      const result = await runProduction75Operator(f.args);
+      expect(JSON.parse(JSON.stringify(result)).callbackFailure).toEqual({
+        callback: `${kind}-context`,
+        stage: `${kind}-reader-state`,
+        safeCode: "production75_live_query",
+        sqlState: "42501",
+      });
+      expect(result).toMatchObject({
+        status: "held-and-cleaned",
+        errorCode: "production75_operator_callback",
+        copyDeleted: true,
+        resourcesClosed: true,
+      });
+      expect(f.calls).toEqual(["create", "reader", "delete"]);
+      expect(mocks.scheduling).not.toHaveBeenCalled();
+      if (kind === "legacy") expect(mocks.verify).not.toHaveBeenCalled();
+      expect(JSON.stringify(result)).not.toContain("synthetic private");
+      expect(live.transport.metadata()).toMatchObject({
+        clientsClosed: 1,
+        socketsClosed: 1,
+        proxiesClosed: 1,
+      });
+    } finally {
+      f.cleanup();
+    }
+  },
+);
+
+test.each([
+  "error",
+  "string",
+  "undefined",
+  "null",
+  "false",
+  "zero",
+  "empty",
+  "getter",
+  "proxy",
+])(
+  "callback diagnostics bound unknown %s values without reading hooks or weakening cleanup",
+  async (kind) => {
+    const f = fixture();
+    let hooks = 0;
+    const privateValue = "synthetic-customer-row-and-private-credential";
+    let failure;
+    if (kind === "error")
+      failure = Object.assign(Error(privateValue), {
+        safeCode: "production75_live_query",
+        cause: privateValue,
+      });
+    if (kind === "string") failure = privateValue;
+    if (kind === "null") failure = null;
+    if (kind === "false") failure = false;
+    if (kind === "zero") failure = 0;
+    if (kind === "empty") failure = "";
+    if (kind === "getter")
+      failure = Object.defineProperties(
+        {},
+        {
+          safeCode: {
+            get() {
+              hooks++;
+              throw Error(privateValue);
+            },
+          },
+          toJSON: {
+            get() {
+              hooks++;
+              throw Error(privateValue);
+            },
+          },
+        },
+      );
+    if (kind === "proxy") {
+      const revoked = Proxy.revocable(
+        {},
+        {
+          get() {
+            hooks++;
+            throw Error(privateValue);
+          },
+        },
+      );
+      revoked.revoke();
+      failure = revoked.proxy;
+    }
+    f.callbacks.verificationContext = async () => {
+      throw failure;
+    };
+    try {
+      const result = await runProduction75Operator(f.args);
+      expect(result.callbackFailure).toEqual({
+        callback: "legacy-context",
+        stage: "legacy-context",
+        safeCode: "production75_diagnostic_unknown",
+      });
+      expect(result.errorCode).toBe("production75_operator_callback");
+      expect(result.status).toBe("held-and-cleaned");
+      expect(result.outcomes).toEqual({});
+      expect(result.resourcesClosed).toBe(true);
+      expect(f.calls).toEqual(["create", "reader", "delete"]);
+      expect(JSON.stringify(result)).not.toContain(privateValue);
+      expect(hooks).toBe(0);
+      expect(mocks.verify).not.toHaveBeenCalled();
+    } finally {
+      f.cleanup();
+    }
+  },
+);
 test("one copy/Reader, rollback then commit and owned deletion pass in order", async () => {
   const f = fixture();
   try {

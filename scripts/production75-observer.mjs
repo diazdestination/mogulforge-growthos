@@ -1,6 +1,7 @@
 /** Fixed-query supplied-client observer. No transport, credentials, logs or mutation.
  * Caller owns an exclusive connected backend and READ ONLY transaction. */
 import { isDeepStrictEqual } from 'node:util';
+import { transferProduction75Diagnostic } from './production75-safe-diagnostics.mjs';
 import { CATALOG_QUERIES,catalogDigest } from '../reports/release-preparation-2026-10-09/schema-catalog.mjs';
 import { PRODUCTION75_PRIVILEGE_QUERIES,OWNERSHIP_SQL,IDENTITY_SQL,ORIGINAL_DEFAULTS } from './production75-core.mjs';
 export const PRODUCTION75_EXTRA_QUERIES=Object.freeze({
@@ -40,7 +41,7 @@ export function createProduction75Observer({client,principals,catalog75,catalog1
  for(const table of catalog142.tables.filter(t=>!catalog75.tables.some(o=>o.name===t.name)))add(`SELECT count(*)::text AS rows FROM public.${q(table.name)}`);
  const until=now()+bound.operationMs;let pid=null,busy=false,unusable=false;
  const remaining=()=>{const ms=until-now();check(ms>0,'production75_observer_deadline');return Math.min(ms,bound.queryMs);};
- async function dispatch(sql,args){let timer;try{const ms=remaining(),queryUntil=now()+ms;const r=await Promise.race([Promise.resolve().then(()=>client.query(sql,args)),new Promise((_,reject)=>{timer=setTimeout(()=>reject(safeError('production75_observer_deadline')),ms);})]);check(now()<queryUntil,'production75_observer_deadline');remaining();check(r&&Array.isArray(r.rows)&&r.rows.length<=bound.metadataRows&&Buffer.byteLength(JSON.stringify(r.rows))<=bound.metadataBytes,'production75_observer_bound');return r;}catch(e){unusable=true;throw safeError(internalErrors.get(e)??'production75_observer_database');}finally{clearTimeout(timer);}}
+ async function dispatch(sql,args){let timer;try{const ms=remaining(),queryUntil=now()+ms;const r=await Promise.race([Promise.resolve().then(()=>client.query(sql,args)),new Promise((_,reject)=>{timer=setTimeout(()=>reject(safeError('production75_observer_deadline')),ms);})]);check(now()<queryUntil,'production75_observer_deadline');remaining();check(r&&Array.isArray(r.rows)&&r.rows.length<=bound.metadataRows&&Buffer.byteLength(JSON.stringify(r.rows))<=bound.metadataBytes,'production75_observer_bound');return r;}catch(e){unusable=true;throw transferProduction75Diagnostic(safeError(internalErrors.get(e)??'production75_observer_database'),e);}finally{clearTimeout(timer);}}
  return Object.freeze({query:async(sql,args)=>{
   check(args===undefined||Array.isArray(args),'production75_observer_query');let parameters;try{parameters=args===undefined||args.length===0?undefined:structuredClone(args);}catch{throw safeError('production75_observer_query');}
   check(typeof sql==='string'&&registry.has(sql)&&isDeepStrictEqual(parameters,registry.get(sql)),'production75_observer_query');

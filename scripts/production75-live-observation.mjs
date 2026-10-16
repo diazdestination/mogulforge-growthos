@@ -1,6 +1,10 @@
 /** Full fixed-query snapshots; no default I/O or provider mutation. */
 import { isDeepStrictEqual } from "node:util";
 import {
+  withProduction75Stage,
+  recordProduction75Secondary,
+} from "./production75-safe-diagnostics.mjs";
+import {
   collectSchemaCatalog,
   catalogDigest,
 } from "../reports/release-preparation-2026-10-09/schema-catalog.mjs";
@@ -154,7 +158,9 @@ export async function captureLiveSnapshot({
       readonly: true,
       resources,
     });
-    let began = false;
+    let began = false,
+      observationFailed = false,
+      primaryFailure;
     try {
       await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
       began = true;
@@ -233,12 +239,50 @@ export async function captureLiveSnapshot({
       });
       await client.query("ROLLBACK");
       began = false;
+    } catch (failure) {
+      observationFailed = true;
+      primaryFailure = failure;
+      throw failure;
     } finally {
+      let rollbackFailed = false,
+        rollbackFailure;
       if (began && !resources.signal.aborted)
         try {
-          await client.query("ROLLBACK");
-        } catch {}
-      await client.__driverClose();
+          await withProduction75Stage("snapshot-rollback", () =>
+            client.query("ROLLBACK"),
+          );
+        } catch (failure) {
+          if (observationFailed)
+            recordProduction75Secondary(
+              primaryFailure,
+              failure,
+              "snapshot-rollback",
+            );
+          else {
+            rollbackFailed = true;
+            rollbackFailure = failure;
+          }
+        }
+      try {
+        await withProduction75Stage("snapshot-close", () =>
+          client.__driverClose(),
+        );
+      } catch (failure) {
+        if (observationFailed)
+          recordProduction75Secondary(
+            primaryFailure,
+            failure,
+            "snapshot-close",
+          );
+        else if (rollbackFailed)
+          recordProduction75Secondary(
+            rollbackFailure,
+            failure,
+            "snapshot-close",
+          );
+        else throw failure;
+      }
+      if (rollbackFailed) throw rollbackFailure;
     }
   }
   const result = { databases: snapshots };

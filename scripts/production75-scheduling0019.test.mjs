@@ -1,6 +1,11 @@
 import { beforeAll, test, expect, vi } from "vitest";
 import { createHash, randomUUID } from "node:crypto";
 import {
+  production75Diagnostic,
+  recordProduction75DriverFailure,
+  registerProduction75SafeError,
+} from "./production75-safe-diagnostics.mjs";
+import {
   buildScheduling0019Source,
   prepareScheduling0019,
   captureScheduling0019State,
@@ -191,6 +196,37 @@ function transactionFixture(options = {}) {
     },
   };
 }
+
+test.each(["23514", "08006", "25P03"])(
+  "diagnostic SQLSTATE %s cannot authorize transaction cleanup or replay",
+  async (code) => {
+    const failure = recordProduction75DriverFailure(
+      registerProduction75SafeError(
+        Object.assign(Error("production75_live_query"), {
+          safeCode: "production75_live_query",
+        }),
+        "production75_live_query",
+      ),
+      Object.assign(Error("synthetic private driver"), {
+        code,
+        severity: "FATAL",
+      }),
+    );
+    expect(production75Diagnostic(failure).sqlState).toBe(code);
+    const f = transactionFixture({ sourceError: failure, outcome: "commit" });
+    const result = await runScheduling0019Verification(f.args);
+    expect(result.status).toBe("verification-held-no-replay");
+    expect(result.proof.rollbackDispatched).toBe(false);
+    expect(result.proof.commitDispatched).toBe(false);
+    expect(queryCalls(f)).not.toContain("ROLLBACK");
+    expect(queryCalls(f)).not.toContain("COMMIT");
+    await expect(
+      runScheduling0019Verification({ ...f.args, attemptId: randomUUID() }),
+    ).rejects.toMatchObject({ safeCode: "scheduling0019_verification_replay" });
+    expect(f.ddlDispatches).toBe(1);
+    expect(JSON.stringify(result)).not.toContain("synthetic private");
+  },
+);
 const queryCalls = (f) =>
   f.calls.filter((c) => c[0] === "query").map((c) => c[1]);
 test.each(["rollback", "commit"])(
