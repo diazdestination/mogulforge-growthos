@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { postSmsOnce, SmsCarrierUnsupportedError, type SmsCarrierAttempt, type TwilioSmsCarrierIdentity } from "./sms-carrier-transport";
+import { postCallieAcknowledgment, type CallieDispatchIdentity } from "./callie-ack-transport";
 
 const holdTrace = vi.hoisted(() => ({ events: [] as string[] }));
 vi.mock("./outbound-hold", async (importOriginal) => {
@@ -8,6 +9,25 @@ vi.mock("./outbound-hold", async (importOriginal) => {
     holdTrace.events.push("hold");
     return actual.assertOutboundDeliveryAllowed(...args);
   } };
+});
+
+describe("CALLIE compatibility wrapper", () => {
+  it("projects its original fields and excludes an extra runtime From", async () => {
+    const current = vi.fn(async () => twilioIdentity({ from: "+15555550202" }) as CallieDispatchIdentity);
+    const onDispatch = vi.fn();
+    const response = new Response('{"sid":"synthetic"}', { status: 201 });
+    fetchMock.mockResolvedValueOnce(response);
+    expect(await postCallieAcknowledgment(current, onDispatch)).toBe(response);
+    expect(current).toHaveBeenCalledTimes(1); expect(onDispatch).toHaveBeenCalledTimes(1);
+    expect(response.bodyUsed).toBe(false);
+    expect(new URLSearchParams(String(fetchMock.mock.calls[0][1]?.body)).has("From")).toBe(false);
+  });
+  it("passes resolver rejection through without marking or posting", async () => {
+    const error = new Error("Synthetic current authority refusal");
+    const onDispatch = vi.fn();
+    await expect(postCallieAcknowledgment(async () => { throw error; }, onDispatch)).rejects.toBe(error);
+    expect(onDispatch).not.toHaveBeenCalled(); expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 function twilioIdentity(overrides: Partial<TwilioSmsCarrierIdentity> = {}): TwilioSmsCarrierIdentity {

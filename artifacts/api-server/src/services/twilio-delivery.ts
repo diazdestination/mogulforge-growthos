@@ -7,6 +7,7 @@ import {
 } from "@workspace/db";
 import { addSuppression, checkSendEligibility } from "./send-gate";
 import { assertOutboundDeliveryAllowed } from "./outbound-hold";
+import { postSmsOnce } from "./sms-carrier-transport";
 import {
   digest,
   phoneE164,
@@ -142,83 +143,77 @@ export async function sendTwilioSms(
   }
   let dispatched = false;
   try {
-    // The workflow's approval may have changed while ownership was acquired.
-    await beforeDispatch?.();
-    const current = await twilioForOrganization(context.organizationId);
-    if (!current?.smsEnabled || current.id !== config.id ||
-        current.accountSid !== config.accountSid ||
-        current.phoneNumber !== config.phoneNumber ||
-        current.messagingServiceSid !== config.messagingServiceSid ||
-        current.origin !== config.origin || current.businessName !== config.businessName ||
-        current.smsDisclosureVersion !== config.smsDisclosureVersion ||
-        current.dailySmsLimit !== config.dailySmsLimit) {
-      await db.update(twilioDispatchesTable)
-        .set({ status: "cancelled", updatedAt: new Date() })
-        .where(eq(twilioDispatchesTable.id, operation.id));
-      throw new Error("SMS cancelled because the client binding is disabled or changed");
-    }
-    const [freshContact] = await db.select().from(contactsTable).where(and(
-      eq(contactsTable.organizationId, context.organizationId), eq(contactsTable.id, context.contactId),
-    ));
-    const [freshProof] = await db.select().from(twilioConsentProofsTable).where(and(
-      eq(twilioConsentProofsTable.organizationId, context.organizationId),
-      eq(twilioConsentProofsTable.contactId, context.contactId),
-      eq(twilioConsentProofsTable.phone, phone), eq(twilioConsentProofsTable.purpose, context.purpose),
-    )).orderBy(desc(twilioConsentProofsTable.recordedAt), asc(twilioConsentProofsTable.granted)).limit(1);
-    if (!freshContact || phoneE164(freshContact.phone ?? "") !== phone ||
-        !freshProof?.granted || freshProof.id !== proof.id ||
-        freshProof.disclosureVersion !== current.smsDisclosureVersion)
-      throw new Error("SMS cancelled because its recipient or purpose consent changed");
-    // Re-read contact flags as well as STOP immediately before network handoff.
-    const latest = await checkSendEligibility({
-      organizationId: context.organizationId,
-      contact: freshContact,
-      channel: "sms",
-      kind: "transactional",
-    });
-    if (!latest.ok) {
-      await db
-        .update(twilioDispatchesTable)
-        .set({ status: "cancelled", updatedAt: new Date() })
-        .where(eq(twilioDispatchesTable.id, operation.id));
-      throw new Error("SMS cancelled by current consent/suppression policy");
-    }
-    assertOutboundDeliveryAllowed();
-    if (context.serviceSmsParentId) {
-      // The original approval may have been revoked while transport consent was
-      // read. Retain exact parent/dispatch evidence before the irreversible POST.
-      await beforeDispatch?.();
-      const { assertServiceSmsParentDispatch } = await import("./service-sms");
-      await assertServiceSmsParentDispatch({ parentId: context.serviceSmsParentId, organizationId: context.organizationId, operationId: operation.id, body, binding: current, consentProofId: proof.id });
-    }
-    if (context.contactTouch) {
-      const { assertSmsContactTouch, markContactTouchDispatchStarted } = await import("./contact-touch-claim");
-      await assertSmsContactTouch({ organizationId: context.organizationId, contactId: context.contactId, to, ...context.contactTouch });
-      await markContactTouchDispatchStarted(context.organizationId, context.contactTouch.logicalKey);
-    }
-    dispatched = true;
-    const response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${current.accountSid}/Messages.json`,
-      {
-        method: "POST",
-        // A 307/308 must not replay this irreversible POST outside our guard.
-        redirect: "error",
-        signal: AbortSignal.timeout(10_000),
-        headers: {
-          "content-type": "application/x-www-form-urlencoded",
-          authorization: `Basic ${Buffer.from(`${current.apiKeySid}:${current.apiKeySecret}`).toString("base64")}`,
-        },
-        body: new URLSearchParams({
-          To: phone,
-          MessagingServiceSid: current.messagingServiceSid!,
-          // Typed service replies are bound to this exact shop line, not an
-          // arbitrary sender selected from a Messaging Service pool.
-          ...(context.serviceSmsParentId ? { From: current.phoneNumber } : {}),
-          Body: message,
-          StatusCallback: `${current.origin}/api/v1/public/sms/status?operation=${operation.id}`,
-        }).toString(),
+    const response = await postSmsOnce({
+      provider: "twilio",
+      current: async () => {
+        // The workflow's approval may have changed while ownership was acquired.
+        await beforeDispatch?.();
+        const current = await twilioForOrganization(context.organizationId);
+        if (!current?.smsEnabled || current.id !== config.id ||
+            current.accountSid !== config.accountSid ||
+            current.phoneNumber !== config.phoneNumber ||
+            current.messagingServiceSid !== config.messagingServiceSid ||
+            current.origin !== config.origin || current.businessName !== config.businessName ||
+            current.smsDisclosureVersion !== config.smsDisclosureVersion ||
+            current.dailySmsLimit !== config.dailySmsLimit) {
+          await db.update(twilioDispatchesTable)
+            .set({ status: "cancelled", updatedAt: new Date() })
+            .where(eq(twilioDispatchesTable.id, operation.id));
+          throw new Error("SMS cancelled because the client binding is disabled or changed");
+        }
+        const [freshContact] = await db.select().from(contactsTable).where(and(
+          eq(contactsTable.organizationId, context.organizationId), eq(contactsTable.id, context.contactId),
+        ));
+        const [freshProof] = await db.select().from(twilioConsentProofsTable).where(and(
+          eq(twilioConsentProofsTable.organizationId, context.organizationId),
+          eq(twilioConsentProofsTable.contactId, context.contactId),
+          eq(twilioConsentProofsTable.phone, phone), eq(twilioConsentProofsTable.purpose, context.purpose),
+        )).orderBy(desc(twilioConsentProofsTable.recordedAt), asc(twilioConsentProofsTable.granted)).limit(1);
+        if (!freshContact || phoneE164(freshContact.phone ?? "") !== phone ||
+            !freshProof?.granted || freshProof.id !== proof.id ||
+            freshProof.disclosureVersion !== current.smsDisclosureVersion)
+          throw new Error("SMS cancelled because its recipient or purpose consent changed");
+        // Re-read contact flags as well as STOP immediately before network handoff.
+        const latest = await checkSendEligibility({
+          organizationId: context.organizationId,
+          contact: freshContact,
+          channel: "sms",
+          kind: "transactional",
+        });
+        if (!latest.ok) {
+          await db
+            .update(twilioDispatchesTable)
+            .set({ status: "cancelled", updatedAt: new Date() })
+            .where(eq(twilioDispatchesTable.id, operation.id));
+          throw new Error("SMS cancelled by current consent/suppression policy");
+        }
+        assertOutboundDeliveryAllowed();
+        if (context.serviceSmsParentId) {
+          // The original approval may have been revoked while transport consent was
+          // read. Retain exact parent/dispatch evidence before the irreversible POST.
+          await beforeDispatch?.();
+          const { assertServiceSmsParentDispatch } = await import("./service-sms");
+          await assertServiceSmsParentDispatch({ parentId: context.serviceSmsParentId, organizationId: context.organizationId, operationId: operation.id, body, binding: current, consentProofId: proof.id });
+        }
+        if (context.contactTouch) {
+          const { assertSmsContactTouch, markContactTouchDispatchStarted } = await import("./contact-touch-claim");
+          await assertSmsContactTouch({ organizationId: context.organizationId, contactId: context.contactId, to, ...context.contactTouch });
+          await markContactTouchDispatchStarted(context.organizationId, context.contactTouch.logicalKey);
+        }
+        return {
+          accountSid: current.accountSid,
+          apiKeySid: current.apiKeySid!,
+          apiKeySecret: current.apiKeySecret!,
+          messagingServiceSid: current.messagingServiceSid!,
+          to: phone,
+          message,
+          callbackUrl: `${current.origin}/api/v1/public/sms/status?operation=${operation.id}`,
+          // Typed replies remain pinned to the exact reviewed shop line.
+          ...(context.serviceSmsParentId ? { from: current.phoneNumber } : {}),
+        };
       },
-    );
+      onDispatch: () => { dispatched = true; },
+    });
     if (!response.ok) {
       const data = (await response.json().catch(() => ({}))) as {
         code?: number;
