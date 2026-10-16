@@ -38,9 +38,9 @@ import {
   recipientsExactly,
   credentialVerified,
   appointmentLink,
-  completionUiClaim,
   withRestoredPolicy,
 } from "./guards.mjs";
+import { observeCompletedVisitUi } from "./completion-ui.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let target, manifest, rec;
@@ -832,20 +832,17 @@ async function runCompany(browser, company, runtimeSecrets) {
         followup: null,
       },
     );
+    const completionRequestId = uuid();
     const done = await api(
       a,
       "POST",
       `/api/v1/appointments/${s.appointment.id}/work/complete`,
       {
-        requestId: uuid(),
+        requestId: completionRequestId,
         previewToken: cp.json?.previewToken,
         confirmed: true,
       },
     );
-    await a.goto(
-      BASE_URL + appointmentLink(company.organizationId, s.appointment.id),
-    );
-    await a.waitForLoadState("networkidle").catch(() => {});
     rec.record(
       company.key === "painless" ? "P-G" : "H-G",
       ok(cp) && ok(done) ? "PASS" : "FAIL",
@@ -858,18 +855,37 @@ async function runCompany(browser, company, runtimeSecrets) {
         apiStatus: done.status,
       },
     );
-    const ui = completionUiClaim(
-      await a
-        .locator("body")
-        .innerText()
-        .catch(() => ""),
-    );
+    await preflightPage(a, company, staffA);
+    const ui = await observeCompletedVisitUi(a, {
+      origin: BASE_URL,
+      organizationId: company.organizationId,
+      appointmentId: s.appointment.id,
+      contactId: s.contactId,
+      propertyId: s.propertyId,
+      assetId: s.assetId,
+      entryId: e?.id,
+      checklistRevisionId: tpl?.latestRevision?.id,
+      checklistName: definition.name,
+      assetLabel: P.assetLabel,
+      customerLabel: intakeBody.contact.name,
+      completionId: done.json?.work?.completion?.id,
+      completionRequestId,
+      updatedAt: done.json?.work?.appointment?.updatedAt,
+      performerUserId: staffA.id,
+      summary: "TEST visit completed by acceptance automation",
+    });
     rec.record(
       company.key === "painless" ? "P-G" : "H-G",
-      ui,
-      `${company.name}: refreshed organization-bound visit image; completed UI assertion remains NOT_RUN`,
+      ui.status,
+      `${company.name}: exact selected visit and recorded completion UI: ${ui.reason}`,
       [await shot(a, `${tag}-06-visit`)],
-      { company: company.name, step: "complete-ui", uiStatus: ui },
+      {
+        company: company.name,
+        step: "complete-ui",
+        uiStatus: ui.status,
+        partial:
+          "Synthetic visible UI correlated to fresh exact-visit reads; no physical photo or company acceptance claim.",
+      },
     );
     s.completionId = done.json?.work?.completion?.id;
     if (s.completionId) {

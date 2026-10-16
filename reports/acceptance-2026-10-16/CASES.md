@@ -124,6 +124,26 @@ predicates checked identifiers/count upper bounds/label survival/2xx, with the
 observed one visit and $230 balance. They did not establish the stronger exact
 lineage, whole-document and required-cents invariants now enforced for future runs.
 
+### Future completion UI assertion (source only)
+
+The source successor adds an attempted UI assertion for future P-G/H-G runs.
+It first refreshes the admitted staff context, then navigates to the exact
+organization-bound appointment and explicitly opens its read-only Visit work
+disclosure. Fresh GET responses caused by those actions must match this run's
+company, appointment, customer, property, completion request, completion ID,
+finalized entry, checklist revision and asset. The selected card must visibly
+show completed status and the exact customer link. Its own work panel must show
+the customer, completed native status, finalized asset/checklist entry, and the
+recorded completion summary, outcome, performer and one-entry count. Invalid or
+foreign links, stale/unrelated responses, hidden/missing panels and mismatches
+fail the attempted UI check. A schedule row or screenshot alone cannot pass it.
+
+API completion and UI display remain separate recorded subchecks. This is a
+future assertion capability, not an executed acceptance result. Actual staging
+run `c39de1f7-5c91-4a3a-a655-a1f81aba1b37` retains both original completion UI
+`NOT_RUN` records, its API results, screenshots and all other results unchanged.
+No new hosted run, physical photo, real device or company acceptance is claimed.
+
 Contractor card/bank collection (G-01 and deposit collection) is explicitly
 owner-DEFERRED for initial launch under AGENTS.md. It is not required for the
 permitted P-I/H-I accounting slice. Signed-scope approval (G-02), invoices, delivery,
