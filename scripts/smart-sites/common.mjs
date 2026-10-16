@@ -8,10 +8,17 @@
  */
 
 export const PRODUCTION_API_ORIGIN = "https://app.mogulforge.ai";
+/** The one approved staging app (Codex review decision 2, 2026-10-16). */
+export const STAGING_API_ORIGIN = "https://mogulforge-growthos-staging.fly.dev";
+/** Staging database identity, mirrored from scripts/staging-readonly-preflight.mjs. */
+export const STAGING_DATABASE = "growthos_staging";
+export const STAGING_LOGIN = "growthos-staging-live";
 export const ENVIRONMENTS = ["local", "staging", "production"];
 export const OWNER_APPROVAL_FLAG = "--i-have-owner-approval";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (value) => UUID.test(value ?? "");
+/** A record name visibly labeled with the standalone word TEST. */
+export const hasTestLabel = (value) => /\bTEST\b/.test(value ?? "");
 export const isLoopbackHost = (hostname) =>
   ["127.0.0.1", "localhost", "[::1]", "::1"].includes(hostname);
 
@@ -87,8 +94,8 @@ export function exactOrigin(value, label) {
 }
 
 /**
- * Environment fence. Local = loopback API only. Staging = https, never the
- * production origin, and every record must be visibly labeled TEST. Production =
+ * Environment fence. Local = loopback API only. Staging = exactly the approved
+ * staging origin, and every record must be visibly labeled TEST. Production =
  * the pinned production origin and an explicit owner-approval flag.
  */
 export function assertEnvironment({ env, api, ownerApproved, labels = [] }) {
@@ -102,13 +109,13 @@ export function assertEnvironment({ env, api, ownerApproved, labels = [] }) {
         "--env local only talks to a loopback GrowthOS API (127.0.0.1/localhost)",
       );
   } else if (env === "staging") {
-    if (url.protocol !== "https:" || url.origin === PRODUCTION_API_ORIGIN)
+    if (url.origin !== STAGING_API_ORIGIN)
       throw new OperatorError(
         "env_mismatch",
-        "--env staging needs an https staging API origin that is not production",
+        `--env staging must use ${STAGING_API_ORIGIN} (the approved staging app)`,
       );
     for (const [what, value] of labels)
-      if (!/\bTEST\b/.test(value ?? ""))
+      if (!hasTestLabel(value))
         throw new OperatorError(
           "staging_label_required",
           `Staging records must be labeled TEST: ${what} must contain the word TEST`,
