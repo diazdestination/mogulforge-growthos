@@ -201,17 +201,28 @@ nothing in this demo is billed.
 
 - The practice data is pinned to **Saturday, October 17, 2026** (company time
   zone America/New_York). Re-running the loader never moves an existing visit
-  to another day; if anything differs from the reviewed data it stops with
-  **HOLD** and changes nothing.
+  to another day. Edits or uncertain custody produce **HOLD**; the loader never
+  overwrites the edit or silently creates a replacement. A failed first attempt
+  may already have acknowledged effects, so retain its journal and receipt.
 - Local rehearsal: start `node scripts/demo/demo-runtime.mjs`, then pass the
   manifest path it prints to
   `node scripts/demo/seed-soft-onboarding.mjs --base-url http://127.0.0.1:<port> --local-manifest <path> [--apply] [--verify]`.
-- Staging needs a reviewed `--execution-manifest` with the exact company,
-  owner and staff IDs, the deployed release SHA and a hold check from the last
-  6 hours. Without it the loader refuses. It never creates companies or users.
+- Staging needs a ROOT-reviewed `--execution-manifest` and its exact raw
+  `--execution-manifest-sha`, binding the company/site/owner/staff IDs to actual
+  catalog/database, immutable image, frontend, deployed source, config, holds
+  and absolute runtime-stop proof. Proof expires within five minutes. This
+  source refuses any staging admission past **22:00Z October 16**; a prepared or
+  partial extension cannot extend that deadline. It creates no companies/users.
 - A run only counts as done when it ends **APPLIED** with read-back PASS and,
   with `--verify`, every expected name visible on every page. Any other ending
   (BLOCKED, HOLD, INCOMPLETE, UNKNOWN) exits nonzero: stop and ask before the
   call rather than demoing partial data.
-- Each run writes its own folder under `soft-onboarding/runs/` (receipt,
-  screenshots, hash list). Older receipts are kept as they were.
+- Each run writes its own folder under
+  `C:/Forge/artifacts/growthos-demo-seed-correction-20261016/runs/` (receipt,
+  screenshots, hash list). Permanent mutation custody uses a fixed sibling
+  `custody/` namespace independent of report/lock directory and run ID. Never
+  delete/reset those reservations or retry UNKNOWN. A completed fixture can
+  only be verified with the same retained IDs; edits require reconciliation.
+- [Execution guard contract](SEED-EXECUTION-GUARDS.md) specifies proof fields,
+  retained resource identities, irreversible-attempt limits and reconciliation
+  responsibility. These source checks do not establish hosted or launch proof.

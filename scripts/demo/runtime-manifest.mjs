@@ -26,7 +26,8 @@ export async function createOwnedManifest({ port, origin, payload, file, baseDir
     dir = await mkdtemp(path.join(baseDir, `growthos-soft-onboarding-${port}-`));
     target = path.join(dir, MANIFEST_BASENAME);
   }
-  const body = { ...payload, instanceId, port, origin, pid: process.pid };
+  const fields=typeof payload==="function"?await payload({instanceId,port,origin,pid:process.pid}):payload;
+  const body = { ...fields, instanceId, port, origin, pid: process.pid };
   // "wx": fail if the path exists, so a second runtime can never overwrite
   // another runtime's (or anyone's) file.
   await writeFile(target, JSON.stringify(body, null, 2) + "\n", { flag: "wx", mode: 0o600 });

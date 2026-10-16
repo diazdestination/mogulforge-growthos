@@ -4,13 +4,19 @@
 // X-Result-Limit-Reached header). `faults` lets a test replace any response.
 import { randomUUID } from "node:crypto";
 import { DEMO_COMPANIES } from "./demo-data.mjs";
+import { proofHash } from "./execution-proof.mjs";
+import { createMutationCustody } from "./mutation-custody.mjs";
+export const FAKE_RELEASE={sha:"a".repeat(40),builtAt:"2026-10-16T17:59:00.000Z",environment:"test"};
+export function memoryCustodyFiles(){const files=new Map();return {files,mkdir:async()=>{},readdir:async dir=>[...files.keys()].filter(k=>k.startsWith(dir+"/")).map(k=>k.slice(dir.length+1)),readFile:async p=>{if(!files.has(p))throw Object.assign(Error(),{code:"ENOENT"});return Buffer.from(files.get(p));},open:async p=>{if(files.has(p))throw Object.assign(Error(),{code:"EEXIST"});files.set(p,Buffer.alloc(0));return {write:async(b,o,l,pos)=>{const count=Math.min(37,l),out=Buffer.alloc(Math.max(files.get(p).length,pos+count));files.get(p).copy(out);b.copy(out,pos,o,o+count);files.set(p,out);return {bytesWritten:count};},sync:async()=>{},close:async()=>{}};}};}
+export function fakeExecutionProof(plan,now=Date.parse("2026-10-16T18:00:00Z")){const local=plan.target==="local";return {kind:local?"LOCAL_DEMO_EXECUTION_PROOF_V1":"ROOT_DEMO_EXECUTION_PROOF_V1",origin:plan.origin.replace("localhost","127.0.0.1"),fixturesSha256:proofHash(plan.companies),observedAt:new Date(now).toISOString(),expiresAt:new Date(now+300000).toISOString(),configSha256:"b".repeat(64),imageSha256:"c".repeat(64),frontendIndexSha256:"d".repeat(64),release:local?FAKE_RELEASE:plan.release,schema:{database:local?"postgres":"growthos_staging",cluster:local?null:"zp2wjrejd2zodn4q",tables:142,columns:1870,catalogSha256:"e".repeat(64)},holds:{outbound:true,scheduler:false,communications:false,stagingOutboundApproved:false,recipientAllowlistEmpty:true},...(local?{}:{reviewedBy:"ROOT",account:"diazdestination@gmail.com",org:"personal",orgId:"1854600",apiOrg:"adam-diaz",app:"mogulforge-growthos-staging",machine:"8d96936a03d058",immutableImage:`registry.fly.io/mogulforge-growthos-staging@sha256:${"c".repeat(64)}`}),runtime:local?{instanceId:plan.instanceId,processId:123}:{instanceId:"synthetic-provider-instance",state:"started",eventsSha256:"f".repeat(64),configSha256:"b".repeat(64),stopAt:"2026-10-16T22:00:00Z",taskNextUtc:"2026-10-16T22:00:00Z",anchorUpperAt:new Date(now).toISOString(),capSeconds:14400,verifiedReceiptSha256:"1".repeat(64),anchorSha256:"2".repeat(64)}};}
 
 export function fakePlan(key = "css", overrides = {}) {
   const company = DEMO_COMPANIES[key];
   const staff = Object.fromEntries(company.staff.map((s) => [s.key, randomUUID()]));
+  const cplan={ organizationId: randomUUID(), name: company.name, slug: company.slug, timezone: company.timezone, siteId: randomUUID(), staff, ...overrides };
+  const plan={ target: "local", origin: "http://127.0.0.1:4192", demoDate: "2026-10-17", release: FAKE_RELEASE, instanceId: randomUUID(), holds: {}, companies: {[key]:cplan} };plan.executionProof=fakeExecutionProof(plan);plan.executionProofSha256=proofHash(plan.executionProof);
   return {
-    plan: { target: "local", origin: "http://127.0.0.1:4192", demoDate: "2026-10-17", release: null, instanceId: randomUUID(), holds: {}, companies: {} },
-    cplan: { organizationId: randomUUID(), name: company.name, slug: company.slug, timezone: company.timezone, siteId: randomUUID(), staff, ...overrides },
+    plan,cplan,
     company,
   };
 }
@@ -27,9 +33,12 @@ export class FakeGrowthOS {
     this.writes = [];
     this.requestIds = new Map();
     this.siteKey = "test-site-key-0123456789abcdef";
+    this.custodyFiles=memoryCustodyFiles();
   }
   fault(method, pattern, respond) { this.faults.push({ method, pattern, respond }); return this; }
   session() { return { siteId: this.cplan.siteId, siteKey: this.siteKey }; }
+  observe(){return {origin:"http://127.0.0.1:4192",release:FAKE_RELEASE,frontendIndexSha256:"d".repeat(64)};}
+  mutationCustody(plan){return createMutationCustody({plan,cplan:this.cplan,company:this.company,io:this.custodyFiles});}
   get call() { return (method, p, body) => this.handle(method, p, body); }
   get publicPost() { return (p, body, key) => this.handle("POST", p, body, key); }
 
@@ -45,7 +54,7 @@ export class FakeGrowthOS {
     const add = (table, row) => { const r = { id: randomUUID(), organizationId: this.org.id, createdAt: now, updatedAt: now, ...row }; this.db[table].push(r); return r; };
     const replay = (kind, requestId, make) => { const k = `${kind}:${requestId}`; if (requestId && this.requestIds.has(k)) return { ...this.requestIds.get(k), duplicate: true }; const out = make(); if (requestId) this.requestIds.set(k, out); return out; };
 
-    if (url.pathname === "/api/readyz") return res(200, { status: "ready", database: "reachable", release: { sha: null, builtAt: null, environment: "unknown" } });
+    if (url.pathname === "/api/readyz") return res(200, { status: "ready", database: "reachable", release: FAKE_RELEASE });
     if (url.pathname.startsWith("/api/v1/public/smart-sites/")) {
       if (siteKey !== this.siteKey || seg[2] !== this.cplan.siteId) return res(401, { code: "unauthorized" });
       if (seg[3] === "check") return res(200, { ok: true });
@@ -104,8 +113,9 @@ export class FakeGrowthOS {
         const out = replay("invoice", body.requestId, () => {
           const d = body.document;
           const lineItems = d.lineItems.map((l) => ({ ...l, totalCents: Math.round(Number(l.quantity) * l.unitPriceCents) }));
-          const inv = add("invoices", { contactId: body.source.contactId, propertyId: body.source.propertyId, status: "draft", version: 1, title: d.title, customerName: d.customerName, currency: d.currency, taxCents: 0,
-            totalCents: lineItems.reduce((s, l) => s + l.totalCents, 0), recordedPaidCents: 0, paymentState: "unpaid", reconciliationRequired: false, document: { ...d, lineItems } });
+          const totalCents=lineItems.reduce((s,l)=>s+l.totalCents,0);
+          const inv = add("invoices", { contactId: body.source.contactId, propertyId: body.source.propertyId,sourceKind:"existing_customer",leadId:null,projectId:null,estimateId:null,customerWorkId:null,balanceBasis:"full_history",openingReceivableCents:null,openingAsOf:null,historicalSource:null, status: "draft", version: 1, title: d.title, customerName: d.customerName, currency: d.currency, taxCents: 0,
+            totalCents, recordedPaidCents: 0,recordedBalanceCents:totalCents,balanceDueCents:null,unallocatedRefundCents:0, paymentState: "unpaid", reconciliationRequired: false, document: {issuerAddress:null,customerAddress:null, ...d, lineItems,subtotalCents:totalCents,totalCents } });
           return { invoice: inv };
         });
         return res(201, out);
@@ -118,8 +128,8 @@ export class FakeGrowthOS {
       const inv = this.db.invoices.find((x) => x.id === b);
       if (!inv) return res(404, {});
       if (method === "GET") return res(200, inv);
-      if (c === "issue") { inv.status = "issued"; inv.version++; return res(200, { invoice: inv }); }
-      if (c === "payments") return res(200, replay("payment", body.requestId, () => { inv.recordedPaidCents += body.amountCents; inv.paymentState = inv.recordedPaidCents >= inv.totalCents ? "paid" : "partial"; inv.version++; return { invoice: inv }; }));
+      if (c === "issue") { inv.status = "issued";inv.balanceDueCents=inv.recordedBalanceCents; inv.version++; return res(200, { invoice: inv }); }
+      if (c === "payments") return res(200, replay("payment", body.requestId, () => { inv.recordedPaidCents += body.amountCents;inv.recordedBalanceCents=inv.totalCents-inv.recordedPaidCents;inv.balanceDueCents=inv.recordedBalanceCents; inv.paymentState = inv.recordedPaidCents >= inv.totalCents ? "paid" : "partial"; inv.version++; return { invoice: inv }; }));
     }
     if (a === "service-obligations") {
       if (method === "POST" && !b) { const { dueDate, assignedUserId, ...rest } = body; return res(201, add("obligations", { ...rest, dueAt: `${dueDate}T12:00:00.000Z`, status: "active", recurrence: null })); }

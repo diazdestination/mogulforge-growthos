@@ -2,7 +2,8 @@
 //
 //   node scripts/demo/seed-soft-onboarding.mjs --base-url <url> [--company css|painless|both]
 //        [--apply] [--verify] [--demo-date YYYY-MM-DD (local only)]
-//        (--local-manifest <file> | --execution-manifest <file> [--auth-module <file>])
+//        (--local-manifest <file> | --execution-manifest <file>
+//         --execution-manifest-sha <SHA256> [--auth-module <file>])
 //        [--receipt-dir <dir>] [--lock-dir <dir>]
 //
 // Dry-run by default: signs in, admits the target, reads what already exists
@@ -18,19 +19,21 @@
 //  * Reviewed execution manifest: local runs use the runtime's own instance
 //    manifest; staging requires --execution-manifest naming the exact
 //    organization ID, name, slug, time zone, owner and staff user IDs, site ID,
-//    release SHA, frozen demo date and a fresh hold attestation. Admission
+//    release SHA, frozen demo date and a hash-bound ROOT deployment/catalog
+//    proof no older than five minutes. Admission
 //    checks /api/readyz, /me and /users against it; a 403 or missing staff
 //    member BLOCKS (nothing is ever reassigned to the signed-in user). The
 //    session is re-checked before every write.
 //  * Holds: the local runtime starts with communications disabled, outbound
 //    hold on and schedulers off and records that in its manifest. An owner
 //    session cannot read hosted holds, so staging requires a reviewed hold
-//    attestation no older than 6 hours plus an exact release-SHA match.
+//    proof of actual config/holds/catalog/image/runtime bound. The current
+//    source refuses any runtime extension past 22Z October 16.
 //  * Fail closed: any unsuccessful, malformed or possibly-truncated read stops
 //    the company; absence is never inferred from a failed lookup. A write with
 //    an unknown outcome (network error/5xx) stops with UNKNOWN.
-//  * Exclusive claim: one run per target+organization at a time (exclusive
-//    lock file; never stolen automatically).
+//  * Exclusive claim plus permanent canonical plan/operation intents: an
+//    UNKNOWN/crash remains reserved across run IDs and report/lock directories.
 //  * Reuse is exact: an existing record is reused only when every reviewed
 //    fixture field matches (parents, amounts, dates, assignee). Ambiguity or
 //    any difference (including staff edits) is a HOLD; nothing is issued, paid
@@ -50,6 +53,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DEMO_COMPANIES, DEMO_DATE } from "./demo-data.mjs";
+import { canonicalRuntimeOrigin, validateExecutionProof, verifyDeploymentObservation, PROOF_MAX_AGE_MS,fingerprintFrontend } from "./execution-proof.mjs";
+import { createMutationCustody, CustodyHalt } from "./mutation-custody.mjs";
 
 export const STAGING_ORIGIN = "https://mogulforge-growthos-staging.fly.dev";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost"]);
@@ -61,11 +66,11 @@ const PRODUCTION_PATTERNS = [
   /(^|\.)mogulforge\.(com|app|io|co)$/i,
   /(^|\.)growthos\.(com|app|io|co)$/i,
 ];
-export const RECEIPT_DIR = "C:/Forge/artifacts/growthos-launch-claude-20261016/soft-onboarding";
+export const RECEIPT_DIR = "C:/Forge/artifacts/growthos-demo-seed-correction-20261016";
 const DEFAULT_AUTH_MODULE = "C:/Forge/artifacts/growthos-staging-acceptance-20261016/test-owner-auth.mjs";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const LOCAL_HOLDS = Object.freeze({ COMMUNICATIONS_ENABLED: "false", GROWTHOS_OUTBOUND_HOLD: "true", SCHEDULER_AUTOSTART: "false" });
-export const HOLD_ATTESTATION_MAX_AGE_MS = 6 * 3600_000;
+export const HOLD_ATTESTATION_MAX_AGE_MS = PROOF_MAX_AGE_MS;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
 
@@ -80,18 +85,20 @@ export class SeedHalt extends Error {
   }
 }
 const blocked = (code, detail) => new SeedHalt("BLOCKED", code, detail);
-const SAFE_CODE = /^[a-z][a-z0-9_.-]{0,63}$/i;
+const SAFE_CODE = new Set(["invalid_contact", "unauthorized", "forbidden", "stale", "invoice_invalid_request", "invoice_version_conflict", "smart_site_inactive"]);
+const SAFE_INTERNAL=new Set(["auth_module_contract","concurrent_run","custody_required","demo_date_not_reviewed","execution_manifest_hash","execution_manifest_invalid","execution_manifest_unreviewed","execution_observation_missing","holds_attestation_stale","holds_unverified","identity_mismatch","local_manifest_invalid","local_manifest_origin_mismatch","lock_unavailable","manifest_company_mismatch","manifest_company_missing","manifest_staff_missing","release_mismatch","release_not_pinned","session_unverified","site_mismatch","staff_unverified","target_not_ready","unknown_company","origin_changed","session_changed","unsafe_api_path","demo_date_passed","fixture_conflict","read_failed","read_incomplete","read_shape","smart_site_check_failed","write_failed","unknown_outcome"]);
 /** HTTP status plus an allowlisted machine code; never response prose or payload. */
 export function safeBrief(r) {
   const status = Number.isInteger(r?.status) ? r.status : 0;
-  const code = [r?.json?.code, r?.json?.error].find((v) => typeof v === "string" && SAFE_CODE.test(v));
+  const code = [r?.json?.code, r?.json?.error].find((v) => SAFE_CODE.has(v));
   return status === 0 ? "no response (network/timeout)" : `HTTP ${status}${code ? ` ${code}` : ""}`;
 }
-/** Persistable description of an unexpected exception: its class name only. */
+/** Persistable finite outcome; unexpected exceptions carry no message/class. */
 export function safeError(error) {
-  if (error instanceof SeedHalt) return { status: error.status, code: error.code, ...(error.detail ? { detail: error.detail } : {}) };
-  const name = typeof error?.name === "string" && /^[A-Za-z]{1,40}$/.test(error.name) ? error.name : "Error";
-  return { status: "ERROR", code: "unexpected", detail: name };
+  if (error instanceof SeedHalt&&SAFE_INTERNAL.has(error.code)) return { status: error.status, code: error.code, ...(error.detail ? { detail: error.detail } : {}) };
+  if(error instanceof CustodyHalt&&["custody_identity","custody_uncertain","mutation_reserved"].includes(error.code))return {status:"HOLD",code:error.code};
+  if(["execution_proof_shape","execution_proof_missing","execution_proof_expired","execution_proof_target","execution_proof_deployment","execution_proof_schema","execution_proof_holds","execution_proof_runtime","execution_proof_stop","execution_observation_mismatch"].includes(error?.code))return {status:"BLOCKED",code:error.code};
+  return { status: "ERROR", code: "unexpected" };
 }
 
 // ---------- target guard ----------
@@ -134,6 +141,7 @@ export function parseArgs(argv) {
     else if (a === "--demo-date") args.demoDate = next();
     else if (a === "--local-manifest") args.localManifest = next();
     else if (a === "--execution-manifest") args.executionManifest = next();
+    else if (a === "--execution-manifest-sha") args.executionManifestSha = next();
     else if (a === "--auth-module") args.authModule = next();
     else if (a === "--receipt-dir") args.receiptDir = next();
     else if (a === "--lock-dir") args.lockDir = next();
@@ -193,7 +201,7 @@ function checkStaffMap(company, staff) {
 }
 
 /** Local plan from the runtime's own instance manifest. Secrets stay in `secrets`, never in the plan. */
-export function planFromLocalManifest(manifest, { origin, keys, demoDate }) {
+export function planFromLocalManifest(manifest, { origin, keys, demoDate,now=Date.now() }) {
   if (manifest?.kind !== "growthos-soft-onboarding-local-manifest") throw blocked("local_manifest_invalid");
   const loopback = origin.replace("//localhost:", "//127.0.0.1:");
   if (manifest.origin !== loopback || manifest.origin !== `http://127.0.0.1:${manifest.port}`) throw blocked("local_manifest_origin_mismatch");
@@ -201,7 +209,10 @@ export function planFromLocalManifest(manifest, { origin, keys, demoDate }) {
   for (const [k, v] of Object.entries(LOCAL_HOLDS)) if (manifest.holds?.[k] !== v) throw blocked("holds_unverified", k);
   const companies = {};
   const secrets = {};
-  for (const company of fixtureCompanies(keys)) {
+  const present=(manifest.companies??[]).map(c=>c.key);
+  if(new Set(present).size!==present.length||present.some(k=>!DEMO_COMPANIES[k]))throw blocked("local_manifest_invalid");
+  for(const key of keys)if(!present.includes(key))throw blocked("manifest_company_missing",key);
+  for (const company of fixtureCompanies(present)) {
     const entry = (manifest.companies ?? []).find((c) => c.key === company.key);
     if (!entry) throw blocked("manifest_company_missing", company.key);
     if (entry.name !== company.name || entry.slug !== company.slug || entry.timezone !== company.timezone) throw blocked("manifest_company_mismatch", company.key);
@@ -215,8 +226,10 @@ export function planFromLocalManifest(manifest, { origin, keys, demoDate }) {
     const owner = entry.staff.find((x) => x.key === "owner");
     secrets[company.key] = { email: owner.email, password: owner.password, siteKey: entry.siteKey ?? null };
   }
+  const plan={ target: "local", origin, demoDate: demoDate ?? DEMO_DATE, release: manifest.executionProof?.release, instanceId: manifest.instanceId, holds: { source: "local-runtime-manifest", ...LOCAL_HOLDS }, companies,executionProof:manifest.executionProof,executionProofSha256:manifest.executionProofSha256 };
+  validateExecutionProof(plan,now);
   return {
-    plan: { target: "local", origin, demoDate: demoDate ?? DEMO_DATE, release: null, instanceId: manifest.instanceId, holds: { source: "local-runtime-manifest", ...LOCAL_HOLDS }, companies },
+    plan,
     secrets,
   };
 }
@@ -235,15 +248,21 @@ export function planFromExecutionManifest(m, { origin, keys, demoDate, now = Dat
   const verifiedAt = ISO.test(h.verifiedAt ?? "") ? Date.parse(h.verifiedAt) : NaN;
   if (!Number.isFinite(verifiedAt) || verifiedAt > now + 5 * 60_000 || now - verifiedAt > HOLD_ATTESTATION_MAX_AGE_MS) throw blocked("holds_attestation_stale");
   const companies = {};
-  for (const company of fixtureCompanies(keys)) {
+  const present=Object.keys(m.companies??{});
+  if(present.some(k=>!DEMO_COMPANIES[k]))throw blocked("execution_manifest_invalid");
+  for(const key of keys)if(!present.includes(key))throw blocked("manifest_company_mismatch",key);
+  for (const company of fixtureCompanies(present)) {
     const c = m.companies?.[company.key];
     if (!c || c.name !== company.name || c.slug !== company.slug || c.timezone !== company.timezone || !UUID.test(c.organizationId ?? "") || (c.siteId !== null && !UUID.test(c.siteId ?? "")))
       throw blocked("manifest_company_mismatch", company.key);
     companies[company.key] = { organizationId: c.organizationId, name: c.name, slug: c.slug, timezone: c.timezone, siteId: c.siteId, staff: checkStaffMap(company, c.staff) };
   }
+  const plan={ target: "staging", origin, demoDate: m.demoDate, release: m.release, instanceId: null,
+      holds: { source: "reviewed-attestation", outboundHold: true, communicationsEnabled: false, schedulerAutostart: false, evidenceSha256:sha256(Buffer.from(h.evidence)), verifiedAt: h.verifiedAt }, reviewedBy: m.reviewedBy, reviewedAt: m.reviewedAt, companies,executionProof:m.executionProof,executionProofSha256:m.executionProofSha256 };
+  if(m.reviewedBy!=="ROOT")throw blocked("execution_manifest_unreviewed");
+  validateExecutionProof(plan,now);
   return {
-    plan: { target: "staging", origin, demoDate: m.demoDate, release: { sha: m.release.sha, environment: "staging" }, instanceId: null,
-      holds: { source: "reviewed-attestation", outboundHold: true, communicationsEnabled: false, schedulerAutostart: false, evidence: h.evidence, verifiedAt: h.verifiedAt }, reviewedBy: m.reviewedBy, reviewedAt: m.reviewedAt, companies },
+    plan,
     secrets: {},
   };
 }
@@ -263,13 +282,13 @@ export function validateAuthResult(result, expectedSiteId) {
 }
 
 // ---------- exclusive run claim ----------
-export function lockPath(lockDir, origin, organizationId) {
-  return path.join(lockDir, `${createHash("sha256").update(`${origin}|${organizationId}`).digest("hex").slice(0, 24)}.lock`);
+export function lockPath(lockDir, origin, organizationId,instanceId="") {
+  return path.join(lockDir, `${createHash("sha256").update(`${canonicalRuntimeOrigin(origin)}|${instanceId}|${organizationId}`).digest("hex").slice(0, 24)}.lock`);
 }
 /** Exclusive create; an existing claim is never stolen (remove it by hand after confirming no run is active). */
-export async function acquireRunLock(lockDir, origin, organizationId, runId) {
+export async function acquireRunLock(lockDir, origin, organizationId, runId,instanceId="") {
   await mkdir(lockDir, { recursive: true });
-  const file = lockPath(lockDir, origin, organizationId);
+  const file = lockPath(lockDir, origin, organizationId,instanceId);
   try {
     await writeFile(file, JSON.stringify({ runId, pid: process.pid, origin, organizationId, startedAt: new Date().toISOString() }) + "\n", { flag: "wx" });
   } catch (error) {
@@ -412,13 +431,16 @@ export function gradeRecords(company, records, apply) {
 
 // ---------- admission ----------
 /** Verify target, identity, staff and holds against the reviewed plan before any write. */
-export async function admit({ call, company, cplan, plan }) {
+export async function admit({ call, company, cplan, plan,now=Date.now,observe }) {
   const ready = await call("GET", "/api/readyz");
   if (!ok(ready) || ready.json?.status !== "ready") throw blocked("target_not_ready", safeBrief(ready));
   const release = ready.json?.release ?? {};
   if (plan.target === "staging") {
     if (release.environment !== "staging" || release.sha !== plan.release.sha) throw blocked("release_mismatch");
   } else if (["staging", "production"].includes(release.environment)) throw blocked("release_mismatch");
+  validateExecutionProof(plan,now());
+  if(typeof observe!=="function")throw blocked("execution_observation_missing");
+  verifyDeploymentObservation(plan,await observe(),now());
   const me = await call("GET", "/api/v1/me");
   if (!ok(me)) throw blocked("session_unverified", safeBrief(me));
   const org = me.json?.organization;
@@ -439,7 +461,7 @@ export async function admit({ call, company, cplan, plan }) {
   for (const s of company.staff) {
     const matches = users.json.filter((u) => lower(u?.email) === lower(s.email));
     const u = matches[0];
-    if (matches.length !== 1 || u.id !== cplan.staff[s.key] || u.role !== s.role || u.isActive !== true || u.operationallyEligible === false)
+    if (matches.length !== 1 || u.id !== cplan.staff[s.key] || u.role !== s.role || u.isActive !== true || u.operationallyEligible !== true)
       throw blocked("staff_unverified", s.key);
     userIds[s.key] = u.id;
   }
@@ -452,13 +474,14 @@ export async function admit({ call, company, cplan, plan }) {
  * same-session API call returning { status, json, limitReached }. `publicPost(path, body, siteKey)`
  * calls the public smart-site API. Throws nothing: halts are returned as a graded result.
  */
-export async function seedCompany({ call, publicPost, company, cplan, plan, demoDate, apply, session = {}, now = () => Date.now(), quiet = false }) {
+export async function seedCompany({ call, publicPost, company, cplan, plan, demoDate, apply, session = {}, now = () => Date.now(), quiet = false,custody,observe }) {
   const L = new Ledger(quiet);
   const result = { status: null, organizationId: cplan.organizationId, organizationName: company.name, demoDate, timezone: company.timezone, records: L.records };
   try {
-    const admission = await admit({ call, company, cplan, plan });
+    const admission = await admit({ call, company, cplan, plan,now,observe });
     result.release = admission.release;
-    await seedRecords({ call, publicPost, company, demoDate, apply, session, now, L, admission });
+    if(!custody)throw blocked("custody_required");await custody.load({readOnly:!apply});if(apply)await custody.begin();
+    await seedRecords({ call, publicPost, company, demoDate, apply, session, now, L, admission,custody,plan,observe });
     const grade = gradeRecords(company, L.records, apply);
     result.grade = grade;
     result.status = grade.complete ? (apply ? "APPLIED" : "DRY-RUN") : apply ? "INCOMPLETE" : "DRY-RUN-INCOMPLETE";
@@ -467,12 +490,11 @@ export async function seedCompany({ call, publicPost, company, cplan, plan, demo
     result.status = e.status;
     result.halt = { code: e.code, ...(e.detail ? { detail: e.detail } : {}) };
     result.grade = gradeRecords(company, L.records, apply);
-    if (!(error instanceof SeedHalt) && process.env.DEMO_SEED_DEBUG) console.error(error);
   }
   return result;
 }
 
-async function seedRecords({ call, publicPost, company, demoDate, apply, session, now, L, admission }) {
+async function seedRecords({ call, publicPost, company, demoDate, apply, session, now, L, admission,custody,plan,observe }) {
   const tz = company.timezone;
   const day = (n) => addDays(demoDate, n);
   const orgId = admission.organizationId;
@@ -482,12 +504,15 @@ async function seedRecords({ call, publicPost, company, demoDate, apply, session
 
   /** Re-check the session before each write; a changed identity stops the run. */
   const guard = async () => {
+    verifyDeploymentObservation(plan,await observe(),now());
     const me = await call("GET", "/api/v1/me");
-    if (!ok(me) || me.json?.id !== admission.ownerId || me.json?.organization?.id !== orgId) throw new SeedHalt("BLOCKED", "session_changed");
+    if (!ok(me) || me.json?.id !== admission.ownerId || me.json?.role!=="owner"||me.json?.isActive!==true||me.json?.organization?.id !== orgId||me.json.organization.name!==company.name||me.json.organization.slug!==company.slug||me.json.organization.timezone!==company.timezone) throw new SeedHalt("BLOCKED", "session_changed");
+    const staff=await call("GET","/api/v1/users");if(!ok(staff)||!Array.isArray(staff.json))throw blocked("staff_unverified");
+    for(const expected of company.staff){const matches=staff.json.filter(u=>lower(u.email)===lower(expected.email));if(matches.length!==1||matches[0].id!==userByKey[expected.key]||matches[0].role!==expected.role||matches[0].isActive!==true||matches[0].operationallyEligible!==true)throw blocked("staff_unverified",expected.key);}
   };
-  const write = async (kind, key, method, pathname, body) => {
+  const write = async (kind, key, method, pathname, body,dispatch=()=>call(method,pathname,body)) => {
     await guard();
-    const r = await call(method, pathname, body);
+    const r = await custody.dispatch({kind,key,method,pathname,body},dispatch,r=>r.json?.id??r.json?.invoice?.id??r.json?.asset?.id??r.json?.estimate?.id??r.json?.leadId??pathname.split('/').find(x=>UUID.test(x)),()=>validateExecutionProof(plan,now()));
     if (r.status === 0 || r.status >= 500) { L.add(kind, key, "unknown", null, safeBrief(r)); throw new SeedHalt("UNKNOWN", "unknown_outcome", `${kind}:${key}`); }
     if (!ok(r)) { L.add(kind, key, "failed", null, safeBrief(r)); throw new SeedHalt("INCOMPLETE", "write_failed", `${kind}:${key}`); }
     return r;
@@ -499,6 +524,9 @@ async function seedRecords({ call, publicPost, company, demoDate, apply, session
   /** Zero -> null; one exact match -> row; ambiguity or any field difference -> HOLD. */
   const pick = (kind, key, candidates, expectedOf) => {
     if (candidates.length > 1) throw conflict(kind, key, null, `ambiguous (${candidates.length} candidates)`);
+    const retained=custody.resource(kind,key);
+    if(retained&&(!candidates.length||candidates.some(r=>r.id!==retained)))throw conflict(kind,key,retained,"retained identity or original creation fields");
+    if(!retained&&candidates.length)throw conflict(kind,key,candidates[0].id,"unowned existing identity; explicit reconciliation required");
     if (!candidates.length) return null;
     const row = candidates[0];
     const diff = diffFields(expectedOf(row), row);
@@ -518,6 +546,7 @@ async function seedRecords({ call, publicPost, company, demoDate, apply, session
     const [addressLine1, city, state, postalCode] = c.address;
     const props = (await readList(call, "properties", `/api/v1/properties?contactId=${contactId}`, "offset")).filter((p) => p.contactId === contactId);
     const exact = props.filter((p) => p.addressLine1 === addressLine1);
+    if(intakeProperties[c.key]&&!custody.resource("property",c.key)&&exact.length===1&&exact[0].id===intakeProperties[c.key])await custody.bindDerived("property",c.key,exact[0].id,"smart-site-lead",c.key,{contactId,addressLine1,city,state,postalCode});
     const found = pick("property", c.key, exact, () => ({ contactId, addressLine1, city, state, postalCode }));
     if (found) { ids.properties[c.key] = found.id; L.add("property", c.key, "existing", found.id); return; }
     // A different property on our customer means someone edited it: hold, do not add a second one.
@@ -528,10 +557,11 @@ async function seedRecords({ call, publicPost, company, demoDate, apply, session
     L.add("property", c.key, "created", ids.properties[c.key]);
   };
   const smartKey = company.smartSiteLead?.customer;
+  const intakeProperties={};
   for (const c of company.customers) {
     const list = await readList(call, "contacts", `/api/v1/contacts?search=${encodeURIComponent(c.email)}`, "offset");
     // Phones compare by digits: the website inquiry stores them normalized.
-    const found = pick("customer", c.key, list.filter((x) => lower(x.email) === lower(c.email)).map((x) => ({ ...x, phone: digits(x.phone) })), () => ({ firstName: c.first, lastName: c.last, phone: digits(c.phone) }));
+    const found = pick("customer", c.key, list.filter((x) => lower(x.email) === lower(c.email)).map((x) => ({ ...x, phone: digits(x.phone) })), () => ({ email:c.email,firstName: c.first, lastName: c.last, phone: digits(c.phone) }));
     if (found) { ids.contacts[c.key] = found.id; L.add("customer", c.key, "existing", found.id); await ensureProperty(c); continue; }
     if (c.key === smartKey) continue; // created by the website inquiry below
     if (!apply) { L.add("customer", c.key, "would-create"); L.add("property", c.key, "would-create"); continue; }
@@ -571,13 +601,14 @@ async function seedRecords({ call, publicPost, company, demoDate, apply, session
       const serviceCode = Array.isArray(s0) ? s0[0] : s0?.slug ?? s0?.code;
       if (typeof serviceCode !== "string") throw new SeedHalt("INCOMPLETE", "read_shape", "smart-site-profiles");
       const [address, city, state, postalCode] = cust.address;
-      await guard();
-      const response = await publicPost(`/api/v1/public/smart-sites/${session.siteId}/intake`, {
+      const intakePath=`/api/v1/public/smart-sites/${session.siteId}/intake`;
+      const intakeBody={
         schemaVersion: 1, requestId: stableId(orgId, "smart-site", ss.customer),
         contact: { name: `${cust.first} ${cust.last}`, email: cust.email, phone: cust.phone },
         project: { serviceCode, address, city, state, postalCode, summary: ss.summary, timing: ss.timing },
         consent: { contact: true, policyVersion: "test-demo-2026-10-17", analytics: false, channels: ["email"] },
-      }, session.siteKey);
+      };
+      const response=await write("smart-site-lead",ss.customer,"POST",intakePath,intakeBody,()=>publicPost(intakePath,intakeBody,session.siteKey));
       if (response.status === 0 || response.status >= 500) { L.add("smart-site-lead", ss.customer, "unknown", null, safeBrief(response)); throw new SeedHalt("UNKNOWN", "unknown_outcome", "smart-site-lead"); }
       if (!ok(response) || !UUID.test(response.json?.leadId ?? "")) { L.add("smart-site-lead", ss.customer, "failed", null, safeBrief(response)); throw new SeedHalt("INCOMPLETE", "write_failed", "smart-site-lead"); }
       const lead = await readOne(call, "lead", `/api/v1/leads/${response.json.leadId}`);
@@ -587,6 +618,8 @@ async function seedRecords({ call, publicPost, company, demoDate, apply, session
       const ldiff = diffFields({ summary: ss.summary, source, creationMethod: "smart-site" }, leadRow);
       if (cdiff.length || ldiff.length) throw conflict("smart-site-lead", ss.customer, response.json.leadId, [...cdiff, ...ldiff].join(","));
       ids.contacts[ss.customer] = contact.id;
+      await custody.bindDerived("customer",ss.customer,contact.id,"smart-site-lead",ss.customer,{email:cust.email,firstName:cust.first,lastName:cust.last,phone:digits(cust.phone)});
+      intakeProperties[ss.customer]=leadRow.propertyId;
       L.add("customer", ss.customer, response.json.duplicate ? "existing" : "created", contact.id, "via website inquiry");
       L.add("smart-site-lead", ss.customer, response.json.duplicate ? "existing" : "created", response.json.leadId, "TEST website inquiry");
       ids.leads["smart-site"] = response.json.leadId;
@@ -717,12 +750,15 @@ async function seedRecords({ call, publicPost, company, demoDate, apply, session
     }
     const cust = customer(inv.customer);
     const total = cents(inv.lines);
+    const expectedDocument={title:inv.title,currency:"USD",issuerName:company.name,issuerAddress:null,customerName:`${cust.first} ${cust.last}`,customerAddress:null,dueDate:addDays(demoDate,14),notes:"TEST demo record - not a real bill. Email delivery is held in this demo.",lineItems:inv.lines.map(([description,quantity,unitPriceCents])=>({description,quantity:String(quantity),unitPriceCents,totalCents:Math.round(quantity*unitPriceCents)})),taxCents:0,subtotalCents:total,totalCents:total};
     const expectInvoice = (x) => ({ contactId, propertyId: ids.properties[inv.customer] ?? null, totalCents: total, taxCents: 0, currency: "USD", customerName: `${cust.first} ${cust.last}`,
       status: ["draft", "issued"].includes(x.status) ? x.status : "issued", reconciliationRequired: false });
     const verifyDocument = async (id) => {
       const detail = await readOne(call, "invoice", `/api/v1/invoices/${id}`);
-      const d = diffFields({ lines: fixtureLines(inv.lines), title: inv.title }, { lines: normLines(detail.document?.lineItems), title: detail.document?.title });
+      const d=diffFields(expectedDocument,detail.document??{});for(const field of Object.keys(detail.document??{}))if(!(field in expectedDocument))d.push(field);
       if (detail.organizationId !== orgId) d.push("organizationId");
+      const lineage={contactId,propertyId:ids.properties[inv.customer]??null,sourceKind:"existing_customer",leadId:null,projectId:null,estimateId:null,customerWorkId:null,balanceBasis:"full_history",openingReceivableCents:null,openingAsOf:null,historicalSource:null};d.push(...diffFields(lineage,detail));
+      if(!Number.isInteger(detail.version)||detail.version<1||!Number.isInteger(detail.recordedPaidCents)||!Number.isInteger(detail.recordedBalanceCents)||detail.recordedBalanceCents!==total-detail.recordedPaidCents||detail.unallocatedRefundCents!==0||detail.balanceDueCents!==(detail.status==="draft"?null:total-detail.recordedPaidCents))d.push("balances");
       if (d.length) throw conflict("invoice", inv.key, id, d.join(","));
       return detail;
     };
@@ -760,7 +796,7 @@ async function seedRecords({ call, publicPost, company, demoDate, apply, session
         L.add("invoice-issue", inv.key, "updated", invoice.id, "issued (not emailed)");
       }
     }
-    const paid = Number(invoice.recordedPaidCents ?? 0);
+    const paid = invoice.recordedPaidCents;
     if (inv.paidInFull) {
       if (invoice.paymentState === "paid" && paid === total) L.add("invoice-payment", inv.key, "existing", invoice.id, "already paid");
       else if (paid !== 0) throw conflict("invoice-payment", inv.key, invoice.id, "recordedPaidCents");
@@ -845,6 +881,7 @@ export async function runCompany(args) {
       ...(back.halt ? { halt: back.halt } : {}), ...(notExisting ? { issues: back.records.filter((r) => r.outcome !== "existing") } : {}),
     };
     if (!result.readBack.pass) result.status = "INCOMPLETE";
+    else try{await args.custody.complete();result.custody="confirmed";}catch(e){result.status="INCOMPLETE";result.custody="failed";result.halt=safeError(e);}
     if (!args.quiet) console.log(`  read-back: ${result.readBack.pass ? "PASS" : "FAIL"} (${result.readBack.reMatched} records re-matched)`);
   }
   return result;
@@ -951,7 +988,6 @@ async function api(page, origin, method, pathname, body) {
   assertApiPath(pathname);
   if (!sameOrigin(page.url(), origin)) await page.goto(`${origin}/`);
   if (!sameOrigin(page.url(), origin)) throw new SeedHalt("BLOCKED", "origin_changed");
-  if (process.env.DEMO_SEED_DEBUG) console.log(`    > ${method} ${pathname}`);
   return page.evaluate(async ({ method, pathname, body }) => {
     try {
       const response = await fetch(pathname, {
@@ -1021,7 +1057,8 @@ export async function main(argv = process.argv.slice(2)) {
     built = planFromLocalManifest(JSON.parse(await readFile(options.localManifest, "utf8")), { origin, keys, demoDate: options.demoDate });
   } else {
     if (!options.executionManifest) throw new Error("--execution-manifest (reviewed, exact IDs, release SHA and hold attestation) is required for staging.");
-    built = planFromExecutionManifest(JSON.parse(await readFile(options.executionManifest, "utf8")), { origin, keys, demoDate: options.demoDate });
+    const bytes=await readFile(options.executionManifest);if(!/^[a-f0-9]{64}$/.test(options.executionManifestSha??"")||sha256(bytes)!==options.executionManifestSha)throw blocked("execution_manifest_hash");
+    built = planFromExecutionManifest(JSON.parse(bytes), { origin, keys, demoDate: options.demoDate });
   }
   const { plan, secrets } = built;
   const runId = newRunId(target, mode, options.company);
@@ -1040,7 +1077,7 @@ export async function main(argv = process.argv.slice(2)) {
     options: { company: options.company, apply: options.apply, verify: options.verify, demoDateOverride: options.demoDate ?? null },
     plan: { ...plan, companies: plan.companies },
     custody: await collectCustody(),
-    note: "IDs, outcomes and allowlisted status codes only. No credentials, cookies, tokens, site keys or response text. All records are fictional TEST data. Earlier receipts in the parent folder were producer-recorded under the weaker 7fb2b33 assertions and are not re-graded by this run.",
+    note: "Reviewed public target/proof metadata, IDs, outcomes and finite codes only. No credentials, cookies, tokens, site keys or response text. All records are fictional TEST data. Original 7fb2b33/f2fcbe9 producer evidence retains its qualifications and is not re-graded by this run.",
     companies: {},
   };
   const { chromium } = await loadPlaywright();
@@ -1056,11 +1093,13 @@ export async function main(argv = process.argv.slice(2)) {
       const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
       const page = await context.newPage();
       try {
-        lock = await acquireRunLock(lockDir, origin, cplan.organizationId, runId);
+        lock = await acquireRunLock(lockDir, origin, cplan.organizationId, runId,plan.instanceId??"");
         const session = await signIn(page, origin, target, company, cplan, options, secrets);
         const call = (method, p, body) => api(page, origin, method, p, body);
         const publicPost = (p, body, siteKey) => publicPostFor(origin, p, body, siteKey);
-        const result = await runCompany({ call, publicPost, company, cplan, plan, demoDate: plan.demoDate, apply: options.apply, session });
+        const custody=createMutationCustody({plan,cplan,company,runId});
+        const observe=async()=>{const ready=await call("GET","/api/readyz");if(!ok(ready))throw blocked("target_not_ready");const response=await fetch(`${origin}/`,{redirect:"error",signal:AbortSignal.timeout(20000)});return {origin:canonicalRuntimeOrigin(origin),release:ready.json.release,frontendIndexSha256:await fingerprintFrontend(response)};};
+        const result = await runCompany({ call, publicPost, company, cplan, plan, demoDate: plan.demoDate, apply: options.apply, session,custody,observe });
         if (options.verify && !["BLOCKED", "ERROR"].includes(result.status)) {
           result.ui = await verifyUi(page, origin, company, plan.demoDate, path.join(runDir, "screenshots"), `${target}-${key}`);
           result.ui.kind = "fixture visibility (every expected item must appear); smoke = page loaded on the exact origin without a login redirect";
@@ -1071,7 +1110,6 @@ export async function main(argv = process.argv.slice(2)) {
         const e = safeError(error);
         receipt.companies[key] = { status: e.status, halt: { code: e.code, ...(e.detail ? { detail: e.detail } : {}) } };
         console.error(`[demo-seed] ${company.name}: ${e.status} ${e.code}${e.detail ? ` ${e.detail}` : ""}`);
-        if (process.env.DEMO_SEED_DEBUG) console.error(error);
       } finally {
         await releaseRunLock(lock);
         await context.close();
@@ -1098,5 +1136,5 @@ export function exitCodeFor(receipt, options) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch((error) => { const e = safeError(error); console.error(`[demo-seed] ${e.status} ${e.code}${error instanceof SeedHalt ? "" : `: ${String(error.message).split("\n")[0]}`}`); process.exitCode = 1; });
+  main().catch((error) => { const e = safeError(error); console.error(`[demo-seed] ${e.status} ${e.code}`); process.exitCode = 1; });
 }

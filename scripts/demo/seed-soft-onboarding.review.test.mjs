@@ -5,7 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { DEMO_DATE } from "./demo-data.mjs";
-import { FakeGrowthOS, fakePlan } from "./fake-growthos-api.mjs";
+import { FakeGrowthOS, fakePlan,fakeExecutionProof } from "./fake-growthos-api.mjs";
+import { proofHash } from "./execution-proof.mjs";
 import { createOwnedManifest, removeOwnedManifest } from "./runtime-manifest.mjs";
 import {
   STAGING_ORIGIN, acquireRunLock, assertApiPath, collectCustody, exitCodeFor, gradeUiPage, newRunId, planFromExecutionManifest,
@@ -16,7 +17,7 @@ const NOW = () => Date.parse("2026-10-16T18:00:00Z");
 function setup(key = "css") {
   const { plan, cplan, company } = fakePlan(key);
   const api = new FakeGrowthOS({ company, cplan });
-  const args = { call: api.call, publicPost: api.publicPost, company, cplan, plan, demoDate: DEMO_DATE, apply: true, session: api.session(), now: NOW, quiet: true };
+  const args = { call: api.call, publicPost: api.publicPost, company, cplan, plan, demoDate: DEMO_DATE, apply: true, session: api.session(), now: NOW, quiet: true,custody:api.mutationCustody(plan),observe:()=>api.observe() };
   return { api, args, company, cplan, plan };
 }
 const tmp = () => mkdtemp(path.join(os.tmpdir(), "soft-onboarding-test-"));
@@ -92,14 +93,15 @@ describe("I1 write admission", () => {
     expect(assertApiPath("/api/v1/contacts?search=a%40example.com")).toBeTruthy();
   });
   it("requires a reviewed staging execution manifest with exact IDs, pinned release and a fresh hold attestation", () => {
-    const now = Date.parse("2026-10-17T10:00:00Z");
+    const now = Date.parse("2026-10-16T18:00:00Z");
     const { cplan } = fakePlan("css");
     const m = {
       kind: "growthos-soft-onboarding-execution-manifest", target: "staging", origin: STAGING_ORIGIN, demoDate: DEMO_DATE,
-      reviewedBy: "Codex", reviewedAt: "2026-10-17T09:00:00Z", release: { sha: "a".repeat(40), environment: "staging" },
-      holds: { outboundHold: true, communicationsEnabled: false, schedulerAutostart: false, evidence: "ROOT receipt ref", verifiedAt: "2026-10-17T09:30:00Z" },
+      reviewedBy: "ROOT", reviewedAt: "2026-10-16T18:00:00Z", release: { sha: "a".repeat(40),builtAt:"2026-10-16T17:59:00.000Z", environment: "staging" },
+      holds: { outboundHold: true, communicationsEnabled: false, schedulerAutostart: false, evidence: "ROOT receipt ref", verifiedAt: "2026-10-16T18:00:00Z" },
       companies: { css: { organizationId: cplan.organizationId, name: cplan.name, slug: cplan.slug, timezone: cplan.timezone, siteId: cplan.siteId, staff: cplan.staff } },
     };
+    m.executionProof=fakeExecutionProof({...m,instanceId:null},now);m.executionProofSha256=proofHash(m.executionProof);
     const opts = { origin: STAGING_ORIGIN, keys: ["css"], now };
     expect(planFromExecutionManifest(m, opts).plan.companies.css.organizationId).toBe(cplan.organizationId);
     const bad = (patch) => () => planFromExecutionManifest({ ...structuredClone(m), ...patch }, opts);
@@ -127,6 +129,8 @@ describe("I1 write admission", () => {
       companies: [{ key: "css", name: company.name, slug: company.slug, timezone: company.timezone, organizationId: cplan.organizationId, siteId: cplan.siteId, siteKey: "k".repeat(20),
         staff: company.staff.map((s) => ({ key: s.key, email: s.email, role: s.role, id: cplan.staff[s.key], password: "local-secret-value" })) }],
     };
+    const localPlan={target:"local",origin:manifest.origin,instanceId:manifest.instanceId,companies:{css:cplan}};
+    manifest.executionProof=fakeExecutionProof(localPlan,Date.now());manifest.executionProofSha256=proofHash(manifest.executionProof);
     const built = planFromLocalManifest(manifest, { origin: "http://127.0.0.1:4192", keys: ["css"] });
     expect(built.plan.companies.css.staff).toEqual(cplan.staff);
     expect(JSON.stringify(built.plan)).not.toContain("local-secret-value");
@@ -279,7 +283,8 @@ describe("I5 frozen demo date; existing visits are never relabeled", () => {
   });
   it("refuses to create a visit once the reviewed date has passed", async () => {
     const { args } = setup();
-    const r = await seedCompany({ ...args, now: () => Date.parse("2026-10-18T00:00:00Z") });
+    const later=Date.parse("2026-10-18T00:00:00Z");args.plan.executionProof=fakeExecutionProof(args.plan,later);args.plan.executionProofSha256=proofHash(args.plan.executionProof);
+    const r = await seedCompany({ ...args, now: () => later });
     expect(r.status).toBe("HOLD");
     expect(r.halt.code).toBe("demo_date_passed");
     expect(zonedInstant(DEMO_DATE, "07:30", "America/New_York").toISOString()).toBe("2026-10-17T11:30:00.000Z");

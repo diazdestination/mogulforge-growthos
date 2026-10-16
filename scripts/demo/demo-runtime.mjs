@@ -24,13 +24,16 @@
 // start if neither is free.
 import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
-import { randomBytes, randomUUID, scryptSync } from "node:crypto";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { randomBytes, randomUUID, scryptSync,createHash } from "node:crypto";
+import { mkdir, mkdtemp, rm,readFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DEMO_COMPANIES } from "./demo-data.mjs";
 import { createOwnedManifest, removeOwnedManifest } from "./runtime-manifest.mjs";
+import { proofHash,fingerprintFrontend } from "./execution-proof.mjs";
+import { safeError } from "./seed-soft-onboarding.mjs";
+import { collectSchemaCatalog,catalogDigest } from "../../reports/release-preparation-2026-10-09/schema-catalog.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const api = path.join(root, "artifacts/api-server");
@@ -166,6 +169,7 @@ try {
   Object.assign(env, {
     DATABASE_URL: `postgresql://postgres:synthetic@${socket.getServerConn()}/postgres`,
     NODE_ENV: "production",
+    GROWTHOS_ENVIRONMENT:"test",
     HOST: "127.0.0.1",
     PORT: String(PORT),
     APP_ORIGIN: ORIGIN,
@@ -211,20 +215,32 @@ try {
     port: PORT,
     origin: ORIGIN,
     file: process.env.DEMO_LOCAL_MANIFEST,
-    payload: {
+    payload: async({instanceId})=>{
+      const observer=new pg.Client({connectionString:env.DATABASE_URL});let catalog;
+      await observer.connect();try{await observer.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");await observer.query("SET LOCAL statement_timeout='20s'");await observer.query("SET LOCAL search_path=pg_catalog,public,pg_temp");catalog=await collectSchemaCatalog(observer);await observer.query("ROLLBACK");}finally{await observer.end();}
+      if(catalog.tables.length!==142||catalog.columns.length!==1870)throw Error("Local schema proof unavailable");
+      const ready=await http("/api/readyz"),page=await fetch(ORIGIN+"/",{redirect:"error",signal:AbortSignal.timeout(20000)});
+      if(ready.status!==200||page.status!==200)throw Error("Local deployment proof unavailable");
+      const frontendIndexSha256=await fingerprintFrontend(page);
+      const fixtures=Object.fromEntries(companies.map(c=>[c.key,{organizationId:c.organizationId,name:c.name,slug:c.slug,timezone:c.timezone,siteId:c.siteId,staff:Object.fromEntries(c.staff.map(s=>[s.key,s.id]))}]));
+      const observed=Date.now(),executionProof={kind:"LOCAL_DEMO_EXECUTION_PROOF_V1",origin:ORIGIN,fixturesSha256:proofHash(fixtures),observedAt:new Date(observed).toISOString(),expiresAt:new Date(observed+300000).toISOString(),configSha256:proofHash({origin:ORIGIN,holds:HOLDS,autoMigrate:env.AUTO_MIGRATE,environment:env.GROWTHOS_ENVIRONMENT}),imageSha256:createHash("sha256").update(await readFile(path.join(buildDir,"runtime-preview-server.mjs"))).digest("hex"),frontendIndexSha256,release:ready.json.release,schema:{database:"postgres",cluster:null,tables:142,columns:1870,catalogSha256:catalogDigest(catalog)},holds:{outbound:true,scheduler:false,communications:false,stagingOutboundApproved:false,recipientAllowlistEmpty:true},runtime:{instanceId,processId:process.pid}};
+      return {
       kind: "growthos-soft-onboarding-local-manifest",
       environment: "LOCAL disposable runtime (in-memory PGlite, loopback only, outbound hold on, communications disabled)",
       createdAt: new Date().toISOString(),
       // Set by this process itself; these are the holds the API child runs with.
       holds: HOLDS,
       companies,
+      executionProof,executionProofSha256:proofHash(executionProof),
       note: "Local disposable logins and site keys only; destroyed when the runtime exits. Do not copy into artifacts or Git.",
-    },
+    };},
   });
   console.log(`[demo-runtime] READY ${ORIGIN} manifest=${manifest.file}`);
   for (const c of companies) console.log(`[demo-runtime] ${c.name}: org=${c.organizationId} site=${c.siteId} key=${c.siteKeyIssueStatus}`);
   const status = await exited;
   if (status) process.exitCode = status;
+} catch(error) {
+  const e=safeError(error);console.error(`[demo-runtime] ${e.status} ${e.code}`);process.exitCode=2;
 } finally {
   if (child && child.exitCode === null && child.signalCode === null) child.kill();
   // Only this instance's own manifest; never another runtime's file.
