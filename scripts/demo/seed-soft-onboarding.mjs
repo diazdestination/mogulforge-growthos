@@ -512,7 +512,17 @@ async function seedRecords({ call, publicPost, company, demoDate, apply, session
   };
   const write = async (kind, key, method, pathname, body,dispatch=()=>call(method,pathname,body)) => {
     await guard();
-    const r = await custody.dispatch({kind,key,method,pathname,body},dispatch,r=>r.json?.id??r.json?.invoice?.id??r.json?.asset?.id??r.json?.estimate?.id??r.json?.leadId??pathname.split('/').find(x=>UUID.test(x)),()=>validateExecutionProof(plan,now()));
+    const resourceId = (r) => {
+      if (kind === "smart-site" && key === "credential-check") {
+        const check = r.json;
+        return check?.status === "credential_verified" && check.siteId === session.siteId &&
+          check.profile === company.profile && check.createsLead === false &&
+          Number.isInteger(check.credentialVersion) && check.credentialVersion > 0 &&
+          Number.isFinite(Date.parse(check.checkedAt)) ? check.siteId : null;
+      }
+      return r.json?.id??r.json?.invoice?.id??r.json?.asset?.id??r.json?.estimate?.id??r.json?.leadId??pathname.split('/').find(x=>UUID.test(x));
+    };
+    const r = await custody.dispatch({kind,key,method,pathname,body},dispatch,resourceId,()=>validateExecutionProof(plan,now()));
     if (r.status === 0 || r.status >= 500) { L.add(kind, key, "unknown", null, safeBrief(r)); throw new SeedHalt("UNKNOWN", "unknown_outcome", `${kind}:${key}`); }
     if (!ok(r)) { L.add(kind, key, "failed", null, safeBrief(r)); throw new SeedHalt("INCOMPLETE", "write_failed", `${kind}:${key}`); }
     return r;
@@ -592,8 +602,8 @@ async function seedRecords({ call, publicPost, company, demoDate, apply, session
       L.add("property", ss.customer, "would-create", null, "via website inquiry");
       L.add("smart-site-lead", ss.customer, "would-create");
     } else {
-      const check = await publicPost(`/api/v1/public/smart-sites/${session.siteId}/check`, { schemaVersion: 1 }, session.siteKey);
-      if (!ok(check)) { L.add("smart-site", "credential-check", check.status === 0 || check.status >= 500 ? "unknown" : "failed", null, safeBrief(check)); throw new SeedHalt("INCOMPLETE", "smart_site_check_failed"); }
+      const checkPath = `/api/v1/public/smart-sites/${session.siteId}/check`, checkBody = { schemaVersion: 1 };
+      await write("smart-site", "credential-check", "POST", checkPath, checkBody, () => publicPost(checkPath, checkBody, session.siteKey));
       await write("smart-site", "activate", "PATCH", `/api/v1/smart-sites/${session.siteId}`, { isActive: true, confirmedLaunch: true });
       const profiles = readOk(await call("GET", "/api/v1/smart-sites/profiles"), "smart-site-profiles");
       const profile = (Array.isArray(profiles.json) ? profiles.json : profiles.json?.profiles ?? []).find((p) => p.id === company.profile);
@@ -757,7 +767,9 @@ async function seedRecords({ call, publicPost, company, demoDate, apply, session
       const detail = await readOne(call, "invoice", `/api/v1/invoices/${id}`);
       const d=diffFields(expectedDocument,detail.document??{});for(const field of Object.keys(detail.document??{}))if(!(field in expectedDocument))d.push(field);
       if (detail.organizationId !== orgId) d.push("organizationId");
-      const lineage={contactId,propertyId:ids.properties[inv.customer]??null,sourceKind:"existing_customer",leadId:null,projectId:null,estimateId:null,customerWorkId:null,balanceBasis:"full_history",openingReceivableCents:null,openingAsOf:null,historicalSource:null};d.push(...diffFields(lineage,detail));
+      const originalRoot=custody.invoiceRoot(inv.key);
+      if(!UUID.test(originalRoot??""))d.push("customerWorkId");
+      const lineage={contactId,propertyId:ids.properties[inv.customer]??null,sourceKind:"customer_work",leadId:null,projectId:null,estimateId:null,customerWorkId:originalRoot,balanceBasis:"full_history",openingReceivableCents:null,openingAsOf:null,historicalSource:null};d.push(...diffFields(lineage,detail));
       if(!Number.isInteger(detail.version)||detail.version<1||!Number.isInteger(detail.recordedPaidCents)||!Number.isInteger(detail.recordedBalanceCents)||detail.recordedBalanceCents!==total-detail.recordedPaidCents||detail.unallocatedRefundCents!==0||detail.balanceDueCents!==(detail.status==="draft"?null:total-detail.recordedPaidCents))d.push("balances");
       if (d.length) throw conflict("invoice", inv.key, id, d.join(","));
       return detail;

@@ -99,6 +99,14 @@ and intent-byte hash. Website intake's derived customer/property IDs are bound
 to that acknowledged original lead, with their own reviewed identity hashes.
 The plan retains original fixture/company identities and ROOT proof hash.
 
+The public smart-site credential check is also a mutation: the product records
+`credentialCheckedAt` and an audit event. It uses the same session/staff guard,
+exclusive operation intent and immediate pre-dispatch proof check as activation
+and intake. Its site key stays only in the in-memory dispatch closure; the
+journal contains the nonsecret request hash and reviewed site ID. A successful
+HTTP response must identify that exact site's `credential_verified` result.
+Lost or malformed acknowledgments remain UNKNOWN and reserved across runs.
+
 Buffer writes honor actual byte counts and offsets; zero progress, write,
 fsync/close failure or overlap poisons the writer. UNKNOWN, crash, failed
 acknowledgment, incomplete readback or any other unfinished attempt leaves the
@@ -122,6 +130,14 @@ sections are not silently accepted. Source/contact/property/work identities,
 version, financial basis and exact required balances are checked too. Missing
 balances do not become zero. Issued document lineage is preserved; staff edits
 hold instead of being issued, topped up or overwritten.
+
+Creating an invoice from `existing_customer` creates a returning-work root in
+the product. The returned DTO has `sourceKind: customer_work` and its generated
+`customerWorkId`. The original root ID is retained in the invoice creation ACK
+before any issue/payment; all later detail reads must match that exact root,
+including fresh verification-only runs. A different valid UUID does not pass.
+Missing or invalid creation-root identity is UNKNOWN, and old/malformed custody
+without the original root is held without rewriting or replaying it.
 
 Reconciliation has no automatic CLI implementation. ROOT must review original
 intent/request/ack hashes and actual API identity/state, exclude original

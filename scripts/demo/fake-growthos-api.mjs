@@ -57,7 +57,7 @@ export class FakeGrowthOS {
     if (url.pathname === "/api/readyz") return res(200, { status: "ready", database: "reachable", release: FAKE_RELEASE });
     if (url.pathname.startsWith("/api/v1/public/smart-sites/")) {
       if (siteKey !== this.siteKey || seg[2] !== this.cplan.siteId) return res(401, { code: "unauthorized" });
-      if (seg[3] === "check") return res(200, { ok: true });
+      if (seg[3] === "check") return res(200, { status: "credential_verified", siteId: this.cplan.siteId, profile: this.company.profile, captureEnabled: false, credentialVersion: 1, checkedAt: now, createsLead: false });
       const out = replay("intake", body.requestId, () => {
         const [first, ...rest] = body.contact.name.split(" ");
         const contact = add("contacts", { firstName: first, lastName: rest.join(" "), email: body.contact.email, phone: body.contact.phone.replace(/\D/g, "") });
@@ -114,7 +114,7 @@ export class FakeGrowthOS {
           const d = body.document;
           const lineItems = d.lineItems.map((l) => ({ ...l, totalCents: Math.round(Number(l.quantity) * l.unitPriceCents) }));
           const totalCents=lineItems.reduce((s,l)=>s+l.totalCents,0);
-          const inv = add("invoices", { contactId: body.source.contactId, propertyId: body.source.propertyId,sourceKind:"existing_customer",leadId:null,projectId:null,estimateId:null,customerWorkId:null,balanceBasis:"full_history",openingReceivableCents:null,openingAsOf:null,historicalSource:null, status: "draft", version: 1, title: d.title, customerName: d.customerName, currency: d.currency, taxCents: 0,
+          const inv = add("invoices", { contactId: body.source.contactId, propertyId: body.source.propertyId,sourceKind:"customer_work",leadId:null,projectId:null,estimateId:null,customerWorkId:randomUUID(),balanceBasis:"full_history",openingReceivableCents:null,openingAsOf:null,historicalSource:null, status: "draft", version: 1, title: d.title, customerName: d.customerName, currency: d.currency, taxCents: 0,
             totalCents, recordedPaidCents: 0,recordedBalanceCents:totalCents,balanceDueCents:null,unallocatedRefundCents:0, paymentState: "unpaid", reconciliationRequired: false, document: {issuerAddress:null,customerAddress:null, ...d, lineItems,subtotalCents:totalCents,totalCents } });
           return { invoice: inv };
         });

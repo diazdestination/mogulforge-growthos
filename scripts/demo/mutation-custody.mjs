@@ -175,7 +175,8 @@ export function createMutationCustody({
             original.value.planIntentSha256 !== sha(intent.bytes) ||
             original.value.scope !== scope ||
             original.value.kind !== r.kind ||
-            original.value.key !== r.key
+            original.value.key !== r.key ||
+            (r.kind === "invoice" && !uuid(r.customerWorkId))
           )
             fail("custody_uncertain");
         }
@@ -203,6 +204,8 @@ export function createMutationCustody({
     load,
     resource: (kind, key) =>
       resources.get(kind + ":" + key)?.resourceId ?? null,
+    invoiceRoot: (key) =>
+      resources.get("invoice:" + key)?.customerWorkId ?? null,
     begin: async () => {
       if (!loaded || poisoned) fail("mutation_reserved");
       if (completed) return;
@@ -259,7 +262,14 @@ export function createMutationCustody({
         }
         if (Number.isInteger(r?.status) && r.status >= 200 && r.status < 300) {
           const resourceId = idOf(r);
-          if (!uuid(resourceId)) {
+          const invoice =
+            kind === "invoice" ? (r.json?.invoice ?? r.json) : null;
+          if (
+            !uuid(resourceId) ||
+            (kind === "invoice" &&
+              (invoice?.sourceKind !== "customer_work" ||
+                !uuid(invoice?.customerWorkId)))
+          ) {
             poisoned = true;
             return { status: 0, json: null };
           }
@@ -270,6 +280,7 @@ export function createMutationCustody({
             resourceId,
             creationRequestSha256: requestSha256,
             intentSha256,
+            ...(invoice ? { customerWorkId: invoice.customerWorkId } : {}),
           };
           await write(name + ".ack.json", record);
           resources.set(kind + ":" + key, record);
