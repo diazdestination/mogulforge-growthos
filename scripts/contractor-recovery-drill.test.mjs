@@ -7,6 +7,13 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   try { result = await runContractorRecoveryDrill({ emit: line => receipts.push(JSON.parse(line)) }); }
   catch(error) { console.error('RECOVERY_FAILURE_RECEIPTS',JSON.stringify(receipts)); throw error; }
   expect(result.previousTableCount).toBe(90);
+  expect(result.sourcePreservation.legacy.sourceCommit).toBe('f56e6cef452b5b564838a72202c0d37cd2caf384');
+  expect(result.sourcePreservation.overlay.sourceCommit).toBe('54cffe4c1552ae306781632202da19bb0fe88f4a');
+  expect(result.sourcePreservation.releaseEligible).toBe(false);
+  expect(result.scheduling.identity.sourceCommit).toBe(result.scheduling.checkout.commit);
+  expect(result.scheduling.identity.sourceTree).toBe(result.scheduling.checkout.tree);
+  expect(result.scheduling.sourceFiles.map(file=>file.path)).toContain('scripts/c1-source-preservation.mjs');
+  expect(result.scheduling.sourceFiles.map(file=>file.path)).toContain('reports/c1-source-preservation-2026-10-16.json');
   expect(result.tableCount).toBe(142);
   expect(result.alertCoveragePreviousTableCount).toBe(141);
   expect(result.alertCoveragePriorRowsUnchanged).toBe(true);
@@ -139,6 +146,8 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.scheduling.manualOutcomes).toBe(6);
   expect(result.scheduling.sourceOutcomes).toBe(3);
   expect(result.scheduling.enforcement.cases).toHaveLength(4);
+  expect(result.scheduling.artifact.workerFilesVerified).toBe(true);
+  expect(result.scheduling.cleanup.filter(receipt=>receipt.kind==='build_stage')).toHaveLength(1);
   expect(result.scheduling.rollback.candidateCompatible).toBe(true);
   expect(result.scheduling.rollback.releaseEligible).toBe(false);
   expect(result.scheduling.cleanupVerified).toBe(true);

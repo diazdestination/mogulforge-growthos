@@ -19,6 +19,9 @@ import { assertServiceSmsParentDispatch, hasServiceSmsReplyHold, listServiceSmsR
 import { careFingerprint, type ServiceCareApproval } from "./service-care-policy";
 import { assertServiceSmsReplyStorageReady, parseServiceSmsReference } from "./service-sms-policy";
 import { twilioForOrganization } from "./twilio-controls";
+import { sendTwilioSms } from "./twilio-delivery";
+import { contactTouchReservationsTable as touches } from "../../../../lib/db/src/schema/contact-touch-reservations";
+import { touchAddress } from "./contact-touch-claim";
 
 const realFetch = globalThis.fetch, orgs: string[] = [], sessions: string[] = [];
 const token = "synthetic-service-sms-webhook", recipient = "+14045550123", origin = "https://growth.example";
@@ -115,6 +118,25 @@ describe("typed service SMS safety", () => {
     expect((await listServiceSmsReplies(f.org, f.staff, f.service.id)).items[0]).toMatchObject({ evidence: "signed_sms_reference", content: { text } });
     await processServiceWatch(f.org); expect((await getServiceWatch(f.org, f.staff, f.service.id)).reasons).toContain("reply_received_review");
     await processDueScheduledActions(f.org); expect(posts).toHaveLength(1);
+  });
+  it("withdraws service approval at the second guard and retains the parent, operation and contact allowance", async () => {
+    const f = await fixture(), queued = await queue(f), fingerprint = careFingerprint({ action: queued.scheduled.action, context: queued.scheduled.context });
+    await db.insert(revenueExecutionsTable).values({ organizationId: f.org, actionKey: `scheduled:${queued.scheduled.id}`, kind: "service_care_reminder", fingerprint, expiresAt: new Date(Date.now() + 300_000) });
+    const parentId = await reserveServiceSmsParent({ organizationId: f.org, serviceObligationId: f.service.id, approvalId: queued.approval.approvalId, scheduledActionId: queued.scheduled.id, executionFingerprint: fingerprint });
+    const logicalKey = `scheduled:${queued.scheduled.id}`, payloadHash = "a".repeat(64);
+    const [touch] = await db.insert(touches).values({ organizationId: f.org, contactId: f.contact.id, logicalKey, payloadHash, sourceKind: "service", channel: "sms", address: touchAddress("sms", recipient) }).returning();
+    const context = { organizationId: f.org, contactId: f.contact.id, purpose: "customer_care" as const, idempotencyKey: `service-care:${f.service.id}`, serviceSmsParentId: parentId, contactTouch: { logicalKey, payloadHash } };
+    let checks = 0;
+    const guard = vi.fn(async () => { if (++checks === 2) throw new Error("Synthetic service approval withdrawn at second guard"); });
+    await expect(sendTwilioSms(recipient, queued.preview.body, context, guard)).rejects.toThrow("withdrawn at second guard");
+    expect(guard).toHaveBeenCalledTimes(2); expect(posts).toHaveLength(0);
+    const [owned] = await db.select().from(twilioDispatchesTable).where(eq(twilioDispatchesTable.organizationId, f.org));
+    expect(owned).toMatchObject({ status: "cancelled", providerSid: null });
+    await expect(sendTwilioSms(recipient, queued.preview.body, context, guard)).rejects.toThrow(/cancelled/);
+    expect(guard).toHaveBeenCalledTimes(2); expect(posts).toHaveLength(0);
+    expect((await db.select().from(touches).where(eq(touches.id, touch.id)))[0]).toEqual(touch);
+    expect((await db.select().from(parents).where(eq(parents.id, parentId)))[0]).toMatchObject({ dispatchId: null, dispatchStartedAt: null });
+    expect((await db.select().from(twilioDispatchesTable).where(eq(twilioDispatchesTable.organizationId, f.org))).map(row => row.id)).toEqual([owned.id]);
   });
   it("keeps no-reference replies ambiguous even with one candidate and holds later same-phone occurrences", async () => {
     const f = await fixture(); await send(f);
