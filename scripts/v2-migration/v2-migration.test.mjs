@@ -5,11 +5,13 @@
 import { it as test, beforeAll, afterAll } from 'vitest';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
-import { root, connect, beginSourceSnapshot, loadReviewedPlan, captureSource, legacySchemaSql, safeError } from './lib.mjs';
+import { root, connect, beginSourceSnapshot, loadReviewedPlan, captureSource, legacySchemaSql, safeError, SESSION_SQL } from './lib.mjs';
+import { checkAppPrivileges } from './app-privileges.mjs';
 import { copyToV2, identify, EXIT_CODES } from './copy-to-v2.mjs';
 import { compare, EXIT_CODES as COMPARE_EXIT_CODES } from './compare.mjs';
 
@@ -82,13 +84,14 @@ beforeAll(async () => {
   dstPort = await startPostgres('dst');
   for (const port of [srcPort, dstPort])
     await admin(port, 'control', `CREATE ROLE schema_admin NOLOGIN; CREATE ROLE "fly-user" LOGIN PASSWORD '${USER_PW}'; GRANT schema_admin TO "fly-user";
-      CREATE ROLE "growthos-reader" LOGIN PASSWORD '${READER_PW}'; GRANT pg_read_all_data TO "growthos-reader";`);
+      CREATE ROLE "growthos-reader" LOGIN PASSWORD '${READER_PW}'; GRANT pg_read_all_data, pg_read_all_stats TO "growthos-reader";`);
   for (const [layout, db] of Object.entries(LAYOUTS)) {
     await admin(srcPort, 'control', `CREATE DATABASE "${db}" OWNER schema_admin`);
     const c = await connect(url(srcPort, db, 'fly-user', USER_PW), 'claude-v2mig-seed');
     try { await c.query('SET ROLE schema_admin'); await c.query(fixtureSql(layout)); await seed(c); } finally { await c.end(); }
   }
-  for (const db of ['tgt_happy', 'tgt_layout2', 'tgt_nonempty', 'tgt_corrupt', 'tgt_lost_ack', 'tgt_pre_commit', 'tgt_identity'])
+  await admin(srcPort, 'control', 'CREATE DATABASE tgt_same_cluster OWNER schema_admin');
+  for (const db of ['tgt_happy', 'tgt_layout2', 'tgt_nonempty', 'tgt_corrupt', 'tgt_lost_ack', 'tgt_pre_commit', 'tgt_identity', 'tgt_sessions', 'tgt_late_writer', 'tgt_objects'])
     await admin(dstPort, 'control', `CREATE DATABASE ${db} OWNER schema_admin`);
   timings.containersAndSeedMs = Date.now() - t0;
 }, 180000);
@@ -103,10 +106,13 @@ afterAll(async () => {
 
 const src = (layout = 'fly-db') => url(srcPort, LAYOUTS[layout], 'growthos-reader', READER_PW);
 const dst = db => url(dstPort, db, 'fly-user', USER_PW);
-// Every run pins both identities, as the operator does with --identify.
-const pins = async (sourceUrl, targetUrl) => { const i = await identify({ sourceUrl, targetUrl }); return { sourceIdentity: i.source, targetIdentity: i.target }; };
-const copy = async opts => copyToV2({ ...(await pins(opts.sourceUrl, opts.targetUrl)), ...opts });
-const cmp = async opts => compare({ ...(await pins(opts.sourceUrl, opts.targetUrl)), ...opts });
+// Every run uses a reviewed manifest drafted by --identify, with the owner role filled in.
+const manifestFor = async (sourceUrl, targetUrl, change = m => m) => {
+  const { observedSourceSessions: _observed, ...draft } = await identify({ sourceUrl, targetUrl });
+  return change({ ...draft, target: { ...draft.target, ownerRole: 'schema_admin' } });
+};
+const copy = async opts => copyToV2({ manifest: await manifestFor(opts.sourceUrl, opts.targetUrl), ...opts });
+const cmp = async opts => compare({ manifest: await manifestFor(opts.sourceUrl, opts.targetUrl), ...opts });
 
 test('rebuilt legacy schema SQL is byte-identical to the reviewed production75 fixtures', () => {
   for (const layout of Object.keys(LAYOUTS)) assert.equal(legacySchemaSql(catalog75(layout)), fixtureSql(layout));
@@ -114,11 +120,14 @@ test('rebuilt legacy schema SQL is byte-identical to the reviewed production75 f
 
 test('happy path: copy commits, 75 tables match by count and fingerprint, compare passes', async () => {
   const t0 = Date.now();
-  const r = await copy({ sourceUrl: src(), targetUrl: dst('tgt_happy'), ownerRole: 'schema_admin' });
+  const r = await copy({ sourceUrl: src(), targetUrl: dst('tgt_happy') });
   timings.copyMs = Date.now() - t0; timings.copyBreakdownMs = r.timingsMs;
   assert.equal(r.status, 'COMMITTED', JSON.stringify(r.verification.problems));
-  assert.deepEqual(r.identityCheck, { source: (await identify({ sourceUrl: src(), targetUrl: dst('tgt_happy') })).source, target: (await identify({ sourceUrl: src(), targetUrl: dst('tgt_happy') })).target });
-  assert.match(r.identityCheck.target, /^\d+\/tgt_happy$/); // least-privilege logins can read pg_control_system here
+  // Receipt is bound to the admitted facts (least-privilege logins can read pg_control_system here).
+  assert.deepEqual({ ...r.admitted.target, systemIdentifier: 'x' }, { systemIdentifier: 'x', database: 'tgt_happy', sessionUser: 'fly-user', currentUser: 'fly-user', pgMajor: 16, ownerRole: 'schema_admin' });
+  assert.equal(r.admitted.source.sessionUser, 'growthos-reader');
+  assert.notEqual(r.admitted.source.systemIdentifier, r.admitted.target.systemIdentifier);
+  assert.deepEqual(r.sourceSessions, { observed: 0, allowlist: [], unexpected: 0 });
   assert.equal(r.stepsApplied.length, 20);
   assert.equal(r.rowsCopied, 46);
   assert.deepEqual(r.verification.catalog.tables, 142);
@@ -193,22 +202,30 @@ test('compare detects a corrupted target row, a lost row and a stray row in a ne
   assert.deepEqual(r.problems.map(p => `${p.check}:${p.table}`).sort(),
     ['new_table_not_empty:invoice_sequences', 'table:contacts', 'table:org_settings', 'table:sessions']);
   // CLI: exit status 1 and no row values in output.
+  const manifestPath = resolve(tmpdir(), `claude-v2mig-manifest-${runId}.json`);
+  writeFileSync(manifestPath, JSON.stringify(await manifestFor(src(), dst('tgt_corrupt'))));
   const child = spawn(process.execPath, [resolve(root, 'scripts/v2-migration/compare.mjs')], {
-    env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, SOURCE_DATABASE_URL: src(), TARGET_DATABASE_URL: dst('tgt_corrupt'),
-      SOURCE_IDENTITY: (await pins(src(), dst('tgt_corrupt'))).sourceIdentity, TARGET_IDENTITY: (await pins(src(), dst('tgt_corrupt'))).targetIdentity }, windowsHide: true });
+    env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, SOURCE_DATABASE_URL: src(), TARGET_DATABASE_URL: dst('tgt_corrupt'), V2_MANIFEST: manifestPath }, windowsHide: true });
   let out = ''; child.stdout.on('data', d => { out += d; });
   const code = await new Promise(done => child.on('close', done));
+  unlinkSync(manifestPath);
   assert.equal(code, 1);
   assert.equal(JSON.parse(out).status, 'MISMATCH');
   assert.ok(!out.includes('Fictional') && !out.includes(USER_PW) && !out.includes(READER_PW));
 }, 120000);
 
 /** Fault injection on the real pg client used by copy-to-v2 (target connection only). */
+const pg = createRequire(resolve(root, 'artifacts/api-server/package.json'))('pg');
 async function withTargetFault(fault, fn) {
-  const pg = createRequire(resolve(root, 'artifacts/api-server/package.json'))('pg');
-  const original = pg.Client.prototype.query;
+  const original = pg.Client.prototype.query, late = [];
   pg.Client.prototype.query = async function (...args) {
     const target = this.connectionParameters.application_name === 'growthos-v2-copy-target';
+    if (target && fault === 'pg17' && typeof args[0] === 'string' && args[0].includes('"pgMajor"')) {
+      const result = await original.apply(this, args); result.rows[0].pgMajor = 17; return result;
+    }
+    // 'late-writer': a writer connects to the source while the target transaction is running.
+    if (target && fault === 'late-writer' && typeof args[0] === 'string' && args[0].includes('ADD COLUMN "scheduling_policy"') && late.length === 0)
+      late.push(await connect(url(srcPort, 'fly-db', 'fly-user', USER_PW), 'claude-v2mig-late-writer'));
     if (target && fault === 'identity' && typeof args[0] === 'string' && args[0].includes('pg_control_system')) throw Object.assign(new Error('synthetic permission denied'), { code: '42501' });
     // 'before': connection lost while the last reviewed step (0019) runs, i.e. before COMMIT is sent.
     if (target && fault === 'before' && typeof args[0] === 'string' && args[0].includes('ADD COLUMN "scheduling_policy"')) throw Object.assign(new Error('synthetic pre-commit loss'), { code: '08006' });
@@ -219,7 +236,7 @@ async function withTargetFault(fault, fn) {
     }
     return original.apply(this, args);
   };
-  try { return await fn(); } finally { pg.Client.prototype.query = original; }
+  try { return await fn(); } finally { pg.Client.prototype.query = original; for (const c of late) await c.end(); }
 }
 const publicTables = async db => Number((await admin(dstPort, db, "SELECT count(*) AS n FROM pg_tables WHERE schemaname='public'")).rows[0].n);
 
@@ -244,20 +261,97 @@ test('failure before COMMIT is FAILED with commitSent=false; target stays empty 
   assert.equal(COMPARE_EXIT_CODES[cmpResult.status], 2);
 }, 120000);
 
-test('identity checks are mandatory and fail closed: unreadable, unpinned, wrong pin', async () => {
+test('admission is mandatory and positive: unreadable, missing, same cluster, URL alias, wrong login/role/major', async () => {
+  const target = dst('tgt_identity'), code = c => e => e.safeCode === c;
   // Unreadable identity: refused, no override exists.
-  await assert.rejects(withTargetFault('identity', () => copy({ sourceUrl: src(), targetUrl: dst('tgt_identity') })), e => e.safeCode === 'v2_identity_unavailable');
-  // Missing pins.
-  await assert.rejects(copyToV2({ sourceUrl: src(), targetUrl: dst('tgt_identity') }), e => e.safeCode === 'v2_identity_pin_required');
-  await assert.rejects(compare({ sourceUrl: src(), targetUrl: dst('tgt_identity') }), e => e.safeCode === 'v2_identity_pin_required');
-  // Pinned to a different (empty) target than the one connected.
-  const wrong = await pins(src(), dst('tgt_pre_commit'));
-  await assert.rejects(copyToV2({ sourceUrl: src(), targetUrl: dst('tgt_identity'), ...wrong }), e => e.safeCode === 'v2_target_identity_mismatch');
-  await assert.rejects(copyToV2({ sourceUrl: src(), targetUrl: dst('tgt_identity'), ...wrong, sourceIdentity: wrong.targetIdentity }), e => e.safeCode === 'v2_source_identity_mismatch' || e.safeCode === 'v2_target_identity_mismatch');
+  await assert.rejects(withTargetFault('identity', () => copy({ sourceUrl: src(), targetUrl: target })), code('v2_identity_unavailable'));
+  // Missing manifest (copy and compare).
+  await assert.rejects(copyToV2({ sourceUrl: src(), targetUrl: target }), code('v2_manifest_required'));
+  await assert.rejects(compare({ sourceUrl: src(), targetUrl: target }), code('v2_manifest_required'));
+  // Same cluster, different database: refused even though the database names differ.
+  const sameCluster = url(srcPort, 'tgt_same_cluster', 'fly-user', USER_PW);
+  await assert.rejects(copy({ sourceUrl: src(), targetUrl: sameCluster }), code('v2_same_cluster'));
+  // A manifest claiming a different cluster does not help: the observed identifiers are compared.
+  await assert.rejects(copyToV2({ sourceUrl: src(), targetUrl: sameCluster, manifest: await manifestFor(src(), target) }), code('v2_same_cluster'));
+  // URL alias of the source itself (localhost vs 127.0.0.1).
+  await assert.rejects(copy({ sourceUrl: src(), targetUrl: src().replace('127.0.0.1', 'localhost') }), code('v2_same_cluster'));
+  // Wrong pinned target database, login, source role, owner role, PG major.
+  const wrong = async change => copyToV2({ sourceUrl: src(), targetUrl: target, manifest: await manifestFor(src(), target, change) });
+  await assert.rejects(wrong(m => ({ ...m, target: { ...m.target, database: 'tgt_pre_commit' } })), code('v2_target_database_mismatch'));
+  await assert.rejects(wrong(m => ({ ...m, target: { ...m.target, sessionUser: 'growthos-reader' } })), code('v2_target_session_user_mismatch'));
+  await assert.rejects(wrong(m => ({ ...m, source: { ...m.source, currentUser: 'schema_admin' } })), code('v2_source_current_user_mismatch'));
+  await assert.rejects(wrong(m => ({ ...m, target: { ...m.target, ownerRole: 'growthos-reader' } })), code('v2_target_owner_role_unavailable'));
+  await assert.rejects(wrong(m => ({ ...m, target: { ...m.target, pgMajor: 17 } })), code('v2_manifest_invalid'));
+  await assert.rejects(withTargetFault('pg17', () => copy({ sourceUrl: src(), targetUrl: target })), code('v2_target_pg_major_mismatch'));
   assert.equal(await publicTables('tgt_identity'), 0);
-  // Correct pins succeed.
-  assert.equal((await copy({ sourceUrl: src(), targetUrl: dst('tgt_identity') })).status, 'COMMITTED');
+  assert.equal((await admin(srcPort, 'tgt_same_cluster', "SELECT count(*) AS n FROM pg_tables WHERE schemaname='public'")).rows[0].n, '0');
+  // Correct manifest succeeds.
+  assert.equal((await copy({ sourceUrl: src(), targetUrl: target })).status, 'COMMITTED');
+}, 180000);
+
+test('unexpected source sessions hold the copy before target mutation and again before COMMIT', async () => {
+  const writer = await connect(url(srcPort, 'fly-db', 'fly-user', USER_PW), 'claude-v2mig-writer');
+  try {
+    await assert.rejects(copy({ sourceUrl: src(), targetUrl: dst('tgt_sessions') }),
+      e => e.safeCode === 'v2_source_unexpected_sessions' && e.commitSent === false && e.v2Detail.unexpected.some(u => u.usename === 'fly-user'));
+    assert.equal(await publicTables('tgt_sessions'), 0);
+    // A reviewed allowlist entry (exact login + application name) is accepted and recorded.
+    const seen = (await identify({ sourceUrl: src(), targetUrl: dst('tgt_sessions') })).observedSourceSessions;
+    const allow = seen.map(({ usename, application_name }) => ({ usename, application_name }));
+    const r = await copyToV2({ sourceUrl: src(), targetUrl: dst('tgt_sessions'), manifest: await manifestFor(src(), dst('tgt_sessions'), m => ({ ...m, allowedSourceSessions: allow })) });
+    assert.equal(r.status, 'COMMITTED');
+    assert.deepEqual(r.sourceSessions, { observed: 1, allowlist: allow, unexpected: 0 });
+  } finally { await writer.end(); }
+  // A writer that appears while the target transaction runs blocks the COMMIT.
+  await assert.rejects(withTargetFault('late-writer', () => copy({ sourceUrl: src(), targetUrl: dst('tgt_late_writer') })),
+    e => e.safeCode === 'v2_source_unexpected_sessions' && e.commitSent === false);
+  assert.equal(await publicTables('tgt_late_writer'), 0);
+  // A source login that cannot see other users' sessions fails closed instead of seeing none.
+  const blind = url(srcPort, 'fly-db', 'fly-user', USER_PW);
+  await assert.rejects(copy({ sourceUrl: blind, targetUrl: dst('tgt_late_writer') }), e => e.safeCode === 'v2_source_sessions_unobservable');
+  assert.equal(await publicTables('tgt_late_writer'), 0);
+}, 180000);
+
+test('target with standalone routines, composite types or extra schemas is not empty', async () => {
+  await admin(dstPort, 'tgt_objects', "CREATE FUNCTION public.f() RETURNS int LANGUAGE sql AS 'SELECT 1'");
+  await assert.rejects(copy({ sourceUrl: src(), targetUrl: dst('tgt_objects') }), e => e.safeCode === 'v2_target_not_empty' && e.v2Detail.routines === 1);
+  await admin(dstPort, 'tgt_objects', 'DROP FUNCTION public.f(); CREATE TYPE public.pair AS (a int, b int)');
+  await assert.rejects(copy({ sourceUrl: src(), targetUrl: dst('tgt_objects') }), e => e.safeCode === 'v2_target_not_empty' && e.v2Detail.relations === 1);
+  await admin(dstPort, 'tgt_objects', 'DROP TYPE public.pair; CREATE SCHEMA extra');
+  await assert.rejects(copy({ sourceUrl: src(), targetUrl: dst('tgt_objects') }), e => e.safeCode === 'v2_target_not_empty' && e.v2Detail.schemas === 1);
+  assert.notEqual((await cmp({ sourceUrl: src(), targetUrl: dst('tgt_objects') })).status, 'TARGET_EMPTY');
+  await admin(dstPort, 'tgt_objects', 'DROP SCHEMA extra');
+  assert.equal((await cmp({ sourceUrl: src(), targetUrl: dst('tgt_objects') })).status, 'TARGET_EMPTY');
 }, 120000);
+
+test('app privilege check: owner-member passes; SELECT-only and wholly inaccessible tables are gaps', async () => {
+  // tgt_happy holds the committed 142-table copy from the happy-path test.
+  assert.equal((await checkAppPrivileges(dst('tgt_happy'))).status, 'OK');
+  await admin(dstPort, 'control', `CREATE ROLE app_select_one LOGIN PASSWORD '${USER_PW}'; CREATE ROLE app_all_but_one LOGIN PASSWORD '${USER_PW}'`);
+  await admin(dstPort, 'tgt_happy', `GRANT SELECT ON organizations TO app_select_one;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_all_but_one; REVOKE ALL ON sessions FROM app_all_but_one`);
+  const one = await checkAppPrivileges(url(dstPort, 'tgt_happy', 'app_select_one', USER_PW));
+  assert.equal(one.status, 'GAPS');
+  assert.equal(one.gaps.length, 142 * 4 - 1); // everything except SELECT on organizations
+  assert.ok(one.gaps.some(g => g.name === 'organizations' && g.privilege === 'INSERT'));
+  const most = await checkAppPrivileges(url(dstPort, 'tgt_happy', 'app_all_but_one', USER_PW));
+  assert.deepEqual(most.gaps.map(g => `${g.name}:${g.privilege}`), ['sessions:DELETE', 'sessions:INSERT', 'sessions:SELECT', 'sessions:UPDATE']);
+}, 60000);
+
+test('setup failures never strand connections (connect and identify)', async () => {
+  const original = { query: pg.Client.prototype.query, end: pg.Client.prototype.end };
+  let ends = 0;
+  pg.Client.prototype.end = function (...a) { ends++; return original.end.apply(this, a); };
+  try {
+    pg.Client.prototype.query = function (...a) { return a[0] === SESSION_SQL ? Promise.reject(new Error('synthetic init failure')) : original.query.apply(this, a); };
+    await assert.rejects(connect(src(), 'claude-v2mig-init'), /synthetic init failure/);
+    assert.equal(ends, 1);
+    pg.Client.prototype.query = original.query;
+    ends = 0;
+    await assert.rejects(identify({ sourceUrl: src(), targetUrl: url(dstPort, 'tgt_happy', 'fly-user', 'wrong-password') }));
+    assert.equal(ends, 2); // failed target client and the already-open source client
+  } finally { Object.assign(pg.Client.prototype, original); }
+}, 60000);
 
 test('error output never contains PostgreSQL detail/message values, only codes and object names', async () => {
   let caught;

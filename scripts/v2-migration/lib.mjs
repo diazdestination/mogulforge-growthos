@@ -47,8 +47,8 @@ export async function connect(url, applicationName) {
     connectionTimeoutMillis: 15000,
     statement_timeout: 120000, query_timeout: 130000 });
   client.on('error', () => {});
-  await client.connect();
-  await client.query(SESSION_SQL);
+  try { await client.connect(); await client.query(SESSION_SQL); }
+  catch (e) { await client.end().catch(() => {}); throw e; } // never strand a socket on init failure
   return client;
 }
 
@@ -177,6 +177,7 @@ export async function verifyTarget(client, source) {
   for (const [table, cols] of Object.entries(ADDED_0019)) for (const c of cols) (added[table] ??= {})[c] = null;
   let addedChecked = 0;
   for (const [table, fields] of Object.entries(added)) for (const [column, value] of Object.entries(fields)) {
+    if (!catalog.columns.some(c => c.table_name === table && c.name === column)) { problems.push({ check: 'added_column_missing', table, column }); continue; }
     const n = (await client.query(`SELECT count(*) AS n FROM public.${q(table)} WHERE to_jsonb(${q(column)}) IS DISTINCT FROM $1::jsonb`,
       [value === null ? null : JSON.stringify(value)])).rows[0].n;
     addedChecked++;
@@ -203,14 +204,21 @@ export async function verifyTarget(client, source) {
   };
 }
 
+/** "Empty" target = no user objects outside the system namespaces except extension-owned ones:
+ * no relations (incl. standalone composite types), no standalone types (enum/domain/range/
+ * multirange/base/pseudo; array and row types belong to their owners), no routines, and no
+ * schemas besides public. Provider objects must be extension-owned, otherwise the copy refuses. */
+const USER_NS = `n.nspname NOT IN ('pg_catalog','information_schema','pg_toast') AND n.nspname NOT LIKE 'pg_temp%' AND n.nspname NOT LIKE 'pg_toast_temp%'`;
+const notExt = (cls, col) => `NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid='${cls}'::regclass AND d.objid=${col} AND d.deptype='e')`;
 export const isEmptyTargetSql = `SELECT
   (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-    WHERE n.nspname NOT IN ('pg_catalog','information_schema','pg_toast') AND n.nspname NOT LIKE 'pg_temp%' AND n.nspname NOT LIKE 'pg_toast_temp%'
-    AND c.relkind IN ('r','p','v','m','S','f')
-    AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid='pg_class'::regclass AND d.objid=c.oid AND d.deptype='e')) AS relations,
-  (SELECT count(*) FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND t.typtype IN ('e','c','d')
-    AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid='pg_type'::regclass AND d.objid=t.oid AND d.deptype='e')
-    AND NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.oid=t.typrelid)) AS types`;
+    WHERE ${USER_NS} AND c.relkind IN ('r','p','v','m','S','f','c') AND ${notExt('pg_class', 'c.oid')}) AS relations,
+  (SELECT count(*) FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace
+    WHERE ${USER_NS} AND t.typtype IN ('e','d','r','m','b','p') AND t.typcategory <> 'A' AND ${notExt('pg_type', 't.oid')}) AS types,
+  (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE ${USER_NS} AND ${notExt('pg_proc', 'p.oid')}) AS routines,
+  (SELECT count(*) FROM pg_namespace n WHERE ${USER_NS} AND n.nspname <> 'public' AND ${notExt('pg_namespace', 'n.oid')}) AS schemas`;
+export const isEmptyCounts = row => Object.values(row).every(v => v === '0');
 
 /** Error output: our safe code + our own name/count detail, or for PostgreSQL errors only the
  * SQLSTATE and object names. Never message, detail, hint, where or parameter values. */
@@ -226,21 +234,63 @@ export function safeError(e) {
   return out;
 }
 
-/** Cluster+database identity "<system_identifier>/<database>". Fails closed if unreadable. */
-export async function readIdentity(client) {
+/* Admission manifest: a nonsecret JSON file reviewed in the execution packet (V2_MANIFEST).
+ * Values come from --identify against the real endpoints, never invented:
+ *   { "source": { "systemIdentifier", "database", "sessionUser", "currentUser", "pgMajor": 16 },
+ *     "target": { "systemIdentifier", "database", "sessionUser", "ownerRole", "pgMajor": 16 },
+ *     "allowedSourceSessions": [ { "usename", "application_name" } ] }  // reviewed non-writers only */
+const FACTS_SQL = `SELECT (SELECT system_identifier::text FROM pg_control_system()) AS "systemIdentifier",
+  current_database() AS database, session_user::text AS "sessionUser", current_user::text AS "currentUser",
+  current_setting('server_version_num')::int / 10000 AS "pgMajor"`;
+export const REQUIRED_PG_MAJOR = 16;
+export async function readFacts(client) {
   let row;
-  try { row = (await client.query('SELECT system_identifier::text AS s, current_database() AS d FROM pg_control_system()')).rows[0]; }
-  catch { fail('v2_identity_unavailable'); }
-  check(/^\d+$/.test(row?.s ?? '') && typeof row.d === 'string' && row.d.length > 0, 'v2_identity_unavailable');
-  return `${row.s}/${row.d}`;
+  try { row = (await client.query(FACTS_SQL)).rows[0]; } catch { fail('v2_identity_unavailable'); }
+  check(/^\d+$/.test(row?.systemIdentifier ?? '') && row.database, 'v2_identity_unavailable');
+  return row;
 }
-/** Both identities must be pinned by the operator (from --identify, recorded in the packet) and match. */
-export async function assertPinnedIdentities(source, target, pins = {}) {
-  check(typeof pins.source === 'string' && typeof pins.target === 'string' && pins.source && pins.target, 'v2_identity_pin_required');
-  const [s, t] = [await readIdentity(source), await readIdentity(target)];
-  check(s !== t, 'v2_source_target_same_database');
-  check(s === pins.source, 'v2_source_identity_mismatch');
-  check(t === pins.target, 'v2_target_identity_mismatch');
-  return { source: s, target: t };
+const snake = s => s.replace(/[A-Z]/g, c => '_' + c.toLowerCase());
+const str = v => typeof v === 'string' && v.length > 0 && v.length <= 128;
+export function validateManifest(m) {
+  check(m && typeof m === 'object' && m.source && m.target, 'v2_manifest_required');
+  for (const [side, fields] of [['source', ['systemIdentifier', 'database', 'sessionUser', 'currentUser']], ['target', ['systemIdentifier', 'database', 'sessionUser', 'ownerRole']]])
+    for (const f of fields) check(str(m[side][f]), 'v2_manifest_invalid', { field: `${side}.${f}` });
+  check(m.source.pgMajor === REQUIRED_PG_MAJOR && m.target.pgMajor === REQUIRED_PG_MAJOR, 'v2_manifest_invalid', { field: 'pgMajor' });
+  check(/^[a-z_][a-z0-9_-]{0,62}$/.test(m.target.ownerRole), 'v2_manifest_invalid', { field: 'target.ownerRole' });
+  check(m.source.systemIdentifier !== m.target.systemIdentifier, 'v2_same_cluster');
+  const allowed = m.allowedSourceSessions ?? [];
+  check(Array.isArray(allowed) && allowed.every(a => str(a?.usename) && (a.application_name === null || typeof a.application_name === 'string')),
+    'v2_manifest_invalid', { field: 'allowedSourceSessions' });
+  return { ...m, allowedSourceSessions: allowed };
+}
+function assertFacts(side, facts, expected, fields) {
+  for (const f of fields) check(facts[f] === expected[f], `v2_${side}_${snake(f)}_mismatch`);
+}
+/** Positive admission before any target mutation: distinct clusters (independent of database
+ * names or URL spelling), exact databases, logins, effective source role and PG major. */
+export async function admit(source, target, manifest) {
+  const m = validateManifest(manifest);
+  const s = await readFacts(source), t = await readFacts(target);
+  check(s.systemIdentifier !== t.systemIdentifier, 'v2_same_cluster');
+  assertFacts('source', s, m.source, ['systemIdentifier', 'database', 'sessionUser', 'currentUser', 'pgMajor']);
+  assertFacts('target', t, m.target, ['systemIdentifier', 'database', 'sessionUser', 'pgMajor']);
+  return { manifest: m, source: s, target: t };
+}
+/** Target-side recheck: same admitted target and, inside the copy transaction, the owner role. */
+export async function assertTargetFacts(target, m, { ownerRole = false } = {}) {
+  const t = await readFacts(target);
+  assertFacts('target', t, m.target, ['systemIdentifier', 'database', 'sessionUser', 'pgMajor']);
+  if (ownerRole) check(t.currentUser === m.target.ownerRole, 'v2_target_owner_role_mismatch');
+  return t;
+}
+/** Other client sessions on the source database; anything not on the reviewed allowlist is unexpected. */
+export async function sourceSessions(client, allowed) {
+  // Without pg_read_all_stats other users' sessions are hidden; fail closed rather than see nothing.
+  const visible = (await client.query("SELECT pg_has_role(current_user, 'pg_read_all_stats', 'USAGE') OR (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS ok")).rows[0].ok;
+  check(visible === true, 'v2_source_sessions_unobservable');
+  const observed = (await client.query(`SELECT usename::text AS usename, application_name FROM pg_stat_activity
+    WHERE datname=current_database() AND pid<>pg_backend_pid() AND backend_type='client backend' ORDER BY 1,2`)).rows;
+  const unexpected = observed.filter(r => !allowed.some(a => a.usename === r.usename && a.application_name === (r.application_name ?? null)));
+  return { observed: observed.length, unexpected };
 }
 export { sha, catalogDigest };
