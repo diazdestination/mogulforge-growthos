@@ -50,11 +50,13 @@ records; it does not delete the customer's inquiry.
 - Collection ignores obvious crawler/monitor user agents. Privacy erasure remains
   available even when the user agent is automated.
 
-## Lead intake never fails on measurement (October 16, 2026 — NEEDS OWNER OK)
+## Unusable measurement no longer blocks a lead (October 16, 2026; owner-approved)
 
-Measurement is optional; the inquiry is not. When a lead arrives with a `measurement`
-block but the site's analytics is off, or the browser consented under a stale policy
-version, GrowthOS saves the lead **without** the measurement: no visitor link on the lead,
+Measurement is optional; the inquiry is not. When a lead arrives with a well-formed
+`measurement` block that cannot be used, GrowthOS saves the lead **without** the
+measurement. That happens when the site's analytics is off or the browser consented under
+a stale policy version. A malformed measurement block still fails strict validation with
+400, as before. When measurement is dropped, nothing about it is kept: no visitor link on the lead,
 no `lead_saved` analytics event, and no measurement values stored. The `201` receipt and
 the `smart_site.lead_saved` audit metadata carry only `measurementDropped:
 "analytics_disabled" | "analytics_policy_version_mismatch"`. Previously these leads were
