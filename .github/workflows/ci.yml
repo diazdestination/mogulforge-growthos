@@ -6,7 +6,7 @@ name: CI
 #   fast    -> stacked PRs (base != main): install, typecheck, affected-package tests.
 #   gate    -> always-reporting aggregator named "Test, typecheck, and build" so a
 #              branch-protection required check never hangs or passes on a failure.
-# Draft PRs run nothing billable. Docs/report-only PRs run only `changes`.
+# Draft PRs run nothing billable. Markdown-only PRs run only `changes`.
 # Never add workflow-level paths/paths-ignore: that leaves required checks pending.
 #
 # Runner target: GitHub-hosted ubuntu-latest unless the repository variable
@@ -59,11 +59,12 @@ jobs:
         uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4 (MIT)
         with:
           predicate-quantifier: every
+          # Only Markdown prose is documentation. JSON and other files under
+          # reports/ and docs/ are source/recovery descriptors hash-pinned by
+          # scripts (e.g. scripts/c1-source-preservation.mjs), so they are code.
           filters: |
             code:
-              - '!docs/**'
               - '!**/*.md'
-              - '!reports/**'
             shared:
               - '{package.json,pnpm-lock.yaml,pnpm-workspace.yaml,tsconfig.json,tsconfig.base.json,.npmrc}'
 
