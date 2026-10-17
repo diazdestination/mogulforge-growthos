@@ -21,6 +21,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+import { syntheticTwilioNumber, syntheticTwilioSid } from "../test-helpers/synthetic-twilio";
 import { updateOrgSettings } from "./settings";
 
 import { createAutomation, runEvent } from "./automation";
@@ -34,7 +35,7 @@ const service = `MG${"b".repeat(32)}`;
 const apiKey = `SK${"3".repeat(32)}`;
 const apiSecret = "synthetic-api-key-secret";
 const authToken = "synthetic-webhook-token";
-const sender = "+15005550009";
+const sender = syntheticTwilioNumber();
 const recipient = "+15551234567";
 let org: { id: string };
 let contact: { id: string };
@@ -138,7 +139,7 @@ afterAll(async () => {
 describe("twilioSmsProvider", () => {
   it("POSTs the correct to/from/body to the Twilio API and returns the SID", async () => {
     stubTwilioEnv();
-    const sid = `SM${"a".repeat(32)}`;
+    const sid = syntheticTwilioSid("SM");
     const calls = stubTwilioFetch({ ok: true, json: { sid } });
 
     const res = await twilioSmsProvider.send(recipient, "Hello homeowner", context());
@@ -193,7 +194,7 @@ describe("twilioSmsProvider", () => {
 describe("SMS provider selection (module load)", () => {
   it("routes a configured client through the Twilio guard at send time", async () => {
     stubTwilioEnv();
-    const sid = `SM${"b".repeat(32)}`;
+    const sid = syntheticTwilioSid("SM");
     const calls = stubTwilioFetch({ ok: true, json: { sid } });
     expect((await providers.sms.send(recipient, "Configured", context())).provider).toBe("twilio");
     expect(calls).toHaveLength(1);

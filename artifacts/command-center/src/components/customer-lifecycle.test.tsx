@@ -8,20 +8,20 @@ const status = (state: "active" | "paused" | "offboarding_requested" = "active",
   requestedAt: state === "offboarding_requested" ? "2026-10-01T10:00:00.000Z" : null, updatedAt: null, reason: null, deletionPerformed: false, billingChanged: false,
 });
 const exported = () => {
-  const tables = ["contacts", "properties", "leads", "estimates", "projects", "crm_tasks", "appointments", "activities", "consent_records", "suppressions", "value_entries", "revenue_executions", "revenue_execution_events", "stored_objects", "service_obligations", "invoices", "invoice_receipt_allocations", "invoice_operations"];
+  const tables = ["contacts", "properties", "leads", "estimates", "projects", "crm_tasks", "appointments", "activities", "consent_records", "suppressions", "value_entries", "revenue_executions", "revenue_execution_events", "stored_objects", "service_obligations", "invoices", "invoice_receipt_allocations", "invoice_operations", "customer_work_roots", "service_watch_cases", "financial_migration_items", "property_assets", "work_checklist_templates", "work_checklist_revisions", "appointment_work_completions", "appointment_work_entries", "appointment_work_photos", "estimate_email_receipts"];
   return {
     format: "growthos-core-customer-export", version: 1, exportId: "eec65dde-1d8c-4e04-b0a0-437cfb62c742", generatedAt: "2026-10-01T10:00:00.000Z",
-    organization: { id: "919c9194-5267-4871-aed5-7470b0a7251b", name: "Synthetic company", slug: "synthetic-company", created_at: "2026-10-01T10:00:00.000Z" },
+    organization: { id: "919c9194-5267-4871-aed5-7470b0a7251b", name: "Synthetic company", slug: "synthetic-company", schedulingPolicy: null, schedulingHistory: [], created_at: "2026-10-01T10:00:00.000Z" },
     manifest: { scope: "core_customer_records", completeAccountExport: false, deletionPerformed: false, rowsPerTableLimit: 2000, byteLimit: 10 * 1024 * 1024,
       tables: tables.map((table) => ({ table, fields: ["id", "first_name"], count: table === "contacts" ? 1 : 0, withheldInvalidLinks: table === "estimates" ? 1 : 0 })),
-      exclusions: ["Credentials excluded"], dataSha256: "a".repeat(64), followUp: "Ask your operator" },
+      schedulingPolicy: { state: "unconfigured" }, schedulingHistory: { count: 0, withheldInvalidLinks: 0, withheldInvalidRecords: 0 }, schedulingPolicySha256: "b".repeat(64), schedulingHistorySha256: "c".repeat(64), exclusions: ["Credentials excluded"], dataSha256: "a".repeat(64), followUp: "Ask your operator" },
     data: Object.fromEntries(tables.map((table) => [table, table === "contacts" ? [{ id: "own-contact", first_name: "Synthetic contact" }] : []])),
   };
 };
 const review = () => fireEvent.click(screen.getByRole("button", { name: "Review company status" }));
 const reason = (text = "Owner reviewed pending company work") => fireEvent.change(screen.getByLabelText("Reason for this change"), { target: { value: text } });
 function downloads() {
-  const createObjectURL = vi.fn(() => "blob:synthetic-download"), revokeObjectURL = vi.fn();
+  const createObjectURL = vi.fn((_blob: Blob) => "blob:synthetic-download"), revokeObjectURL = vi.fn();
   const OriginalURL = URL;
   vi.stubGlobal("URL", class extends OriginalURL { static createObjectURL = createObjectURL; static revokeObjectURL = revokeObjectURL; });
   const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
@@ -49,7 +49,7 @@ it("downloads a manually requested validated core export with coverage and witho
   const download = downloads(), fetch = vi.fn().mockResolvedValue(json(exported())); vi.stubGlobal("fetch", fetch);
   render(<CustomerLifecycle accountKey="owner:company-a" />);
   fireEvent.click(screen.getByRole("button", { name: "Download core records" }));
-  expect((await screen.findByRole("status")).textContent).toContain("1 record across 18 datasets");
+  expect((await screen.findByRole("status")).textContent).toContain("1 record across 28 datasets");
   expect(screen.getByRole("status").textContent).toContain("1 record was withheld");
   expect(fetch.mock.calls[0][0]).toBe("/api/v1/customer-lifecycle/export");
   expect(download.createObjectURL).toHaveBeenCalledTimes(1);
@@ -153,4 +153,31 @@ it("bounds stalled response bodies and requires another manual action", async ()
   expect(screen.getByRole("alert").textContent).toContain("status could not be checked");
   expect((fetch.mock.calls[0][1].signal as AbortSignal).aborted).toBe(true);
   expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+const currentExport = exported;
+const readBlob = (blob: Blob) => new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsText(blob); });
+it('downloads the current 28 approved datasets with scheduling envelopes and checksums in the actual Blob', async () => {
+  const fixture = currentExport(), download = downloads(); vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(fixture)));
+  render(<CustomerLifecycle accountKey="owner:company-a" />);
+  fireEvent.click(screen.getByRole('button', { name: 'Download core records' }));
+  expect((await screen.findByRole('status')).textContent).toContain('28 datasets');
+  const downloaded = JSON.parse(await readBlob(download.createObjectURL.mock.calls[0][0]));
+  expect(downloaded.organization).toEqual(fixture.organization);
+  expect(downloaded.manifest).toEqual(fixture.manifest);
+  expect(downloaded.data).toEqual(fixture.data);
+});
+it.each(['historical18', 'foreign-table', 'policy-state', 'policy-digest', 'history-count', 'history-extra', 'history-overflow'])('rejects invalid %s scheduling export coverage before creating a Blob', async (kind) => {
+  const fixture: any = currentExport();
+  if (kind === 'historical18') { fixture.manifest.tables = fixture.manifest.tables.slice(0, 18); fixture.data = Object.fromEntries(fixture.manifest.tables.map(({table}: any) => [table, fixture.data[table]])); }
+  if (kind === 'foreign-table') { const old = fixture.manifest.tables[0].table; fixture.manifest.tables[0].table = 'private_provider_credentials'; fixture.data.private_provider_credentials = fixture.data[old]; delete fixture.data[old]; }
+  if (kind === 'policy-state') fixture.manifest.schedulingPolicy.state = 'versioned';
+  if (kind === 'policy-digest') fixture.manifest.schedulingPolicySha256 = 'not-a-digest';
+  if (kind === 'history-count') fixture.manifest.schedulingHistory.count = 1;
+  if (kind === 'history-extra') fixture.manifest.schedulingHistory.actorUserId = 'private-actor';
+  if (kind === 'history-overflow') fixture.organization.schedulingHistory = Array(2001).fill({});
+  const download = downloads(); vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json(fixture)));
+  render(<CustomerLifecycle accountKey="owner:company-a" />); fireEvent.click(screen.getByRole('button', { name: 'Download core records' }));
+  expect((await screen.findByRole('alert')).textContent).toContain('export could not be prepared');
+  expect(download.createObjectURL).not.toHaveBeenCalled();
 });

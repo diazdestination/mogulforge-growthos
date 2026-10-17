@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { careCanonicalJson } from "./service-care-booking-contract";
+export { careCanonicalJson, serviceCareBookingSchema, serviceCareSchedulingSourceSchema, serviceCareSchedulingReadSchema, serviceCareBookingOutcomeSchema, serviceCareBookingResultSchema } from "./service-care-booking-contract";
+export type { ServiceCareBookingInput, ServiceCareSchedulingRead, ServiceCareBookingOutcome, ServiceCareBookingResult } from "./service-care-booking-contract";
 import type { CustomerEmailSender } from "./customer-email";
 import type { MailboxIdentity } from "./mailbox-contract";
 
@@ -37,22 +40,7 @@ export const serviceCareResponseSchema = z.object({
   respondedAt: z.iso.datetime(), note: z.string().trim().min(10).max(1000),
   staffAttested: z.literal(true),
 }).strict();
-export const serviceCareBookingSchema = z.object({
-  ...command, responseId: z.uuid(), assignedUserId: z.string().min(1).max(200),
-  scheduledStart: z.iso.datetime(), scheduledEnd: z.iso.datetime(),
-  type: z.enum(["inspection", "other"]), customerConfirmed: z.literal(true),
-}).strict();
-
-// Matches durable-execution's canonical JSON representation; JSONB key order
-// must not change the identity of an approved payload or execution receipt.
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  if (value && typeof value === "object") return `{${Object.entries(value)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
-  return JSON.stringify(value) ?? "null";
-}
-export const careFingerprint = (value: unknown) => createHash("sha256").update(canonical(value)).digest("hex");
+export const careFingerprint = (value: unknown) => createHash("sha256").update(careCanonicalJson(value)).digest("hex");
 
 /** Fixed expected-service copy: never infers warranty terms or promotes work. */
 export function serviceCareMessage(input: { businessName: string; equipmentLabel: string; kind: string; dueDate: string }) {

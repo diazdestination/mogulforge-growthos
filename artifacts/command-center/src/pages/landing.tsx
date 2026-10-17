@@ -75,14 +75,14 @@ export default function LandingPage() {
     <div className="min-h-screen w-full bg-[#05111e] text-zinc-100 overflow-x-hidden">
       <div className="relative">
         {/* Nav */}
-        <header className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
+        <header className="max-w-6xl mx-auto px-5 md:px-8 min-h-16 py-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
           <div className="flex items-center gap-2.5">
             <img src="/brand/mogulforge-mark.svg" alt="" className="w-11 h-11 object-contain" />
             <span className="font-bold uppercase tracking-[0.13em]">
               {CLIENT.businessShortName === 'MogulForge' ? <>Mogul<span className="text-[#baf000]">Forge</span></> : CLIENT.businessShortName}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <nav aria-label="Primary" className="flex flex-wrap items-center justify-end gap-2 max-w-full">
             <Link href="/agent-team" className="whitespace-nowrap text-sm text-[#d6f877] hover:text-white px-3 py-2 transition-colors">Meet the team</Link>
             <Link
               href="/login"
@@ -96,7 +96,7 @@ export default function LandingPage() {
             >
               Explore
             </Link>
-          </div>
+          </nav>
         </header>
 
         {/* Hero */}
@@ -120,7 +120,7 @@ export default function LandingPage() {
             </Cta>
             <Cta href="/login">Sign in</Cta>
           </div>
-          <p className="mt-5 text-xs text-zinc-500 flex items-center justify-center gap-1.5">
+          <p className="mt-5 text-xs text-zinc-400 flex items-center justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> Start with sample
             data. Live outreach requires provider setup and launch verification.
           </p>
@@ -199,7 +199,7 @@ export default function LandingPage() {
 
         {/* Footer */}
         <footer className="border-t border-white/10">
-          <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between text-sm text-zinc-500">
+          <div className="max-w-6xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between text-sm text-zinc-400">
             <span className="flex items-center gap-2">
               <img src="/brand/mogulforge-mark.svg" alt="" className="w-5 h-5 object-contain" />
               {CLIENT.appName}

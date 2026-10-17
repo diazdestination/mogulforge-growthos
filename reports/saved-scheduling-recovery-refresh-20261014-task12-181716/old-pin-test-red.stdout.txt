@@ -1,0 +1,14 @@
+
+ RUN  v4.1.10 C:/Forge/worktrees/growthos-scheduling-recovery-refresh-20261014/scripts
+
+ ❯ contractor-recovery-drill.test.mjs (1 test | 1 failed) 10272ms
+   × upgrades the full prior schema, restores both synthetic companies, boots a read-only real app and preserves uncertainty/holds 10270ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  18:17:28
+   Duration  11.05s (transform 216ms, setup 0ms, import 581ms, tests 10.27s, environment 0ms)
+
+undefined
+C:\Forge\worktrees\growthos-scheduling-recovery-refresh-20261014\scripts:
+[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command failed with exit code 1: vitest run contractor-recovery-drill.test.mjs

@@ -24,6 +24,7 @@ import { hasPermission } from "../lib/permissions";
 import { getCustomerLifecycleStatus } from "./customer-lifecycle";
 import { customerWorkHeld } from "./customer-lifecycle-runtime";
 import { acceptedStaffCondition } from "./accepted-staff";
+import { normalizeSmsPhone } from "./phone-number";
 
 export class SmartSiteError extends Error {
   constructor(
@@ -35,6 +36,9 @@ export class SmartSiteError extends Error {
   }
 }
 const hash = (v: string) => createHash("sha256").update(v).digest("hex");
+export type SmartSiteMeasurementDropReason =
+  | "analytics_disabled"
+  | "analytics_policy_version_mismatch";
 const publicFields = {
   id: smartSitesTable.id,
   name: smartSitesTable.name,
@@ -406,14 +410,20 @@ export async function captureSmartSiteInquiry(
       .for("share");
     if (!currentSite?.isActive || currentSite.keyHash !== site.keyHash)
       throw new SmartSiteError("site_capture_disabled", 503);
-    const measurement = input.measurement;
-    if (measurement && !currentSite.analyticsEnabled)
-      throw new SmartSiteError("site_measurement_disabled", 503);
-    if (
-      measurement &&
-      measurement.policyVersion !== currentSite.analyticsPolicyVersion
-    )
-      throw new SmartSiteError("analytics_policy_version_mismatch", 409);
+    // A lead is never lost because of optional measurement. When analytics is off for
+    // this site, or the browser consented under a stale policy version, the lead is
+    // saved WITHOUT any measurement (no visitor link, no lead_saved event) and only the
+    // drop reason is recorded. Raw measurement values are never stored or echoed.
+    const measurementDropped: SmartSiteMeasurementDropReason | undefined =
+      !input.measurement
+        ? undefined
+        : !currentSite.analyticsEnabled
+          ? "analytics_disabled"
+          : input.measurement.policyVersion !==
+              currentSite.analyticsPolicyVersion
+            ? "analytics_policy_version_mismatch"
+            : undefined;
+    const measurement = measurementDropped ? undefined : input.measurement;
     const [receipt] = await tx
       .select()
       .from(smartSiteSubmissionsTable)
@@ -529,6 +539,13 @@ export async function captureSmartSiteInquiry(
         : undefined,
     });
     const urgency = p.timing === "urgent" ? "high" : "normal";
+    // GAP-11: same verdict as manual SMS. Keep the lead and the submitted
+    // number; flag it so staff confirm it before calling or texting.
+    const phoneNeedsReview = Boolean(
+      input.contact.phone && !normalizeSmsPhone(input.contact.phone),
+    );
+    const phoneReviewNote =
+      "The phone number given is not a valid US/Canada number; confirm it before calling or texting.";
     // A new request is a new project inquiry, even for an existing contact. Retries use requestId.
     const [lead] = await tx
       .insert(leadsTable)
@@ -625,7 +642,9 @@ export async function captureSmartSiteInquiry(
       `Service: ${service[1]} · Timing: ${p.timing}`,
       p.postalCode ? `Property ZIP: ${p.postalCode}` : null,
       `Submitted by: ${input.contact.name}`,
-      input.contact.phone ? `Callback: ${input.contact.phone}` : null,
+      input.contact.phone
+        ? `Callback: ${input.contact.phone}${phoneNeedsReview ? " (needs review: not a valid US/Canada number)" : ""}`
+        : null,
       input.contact.email ? `Email: ${input.contact.email}` : null,
     ]
       .filter(Boolean)
@@ -649,6 +668,7 @@ export async function captureSmartSiteInquiry(
         state: p.state,
         submittedContact: input.contact,
         consent,
+        ...(phoneNeedsReview ? { phoneNeedsReview: true } : {}),
       },
     });
     await tx.insert(crmTasksTable).values({
@@ -657,7 +677,8 @@ export async function captureSmartSiteInquiry(
       contactId: contact.id,
       title: `Review ${service[1].toLowerCase()} inquiry`,
       description:
-        "Contact permission covers this inquiry only. Assign an owner and record the follow-up; no email, SMS, appointment or dispatch has been sent or confirmed.",
+        "Contact permission covers this inquiry only. Assign an owner and record the follow-up; no email, SMS, appointment or dispatch has been sent or confirmed." +
+        (phoneNeedsReview ? ` ${phoneReviewNote}` : ""),
       sourceEvent: "smart_site.lead_saved",
       priority: urgency,
       dueAt: responseDueAt,
@@ -671,6 +692,8 @@ export async function captureSmartSiteInquiry(
         siteId: site.id,
         receiptId: saved.id,
         serviceCode: p.serviceCode,
+        ...(measurementDropped ? { measurementDropped } : {}),
+        ...(phoneNeedsReview ? { phoneNeedsReview: true } : {}),
       },
     });
     return {
@@ -679,6 +702,7 @@ export async function captureSmartSiteInquiry(
       receiptId: saved.id,
       duplicate: false,
       notification: "staff-inbox" as const,
+      ...(measurementDropped ? { measurementDropped } : {}),
     };
   });
 }

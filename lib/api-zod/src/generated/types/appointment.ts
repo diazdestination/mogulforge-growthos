@@ -5,8 +5,11 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+import type { AppointmentSchedulingEvidence } from './appointmentSchedulingEvidence';
 import type { AppointmentStatus } from './appointmentStatus';
 import type { AppointmentType } from './appointmentType';
+import type { ManualSchedulingAck } from './manualSchedulingAck';
+import type { ReservationSnapshot } from './reservationSnapshot';
 
 export interface Appointment {
   id: string;
@@ -33,4 +36,16 @@ export interface Appointment {
   notes?: string | null;
   createdAt: Date;
   updatedAt?: Date;
+  schedulingReservation?: ReservationSnapshot | null;
+  schedulingEvidence?: AppointmentSchedulingEvidence;
+  /** @pattern ^[a-f0-9]{64}$ */
+  schedulingTargetFingerprint?: string;
+  schedulingCompanyTimeZone?: string;
+  /**
+     * @minimum 0
+     * @maximum 9007199254740991
+     * @nullable
+     */
+  schedulingPolicyRevision?: number | null;
+  schedulingOperation?: ManualSchedulingAck;
 }

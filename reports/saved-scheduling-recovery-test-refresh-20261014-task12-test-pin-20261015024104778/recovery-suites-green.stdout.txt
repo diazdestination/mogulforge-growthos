@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 C:/Forge/worktrees/growthos-recovery-test-pin-20261014/scripts
+
+
+ Test Files  3 passed (3)
+      Tests  34 passed (34)
+   Start at  19:38:41
+   Duration  75.81s (transform 277ms, setup 0ms, import 805ms, tests 119.87s, environment 0ms)
+

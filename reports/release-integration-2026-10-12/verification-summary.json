@@ -1,0 +1,90 @@
+{
+  "at": "2026-10-12T15:34:09.228Z",
+  "fullTests": {
+    "passed": 4457,
+    "skipped": 15,
+    "api": 2999,
+    "ui": 1061,
+    "scripts": 355,
+    "reactClient": 13,
+    "emailIntake": 3,
+    "websiteAdapter": 26,
+    "exitCode": 0
+  },
+  "typecheckExitCode": 0,
+  "localBuildSourceIdentity": "unknown because preserved historical untracked receipts",
+  "requiredCleanCheckoutCI": true,
+  "sourceReviews": [],
+  "files": [
+    {
+      "name": "review-integrated-invoice-and-recovery.json",
+      "sha256": "6952e2c78a16ec4ad631ff2d0b32d4369b1b49b500a2d46718407c3ca14fd997"
+    },
+    {
+      "name": "review-integrated-customer-import-and-launch.json",
+      "sha256": "7329eef3f479a8f14a41553cd8cd17ae8215c8f3ea07b09bbaea3a42236366f8"
+    },
+    {
+      "name": "customer-csv-fix.json",
+      "sha256": "9d3f84edaa031e075d4e6f2ef9713b231234441661c2243e19399c82e227ee9b"
+    },
+    {
+      "name": "production75-retention-fix.json",
+      "sha256": "bad4a1eb83880dacba2fb126ff3f2d5c7a56e9f17e22323a15c114b0f839a27a"
+    },
+    {
+      "name": "generated-contract-verification.json",
+      "sha256": "a785d39b19b3f610395698cec956a7de702768416ff06c3d1c8e29365348f287"
+    },
+    {
+      "name": "fixture-json-normalization.json",
+      "sha256": "04e1883164441bfaa30160566e851f8179a432e21aa7db3a22f767432f86d197"
+    },
+    {
+      "name": "combined-native-tests-result.json",
+      "sha256": "30983d2dbba3f7b8cd40a03f8dc03a6c08304c073fa363fa2c50bb8a49c260fb"
+    },
+    {
+      "name": "combined-builds-result.json",
+      "sha256": "8bfdfcf6348fe184273c022d3de615a14b0adeb33ce393391d98ed9ffb1395ca"
+    },
+    {
+      "name": "combined-docker-parity-result.json",
+      "sha256": "35124101043bffdebbee036e6d556d5ed6466547c343c1d74c768285b624d98e"
+    },
+    {
+      "name": "candidate-secret-scan-result.json",
+      "sha256": "66fac41dea0767284f36f944abe8ce9bce716d28cd2c32b479c0f00086ebe28b"
+    },
+    {
+      "name": "browser-import-acceptance.json",
+      "sha256": "8bdf0ce79f79e3f583a58c847a6671757d58f8fa95b6e0dabcc47ac85215563f"
+    },
+    {
+      "name": "browser-invoice-mobile.json",
+      "sha256": "99d59bd0a7de2701a1dc7f6c87e2226e375a79dfdc36cf05ccd435d6e63eb306"
+    }
+  ],
+  "logs": {
+    "combined-native-tests.log": {
+      "sha256": "adb19d8b297c651cbdf48483329156991ddf0e80cf86ca7dc174edcf2f444b9b",
+      "localPath": "C:/Forge/artifacts/growthos-release-integration-20261012/combined-native-tests.log"
+    },
+    "combined-typecheck.log": {
+      "sha256": "b4152f2adbe673f47cd572c640b0db10cb86c655ae25adc00806196500500615",
+      "localPath": "C:/Forge/artifacts/growthos-release-integration-20261012/combined-typecheck.log"
+    },
+    "combined-builds.log": {
+      "sha256": "c1d33a57e3f60dd477c0226b1a3374731dde6ade3538aa0f23c9282a1dec45d3",
+      "localPath": "C:/Forge/artifacts/growthos-release-integration-20261012/combined-builds.log"
+    },
+    "combined-docker-parity.log": {
+      "sha256": "2d0fceba436fe1f90776524a3b221b5f12ebc83212bc97066a3b03fde403b41d",
+      "localPath": "C:/Forge/artifacts/growthos-release-integration-20261012/combined-docker-parity.log"
+    },
+    "candidate-secret-scan.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "localPath": "C:/Forge/artifacts/growthos-release-integration-20261012/candidate-secret-scan.log"
+    }
+  }
+}

@@ -9,11 +9,12 @@ import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
 import { createApiKey } from "../../services/api-keys";
 import { createServiceObligation } from "../../services/service-obligations";
 import { resolveCustomerEmailSender, sendCustomerEmail } from "../../services/customer-email";
+import { careFingerprint, serviceCareBookingResultSchema, serviceCareSchedulingReadSchema, type ServiceCareSchedulingRead } from "../../services/service-care-policy";
 
 vi.mock("../../services/customer-email", () => ({ resolveCustomerEmailSender: vi.fn(), sendCustomerEmail: vi.fn() }));
 let server: Server, base: string, org: string, other: string, staff: string, serviceId: string, key: string;
 const sessions: string[] = [];
-type CareResult = { expectedUpdatedAt: string; preview: { fingerprint: string }; reminder: { state: string }; response: { evidence: string } };
+type CareResult = { expectedUpdatedAt: string; preview: { fingerprint: string }; reminder: { state: string }; response: { evidence: string }; scheduling: ServiceCareSchedulingRead };
 let office: string, viewer: string, invited: string, foreign: string;
 async function login(organizationId: string, role: "office" | "viewer", verified = true) {
   const [user] = await db.insert(usersTable).values({ organizationId, role, emailVerifiedAt: verified ? new Date() : null }).returning();
@@ -54,7 +55,7 @@ it("rejects cross-site changes, non-JSON, unknown channels and recipient/org ove
   const input = await approval();
   expect((await fetch(`${base}/reminder`, { method: "POST", headers: { ...headers(), origin: "https://untrusted.example" }, body: JSON.stringify(input) })).status).toBe(403);
   expect((await fetch(`${base}/reminder`, { method: "POST", headers: { authorization: `Bearer ${office}`, "content-type": "text/plain" }, body: JSON.stringify(input) })).status).toBe(415);
-  for (const query of ["channel=push", `organizationId=${other}`]) expect((await fetch(`${base}?${query}`, { headers: headers() })).status).toBe(400);
+  for (const query of ["channel=push", "appointmentType=production", `actorUserId=${staff}`, `organizationId=${other}`]) expect((await fetch(`${base}?${query}`, { headers: headers() })).status).toBe(400);
   for (const extra of [{ to: "override@example.invalid" }, { organizationId: other }, { expectedServiceConfirmed: false }]) expect((await fetch(`${base}/reminder`, { method: "POST", headers: headers(), body: JSON.stringify({ ...input, ...extra }) })).status).toBe(400);
 });
 it("queues the reviewed message once through HTTP and exposes the durable preparation receipt", async () => {
@@ -72,9 +73,25 @@ it("records a staff response and books one appointment through the permissioned 
   expect(response.status).toBe(200); const recorded = await response.json() as { responseId: string };
   const fresh = await (await fetch(base, { headers: headers() })).json() as CareResult;
   expect(fresh.reminder.state).toBe("cancelled"); expect(fresh.response.evidence).toBe("staff_attested_not_provider_verified");
-  const booking = { requestId: randomUUID(), expectedUpdatedAt: fresh.expectedUpdatedAt, responseId: recorded.responseId, assignedUserId: staff, type: "inspection", scheduledStart: "2035-01-05T15:00:00.000Z", scheduledEnd: "2035-01-05T16:00:00.000Z", customerConfirmed: true };
+  expect(fresh.scheduling.review.state).toBe("ready");
+  if (fresh.scheduling.review.state !== "ready") throw new Error("Expected source review");
+  const booking = { requestId: randomUUID(), expectedUpdatedAt: fresh.expectedUpdatedAt, responseId: recorded.responseId, assignedUserId: staff, type: "inspection", scheduledStart: "2035-01-05T15:00:00.000Z", scheduledEnd: "2035-01-05T16:00:00.000Z", customerConfirmed: true, schedulingReview: { context: fresh.scheduling.review.context, duration: { kind: "explicit", preset: null }, startWallTime: null, endWallTime: null } };
+  const { schedulingReview: _review, ...unreviewed } = booking;
+  const missing = await fetch(`${base}/book`, { method: "POST", headers: headers(), body: JSON.stringify(unreviewed) });
+  expect(missing.status).toBe(409); expect(await missing.json()).toMatchObject({ code: "stale_scheduling_review" });
+  for (const extra of [{ actorUserId: staff }, { organizationId: org }, { schedulingReservation: null }, { schedulingReview: { ...booking.schedulingReview, actorUserId: staff } }]) expect((await fetch(`${base}/book`, { method: "POST", headers: headers(), body: JSON.stringify({ ...booking, ...extra }) })).status).toBe(400);
   const result = await fetch(`${base}/book`, { method: "POST", headers: headers(), body: JSON.stringify(booking) }); expect(result.status).toBe(200);
-  const booked = await result.json() as { appointmentId: string; replayed: boolean };
+  const booked = serviceCareBookingResultSchema.parse(await result.json());
+  expect(booked.bookingOutcome).toMatchObject({ requestId: booking.requestId, requestFingerprint: careFingerprint(booking), actorUserId: staff, organizationId: org, obligationId: serviceId, responseId: recorded.responseId, expectedUpdatedAt: fresh.expectedUpdatedAt });
   expect(await (await fetch(`${base}/book`, { method: "POST", headers: headers(), body: JSON.stringify(booking) })).json()).toEqual({ ...booked, replayed: true });
   expect(await (await fetch(base, { headers: headers() })).json()).toMatchObject({ active: true, appointment: { id: booked.appointmentId, status: "confirmed" } }); expect(sendCustomerEmail).not.toHaveBeenCalled();
+});
+it("reads a closed selected-type source projection even when reminder readiness fails", async () => {
+  vi.mocked(resolveCustomerEmailSender).mockRejectedValueOnce(new Error("Synthetic sender unavailable"));
+  const response = await fetch(`${base}?appointmentType=other`, { headers: headers() });
+  expect(response.status).toBe(200); expect(response.headers.get("cache-control")).toBe("no-store");
+  const read = await response.json() as CareResult;
+  const scheduling = serviceCareSchedulingReadSchema.parse(read.scheduling);
+  expect(scheduling).toMatchObject({ actorUserId: staff, obligationId: serviceId, organizationId: org, appointmentType: "other", source: { sourceKind: "direct_customer", propertyId: null }, review: { state: "ready", context: { inspection: null, targetVersion: null, targetFingerprint: null } } });
+  expect(sendCustomerEmail).not.toHaveBeenCalled();
 });

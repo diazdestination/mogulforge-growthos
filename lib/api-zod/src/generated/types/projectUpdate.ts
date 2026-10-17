@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProjectStatus } from './projectStatus';
+import type { SchedulingMutationReview } from './schedulingMutationReview';
 
 export interface ProjectUpdate {
   /** @nullable */
@@ -22,4 +23,7 @@ export interface ProjectUpdate {
   crewNotes?: string | null;
   /** Last observed update token; stale edits return 409. */
   expectedUpdatedAt?: Date;
+  schedulingReview?: SchedulingMutationReview;
+  /** @pattern ^[a-f0-9]{64}$ */
+  expectedTargetFingerprint?: string;
 }

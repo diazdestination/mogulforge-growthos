@@ -2,8 +2,18 @@ import { expect, it } from 'vitest';
 import { runContractorRecoveryDrill } from './contractor-recovery-drill.mjs';
 
 it('upgrades the full prior schema, restores both synthetic companies, boots a read-only real app and preserves uncertainty/holds', async () => {
-  const result = await runContractorRecoveryDrill({ emit: () => {} });
+  const receipts=[];
+  let result;
+  try { result = await runContractorRecoveryDrill({ emit: line => receipts.push(JSON.parse(line)) }); }
+  catch(error) { console.error('RECOVERY_FAILURE_RECEIPTS',JSON.stringify(receipts)); throw error; }
   expect(result.previousTableCount).toBe(90);
+  expect(result.sourcePreservation.legacy.sourceCommit).toBe('f56e6cef452b5b564838a72202c0d37cd2caf384');
+  expect(result.sourcePreservation.overlay.sourceCommit).toBe('54cffe4c1552ae306781632202da19bb0fe88f4a');
+  expect(result.sourcePreservation.releaseEligible).toBe(false);
+  expect(result.scheduling.identity.sourceCommit).toBe(result.scheduling.checkout.commit);
+  expect(result.scheduling.identity.sourceTree).toBe(result.scheduling.checkout.tree);
+  expect(result.scheduling.sourceFiles.map(file=>file.path)).toContain('scripts/c1-source-preservation.mjs');
+  expect(result.scheduling.sourceFiles.map(file=>file.path)).toContain('reports/c1-source-preservation-2026-10-16.json');
   expect(result.tableCount).toBe(142);
   expect(result.alertCoveragePreviousTableCount).toBe(141);
   expect(result.alertCoveragePriorRowsUnchanged).toBe(true);
@@ -21,12 +31,15 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.returningV3UnknownOwnershipPreserved).toBe(true);
   expect(result.returningCustomerReadVerified).toBe(true);
   expect(result.returningV3UnknownReadVerified).toBe(true);
-  expect(result.tableCounts.customer_work_roots).toBe(6);
-  expect(result.tableCounts.customer_work_commands).toBe(8);
+  expect(result.scheduling.priorFixtureTableCounts.customer_work_roots).toBe(6);
+  expect(result.scheduling.priorFixtureTableCounts.customer_work_commands).toBe(8);
+  expect(result.tableCounts.customer_work_roots).toBe(7);
+  expect(result.tableCounts.customer_work_commands).toBe(9);
   expect(result.tableCounts.value_entries).toBe(10);
   expect(result.sourceFingerprint).toBe(result.restoredFingerprint);
   expect(result.appBootVerified).toBe(true);
   expect(result.readOnlyDatabaseVerified).toBe(true);
+  expect(result.readOnlySchedulingHeldVerified).toBe(true);
   expect(result.tenantBoundariesVerified).toBe(true);
   expect(result.postSnapshotMarkerAbsent).toBe(true);
   expect(result.uncertainCheckoutPreserved).toBe(true);
@@ -35,6 +48,8 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.tableCounts.invoices).toBe(8);
   expect(result.tableCounts.invoice_receipt_allocations).toBe(10);
   expect(result.readChecks).toBe(91);
+  expect(result.restoredSchedulingExplanationPostStatus).toBe(405);
+  expect(result.restoredSchedulingExplanationSucceeded).toBe(false);
   expect(result.workdayConstraintChecks).toBe(16);
   expect(result.workdayCapturedHistoryPreserved).toBe(true);
   expect(result.workdayImmutableRevisionPreserved).toBe(true);
@@ -67,8 +82,10 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.tableCounts.callie_reception_bindings).toBe(2);
   expect(result.tableCounts.callie_reception_sessions).toBe(2);
   expect(result.tableCounts.callie_reception_events).toBe(2);
-  expect(result.tableCounts.callie_policy_revisions).toBe(8);
-  expect(result.tableCounts.callie_intakes).toBe(4);
+  expect(result.scheduling.priorFixtureTableCounts.callie_policy_revisions).toBe(8);
+  expect(result.scheduling.priorFixtureTableCounts.callie_intakes).toBe(4);
+  expect(result.tableCounts.callie_policy_revisions).toBe(9);
+  expect(result.tableCounts.callie_intakes).toBe(5);
   expect(result.tableCounts.callie_ack_dispatches).toBe(2);
   expect(result.standingServiceConstraintChecks).toBe(14);
   expect(result.standingDisabledHeadPreserved).toBe(true);
@@ -116,4 +133,22 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.pausedServiceExceptionVerified).toBe(true);
   expect(result.providerCalls).toBe(0);
   expect(result.managedBackupRestoreVerified).toBe(false);
-}, 120_000);
+  expect(result.scheduling.schema.priorRowsUnchanged).toBe(true);
+  expect(result.scheduling.schema.predecessors).toHaveLength(19);
+  expect(result.scheduling.schema.addedColumns).toHaveLength(3);
+  expect(result.scheduling.originalStatePreserved).toBe(true);
+  expect(result.scheduling.originalOutcomesPreserved).toBe(true);
+  expect(result.scheduling.exportDatasetCount).toBe(28);
+  expect(result.scheduling.legacyCompatibilityVerified).toBe(true);
+  expect(result.scheduling.invalidPolicyWithheld).toBe(true);
+  expect(result.scheduling.exportBoundVerified).toBe(true);
+  expect(result.scheduling.callieReplayRateCounterIncrements).toBe(2);
+  expect(result.scheduling.manualOutcomes).toBe(6);
+  expect(result.scheduling.sourceOutcomes).toBe(3);
+  expect(result.scheduling.enforcement.cases).toHaveLength(4);
+  expect(result.scheduling.artifact.workerFilesVerified).toBe(true);
+  expect(result.scheduling.cleanup.filter(receipt=>receipt.kind==='build_stage')).toHaveLength(1);
+  expect(result.scheduling.rollback.candidateCompatible).toBe(true);
+  expect(result.scheduling.rollback.releaseEligible).toBe(false);
+  expect(result.scheduling.cleanupVerified).toBe(true);
+}, 240_000);

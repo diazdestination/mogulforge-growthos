@@ -1,10 +1,18 @@
 import { db, organizationsTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { Router, type IRouter, type NextFunction, type Request, type Response } from "express";
+import {
+  Router,
+  type IRouter,
+  type NextFunction,
+  type Request,
+  type Response,
+} from "express";
 
 import { requireMember } from "../../middlewares/requireMember";
 import { recordAudit } from "../../services/audit";
 import { createOrganization, listAllOrganizations } from "../../services/org";
+import { setSchedulingCompanyTimeZone } from "../../services/scheduling-policy";
+import { schedulingError } from "./scheduling";
 
 const router: IRouter = Router();
 
@@ -74,12 +82,12 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     const user = req.sessionUser!;
     const organization = user.organizationId
-      ? (
+      ? ((
           await db
             .select()
             .from(organizationsTable)
             .where(eq(organizationsTable.id, user.organizationId))
-        )[0] ?? null
+        )[0] ?? null)
       : null;
     res.json({
       id: user.id,
@@ -112,7 +120,8 @@ router.post(
     const body = req.body ?? {};
     const name = typeof body.name === "string" ? body.name : "";
     const slug = typeof body.slug === "string" ? body.slug : undefined;
-    const timezone = typeof body.timezone === "string" ? body.timezone : undefined;
+    const timezone =
+      typeof body.timezone === "string" ? body.timezone : undefined;
     if (!name.trim()) {
       res.status(400).json({ error: "Company name is required" });
       return;
@@ -172,39 +181,78 @@ router.patch(
   async (req: Request, res: Response): Promise<void> => {
     const body = req.body ?? {};
     const patch: Partial<{ name: string; timezone: string }> = {};
+    if (
+      Object.keys(body).some(
+        (key) => !["name", "timezone", "expectedTimeZone"].includes(key),
+      )
+    ) {
+      res.status(400).json({ error: "Unknown organization update fields." });
+      return;
+    }
     if (typeof body.name === "string" && body.name.trim().length >= 2) {
       patch.name = body.name.trim().slice(0, 120);
     }
     if (typeof body.timezone === "string" && body.timezone.trim()) {
       try {
         new Intl.DateTimeFormat("en-US", { timeZone: body.timezone });
-        patch.timezone = body.timezone;
+        if (typeof body.expectedTimeZone !== "string") {
+          res.status(400).json({
+            error: "Review the current company timezone before changing it.",
+            code: "stale_scheduling_review",
+          });
+          return;
+        }
       } catch {
         res.status(400).json({ error: "Invalid timezone" });
         return;
       }
     }
-    if (Object.keys(patch).length === 0) {
+    if (Object.keys(patch).length === 0 && typeof body.timezone !== "string") {
       res.status(400).json({ error: "Nothing to update" });
       return;
     }
-    const [updated] = await db
-      .update(organizationsTable)
-      .set(patch)
-      .where(eq(organizationsTable.id, String(req.params.id)))
-      .returning();
+    if (typeof body.timezone === "string") {
+      try {
+        await setSchedulingCompanyTimeZone(
+          {
+            organizationId: String(req.params.id),
+            userId: req.sessionUser!.id,
+          },
+          String(req.params.id),
+          body.timezone,
+          body.expectedTimeZone,
+          patch.name,
+        );
+      } catch (error) {
+        if (schedulingError(error, res)) return;
+        throw error;
+      }
+    }
+    const nameOnly =
+      typeof body.timezone !== "string" && Object.keys(patch).length > 0;
+    const [updated] = nameOnly
+      ? await db
+          .update(organizationsTable)
+          .set(patch)
+          .where(eq(organizationsTable.id, String(req.params.id)))
+          .returning()
+      : await db
+          .select()
+          .from(organizationsTable)
+          .where(eq(organizationsTable.id, String(req.params.id)));
     if (!updated) {
       res.status(404).json({ error: "Organization not found" });
       return;
     }
-    await recordAudit({
-      organizationId: updated.id,
-      actorUserId: req.sessionUser!.id,
-      action: "organization.updated",
-      entityType: "organization",
-      entityId: updated.id,
-      metadata: patch,
-    });
+    if (nameOnly)
+      await recordAudit({
+        organizationId: updated.id,
+        actorUserId: req.sessionUser!.id,
+        action: "organization.updated",
+        entityType: "organization",
+        entityId: updated.id,
+        metadata: patch,
+      });
     res.json({
       organization: {
         id: updated.id,

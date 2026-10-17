@@ -7,8 +7,11 @@ import {
 } from "@workspace/db";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { hasPermission } from "../lib/permissions";
-import { assertOperationalStaff, assertResourceWindow, assertScheduleInterval, assertScheduleVersion, appointmentCustomer, lockContractorSchedule, type ScheduleTransaction } from "./contractor-scheduling";
-import { insertInspectionInTransaction } from "./inspection-booking";
+import { assertOperationalStaff, assertScheduleInterval, assertScheduleVersion, appointmentCustomer, lockContractorSchedule, type ScheduleTransaction } from "./contractor-scheduling";
+import { assertSchedulingActor, lockSchedulingConfiguration, readSchedulingContext, SchedulingPolicyError } from "./scheduling-policy";
+import { appendSchedulingTransition, prepareSchedulingAdmission, schedulingFailure, type ServerSchedulingAuthority } from "./scheduling-admission";
+import { CustomerLifecycleHoldError, getCustomerLifecycleStatus } from "./customer-lifecycle";
+import type { SchedulingCandidate } from "@workspace/scheduling-core";
 import { resolveCustomerEmailSender, sendCustomerEmail } from "./customer-email";
 import { emailAcceptanceEvidence } from "./user-email";
 import { EmailDispatchBlockedError } from "./email-dispatch-guard";
@@ -19,7 +22,7 @@ import { getSendingHours } from "./settings";
 import { phoneE164, twilioForOrganization } from "./twilio-controls";
 import { sendTwilioSms } from "./twilio-delivery";
 import { serviceNoticeAt } from "./service-obligations";
-import { approveServiceCareSchema, careFingerprint, serviceCareBookingSchema, serviceCareMessage, serviceCareResponseSchema, type ServiceCareSnapshot as Snapshot, type ServiceCareApproval as Approval } from "./service-care-policy";
+import { approveServiceCareSchema, careFingerprint, serviceCareBookingSchema, serviceCareBookingResultSchema, serviceCareSchedulingReadSchema, serviceCareMessage, serviceCareResponseSchema, type ServiceCareSnapshot as Snapshot, type ServiceCareApproval as Approval, type ServiceCareSchedulingRead, type ServiceCareBookingResult } from "./service-care-policy";
 import { hasServiceMailboxReplyHold, recordMailboxParentAcceptance, reserveServiceMailboxParent } from "./mailbox-communication";
 import { assertServiceCareAuthorizationCurrent } from "./service-care-authorization";
 import { lockServiceStanding, ServiceStandingError, standingCompanyProjection } from "./service-standing-policy";
@@ -41,8 +44,9 @@ export class ServiceCareError extends Error {
 }
 function fail(code: string, message: string, status = 409): never { throw new ServiceCareError(code, message, status); }
 const serviceWhere = (org: string, id: string) => and(eq(serviceObligationsTable.organizationId, org), eq(serviceObligationsTable.id, id));
-async function readService(org: string, id: string, reader: Reader = db) {
-  const [obligation] = await reader.select().from(serviceObligationsTable).where(serviceWhere(org, id));
+async function readService(org: string, id: string, reader: Reader = db, lock?: "share" | "update") {
+  const query = reader.select().from(serviceObligationsTable).where(serviceWhere(org, id));
+  const [obligation] = await (lock ? query.for(lock) : query);
   if (!obligation) return fail("not_found", "Service is not available in this company.", 404);
   const [contact] = await reader.select().from(contactsTable).where(and(eq(contactsTable.organizationId, org), eq(contactsTable.id, obligation.contactId)));
   if (!contact) return fail("not_found", "Service customer is not available.", 404);
@@ -103,8 +107,37 @@ async function eligibility(org: string, contact: Contact, channel: Channel, acti
   // into marketing or release imported opportunities for campaigns.
   return checkSendEligibility({ organizationId: org, contact, channel, kind: "outreach", sendingHours: (await standingCompanyProjection(db, org)).hours, serviceCareActionKey: actionKey });
 }
-export async function getServiceCare(org: string, id: string, channel: Channel = "email") {
-  const { obligation, contact } = await readService(org, id);
+export type ServiceCareReadOptions = { actorUserId?: string; appointmentType?: "inspection" | "other" };
+async function readServiceScheduling(org: string, id: string, options: ServiceCareReadOptions) {
+  return db.transaction(async tx => {
+    // A recovery Reader can inspect Care but cannot acquire row locks or offer
+    // a writable scheduling review. This mode comes only from PostgreSQL.
+    const mode = await tx.execute(sql`SELECT current_setting('transaction_read_only') AS read_only`);
+    const readOnly = mode.rows[0]?.read_only === "on";
+    const readOptions = readOnly ? { readOnly: true as const } : {};
+    if (!readOnly) await lockSchedulingConfiguration(tx, org, false);
+    if (options.actorUserId !== undefined) await assertSchedulingActor(tx, { organizationId: org, userId: options.actorUserId }, "crm.read", false, readOptions);
+    const { obligation, contact } = await readService(org, id, tx, readOnly ? undefined : "share");
+    await appointmentCustomer(tx, org, obligation, readOptions);
+    const source = { sourceKind: "direct_customer" as const, leadId: null, contactId: obligation.contactId, propertyId: obligation.propertyId, estimateId: null };
+    const appointmentType = options.appointmentType ?? "inspection";
+    let review: ServiceCareSchedulingRead["review"] = { state: "held", code: "scheduling_reader_required", message: "Sign in as an accepted staff member to review this booking." };
+    if (readOnly) review = { state: "held", code: "scheduling_reader_required", message: "Scheduling review requires a writable database connection." };
+    if (options.actorUserId !== undefined && !readOnly) {
+      try {
+        const current = await readSchedulingContext(tx, org, undefined, { reservationKind: "appointment", appointmentType });
+        review = { state: "ready", policy: current.policy, context: { ...current.context, source } };
+      } catch (error) {
+        if (!(error instanceof SchedulingPolicyError) || error.code !== "invalid_scheduling_policy") throw error;
+        review = { state: "held", code: "invalid_scheduling_policy", message: error.message };
+      }
+    }
+    const scheduling = serviceCareSchedulingReadSchema.parse({ organizationId: org, actorUserId: options.actorUserId ?? null, obligationId: obligation.id, expectedUpdatedAt: obligation.updatedAt.toISOString(), appointmentType, source, review });
+    return { obligation, contact, scheduling };
+  });
+}
+export async function getServiceCare(org: string, id: string, channel: Channel = "email", options: ServiceCareReadOptions = {}) {
+  const { obligation, contact, scheduling } = await readServiceScheduling(org, id, options);
   const approval = await latest(org, id, APPROVED);
   const response = await latest(org, id, RESPONSE);
   const booking = await latest(org, id, BOOKED);
@@ -130,7 +163,7 @@ export async function getServiceCare(org: string, id: string, channel: Channel =
   const executionState = execution?.state === "processing" && execution.expiresAt.getTime() <= Date.now() ? "indeterminate" : execution?.state;
   const [scheduled] = approved ? await db.select().from(scheduledActionsTable).where(and(eq(scheduledActionsTable.organizationId, org), eq(scheduledActionsTable.id, approved.scheduledActionId))) : [];
   const [appointment] = obligation.appointmentId ? await db.select().from(appointmentsTable).where(and(eq(appointmentsTable.organizationId, org), eq(appointmentsTable.id, obligation.appointmentId))) : [];
-  return { obligationId: id, expectedUpdatedAt: obligation.updatedAt.toISOString(), active: obligation.status === "active", preview, blockReason, deferredReason,
+  return { obligationId: id, expectedUpdatedAt: obligation.updatedAt.toISOString(), active: obligation.status === "active", scheduling, preview, blockReason, deferredReason,
     reminder: approval ? { approvalId: approval.id, approvedAt: approval.createdAt.toISOString(), origin: approved!.authorization?.origin ?? "individual", policyRevisionId: approved!.authorization?.origin === "standing" ? approved!.authorization.policyRevisionId : null, channel: approved!.snapshot.channel, recipient: approved!.snapshot.recipient, subject: approved!.snapshot.subject, body: approved!.snapshot.body, agreementNote: approved!.agreementNote, state: executionState ?? scheduled?.status ?? "review_required", runAt: scheduled?.runAt.toISOString() ?? null, detail: execution?.detail ?? scheduled?.lastError ?? null, providerEvidence: accepted?.metadata ?? null, deliveryConfirmed: false } : null,
     response: response ? { id: response.id, recordedAt: response.createdAt.toISOString(), ...response.metadata } : null,
     booking: booking ? { id: booking.id, ...booking.metadata } : null,
@@ -296,15 +329,29 @@ export async function recordServiceCareResponse(org: string, actor: string, id: 
   });
 }
 
-export async function bookServiceCareVisit(org: string, actor: string, id: string, raw: unknown) {
+function bookingResult(audit: typeof auditEventsTable.$inferSelect, replayed: boolean): ServiceCareBookingResult {
+  const metadata = audit.metadata;
+  const stored = serviceCareBookingSchema.safeParse(Object.fromEntries(Object.keys(serviceCareBookingSchema.shape)
+    .filter(key => Object.hasOwn(metadata, key)).map(key => [key, metadata[key]])));
+  if (!stored.success || metadata.requestFingerprint !== careFingerprint(stored.data)) fail("invalid_booking_receipt", "The original booking proof is incomplete. Retain the original request for operator review.");
+  const result = serviceCareBookingResultSchema.safeParse({ appointmentId: metadata.appointmentId, replayed, bookingOutcome: {
+    formatVersion: 1, status: "committed", organizationId: audit.organizationId, actorUserId: audit.actorUserId,
+    obligationId: audit.entityId, bookingId: audit.id, requestId: stored.data.requestId,
+    requestFingerprint: metadata.requestFingerprint, responseId: stored.data.responseId,
+    expectedUpdatedAt: stored.data.expectedUpdatedAt, appointmentId: metadata.appointmentId,
+  } });
+  if (!result.success) fail("invalid_booking_receipt", "The original booking proof is incomplete. Retain the original request for operator review.");
+  return result.data;
+}
+export async function bookServiceCareVisit(org: string, actor: string, id: string, raw: unknown): Promise<ServiceCareBookingResult> {
   const input = serviceCareBookingSchema.parse(raw);
-  if (await customerWorkHeld(org)) fail("customer_lifecycle_paused", "Customer work is paused.");
   return db.transaction(async tx => {
-    await lockContractorSchedule(tx, org);
+    await lockSchedulingConfiguration(tx, org, false);
     await assertOperationalStaff(tx, org, [actor]);
     const repeated = await replay(tx, org, id, BOOKED, input);
-    if (repeated) return { appointmentId: repeated.metadata.appointmentId as string, replayed: true };
-    const { obligation } = await readService(org, id, tx);
+    if (repeated) return bookingResult(repeated, true);
+    if (!(await getCustomerLifecycleStatus(org, tx)).automationAllowed) throw new CustomerLifecycleHoldError();
+    const { obligation } = await readService(org, id, tx, "update");
     activeUnbooked(obligation);
     assertScheduleVersion(obligation.updatedAt, input.expectedUpdatedAt);
     if (await isBooked(org, obligation, tx)) fail("already_booked", "This service already has an active appointment. Manage it in Appointments.");
@@ -317,18 +364,22 @@ export async function bookServiceCareVisit(org: string, actor: string, id: strin
     const start = new Date(input.scheduledStart), end = new Date(input.scheduledEnd);
     assertScheduleInterval(start, end);
     if (start.getTime() <= Date.now() || end.getTime() - start.getTime() > 24 * 3_600_000) fail("invalid_window", "Choose a future service window no longer than 24 hours.", 400);
-    await assertOperationalStaff(tx, org, [input.assignedUserId]);
     await appointmentCustomer(tx, org, obligation);
-    await assertResourceWindow(tx, org, [input.assignedUserId], start, end);
-    const values = { organizationId: org, contactId: obligation.contactId, propertyId: obligation.propertyId, assignedUserId: input.assignedUserId, type: input.type, status: "confirmed" as const, scheduledStart: start, scheduledEnd: end, notes: `Office-confirmed service visit: ${obligation.equipmentLabel}. Customer confirmation recorded by staff; service completion and warranty coverage are not inferred.` };
-    const appointment = input.type === "inspection" ? await insertInspectionInTransaction(tx, values) : (await tx.insert(appointmentsTable).values(values).returning())[0];
-    if (!appointment) fail("capacity_conflict", "The inspection window is full. Choose another confirmed time.");
+    await assertOperationalStaff(tx, org, [actor, input.assignedUserId]);
+    if (!input.schedulingReview) schedulingFailure("stale_scheduling_review");
+    const source = { sourceKind: "direct_customer" as const, leadId: null, contactId: obligation.contactId, propertyId: obligation.propertyId, estimateId: null };
+    const authority: ServerSchedulingAuthority = { organizationId: org, actorUserId: actor, origin: "service_care", sourceId: obligation.id, reviewMode: "reviewed" };
+    const candidate: SchedulingCandidate = { kind: "appointment", id: randomUUID(), startAt: start.toISOString(), endAt: end.toISOString(), resourceUserIds: [input.assignedUserId], type: input.type, status: "confirmed", source, reservation: null };
+    const admission = await prepareSchedulingAdmission(tx, authority, null, candidate, input.schedulingReview);
+    const values = { id: candidate.id, organizationId: org, contactId: obligation.contactId, propertyId: obligation.propertyId, assignedUserId: input.assignedUserId, type: input.type, status: "confirmed" as const, scheduledStart: start, scheduledEnd: end, schedulingReservation: admission.snapshot, notes: `Office-confirmed service visit: ${obligation.equipmentLabel}. Customer confirmation recorded by staff; service completion and warranty coverage are not inferred.` };
+    const [appointment] = await tx.insert(appointmentsTable).values(values).returning();
     await guardWorkdayService(tx, org, id, obligation, { appointmentId: appointment.id });
     await tx.update(serviceObligationsTable).set({ appointmentId: appointment.id, updatedAt: new Date(Math.max(Date.now(), obligation.updatedAt.getTime() + 1)) }).where(serviceWhere(org, id));
     await tx.update(crmTasksTable).set({ status: "done", completedAt: new Date(), assignedUserId: input.assignedUserId, description: "Office-confirmed appointment linked. After the visit, explicitly mark the service complete; a booked appointment does not establish completion or warranty coverage." }).where(and(eq(crmTasksTable.organizationId, org), eq(crmTasksTable.id, obligation.taskId)));
     const { scheduleAppointmentReminder } = await import("./automation");
     await scheduleAppointmentReminder(org, appointment, undefined, tx);
-    await tx.insert(auditEventsTable).values({ organizationId: org, actorUserId: actor, action: BOOKED, entityType: "service_obligation", entityId: id, metadata: { ...input, requestFingerprint: careFingerprint(input), appointmentId: appointment.id, evidence: "staff_attested_customer_confirmation" } });
-    return { appointmentId: appointment.id, replayed: false };
+    await appendSchedulingTransition(tx, authority, null, admission.snapshot, { kind: "appointment", id: appointment.id }, { transition: admission.transition, source, invalidHistoricalEvidenceRetained: false });
+    const [audit] = await tx.insert(auditEventsTable).values({ organizationId: org, actorUserId: actor, action: BOOKED, entityType: "service_obligation", entityId: id, metadata: { ...input, requestFingerprint: careFingerprint(input), appointmentId: appointment.id, evidence: "staff_attested_customer_confirmation" } }).returning();
+    return bookingResult(audit, false);
   });
 }

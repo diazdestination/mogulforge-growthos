@@ -7,6 +7,7 @@ import {
 import { and, eq } from "drizzle-orm";
 
 import { recordAudit } from "./audit";
+import { normalizeSmsPhone } from "./phone-number";
 import { checkSendEligibility } from "./send-gate";
 
 export const MANUAL_SMS_TEMPLATE_IDS = [
@@ -30,23 +31,8 @@ export interface ManualSmsDrafts {
   orgId: string;
 }
 
-/**
- * Validate ONE telephone recipient before building a native URI. The send
- * gate's digit-only normalization is for suppression matching, not URI safety.
- * Do not turn an injected URI, multiple numbers or an extension into a phone.
- * Unprefixed numbers are NANP; international numbers require an explicit +.
- */
-export function normalizeManualSmsPhone(value: string | null | undefined): string | null {
-  if (!value || value.length > 64 || !/^[+0-9 ().-]+$/.test(value)) return null;
-  const compact = value.trim().replace(/[ ().-]/g, "");
-  if (compact.startsWith("+")) {
-    if (!/^\+[1-9]\d{9,14}$/.test(compact)) return null;
-    if (compact.startsWith("+1") && !/^\+1[2-9]\d{2}[2-9]\d{6}$/.test(compact)) return null;
-    return compact;
-  }
-  const national = compact.length === 11 && compact.startsWith("1") ? compact.slice(1) : compact;
-  return /^[2-9]\d{2}[2-9]\d{6}$/.test(national) ? `+1${national}` : null;
-}
+/** Shared with Smart Site intake so both reach the same verdict (GAP-11). */
+export const normalizeManualSmsPhone = normalizeSmsPhone;
 
 function label(value: string | null | undefined, fallback: string, maxLength: number): string {
   return value
@@ -115,11 +101,14 @@ export async function getManualSmsDrafts(input: {
   // Explicit SMS consent, hard do-not-contact flags and address-level STOP
   // suppressions still apply. A manual draft never creates or implies consent.
   // This requested-service reply is human-reviewed, not automated outreach.
+  // A website inquiry's own SMS consent counts only for THIS lead and the
+  // phone given in that inquiry; it never becomes contact-wide consent.
   const gate = await checkSendEligibility({
     organizationId: input.organizationId,
     contact: row.contact,
     channel: "sms",
     kind: "transactional",
+    manualInquiryReplyLeadId: input.leadId,
   });
   if (!gate.ok) return blocked(gate.reason);
   return {

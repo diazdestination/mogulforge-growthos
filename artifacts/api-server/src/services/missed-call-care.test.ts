@@ -1,4 +1,5 @@
-import { createECDH, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { createVapidTestKeyPair } from "../test-helpers/vapid-test-keys";
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -8,6 +9,7 @@ import {
   missedCallHandoffsTable as handoffs, crmTasksTable, customerLifecycleTable, leadsTable, staffPushDeliveriesTable,
 } from "@workspace/db";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+import { syntheticTwilioNumber } from "../test-helpers/synthetic-twilio";
 import { createSession, deleteSession } from "../lib/auth";
 import { registerStaffPush, saveStaffPushPolicy } from "./staff-push";
 import { SMS_DISCLOSURE_VERSION } from "./twilio-controls";
@@ -56,7 +58,7 @@ beforeEach(async () => {
   ]).returning()).map((item) => item.id);
   [contact] = (await db.insert(contactsTable).values({ organizationId: org, firstName: "Synthetic caller", phone }).returning()).map((item) => item.id);
   account = `AC${randomUUID().replaceAll("-", "")}`;
-  await db.insert(twilioClientBindingsTable).values({ organizationId: org, accountSid: account, phoneNumber: "+15005550009",
+  await db.insert(twilioClientBindingsTable).values({ organizationId: org, accountSid: account, phoneNumber: syntheticTwilioNumber(),
     messagingServiceSid: `MG${"2".repeat(32)}`, apiKeySid: `SK${"3".repeat(32)}`,
     authTokenSecretRef: "TWILIO_CLIENT_CARE_AUTH_TOKEN", apiKeySecretRef: "TWILIO_CLIENT_CARE_API_KEY_SECRET",
     publicOrigin: "https://growth.example", businessName: "Synthetic Contractor", smsDisclosureVersion: SMS_DISCLOSURE_VERSION,
@@ -210,7 +212,7 @@ describe("reviewed missed-call recovery", () => {
     expect((await row()).state).toBe("indeterminate"); expect((await records())[0].state).toBe("indeterminate"); expect(provider).not.toHaveBeenCalled();
   });
   it("creates one canonical lead push only inside the reviewed new-lead transaction", async () => {
-    const key = createECDH("prime256v1"); key.generateKeys();
+    const key = createVapidTestKeyPair().ecdh;
     vi.stubEnv("WEB_PUSH_ENABLED", "true"); vi.stubEnv("OAUTH_TOKEN_ENCRYPTION_KEY", "a".repeat(64));
     vi.stubEnv("WEB_PUSH_VAPID_PUBLIC_KEY", key.getPublicKey().toString("base64url"));
     vi.stubEnv("WEB_PUSH_VAPID_PRIVATE_KEY", key.getPrivateKey().toString("base64url"));

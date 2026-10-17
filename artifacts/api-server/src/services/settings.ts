@@ -26,6 +26,17 @@ import {
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { isLegacyDefaultOrg } from "../lib/orgFlavor";
+import { CLIENT } from "../lib/client.config";
+import type { ScheduleTransaction } from "./contractor-scheduling";
+import {
+  advanceSchedulingInspectionPolicy,
+  assertSchedulingActor,
+  lockSchedulingConfiguration,
+  readSchedulingContext,
+  SchedulingPolicyError,
+  type SchedulingActor,
+} from "./scheduling-policy";
+import { auditEventsTable } from "@workspace/db";
 
 /**
  * Legacy service slugs migrated to their canonical form. The website's rich
@@ -43,22 +54,27 @@ export const LEGACY_SERVICE_SLUGS: Record<string, string> = {
  * matching rich page copy in the website's AREAS content list.
  */
 export const DEFAULT_SERVICE_AREAS: ServiceAreaEntry[] = [
-  { slug: "canton-ga",       name: "Canton",       state: "GA", isActive: true },
-  { slug: "alpharetta-ga",   name: "Alpharetta",   state: "GA", isActive: true },
-  { slug: "cumming-ga",      name: "Cumming",      state: "GA", isActive: true },
-  { slug: "gainesville-ga",  name: "Gainesville",  state: "GA", isActive: true },
-  { slug: "dawsonville-ga",  name: "Dawsonville",  state: "GA", isActive: true },
-  { slug: "atlanta-ga",      name: "Atlanta",      state: "GA", isActive: true },
-  { slug: "woodstock-ga",    name: "Woodstock",    state: "GA", isActive: true },
-  { slug: "marietta-ga",     name: "Marietta",     state: "GA", isActive: true },
-  { slug: "roswell-ga",      name: "Roswell",      state: "GA", isActive: true },
-  { slug: "acworth-ga",      name: "Acworth",      state: "GA", isActive: true },
-  { slug: "kennesaw-ga",     name: "Kennesaw",     state: "GA", isActive: true },
-  { slug: "cartersville-ga", name: "Cartersville", state: "GA", isActive: true },
-  { slug: "ball-ground-ga",  name: "Ball Ground",  state: "GA", isActive: true },
-  { slug: "jasper-ga",       name: "Jasper",       state: "GA", isActive: true },
-  { slug: "blue-ridge-ga",   name: "Blue Ridge",   state: "GA", isActive: true },
-  { slug: "rome-ga",         name: "Rome",         state: "GA", isActive: true },
+  { slug: "canton-ga", name: "Canton", state: "GA", isActive: true },
+  { slug: "alpharetta-ga", name: "Alpharetta", state: "GA", isActive: true },
+  { slug: "cumming-ga", name: "Cumming", state: "GA", isActive: true },
+  { slug: "gainesville-ga", name: "Gainesville", state: "GA", isActive: true },
+  { slug: "dawsonville-ga", name: "Dawsonville", state: "GA", isActive: true },
+  { slug: "atlanta-ga", name: "Atlanta", state: "GA", isActive: true },
+  { slug: "woodstock-ga", name: "Woodstock", state: "GA", isActive: true },
+  { slug: "marietta-ga", name: "Marietta", state: "GA", isActive: true },
+  { slug: "roswell-ga", name: "Roswell", state: "GA", isActive: true },
+  { slug: "acworth-ga", name: "Acworth", state: "GA", isActive: true },
+  { slug: "kennesaw-ga", name: "Kennesaw", state: "GA", isActive: true },
+  {
+    slug: "cartersville-ga",
+    name: "Cartersville",
+    state: "GA",
+    isActive: true,
+  },
+  { slug: "ball-ground-ga", name: "Ball Ground", state: "GA", isActive: true },
+  { slug: "jasper-ga", name: "Jasper", state: "GA", isActive: true },
+  { slug: "blue-ridge-ga", name: "Blue Ridge", state: "GA", isActive: true },
+  { slug: "rome-ga", name: "Rome", state: "GA", isActive: true },
 ];
 
 /**
@@ -70,7 +86,11 @@ export const DEFAULT_SERVICES: ServiceEntry[] = [
   { slug: "roof-replacement", name: "Roof Replacement", isActive: true },
   { slug: "roof-repair", name: "Roof Repair", isActive: true },
   { slug: "storm-damage", name: "Storm Damage Restoration", isActive: true },
-  { slug: "water-damage-restoration", name: "Water Damage Restoration", isActive: true },
+  {
+    slug: "water-damage-restoration",
+    name: "Water Damage Restoration",
+    isActive: true,
+  },
   { slug: "emergency-roofing", name: "Emergency Tarping", isActive: true },
 ];
 
@@ -107,7 +127,9 @@ function normalizeServices(services: ServiceEntry[]): ServiceEntry[] | null {
 }
 
 /** Get (or lazily create) the settings row for an org. */
-export async function getOrgSettings(organizationId: string): Promise<OrgSettings> {
+export async function getOrgSettings(
+  organizationId: string,
+): Promise<OrgSettings> {
   const [existing] = await db
     .select()
     .from(orgSettingsTable)
@@ -123,15 +145,40 @@ export async function getOrgSettings(organizationId: string): Promise<OrgSetting
       .returning();
     return updated ?? { ...existing, services: normalized };
   }
+  return db.transaction(async (tx) => {
+    await lockSchedulingConfiguration(tx, organizationId);
+    return initializeOrgSettings(tx, organizationId);
+  });
+}
+
+/** Caller holds lifecycle/schedule, then actor when applicable. Default-only
+ * system compatibility initializer; never overwrites saved scheduling authority. */
+export async function initializeOrgSettings(
+  tx: ScheduleTransaction,
+  organizationId: string,
+): Promise<OrgSettings> {
+  const [org] = await tx
+    .select()
+    .from(organizationsTable)
+    .where(eq(organizationsTable.id, organizationId))
+    .for("update");
+  if (!org)
+    throw new SchedulingPolicyError(
+      "organization_missing",
+      "Company not found.",
+      404,
+    );
+  const [existing] = await tx
+    .select()
+    .from(orgSettingsTable)
+    .where(eq(orgSettingsTable.organizationId, organizationId))
+    .for("update");
+  if (existing) return existing;
   // Lazily created rows get flavor-appropriate seeds: the legacy default org
   // keeps its historical seeded profile; every other org starts
   // industry-neutral — its own name, no borrowed phone/city/services.
-  const legacy = await isLegacyDefaultOrg(organizationId);
-  const [org] = await db
-    .select({ name: organizationsTable.name })
-    .from(organizationsTable)
-    .where(eq(organizationsTable.id, organizationId));
-  const [created] = await db
+  const legacy = org.slug === CLIENT.defaultOrgSlug;
+  const [created] = await tx
     .insert(orgSettingsTable)
     .values(
       legacy
@@ -162,7 +209,7 @@ export async function getOrgSettings(organizationId: string): Promise<OrgSetting
     .onConflictDoNothing()
     .returning();
   if (created) return created;
-  const [row] = await db
+  const [row] = await tx
     .select()
     .from(orgSettingsTable)
     .where(eq(orgSettingsTable.organizationId, organizationId));
@@ -210,18 +257,73 @@ export async function updateOrgSettings(
       | "playbookStageBehaviors"
     >
   >,
+  actor?: SchedulingActor,
 ): Promise<OrgSettings> {
-  await getOrgSettings(organizationId); // ensure row exists
+  if ("schedulingPolicy" in patch)
+    throw new SchedulingPolicyError(
+      "invalid_scheduling_policy",
+      "Use the dedicated scheduling policy operation.",
+      400,
+    );
+  if (patch.inspectionAvailability !== undefined && !actor)
+    throw new SchedulingPolicyError(
+      "scheduling_access_denied",
+      "Inspection changes require accepted staff authority.",
+      403,
+    );
   if (patch.services) {
     // Keep writes canonical too (e.g. a stale client re-submitting legacy slugs).
-    patch = { ...patch, services: normalizeServices(patch.services) ?? patch.services };
+    patch = {
+      ...patch,
+      services: normalizeServices(patch.services) ?? patch.services,
+    };
   }
-  const [row] = await db
-    .update(orgSettingsTable)
-    .set(patch)
-    .where(eq(orgSettingsTable.organizationId, organizationId))
-    .returning();
-  return row;
+  return db.transaction(async (tx) => {
+    await lockSchedulingConfiguration(tx, organizationId);
+    if (actor) {
+      if (actor.organizationId !== organizationId)
+        throw new SchedulingPolicyError(
+          "scheduling_access_denied",
+          "Use the authorized company context.",
+          403,
+        );
+      await assertSchedulingActor(tx, actor, "settings.manage");
+    }
+    await initializeOrgSettings(tx, organizationId);
+    const current =
+      patch.inspectionAvailability !== undefined
+        ? await readSchedulingContext(tx, organizationId)
+        : null;
+    const [row] = await tx
+      .update(orgSettingsTable)
+      .set(patch)
+      .where(eq(orgSettingsTable.organizationId, organizationId))
+      .returning();
+    if (current)
+      await advanceSchedulingInspectionPolicy(
+        tx,
+        actor!,
+        current.policy,
+        current.context.companyTimeZone,
+        patch.inspectionAvailability,
+      );
+    if (actor)
+      await tx
+        .insert(auditEventsTable)
+        .values({
+          organizationId,
+          actorUserId: actor.userId,
+          action: "settings.updated",
+          entityType: "org_settings",
+          entityId: row.id,
+          metadata: { fields: Object.keys(patch) },
+        });
+    const [updated] = await tx
+      .select()
+      .from(orgSettingsTable)
+      .where(eq(orgSettingsTable.organizationId, organizationId));
+    return updated;
+  });
 }
 
 /** Effective sending safeguards: org override merged over defaults. */
@@ -234,7 +336,10 @@ export async function getSendingHours(
     merged.timezone = DEFAULT_SENDING_HOURS.timezone;
   }
   merged.startHour = Math.min(Math.max(Math.trunc(merged.startHour), 0), 23);
-  merged.endHour = Math.min(Math.max(Math.trunc(merged.endHour), merged.startHour + 1), 24);
+  merged.endHour = Math.min(
+    Math.max(Math.trunc(merged.endHour), merged.startHour + 1),
+    24,
+  );
   merged.maxTouchesPerDay = Math.max(Math.trunc(merged.maxTouchesPerDay), 0);
   if (!Array.isArray(merged.days) || merged.days.length === 0) {
     merged.days = DEFAULT_SENDING_HOURS.days;
@@ -253,7 +358,9 @@ export async function getPlaybookStageBehaviors(
 ): Promise<PlaybookStageBehaviors> {
   const settings = await getOrgSettings(organizationId);
   const raw = settings.playbookStageBehaviors ?? {};
-  const merged: PlaybookStageBehaviors = { ...DEFAULT_PLAYBOOK_STAGE_BEHAVIORS };
+  const merged: PlaybookStageBehaviors = {
+    ...DEFAULT_PLAYBOOK_STAGE_BEHAVIORS,
+  };
   for (const [stage, entry] of Object.entries(raw)) {
     const sanitized = sanitizeStageBehavior(entry);
     if (sanitized) merged[stage] = sanitized;
@@ -297,14 +404,27 @@ export async function getInspectionAvailability(
   organizationId: string,
 ): Promise<InspectionAvailabilitySettings> {
   const settings = await getOrgSettings(organizationId);
-  const raw = settings.inspectionAvailability;
+  return normalizeInspectionAvailability(settings.inspectionAvailability);
+}
+
+/** Deterministic legacy compatibility. No persistence and no owner approval. */
+export function normalizeInspectionAvailability(
+  value: unknown,
+): InspectionAvailabilitySettings {
+  const raw =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Partial<InspectionAvailabilitySettings>)
+      : null;
   if (!raw) return DEFAULT_INSPECTION_AVAILABILITY;
   const merged = { ...DEFAULT_INSPECTION_AVAILABILITY, ...raw };
   const validDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const days = merged.days.filter((d) => validDays.includes(d));
-  const windows = merged.windows
+  const days = (Array.isArray(merged.days) ? merged.days : []).filter((d) =>
+    validDays.includes(d),
+  );
+  const windows = (Array.isArray(merged.windows) ? merged.windows : [])
     .filter(
       (w) =>
+        w != null &&
         Number.isFinite(w.startHour) &&
         Number.isFinite(w.endHour) &&
         w.startHour >= 0 &&
@@ -318,10 +438,14 @@ export async function getInspectionAvailability(
       : DEFAULT_INSPECTION_AVAILABILITY.timezone,
     days: days.length ? days : DEFAULT_INSPECTION_AVAILABILITY.days,
     windows: windows.length ? windows : DEFAULT_INSPECTION_AVAILABILITY.windows,
-    maxBookingsPerWindow: Math.max(1, Math.floor(merged.maxBookingsPerWindow) || 1),
-    blackoutDates: (merged.blackoutDates ?? []).filter((d) =>
-      /^\d{4}-\d{2}-\d{2}$/.test(d),
+    maxBookingsPerWindow: Math.max(
+      1,
+      Math.floor(merged.maxBookingsPerWindow) || 1,
     ),
+    blackoutDates: (Array.isArray(merged.blackoutDates)
+      ? merged.blackoutDates
+      : []
+    ).filter((d) => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)),
   };
 }
 
@@ -388,14 +512,18 @@ export async function getConciergeSettings(
       key: i.key.trim(),
       label: i.label.trim(),
       service: i.service.trim(),
-      points: Number.isFinite(i.points) ? Math.max(0, Math.min(100, i.points)) : 10,
+      points: Number.isFinite(i.points)
+        ? Math.max(0, Math.min(100, i.points))
+        : 10,
       reason: nonEmpty(i.reason, `${i.label.trim()} requested`),
       urgency: (["normal", "high", "emergency"] as const).includes(i.urgency)
         ? i.urgency
         : "normal",
       triage: Boolean(i.triage),
       keywords: (Array.isArray(i.keywords) ? i.keywords : [])
-        .filter((k): k is string => typeof k === "string" && k.trim().length > 0)
+        .filter(
+          (k): k is string => typeof k === "string" && k.trim().length > 0,
+        )
         .map((k) => k.trim().toLowerCase()),
     }));
   return {
@@ -433,7 +561,9 @@ export async function getBusinessName(organizationId: string): Promise<string> {
 }
 
 /** Org-specific extra AI instructions (empty string when unset). */
-export async function getAiInstructions(organizationId: string): Promise<string> {
+export async function getAiInstructions(
+  organizationId: string,
+): Promise<string> {
   const settings = await getOrgSettings(organizationId);
   return settings.aiInstructions?.trim() ?? "";
 }

@@ -16,6 +16,9 @@
   },
   "references": [
     {
+      "path": "../../lib/scheduling-core"
+    },
+    {
       "path": "../../lib/api-client-react"
     }
   ]

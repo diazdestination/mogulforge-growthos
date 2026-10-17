@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import { callieReceptionEvidenceSchema, callieReceptionPreviewSchema, callieReceptionViewSchema } from "../../../api-server/src/services/callie-reception-contract";
+import { callieBookingOutcomeSchema, callieBookingSchema, callieSchedulingContextQuerySchema, callieSchedulingContextReadSchema, type CallieBooking, type CallieSchedulingContextQuery } from "../../../api-server/src/services/callie-office-contract";
 
 const uuid = z.uuid(), date = z.iso.datetime(), hash = z.string().regex(/^[a-f0-9]{64}$/);
 const member = z.string().min(1).max(128), label = z.string().max(1000), reason = z.string().max(160);
@@ -36,6 +37,21 @@ function validModeEvidence(value: CallieItem) {
 export const calliePageFor = (org: string, scope: string, offset: number) => pageSchema.refine(value => value.scope === scope && value.offset === offset && value.items.every(item => item.organizationId === org && validModeEvidence(item)));
 export const callieDetailFor = (org: string, id: string) => detailSchema.refine(value => value.organizationId === org && value.id === id && validModeEvidence(value) && (!value.appointment || value.appointment.id === value.appointmentId) && (value.mode === "conversation" ? value.delivery === null && value.execution === null : value.reception === null));
 export const callieCommandFor = (org: string, id: string) => z.object({ detail: callieDetailFor(org, id), replayed: z.boolean() }).strict();
+/** Match original command custody, never a freshly refreshed case or actor. */
+export function callieBookingFor(org: string, actor: string, id: string, originalParsedBody: CallieBooking, originalRequestFingerprint: string) {
+  const original = callieBookingSchema.parse(originalParsedBody), fingerprint = hash.parse(originalRequestFingerprint);
+  return z.object({ detail: callieDetailFor(org, id).nullable(), replayed: z.boolean(), bookingOutcome: callieBookingOutcomeSchema }).strict().refine(value => {
+    const outcome = value.bookingOutcome;
+    return outcome.organizationId === org && outcome.actorUserId === actor && outcome.intakeId === id && outcome.requestId === original.requestId && outcome.requestFingerprint === fingerprint &&
+      outcome.expectedVersion === original.expectedVersion && outcome.expectedFingerprint === original.expectedFingerprint && outcome.customerConfirmed === original.customerConfirmed &&
+      (!value.detail || value.detail.appointmentId === outcome.appointmentId && value.detail.appointment?.id === outcome.appointmentId) && (value.replayed || value.detail !== null);
+  });
+}
+export function callieSchedulingContextFor(org: string, actor: string, id: string, selected: CallieSchedulingContextQuery) {
+  const query = callieSchedulingContextQuerySchema.parse(selected);
+  return callieSchedulingContextReadSchema.refine(value => value.organizationId === org && value.actorUserId === actor && value.intakeId === id && value.appointmentType === query.appointmentType &&
+    (value.source === null || value.source.propertyId === (query.propertyId ?? null)));
+}
 export const receptionViewFor = (org: string) => callieReceptionViewSchema.refine(value => value.organizationId === org);
 export const samePolicyFields = (saved: object, draft: object) => Object.entries(draft).every(([key, value]) => JSON.stringify((saved as Record<string, unknown>)[key]) === JSON.stringify(value));
 export const policyPreviewFor = (org: string, actor: string, version: number, policy: CallieSettings) => policyPreviewSchema.refine(value => value.expectedVersion === version && value.expectedSnapshot.expectedVersion === version && value.expectedSnapshot.organizationId === org && value.expectedSnapshot.actorUserId === actor && value.expiresAt === value.expectedSnapshot.expiresAt && samePolicyFields(value.expectedSnapshot.policy, policy));

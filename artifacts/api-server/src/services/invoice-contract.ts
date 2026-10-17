@@ -97,6 +97,21 @@ const requestId = z.uuid();
 const expectedVersion = z.number().int().min(1).max(2_147_483_646);
 const confirmation = { requestId, expectedVersion, confirmed: z.literal(true) };
 const reason = z.string().trim().min(10).max(500);
+export const MAX_INVOICE_EQUIPMENT = 10;
+/**
+ * Staff choose recorded property assets; the server copies their current facts
+ * into the draft. Optional and outside the document input so imports and older
+ * request hashes are unchanged.
+ */
+export const invoiceEquipmentSelectionSchema = z
+  .object({
+    assetIds: z
+      .array(z.uuid())
+      .max(MAX_INVOICE_EQUIPMENT)
+      .refine((ids) => new Set(ids).size === ids.length, "Choose each equipment record once."),
+    warrantyTerms: nullableText(2000),
+  })
+  .strict();
 export const legacyCreateInvoiceSchema = z
   .object({
     requestId,
@@ -104,16 +119,18 @@ export const legacyCreateInvoiceSchema = z
     projectId: z.uuid().nullable().optional(),
     estimateId: z.uuid().nullable().optional(),
     document: invoiceDocumentInputSchema,
+    equipment: invoiceEquipmentSelectionSchema.optional(),
   })
   .strict();
 export const createReturningInvoiceSchema = z.object({
   requestId, source: z.discriminatedUnion("kind", [customerWorkSourceSchema, existingCustomerSourceSchema]),
   projectId: z.uuid().nullable().optional(), estimateId: z.uuid().nullable().optional(), document: invoiceDocumentInputSchema,
+  equipment: invoiceEquipmentSelectionSchema.optional(),
 }).strict().refine(v => v.source.kind !== "existing_customer" || (!v.projectId && !v.estimateId), "A standalone invoice cannot borrow another work record.");
 /** Preserve the literal old parse/normalization branch and its saved request hash. */
 export const createInvoiceSchema = z.union([legacyCreateInvoiceSchema, createReturningInvoiceSchema]);
 export const updateInvoiceSchema = z
-  .object({ requestId, expectedVersion, document: invoiceDocumentInputSchema })
+  .object({ requestId, expectedVersion, document: invoiceDocumentInputSchema, equipment: invoiceEquipmentSelectionSchema.optional() })
   .strict();
 export const issueInvoiceSchema = z.object(confirmation).strict();
 export const voidInvoiceSchema = z.object({ ...confirmation, reason }).strict();

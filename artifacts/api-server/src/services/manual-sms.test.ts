@@ -10,16 +10,26 @@ import {
   db,
   leadsTable,
   organizationsTable,
+  smartSitesTable,
   suppressionsTable,
   usersTable,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import manualSmsRouter from "../routes/v1/manual-sms";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
-import { buildManualSmsTemplates, normalizeManualSmsPhone, type ManualSmsDrafts } from "./manual-sms";
-import { addSuppression } from "./send-gate";
+import * as crm from "./crm";
+import {
+  buildManualSmsTemplates,
+  getManualSmsDrafts,
+  normalizeManualSmsPhone,
+  prepareManualSmsDraft,
+  type ManualSmsDrafts,
+} from "./manual-sms";
+import { addSuppression, checkSendEligibility } from "./send-gate";
+import { normalizeSmartSiteIntake } from "./smart-site-contract";
+import { captureSmartSiteInquiry } from "./smart-sites";
 
 describe("manual SMS recipient and template safety", () => {
   it.each([
@@ -251,5 +261,190 @@ describe("manual SMS session, policy and evidence boundary", () => {
     } finally {
       await db.update(contactsTable).set({ organizationId: orgA }).where(and(eq(contactsTable.id, contactA), eq(contactsTable.organizationId, orgB)));
     }
+  });
+});
+
+// GAP-02: a website inquiry that explicitly consented to SMS may be answered by
+// a staff member from their own phone, about THAT inquiry, to the number given
+// in it. It never becomes contact-wide, automated, marketing or sequence consent.
+describe("inquiry-scoped SMS consent from a website inquiry", () => {
+  const orgs: string[] = [];
+  afterAll(async () => { await deleteTestOrgs(...orgs.splice(0)); });
+
+  async function inquiryFixture(channels: ("phone" | "email" | "sms")[], phone = "404-555-0177") {
+    const stamp = randomUUID();
+    const [org] = await db.insert(organizationsTable).values({ name: "Synthetic Inquiry Co", slug: `inquiry-sms-${stamp}` }).returning();
+    orgs.push(org.id);
+    const [owner] = await db.insert(usersTable).values({
+      organizationId: org.id, role: "owner", firstName: "Sam", isActive: true,
+      email: `inquiry-sms-${stamp}@example.test`, emailVerifiedAt: new Date(),
+    }).returning();
+    const [site] = await db.insert(smartSitesTable).values({
+      organizationId: org.id, name: "Synthetic site", siteKey: stamp, profile: "hvac",
+      source: "synthetic", keyHash: "0".repeat(64), isActive: true,
+    }).returning();
+    const saved = await captureSmartSiteInquiry(site, normalizeSmartSiteIntake({
+      schemaVersion: 1, requestId: randomUUID(),
+      contact: { name: "Avery Visitor", email: `visitor-${stamp}@example.invalid`, phone },
+      project: { serviceCode: "repair", timing: "soon", summary: "Synthetic inquiry" },
+      consent: { contact: true, analytics: false, policyVersion: "synthetic-test-v1", channels },
+    }));
+    const [lead] = await db.select().from(leadsTable).where(eq(leadsTable.id, saved.leadId));
+    const [contact] = await db.select().from(contactsTable).where(eq(contactsTable.id, lead.contactId!));
+    return { orgId: org.id, owner, site, receiptId: saved.receiptId, leadId: lead.id, contact };
+  }
+  const drafts = (f: { orgId: string; leadId: string }) =>
+    getManualSmsDrafts({ organizationId: f.orgId, leadId: f.leadId, staffFirstName: "Sam" });
+
+  it("allows a staff manual reply about the consented inquiry to the phone given in it", async () => {
+    const f = await inquiryFixture(["phone", "sms"]);
+    expect(await db.select().from(consentRecordsTable).where(eq(consentRecordsTable.organizationId, f.orgId))).toHaveLength(0);
+    expect(await drafts(f)).toMatchObject({ allowed: true, reason: null, phoneE164: "+14045550177" });
+    const prepared = await prepareManualSmsDraft({
+      organizationId: f.orgId, actorUserId: f.owner.id, staffFirstName: "Sam", leadId: f.leadId, templateId: "first-response",
+    });
+    expect(prepared).toMatchObject({ allowed: true, prepared: true });
+    // Nothing contact-wide is created from inquiry consent.
+    expect(await db.select().from(consentRecordsTable).where(eq(consentRecordsTable.organizationId, f.orgId))).toHaveLength(0);
+  });
+
+  it("does not extend to another lead for the same contact or another contact with the same phone", async () => {
+    const f = await inquiryFixture(["sms"]);
+    const [sameContactLead] = await db.insert(leadsTable).values({ organizationId: f.orgId, contactId: f.contact.id }).returning();
+    expect(await drafts({ orgId: f.orgId, leadId: sameContactLead.id })).toMatchObject({ allowed: false, reason: "no_sms_consent" });
+    const [twin] = await db.insert(contactsTable).values({ organizationId: f.orgId, firstName: "Twin", phone: "404-555-0177" }).returning();
+    const [twinLead] = await db.insert(leadsTable).values({ organizationId: f.orgId, contactId: twin.id }).returning();
+    expect(await drafts({ orgId: f.orgId, leadId: twinLead.id })).toMatchObject({ allowed: false, reason: "no_sms_consent" });
+  });
+
+  it("does not follow the contact to a different phone number than the inquiry gave", async () => {
+    const f = await inquiryFixture(["sms"]);
+    await db.update(contactsTable).set({ phone: "404-555-0166" }).where(eq(contactsTable.id, f.contact.id));
+    expect(await drafts(f)).toMatchObject({ allowed: false, reason: "no_sms_consent" });
+  });
+
+  it("never unlocks automated, sequence or marketing SMS for the consented lead", async () => {
+    const f = await inquiryFixture(["sms"]);
+    for (const kind of ["transactional", "outreach"] as const) {
+      expect(await checkSendEligibility({ organizationId: f.orgId, leadId: f.leadId, contact: f.contact, channel: "sms", kind }))
+        .toMatchObject({ ok: false, reason: "no_sms_consent" });
+      expect(await checkSendEligibility({ organizationId: f.orgId, contact: f.contact, channel: "sms", kind }))
+        .toMatchObject({ ok: false, reason: "no_sms_consent" });
+    }
+    // Even the explicit manual-reply marker cannot be combined with outreach.
+    expect(await checkSendEligibility({
+      organizationId: f.orgId, leadId: f.leadId, manualInquiryReplyLeadId: f.leadId, contact: f.contact, channel: "sms", kind: "outreach",
+    })).toMatchObject({ ok: false, reason: "no_sms_consent" });
+  });
+
+  it("lets a later opt-out win over the inquiry consent", async () => {
+    const f = await inquiryFixture(["sms"]);
+    expect((await drafts(f))?.allowed).toBe(true);
+    await db.insert(consentRecordsTable).values({
+      organizationId: f.orgId, contactId: f.contact.id, channel: "sms", granted: false,
+      disclosureVersion: "synthetic-opt-out", recordedAt: new Date(Date.now() + 1_000),
+    });
+    expect(await drafts(f)).toMatchObject({ allowed: false, reason: "no_sms_consent" });
+  });
+
+  it("lets a STOP suppression and do-not-text flag win over the inquiry consent", async () => {
+    const f = await inquiryFixture(["sms"]);
+    await addSuppression({ organizationId: f.orgId, channel: "sms", value: "4045550177", reason: "stop_keyword", source: "synthetic-test" });
+    expect(await drafts(f)).toMatchObject({ allowed: false, reason: "suppressed:stop_keyword" });
+    const g = await inquiryFixture(["sms"], "404-555-0155");
+    await db.update(contactsTable).set({ doNotContactSms: true }).where(eq(contactsTable.id, g.contact.id));
+    expect(await drafts(g)).toMatchObject({ allowed: false, reason: "do_not_contact_sms" });
+  });
+
+  it("stays blocked when the inquiry did not consent to SMS", async () => {
+    const f = await inquiryFixture(["phone", "email"]);
+    expect(await drafts(f)).toMatchObject({ allowed: false, reason: "no_sms_consent" });
+  });
+
+  // GAP-02 I1: only the capture activity written by intake, in the receipt's own
+  // transaction, is phone authority. Staff-writable timeline rows never are.
+  type InquiryFixture = Awaited<ReturnType<typeof inquiryFixture>>;
+  const blockedNoConsent = { allowed: false, reason: "no_sms_consent" };
+  const originalCapture = async (f: InquiryFixture) => {
+    const rows = await db.select().from(activitiesTable).where(and(
+      eq(activitiesTable.organizationId, f.orgId), eq(activitiesTable.type, "lead_captured"),
+    ));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ leadId: f.leadId, contactId: f.contact.id, actorUserId: null });
+    return rows[0];
+  };
+  // Exactly what POST /leads/:id/activities writes for a crm.write member.
+  const staffCapture = (f: InquiryFixture, leadId: string, phone: string, smartSiteId: string) =>
+    crm.createActivity(f.orgId, {
+      leadId, contactId: f.contact.id, actorUserId: f.owner.id, type: "lead_captured", title: "Inquiry",
+      body: null, metadata: { smartSiteId, receiptId: f.receiptId, submittedContact: { name: "Avery Visitor", phone } },
+    });
+
+  it("rejects the reviewed merge + changed phone + staff replacement capture sequence", async () => {
+    const f = await inquiryFixture(["sms"]);
+    expect((await drafts(f))?.allowed).toBe(true);
+    const [survivor] = await db.insert(leadsTable).values({ organizationId: f.orgId, contactId: f.contact.id }).returning();
+    expect(await crm.mergeLeads(f.orgId, survivor.id, f.leadId, f.owner.id)).toMatchObject({ ok: true });
+    // The authentic capture moved to the survivor; the receipt stayed on the source.
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
+    expect(await drafts({ orgId: f.orgId, leadId: survivor.id })).toMatchObject(blockedNoConsent);
+    await crm.updateContact(f.orgId, f.contact.id, { phone: "404-555-0166" });
+    await staffCapture(f, f.leadId, "404-555-0166", randomUUID());
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
+    await staffCapture(f, f.leadId, "404-555-0166", f.site.id);
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
+    expect(await drafts({ orgId: f.orgId, leadId: survivor.id })).toMatchObject(blockedNoConsent);
+  });
+
+  it("rejects a staff replacement capture naming a replaced phone while the original remains", async () => {
+    const f = await inquiryFixture(["sms"]);
+    await originalCapture(f);
+    await crm.updateContact(f.orgId, f.contact.id, { phone: "404-555-0166" });
+    await staffCapture(f, f.leadId, "404-555-0166", f.site.id);
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
+    // Restoring the inquiry phone restores the genuine authority; the staff row adds none.
+    await crm.updateContact(f.orgId, f.contact.id, { phone: "404-555-0177" });
+    expect((await drafts(f))?.allowed).toBe(true);
+  });
+
+  it("fails closed when the original capture evidence is missing", async () => {
+    const f = await inquiryFixture(["sms"]);
+    const original = await originalCapture(f);
+    await db.delete(activitiesTable).where(eq(activitiesTable.id, original.id));
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
+    // A later actor-less copy is not intake evidence either: it was not written with the receipt.
+    await db.insert(activitiesTable).values({
+      organizationId: f.orgId, leadId: f.leadId, contactId: f.contact.id, type: "lead_captured",
+      title: original.title, body: original.body, metadata: original.metadata,
+      occurredAt: original.occurredAt, createdAt: new Date(original.createdAt.getTime() + 60_000),
+    });
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
+  });
+
+  it.each([
+    ["moved to another lead", "lead"],
+    ["moved to another contact", "contact"],
+    ["bound to another site", "site"],
+    ["duplicated (ambiguous)", "duplicate"],
+  ] as const)("fails closed when the original capture is %s", async (_label, change) => {
+    const f = await inquiryFixture(["sms"]);
+    const original = await originalCapture(f);
+    expect((await drafts(f))?.allowed).toBe(true);
+    if (change === "lead") {
+      const [other] = await db.insert(leadsTable).values({ organizationId: f.orgId, contactId: f.contact.id }).returning();
+      await db.update(activitiesTable).set({ leadId: other.id }).where(eq(activitiesTable.id, original.id));
+    } else if (change === "contact") {
+      const [other] = await db.insert(contactsTable).values({ organizationId: f.orgId, firstName: "Other", phone: "404-555-0177" }).returning();
+      await db.update(activitiesTable).set({ contactId: other.id }).where(eq(activitiesTable.id, original.id));
+    } else if (change === "site") {
+      await db.update(activitiesTable).set({ metadata: { ...original.metadata, smartSiteId: randomUUID() } })
+        .where(eq(activitiesTable.id, original.id));
+    } else {
+      // Exact copy in SQL, keeping created_at to the microsecond.
+      await db.execute(sql`insert into activities (organization_id, lead_id, contact_id, actor_user_id, type, title, body, metadata, occurred_at, created_at)
+        select organization_id, lead_id, contact_id, actor_user_id, type, title, body, metadata, occurred_at, created_at
+        from activities where id = ${original.id}`);
+    }
+    expect(await drafts(f)).toMatchObject(blockedNoConsent);
   });
 });

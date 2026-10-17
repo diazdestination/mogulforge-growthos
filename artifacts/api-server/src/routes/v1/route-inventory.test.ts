@@ -72,6 +72,11 @@ const SESSION_ONLY_ROUTES = new Set([
  * - settings.manage — org configuration surfaces (owner/admin)
  */
 const EXPECTED_PERMISSIONS: Record<string, Permission> = {
+  "GET /settings/scheduling-policy": "crm.read",
+  "PUT /settings/scheduling-policy": "settings.manage",
+  "GET /scheduling/review-context": "crm.read",
+  "POST /scheduling/conflict-explanation": "crm.read",
+  "POST /scheduling/operations/reconcile": "crm.write",
   "GET /contacts/:id/detail-correction": "crm.read",
   "POST /contacts/:id/detail-corrections": "crm.write",
   "GET /contacts/:id/detail-corrections/:requestId": "crm.read",
@@ -121,6 +126,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "POST /communications/callie/policy/preview": "settings.manage",
   "POST /communications/callie/policy/approve": "settings.manage",
   "GET /communications/callie/:id": "crm.read",
+  "GET /communications/callie/:id/scheduling-context": "crm.read",
   "POST /communications/callie/:id/office-action": "crm.write",
   "POST /communications/callie/:id/review-caller": "crm.write",
   "POST /communications/callie/:id/book": "crm.write",
@@ -282,6 +288,9 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /estimates": "crm.read",
   "POST /estimates": "crm.write",
   "GET /estimates/:id": "crm.read",
+  "GET /estimates/:id/delivery": "crm.read",
+  "POST /estimates/:id/delivery/preview": "crm.write",
+  "POST /estimates/:id/delivery/send": "crm.write",
   "PATCH /estimates/:id": "crm.write",
   "DELETE /estimates/:id": "crm.delete",
   "GET /projects": "crm.read",

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tsImport } from 'tsx/esm/api';
@@ -24,6 +24,9 @@ import { CALLIE_CONVERSATION_RECOVERY_SLUGS, seedCallieConversationRecovery, ass
 import { WORKDAY_RECOVERY_SLUGS, seedWorkdayRecovery, assertWorkdayRecovery, assertWorkdayKeys } from './contractor-workday-recovery-fixture.mjs';
 import { returningCustomerIds, seedReturningCustomerRecovery, assertReturningCustomerRecovery, assertReturningCustomerKeys } from './returning-customer-recovery-fixture.mjs';
 import { seedLeadAlertCoverage, assertLeadAlertCoverage, assertLeadAlertCoverageConstraints } from './lead-alert-coverage-recovery-fixture.mjs';
+import { applySchedulingRecoveryDelta, seedSchedulingPrerequisites, captureSchedulingState, SCHEDULING_PRODUCTION_BASE, SCHEDULING_PRODUCTION_TREE } from './saved-scheduling-recovery-fixture.mjs';
+import { evaluateSavedSchedulingRollback } from './release-schema.mjs';
+import { assertC1SourcePreserved } from './c1-source-preservation.mjs';
 
 const requireApi = createRequire(new URL('../artifacts/api-server/package.json', import.meta.url));
 const requireDb = createRequire(new URL('../lib/db/package.json', import.meta.url));
@@ -33,12 +36,12 @@ const { generateDrizzleJson } = requireDb('drizzle-kit/api');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const identifier = (name) => { if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error('contractor_identifier_invalid'); return `"${name}"`; };
-const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot', 'reasons', 'snapshot', 'settings', 'result', 'historical_source', 'policy', 'context_snapshot', 'recipients']);
+const jsonFields = new Set(['metadata', 'payload', 'evidence', 'options', 'line_items', 'draft_document', 'issued_document', 'recurrence', 'days', 'approved_snapshot', 'reasons', 'snapshot', 'settings', 'result', 'historical_source', 'policy', 'context_snapshot', 'recipients', 'scheduling_policy', 'scheduling_reservation']);
 const deltas = ['0002_mobile-microsoft-pilot.sql', '0003_swarm-foundation.sql', '0004_beta-operations.sql', '0005_contractor-operations.sql', '0006_native-contractor-day.sql', '0007_customer-care.sql', '0008_operations-wave.sql', '0009_launch-communications.sql', '0010_lead-replies.sql', '0011_invoice-recovery.sql', '0012_callie-intake.sql', '0013_standing-service.sql', '0014_source-nurture.sql', '0015_callie-conversation.sql', '0016_contractor-workday.sql', '0017_returning-customer-work.sql', '0018_lead-alert-coverage.sql'];
 
 async function insert(database, table, row) {
   const fields = Object.keys(row);
-  await database.query(`INSERT INTO ${identifier(table)} (${fields.map(identifier).join(',')}) VALUES (${fields.map((_, i) => `$${i + 1}`).join(',')})`, fields.map((field) => jsonFields.has(field) && (field !== 'evidence' || typeof row[field] !== 'string') ? JSON.stringify(row[field]) : row[field]));
+  await database.query(`INSERT INTO ${identifier(table)} (${fields.map(identifier).join(',')}) VALUES (${fields.map((_, i) => `$${i + 1}`).join(',')})`, fields.map((field) => !(row[field] === null && ['scheduling_policy','scheduling_reservation'].includes(field)) && jsonFields.has(field) && (field !== 'evidence' || typeof row[field] !== 'string') ? JSON.stringify(row[field]) : row[field]));
 }
 
 async function fingerprints(database) {
@@ -50,52 +53,86 @@ async function fingerprints(database) {
   return { tables: values, sha256: sha(JSON.stringify(values)) };
 }
 
-async function probeApp(database) {
+function ownedBuild(output) {
   const artifactRoot = resolve(root, 'artifacts/api-server');
-  const output = await mkdtemp(join(artifactRoot, '.contractor-recovery-'));
   if (dirname(output) !== artifactRoot || !basename(output).startsWith('.contractor-recovery-')) throw new Error('contractor_build_path_invalid');
+}
+function ownedStaging(output) {
+  const scratchRoot = resolve(root, 'artifacts/api-server/tmp');
+  if (dirname(output) !== scratchRoot || !basename(output).startsWith('.contractor-recovery-')) throw new Error('contractor_build_stage_path_invalid');
+}
+async function artifactFiles(output,staged=false) {
+  if(staged) ownedStaging(output); else ownedBuild(output);
+  assert.equal(await readFile(join(output,'.gitignore'),'utf8'),'*\n','contractor derived output marker changed');
+  const entries=await readdir(output,{withFileTypes:true}), files=[];
+  for(const entry of entries.sort((a,b)=>a.name.localeCompare(b.name))) {
+    assert.ok(entry.isFile()&&!entry.isSymbolicLink());
+    if(entry.name==='scheduling-fixture.json'||entry.name==='.gitignore') continue;
+    const bytes=await readFile(join(output,entry.name)); files.push({path:entry.name,bytes:bytes.length,sha256:sha(bytes)});
+  }
+  assert.ok(files.some(f=>f.path==='contractor-recovery-entry.mjs'));
+  assert.ok(files.some(f=>f.path.includes('worker')));
+  return files;
+}
+async function recoverySourceFiles() {
+  const paths=['scripts/saved-scheduling-recovery-fixture.mjs','scripts/contractor-recovery-drill.mjs','scripts/contractor-recovery-app-probe.mjs','scripts/release-schema.mjs','artifacts/api-server/build.mjs','artifacts/api-server/build-identity.mjs','artifacts/api-server/scripts/contractor-recovery-entry.ts','pnpm-lock.yaml','scripts/c1-source-preservation.mjs','reports/c1-source-preservation-2026-10-16.json'];
+  return Promise.all(paths.map(async path=>({path,sha256:sha(await readFile(join(root,path)))})));
+}
+async function probeApp(database, output, files, cleanup, mode='reader', fixtureSha256,workerOutput) {
+  ownedBuild(output); assert.deepEqual(await artifactFiles(output),files);
+  assert.deepEqual(await artifactFiles(workerOutput,true),files,'compiled worker inputs changed before probe');
   let socket;
+  const receipt={kind:'app_child',mode,socketStopped:false,childExited:false}; cleanup.push(receipt);
   try {
-  await buildAll({ entryPoint: join(artifactRoot, 'scripts/contractor-recovery-entry.ts'), outDir: output });
-  await database.exec('SET SESSION AUTHORIZATION contractor_recovery_reader; SET default_transaction_read_only=on');
+  await database.exec(mode==='reader'?'SET SESSION AUTHORIZATION contractor_recovery_reader; SET default_transaction_read_only=on':'SET SESSION AUTHORIZATION contractor_recovery_writer; SET default_transaction_read_only=off');
   socket = new PGLiteSocketServer({ db: database, host: '127.0.0.1', port: 0, maxConnections: 20 });
   await socket.start();
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => /^(PATH|SystemRoot|WINDIR|TEMP|TMP|PATHEXT|COMSPEC)$/i.test(key)));
   Object.assign(env, {
-    NODE_ENV: 'test', DATABASE_URL: `postgresql://contractor_recovery_reader:synthetic@${socket.getServerConn()}/postgres`,
+    NODE_ENV: 'test', DATABASE_URL: `postgresql://contractor_recovery_${mode==='reader'?'reader':'writer'}:synthetic@${socket.getServerConn()}/postgres`,
     SESSION_SECRET: 'synthetic-contractor-recovery-not-for-deployment', APP_ORIGIN: 'https://growth.example',
     OAUTH_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 63).toString('base64'),
-    OBJECT_STORAGE_PROVIDER: 'postgres', LOG_LEVEL: 'silent', RESTORE_DRILL_ONLY: 'true',
+    OBJECT_STORAGE_PROVIDER: 'postgres', LOG_LEVEL: 'silent', ...(mode==='reader'?{RESTORE_DRILL_ONLY:'true'}:{}),
     CONTRACTOR_SYNTHETIC_RECOVERY: 'true', GROWTHOS_OUTBOUND_HOLD: 'true', SCHEDULER_AUTOSTART: 'false',
     CONTRACTOR_RECOVERY_APP: join(output, 'contractor-recovery-entry.mjs'),
+    AUTO_MIGRATE:'false', STAGING_OUTBOUND_APPROVED:'false', CONTRACTOR_RECOVERY_PROBE_MODE:mode,
+    ...(fixtureSha256?{CONTRACTOR_RECOVERY_FIXTURE_SHA256:fixtureSha256}:{}),
   });
     return await new Promise((done, reject) => {
       let output = '', diagnostic = '', failureCode = '';
       const child = spawn(process.execPath, [fileURLToPath(new URL('./contractor-recovery-app-probe.mjs', import.meta.url))], { cwd: root, env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-      const timer = setTimeout(() => { child.kill(); reject(new Error('contractor_app_probe_timeout')); }, 45_000);
+      let timedOut=false;
+      const timer = setTimeout(() => { timedOut=true; child.kill(); }, 45_000);
       child.stdout.on('data', (chunk) => { output += chunk; if (output.length > 16_000) child.kill(); });
       child.stderr.on('data', (chunk) => {
         diagnostic = (diagnostic + chunk).slice(-4000);
-        const code = diagnostic.match(/CONTRACTOR_APP_PROBE_FAILED:[a-z_0-9]+:(?:assertion|unavailable)(?::status_\d+)?/);
+        const code = diagnostic.match(/CONTRACTOR_APP_PROBE_FAILED:[a-z_0-9]+:(?:assertion|unavailable)(?::status_\d+)?(?::sql_[A-Z0-9]{5})?/);
         if (code) failureCode = code[0];
+        const reader=diagnostic.match(/CONTRACTOR_READER_DIAGNOSTIC:(\{[^\n]+\})/);
+        if(reader) receipt.failure=JSON.parse(reader[1]);
       });
       child.once('error', (error) => { clearTimeout(timer); reject(error); });
       child.once('exit', (code) => {
+        receipt.childExited=true;
         clearTimeout(timer);
-        if (code !== 0) return reject(new Error(`contractor_app_probe_failed${failureCode.includes('assertion') ? '_assertion' : ''}`, { cause: failureCode || 'contractor_probe_child_unavailable' }));
+        if(timedOut) return reject(new Error('contractor_app_probe_timeout'));
+        if (code !== 0) return reject(new Error(`contractor_app_probe_failed:${failureCode||'child_unavailable'}`));
         try { const lines = output.trim().split('\n'); done(JSON.parse(lines.at(-1))); } catch { reject(new Error('contractor_app_probe_result_invalid')); }
       });
     });
   } finally {
-    try { await socket?.stop(); }
-    finally { await rm(output, { recursive: true, force: true }); }
+    await socket?.stop(); receipt.socketStopped=true;
+    if(mode==='seed') await database.exec('RESET SESSION AUTHORIZATION; SET default_transaction_read_only=off');
+    assert.deepEqual(await artifactFiles(workerOutput,true),files,'compiled worker inputs changed during probe');
   }
 }
 
 export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
   const startedAt = Date.now();
-  const source = await PGlite.create(); let restored;
+  const source = await PGlite.create(); let restored,output,stagingOutput,publicationStage,evidence;
+  const cleanup=[],clones=[],progress={};
   try {
+    assert.equal(execFileSync('git',['rev-parse',`${SCHEDULING_PRODUCTION_BASE}^{tree}`],{cwd:root,encoding:'utf8',windowsHide:true}).trim(),SCHEDULING_PRODUCTION_TREE);
     const base = await reviewedSchema();
     await source.exec(base);
     const codec = await credentialCodec(Buffer.alloc(32, 63).toString('base64'));
@@ -138,6 +175,8 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       migrations.push({ file, sha256: sha(sql) });
     }
     assert.deepEqual(await legacyFingerprint(),returningLegacyFingerprint);
+    const schedulingSchema=await applySchedulingRecoveryDelta(source,{baseSha256:sha(base),migrations});
+    migrations.push({file:'0019_saved-scheduling-policy.sql',sha256:schedulingSchema.delta.executedSha256});
     const currentSchema = await tsImport('../lib/db/src/schema/index.ts', import.meta.url);
     const expected = generateDrizzleJson(currentSchema).tables;
     const actual = (await source.query("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,column_name")).rows;
@@ -256,13 +295,45 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       await check(careOptions);
     }
     assert.deepEqual(await fingerprints(source),guardBaseline);
+    // Preserve every original fixture before adding independent scheduling tenants.
+    await seedSchedulingPrerequisites(source);
+    await source.exec('CREATE ROLE contractor_recovery_writer; GRANT USAGE ON SCHEMA public TO contractor_recovery_writer; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO contractor_recovery_writer; GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO contractor_recovery_writer;');
+    const sourcePreservation=assertC1SourcePreserved();
+    const artifactRoot=resolve(root,'artifacts/api-server');
+    // Preserve esbuild's absolute worker paths under ignored tmp. Publish an
+    // identical, self-ignored bundle at the unchanged probe's API-child path.
+    const scratchRoot=join(artifactRoot,'tmp');
+    await mkdir(scratchRoot,{recursive:true});
+    const scratch=await lstat(scratchRoot);
+    assert.ok(scratch.isDirectory()&&!scratch.isSymbolicLink(),'contractor scratch must be an ordinary owned directory');
+    stagingOutput=await mkdtemp(join(scratchRoot,'.contractor-recovery-')); ownedStaging(stagingOutput);
+    const sourceFiles=await recoverySourceFiles();
+    const checkout={commit:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8',windowsHide:true}).trim(),tree:execFileSync('git',['rev-parse','HEAD^{tree}'],{cwd:root,encoding:'utf8',windowsHide:true}).trim(),dirtyScope:execFileSync('git',['status','--porcelain'],{cwd:root,encoding:'utf8',windowsHide:true}).trim().split(/\r?\n/).filter(Boolean),trackedDiffSha256:sha(execFileSync('git',['diff','--binary','--','.'],{cwd:root,windowsHide:true,maxBuffer:20*1024*1024}))};
+    const runtime={node:process.version,platform:process.platform,architecture:process.arch,postgres:(await source.query('SELECT version() AS version')).rows[0].version};
+    await buildAll({entryPoint:join(artifactRoot,'scripts/contractor-recovery-entry.ts'),outDir:stagingOutput});
+    await writeFile(join(stagingOutput,'.gitignore'),'*\n',{flag:'wx'});
+    publicationStage=await mkdtemp(join(scratchRoot,'.contractor-recovery-')); ownedStaging(publicationStage);
+    await cp(stagingOutput,publicationStage,{recursive:true});
+    const publishedOutput=join(artifactRoot,basename(publicationStage)); ownedBuild(publishedOutput);
+    await assert.rejects(lstat(publishedOutput),{code:'ENOENT'});
+    await rename(publicationStage,publishedOutput);
+    output=publishedOutput;publicationStage=undefined;
+    assert.deepEqual(assertC1SourcePreserved(),sourcePreservation,'C1 source changed during the frozen artifact build');
+    const files=await artifactFiles(output),artifactSha256=sha(JSON.stringify(files));
+    assert.deepEqual(await artifactFiles(stagingOutput,true),files,'published artifact differs from compiled worker inputs');
+    const seed=await probeApp(source,output,files,cleanup,'seed',undefined,stagingOutput);
+    Object.assign(progress,{seed,artifact:{files,artifactSha256,workerFilesVerified:true},sourceCommit:checkout.commit,sourceTree:checkout.tree,legacySourceCommit:SCHEDULING_PRODUCTION_BASE,legacySourceTree:SCHEDULING_PRODUCTION_TREE,sourcePreservation,schema:schedulingSchema,checkout,runtime,sourceFiles});
+    const schedulingBefore=await captureSchedulingState(source);
     const baseline = await fingerprints(source);
+    progress.tableCounts=Object.fromEntries(Object.entries(baseline.tables).filter(([,value])=>value.count).map(([table,value])=>[table,value.count]));
     const snapshot = await source.dumpDataDir();
+    Object.assign(progress,{snapshotSha256:sha(Buffer.from(await snapshot.arrayBuffer())),sourceFingerprint:baseline.sha256});
     // This marker is deliberately after the snapshot; it must not appear in restoration.
     await insert(source, 'organizations', { name: 'SYNTHETIC after snapshot', slug: 'restore-drill-after-snapshot' });
     const restoreStartedAt = Date.now();
     restored = await PGlite.create({ loadDataDir: snapshot });
     assert.deepEqual(await fingerprints(restored), baseline);
+    assert.deepEqual(await captureSchedulingState(restored),schedulingBefore);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM organizations WHERE slug='restore-drill-after-snapshot'")).rows[0].n, 0);
     for (const slug of slugs) await assertFixtureRecords({ query: (sql, values) => restored.query(sql, values) }, { syntheticSlug: slug }, codec, { reviewedPausedServiceId: nativeFixtureIds(slug).nextService, reviewedPausedCareExecutionId: careFixtureIds(slug).execution, reviewedPausedInvoiceExecutionId: invoiceRecoveryIds(slug).secondExecution, reviewedPausedCallieExecutionId: callieFixtureIds(slug).execution, reviewedPausedStandingExecutionId: standingServiceIds(slug).execution, reviewedPausedNurtureExecutionId: sourceNurtureIds(slug).execution, reviewedPausedReturningInvoiceExecutionId:returningCustomerIds(slug).execution });
     for (const slug of slugs) await assertNativeFixture(restored,slug);
@@ -282,13 +353,25 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM customer_lifecycle WHERE state='paused'")).rows[0].n, 2);
     assert.equal((await restored.query("SELECT count(*)::int AS n FROM staff_invitations WHERE state='pending' AND delivery_state='unconfirmed'")).rows[0].n, 2);
     assert.equal((await restored.query('SELECT count(*)::int AS n FROM email_response_reviews WHERE hold_active=true AND message_id IS NULL')).rows[0].n, 6);
-    const app = await probeApp(restored);
+    const outcomes={};
+    progress.outcomes=outcomes;
+    for(const mode of ['reconcile','reduced','disabled']) {
+      const database=await PGlite.create({loadDataDir:snapshot}); clones.push({database,mode});
+      assert.deepEqual(await fingerprints(database),baseline);
+      outcomes[mode]=await probeApp(database,output,files,cleanup,mode,seed.fixtureSha256,stagingOutput);
+      assert.deepEqual(outcomes[mode].artifactBuildStamp,seed.artifactBuildStamp);
+      outcomes[mode].startingFingerprint=baseline.sha256;
+    }
+    const app = await probeApp(restored,output,files,cleanup,'reader',undefined,stagingOutput);
     assert.deepEqual(await fingerprints(restored), baseline);
-    const evidence = {
+    assert.deepEqual(await recoverySourceFiles(),sourceFiles,'recovery source changed during the frozen artifact probe');
+    const identity={sourceCommit:checkout.commit,sourceTree:checkout.tree,schemaSha256:schedulingSchema.schemaSha256,sqlSha256:schedulingSchema.sqlSha256,fixtureSha256:seed.fixtureSha256};
+    evidence = {
       check: 'contractor_synthetic_upgrade_restore', engine: 'PGlite embedded PostgreSQL',
-      commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim(),
-      trackedDiffSha256: sha(execFileSync('git', ['diff', '--', '.'], { cwd: root, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 20 * 1024 * 1024 })),
-      candidateCommitted: execFileSync('git', ['status', '--porcelain'], { cwd: root, windowsHide: true, encoding: 'utf8' }).trim().length === 0,
+      // Report the source captured before this call created bundle/sidecar files.
+      commit: checkout.commit, trackedDiffSha256:checkout.trackedDiffSha256,
+      candidateCommitted:checkout.dirtyScope.length===0,
+      sourcePreservation,
       migrations, tableCount: Object.keys(expected).length, previousTableCount: Object.keys(beforeUpgrade.tables).length,
       sourceFingerprint: baseline.sha256, restoredFingerprint: baseline.sha256,
       snapshotSha256: sha(Buffer.from(await snapshot.arrayBuffer())),
@@ -323,9 +406,40 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
       callieConversationEncryptionVerified: true, callieConversationLegacySeparated: true,
       ...app, restoreVerificationMs: Date.now() - restoreStartedAt, elapsedMs: Date.now() - startedAt,
       providerCalls: 0, managedBackupRestoreVerified: false, productionRpoRtoEstablished: false,
+      scheduling:{schema:schedulingSchema,originalStatePreserved:true,...outcomes.reconcile,
+        priorFixtureTableCounts:Object.fromEntries(['customer_work_roots','customer_work_commands','callie_policy_revisions','callie_intakes'].map(table=>[table,guardBaseline.tables[table].count])),
+        identity,artifact:{...identity,files,artifactSha256,workerFilesVerified:true},
+        enforcement:{...identity,artifactSha256,engine:'PGlite embedded PostgreSQL',restoredFingerprint:baseline.sha256,cases:[...outcomes.reduced.cases,...outcomes.disabled.cases],providerCalls:0,cleanupVerified:false},
+        sourceFiles,checkout,runtime,restoredClones:Object.fromEntries(Object.entries(outcomes).map(([mode,result])=>[mode,result.startingFingerprint])),
+        artifactBuildStamp:seed.artifactBuildStamp,
+        cleanup,cleanupVerified:false,
+      },
     };
-    emit(JSON.stringify(evidence)); return evidence;
-  } finally { await restored?.close(); await source.close(); }
+  } catch(error) {
+    progress.failure=/^contractor_[a-z_]+(?::CONTRACTOR_APP_PROBE_FAILED:[a-z_0-9]+:(?:assertion|unavailable)(?::status_\d+)?(?::sql_[A-Z0-9]{5})?)?$/.test(error.message??'')?error.message:error.code==='ERR_ASSERTION'?'assertion':'unavailable';
+    throw error;
+  } finally {
+    for(const {database,mode} of [...clones,...(restored?[{database:restored,mode:'reader'}]:[]),{database:source,mode:'source'}]) {
+      const receipt={kind:'database',mode,closed:false};cleanup.push(receipt);
+      try {await database.close();receipt.closed=true;} catch {receipt.failure='database_close_failed';}
+    }
+    if(output) {
+      const receipt={kind:'build',name:basename(output),removed:false};cleanup.push(receipt);
+      try {ownedBuild(output);await rm(output,{recursive:true,force:true});receipt.removed=true;} catch {receipt.failure='owned_build_cleanup_failed';}
+    }
+    for(const stage of [stagingOutput,publicationStage].filter(Boolean)) {
+      const receipt={kind:'build_stage',name:basename(stage),removed:false};cleanup.push(receipt);
+      try {ownedStaging(stage);await rm(stage,{recursive:true,force:true});receipt.removed=true;} catch {receipt.failure='owned_build_stage_cleanup_failed';}
+    }
+    const cleanupFailed=cleanup.some(r=>r.kind==='app_child'?!r.childExited||!r.socketStopped:r.kind==='database'?!r.closed:!r.removed);
+    if(!evidence||cleanupFailed) emit(JSON.stringify({check:'contractor_recovery_failed',progress,cleanup}));
+    if(cleanupFailed) throw new Error('contractor_recovery_cleanup_failed');
+  }
+  evidence.scheduling.cleanupVerified=cleanup.every(r=>r.kind==='app_child'?r.childExited&&r.socketStopped:r.kind==='database'?r.closed:r.removed);
+  evidence.scheduling.enforcement.cleanupVerified=evidence.scheduling.cleanupVerified;
+  evidence.scheduling.rollback=evaluateSavedSchedulingRollback({expected:evidence.scheduling.identity,artifact:evidence.scheduling.artifact,probe:evidence.scheduling.enforcement});
+  assert.equal(evidence.scheduling.rollback.candidateCompatible,true);
+  emit(JSON.stringify(evidence)); return evidence;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

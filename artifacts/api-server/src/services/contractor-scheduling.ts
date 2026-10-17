@@ -17,24 +17,32 @@ export class ScheduleError extends Error {
  * New manual work checks the lead's complete property lineage; unchanged
  * historical edits retain the older lead/property semantics, without relinking.
  */
-export async function appointmentCustomer(tx: ScheduleTransaction, org: string, refs: { leadId?: string | null; contactId?: string | null; propertyId?: string | null }, options: { requireCoherentLeadProperty?: boolean } = {}) {
+export async function appointmentCustomer(tx: ScheduleTransaction, org: string, refs: { leadId?: string | null; contactId?: string | null; propertyId?: string | null }, options: { requireCoherentLeadProperty?: boolean; readOnly?: true } = {}) {
+  // Internal recovery Reader support; ordinary callers retain all SHARE locks.
+  if (options.readOnly) {
+    const mode = await tx.execute(sql`SELECT current_setting('transaction_read_only') AS read_only`);
+    if (mode.rows[0]?.read_only !== "on") throw new Error("Nonlocking customer validation requires a read-only transaction.");
+  }
   let contactId = refs.contactId ?? null;
   let leadPropertyId: string | null = null;
   if (refs.leadId) {
-    const [lead] = await tx.select({ contactId: leadsTable.contactId, propertyId: leadsTable.propertyId }).from(leadsTable).where(and(eq(leadsTable.organizationId, org), eq(leadsTable.id, refs.leadId))).for("share");
+    const query = tx.select({ contactId: leadsTable.contactId, propertyId: leadsTable.propertyId }).from(leadsTable).where(and(eq(leadsTable.organizationId, org), eq(leadsTable.id, refs.leadId)));
+    const [lead] = await (options.readOnly ? query : query.for("share"));
     if (!lead || (contactId && contactId !== lead.contactId)) throw new ScheduleError("customer_reference_mismatch", 400);
     contactId = lead.contactId;
     if (options.requireCoherentLeadProperty) leadPropertyId = lead.propertyId;
   }
   if (contactId) {
-    const [contact] = await tx.select({ id: contactsTable.id }).from(contactsTable).where(and(eq(contactsTable.organizationId, org), eq(contactsTable.id, contactId))).for("share");
+    const query = tx.select({ id: contactsTable.id }).from(contactsTable).where(and(eq(contactsTable.organizationId, org), eq(contactsTable.id, contactId)));
+    const [contact] = await (options.readOnly ? query : query.for("share"));
     if (!contact) throw new ScheduleError("customer_reference_mismatch", 400);
   }
   if (leadPropertyId && refs.propertyId && leadPropertyId !== refs.propertyId) throw new ScheduleError("customer_reference_mismatch", 400);
   const propertyIds = [...new Set([refs.propertyId, leadPropertyId].filter((id): id is string => !!id))].sort();
   if (propertyIds.length) {
-    const properties = await tx.select({ id: propertiesTable.id, contactId: propertiesTable.contactId }).from(propertiesTable)
-      .where(and(eq(propertiesTable.organizationId, org), inArray(propertiesTable.id, propertyIds))).orderBy(propertiesTable.id).for("share");
+    const query = tx.select({ id: propertiesTable.id, contactId: propertiesTable.contactId }).from(propertiesTable)
+      .where(and(eq(propertiesTable.organizationId, org), inArray(propertiesTable.id, propertyIds))).orderBy(propertiesTable.id);
+    const properties = await (options.readOnly ? query : query.for("share"));
     if (!contactId || properties.length !== propertyIds.length || properties.some(property => property.contactId !== contactId)) throw new ScheduleError("customer_reference_mismatch", 400);
   }
   // Derive only the customer from an explicit lead, never its worksite.
@@ -55,17 +63,17 @@ export function assertScheduleInterval(start?: Date | null, end?: Date | null) {
 }
 
 export async function assertOperationalStaff(tx: ScheduleTransaction, org: string, ids: string[]) {
-  const unique = [...new Set(ids)];
+  const unique = [...new Set(ids)].sort();
   if (!unique.length) return;
-  const users = await tx.select().from(usersTable).where(and(eq(usersTable.organizationId, org), inArray(usersTable.id, unique))).for("share");
+  const users = await tx.select().from(usersTable).where(and(eq(usersTable.organizationId, org), inArray(usersTable.id, unique))).orderBy(usersTable.id).for("share");
   if (users.length !== unique.length || users.some(user => !user.isActive || user.id.startsWith("invite:") || !user.emailVerifiedAt || !hasPermission(user.role, "crm.write"))) throw new ScheduleError("invalid_assignee", 400);
 }
 
 /** Terminal transitions retain same-company history even after access is revoked. */
 export async function assertHistoricalStaff(tx: ScheduleTransaction, org: string, ids: string[]) {
-  const unique = [...new Set(ids)];
+  const unique = [...new Set(ids)].sort();
   if (!unique.length) return;
-  const users = await tx.select({ id: usersTable.id }).from(usersTable).where(and(eq(usersTable.organizationId, org), inArray(usersTable.id, unique))).for("share");
+  const users = await tx.select({ id: usersTable.id }).from(usersTable).where(and(eq(usersTable.organizationId, org), inArray(usersTable.id, unique))).orderBy(usersTable.id).for("share");
   if (users.length !== unique.length) throw new ScheduleError("invalid_assignee", 400);
 }
 

@@ -5,6 +5,8 @@
  * MogulForge GrowthOS API
  * OpenAPI spec version: 0.1.0
  */
+import type { CustomerWorkProjectMutationProjectSchedulingEvidence } from './customerWorkProjectMutationProjectSchedulingEvidence';
+import type { CustomerWorkProjectMutationProjectSchedulingReservation } from './customerWorkProjectMutationProjectSchedulingReservation';
 import type { CustomerWorkProjectMutationProjectSourceKind } from './customerWorkProjectMutationProjectSourceKind';
 import type { CustomerWorkProjectMutationProjectStatus } from './customerWorkProjectMutationProjectStatus';
 
@@ -42,8 +44,16 @@ export type CustomerWorkProjectMutationProject = {
      */
   name: string;
   status: CustomerWorkProjectMutationProjectStatus;
-  scheduledStart: Date | null;
-  scheduledEnd: Date | null;
+  /**
+     * Original ISO datetime string; preserve spelling and fractional precision for source command custody.
+     * @pattern ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+     */
+  scheduledStart: string | null;
+  /**
+     * Original ISO datetime string; preserve spelling and fractional precision for source command custody.
+     * @pattern ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+     */
+  scheduledEnd: string | null;
   /**
      * @maxItems 50
      * @items.minLength 1
@@ -52,7 +62,23 @@ export type CustomerWorkProjectMutationProject = {
   crewUserIds: string[];
   /** @maxLength 4000 */
   crewNotes: string | null;
-  completedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  /**
+     * Original ISO datetime string; preserve spelling and fractional precision for source command custody.
+     * @pattern ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+     */
+  completedAt: string | null;
+  /**
+     * Original ISO datetime string; preserve spelling and fractional precision for source command custody.
+     * @pattern ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+     */
+  createdAt: string;
+  /**
+     * Original ISO datetime string; preserve spelling and fractional precision for source command custody.
+     * @pattern ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z))$
+     */
+  updatedAt: string;
+  schedulingReservation: CustomerWorkProjectMutationProjectSchedulingReservation;
+  schedulingEvidence: CustomerWorkProjectMutationProjectSchedulingEvidence;
+  /** @pattern ^[a-f0-9]{64}$ */
+  schedulingTargetFingerprint: string;
 };

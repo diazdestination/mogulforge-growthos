@@ -8,6 +8,7 @@ import { InvoiceEditor } from "@/components/invoice-editor";
 import { InvoiceActions } from "@/components/invoice-actions";
 import { InvoiceDelivery } from "@/components/invoice-delivery";
 import { InvoiceDeliveryWorklist } from "@/components/invoice-delivery-worklist";
+import { InvoiceEquipmentPicker, InvoiceEquipmentView } from "@/components/invoice-equipment";
 import { canManageInvoices, canReadInvoices } from "@/lib/permissions";
 import { contractorRequest } from "@/lib/contractor-api";
 import { memberAuthorityScope } from '@/lib/member-authority-scope';
@@ -21,6 +22,8 @@ import {
 } from "@/hooks/use-invoice-command";
 import {
   draftDocument,
+  equipmentPayload,
+  equipmentSelection,
   invoiceButton,
   invoiceControl,
   invoicePrimary,
@@ -29,6 +32,7 @@ import {
   printInvoiceDocument,
   type InvoiceDetail,
   type InvoiceDraft,
+  type InvoiceEquipmentSelection,
   type InvoiceList,
   type InvoiceSummary,
 } from "@/lib/invoice-ui";
@@ -593,6 +597,12 @@ function InvoiceDraftEditor({
       (command.pending?.body.document as InvoiceDraft | undefined) ??
       draftDocument(invoice.document),
   }));
+  // A pending save is resumed with exactly the selection it was sent with.
+  const [equipment, setEquipment] = useState<InvoiceEquipmentSelection>(() =>
+    command.pending
+      ? ((command.pending.body.equipment as InvoiceEquipmentSelection | undefined) ?? { assetIds: [], warrantyTerms: null })
+      : equipmentSelection(invoice.document),
+  );
   const changed =
     invoice.version !== base.version || invoice.status !== "draft";
   return (
@@ -613,6 +623,7 @@ function InvoiceDraftEditor({
                   version: invoice.version,
                   document: draftDocument(invoice.document),
                 });
+                setEquipment(equipmentSelection(invoice.document));
                 command.refreshed();
               }}
             >
@@ -631,11 +642,23 @@ function InvoiceDraftEditor({
           void command.submit(
             `/invoices/${invoice.id}`,
             "PATCH",
-            { expectedVersion: base.version, document },
+            { expectedVersion: base.version, document, ...equipmentPayload(equipment) },
             "Save draft",
           );
         }}
-      />
+      >
+        {invoice.organizationId && invoice.contactId && (
+          <InvoiceEquipmentPicker
+            organizationId={invoice.organizationId}
+            contactId={invoice.contactId}
+            propertyId={invoice.propertyId ?? null}
+            attached={invoice.document.equipment?.items ?? []}
+            value={equipment}
+            onChange={setEquipment}
+            disabled={command.locked || changed}
+          />
+        )}
+      </InvoiceEditor>
     </>
   );
 }
@@ -741,7 +764,7 @@ function InvoiceWorkspace({ id, actor }: { id: string; actor: Actor }) {
               </div>
             </header>
             {invoice.contactId && <Link className={invoiceButton} href={customerWorkspacePath(invoice.contactId, actor.organizationId, 'invoices')!}>Customer invoice history</Link>}
-            {invoice.customerWorkId && <p className="break-words text-sm text-muted-foreground">Existing-customer work · {invoice.customerWorkId}. Receipt accounting is isolated to this work, not this customer’s other jobs.</p>}
+            {invoice.customerWorkId && <p className="break-words text-sm text-muted-foreground">Existing-customer work. Receipt accounting is isolated to this work, not this customer’s other jobs.</p>}
             {actor.manage &&
               invoice.status === "draft" &&
               !editing &&
@@ -1070,6 +1093,7 @@ function InvoiceDocumentView({ invoice }: { invoice: InvoiceDetail }) {
             {doc.notes}
           </p>
         )}
+        <InvoiceEquipmentView equipment={doc.equipment} />
       </article>
     </section>
   );

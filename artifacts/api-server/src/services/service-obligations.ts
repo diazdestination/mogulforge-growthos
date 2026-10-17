@@ -10,7 +10,7 @@ import {
   type ServiceObligationKind,
 } from "@workspace/db";
 import { and, asc, eq, or, sql } from "drizzle-orm";
-import { parseCsv } from "./reactivation";
+import { CsvParseError, parseCsv } from "./reactivation";
 import { phoneE164 } from "./twilio-controls";
 import { assertOperationalStaff, assertScheduleVersion, lockContractorSchedule, ScheduleError, type ScheduleTransaction } from "./contractor-scheduling";
 import { z } from "zod";
@@ -362,7 +362,12 @@ export async function importServiceCustomers(
     commit: boolean;
   },
 ) {
-  const all = parseCsv(input.csv);
+  let all: string[][];
+  try { all = parseCsv(input.csv); }
+  catch (error) {
+    if (error instanceof CsvParseError) return { error: "invalid_csv" as const };
+    throw error;
+  }
   const rows = input.hasHeader ? all.slice(1) : all;
   if (!rows.length || rows.length > MAX_IMPORT_ROWS) return { error: "invalid_row_count" as const };
   const mapping = input.mapping;

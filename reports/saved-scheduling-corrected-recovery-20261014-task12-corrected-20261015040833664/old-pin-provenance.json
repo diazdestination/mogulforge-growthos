@@ -1,0 +1,64 @@
+{
+  "executedBeforeFixtureEdit": true,
+  "checkout": {
+    "commit": "f56e6cef452b5b564838a72202c0d37cd2caf384",
+    "tree": "3e55c4fc984f64ac1fe187f109bf4323d0586a5e",
+    "dirtyScope": []
+  },
+  "oldProductionCommit": "2901da320e41a47e77cc86e97d2c2f59fffa824d",
+  "oldProductionTree": "f858832a833233ecf2f3844ad6222f0e6bbdcc8d",
+  "productScopeDiffBytes": 129349,
+  "productScopeDiffSha256": "3bfdb1876de64ae32f229771df72d1417e77a08de9798d03a72a446d64a36460",
+  "changedTests": [
+    {
+      "path": "artifacts/api-server/src/routes/v1/route-inventory.test.ts",
+      "gitBlob": "8e9793c08ce0dc63dbc3226747fde218e9fdb73a",
+      "gitBytes": 29471,
+      "gitSha256": "b175ff19464aa82bac89d5ada32c9c7b32c266421d7b8197f26125fb4d8794e5",
+      "workingBytes": 30122,
+      "workingSha256": "e95fa3fe9de6e04abb163e47798d9a75a780013e09a75412981c548574a022f3"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/scheduling.test.ts",
+      "gitBlob": "44ffb69c5a457fbb0083c13da7811506a3ab1681",
+      "gitBytes": 15214,
+      "gitSha256": "b9180eb0e1fddd27283c1d6ef7edc1174bb469774dab77e87abc82003ff24bce",
+      "workingBytes": 15572,
+      "workingSha256": "794641979847adf9bdde41f06cfb2e30ee5ca53f08f963fbf2c15b881e765612"
+    },
+    {
+      "path": "artifacts/api-server/src/services/scheduling-history.test.ts",
+      "gitBlob": "13e343785f4e10ca36bb4d765765ddde2ebd14b2",
+      "gitBytes": 51319,
+      "gitSha256": "b30df466e3ce16bd64a30bebf56f79b80aa88a46073c930c881a9d6039ab3c92",
+      "workingBytes": 52904,
+      "workingSha256": "b48f36f0edd6e5dfe692d4b03e85f88a85b5c5770f175c15f0fc35f985a2b0f9"
+    },
+    {
+      "path": "artifacts/api-server/src/services/scheduling-host-api-bridge.test.ts",
+      "gitBlob": "f2bbb7e3a4cdb66ffe51a03ae2e6cfd8732453df",
+      "gitBytes": 9787,
+      "gitSha256": "5cbf9e21b6cda7b9d3f77e70d5579a1d17a3ab0ab18e2c524301aa9138c7a4c6",
+      "workingBytes": 9874,
+      "workingSha256": "9914b2818876da86f62222d4dbd8908ed6ff872c7843003499c12efb3fdd89f7"
+    },
+    {
+      "path": "lib/scheduling-core/src/reservations.test.ts",
+      "gitBlob": "9ae6d4f0330458c2646b24a4d821e837dea87c42",
+      "gitBytes": 10439,
+      "gitSha256": "f4d6494e52b710c71975363a31c1b56cc684f7fabb6ddd7523639a417c73ff8c",
+      "workingBytes": 10571,
+      "workingSha256": "b1ca8154d70ef62b624f47ed63abdf6243aaef69adf052a571e1db08c4e25ea1"
+    }
+  ],
+  "standaloneFailure": "CONTRACTOR_RECOVERY_FAILED:assertion",
+  "existingTestFailure": "accepted production source must remain exact: 129349 !== 0, contractor-recovery-drill.mjs:294",
+  "noSkips": true,
+  "cleanup": [
+    {
+      "kind": "database",
+      "mode": "source",
+      "closed": true
+    }
+  ]
+}

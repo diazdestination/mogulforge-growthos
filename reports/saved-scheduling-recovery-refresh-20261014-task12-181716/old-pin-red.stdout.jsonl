@@ -1,0 +1,1 @@
+{"check":"contractor_recovery_failed","progress":{"failure":"assertion"},"cleanup":[{"kind":"database","mode":"source","closed":true}]}

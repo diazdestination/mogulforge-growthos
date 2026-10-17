@@ -340,6 +340,7 @@ export async function sendGmailForUser(input: {
   subject: string;
   body: string;
   beforeDispatch?: EmailDispatchGuard;
+  beforeFinalDispatch?: EmailDispatchGuard;
 }): Promise<{ id: string; provider: "gmail"; senderEmail: string }> {
   assertOutboundDeliveryAllowed({ channel: "email", recipient: input.to });
   if (!isSafeMailbox(input.to)) throw new Error("Refusing to send email: invalid recipient address");
@@ -399,6 +400,9 @@ export async function sendGmailForUser(input: {
     // Gaxios's retry:false setting. Irreversible sends must not enter that loop
     // or acquire a new token after the final approval. Dispatch the frozen token
     // exactly once through the bare transport; redirects are retries too.
+    // Optional approval is the final awaited leaf; no async checks follow it.
+    if (input.beforeFinalDispatch)
+      await runEmailDispatchGuard(input.beforeFinalDispatch, { provider: "gmail", senderEmail: connection.email });
     const response = await oauth.transporter.request<{ id?: string }>({
       url: "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
       method: "POST",

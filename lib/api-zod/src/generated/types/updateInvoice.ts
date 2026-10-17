@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { InvoiceDocumentInput } from './invoiceDocumentInput';
+import type { InvoiceEquipmentSelection } from './invoiceEquipmentSelection';
 
 export interface UpdateInvoice {
   requestId: string;
@@ -15,4 +16,5 @@ export interface UpdateInvoice {
      */
   expectedVersion: number;
   document: InvoiceDocumentInput;
+  equipment?: InvoiceEquipmentSelection;
 }

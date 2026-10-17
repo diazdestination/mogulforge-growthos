@@ -1,0 +1,12 @@
+{"phase":"begin-intent"}
+{"phase":"begin-ack","pid":101}
+{"phase":"step-intent","path":"production75-selected-0000","sha256":"0240348d564b0d88860c4dde838949db8cdee81f13221a6dbf31841feb405a51"}
+{"phase":"step-ack","path":"production75-selected-0000"}
+{"phase":"step-intent","path":"reports/staging-schema-preview-2026-09-30/0001_pilot-email-sender.sql","sha256":"8d2d49f344e4900e5304d1f7b23ce23b929121f9af04362d50902a692605883f"}
+{"phase":"step-ack","path":"reports/staging-schema-preview-2026-09-30/0001_pilot-email-sender.sql"}
+{"phase":"step-intent","path":"reports/staging-schema-preview-2026-10-01/0002_mobile-microsoft-pilot.sql","sha256":"eec075e1009718e9307a0e88b905098749b337211abc87f0bfdb49c38c5138d0"}
+{"phase":"step-ack","path":"reports/staging-schema-preview-2026-10-01/0002_mobile-microsoft-pilot.sql"}
+{"phase":"bridge-verified","proof":{"originalTables":75,"originalColumns":849,"newTablesEmpty":20,"defaultsVerified":1}}
+{"phase":"precommit-verified","proof":{"originalTables":75,"originalColumns":849,"newTablesEmpty":20,"defaultsVerified":1}}
+{"phase":"rollback-intent"}
+{"phase":"rollback-ack"}

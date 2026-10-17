@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { InvoiceDocumentCurrency } from './invoiceDocumentCurrency';
+import type { InvoiceEquipmentSection } from './invoiceEquipmentSection';
 import type { InvoiceLine } from './invoiceLine';
 
 export interface InvoiceDocument {
@@ -59,4 +60,5 @@ export interface InvoiceDocument {
      * @maximum 1000000000
      */
   totalCents: number;
+  equipment?: InvoiceEquipmentSection;
 }

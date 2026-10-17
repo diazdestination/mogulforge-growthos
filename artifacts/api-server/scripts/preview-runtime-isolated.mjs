@@ -25,6 +25,17 @@ import { seedContractorWorkdayPreview } from "./contractor-workday-preview-fixtu
 import { credentialCodec } from "../../../scripts/restore-drill-fixture.mjs";
 import { seedSyntheticReturningCustomer } from "../../../scripts/returning-customer-recovery-fixture.mjs";
 
+// This automated acceptance branch owns every resource from acquisition onward.
+// Other visual-preview flags retain their original interactive lifecycle below.
+if (process.argv.includes("--saved-scheduling")) {
+  if (process.argv.slice(2).some((arg) => !["--saved-scheduling", "--scope-switch-only"].includes(arg)))
+    throw new Error("Saved scheduling acceptance cannot mix preview fixtures");
+  const { runSavedSchedulingPreview } = await import("./saved-scheduling-preview-fixture.mjs");
+  await runSavedSchedulingPreview({ scopeSwitchOnly: process.argv.includes("--scope-switch-only") });
+} else {
+if (process.argv.includes("--scope-switch-only"))
+  throw new Error("Scope-switch-only requires the saved-scheduling acceptance branch");
+
 const api = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const database = path.resolve(api, "../../lib/db");
 const storage = await PGlite.create();
@@ -172,4 +183,5 @@ try {
   if (path.dirname(buildDir) !== cacheRoot)
     throw new Error("Unexpected preview artifact path");
   await rm(buildDir, { recursive: true, force: true });
+}
 }

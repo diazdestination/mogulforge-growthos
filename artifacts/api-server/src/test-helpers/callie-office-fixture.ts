@@ -2,13 +2,13 @@ import { randomUUID } from "node:crypto";
 import { auditEventsTable, contactsTable, crmTasksTable, db, missedCallHandoffsTable, organizationsTable, propertiesTable, twilioCallsTable, twilioClientBindingsTable, usersTable } from "@workspace/db";
 import { callieIntakesTable, calliePolicyRevisionsTable } from "../../../../lib/db/src/schema/callie";
 import { buildCalliePolicySnapshot, DEFAULT_CALLIE_POLICY } from "../services/callie-contract";
+import { syntheticTwilioNumber } from "./synthetic-twilio";
 
-let sequence = 1000;
 /** Synthetic records only; no provider is selected or contacted. */
 export async function callieOfficeFixture(reviewed = false) {
   const [org] = await db.insert(organizationsTable).values({ name: "Fictional CALLIE office", slug: `callie-office-${randomUUID()}` }).returning();
   const [owner, office] = await db.insert(usersTable).values([{ organizationId: org.id, role: "owner", emailVerifiedAt: new Date(), firstName: "Synthetic owner" }, { organizationId: org.id, role: "office", emailVerifiedAt: new Date(), firstName: "Synthetic office" }]).returning();
-  const shopPhone = `+1202555${String(++sequence).padStart(4, "0")}`;
+  const shopPhone = syntheticTwilioNumber();
   const [binding] = await db.insert(twilioClientBindingsTable).values({ organizationId: org.id, accountSid: `AC${randomUUID().replaceAll("-", "")}`, phoneNumber: shopPhone, messagingServiceSid: `MG${randomUUID().replaceAll("-", "")}`,
     authTokenSecretRef: "TWILIO_CLIENT_CALLIE_OFFICE_AUTH_TOKEN", publicOrigin: "https://callie-office.example.invalid", businessName: "Fictional CALLIE office", smsDisclosureVersion: "synthetic.v1" }).returning();
   const snapshot = buildCalliePolicySnapshot({ ...DEFAULT_CALLIE_POLICY, businessHoursOwnerId: owner.id, afterHoursOwnerId: owner.id }, { id: binding.id, accountSid: binding.accountSid, sender: binding.phoneNumber, messagingServiceSid: binding.messagingServiceSid!, disclosureVersion: binding.smsDisclosureVersion!, origin: binding.publicOrigin, businessName: binding.businessName });

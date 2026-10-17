@@ -1,0 +1,9 @@
+
+ RUN  v4.1.10 C:/Forge/worktrees/growthos-scheduling-recovery-refresh-20261014/scripts
+
+
+ Test Files  3 passed (3)
+      Tests  34 passed (34)
+   Start at  18:18:17
+   Duration  104.68s (transform 226ms, setup 0ms, import 635ms, tests 141.27s, environment 0ms)
+

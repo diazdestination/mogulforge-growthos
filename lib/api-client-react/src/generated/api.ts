@@ -47,6 +47,7 @@ import type {
   BulkLeadActionRequest,
   BulkLeadActionResult,
   CallieBookingRequest,
+  CallieBookingResult,
   CallieCallerReviewRequest,
   CallieIntakeDetail,
   CallieIntakePage,
@@ -61,6 +62,7 @@ import type {
   CallieReceptionPreview,
   CallieReceptionPreviewRequest,
   CallieReceptionView,
+  CallieSchedulingContextRead,
   CaptureDelivery,
   CaptureEndpoint,
   CaptureEndpointInput,
@@ -90,6 +92,7 @@ import type {
   CreateClientStaffInvitation,
   CreateCustomerWorkEstimate,
   CreateCustomerWorkProject,
+  CreateCustomerWorkProject409,
   CreateInvoice,
   CreateOrgInput,
   CrmTask,
@@ -109,6 +112,11 @@ import type {
   EmailProviderStatus,
   ErrorEnvelope,
   Estimate,
+  EstimateDeliveryError,
+  EstimateDeliveryEvidence,
+  EstimateDeliveryPreview,
+  EstimateDeliveryPreviewRequest,
+  EstimateDeliverySendRequest,
   EstimateInput,
   EstimateUpdate,
   ExportRoiReportParams,
@@ -119,11 +127,13 @@ import type {
   FinancialMigrationReview,
   FormShareAssets,
   FormSubmissionRecord,
+  GetCallieSchedulingContextParams,
   GetContractorTodayParams,
   GetCustomerWorkspaceSectionParams,
   GetMarketingSummaryParams,
   GetReferralLinkInfo200,
   GetRoiReportParams,
+  GetSchedulingReviewContextParams,
   GetServiceCareParams,
   GetWorkdayAssetsParams,
   GoogleReviewsResponse,
@@ -155,6 +165,7 @@ import type {
   LeadBehaviorSummary,
   LeadEnrollmentEnvelope,
   LeadImport,
+  LeadImportPreview,
   LeadImportRequest,
   LeadInput,
   LeadMailboxReplyPage,
@@ -189,6 +200,9 @@ import type {
   LogoutBrowserSessionParams,
   LogoutPortalSession200,
   LogoutSuccess,
+  ManualSchedulingAck,
+  ManualSchedulingCommand,
+  ManualSchedulingError,
   MarketingSummary,
   Member,
   MemberProfile,
@@ -219,6 +233,8 @@ import type {
   PlaybookEnrollment,
   PlaybookInput,
   PlaybookUpdate,
+  PolicyReadResult,
+  PolicySaveInput,
   PortalAddPhotos,
   PortalConversation,
   PortalLoginRequest,
@@ -261,6 +277,10 @@ import type {
   SaveMissedCallCarePolicy,
   SavedFilter,
   SavedFilterInput,
+  SchedulingConflictExplanation,
+  SchedulingConflictExplanationRequest,
+  SchedulingReviewContext,
+  ServiceCareBookingResult,
   ServiceCareCommandResult,
   ServiceCareReview,
   ServiceMailboxReplyPage,
@@ -315,6 +335,7 @@ import type {
   UpdateApiKeyInput,
   UpdateCustomerWorkEstimate,
   UpdateCustomerWorkProject,
+  UpdateCustomerWorkProject409,
   UpdateInvoice,
   UpdatePlatformOrgInput,
   UpdateUserInput,
@@ -383,6 +404,216 @@ const withQueryKey = <T extends object, K>(
   }
   return result;
 };
+
+export const getExplainSchedulingConflictUrl = () => {
+  return `/api/v1/scheduling/conflict-explanation`;
+};
+
+/**
+ * @summary Read one authorized current adjacent staff conflict; never original operation evidence
+ */
+export const explainSchedulingConflict = async (
+  schedulingConflictExplanationRequest: SchedulingConflictExplanationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<SchedulingConflictExplanation> => {
+  return customFetch<SchedulingConflictExplanation>(
+    getExplainSchedulingConflictUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(schedulingConflictExplanationRequest),
+    },
+  );
+};
+
+export const getExplainSchedulingConflictMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof explainSchedulingConflict>>,
+    TError,
+    { data: BodyType<SchedulingConflictExplanationRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof explainSchedulingConflict>>,
+  TError,
+  { data: BodyType<SchedulingConflictExplanationRequest> },
+  TContext
+> => {
+  const mutationKey = ["explainSchedulingConflict"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof explainSchedulingConflict>>,
+    { data: BodyType<SchedulingConflictExplanationRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return explainSchedulingConflict(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ExplainSchedulingConflictMutationResult = NonNullable<
+  Awaited<ReturnType<typeof explainSchedulingConflict>>
+>;
+export type ExplainSchedulingConflictMutationBody =
+  BodyType<SchedulingConflictExplanationRequest>;
+export type ExplainSchedulingConflictMutationError = ErrorType<void>;
+
+/**
+ * @summary Read one authorized current adjacent staff conflict; never original operation evidence
+ */
+export const useExplainSchedulingConflict = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof explainSchedulingConflict>>,
+    TError,
+    { data: BodyType<SchedulingConflictExplanationRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof explainSchedulingConflict>>,
+  TError,
+  { data: BodyType<SchedulingConflictExplanationRequest> },
+  TContext
+> => {
+  return useMutation(getExplainSchedulingConflictMutationOptions(options));
+};
+
+export const getGetCallieSchedulingContextUrl = (
+  id: string,
+  params: GetCallieSchedulingContextParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/communications/callie/${id}/scheduling-context?${stringifiedParams}`
+    : `/api/v1/communications/callie/${id}/scheduling-context`;
+};
+
+/**
+ * @summary Review the actual CALLIE customer, selected visit type and property against current scheduling
+ */
+export const getCallieSchedulingContext = async (
+  id: string,
+  params: GetCallieSchedulingContextParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<CallieSchedulingContextRead> => {
+  return customFetch<CallieSchedulingContextRead>(
+    getGetCallieSchedulingContextUrl(id, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetCallieSchedulingContextQueryKey = (
+  id: string,
+  params?: GetCallieSchedulingContextParams,
+) => {
+  return [
+    `/api/v1/communications/callie/${id}/scheduling-context`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetCallieSchedulingContextQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCallieSchedulingContext>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  params: GetCallieSchedulingContextParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCallieSchedulingContext>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetCallieSchedulingContextQueryKey(id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCallieSchedulingContext>>
+  > = ({ signal }) =>
+    getCallieSchedulingContext(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCallieSchedulingContext>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCallieSchedulingContextQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCallieSchedulingContext>>
+>;
+export type GetCallieSchedulingContextQueryError = ErrorType<void>;
+
+/**
+ * @summary Review the actual CALLIE customer, selected visit type and property against current scheduling
+ */
+
+export function useGetCallieSchedulingContext<
+  TData = Awaited<ReturnType<typeof getCallieSchedulingContext>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  params: GetCallieSchedulingContextParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCallieSchedulingContext>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCallieSchedulingContextQueryOptions(
+    id,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
 
 export const getGetStaffLeadAlertCoverageUrl = (leadId: string) => {
   return `/api/v1/staff-push/leads/${leadId}/coverage`;
@@ -686,7 +917,7 @@ export const updateCustomerWorkProject = async (
 };
 
 export const getUpdateCustomerWorkProjectMutationOptions = <
-  TError = ErrorType<void>,
+  TError = ErrorType<void | UpdateCustomerWorkProject409>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -728,13 +959,14 @@ export type UpdateCustomerWorkProjectMutationResult = NonNullable<
 >;
 export type UpdateCustomerWorkProjectMutationBody =
   BodyType<UpdateCustomerWorkProject>;
-export type UpdateCustomerWorkProjectMutationError = ErrorType<void>;
+export type UpdateCustomerWorkProjectMutationError =
+  ErrorType<void | UpdateCustomerWorkProject409>;
 
 /**
  * @summary updateCustomerWorkProject
  */
 export const useUpdateCustomerWorkProject = <
-  TError = ErrorType<void>,
+  TError = ErrorType<void | UpdateCustomerWorkProject409>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -777,7 +1009,7 @@ export const createCustomerWorkProject = async (
 };
 
 export const getCreateCustomerWorkProjectMutationOptions = <
-  TError = ErrorType<void>,
+  TError = ErrorType<void | CreateCustomerWorkProject409>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -819,13 +1051,14 @@ export type CreateCustomerWorkProjectMutationResult = NonNullable<
 >;
 export type CreateCustomerWorkProjectMutationBody =
   BodyType<CreateCustomerWorkProject>;
-export type CreateCustomerWorkProjectMutationError = ErrorType<void>;
+export type CreateCustomerWorkProjectMutationError =
+  ErrorType<void | CreateCustomerWorkProject409>;
 
 /**
  * @summary createCustomerWorkProject
  */
 export const useCreateCustomerWorkProject = <
-  TError = ErrorType<void>,
+  TError = ErrorType<void | CreateCustomerWorkProject409>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -5511,8 +5744,8 @@ export const bookCallieVisit = async (
   id: string,
   callieBookingRequest: CallieBookingRequest,
   options?: Parameters<typeof customFetch>[1],
-): Promise<CallieOfficeCommandResult> => {
-  return customFetch<CallieOfficeCommandResult>(getBookCallieVisitUrl(id), {
+): Promise<CallieBookingResult> => {
+  return customFetch<CallieBookingResult>(getBookCallieVisitUrl(id), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
@@ -10584,7 +10817,7 @@ export const createProject = async (
 };
 
 export const getCreateProjectMutationOptions = <
-  TError = ErrorType<ErrorEnvelope>,
+  TError = ErrorType<ErrorEnvelope | ManualSchedulingError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -10625,10 +10858,12 @@ export type CreateProjectMutationResult = NonNullable<
   Awaited<ReturnType<typeof createProject>>
 >;
 export type CreateProjectMutationBody = BodyType<ProjectInput>;
-export type CreateProjectMutationError = ErrorType<ErrorEnvelope>;
+export type CreateProjectMutationError = ErrorType<
+  ErrorEnvelope | ManualSchedulingError
+>;
 
 export const useCreateProject = <
-  TError = ErrorType<ErrorEnvelope>,
+  TError = ErrorType<ErrorEnvelope | ManualSchedulingError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -11908,7 +12143,7 @@ export const createAppointment = async (
 };
 
 export const getCreateAppointmentMutationOptions = <
-  TError = ErrorType<ErrorEnvelope>,
+  TError = ErrorType<ManualSchedulingError | ErrorEnvelope>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -11949,10 +12184,12 @@ export type CreateAppointmentMutationResult = NonNullable<
   Awaited<ReturnType<typeof createAppointment>>
 >;
 export type CreateAppointmentMutationBody = BodyType<AppointmentInput>;
-export type CreateAppointmentMutationError = ErrorType<ErrorEnvelope>;
+export type CreateAppointmentMutationError = ErrorType<
+  ManualSchedulingError | ErrorEnvelope
+>;
 
 export const useCreateAppointment = <
-  TError = ErrorType<ErrorEnvelope>,
+  TError = ErrorType<ManualSchedulingError | ErrorEnvelope>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -16131,8 +16368,8 @@ export const getImportLeadsCsvUrl = () => {
 export const importLeadsCsv = async (
   leadImportRequest: LeadImportRequest,
   options?: Parameters<typeof customFetch>[1],
-): Promise<LeadImport> => {
-  return customFetch<LeadImport>(getImportLeadsCsvUrl(), {
+): Promise<LeadImportPreview | LeadImport> => {
+  return customFetch<LeadImportPreview | LeadImport>(getImportLeadsCsvUrl(), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
@@ -20830,7 +21067,7 @@ export const getGetContractorTodayUrl = (params?: GetContractorTodayParams) => {
 };
 
 /**
- * Read-only snapshot in the configured inspection timezone, falling back to UTC explicitly. Each queue is capped at 50 with exact total/truncated indicators. Tasks include overdue, due today and undated work; company scope requires existing CRM read access. No provider calls or settings initialization.
+ * Read-only snapshot in the authoritative organization timezone; invalid timezone is an actionable hold. Each queue is capped at 50 with exact total/truncated indicators. Tasks include overdue, due today and undated work; company scope requires existing CRM read access. No provider calls or settings initialization.
  * @summary Read the company-local workday snapshot
  */
 export const getContractorToday = async (
@@ -23655,6 +23892,277 @@ export function useListInvoiceDeliveryWorklist<
   return withQueryKey(query, queryOptions.queryKey);
 }
 
+export const getGetEstimateDeliveryUrl = (id: string) => {
+  return `/api/v1/estimates/${id}/delivery`;
+};
+
+/**
+ * Requires crm.read. Closed retained evidence contains no approval capabilities or mailbox user/connection identities. Provider acceptance does not establish inbox delivery, customer acceptance or signature.
+ * @summary getEstimateDelivery
+ */
+export const getEstimateDelivery = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<EstimateDeliveryEvidence> => {
+  return customFetch<EstimateDeliveryEvidence>(getGetEstimateDeliveryUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEstimateDeliveryQueryKey = (id: string) => {
+  return [`/api/v1/estimates/${id}/delivery`] as const;
+};
+
+export const getGetEstimateDeliveryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEstimateDelivery>>,
+  TError = ErrorType<EstimateDeliveryError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimateDelivery>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetEstimateDeliveryQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEstimateDelivery>>
+  > = ({ signal }) => getEstimateDelivery(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEstimateDelivery>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEstimateDeliveryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEstimateDelivery>>
+>;
+export type GetEstimateDeliveryQueryError = ErrorType<EstimateDeliveryError>;
+
+/**
+ * @summary getEstimateDelivery
+ */
+
+export function useGetEstimateDelivery<
+  TData = Awaited<ReturnType<typeof getEstimateDelivery>>,
+  TError = ErrorType<EstimateDeliveryError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEstimateDelivery>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEstimateDeliveryQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getPreviewEstimateDeliveryUrl = (id: string) => {
+  return `/api/v1/estimates/${id}/delivery/preview`;
+};
+
+/**
+ * Accepted verified active session; actual and effective office/admin/owner crm.write. Explicit exact APP_ORIGIN required; API-key header presence rejected. Ten-minute actor-bound review of complete saved previously unsent estimate.
+ * @summary previewEstimateDelivery
+ */
+export const previewEstimateDelivery = async (
+  id: string,
+  estimateDeliveryPreviewRequest: EstimateDeliveryPreviewRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<EstimateDeliveryPreview> => {
+  return customFetch<EstimateDeliveryPreview>(
+    getPreviewEstimateDeliveryUrl(id),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(estimateDeliveryPreviewRequest),
+    },
+  );
+};
+
+export const getPreviewEstimateDeliveryMutationOptions = <
+  TError = ErrorType<EstimateDeliveryError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewEstimateDelivery>>,
+    TError,
+    { id: string; data: BodyType<EstimateDeliveryPreviewRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof previewEstimateDelivery>>,
+  TError,
+  { id: string; data: BodyType<EstimateDeliveryPreviewRequest> },
+  TContext
+> => {
+  const mutationKey = ["previewEstimateDelivery"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof previewEstimateDelivery>>,
+    { id: string; data: BodyType<EstimateDeliveryPreviewRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return previewEstimateDelivery(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PreviewEstimateDeliveryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof previewEstimateDelivery>>
+>;
+export type PreviewEstimateDeliveryMutationBody =
+  BodyType<EstimateDeliveryPreviewRequest>;
+export type PreviewEstimateDeliveryMutationError =
+  ErrorType<EstimateDeliveryError>;
+
+/**
+ * @summary previewEstimateDelivery
+ */
+export const usePreviewEstimateDelivery = <
+  TError = ErrorType<EstimateDeliveryError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewEstimateDelivery>>,
+    TError,
+    { id: string; data: BodyType<EstimateDeliveryPreviewRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof previewEstimateDelivery>>,
+  TError,
+  { id: string; data: BodyType<EstimateDeliveryPreviewRequest> },
+  TContext
+> => {
+  return useMutation(getPreviewEstimateDeliveryMutationOptions(options));
+};
+
+export const getSendEstimateDeliveryUrl = (id: string) => {
+  return `/api/v1/estimates/${id}/delivery/send`;
+};
+
+/**
+ * Approve the exact actor-bound preview once. Server-owned permanent estimate-delivery effect key never permits another claim after failure, uncertainty, expiry, edits or reconciliation. No recipients, sender, document or action key accepted from the request. Check original evidence after a failed/lost HTTP result; never automatically submit again.
+ * @summary sendEstimateDelivery
+ */
+export const sendEstimateDelivery = async (
+  id: string,
+  estimateDeliverySendRequest: EstimateDeliverySendRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<EstimateDeliveryEvidence> => {
+  return customFetch<EstimateDeliveryEvidence>(getSendEstimateDeliveryUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(estimateDeliverySendRequest),
+  });
+};
+
+export const getSendEstimateDeliveryMutationOptions = <
+  TError = ErrorType<EstimateDeliveryError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendEstimateDelivery>>,
+    TError,
+    { id: string; data: BodyType<EstimateDeliverySendRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sendEstimateDelivery>>,
+  TError,
+  { id: string; data: BodyType<EstimateDeliverySendRequest> },
+  TContext
+> => {
+  const mutationKey = ["sendEstimateDelivery"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sendEstimateDelivery>>,
+    { id: string; data: BodyType<EstimateDeliverySendRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return sendEstimateDelivery(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SendEstimateDeliveryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendEstimateDelivery>>
+>;
+export type SendEstimateDeliveryMutationBody =
+  BodyType<EstimateDeliverySendRequest>;
+export type SendEstimateDeliveryMutationError =
+  ErrorType<EstimateDeliveryError>;
+
+/**
+ * @summary sendEstimateDelivery
+ */
+export const useSendEstimateDelivery = <
+  TError = ErrorType<EstimateDeliveryError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendEstimateDelivery>>,
+    TError,
+    { id: string; data: BodyType<EstimateDeliverySendRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof sendEstimateDelivery>>,
+  TError,
+  { id: string; data: BodyType<EstimateDeliverySendRequest> },
+  TContext
+> => {
+  return useMutation(getSendEstimateDeliveryMutationOptions(options));
+};
+
 export const getGetInvoiceDeliveryUrl = (id: string) => {
   return `/api/v1/invoices/${id}/delivery`;
 };
@@ -24226,8 +24734,8 @@ export const bookServiceCareVisit = async (
   id: string,
   bookServiceCareVisit: BookServiceCareVisit,
   options?: Parameters<typeof customFetch>[1],
-): Promise<ServiceCareCommandResult> => {
-  return customFetch<ServiceCareCommandResult>(getBookServiceCareVisitUrl(id), {
+): Promise<ServiceCareBookingResult> => {
+  return customFetch<ServiceCareBookingResult>(getBookServiceCareVisitUrl(id), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
@@ -25856,4 +26364,365 @@ export const usePrepareBieLeadEmail = <
   TContext
 > => {
   return useMutation(getPrepareBieLeadEmailMutationOptions(options));
+};
+
+export const getGetSchedulingPolicyUrl = () => {
+  return `/api/v1/settings/scheduling-policy`;
+};
+
+/**
+ * @summary Read saved scheduling policy without initializing settings
+ */
+export const getSchedulingPolicy = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<PolicyReadResult> => {
+  return customFetch<PolicyReadResult>(getGetSchedulingPolicyUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetSchedulingPolicyQueryKey = () => {
+  return [`/api/v1/settings/scheduling-policy`] as const;
+};
+
+export const getGetSchedulingPolicyQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSchedulingPolicy>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getSchedulingPolicy>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetSchedulingPolicyQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSchedulingPolicy>>
+  > = ({ signal }) => getSchedulingPolicy({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSchedulingPolicy>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSchedulingPolicyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSchedulingPolicy>>
+>;
+export type GetSchedulingPolicyQueryError = ErrorType<void>;
+
+/**
+ * @summary Read saved scheduling policy without initializing settings
+ */
+
+export function useGetSchedulingPolicy<
+  TData = Awaited<ReturnType<typeof getSchedulingPolicy>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getSchedulingPolicy>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSchedulingPolicyQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getSaveSchedulingPolicyUrl = () => {
+  return `/api/v1/settings/scheduling-policy`;
+};
+
+/**
+ * @summary Save explicitly reviewed scheduling policy
+ */
+export const saveSchedulingPolicy = async (
+  policySaveInput: PolicySaveInput,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<PolicyReadResult> => {
+  return customFetch<PolicyReadResult>(getSaveSchedulingPolicyUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(policySaveInput),
+  });
+};
+
+export const getSaveSchedulingPolicyMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveSchedulingPolicy>>,
+    TError,
+    { data: BodyType<PolicySaveInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof saveSchedulingPolicy>>,
+  TError,
+  { data: BodyType<PolicySaveInput> },
+  TContext
+> => {
+  const mutationKey = ["saveSchedulingPolicy"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof saveSchedulingPolicy>>,
+    { data: BodyType<PolicySaveInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return saveSchedulingPolicy(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SaveSchedulingPolicyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof saveSchedulingPolicy>>
+>;
+export type SaveSchedulingPolicyMutationBody = BodyType<PolicySaveInput>;
+export type SaveSchedulingPolicyMutationError = ErrorType<void>;
+
+/**
+ * @summary Save explicitly reviewed scheduling policy
+ */
+export const useSaveSchedulingPolicy = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof saveSchedulingPolicy>>,
+    TError,
+    { data: BodyType<PolicySaveInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof saveSchedulingPolicy>>,
+  TError,
+  { data: BodyType<PolicySaveInput> },
+  TContext
+> => {
+  return useMutation(getSaveSchedulingPolicyMutationOptions(options));
+};
+
+export const getGetSchedulingReviewContextUrl = (
+  params: GetSchedulingReviewContextParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/scheduling/review-context?${stringifiedParams}`
+    : `/api/v1/scheduling/review-context`;
+};
+
+/**
+ * @summary Review source-scoped scheduling rules and target version
+ */
+export const getSchedulingReviewContext = async (
+  params: GetSchedulingReviewContextParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<SchedulingReviewContext> => {
+  return customFetch<SchedulingReviewContext>(
+    getGetSchedulingReviewContextUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetSchedulingReviewContextQueryKey = (
+  params?: GetSchedulingReviewContextParams,
+) => {
+  return [
+    `/api/v1/scheduling/review-context`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetSchedulingReviewContextQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSchedulingReviewContext>>,
+  TError = ErrorType<void>,
+>(
+  params: GetSchedulingReviewContextParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSchedulingReviewContext>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetSchedulingReviewContextQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSchedulingReviewContext>>
+  > = ({ signal }) =>
+    getSchedulingReviewContext(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSchedulingReviewContext>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSchedulingReviewContextQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSchedulingReviewContext>>
+>;
+export type GetSchedulingReviewContextQueryError = ErrorType<void>;
+
+/**
+ * @summary Review source-scoped scheduling rules and target version
+ */
+
+export function useGetSchedulingReviewContext<
+  TData = Awaited<ReturnType<typeof getSchedulingReviewContext>>,
+  TError = ErrorType<void>,
+>(
+  params: GetSchedulingReviewContextParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSchedulingReviewContext>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSchedulingReviewContextQueryOptions(
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getReconcileSchedulingOperationUrl = () => {
+  return `/api/v1/scheduling/operations/reconcile`;
+};
+
+/**
+ * Receipt implementation is owned by Task4. Never books or retries CREATE. A missing target, list match, GET or transport error is not no-commit proof. A no_commit_refused acknowledgement is permanent.
+ * @summary Reconcile the exact retained original manual command
+ */
+export const reconcileSchedulingOperation = async (
+  manualSchedulingCommand: ManualSchedulingCommand,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<ManualSchedulingAck> => {
+  return customFetch<ManualSchedulingAck>(
+    getReconcileSchedulingOperationUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(manualSchedulingCommand),
+    },
+  );
+};
+
+export const getReconcileSchedulingOperationMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reconcileSchedulingOperation>>,
+    TError,
+    { data: BodyType<ManualSchedulingCommand> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reconcileSchedulingOperation>>,
+  TError,
+  { data: BodyType<ManualSchedulingCommand> },
+  TContext
+> => {
+  const mutationKey = ["reconcileSchedulingOperation"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reconcileSchedulingOperation>>,
+    { data: BodyType<ManualSchedulingCommand> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return reconcileSchedulingOperation(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReconcileSchedulingOperationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reconcileSchedulingOperation>>
+>;
+export type ReconcileSchedulingOperationMutationBody =
+  BodyType<ManualSchedulingCommand>;
+export type ReconcileSchedulingOperationMutationError = ErrorType<void>;
+
+/**
+ * @summary Reconcile the exact retained original manual command
+ */
+export const useReconcileSchedulingOperation = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reconcileSchedulingOperation>>,
+    TError,
+    { data: BodyType<ManualSchedulingCommand> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reconcileSchedulingOperation>>,
+  TError,
+  { data: BodyType<ManualSchedulingCommand> },
+  TContext
+> => {
+  return useMutation(getReconcileSchedulingOperationMutationOptions(options));
 };

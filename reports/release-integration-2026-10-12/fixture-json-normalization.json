@@ -1,0 +1,56 @@
+{
+  "at": "2026-10-12T15:25:37.204Z",
+  "kind": "FORMAT_ONLY_FIXTURE_NORMALIZATION",
+  "immutableNativeReceiptsAndJournalsUntouched": true,
+  "sourceManifestUntouched": true,
+  "entries": [
+    {
+      "path": "reports/production75-recovery-2026-10-11/catalog95-fly-db.json",
+      "parsedEquality": true,
+      "beforeSha256": "aadd80b161856a5a19f4836751d4152c7b4582563dab36039a3b71592b0de955",
+      "afterSha256": "ac7c464d1d383b3fd535ef09815f4156c125b3f395e55a899959bf41a3d04092",
+      "preservedOriginal": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\preserved-precompact-05010f4b\\catalog95-fly-db.json",
+      "serializationOrderPreserved": true
+    },
+    {
+      "path": "reports/production75-recovery-2026-10-11/catalog95-growthos_staging.json",
+      "parsedEquality": true,
+      "beforeSha256": "b911f28aff51bfddcaa97d650ff43ea9e19444cb18647d197aef99f28e187fd9",
+      "afterSha256": "4c11a5053299344960f86da69873a66a7dce879b4800feff22e64e0bac8f012a",
+      "preservedOriginal": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\preserved-precompact-05010f4b\\catalog95-growthos_staging.json",
+      "serializationOrderPreserved": true
+    },
+    {
+      "path": "reports/production75-recovery-2026-10-11/catalog142-fly-db.json",
+      "parsedEquality": true,
+      "beforeSha256": "a135ffc4d48857caf6fdc42287703950c4c5688822f395331c2b8275d47d219d",
+      "afterSha256": "9076f66aa0a68121864fee8bf8c762c8b6fbb6562e47b6fb8c97301dbc9c5b52",
+      "preservedOriginal": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\preserved-precompact-05010f4b\\catalog142-fly-db.json",
+      "serializationOrderPreserved": true
+    },
+    {
+      "path": "reports/production75-recovery-2026-10-11/catalog142-growthos_staging.json",
+      "parsedEquality": true,
+      "beforeSha256": "3bc3e620e4cd7f935d223d2997ea97a4ec97e740c86eda93fc00e264882cf1b8",
+      "afterSha256": "fa70b68b23ca0ec73372af485dae239554b5f53f34d01311a008c0d707325c5d",
+      "preservedOriginal": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\preserved-precompact-05010f4b\\catalog142-growthos_staging.json",
+      "serializationOrderPreserved": true
+    },
+    {
+      "path": "reports/production75-recovery-2026-10-11/local-policy-fly-db.json",
+      "parsedEquality": true,
+      "beforeSha256": "6f151c88267527e39fc721f09d381c944918aaa19410a928e0710ffc720f0dd8",
+      "afterSha256": "449a77de61be874e40ba4381fae5e0a268acabd860d6192e8f29fc230df8fb19",
+      "preservedOriginal": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\preserved-precompact-05010f4b\\local-policy-fly-db.json",
+      "serializationOrderPreserved": true
+    },
+    {
+      "path": "reports/production75-recovery-2026-10-11/local-policy-growthos_staging.json",
+      "parsedEquality": true,
+      "beforeSha256": "b8e7940b46e7613511974208bf979ec3a414843f90103d17d2a0b863f83d28a6",
+      "afterSha256": "efbe3383390588696cbb27a2b41a49b5f72e31b66825bbaa801651b601537072",
+      "preservedOriginal": "C:\\Forge\\artifacts\\growthos-release-integration-20261012\\preserved-precompact-05010f4b\\local-policy-growthos_staging.json",
+      "serializationOrderPreserved": true
+    }
+  ]
+}

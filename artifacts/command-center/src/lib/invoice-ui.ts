@@ -14,10 +14,42 @@ export interface InvoiceDraft {
   }[];
   taxCents: number;
 }
+export interface InvoiceEquipmentSnapshot {
+  assetId: string;
+  assetVersion: number;
+  category: "hvac_equipment" | "roof_system" | "other";
+  label: string;
+  manufacturer: string | null;
+  model: string | null;
+  serial: string | null;
+  location: string | null;
+  installedOn: string | null;
+  warrantyStartsOn: string | null;
+  warrantyEndsOn: string | null;
+  warrantySource: string | null;
+}
+export interface InvoiceEquipmentSelection {
+  assetIds: string[];
+  warrantyTerms: string | null;
+}
 export interface InvoiceDocument extends Omit<InvoiceDraft, "lineItems"> {
   lineItems: (InvoiceDraft["lineItems"][number] & { totalCents: number })[];
   subtotalCents: number;
   totalCents: number;
+  equipment?: { items: InvoiceEquipmentSnapshot[]; warrantyTerms: string | null };
+}
+export function equipmentSelection(document: InvoiceDocument): InvoiceEquipmentSelection {
+  return {
+    assetIds: document.equipment?.items.map((item) => item.assetId) ?? [],
+    warrantyTerms: document.equipment?.warrantyTerms ?? null,
+  };
+}
+/** Omit an empty selection so unchanged drafts send the original payload shape. */
+export function equipmentPayload(selection: InvoiceEquipmentSelection) {
+  const warrantyTerms = selection.warrantyTerms?.trim() || null;
+  return selection.assetIds.length || warrantyTerms
+    ? { equipment: { assetIds: selection.assetIds, warrantyTerms } }
+    : {};
 }
 export interface InvoiceSummary {
   id: string;

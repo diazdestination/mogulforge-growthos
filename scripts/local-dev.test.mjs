@@ -1,8 +1,116 @@
-import { it as test } from 'vitest';
+import { it as test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough, Writable } from 'node:stream';
-import { apiTestFiles, assertOwnedContainer, databaseTestEnvironment, localEnvironment, parseLoopbackPort, withWslDockerSession } from './local-dev.mjs';
+import { apiTestFiles, assertOwnedContainer, databaseTestEnvironment, localEnvironment, main, parseLoopbackPort, withWslDockerSession } from './local-dev.mjs';
+
+const launcher = vi.hoisted(() => ({ paths: [], existing: new Set(), spawns: [], discoveries: [] }));
+vi.mock('node:fs', async importOriginal => ({ ...await importOriginal(), existsSync: path => launcher.existing.has(path) }));
+vi.mock('node:child_process', async importOriginal => ({
+  ...await importOriginal(),
+  execFileSync(program, args, options) {
+    assert.equal(program, 'where.exe');
+    assert.deepEqual(args, ['pnpm']);
+    launcher.discoveries.push({ program, args, options });
+    return launcher.paths.join('\r\n') + '\r\n';
+  },
+  spawn(program, args, options) {
+    launcher.spawns.push({ program, args, options });
+    const child = new EventEmitter();
+    child.stdout = new PassThrough();
+    child.kill = () => { child.emit('exit', 1); };
+    queueMicrotask(() => child.emit('exit', 0));
+    return child;
+  },
+}));
+async function installedPnpm(paths, existing, operation, platform = 'win32') {
+  const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+  launcher.paths = paths;
+  launcher.existing = new Set(existing);
+  launcher.spawns = [];
+  launcher.discoveries = [];
+  Object.defineProperty(process, 'platform', { value: platform });
+  try { await operation(); } finally { Object.defineProperty(process, 'platform', descriptor); }
+}
+const uiArgs = ['--filter', '@workspace/command-center', 'run', 'test'];
+function directSpawn(program, args) {
+  assert.equal(launcher.spawns.length, 1);
+  assert.equal(launcher.spawns[0].program, program);
+  assert.deepEqual(launcher.spawns[0].args, args);
+  assert.equal(launcher.spawns[0].options.shell ?? false, false);
+  assert.equal(launcher.spawns[0].options.windowsHide, true);
+  assert.deepEqual(launcher.spawns[0].options.stdio, ['ignore', 'inherit', 'inherit']);
+}
+test('discovered Winget native pnpm survives an incomplete later Codex fallback cmd', async () => {
+  const executable = 'C:/Users/diazd/AppData/Local/Microsoft/WinGet/Packages/pnpm.pnpm_Microsoft.Winget.Source_8wekyb3d8bbwe/pnpm.exe';
+  const fallback = 'C:/Users/diazd/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback/pnpm.cmd';
+  await installedPnpm([executable, fallback], [executable], async () => {
+    await main('ui');
+    directSpawn(executable, uiArgs);
+    assert.equal(launcher.discoveries.length, 1);
+  });
+});
+test('native-executable-only pnpm receives the unchanged typecheck arguments directly', async () => {
+  const executable = 'C:/Program Files/pnpm/pnpm.exe';
+  await installedPnpm([executable], [executable], async () => {
+    await main('typecheck');
+    directSpawn(executable, ['run', 'typecheck']);
+  });
+});
+test('a real Node mjs launcher remains preferred over a discovered native executable', async () => {
+  const executable = 'C:/Tools/pnpm/pnpm.exe';
+  const cmd = 'C:/Program Files/Node Tools/pnpm.cmd';
+  const cli = 'C:\\Program Files\\Node Tools\\node_modules\\pnpm\\bin\\pnpm.mjs';
+  await installedPnpm([executable, cmd], [executable, cli, 'C:\\Program Files\\Node Tools\\node_modules\\pnpm\\bin\\pnpm.cjs'], async () => {
+    await main('ui');
+    directSpawn(process.execPath, [cli, ...uiArgs]);
+  });
+});
+test('an installed Node cjs launcher remains supported when the mjs file is absent', async () => {
+  const cmd = 'C:/Tools/pnpm/pnpm.cmd';
+  const cli = 'C:\\Tools\\pnpm\\node_modules\\pnpm\\bin\\pnpm.cjs';
+  await installedPnpm([cmd], [cli], async () => {
+    await main('ui');
+    directSpawn(process.execPath, [cli, ...uiArgs]);
+  });
+});
+test('an incomplete cmd before a native executable does not block direct fallback', async () => {
+  const executable = 'C:/Tools/pnpm/pnpm.exe';
+  await installedPnpm(['C:/Broken/pnpm.cmd', executable], [executable], async () => {
+    await main('ui');
+    directSpawn(executable, uiArgs);
+  });
+});
+test('a later complete cmd remains preferred after an earlier incomplete cmd', async () => {
+  const cmd = 'C:/Tools/pnpm/pnpm.cmd';
+  const cli = 'C:\\Tools\\pnpm\\node_modules\\pnpm\\bin\\pnpm.mjs';
+  await installedPnpm(['C:/Broken/pnpm.cmd', 'C:/Tools/pnpm/pnpm.exe', cmd], ['C:/Tools/pnpm/pnpm.exe', cli], async () => {
+    await main('ui');
+    directSpawn(process.execPath, [cli, ...uiArgs]);
+  });
+});
+test('unsupported or missing discovered launchers never spawn a shell or command', async () => {
+  for (const { paths, existing } of [
+    { paths: [], existing: [] },
+    { paths: ['C:/Tools/pnpm.ps1'], existing: ['C:/Tools/pnpm.ps1'] },
+    { paths: ['C:/Tools/pnpm'], existing: ['C:/Tools/pnpm'] },
+    { paths: ['C:/Broken/pnpm.cmd'], existing: ['C:/Broken/pnpm.cmd'] },
+    { paths: ['C:/Missing/pnpm.exe'], existing: [] },
+    { paths: ['C:/Tools/other.exe'], existing: ['C:/Tools/other.exe'] },
+  ]) {
+    await installedPnpm(paths, existing, async () => {
+      await assert.rejects(main('ui'), /Cannot resolve the installed pnpm/);
+      assert.equal(launcher.spawns.length, 0);
+    });
+  }
+});
+test('non-Windows pnpm invocation keeps its existing program and arguments without discovery', async () => {
+  await installedPnpm([], [], async () => {
+    await main('ui');
+    directSpawn('pnpm', uiArgs);
+    assert.equal(launcher.discoveries.length, 0);
+  }, 'linux');
+});
 
 test('local actions discard inherited provider credentials and database targets', () => {
   const env = localEnvironment({ PATH: 'tools', DATABASE_URL: 'postgresql://live.example/production', OPENAI_API_KEY: 'private', GH_TOKEN: 'private', DOCKER_HOST: 'tcp://remote.example', NODE_OPTIONS: '--require untrusted.js', SCHEDULER_AUTOSTART: 'true' });

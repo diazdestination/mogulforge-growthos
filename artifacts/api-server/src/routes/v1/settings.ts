@@ -4,7 +4,7 @@ import { clearReviewCache } from "./google-reviews";
 import { hasPermission } from "../../lib/permissions";
 
 import { requireMember } from "../../middlewares/requireMember";
-import { recordAudit } from "../../services/audit";
+import { schedulingError } from "./scheduling";
 import { assertCustomerEmailSender } from "../../services/customer-email";
 import { getEmailSendHealth } from "../../services/automation";
 import {
@@ -42,7 +42,11 @@ function isMaskedSentinel(value: string | undefined | null): boolean {
  * Apply API-key masking to a settings object before sending it to the client.
  * Admins (settings.manage) see a masked key; non-admins never see the key.
  */
-function applyApiKeyMask(settings: OrgSettings, isAdmin: boolean): OrgSettings {
+function applyApiKeyMask(
+  raw: OrgSettings,
+  isAdmin: boolean,
+): Omit<OrgSettings, "schedulingPolicy"> {
+  const { schedulingPolicy: _policy, ...settings } = raw;
   if (!settings.googleReviews?.apiKey) return settings;
   const { googleReviews, ...rest } = settings;
   if (!isAdmin) {
@@ -130,14 +134,12 @@ router.put(
           rest.customerEmailSenderUserId,
         );
       } catch (error) {
-        res
-          .status(400)
-          .json({
-            error:
-              error instanceof Error
-                ? error.message
-                : "Customer email sender is unavailable",
-          });
+        res.status(400).json({
+          error:
+            error instanceof Error
+              ? error.message
+              : "Customer email sender is unavailable",
+        });
         return;
       }
     }
@@ -169,25 +171,30 @@ router.put(
         },
       };
     }
-    const settings = await updateOrgSettings(req.member!.organizationId, {
-      ...patch,
-      ...(acknowledgedAt !== undefined
-        ? { securityAlertsAcknowledgedAt: acknowledgedAt }
-        : {}),
-    });
+    let settings: OrgSettings;
+    try {
+      settings = await updateOrgSettings(
+        req.member!.organizationId,
+        {
+          ...patch,
+          ...(acknowledgedAt !== undefined
+            ? { securityAlertsAcknowledgedAt: acknowledgedAt }
+            : {}),
+        },
+        {
+          organizationId: req.member!.organizationId,
+          userId: req.member!.user.id,
+        },
+      );
+    } catch (error) {
+      if (schedulingError(error, res)) return;
+      throw error;
+    }
     // If Google Reviews credentials changed, bust the in-memory cache so the
     // next public request fetches fresh reviews with the new credentials.
     if (parsed.data.googleReviews !== undefined) {
       clearReviewCache();
     }
-    await recordAudit({
-      organizationId: req.member!.organizationId,
-      actorUserId: req.member!.user.id,
-      action: "settings.updated",
-      entityType: "org_settings",
-      entityId: settings.id,
-      metadata: { fields: Object.keys(parsed.data) },
-    });
     // Never return the raw API key — apply the same masking as GET /settings.
     res.json(applyApiKeyMask(settings, true));
   },

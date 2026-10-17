@@ -197,7 +197,9 @@ describe("authenticated Resend delivery callbacks", () => {
 
   it("supports signature rotation but rejects malformed base64 and extra delimiters", async () => {
     const body = JSON.stringify(event());
-    const signature = headers(body)["svix-signature"];
+    // Reuse the signed timestamp; a fresh one from send() can cross a second.
+    const signed = headers(body);
+    const signature = signed["svix-signature"];
     for (const invalid of [
       `${signature},extra`,
       `${signature}=`,
@@ -205,12 +207,16 @@ describe("authenticated Resend delivery callbacks", () => {
       "v1,A===",
       "v1,!!!",
     ])
-      expect((await send(body, { "svix-signature": invalid })).status).toBe(
-        403,
-      );
+      expect(
+        (await send(body, { ...signed, "svix-signature": invalid })).status,
+      ).toBe(403);
     expect(
-      (await send(body, { "svix-signature": `v2,ignored ${signature}` }))
-        .status,
+      (
+        await send(body, {
+          ...signed,
+          "svix-signature": `v2,ignored ${signature}`,
+        })
+      ).status,
     ).toBe(200);
   });
 

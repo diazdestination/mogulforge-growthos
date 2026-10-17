@@ -1,3 +1,4 @@
+import { projectEstimateDeliveryExecution, projectEstimateDeliveryEvent } from "../../services/estimate-delivery-projections";
 import {
   Router,
   type Request,
@@ -267,7 +268,7 @@ router.get(
         ),
       )
       .orderBy(desc(revenueExecutionEventsTable.createdAt));
-    res.json({ execution, events });
+    res.json({ execution:projectEstimateDeliveryExecution(execution), events:execution.kind === "estimate_email" ? events.map(projectEstimateDeliveryEvent) : events });
   }),
 );
 router.post(
@@ -296,7 +297,7 @@ router.post(
         "Only an indeterminate execution can be reconciled. Refresh its state.",
         409,
       );
-    res.json(result);
+    res.json(projectEstimateDeliveryExecution(result));
   }),
 );
 router.patch(

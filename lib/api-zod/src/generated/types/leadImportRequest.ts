@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { LeadImportRequestMapping } from './leadImportRequestMapping';
+import type { LeadImportRequestMode } from './leadImportRequestMode';
 
 export interface LeadImportRequest {
   csv: string;
@@ -19,4 +20,8 @@ export interface LeadImportRequest {
   sourceKey?: string;
   /** Original export snapshot date (ISO date or timestamp with timezone). Omit when unknown; upload time is never source freshness. */
   snapshotAsOf?: string;
+  /** customers imports existing customers as contacts only (no lead, pipeline stage or nurture); only name, email, phone and customer ID columns may be mapped. Defaults to leads. */
+  mode?: LeadImportRequestMode;
+  /** Check and match every row inside one rolled-back transaction and return a preview. Nothing is saved and no import record is created. */
+  dryRun?: boolean;
 }

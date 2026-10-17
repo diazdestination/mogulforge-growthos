@@ -45,6 +45,7 @@
     "@tanstack/react-query": "catalog:",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "14.6.8",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
@@ -81,6 +82,7 @@
     "@workspace/inspection-availability": "workspace:*"
   },
   "dependencies": {
+    "@workspace/scheduling-core": "workspace:*",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1"
   }

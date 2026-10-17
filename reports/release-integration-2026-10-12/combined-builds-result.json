@@ -1,0 +1,18 @@
+{
+  "results": [
+    {
+      "name": "@workspace/command-center",
+      "startedAt": "2026-10-12T15:26:45.450Z",
+      "finishedAt": "2026-10-12T15:26:54.031Z",
+      "exitCode": 0
+    },
+    {
+      "name": "@workspace/api-server",
+      "startedAt": "2026-10-12T15:26:54.031Z",
+      "finishedAt": "2026-10-12T15:26:55.720Z",
+      "exitCode": 0
+    }
+  ],
+  "providerEnvironmentExcluded": true,
+  "knownHistoricalUntrackedArtifactsPreserved": true
+}

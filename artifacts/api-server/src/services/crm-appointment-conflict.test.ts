@@ -1,4 +1,6 @@
-import { appointmentsTable, db, organizationsTable, orgSettingsTable, DEFAULT_INSPECTION_AVAILABILITY } from "@workspace/db";
+import { appointmentsTable, db, organizationsTable, orgSettingsTable, usersTable, DEFAULT_INSPECTION_AVAILABILITY } from "@workspace/db";
+import { eq } from 'drizzle-orm';
+import { getSchedulingReviewContext } from './scheduling-policy';
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
@@ -32,6 +34,19 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await deleteTestOrgs(org.id);
+});
+
+it('reviewed native inspection uses true peak without a duplicate legacy intersection-count refusal',async()=>{
+ const [user]=await db.insert(usersTable).values({organizationId:org.id,role:'owner'}).returning();const actor={organizationId:org.id,userId:user.id};
+ await db.update(orgSettingsTable).set({inspectionAvailability:{...OPEN_AVAILABILITY,maxBookingsPerWindow:2}}).where(eq(orgSettingsTable.organizationId,org.id));
+ try{
+ const start=new Date('2039-01-01T10:00:00Z');
+ const context=await getSchedulingReviewContext(actor,{sourceKind:'unlinked_manual',reservationKind:'appointment',appointmentType:'inspection'});
+ const schedulingReview={context,duration:{kind:'explicit' as const,preset:null},startWallTime:null,endWallTime:null};
+ for(const hour of [0,2])expect(await createAppointment(org.id,{scheduledStart:new Date(start.getTime()+hour*3600000),scheduledEnd:new Date(start.getTime()+(hour+1)*3600000),type:'inspection',schedulingReview},actor)).toBeTruthy();
+ const value=await createAppointment(org.id,{scheduledStart:start,scheduledEnd:new Date(start.getTime()+3*3600000),type:'inspection',schedulingReview},actor);
+ expect(value).not.toBe('conflict');expect(value).toMatchObject({scheduledStart:start,scheduledEnd:new Date(start.getTime()+3*3600000)});
+ }finally{await db.update(orgSettingsTable).set({inspectionAvailability:OPEN_AVAILABILITY}).where(eq(orgSettingsTable.organizationId,org.id));}
 });
 
 /** Slot snapped to the next even UTC hour at least `hoursFromNow` out. */

@@ -11,6 +11,21 @@ import {
 } from "./invoice-delivery-contract";
 
 describe("explicit invoice recovery review contracts", () => {
+  it("keeps a recorded warranty source in email when neither date was recorded", () => {
+    const document = invoiceDocument(invoiceDocumentInputSchema.parse({
+      title: "Synthetic repair", currency: "USD", issuerName: "Synthetic shop",
+      customerName: "Synthetic customer", lineItems: [{ description: "Recorded scope", quantity: "1", unitPriceCents: 5000 }], taxCents: 0,
+    }));
+    document.equipment = { items: [{
+      assetId: randomUUID(), assetVersion: 1, category: "hvac_equipment", label: "Synthetic heat pump",
+      manufacturer: null, model: null, serial: null, location: null, installedOn: null,
+      warrantyStartsOn: null, warrantyEndsOn: null, warrantySource: "Synthetic registration record",
+    }], warrantyTerms: null };
+    const email = renderInvoiceEmail({ invoiceNumber: "INV-000043", issuedAt: "2026-10-02T12:00:00Z", document });
+    expect(email.body).toContain("Recorded warranty: start not recorded to end not recorded (source: Synthetic registration record)");
+    expect(email.body).toContain("Recorded warranty information is listed for reference; the warranty provider determines coverage.");
+  });
+
   it("preserves an initial-only older preview request without inferring recovery", () => {
     expect(invoiceDeliveryPreviewSchema.parse({ expectedVersion: 2 })).toEqual({
       expectedVersion: 2,

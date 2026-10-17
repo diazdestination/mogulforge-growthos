@@ -1,4 +1,72 @@
+# Current combined release acceptance sequence — 2026-10-15
+
+Follow the newest external execution-current.json under C:/Forge/artifacts/growthos-release-integration-20261015; execute only the next unaccepted approved task. The frozen procedures are reports/combined-release-integration-2026-10-15.md and reports/combined-release-recovery-2026-10-15.md. Remaining gates are the reviewed8-container native oracle, unchanged actual-artifact contractor recovery and exact GEEKOM C01–C20 audit, then normal full tests/types/both builds/parity/scans/final review/private draft/CI. Record their actual hashes and outcomes externally without a new source commit merely to add a pass statement.
+
+After source acceptance, actual supported hosted Reader/rehearsal, compatible writable recovery-or-complete-hold, fullG04/G06 and both contractors configuration/import/staff/provider/device/cutover still require their own evidence and applicable authority. Keep original failures/consumed grants/retained cleanup restrictions visible.
+
 # Next acceptance work
+
+## October15 owner-approved combined-source implementation
+
+Execute the owner-approved eight-task combined-release plan: source preservation checkpoint, exact scheduling0019 observer/verifier, stage custody/shared manifest, combined admission/operator, fresh native proof, unchanged recovery audit and full current checks/private draft candidate. ROOT integrates, scoped agents implement, independent reviewers gate each task, and GEEKOM audits the frozen evidence.
+
+Original19 SQL/0018, complete client requirements, full142 preservation and protected product/recovery inputs remain binding. Historical CI does not certify this candidate. Both contractor cards, fullG04/G06, real staff/provider/device evidence, compatible recovery/complete mutation hold, hosted rehearsal and applicable release authority remain open. No new spend, hosted/provider action, customer contact, merge to main or deployment is authorized by this source plan.
+
+## Historical source checkpoints
+
+The dated entries below retain historical receipts. The October15 execution status above supersedes their instructions that describe already completed source work as pending.
+
+## October13 estimate-email release evidence
+
+Publish the independently reviewed estimate-email branch as a dependent draft
+against PR56, then verify exact-head CI including Docker parity. Local source
+checks are complete at ac13692 (4,760 tests, 15 existing skips, types/builds/parity);
+final publication proof is retained in Forge state/artifacts. Preserve PR44 as
+the application candidate and its exact hosted/recovery boundaries.
+
+Continue the FlyReader support/rehearsal path from T-20107 using a fresh exact
+source/target/SQL/recovery packet when supported. Consumed paid grants cannot be
+reused. Real connected-mailbox/inbox and contractor estimate acceptance remain
+required before activating this email flow; SMS/PDF/photos/revised/resend scope
+and configurable capacity/travel rules remain open. Both contractor replacement
+cards require their complete acceptance evidence. This source milestone permits
+no hosted migration, real customer contact, provider activation or cutover.
+
+
+## October13 contractor correctness and delivery work
+
+Publish the reviewed crew-end guard as a dependent draft against PR44 and verify
+its exact-head CI. Preserve the separate Fly support/rehearsal boundaries; local
+source checks do not prove hosted acceptance. Configurable capacity is still
+missing; PR43 integrated customer import. A separate staff-reviewed, initial-only
+estimate email design was approved for detailed implementation planning in durable
+Forge files; review that plan before implementation. Do not activate
+mail providers, send live messages, add schema or reduce SMS/payment requirements
+as part of the scheduling fix. Both contractor acceptance cards remain open.
+
+## October12 next production boundary
+
+Accept the supplied-client operator source evidence in
+reports/bounded-operator-2026-10-12.md, separately from fixed PR44/8df64dc and
+PR45/283715f. Then wire/review real account/authentication/observation/connection
+drivers implementing terminal acquisition and SQL deadline guards. Authenticate
+owner/capability receipts; establish actual V1 Reader/profile/provider equivalence;
+prepare exact target/source/backup/cost/lifetime/deletion-reserve admission before
+requesting a fresh paid copy. Consumed grants stay consumed. Contractor gaps and
+both company acceptance cards remain independent requirements.
+
+## October12 combined launch candidate — local gates passed
+
+PR35 plus39–43 are combined on agent/growthos-release-integration-20261012.
+Independent review corrections cover strict CSV/address handling, source-only
+warranty rendering and preservation of provider-owned recovery metadata.
+4457 full-suite tests passed (15 skipped), types/both builds/Docker parity passed,
+and fictional browser import/preview checks passed. Source remains142 tables;
+all 19 SQL pins are unchanged. The real Fly75 upgrade, supported credential
+retirement and client/provider/device/payment/cutover gates remain open.
+See reports/release-integration-2026-10-12.md and its companion receipts.
+Exact publication-head GitHub CI is still required; no hosted actions occurred.
+
 
 ## October 10 current order
 

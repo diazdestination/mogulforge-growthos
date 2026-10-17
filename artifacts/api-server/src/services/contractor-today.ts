@@ -1,5 +1,20 @@
-import { db, usersTable } from "@workspace/db";
-import { and, eq, sql, type SQL } from "drizzle-orm";
+import {
+  appointmentsTable,
+  db,
+  organizationsTable,
+  projectsTable,
+  usersTable,
+} from "@workspace/db";
+import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+import {
+  companyDayBounds,
+  type ReservationSnapshot,
+} from "@workspace/scheduling-core";
+import {
+  projectSchedulingEvidence,
+  readSchedulingContext,
+  SchedulingPolicyError,
+} from "./scheduling-policy";
 import { z } from "zod/v4";
 import { hasPermission } from "../lib/permissions";
 
@@ -32,7 +47,12 @@ export interface DayTask {
   assigneeName: string | null;
   actionPath: string;
 }
-export interface DayAppointment {
+interface SchedulingProjection {
+  schedulingReservation: ReservationSnapshot | null;
+  schedulingEvidence: "legacy" | "versioned" | "invalid";
+  schedulingTargetFingerprint: string;
+}
+export interface DayAppointment extends SchedulingProjection {
   id: string;
   title: string;
   type: string;
@@ -45,7 +65,7 @@ export interface DayAppointment {
   scheduledStart: string;
   scheduledEnd: string | null;
 }
-export interface DayProject {
+export interface DayProject extends SchedulingProjection {
   id: string;
   title: string;
   status: string;
@@ -75,6 +95,8 @@ export interface DayQueue<T> {
   truncated: boolean;
 }
 export interface ContractorToday {
+  schedulingPolicyRevision: number | null;
+  schedulingPolicyState: "unconfigured" | "configured" | "invalid";
   organizationId: string;
   generatedAt: string;
   date: string;
@@ -155,21 +177,26 @@ export async function getContractorToday(
         )
           ? "company"
           : "mine");
-      // Do not call getOrgSettings: its legacy normalization can write during a GET.
-      const settings =
-        await tx.execute(sql`SELECT inspection_availability->>'timezone' AS zone
-      FROM org_settings WHERE organization_id=${organizationId} LIMIT 1`);
-      const candidate = settings.rows[0]?.zone;
-      let timeZone = validZone(candidate) ? candidate : "UTC";
-      let timeZoneSource: "configured" | "utc_fallback" = validZone(candidate)
-        ? "configured"
-        : "utc_fallback";
-      const zones = await tx.execute(
-        sql`SELECT 1 FROM pg_timezone_names WHERE name=${timeZone} LIMIT 1`,
-      );
-      if (!zones.rows.length) {
-        timeZone = "UTC";
-        timeZoneSource = "utc_fallback";
+      const [company] = await tx
+        .select({ timezone: organizationsTable.timezone })
+        .from(organizationsTable)
+        .where(eq(organizationsTable.id, organizationId));
+      if (!validZone(company?.timezone))
+        throw new ContractorTodayError(
+          409,
+          "The company timezone is invalid. Ask a platform administrator to correct it before scheduling.",
+        );
+      const timeZone = company.timezone,
+        timeZoneSource = "configured" as const;
+      let schedulingPolicyRevision: number | null = null,
+        schedulingPolicyState: ContractorToday["schedulingPolicyState"] =
+          "invalid";
+      try {
+        const read = await readSchedulingContext(tx, organizationId);
+        schedulingPolicyRevision = read.context.policyRevision;
+        schedulingPolicyState = read.policy ? "configured" : "unconfigured";
+      } catch (error) {
+        if (!(error instanceof SchedulingPolicyError)) throw error;
       }
       const parts = new Intl.DateTimeFormat("en-CA", {
         timeZone,
@@ -180,11 +207,9 @@ export async function getContractorToday(
       const part = (key: string) => parts.find((p) => p.type === key)!.value;
       const date =
         query.date ?? `${part("year")}-${part("month")}-${part("day")}`;
-      const bounds = await tx.execute(sql`SELECT
-      (${date}::date::timestamp AT TIME ZONE ${timeZone}) AS start,
-      ((${date}::date + 1)::timestamp AT TIME ZONE ${timeZone}) AS finish`);
-      const startAt = iso(bounds.rows[0].start)!,
-        endAt = iso(bounds.rows[0].finish)!;
+      const bounds = companyDayBounds(date, timeZone);
+      const startAt = bounds.from,
+        endAt = bounds.to;
       const mine = scope === "mine";
       const invoiceReader =
         hasPermission(actor.role, "invoices.read") &&
@@ -305,10 +330,56 @@ export async function getContractorToday(
         sql`"dueAt",id`,
       );
       // A nameless same-company crew member remains unnamed rather than fabricated.
+      if (appointments.items.length) {
+        const rows = await tx
+          .select()
+          .from(appointmentsTable)
+          .where(
+            and(
+              eq(appointmentsTable.organizationId, organizationId),
+              inArray(
+                appointmentsTable.id,
+                appointments.items.map((item) => item.id),
+              ),
+            ),
+          );
+        for (const item of appointments.items)
+          Object.assign(
+            item,
+            projectSchedulingEvidence(
+              "appointment",
+              rows.find((row) => row.id === item.id)!,
+            ),
+          );
+      }
+      if (projects.items.length) {
+        const rows = await tx
+          .select()
+          .from(projectsTable)
+          .where(
+            and(
+              eq(projectsTable.organizationId, organizationId),
+              inArray(
+                projectsTable.id,
+                projects.items.map((item) => item.id),
+              ),
+            ),
+          );
+        for (const item of projects.items)
+          Object.assign(
+            item,
+            projectSchedulingEvidence(
+              "project",
+              rows.find((row) => row.id === item.id)!,
+            ),
+          );
+      }
       for (const project of projects.items)
         project.crewNames = project.crewNames.filter(Boolean);
       return {
         organizationId,
+        schedulingPolicyRevision,
+        schedulingPolicyState,
         generatedAt: now.toISOString(),
         date,
         timeZone,

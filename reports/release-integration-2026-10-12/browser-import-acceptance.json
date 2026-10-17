@@ -1,0 +1,36 @@
+{
+  "at": "2026-10-12T15:32:36.126664+00:00",
+  "scope": "fictional loopback browser UI through Browser Harness; recordings disabled",
+  "origin": "http://127.0.0.1:4192",
+  "allSynthetic": true,
+  "malformedCsvVisibleRejection": true,
+  "baseline": {
+    "contacts": 5,
+    "leads": 1
+  },
+  "preview": {
+    "rows": 3,
+    "new": 2,
+    "skipped": 1,
+    "contactsAfterPreview": 5,
+    "importDisabledUntilReviewed": true
+  },
+  "after": {
+    "contacts": 7,
+    "validImported": 1,
+    "invalidImported": 0,
+    "phoneOnly": [
+      {
+        "email": null,
+        "phone": "+49 (0)30/12345678"
+      }
+    ],
+    "leads": 1
+  },
+  "ui": {
+    "done": "Imported 2 new and updated 0; 0 need review and 1 were skipped. This import is recorded in your import history.",
+    "alerts": []
+  },
+  "nativeDeviceProof": false,
+  "hostedOrProviderProof": false
+}

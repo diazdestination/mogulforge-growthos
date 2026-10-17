@@ -1646,7 +1646,7 @@ export async function ensureDefaultAutomations(
 
     // Fresh orgs get industry-neutral copy; only the legacy default org
     // keeps the historical roofing-flavored templates.
-    const legacy = await isLegacyDefaultOrg(organizationId);
+    const legacy = await isLegacyDefaultOrg(organizationId, tx);
     const smsTemplateId = await seedTemplate({
       name: DEFAULT_ABANDONED_SMS_TEMPLATE_NAME,
       channel: "sms",

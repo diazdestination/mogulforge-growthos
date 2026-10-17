@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-12T15:34:08.456154+00:00",
+  "fixtureOnly": true,
+  "recordings": false,
+  "viewport": {
+    "url": "/invoices/e00805ea-fd1d-4d20-944a-310ffee43060",
+    "width": 390,
+    "overflow": false,
+    "printAvailable": true,
+    "text": "INVO + BILL \u00b7 Invoices support\n\nDocuments, balances and recorded receipts, with clear review steps.\nWorkspace guide\nAll invoices\nRefresh invoice\nINV-000001\n\nFICTIONAL service invoice \u00b7 Version 2\n\nIssued\nUnpaid\nCustomer invoice history\nIssued document\nPrint / Save PDF\n\nThis document is retained as issued. Issuing does not mean it was sent to the customer.\n\nLOCAL QA Contractor\n\nINV-000001\n\nDue: Not set\n\nBill to\n\nFICTIONAL Service Customer\n\nFICTIONAL service invoice\nInvoice line items in USD\nWork\tQty\tPrice\tAmount\nFICTIONAL equipment inspection\t1\t$125.00\t$125.00\nSubtotal\n$125.00\nTax\n$0.00\nTotal (USD)\n$125.00\n\nLOCAL QA ONLY. Not a real bill.\n\nRecorded balance\nIssued total\n$125.00\nRecorded net receipts\n$0.00\nBalance due\n$125.00\n\nPayments shown here are staff-recorded evidence. No bank verification, charge, refund, or customer message is performed by these controls.\n\nNext action\nRecord payment\nApply existing record\nReverse allocation\nVoid invoice\nEmail this invoice\nCheck delivery status\n\nSend the immutable issued document to this opportunity\u2019s saved customer email using the selected staff or company Gmail/Microsoft mailbox. Emailing another copy never creates a new invoice, balance, payment link or charge.\n\nNot sent\n\nNo invoice email has been sent through this flow. Preview and explicitly approve the exact customer and document.\n\nGmail/Microsoft acceptance does not confirm inbox delivery. Delivery/bounce monitoring is not connected by this send-only integration.\n\n0 of 5 lifetime email attempts\n\nPreview invoice email\nPayment and refund allocations\n\nNo receipts or refunds have been allocated to this invoice.\n\nInvoice history"
+  },
+  "physicalDeviceProof": false
+}

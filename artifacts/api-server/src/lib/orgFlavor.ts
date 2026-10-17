@@ -12,10 +12,20 @@ import { CLIENT } from "./client.config";
  */
 const cache = new Map<string, boolean>();
 
-export async function isLegacyDefaultOrg(organizationId: string): Promise<boolean> {
+/**
+ * The shared pool or an open transaction. Callers inside `db.transaction(...)`
+ * must pass their `tx`: reaching back to the pool while the transaction holds
+ * a connection deadlocks a one-connection pool (GAP-16).
+ */
+type OrgFlavorExecutor = Pick<typeof db, "select">;
+
+export async function isLegacyDefaultOrg(
+  organizationId: string,
+  executor: OrgFlavorExecutor = db,
+): Promise<boolean> {
   const cached = cache.get(organizationId);
   if (cached !== undefined) return cached;
-  const [org] = await db
+  const [org] = await executor
     .select({ slug: organizationsTable.slug })
     .from(organizationsTable)
     .where(eq(organizationsTable.id, organizationId));

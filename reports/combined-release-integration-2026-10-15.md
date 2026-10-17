@@ -1,0 +1,25 @@
+# Combined GrowthOS source integration — 2026-10-15
+
+The combined candidate preserves the saved-scheduling product arm P91b7fd2c1fd98d441848e0357954e35c9f65d688 and the Reader/recovery operations arm Oc285c4781145fead9fa2baa39360412f2846f66d. It adds a separate scheduling0019 verification stage after the unchanged production75 mechanism. The canonical repository is diazdestination/mogulforge-growthos; main7091af816715cfd437925eb0af82fb47d3411e34 and common8df64dc72009832f93b2b491031acd1bb2afb903 remain the admitted lineage.
+
+Approved design: docs/superpowers/specs/2026-10-15-combined-release-design.md (edadffad4fc17251f1741e48e4505db45767f494f50c4117b65c7de64f1c2204). Approved eight-task plan: docs/superpowers/plans/2026-10-15-combined-release.md (b198a77fec33d12c97c3a79e6bac3c0f94ea270bdb7c63b5814f2718115154cb). Both are immutable owner-approved copies; older proposal wording is historical.
+
+## Execution contract
+
+Stage A uses the original19 exact SQL inputs/selected bridge and unchanged core/source/observer/verification semantics. It rehearses rollback, commits75→95→142 only on an admitted owned copy, and verifies an independent Reader plus original data, extra metadata and non-target databases. The combined operator requires positive actual verifier/closure evidence before stage progression; a status label alone is insufficient.
+
+Stage B captures a new complete142-table/1867-column Reader baseline. Its separate exact8126-byte0019 source adds three nullable JSONB columns with three CHECKs and no table/default/backfill. It rehearses a real transaction ROLLBACK before a separate committed attempt, checks every original projection and the three NULL columns, and verifies post-state through an independent Reader. All142 table locks precede any writer-transaction SELECT. Effective backend identity must be confirmed before failure ROLLBACK; unresolved/precheck failures stay held for owning resource cleanup. No schema down-migration or replay substitutes for rollback.
+
+Separate fsynced one-use scheduling rollback/commit reservations bind actual copy, source, candidate commit/tree, common executable manifest and full baseline hashes. Identical healthy baseline binds do not rearm permits. Lost COMMIT ACK can reconcile only through complete Reader proof; lost ROLLBACK remains held. Existing deadlines, sole owned-copy cleanup and protected-original/app checks remain.
+
+The shared aggregate binds the exact ordered25 executable inputs, original19 descriptors, separate0019 descriptor, four legacy catalogs, both before/after scheduling layouts, independent oracle payload and current candidate. Finished proof stays outside its own aggregate. The native factory requires completed matching8-container proof before creating provider dependencies; native prepare/execute use distinct explicit CLI commands. The legacy family remains legacy-only.
+
+The supplied-client executeSuppliedCombinedPacket entry shares exactly the v2 callback/execution composition for the local fake-provider rehearsal. It creates no ambient native transport, accepts only caller-owned dependencies/attestations, refuses native-factory objects, and returns nativeOracleAdmissionVerified:false. It cannot certify a finished native oracle. Native CLI never routes through it. This avoids circularly requiring the proof before the local run can produce it.
+
+## Evidence and remaining acceptance
+
+Actual execution state, task/fix reviews, full ruling/cost ledger and unique failed/passing logs are retained outside source in C:/Forge/artifacts/growthos-release-integration-20261015 and the plan-specific SDD workspace. T1 merge98a90d6, T2accepted033d6b0, T3accepted95ae088 and T4source54775fc/cherry-pick7a4c459 have exact retained reviews. This document defines the final source/procedure contract; it makes no claim for unrun native, recovery, full-suite or CI gates.
+
+All runtime/tests/tracked reports must be committed before the native source freeze. The external attestation records actual clean HEAD/tree, oracle/aggregate/module hashes, test/build/recovery outputs and owned resource absence. T6–T8 do not amend source merely to add a pass statement. A real finding requires a new reviewed source checkpoint and only affected revalidation. GEEKOM performs the agreed read-only C01–C20 audit on that exact candidate/evidence without duplicate installs/tests/containers.
+
+P's2115 API/library paths and eight protected recovery/build inputs remain strict acceptance checks. The closed28 datasets, four saved-gap enforcement cases, tenant/authority/history/privacy/export guards and releaseEligible:false remain required. FullG04/G06, an actual supported hosted Reader handshake/rehearsal, a compatible writable rollback artifact or verified complete mutation hold/forward recovery, and both contractors' real configuration/import/staff/provider/device/cutover cards remain open. Green source/local/CI does not replace them. No new paid copy, provider activation, production migration, customer contact, main merge, deployment or public launch is authorized by this source plan.

@@ -1,3 +1,20 @@
+import { activeSnapshotAgrees } from "./scheduling-policy";
+import {
+  projectEstimateEmailExport,
+  type EstimateEmailRetainedLedger,
+  type RevenueExecution,
+  type RevenueExecutionEvent,
+} from "./estimate-delivery-projections";
+import { estimateEmailAdmissionMetadataSchema } from "./estimate-delivery-execution";
+import type { AuditEvent } from "@workspace/db";
+import { reservationSnapshotSchema } from "@workspace/scheduling-core";
+import {
+  projectCurrentSchedulingPolicy,
+  projectReservationExport,
+  projectSchedulingHistory,
+  readSchedulingHistoryEvidence,
+  SCHEDULING_HISTORY_ACTIONS,
+} from "./scheduling-history";
 import { createHash, randomUUID } from "node:crypto";
 import pg from "pg";
 import { z } from "zod/v4";
@@ -96,6 +113,7 @@ export const CUSTOMER_EXPORT_DATASETS: readonly Dataset[] = [
   },
   {
     table: "projects",
+    computedFields: ["scheduling_reservation", "scheduling_evidence"],
     fields: [
       "id",
       "lead_id",
@@ -137,6 +155,7 @@ export const CUSTOMER_EXPORT_DATASETS: readonly Dataset[] = [
   },
   {
     table: "appointments",
+    computedFields: ["scheduling_reservation", "scheduling_evidence"],
     fields: [
       "id",
       "lead_id",
@@ -447,6 +466,8 @@ export const CUSTOMER_EXPORT_DATASETS: readonly Dataset[] = [
   },
 ] as const;
 export const CUSTOMER_EXPORT_EXCLUSIONS = [
+  "Scheduling policy, reservation and history are closed business projections. Original operation/request identities, actor and provider metadata, policy/source digests, and raw invalid evidence remain private in inventory/backups. Withheld links and malformed records are counted separately; target absence is not no-commit proof. Export does not authorize replay or deletion.",
+  "Estimate email receipts include the original reviewed quote/message, original business participants and validated provider acceptance, not inbox delivery or customer acceptance. Preview capabilities, staff/sender connection identities, raw audit rows and permanent execution keys remain excluded and retained. Export does not authorize replay, removal or purge.",
   "Returning-customer immutable business lineage, native work versions and external receipt/refund references are included. Human command request IDs, payload hashes, actor identities and replay internals are excluded and retained in full inventory/backups. The archive is not a command replay, import mapping, payment processor or proof of acquisition revenue.",
   "Workday assets, reviewed checklist definitions, entry answers and projected completion/correction business records are included by closed allowlists. Staff identities, acting notes, raw parent/task/evidence snapshots, command/retry hashes, request IDs, preview tokens, upload reservations/capabilities and private object paths are excluded. Photo records are metadata only, not binary evidence or a re-import/activation grant. Recorded warranty dates and worker observations are not verified coverage or workmanship. The archive digest covers the projected export, not the original internal completion snapshot.",
   "Checklist definition_sha256 verifies the original canonical saved definition before export. exported_definition_sha256 covers its closed canonical export projection; these may differ when future/private fields are excluded. Neither digest is approval, compliance or permission to activate/import work.",
@@ -501,6 +522,29 @@ const invoiceDocument = z.object({
   subtotalCents: z.number().int(),
   taxCents: z.number().int(),
   totalCents: z.number().int(),
+  equipment: z
+    .object({
+      items: z
+        .array(
+          z.object({
+            assetId: z.string(),
+            assetVersion: z.number().int(),
+            category: z.string(),
+            label: z.string(),
+            manufacturer: z.string().nullable(),
+            model: z.string().nullable(),
+            serial: z.string().nullable(),
+            location: z.string().nullable(),
+            installedOn: z.iso.date().nullable(),
+            warrantyStartsOn: z.iso.date().nullable(),
+            warrantyEndsOn: z.iso.date().nullable(),
+            warrantySource: z.string().nullable(),
+          }),
+        )
+        .max(10),
+      warrantyTerms: z.string().nullable(),
+    })
+    .optional(),
 });
 const recurrence = z.object({
   mode: z.literal("calendar_months"),
@@ -816,11 +860,13 @@ export function createCustomerLifecycleExporter({
               "An active company owner or administrator is required.",
             );
           const org = await query(
-            "SELECT id, name, slug, created_at FROM public.organizations WHERE id = $1",
+            "SELECT id, name, slug, created_at, timezone FROM public.organizations WHERE id = $1",
             [organizationId],
           );
           if (org.rows.length !== 1) throw unavailable();
           const data: Record<string, Record<string, unknown>[]> = {};
+          const schedulingSnapshots = new Map<string, unknown>();
+          const currentSchedulingEvidence = new Set<string>();
           const included = new Map<string, Set<unknown>>();
           const coverage: Array<{
             table: string;
@@ -832,7 +878,7 @@ export function createCustomerLifecycleExporter({
           for (const definition of CUSTOMER_EXPORT_DATASETS) {
             // All SQL identifiers are the fixed reviewed list above, never input.
             const result = await query(
-              `SELECT ${definition.fields.map((field) => `"${field}"`).join(", ")} FROM public."${definition.table}" WHERE organization_id = $1 ORDER BY id LIMIT $2`,
+              `SELECT ${definition.fields.map((field) => `"${field}"`).join(", ")}${["appointments", "projects"].includes(definition.table) ? `, scheduling_reservation AS "_schedulingReservation", ${definition.table === 'appointments' ? 'assigned_user_id' : 'crew_user_ids'} AS "_schedulingResources"` : ""} FROM public."${definition.table}" WHERE organization_id = $1 ORDER BY id LIMIT $2`,
               [organizationId, maxRows + 1],
             );
             if (result.rows.length > maxRows)
@@ -841,6 +887,22 @@ export function createCustomerLifecycleExporter({
                 "customer_export_limit",
                 "This company exceeds the core export limit. Ask your GrowthOS operator for an expanded export. No partial file was produced.",
               );
+            if (["appointments", "projects"].includes(definition.table))
+              for (const row of result.rows) {
+                schedulingSnapshots.set(
+                  `${definition.table}:${row.id}`,
+                  row._schedulingReservation ?? null,
+                );
+                const parsed = reservationSnapshotSchema.safeParse(row._schedulingReservation);
+                const kind = definition.table === 'appointments' ? 'appointment' : 'project';
+                if (parsed.success && parsed.data.target.kind === kind && parsed.data.target.id === row.id && activeSnapshotAgrees(kind, {
+                  id: row.id, scheduledStart: row.scheduled_start as Date | null, scheduledEnd: row.scheduled_end as Date | null,
+                  status: row.status as string, type: row.type as string | undefined,
+                  ...(kind === 'appointment' ? { assignedUserId: row._schedulingResources as string | null } : { crewUserIds: row._schedulingResources as string[] }),
+                }, parsed.data)) currentSchedulingEvidence.add(`${definition.table}:${row.id}`);
+                delete row._schedulingResources;
+                delete row._schedulingReservation;
+              }
             const links = Object.entries(definition.references ?? {});
             let rows = result.rows.filter((row) =>
               links.every(
@@ -964,8 +1026,227 @@ export function createCustomerLifecycleExporter({
               withheldInvalidLinks: result.rows.length - rows.length,
             });
           }
+          // Quote receipts are read only on THIS repeatable-read client. Private
+          // source metadata is validated internally and never added to export data.
+          const estimateIds = [
+            ...(included.get("estimates") ?? []),
+          ] as string[];
+          const keys = estimateIds.map((id) => `estimate-delivery:${id}:email`);
+          const bounded = async (text: string, values: unknown[]) => {
+            const result = await query(text, values);
+            if (result.rows.length > maxRows)
+              throw new CustomerLifecycleError(
+                413,
+                "customer_export_limit",
+                "This company exceeds the core export limit. No partial file was produced.",
+              );
+            return result.rows;
+          };
+          const schedulingSettings = await bounded(
+            'SELECT scheduling_policy AS "schedulingPolicy", inspection_availability AS "inspectionAvailability" FROM public.org_settings WHERE organization_id=$1 LIMIT $2',
+            [organizationId, maxRows + 1],
+          );
+          const schedulingPolicy = projectCurrentSchedulingPolicy(
+            schedulingSettings[0]?.schedulingPolicy ?? null,
+            org.rows[0].timezone,
+            schedulingSettings[0]?.inspectionAvailability ?? null,
+          );
+          const schedulingAuditFields =
+            'id, organization_id AS "organizationId", actor_user_id AS "actorUserId", action, entity_type AS "entityType", entity_id AS "entityId", metadata, created_at AS "createdAt"';
+          const schedulingEvents = (await bounded(
+            `SELECT ${schedulingAuditFields} FROM public.audit_events WHERE organization_id=$1 AND action=ANY($2::text[]) ORDER BY created_at, id LIMIT $3`,
+            [organizationId, SCHEDULING_HISTORY_ACTIONS, maxRows + 1],
+          )) as unknown as AuditEvent[];
+          const schedulingEvidence = await readSchedulingHistoryEvidence(
+            bounded,
+            organizationId,
+            schedulingEvents,
+            [...schedulingSnapshots.values()],
+            maxRows,
+          );
+          const schedulingHistory =
+            projectSchedulingHistory(schedulingEvidence);
+          for (const table of ["appointments", "projects"] as const)
+            for (const row of data[table]) {
+              const saved =
+                schedulingSnapshots.get(`${table}:${row.id}`) ?? null;
+              const parsed = reservationSnapshotSchema.safeParse(saved);
+              const kind = table === "appointments" ? "appointment" : "project";
+              const reservation =
+                parsed.success &&
+                parsed.data.target.kind === kind &&
+                parsed.data.target.id === row.id &&
+                currentSchedulingEvidence.has(`${table}:${row.id}`)
+                  ? projectReservationExport(
+                      parsed.data,
+                      schedulingEvidence.context.authorizedHistoricalLinks,
+                    )
+                  : null;
+              row.scheduling_reservation = reservation;
+              row.scheduling_evidence =
+                saved === null
+                  ? "legacy"
+                  : reservation
+                    ? "versioned"
+                    : "invalid";
+              if (saved !== null && !reservation)
+                coverage.find((c) => c.table === table)!.withheldInvalidLinks++;
+            }
+          const schedulingOrganization = {
+            id: org.rows[0].id,
+            name: org.rows[0].name,
+            slug: org.rows[0].slug,
+            created_at: org.rows[0].created_at,
+            schedulingPolicy: schedulingPolicy.policy,
+            schedulingHistory: schedulingHistory.summaries,
+          };
+          bytes += Buffer.byteLength(JSON.stringify(schedulingOrganization));
+          if (bytes > maxBytes)
+            throw new CustomerLifecycleError(
+              413,
+              "customer_export_limit",
+              "This company exceeds the core export size. No partial file was produced.",
+            );
+          const executions = (await bounded(
+            `SELECT id, organization_id AS "organizationId", action_key AS "actionKey", kind, fingerprint, state, detail, actor_user_id AS "actorUserId", expires_at AS "expiresAt", created_at AS "createdAt", completed_at AS "completedAt" FROM public.revenue_executions WHERE (organization_id=$1 AND (kind='estimate_email' OR action_key ILIKE 'estimate-delivery:%')) OR lower(action_key)=ANY($2::text[]) ORDER BY id LIMIT $3`,
+            [organizationId, keys, maxRows + 1],
+          )) as unknown as RevenueExecution[];
+          const executionIds = executions.map((e) => e.id);
+          const auditFields =
+            'id, organization_id AS "organizationId", actor_user_id AS "actorUserId", action, entity_type AS "entityType", entity_id AS "entityId", metadata, created_at AS "createdAt"';
+          const audits = (await bounded(
+            `SELECT ${auditFields} FROM public.audit_events WHERE action IN ('estimate_delivery.admitted','estimate_delivery.provider_accepted') AND (organization_id=$1 OR lower(entity_id::text)=ANY($2::text[]) OR lower(metadata->'snapshot'->>'estimateId')=ANY($2::text[]) OR lower(metadata->>'actionKey')=ANY($3::text[]) OR metadata->>'executionId'=ANY($4::text[])) ORDER BY id LIMIT $5`,
+            [organizationId, estimateIds, keys, executionIds, maxRows + 1],
+          )) as unknown as AuditEvent[];
+          const parsed = audits
+            .filter((a) => a.action === "estimate_delivery.admitted")
+            .map((a) =>
+              estimateEmailAdmissionMetadataSchema.safeParse(a.metadata),
+            );
+          if (parsed.some((p) => !p.success)) throw unavailable();
+          const previewIds = parsed.flatMap((p) =>
+            p.success ? [p.data.previewId] : [],
+          );
+          const reviews = (await bounded(
+            `SELECT ${auditFields} FROM public.audit_events WHERE id=ANY($1::uuid[]) ORDER BY id LIMIT $2`,
+            [previewIds, maxRows + 1],
+          )) as unknown as AuditEvent[];
+          const events = (await bounded(
+            `SELECT id, organization_id AS "organizationId", execution_id AS "executionId", actor_user_id AS "actorUserId", state, detail, created_at AS "createdAt" FROM public.revenue_execution_events WHERE execution_id=ANY($1::uuid[]) ORDER BY id LIMIT $2`,
+            [executionIds, maxRows + 1],
+          )) as unknown as RevenueExecutionEvent[];
+          const memberIds = [
+            ...new Set([
+              ...events.flatMap((e) => (e.actorUserId ? [e.actorUserId] : [])),
+              ...parsed.flatMap((p) =>
+                p.success
+                  ? [p.data.snapshot.actorUserId, p.data.snapshot.sender.userId]
+                  : [],
+              ),
+            ]),
+          ];
+          const participants = (await bounded(
+            `SELECT id, organization_id AS org FROM public.users WHERE id=ANY($1::text[]) ORDER BY id LIMIT $2`,
+            [memberIds, maxRows + 1],
+          )) as unknown as EstimateEmailRetainedLedger["participants"];
+          const receipts: Record<string, unknown>[] = [];
+          const usedAudits = new Set<string>(),
+            usedExecutions = new Set<string>();
+          for (const id of estimateIds) {
+            const key = `estimate-delivery:${id}:email`;
+            const owned = executions.filter(
+              (e) => e.actionKey.toLowerCase() === key,
+            );
+            const linked = audits.filter(
+              (a) =>
+                a.entityId?.toLowerCase() === id ||
+                String(
+                  (a.metadata as any)?.snapshot?.estimateId ?? "",
+                ).toLowerCase() === id ||
+                String((a.metadata as any)?.actionKey ?? "").toLowerCase() ===
+                  key,
+            );
+            if (!owned.length && !linked.length) continue;
+            const admission = linked.find(
+              (a) => a.action === "estimate_delivery.admitted",
+            );
+            const meta = estimateEmailAdmissionMetadataSchema.safeParse(
+              admission?.metadata,
+            );
+            const ledger: EstimateEmailRetainedLedger = {
+              org: organizationId,
+              id,
+              executions: owned,
+              audits: linked,
+              linkedAudits: audits.filter(
+                (a) => (a.metadata as any)?.executionId === owned[0]?.id,
+              ),
+              review: meta.success
+                ? reviews.find((r) => r.id === meta.data.previewId)
+                : undefined,
+              events: events.filter((e) => e.executionId === owned[0]?.id),
+              participants,
+            };
+            const receipt = projectEstimateEmailExport(ledger);
+            if (
+              !receipt ||
+              !included.get("contacts")?.has(receipt.contactId) ||
+              (receipt.leadId !== null &&
+                !included.get("leads")?.has(receipt.leadId)) ||
+              (receipt.customerWorkId !== null &&
+                !included
+                  .get("customer_work_roots")
+                  ?.has(receipt.customerWorkId)) ||
+              (receipt.propertyId !== null &&
+                !included.get("properties")?.has(receipt.propertyId))
+            )
+              throw unavailable();
+            receipts.push(receipt);
+            linked.forEach((a) => usedAudits.add(a.id));
+            owned.forEach((e) => usedExecutions.add(e.id));
+          }
+          // Orphan or corrupt retained ownership is a hold, never a partial receipt archive.
+          if (
+            audits.some((a) => !usedAudits.has(a.id)) ||
+            executions.some((e) => !usedExecutions.has(e.id))
+          )
+            throw unavailable();
+          bytes += Buffer.byteLength(JSON.stringify(receipts));
+          if (bytes > maxBytes)
+            throw new CustomerLifecycleError(
+              413,
+              "customer_export_limit",
+              "This company exceeds the core export size. No partial file was produced.",
+            );
+          data.estimate_email_receipts = receipts;
+          coverage.push({
+            table: "estimate_email_receipts",
+            fields: [
+              "estimateId",
+              "integrity",
+              "state",
+              "executionId",
+              "document",
+              "message",
+              "provider",
+              "providerMessageId",
+              "providerRequestId",
+              "acceptedAt",
+              "deliveryConfirmed",
+              "leadId",
+              "customerWorkId",
+              "contactId",
+              "propertyId",
+            ],
+            count: receipts.length,
+            withheldInvalidLinks: 0,
+          });
           await query("ROLLBACK");
-          const snapshot = { organization: org.rows[0], data, coverage };
+          const snapshot = {
+            organization: schedulingOrganization,
+            data,
+            coverage,
+          };
           // Revalidate against current state on this same bounded connection, outside
           // the earlier snapshot. Keep the actor stable through the audit commit.
           await query("BEGIN");
@@ -999,6 +1280,20 @@ export function createCustomerLifecycleExporter({
               byteLimit: maxBytes,
               tables: snapshot.coverage,
               exclusions: CUSTOMER_EXPORT_EXCLUSIONS,
+              schedulingPolicy: { state: schedulingPolicy.state },
+              schedulingHistory: schedulingHistory.coverage,
+              schedulingPolicySha256: createHash("sha256")
+                .update(
+                  JSON.stringify(snapshot.organization.schedulingPolicy),
+                  "utf8",
+                )
+                .digest("hex"),
+              schedulingHistorySha256: createHash("sha256")
+                .update(
+                  JSON.stringify(snapshot.organization.schedulingHistory),
+                  "utf8",
+                )
+                .digest("hex"),
               dataSha256: createHash("sha256")
                 .update(JSON.stringify(snapshot.data))
                 .digest("hex"),
@@ -1017,6 +1312,10 @@ export function createCustomerLifecycleExporter({
             exportId,
             scope: result.manifest.scope,
             dataSha256: result.manifest.dataSha256,
+            schedulingPolicy: result.manifest.schedulingPolicy,
+            schedulingHistory: result.manifest.schedulingHistory,
+            schedulingPolicySha256: result.manifest.schedulingPolicySha256,
+            schedulingHistorySha256: result.manifest.schedulingHistorySha256,
             counts: snapshot.coverage.map(
               ({ table, count, withheldInvalidLinks }) => ({
                 table,

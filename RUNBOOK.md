@@ -1,3 +1,7 @@
+# Current combined recovery operator — 2026-10-15
+
+See reports/combined-release-recovery-2026-10-15.md for the separate0019 full142 stage, exact frozen-source native8-container proof, supplied local composition and explicit future prepare-combined/execute-combined modes. The legacy commands below remain historical/legacy-only. Native combined preparation/execution requires completed current proof and the applicable separate provider/price/owner/capability authority; this source plan runs neither command against Fly. Actual gate status is external to the frozen source.
+
 # GrowthOS operating entry points
 
 ## Local development actions — October 10 UTC
@@ -306,3 +310,14 @@ playbook holds retain their step and require explicit enrollment review. Opt-out
 stops, outcomes and provider receipts remain available. Platform identity/security
 notifications remain independent. Offboarding requests preserve data and billing;
 separately review expanded exports, deletion, retention and credential revocation.
+## October12 supplied-client operator rehearsal
+
+`node scripts/production75-operator-local.mjs --run-local` is the explicit local
+fake-provider/owned-PG16 rehearsal. It uses synthetic data/admission and host trust;
+it never loads real credentials, invokes Fly, starts GrowthOS or changes originals.
+The import-safe operator requires explicitly supplied authenticated transport and
+proof callbacks; resource-owning callbacks must acquire through its terminal
+registry and honor signal/deadline. No default hosted execution command exists.
+See reports/bounded-operator-2026-10-12.md for evidence and remaining gates.
+Stale active.lock is a fail-closed recovery hold; never automatically steal it or
+replay a persisted reserved operation. Release requires exact-journal review.

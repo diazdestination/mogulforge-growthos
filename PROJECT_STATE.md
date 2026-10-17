@@ -1,4 +1,105 @@
+# Current combined release source contract — 2026-10-15
+
+The owner-approved P91b7fd2/Oc285c47 integration now uses separate legacy75→95→142 and scheduling0019 stages. See reports/combined-release-integration-2026-10-15.md and reports/combined-release-recovery-2026-10-15.md. Exact current task/native/recovery/CI acceptance is recorded externally at C:/Forge/artifacts/growthos-release-integration-20261015/execution-current.json and its final attestation; this tracked procedure is frozen before those runs and makes no future pass claim. All13 saved-scheduling source tasks atP remain accepted. Main7091, API/library and eight protected inputs retain their own strict source checks. Hosted Reader, compatible recovery-or-complete-hold, fullG04/G06 and both real contractor replacement cards remain required. No source/local action implies new spend, hosted preparation/migration, activation, deployment, merge or launch authority.
+
 # GrowthOS project state
+
+## October15 owner-approved combined-source implementation
+
+The owner approved design edadffad and implementation plan b198a77f on October15. ROOT has begun an isolated source integration of product P91b7fd2 and operations Oc285c47. Tasks1–13 of saved scheduling remain complete. The new eight-task combined-release implementation is in progress; combined native/recovery/release acceptance has not yet run. Main7091af8 and both original heads remain unchanged.
+
+Original19 SQL/0018, complete client requirements, full142 preservation and protected product/recovery inputs remain binding. Historical CI does not certify this candidate. Both contractor cards, fullG04/G06, real staff/provider/device evidence, compatible recovery/complete mutation hold, hosted rehearsal and applicable release authority remain open. No new spend, hosted/provider action, customer contact, merge to main or deployment is authorized by this source plan.
+
+## Historical source checkpoints
+
+The dated entries below retain historical receipts. The October15 execution status above supersedes their instructions that describe already completed source work as pending.
+
+## October13 reviewed initial estimate email candidate
+
+Office/admin/owner staff can review the complete saved lead or returning-customer
+quote and approve one initial email through the existing selected Gmail/Microsoft
+sender. Permanent ownership prevents duplicate/replayed attempts; original proof,
+uncertainty and customer history survive ordinary edits and cleanup. Manual status
+is labeled Record external send and remains separate from provider acceptance.
+
+Source ac13692 passed 4,760 full local tests (15 existing skips), types/both builds,
+Docker parity, source/SQL preservation and independent whole-branch review.
+The 142-table catalog and all 19 SQL inputs are unchanged relative to PR44;
+receipt export adds a dataset, not a table. This depends on PR56/3f3c524 and
+PR44/8df64dc. Exact publication-head CI must pass; its receipt is maintained in
+Forge's current state/artifacts. No merge, hosted migration, real send or deployment
+occurred. G-04, full G-06, FlyReader rehearsal and contractor acceptance stay open.
+Read reports/estimate-email-integration-2026-10-13.md.
+
+
+## October13 assigned crew end validation candidate
+
+Based on PR44/8df64dc, explicit end-only clears now reject before project writes
+when a start and assigned crew remain. The saved multi-day reservation cannot
+collapse to the legacy one-day fallback. Six regressions/compatibility checks;
+RED2fails thenGREEN32/32 realPG, full local4463pass/15existingAPI skips, types/both
+builds and independent reviewPASS. Exact publication CI remains a separate gate.
+No schema/SQL/provider changes or deployment. G-04 configurable capacity, G-06
+estimate delivery and both company acceptance cards remain open. Read
+reports/crew-schedule-end-validation-2026-10-13.md.
+
+## October12 supplied-client copy operator
+
+Separate tooling branch agent/growthos-bounded-operator-20261012 builds on
+PR45/283715f. PR44/8df64dc remains the fixed application candidate; its exact-head
+CI38271589412 passed. Full scripts519 tests, focused87 tests and workspace types
+pass after the five independent-review corrections. Native and publication proof
+are recorded in reports/bounded-operator-2026-10-12.md when complete.
+The operator supplies durable admission/custody, pinned V1 requests, exact Reader
+delta, bound rollback/commit baselines and terminal resource cleanup. Real
+authenticated drivers, provider profile/capability acceptance and a reviewed
+paid-copy packet remain open; all20 contractor gaps remain. No hosted action ran.
+
+## October12 combined launch candidate — local gates passed
+
+PR35 plus39–43 are combined on agent/growthos-release-integration-20261012.
+Independent review corrections cover strict CSV/address handling, source-only
+warranty rendering and preservation of provider-owned recovery metadata.
+4457 full-suite tests passed (15 skipped), types/both builds/Docker parity passed,
+and fictional browser import/preview checks passed. Source remains142 tables;
+all 19 SQL pins are unchanged. The real Fly75 upgrade, supported credential
+retirement and client/provider/device/payment/cutover gates remain open.
+See reports/release-integration-2026-10-12.md and its companion receipts.
+Exact publication-head GitHub CI is still required; no hosted actions occurred.
+
+
+## October 12 reviewed production restore retry — PASS, owned copy deleted
+
+New owner grant71fed7d3 consumed one restore POST201 and exact-owned DELETE202.
+The restored copy matched all three source databases/150table fingerprints/
+184records/full catalogs, permissions, ACLs, roles/settings and extension
+definitions. Fresh source-after matches; all read-only transactions rolled
+back and owned clients/sockets/proxies/agents closed. Copyq49ypo494e2017ln is
+terminal deleted and absent; originals and both stopped app configurations/
+secret metadata are unchanged.459.529seconds, cost estimateUSD0.07, billing
+unverified. Independent review accepted the V1 correction and final receipts.
+SourceHEAD remains87adc3e; prior64ddbaa9 FAIL remains preserved.
+
+Approved invoice6664df1 is published as draftPR42 against this branch.
+Local leaked-credential log redaction is recorded with service/backups/disk-WAL
+limitations. Rotation remains approved but deferred: providerV1 native rotation
+is unsupported; any V2 migration and production cutover/private-health start
+need separately admitted scope. No migration/cutover/secret/config/deployment
+occurred. Managed75-to142 upgrade/recovery and client acceptance remain open.
+See reports/production75-recovery-2026-10-11/managed-restore-retry-2026-10-12.md
+and C:\Forge\GROWTHOS_PRODUCTION_RESTORE_RETRY_2026-10-12.md.
+
+## October 12 production restore attempt — FAIL, cleanup verified
+
+PR35/87adc3e one-resource grant was consumed by one restore POST201 and one
+exact-owned DELETE202. Copy nlkxjo5wz64oy93v is terminal deleted and absent.
+Legacy API attachment metadata omission stopped restored-copy SQL verification;
+the production restore gate remains open. All three original DB snapshots and
+both stopped app configuration/secret metadata match, and all transports closed.
+Best costUSD0.07,3m42s through final verification; final billing unverified.
+No replacement, migration/cutover, secret-config or deployment authority.
+See reports/production75-recovery-2026-10-11/managed-restore-2026-10-12.md;
+correct/review V1 response handling and obtain fresh paid-restore approval next.
 
 ## October 10 consolidated local workday
 

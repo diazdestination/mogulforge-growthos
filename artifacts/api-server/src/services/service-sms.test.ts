@@ -10,6 +10,7 @@ import app from "../app";
 import { createSession, deleteSession } from "../lib/auth";
 import { createApiKey } from "./api-keys";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+import { syntheticTwilioNumber } from "../test-helpers/synthetic-twilio";
 import { approveServiceCare, bookServiceCareVisit, getServiceCare, recordServiceCareResponse } from "./service-care";
 import { approveServiceRecurrence, createServiceObligation, updateServiceObligation } from "./service-obligations";
 import { processDueScheduledActions } from "./automation";
@@ -18,10 +19,13 @@ import { assertServiceSmsParentDispatch, hasServiceSmsReplyHold, listServiceSmsR
 import { careFingerprint, type ServiceCareApproval } from "./service-care-policy";
 import { assertServiceSmsReplyStorageReady, parseServiceSmsReference } from "./service-sms-policy";
 import { twilioForOrganization } from "./twilio-controls";
+import { sendTwilioSms } from "./twilio-delivery";
+import { contactTouchReservationsTable as touches } from "../../../../lib/db/src/schema/contact-touch-reservations";
+import { touchAddress } from "./contact-touch-claim";
 
 const realFetch = globalThis.fetch, orgs: string[] = [], sessions: string[] = [];
 const token = "synthetic-service-sms-webhook", recipient = "+14045550123", origin = "https://growth.example";
-let server: Server, base: string, serial = 100, unknown = false;
+let server: Server, base: string, unknown = false;
 const posts: URLSearchParams[] = [];
 beforeAll(async () => { server = app.listen(0, "127.0.0.1"); await new Promise<void>(resolve => server.once("listening", resolve)); base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`; });
 beforeEach(() => {
@@ -46,7 +50,7 @@ async function fixture() {
   const [staff] = await db.insert(usersTable).values({ organizationId: org.id, role: "owner", emailVerifiedAt: new Date() }).returning();
   const [contact] = await db.insert(contactsTable).values({ organizationId: org.id, firstName: "Fictional service customer", phone: recipient }).returning();
   await db.insert(orgSettingsTable).values({ organizationId: org.id, sendingHours: { quietHoursEnabled: false, maxTouchesPerDay: 20 } });
-  const [binding] = await db.insert(twilioClientBindingsTable).values({ organizationId: org.id, accountSid: `AC${randomUUID().replaceAll("-", "")}`, phoneNumber: `+1500555${String(++serial).padStart(4, "0")}`,
+  const [binding] = await db.insert(twilioClientBindingsTable).values({ organizationId: org.id, accountSid: `AC${randomUUID().replaceAll("-", "")}`, phoneNumber: syntheticTwilioNumber(),
     messagingServiceSid: `MG${randomUUID().replaceAll("-", "")}`, apiKeySid: `SK${"a".repeat(32)}`, authTokenSecretRef: "TWILIO_CLIENT_SERVICE_SMS_AUTH_TOKEN", apiKeySecretRef: "TWILIO_CLIENT_SERVICE_SMS_API_KEY_SECRET", publicOrigin: origin,
     businessName: "Synthetic standing SMS", smsDisclosureVersion: "synthetic-service-sms-v1", dailySmsLimit: 50, launchApproved: true, smsEnabled: true, registrationApproved: true, advancedOptOut: true, geoPermissionsReviewed: true }).returning();
   await db.insert(consentRecordsTable).values({ organizationId: org.id, contactId: contact.id, channel: "sms", granted: true, disclosureVersion: binding.smsDisclosureVersion! });
@@ -114,6 +118,25 @@ describe("typed service SMS safety", () => {
     expect((await listServiceSmsReplies(f.org, f.staff, f.service.id)).items[0]).toMatchObject({ evidence: "signed_sms_reference", content: { text } });
     await processServiceWatch(f.org); expect((await getServiceWatch(f.org, f.staff, f.service.id)).reasons).toContain("reply_received_review");
     await processDueScheduledActions(f.org); expect(posts).toHaveLength(1);
+  });
+  it("withdraws service approval at the second guard and retains the parent, operation and contact allowance", async () => {
+    const f = await fixture(), queued = await queue(f), fingerprint = careFingerprint({ action: queued.scheduled.action, context: queued.scheduled.context });
+    await db.insert(revenueExecutionsTable).values({ organizationId: f.org, actionKey: `scheduled:${queued.scheduled.id}`, kind: "service_care_reminder", fingerprint, expiresAt: new Date(Date.now() + 300_000) });
+    const parentId = await reserveServiceSmsParent({ organizationId: f.org, serviceObligationId: f.service.id, approvalId: queued.approval.approvalId, scheduledActionId: queued.scheduled.id, executionFingerprint: fingerprint });
+    const logicalKey = `scheduled:${queued.scheduled.id}`, payloadHash = "a".repeat(64);
+    const [touch] = await db.insert(touches).values({ organizationId: f.org, contactId: f.contact.id, logicalKey, payloadHash, sourceKind: "service", channel: "sms", address: touchAddress("sms", recipient) }).returning();
+    const context = { organizationId: f.org, contactId: f.contact.id, purpose: "customer_care" as const, idempotencyKey: `service-care:${f.service.id}`, serviceSmsParentId: parentId, contactTouch: { logicalKey, payloadHash } };
+    let checks = 0;
+    const guard = vi.fn(async () => { if (++checks === 2) throw new Error("Synthetic service approval withdrawn at second guard"); });
+    await expect(sendTwilioSms(recipient, queued.preview.body, context, guard)).rejects.toThrow("withdrawn at second guard");
+    expect(guard).toHaveBeenCalledTimes(2); expect(posts).toHaveLength(0);
+    const [owned] = await db.select().from(twilioDispatchesTable).where(eq(twilioDispatchesTable.organizationId, f.org));
+    expect(owned).toMatchObject({ status: "cancelled", providerSid: null });
+    await expect(sendTwilioSms(recipient, queued.preview.body, context, guard)).rejects.toThrow(/cancelled/);
+    expect(guard).toHaveBeenCalledTimes(2); expect(posts).toHaveLength(0);
+    expect((await db.select().from(touches).where(eq(touches.id, touch.id)))[0]).toEqual(touch);
+    expect((await db.select().from(parents).where(eq(parents.id, parentId)))[0]).toMatchObject({ dispatchId: null, dispatchStartedAt: null });
+    expect((await db.select().from(twilioDispatchesTable).where(eq(twilioDispatchesTable.organizationId, f.org))).map(row => row.id)).toEqual([owned.id]);
   });
   it("keeps no-reference replies ambiguous even with one candidate and holds later same-phone occurrences", async () => {
     const f = await fixture(); await send(f);
@@ -223,8 +246,9 @@ describe("typed service SMS safety", () => {
     const [reply] = await db.select().from(replies).where(eq(replies.organizationId, f.org)); await reviewServiceSmsReply(f.org, f.staff, f.service.id, reply.id, review("handled"));
     const before = await getServiceCare(f.org, f.service.id, "sms");
     const response = await recordServiceCareResponse(f.org, f.staff, f.service.id, { requestId: randomUUID(), expectedUpdatedAt: before.expectedUpdatedAt, channel: "phone", outcome: "ready_to_book", respondedAt: new Date().toISOString(), note: "Office separately called the customer and confirmed the actual future visit window.", staffAttested: true });
-    const after = await getServiceCare(f.org, f.service.id, "sms");
-    await bookServiceCareVisit(f.org, f.staff, f.service.id, { requestId: randomUUID(), expectedUpdatedAt: after.expectedUpdatedAt, responseId: response.responseId, assignedUserId: f.staff, scheduledStart: "2030-01-05T15:00:00.000Z", scheduledEnd: "2030-01-05T16:00:00.000Z", type: "other", customerConfirmed: true });
+    const after = await getServiceCare(f.org, f.service.id, "sms", { actorUserId: f.staff, appointmentType: "other" });
+    if (after.scheduling.review.state !== "ready") throw new Error("Expected actual staff-reviewed service scheduling context");
+    await bookServiceCareVisit(f.org, f.staff, f.service.id, { requestId: randomUUID(), expectedUpdatedAt: after.expectedUpdatedAt, responseId: response.responseId, assignedUserId: f.staff, scheduledStart: "2030-01-05T15:00:00.000Z", scheduledEnd: "2030-01-05T16:00:00.000Z", type: "other", customerConfirmed: true, schedulingReview: { context: after.scheduling.review.context, duration: { kind: "explicit", preset: null }, startWallTime: null, endWallTime: null } });
     const [booked] = await db.select().from(serviceObligationsTable).where(eq(serviceObligationsTable.id, f.service.id));
     const completed = await updateServiceObligation(f.org, f.staff, f.service.id, { status: "completed", expectedUpdatedAt: booked.updatedAt.toISOString(), completionNote: "Synthetic technician explicitly recorded completed maintenance, not warranty eligibility." });
     if ("error" in completed) throw new Error(completed.error);

@@ -1,15 +1,18 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, webcrypto } from "node:crypto";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { activitiesTable, appointmentsTable, auditEventsTable, consentRecordsTable, contactsTable, crmTasksTable, customerLifecycleTable, db, emailIntelligenceSourcesTable, emailResponseReviewsTable, leadsTable, organizationsTable, orgSettingsTable, revenueExecutionsTable, scheduledActionsTable, serviceObligationsTable, twilioClientBindingsTable, twilioConsentProofsTable, usersTable } from "@workspace/db";
+import { activitiesTable, appointmentsTable, auditEventsTable, consentRecordsTable, contactsTable, crmTasksTable, customerLifecycleTable, db, pool, propertiesTable, DEFAULT_INSPECTION_AVAILABILITY, emailIntelligenceSourcesTable, emailResponseReviewsTable, leadsTable, organizationsTable, orgSettingsTable, revenueExecutionsTable, scheduledActionsTable, serviceObligationsTable, twilioClientBindingsTable, twilioConsentProofsTable, usersTable } from "@workspace/db";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+import { syntheticTwilioNumber, syntheticTwilioSid } from "../test-helpers/synthetic-twilio";
 import { approveServiceCare, bookServiceCareVisit, executeServiceCareReminder, getServiceCare, preflightServiceCareReminder, recordServiceCareResponse } from "./service-care";
-import { careFingerprint, serviceCareMessage } from "./service-care-policy";
+import { careCanonicalJson, careFingerprint, serviceCareMessage, serviceCareBookingSchema, serviceCareBookingOutcomeSchema, serviceCareBookingResultSchema, serviceCareSchedulingReadSchema } from "./service-care-policy";
 import { createServiceObligation, updateServiceObligation } from "./service-obligations";
 import { resolveCustomerEmailSender, sendCustomerEmail } from "./customer-email";
 import { processDueScheduledActions } from "./automation";
 import { addSuppression } from "./send-gate";
 import { updateAppointment } from "./crm";
+import { getSchedulingReviewContext, saveSchedulingPolicy } from "./scheduling-policy";
+import { transitionCustomerLifecycle } from "./customer-lifecycle";
 
 vi.mock("./customer-email", () => ({ resolveCustomerEmailSender: vi.fn(), sendCustomerEmail: vi.fn() }));
 const orgs: string[] = [], effects: string[] = [];
@@ -31,14 +34,15 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.clearAllMocks(); effects.length = 0; lateChange = null; unknownEffect = false; });
 afterAll(async () => { await deleteTestOrgs(...orgs); });
 async function fixture(dueDate = "2026-01-01") {
-  const [org] = await db.insert(organizationsTable).values({ name: "Synthetic Service Company", slug: `service-care-${randomUUID()}` }).returning(); orgs.push(org.id);
+  const [org] = await db.insert(organizationsTable).values({ name: "Synthetic Service Company", slug: `service-care-${randomUUID()}`, timezone: "UTC" }).returning(); orgs.push(org.id);
   const [staff] = await db.insert(usersTable).values({ organizationId: org.id, role: "office", emailVerifiedAt: new Date() }).returning();
+  const [owner] = await db.insert(usersTable).values({ organizationId: org.id, role: "owner", emailVerifiedAt: new Date() }).returning();
   const [contact] = await db.insert(contactsTable).values({ organizationId: org.id, firstName: "Synthetic customer", email: "customer@example.invalid", phone: "+14045550123" }).returning();
   await db.insert(orgSettingsTable).values({ organizationId: org.id, sendingHours: { quietHoursEnabled: false } });
   senders.set(org.id, { userId: staff.id, source: "company_default", provider: "gmail", senderEmail: "office@example.invalid" });
   const obligation = await createServiceObligation(org.id, staff.id, { contactId: contact.id, kind: "maintenance", equipmentLabel: "Synthetic heat pump", dueDate, noticeDays: 14, assignedUserId: staff.id });
   if ("error" in obligation) throw new Error(obligation.error);
-  return { org: org.id, staff: staff.id, contact: contact.id, obligation };
+  return { org: org.id, staff: staff.id, owner: owner.id, contact: contact.id, obligation };
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>;
 async function approvalInput(f: Fixture, channel: "email" | "sms" = "email") {
@@ -57,9 +61,10 @@ async function response(f: Fixture, outcome: "ready_to_book" | "follow_up" | "de
   const input = { requestId: randomUUID(), expectedUpdatedAt: care.expectedUpdatedAt, channel: "phone", outcome, respondedAt: new Date(Date.now() - 1000).toISOString(), note: "Synthetic customer explicitly agreed to office scheduling.", staffAttested: true };
   return { ...await recordServiceCareResponse(f.org, f.staff, f.obligation.id, input), input };
 }
-async function booking(f: Fixture, responseId: string, day = 1) {
+async function booking(f: Fixture, responseId: string, day = 1, type: "inspection" | "other" = "inspection") {
   const care = await getServiceCare(f.org, f.obligation.id);
-  return { requestId: randomUUID(), expectedUpdatedAt: care.expectedUpdatedAt, responseId, assignedUserId: f.staff, type: "inspection", customerConfirmed: true, scheduledStart: `2035-01-${String(day).padStart(2, "0")}T15:00:00.000Z`, scheduledEnd: `2035-01-${String(day).padStart(2, "0")}T16:00:00.000Z` };
+  const context = await getSchedulingReviewContext({ organizationId: f.org, userId: f.staff }, { sourceKind: "direct_customer", sourceId: f.contact, ...(care.scheduling?.source.propertyId ? { propertyId: care.scheduling.source.propertyId } : {}), reservationKind: "appointment", appointmentType: type });
+  return { requestId: randomUUID(), expectedUpdatedAt: care.expectedUpdatedAt, responseId, assignedUserId: f.staff, type, customerConfirmed: true as const, scheduledStart: `2035-01-${String(day).padStart(2, "0")}T15:00:00.000Z`, scheduledEnd: `2035-01-${String(day).padStart(2, "0")}T16:00:00.000Z`, schedulingReview: { context, duration: { kind: "explicit" as const, preset: null }, startWallTime: null, endWallTime: null } };
 }
 describe("one reviewed service reminder", () => {
   it("has fixed non-promotional copy without invented warranty terms and stable JSONB hashes", () => {
@@ -93,9 +98,9 @@ describe("one reviewed service reminder", () => {
     vi.stubEnv("EMAIL_INTELLIGENCE_ENCRYPTION_KEY", Buffer.alloc(32, 19).toString("base64"));
     vi.stubEnv("TWILIO_CLIENT_SERVICE_CARE_AUTH_TOKEN", "synthetic-webhook");
     vi.stubEnv("TWILIO_CLIENT_SERVICE_CARE_API_KEY_SECRET", "synthetic-secret");
-    const provider = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ sid: `SM${"a".repeat(32)}` }), { status: 201 }));
+    const provider = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ sid: syntheticTwilioSid("SM") }), { status: 201 }));
     vi.stubGlobal("fetch", provider);
-    await db.insert(twilioClientBindingsTable).values({ organizationId: f.org, accountSid: `AC${randomUUID().replaceAll("-", "")}`, phoneNumber: "+15005550009", messagingServiceSid: `MG${"2".repeat(32)}`, apiKeySid: `SK${"3".repeat(32)}`, authTokenSecretRef: "TWILIO_CLIENT_SERVICE_CARE_AUTH_TOKEN", apiKeySecretRef: "TWILIO_CLIENT_SERVICE_CARE_API_KEY_SECRET", publicOrigin: "https://synthetic.example.invalid", businessName: "Synthetic Service Company", smsDisclosureVersion: "synthetic-care-v1", dailySmsLimit: 20, launchApproved: true, smsEnabled: true, registrationApproved: true, advancedOptOut: true, geoPermissionsReviewed: true });
+    await db.insert(twilioClientBindingsTable).values({ organizationId: f.org, accountSid: `AC${randomUUID().replaceAll("-", "")}`, phoneNumber: syntheticTwilioNumber(), messagingServiceSid: `MG${"2".repeat(32)}`, apiKeySid: `SK${"3".repeat(32)}`, authTokenSecretRef: "TWILIO_CLIENT_SERVICE_CARE_AUTH_TOKEN", apiKeySecretRef: "TWILIO_CLIENT_SERVICE_CARE_API_KEY_SECRET", publicOrigin: "https://synthetic.example.invalid", businessName: "Synthetic Service Company", smsDisclosureVersion: "synthetic-care-v1", dailySmsLimit: 20, launchApproved: true, smsEnabled: true, registrationApproved: true, advancedOptOut: true, geoPermissionsReviewed: true });
     await db.insert(consentRecordsTable).values({ organizationId: f.org, contactId: f.contact, channel: "sms", granted: true, disclosureVersion: "synthetic-care-v1" });
     await db.insert(twilioConsentProofsTable).values({ organizationId: f.org, contactId: f.contact, phone: "+14045550123", purpose: "customer_care", granted: true, disclosureVersion: "synthetic-care-v1", source: "synthetic fixture only" });
     await queue(f, "sms"); await processDueScheduledActions(f.org); await processDueScheduledActions(f.org);
@@ -225,7 +230,7 @@ describe("staff response to confirmed office booking", () => {
   it("books exactly one linked appointment, returning the original receipt after a lost acknowledgment", async () => {
     const f = await fixture(); const r = await response(f), input = await booking(f, r.responseId);
     const first = await bookServiceCareVisit(f.org, f.staff, f.obligation.id, input);
-    expect(await bookServiceCareVisit(f.org, f.staff, f.obligation.id, input)).toEqual({ appointmentId: first.appointmentId, replayed: true });
+    expect(await bookServiceCareVisit(f.org, f.staff, f.obligation.id, input)).toEqual({ ...first, replayed: true });
     const care = await getServiceCare(f.org, f.obligation.id); expect(care.appointment).toMatchObject({ id: first.appointmentId, status: "confirmed" }); expect(care.active).toBe(true);
     expect((await db.select().from(crmTasksTable).where(eq(crmTasksTable.id, f.obligation.taskId)))[0].status).toBe("done");
     expect(await db.select().from(appointmentsTable).where(eq(appointmentsTable.organizationId, f.org))).toHaveLength(1); expect(effects).toHaveLength(0);
@@ -247,7 +252,7 @@ describe("staff response to confirmed office booking", () => {
     await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, input)).rejects.toMatchObject({ code: "resource_conflict" });
     await db.delete(appointmentsTable).where(eq(appointmentsTable.organizationId, f.org));
     await db.insert(appointmentsTable).values({ organizationId: f.org, contactId: f.contact, type: "inspection", scheduledStart: new Date(input.scheduledStart), scheduledEnd: new Date(input.scheduledEnd) });
-    await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, input)).rejects.toMatchObject({ code: "capacity_conflict" });
+    await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, input)).rejects.toMatchObject({ code: "inspection_capacity_conflict" });
   });
   it("reopens follow-up on cancellation and requires a fresh response before rebooking", async () => {
     const f = await fixture(), r = await response(f), input = await booking(f, r.responseId, 3);
@@ -271,5 +276,227 @@ describe.skipIf(process.env.SCHEDULER_TEST_BACKEND === "pglite")("independent Po
     const results = await Promise.allSettled([approveServiceCare(f.org, f.staff, f.obligation.id, input), approveServiceCare(f.org, f.staff, f.obligation.id, { ...input, requestId: randomUUID() })]);
     expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
     expect(await db.select().from(scheduledActionsTable).where(eq(scheduledActionsTable.organizationId, f.org))).toHaveLength(1);
+  });
+});
+
+async function configureScheduling(f: Fixture, gap = 30, cap: number | null = 2) {
+  return saveSchedulingPolicy({ organizationId: f.org, userId: f.owner }, { expectedRevision: 0, expectedCompanyTimeZone: "UTC", enabled: true, minimumTravelGapMinutes: gap, maxConcurrentReservations: cap, durationPresets: [] });
+}
+describe("reviewed service-care scheduling", () => {
+  it("provides actual source and selected-type context without a connected reminder sender", async () => {
+    const f = await fixture();
+    const [property] = await db.insert(propertiesTable).values({ organizationId: f.org, contactId: f.contact, addressLine1: "Synthetic property", city: "Synthetic", state: "CA", postalCode: "00000" }).returning();
+    await db.update(serviceObligationsTable).set({ propertyId: property.id }).where(eq(serviceObligationsTable.id, f.obligation.id));
+    senders.delete(f.org);
+    const read = await getServiceCare(f.org, f.obligation.id, "email", { actorUserId: f.staff, appointmentType: "other" });
+    expect(read.preview).toBeNull();
+    expect(read.scheduling).toMatchObject({ organizationId: f.org, actorUserId: f.staff, obligationId: f.obligation.id, expectedUpdatedAt: read.expectedUpdatedAt, appointmentType: "other", source: { sourceKind: "direct_customer", contactId: f.contact, propertyId: property.id, leadId: null, estimateId: null }, review: { state: "ready", policy: null, context: { companyTimeZone: "UTC", inspection: null, targetVersion: null, targetFingerprint: null } } });
+    const inspection = await getServiceCare(f.org, f.obligation.id, "sms", { actorUserId: f.staff, appointmentType: "inspection" });
+    expect(inspection.scheduling.review.state).toBe("ready");
+    if (inspection.scheduling.review.state === "ready") expect(inspection.scheduling.review.context.inspection).not.toBeNull();
+    expect(effects).toHaveLength(0);
+  });
+  it("keeps absent property null and holds missing reader or invalid policy without erasing history", async () => {
+    const f = await fixture();
+    expect((await getServiceCare(f.org, f.obligation.id)).scheduling).toMatchObject({ actorUserId: null, source: { propertyId: null }, review: { state: "held", code: "scheduling_reader_required" } });
+    await db.update(organizationsTable).set({ timezone: "Invalid/Zone" }).where(eq(organizationsTable.id, f.org));
+    const read = await getServiceCare(f.org, f.obligation.id, "email", { actorUserId: f.staff });
+    expect(read).toMatchObject({ active: true, obligationId: f.obligation.id, scheduling: { source: { contactId: f.contact, propertyId: null }, review: { state: "held", code: "invalid_scheduling_policy" } } });
+  });
+  it("requires review on fresh revision-zero staff bookings without minting a receipt", async () => {
+    const f = await fixture(), r = await response(f), { schedulingReview: _review, ...legacy } = await booking(f, r.responseId);
+    await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, legacy)).rejects.toMatchObject({ code: "stale_scheduling_review" });
+    expect(await db.select().from(appointmentsTable).where(eq(appointmentsTable.organizationId, f.org))).toHaveLength(0);
+    expect(await db.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, f.org), eq(auditEventsTable.action, "service.care_visit_booked")))).toHaveLength(0);
+  });
+  it("rejects a stale company-zone review before source side effects", async () => {
+    const f = await fixture(), r = await response(f), input = await booking(f, r.responseId);
+    await db.update(organizationsTable).set({ timezone: "America/Los_Angeles" }).where(eq(organizationsTable.id, f.org));
+    await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, input)).rejects.toMatchObject({ code: "stale_scheduling_review" });
+    expect(await db.select().from(appointmentsTable).where(eq(appointmentsTable.organizationId, f.org))).toHaveLength(0);
+    expect((await db.select().from(crmTasksTable).where(eq(crmTasksTable.id, f.obligation.taskId)))[0].status).toBe("open");
+  });
+  it("replays the original audit-bound result before changed policy, lifecycle, service and target", async () => {
+    const f = await fixture(), configured = await configureScheduling(f);
+    const r = await response(f), input = await booking(f, r.responseId), first = await bookServiceCareVisit(f.org, f.staff, f.obligation.id, input);
+    expect(first.bookingOutcome).toMatchObject({ formatVersion: 1, status: "committed", organizationId: f.org, actorUserId: f.staff, obligationId: f.obligation.id, requestId: input.requestId, requestFingerprint: careFingerprint(input), responseId: r.responseId, expectedUpdatedAt: input.expectedUpdatedAt, appointmentId: first.appointmentId });
+    await db.update(orgSettingsTable).set({ schedulingPolicy: { ...configured.policy!, digest: "f".repeat(64) } }).where(eq(orgSettingsTable.organizationId, f.org));
+    await db.update(organizationsTable).set({ timezone: "Invalid/Zone" }).where(eq(organizationsTable.id, f.org));
+    await transitionCustomerLifecycle(f.org, f.owner, { action: "pause", expectedVersion: 0, reason: "Synthetic pause after original booking" });
+    await db.update(serviceObligationsTable).set({ status: "cancelled", appointmentId: null }).where(eq(serviceObligationsTable.id, f.obligation.id));
+    await db.delete(appointmentsTable).where(eq(appointmentsTable.id, first.appointmentId));
+    expect(await bookServiceCareVisit(f.org, f.owner, f.obligation.id, input)).toEqual({ ...first, replayed: true });
+    expect(await db.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, f.org), eq(auditEventsTable.action, "scheduling.reservation_transition.v1")))).toHaveLength(1);
+    await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, { ...input, requestId: randomUUID() })).rejects.toMatchObject({ code: "customer_lifecycle_paused" });
+  });
+  it("preserves historical omitted-review hashes and holds corrupted receipt proof", async () => {
+    const f = await fixture(), r = await response(f), { schedulingReview: _review, ...original } = await booking(f, r.responseId);
+    const legacy = { ...original, requestId: original.requestId.toUpperCase(), expectedUpdatedAt: original.expectedUpdatedAt.replace("Z", "000Z") }; // Retain the original UUID case and accepted timestamp precision.
+    const appointmentId = randomUUID();
+    const [audit] = await db.insert(auditEventsTable).values({ organizationId: f.org, actorUserId: f.staff, entityType: "service_obligation", entityId: f.obligation.id, action: "service.care_visit_booked", metadata: { ...legacy, appointmentId, requestFingerprint: careFingerprint(legacy), evidence: "staff_attested_customer_confirmation" } }).returning();
+    await db.delete(serviceObligationsTable).where(eq(serviceObligationsTable.id, f.obligation.id));
+    const result = await bookServiceCareVisit(f.org, f.owner, f.obligation.id, legacy);
+    expect(result).toMatchObject({ appointmentId, replayed: true, bookingOutcome: { bookingId: audit.id, actorUserId: f.staff, requestFingerprint: careFingerprint(legacy), expectedUpdatedAt: legacy.expectedUpdatedAt } });
+    await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, { ...legacy, schedulingReview: _review })).rejects.toMatchObject({ code: "request_changed" });
+    await db.update(auditEventsTable).set({ metadata: { ...audit.metadata, appointmentId: "not-a-uuid" } }).where(eq(auditEventsTable.id, audit.id));
+    await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, legacy)).rejects.toMatchObject({ code: "invalid_booking_receipt" });
+  });
+  it("rejects reviewed source/type changes and a replacement latest response", async () => {
+    const f = await fixture(), r = await response(f), input = await booking(f, r.responseId);
+    await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, { ...input, type: "other" })).rejects.toMatchObject({ code: "stale_scheduling_review" });
+    await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, { ...input, schedulingReview: { ...input.schedulingReview, context: { ...input.schedulingReview.context, source: { ...input.schedulingReview.context.source, contactId: randomUUID() } } } })).rejects.toMatchObject({ code: "stale_scheduling_review" });
+    await response(f);
+    const fresh = await booking(f, r.responseId);
+    await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, fresh)).rejects.toMatchObject({ code: "response_required" });
+    expect(await db.select().from(appointmentsTable).where(eq(appointmentsTable.organizationId, f.org))).toHaveLength(0);
+  });
+  it("rejects incoherent source properties and unaccepted scheduling readers", async () => {
+    const f = await fixture(), foreign = await fixture();
+    const [property] = await db.insert(propertiesTable).values({ organizationId: foreign.org, contactId: foreign.contact, addressLine1: "Synthetic foreign property", city: "Synthetic", state: "CA", postalCode: "00000" }).returning();
+    await db.update(serviceObligationsTable).set({ propertyId: property.id }).where(eq(serviceObligationsTable.id, f.obligation.id));
+    await expect(getServiceCare(f.org, f.obligation.id, "email", { actorUserId: f.staff })).rejects.toMatchObject({ code: "customer_reference_mismatch" });
+    await expect(getServiceCare(f.org, f.obligation.id, "email", { actorUserId: foreign.staff })).rejects.toMatchObject({ code: "scheduling_access_denied" });
+  });
+  it("holds changed service worksite even when its timestamp was retained", async () => {
+    const f = await fixture(), r = await response(f), input = await booking(f, r.responseId);
+    const [property] = await db.insert(propertiesTable).values({ organizationId: f.org, contactId: f.contact, addressLine1: "Synthetic changed worksite", city: "Synthetic", state: "CA", postalCode: "00000" }).returning();
+    await db.update(serviceObligationsTable).set({ propertyId: property.id, updatedAt: new Date(input.expectedUpdatedAt) }).where(eq(serviceObligationsTable.id, f.obligation.id));
+    await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, input)).rejects.toMatchObject({ code: "stale_scheduling_review" });
+    expect(await db.select().from(appointmentsTable).where(eq(appointmentsTable.organizationId, f.org))).toHaveLength(0);
+  });
+  it("retains the saved neighbor travel gap after policy disable", async () => {
+    const f = await fixture(); await configureScheduling(f, 60, null);
+    const r = await response(f), original = await booking(f, r.responseId);
+    const first = await bookServiceCareVisit(f.org, f.staff, f.obligation.id, original);
+    const stored = (await db.select().from(appointmentsTable).where(eq(appointmentsTable.id, first.appointmentId)))[0];
+    expect(stored.schedulingReservation).toMatchObject({ minimumTravelGapMinutes: 60, admittedByUserId: f.staff, target: { id: first.appointmentId } });
+    await saveSchedulingPolicy({ organizationId: f.org, userId: f.owner }, { expectedRevision: 1, expectedCompanyTimeZone: "UTC", enabled: false, minimumTravelGapMinutes: 0, maxConcurrentReservations: null, durationPresets: [] });
+    const obligation = await createServiceObligation(f.org, f.staff, { contactId: f.contact, kind: "maintenance", equipmentLabel: "Synthetic second system", dueDate: "2035-01-01", noticeDays: 14 });
+    if ("error" in obligation) throw Error(obligation.error);
+    const next = { ...f, obligation }, nextResponse = await response(next), input = await booking(next, nextResponse.responseId);
+    const tooClose = { ...input, scheduledStart: "2035-01-01T16:30:00.000Z", scheduledEnd: "2035-01-01T17:30:00.000Z" };
+    await expect(bookServiceCareVisit(f.org, f.staff, obligation.id, tooClose)).rejects.toMatchObject({ code: "travel_conflict" });
+    expect(await bookServiceCareVisit(f.org, f.staff, obligation.id, { ...input, scheduledStart: "2035-01-01T17:00:00.000Z", scheduledEnd: "2035-01-01T18:00:00.000Z" })).toMatchObject({ replayed: false });
+  });
+  it("uses true peak for inspection/company capacity without the old intersection-count gate", async () => {
+    const f = await fixture();
+    await db.update(orgSettingsTable).set({ inspectionAvailability: { ...DEFAULT_INSPECTION_AVAILABILITY, maxBookingsPerWindow: 2 } }).where(eq(orgSettingsTable.organizationId, f.org));
+    await configureScheduling(f, 0, 2);
+    await db.insert(appointmentsTable).values([15, 16].map(hour => ({ organizationId: f.org, contactId: f.contact, type: "inspection" as const, scheduledStart: new Date(`2035-01-01T${hour}:00:00.000Z`), scheduledEnd: new Date(`2035-01-01T${hour + 1}:00:00.000Z`) })));
+    const r = await response(f), input = { ...await booking(f, r.responseId), scheduledEnd: "2035-01-01T17:00:00.000Z" };
+    expect(await bookServiceCareVisit(f.org, f.staff, f.obligation.id, input)).toMatchObject({ replayed: false });
+    expect(await db.select().from(appointmentsTable).where(eq(appointmentsTable.organizationId, f.org))).toHaveLength(3);
+  });
+  it("enforces the general company ceiling on non-inspection service bookings", async () => {
+    const f = await fixture(); await configureScheduling(f, 0, 1);
+    await db.insert(appointmentsTable).values({ organizationId: f.org, contactId: f.contact, type: "production", scheduledStart: new Date("2035-01-01T15:00:00.000Z"), scheduledEnd: new Date("2035-01-01T16:00:00.000Z") });
+    const r = await response(f), input = await booking(f, r.responseId, 1, "other");
+    await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, input)).rejects.toMatchObject({ code: "company_capacity_conflict" });
+    expect(await db.select().from(scheduledActionsTable).where(eq(scheduledActionsTable.organizationId, f.org))).toHaveLength(0);
+  });
+  it("rolls back native row, source link, task, reminder and transition when the original receipt fails", async () => {
+    const f = await fixture(), r = await response(f), input = await booking(f, r.responseId), hook = `qa_care_rollback_${randomUUID().replaceAll("-", "")}`;
+    await pool.query(`CREATE FUNCTION ${hook}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.organization_id='${f.org}'::uuid AND NEW.action='service.care_visit_booked' THEN RAISE EXCEPTION 'Synthetic source receipt failure'; END IF; RETURN NEW; END $$`);
+    await pool.query(`CREATE TRIGGER ${hook} BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION ${hook}()`);
+    try { await expect(bookServiceCareVisit(f.org, f.staff, f.obligation.id, input)).rejects.toThrow(); }
+    finally { await pool.query(`DROP TRIGGER IF EXISTS ${hook} ON audit_events`); await pool.query(`DROP FUNCTION IF EXISTS ${hook}()`); }
+    expect(await db.select().from(appointmentsTable).where(eq(appointmentsTable.organizationId, f.org))).toHaveLength(0);
+    expect(await db.select().from(scheduledActionsTable).where(eq(scheduledActionsTable.organizationId, f.org))).toHaveLength(0);
+    expect((await db.select().from(serviceObligationsTable).where(eq(serviceObligationsTable.id, f.obligation.id)))[0]).toMatchObject({ appointmentId: null, updatedAt: new Date(input.expectedUpdatedAt) });
+    expect((await db.select().from(crmTasksTable).where(eq(crmTasksTable.id, f.obligation.taskId)))[0].status).toBe("open");
+    expect(await db.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, f.org), eq(auditEventsTable.action, "scheduling.reservation_transition.v1")))).toHaveLength(0);
+    expect(await db.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, f.org), eq(auditEventsTable.action, "service.care_visit_booked")))).toHaveLength(0);
+  });
+});
+
+async function waitForBlocker(pid: number, pattern = "%") {
+  for (let i = 0; i < 200; i++) {
+    const result = await pool.query("SELECT pid FROM pg_stat_activity WHERE $1::int=ANY(pg_blocking_pids(pid)) AND query ILIKE $2", [pid, pattern]);
+    if (result.rows[0]) return Number(result.rows[0].pid);
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error("Independent PostgreSQL service-care barrier was not observed");
+}
+async function careBarrier(table: "appointments" | "customer_lifecycle", org: string) {
+  const name = `qa_care_${randomUUID().replaceAll("-", "")}`, keeper = await pool.connect();
+  await pool.query(`CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.organization_id='${org}'::uuid THEN PERFORM pg_advisory_xact_lock(hashtext('${name}')); END IF; RETURN NEW; END $$`);
+  await pool.query(`CREATE TRIGGER ${name} BEFORE INSERT ON ${table} FOR EACH ROW EXECUTE FUNCTION ${name}()`);
+  await keeper.query("BEGIN");
+  await keeper.query("SELECT pg_advisory_xact_lock(hashtext($1))", [name]);
+  return {
+    pid: Number((await keeper.query("SELECT pg_backend_pid() AS pid")).rows[0].pid),
+    release: () => keeper.query("COMMIT"),
+    cleanup: async (pending: Promise<unknown>[]) => {
+      await keeper.query("ROLLBACK"); keeper.release(); await Promise.allSettled(pending);
+      await pool.query(`DROP TRIGGER IF EXISTS ${name} ON ${table}`);
+      await pool.query(`DROP FUNCTION IF EXISTS ${name}()`);
+    },
+  };
+}
+describe.skipIf(process.env.SCHEDULER_TEST_BACKEND === "pglite")("service-care lifecycle admission races", () => {
+  it.each([true, false])("serializes pause and fresh booking with pauseFirst=%s", async pauseFirst => {
+    const f = await fixture(), r = await response(f), input = await booking(f, r.responseId), pending: Promise<unknown>[] = [];
+    const hold = await careBarrier(pauseFirst ? "customer_lifecycle" : "appointments", f.org);
+    const observe = (value: Promise<unknown>) => { pending.push(value); void value.catch(() => {}); return value; };
+    const pause = () => transitionCustomerLifecycle(f.org, f.owner, { action: "pause", expectedVersion: 0, reason: "Synthetic lifecycle scheduling contender" });
+    const book = () => bookServiceCareVisit(f.org, f.staff, f.obligation.id, input);
+    try {
+      const first = observe(pauseFirst ? pause() : book()), firstPid = await waitForBlocker(hold.pid, "%insert into%");
+      const second = observe(pauseFirst ? book() : pause()), secondPid = await waitForBlocker(firstPid, "%pg_advisory_xact_lock%");
+      expect(new Set([hold.pid, firstPid, secondPid]).size).toBe(3);
+      await hold.release(); await first;
+      if (pauseFirst) await expect(second).rejects.toMatchObject({ code: "customer_lifecycle_paused" });
+      else await second;
+      expect(await db.select().from(appointmentsTable).where(eq(appointmentsTable.organizationId, f.org))).toHaveLength(pauseFirst ? 0 : 1);
+      expect(await db.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, f.org), eq(auditEventsTable.action, "service.care_visit_booked")))).toHaveLength(pauseFirst ? 0 : 1);
+    } finally { await hold.cleanup(pending); }
+  }, 30000);
+  it.each(["actor", "property"] as const)("rechecks committed %s authority after an independent row-lock contender", async kind => {
+    const f = await fixture();
+    const [other] = await db.insert(contactsTable).values({ organizationId: f.org, firstName: "Synthetic different customer" }).returning();
+    const [property] = await db.insert(propertiesTable).values({ organizationId: f.org, contactId: f.contact, addressLine1: "Synthetic locked property", city: "Synthetic", state: "CA", postalCode: "00000" }).returning();
+    await db.update(serviceObligationsTable).set({ propertyId: property.id }).where(eq(serviceObligationsTable.id, f.obligation.id));
+    const r = await response(f), input = await booking(f, r.responseId), keeper = await pool.connect();
+    let pending: Promise<unknown> | undefined;
+    try {
+      await keeper.query("BEGIN");
+      if (kind === "actor") await keeper.query("UPDATE users SET is_active=false WHERE id=$1", [f.staff]);
+      else await keeper.query("UPDATE properties SET contact_id=$1 WHERE id=$2", [other.id, property.id]);
+      const pid = Number((await keeper.query("SELECT pg_backend_pid() AS pid")).rows[0].pid);
+      pending = bookServiceCareVisit(f.org, f.staff, f.obligation.id, input); void pending.catch(() => {});
+      expect(await waitForBlocker(pid, "%for share%")).not.toBe(pid);
+      await keeper.query("COMMIT");
+      await expect(pending).rejects.toMatchObject({ code: kind === "actor" ? "invalid_assignee" : "customer_reference_mismatch" });
+      expect(await db.select().from(appointmentsTable).where(eq(appointmentsTable.organizationId, f.org))).toHaveLength(0);
+    } finally { await keeper.query("ROLLBACK"); keeper.release(); if (pending) await Promise.allSettled([pending]); }
+  }, 30000);
+});
+
+describe("closed service-care wire contract and browser hash vectors", () => {
+  const legacy = { requestId: "11111111-1111-4111-8111-111111111111", expectedUpdatedAt: "2035-01-01T00:00:00.000Z", responseId: "22222222-2222-4222-8222-222222222222", assignedUserId: "staff_original", scheduledStart: "2035-01-02T15:00:00.000Z", scheduledEnd: "2035-01-02T16:00:00.000Z", type: "other" as const, customerConfirmed: true as const };
+  const context = { organizationId: "33333333-3333-4333-8333-333333333333", policyRevision: 0, policyDigest: null, companyTimeZone: "UTC", inspection: null, applicableRules: { newTravelGapMinutes: 0, companyCeiling: null, inspectionCeiling: null }, source: { sourceKind: "direct_customer" as const, leadId: null, contactId: "44444444-4444-4444-8444-444444444444", propertyId: null, estimateId: null }, targetVersion: null, targetFingerprint: null };
+  const reviewed = { ...legacy, schedulingReview: { context, duration: { kind: "explicit" as const, preset: null }, startWallTime: null, endWallTime: null } };
+  it.each([
+    { name: "omitted historical review", input: legacy, hash: "e29febeb749f7845406e3a06ec0b41c79d0f77fb77849f88efb408ad9efd0785" },
+    { name: "exact reviewed booking", input: reviewed, hash: "1fc0cef9f16c12614302654ed91035d324378851f42dffff4ce58e2928306a2a" },
+  ])("pins the $name vector against browser-compatible Web Crypto", async ({ input, hash }) => {
+    expect(serviceCareBookingSchema.parse(input)).toEqual(input);
+    const canonical = careCanonicalJson(input);
+    const browserDigest = await webcrypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+    expect(Array.from(new Uint8Array(browserDigest), value => value.toString(16).padStart(2, "0")).join("")).toBe(hash);
+    expect(careFingerprint(input)).toBe(hash);
+    expect(careFingerprint(Object.fromEntries(Object.entries(input).reverse()))).toBe(hash);
+  });
+  it("closes every new object without accepting authority or normalizing omitted review", () => {
+    expect(Object.hasOwn(serviceCareBookingSchema.parse(legacy), "schedulingReview")).toBe(false);
+    expect(serviceCareBookingSchema.safeParse({ ...legacy, schedulingReview: null }).success).toBe(false);
+    expect(serviceCareBookingSchema.safeParse({ ...reviewed, schedulingReview: { ...reviewed.schedulingReview, context: { ...context, actorUserId: "forged" } } }).success).toBe(false);
+    const read = { organizationId: context.organizationId, actorUserId: "staff_original", obligationId: legacy.requestId, expectedUpdatedAt: legacy.expectedUpdatedAt, appointmentType: "other", source: context.source, review: { state: "ready", policy: null, context } };
+    expect(serviceCareSchedulingReadSchema.safeParse(read).success).toBe(true);
+    for (const altered of [{ ...read, actor: "forged" }, { ...read, actorUserId: null }, { ...read, source: { ...read.source, contactId: legacy.requestId } }, { ...read, source: { ...read.source, customerWorkId: legacy.requestId } }, { ...read, review: { ...read.review, snapshot: {} } }]) expect(serviceCareSchedulingReadSchema.safeParse(altered).success).toBe(false);
+    const outcome = { formatVersion: 1, status: "committed", organizationId: context.organizationId, actorUserId: "staff_original", obligationId: legacy.requestId, bookingId: legacy.responseId, requestId: legacy.requestId, requestFingerprint: careFingerprint(legacy), responseId: legacy.responseId, expectedUpdatedAt: legacy.expectedUpdatedAt, appointmentId: context.source.contactId };
+    expect(serviceCareBookingOutcomeSchema.safeParse(outcome).success).toBe(true);
+    expect(serviceCareBookingOutcomeSchema.safeParse({ ...outcome, available: true }).success).toBe(false);
+    expect(serviceCareBookingResultSchema.safeParse({ appointmentId: legacy.requestId, replayed: true, bookingOutcome: outcome }).success).toBe(false);
   });
 });

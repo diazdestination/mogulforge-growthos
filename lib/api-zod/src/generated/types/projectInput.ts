@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProjectStatus } from './projectStatus';
+import type { SchedulingMutationReview } from './schedulingMutationReview';
 
 export interface ProjectInput {
   leadId: string;
@@ -17,4 +18,6 @@ export interface ProjectInput {
   scheduledEnd?: Date;
   crewUserIds?: string[];
   crewNotes?: string;
+  operationId?: string;
+  schedulingReview?: SchedulingMutationReview;
 }

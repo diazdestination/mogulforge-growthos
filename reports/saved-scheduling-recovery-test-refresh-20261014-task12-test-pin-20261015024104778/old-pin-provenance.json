@@ -1,0 +1,48 @@
+{
+  "executedBeforeFixtureEdit": true,
+  "checkout": {
+    "commit": "2901da320e41a47e77cc86e97d2c2f59fffa824d",
+    "tree": "f858832a833233ecf2f3844ad6222f0e6bbdcc8d",
+    "dirtyScope": []
+  },
+  "oldProductionCommit": "2a62bf754204b7a218249acba6abe32e656d2ce1",
+  "oldProductionTree": "dc7a1895f43dc992d24c0908f8d5feae74c74f6f",
+  "productScopeDiffBytes": 5043,
+  "productScopeDiffSha256": "4cf05e2f8f7c53e0564556dee059a60295ab11e76956e7c8d5a49c5c1b774bd7",
+  "changedTests": [
+    {
+      "path": "artifacts/api-server/src/routes/v1/route-inventory.test.ts",
+      "gitBlob": "10984bd665b3eb8c51467d4c1adf12cda03c69bc",
+      "gitBytes": 29416,
+      "gitSha256": "e282fe7f455945562b8a507ceca3a766d911ff25b699c5570d05a1545f0c40bb",
+      "workingBytes": 30066,
+      "workingSha256": "a5faf4956f5020e1ef907877f7577af88db76d2167777484cf7f815b32acae52"
+    },
+    {
+      "path": "artifacts/api-server/src/services/returning-invoice-delivery-concurrency.test.ts",
+      "gitBlob": "b9b22825244ff05be22630657465032980120c06",
+      "gitBytes": 17058,
+      "gitSha256": "6fc2b31fa8ef06d0633cba8ef4fa7793347d7a592b4261f38dd4bb4847c54ef3",
+      "workingBytes": 17565,
+      "workingSha256": "0b71aa825cb59583506b066485fc7c4e937a27f8798d7c45c2ef28768b2ae8d3"
+    },
+    {
+      "path": "artifacts/api-server/src/services/scheduler-restart.test.ts",
+      "gitBlob": "23b3502e6771efe6315e3e334e3845afa093831a",
+      "gitBytes": 7609,
+      "gitSha256": "61e1df78df7ebc2cd3572ac9c2c4a8a58f23ede95e5daaac0dd533afd4334143",
+      "workingBytes": 7833,
+      "workingSha256": "fd5ce49b669ddd2241b9eee3ec4b19f4422f9074b7ad98f81d02e2d2a5ee0afa"
+    }
+  ],
+  "standaloneFailure": "CONTRACTOR_RECOVERY_FAILED:assertion",
+  "existingTestFailure": "accepted production source must remain exact: 5043 !== 0, contractor-recovery-drill.mjs:294",
+  "noSkips": true,
+  "cleanup": [
+    {
+      "kind": "database",
+      "mode": "source",
+      "closed": true
+    }
+  ]
+}

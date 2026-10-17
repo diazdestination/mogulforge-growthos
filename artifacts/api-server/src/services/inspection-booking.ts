@@ -1,90 +1,141 @@
-/**
- * Shared capacity-guarded insert for inspection appointments.
- *
- * Both the concierge chat booking and staff CRM/API booking go through this
- * helper so neither path can double-book an inspection window the other just
- * filled. The transaction takes a per-org+start advisory lock and re-counts
- * overlapping active inspections against the org's configured capacity.
- */
-import { appointmentsTable, db, orgSettingsTable, DEFAULT_INSPECTION_AVAILABILITY } from "@workspace/db";
-import { and, eq, gt, inArray, lt, ne, sql } from "drizzle-orm";
-
-import { assertOperationalStaff, assertResourceWindow, assertScheduleInterval, lockContractorSchedule, type ScheduleTransaction } from "./contractor-scheduling";
+/** Inspection compatibility wrappers and the common offer/admission gate. */
+import { randomUUID } from "node:crypto";
+import { appointmentsTable, db } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
+import type {
+  ManualSourceRef,
+  SchedulingCandidate,
+  SchedulingMutationReview,
+} from "@workspace/scheduling-core";
+import {
+  appointmentCustomer,
+  assertOperationalStaff,
+  assertScheduleInterval,
+  type ScheduleTransaction,
+} from "./contractor-scheduling";
+import {
+  nativeSchedulingCandidate,
+  prepareNativeSchedulingAdmission,
+  type ServerSchedulingAuthority,
+} from "./scheduling-admission";
+import {
+  lockSchedulingConfiguration,
+  projectSchedulingEvidence,
+  SchedulingPolicyError,
+} from "./scheduling-policy";
 
 type AppointmentInsert = typeof appointmentsTable.$inferInsert;
 export type AppointmentRow = typeof appointmentsTable.$inferSelect;
-async function inspectionCapacity(tx: ScheduleTransaction, org: string) {
-  const [settings] = await tx.select({ availability: orgSettingsTable.inspectionAvailability }).from(orgSettingsTable).where(eq(orgSettingsTable.organizationId, org));
-  return Math.max(1, Math.floor(settings?.availability?.maxBookingsPerWindow ?? DEFAULT_INSPECTION_AVAILABILITY.maxBookingsPerWindow) || 1);
+
+/** No independent population/count approximation: offers and writes use Task5's evidence and limits. */
+export async function prepareInspectionInTransaction(
+  tx: ScheduleTransaction,
+  options: {
+    organizationId: string;
+    candidate: SchedulingCandidate;
+    before?: SchedulingCandidate | null;
+    authority?: ServerSchedulingAuthority;
+    review?: SchedulingMutationReview | null;
+  },
+) {
+  await assertOperationalStaff(
+    tx,
+    options.organizationId,
+    options.candidate.resourceUserIds,
+  );
+  return prepareNativeSchedulingAdmission(
+    tx,
+    options.organizationId,
+    options.authority,
+    options.before ?? null,
+    options.candidate,
+    options.review ?? null,
+  );
 }
 
-/**
- * Insert an inspection appointment only if its window still has capacity.
- * When no scheduledEnd is provided, a standard 2-hour window is assumed for
- * the conflict check (same convention the concierge slot offering uses for
- * end-less appointments). Returns the inserted row, or null when full.
- */
+async function sourceFor(
+  tx: ScheduleTransaction,
+  values: AppointmentInsert,
+): Promise<ManualSourceRef> {
+  const contactId = await appointmentCustomer(
+    tx,
+    values.organizationId,
+    values,
+    { requireCoherentLeadProperty: true },
+  );
+  return {
+    sourceKind: values.leadId
+      ? "lead"
+      : contactId
+        ? "direct_customer"
+        : "unlinked_manual",
+    leadId: values.leadId ?? null,
+    contactId,
+    propertyId: values.propertyId ?? null,
+    estimateId: null,
+  };
+}
+function capacityConflict(error: unknown) {
+  return (
+    error instanceof SchedulingPolicyError &&
+    error.code === "inspection_capacity_conflict"
+  );
+}
+
 export async function insertInspectionIfAvailable(
   values: AppointmentInsert & { scheduledStart: Date },
 ): Promise<AppointmentRow | null> {
   return db.transaction(async (tx) => {
-    await lockContractorSchedule(tx, values.organizationId);
+    await lockSchedulingConfiguration(tx, values.organizationId);
     return insertInspectionInTransaction(tx, values);
   });
 }
 
-export async function insertInspectionInTransaction(tx: ScheduleTransaction, values: AppointmentInsert & { scheduledStart: Date }): Promise<AppointmentRow | null> {
-  const maxBookingsPerWindow = await inspectionCapacity(tx, values.organizationId);
-  const start = values.scheduledStart;
-  const end = values.scheduledEnd ?? new Date(start.getTime() + 2 * 3_600_000);
-  assertScheduleInterval(start, end);
-  const staff = values.assignedUserId ? [values.assignedUserId] : [];
-  await assertOperationalStaff(tx, values.organizationId, staff);
-  await assertResourceWindow(tx, values.organizationId, staff, start, end);
-    // Serialize all inspection bookings for the org for this transaction.
-    // A per-window lock key would miss overlapping windows with different
-    // start times, so we take one org-wide lock; inspection bookings are
-    // infrequent enough that this coarse lock is not a throughput concern.
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${`${values.organizationId}:inspection-booking`}))`,
-    );
-    const conflicts = await tx
-      .select({ id: appointmentsTable.id })
-      .from(appointmentsTable)
-      .where(
-        and(
-          eq(appointmentsTable.organizationId, values.organizationId),
-          // Only inspections consume inspection-window capacity; other
-          // appointment types (production, estimate review, …) may overlap.
-          eq(appointmentsTable.type, "inspection"),
-          inArray(appointmentsTable.status, ["scheduled", "confirmed"]),
-          lt(appointmentsTable.scheduledStart, end),
-          // Legacy rows may lack an end; treat them as 2-hour windows so they
-          // still consume capacity instead of vanishing from conflict checks.
-          gt(
-            sql`coalesce(${appointmentsTable.scheduledEnd}, ${appointmentsTable.scheduledStart} + interval '2 hours')`,
-            start,
-          ),
-        ),
-      )
-      .limit(maxBookingsPerWindow);
-    if (conflicts.length >= maxBookingsPerWindow) return null;
-    // Persist the (possibly inferred) end so future overlap checks see the
-    // full window this booking occupies.
-    const [row] = await tx
-      .insert(appointmentsTable)
-      .values({ ...values, scheduledEnd: end })
-      .returning();
-    return row;
+/** Caller owns lifecycle/schedule. Actorless legacy compatibility never creates protected authority. */
+export async function insertInspectionInTransaction(
+  tx: ScheduleTransaction,
+  values: AppointmentInsert & { scheduledStart: Date },
+): Promise<AppointmentRow | null> {
+  const end =
+    values.scheduledEnd ??
+    new Date(values.scheduledStart.getTime() + 2 * 3600000);
+  assertScheduleInterval(values.scheduledStart, end);
+  const source = await sourceFor(tx, values),
+    id = values.id ?? randomUUID();
+  const candidate: SchedulingCandidate = {
+    kind: "appointment",
+    id,
+    startAt: values.scheduledStart.toISOString(),
+    endAt: end.toISOString(),
+    type: values.type ?? "inspection",
+    status: values.status ?? "scheduled",
+    resourceUserIds: values.assignedUserId ? [values.assignedUserId] : [],
+    source,
+    reservation: null,
+  };
+  try {
+    const admission = await prepareInspectionInTransaction(tx, {
+      organizationId: values.organizationId,
+      candidate,
+    });
+    return (
+      await tx
+        .insert(appointmentsTable)
+        .values({
+          ...values,
+          id,
+          contactId: source.contactId,
+          scheduledEnd: end,
+          schedulingReservation: admission.snapshot,
+        })
+        .returning()
+    )[0];
+  } catch (error) {
+    if (capacityConflict(error)) return null;
+    throw error;
+  }
 }
 
-/**
- * Apply an update to an existing appointment only if the (new) inspection
- * window still has capacity — the appointment being edited is excluded from
- * the conflict count so it never blocks itself. Same lock + counting rules as
- * insertInspectionIfAvailable. Returns the updated row, "conflict" when the
- * window is full, or null when the appointment no longer exists.
- */
 export async function updateInspectionIfAvailable(
   organizationId: string,
   appointmentId: string,
@@ -92,55 +143,93 @@ export async function updateInspectionIfAvailable(
   window: { start: Date; end?: Date | null },
 ): Promise<AppointmentRow | null | "conflict"> {
   return db.transaction(async (tx) => {
-    await lockContractorSchedule(tx, organizationId);
-    return updateInspectionInTransaction(tx, organizationId, appointmentId, set, window);
+    await lockSchedulingConfiguration(tx, organizationId);
+    return updateInspectionInTransaction(
+      tx,
+      organizationId,
+      appointmentId,
+      set,
+      window,
+    );
   });
 }
 
-export async function updateInspectionInTransaction(tx: ScheduleTransaction, organizationId: string, appointmentId: string, set: Partial<AppointmentInsert>, window: { start: Date; end?: Date | null }): Promise<AppointmentRow | null | "conflict"> {
-  await lockContractorSchedule(tx, organizationId);
-  const [current] = await tx.select().from(appointmentsTable).where(and(eq(appointmentsTable.organizationId, organizationId), eq(appointmentsTable.id, appointmentId)));
+export async function updateInspectionInTransaction(
+  tx: ScheduleTransaction,
+  organizationId: string,
+  appointmentId: string,
+  set: Partial<AppointmentInsert>,
+  window: { start: Date; end?: Date | null },
+): Promise<AppointmentRow | null | "conflict"> {
+  const where = and(
+    eq(appointmentsTable.organizationId, organizationId),
+    eq(appointmentsTable.id, appointmentId),
+  );
+  const [current] = await tx
+    .select()
+    .from(appointmentsTable)
+    .where(where)
+    .for("update");
   if (!current) return null;
   const { guardWorkdayAppointment } = await import("./workday-guards");
-  await guardWorkdayAppointment(tx, organizationId, appointmentId, current, set);
-  const maxBookingsPerWindow = await inspectionCapacity(tx, organizationId);
-  const start = window.start;
-  const end = window.end ?? new Date(start.getTime() + 2 * 3_600_000);
-  assertScheduleInterval(start, end);
-    // Same org-wide lock as the insert path so inserts and reschedules
-    // serialize against each other.
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${`${organizationId}:inspection-booking`}))`,
+  await guardWorkdayAppointment(
+    tx,
+    organizationId,
+    appointmentId,
+    current,
+    set,
+  );
+  const end = window.end ?? new Date(window.start.getTime() + 2 * 3600000);
+  assertScheduleInterval(window.start, end);
+  if (
+    projectSchedulingEvidence("appointment", current).schedulingEvidence ===
+    "invalid"
+  )
+    throw new SchedulingPolicyError(
+      "invalid_reservation_snapshot",
+      "Review the original scheduling evidence.",
     );
-    const conflicts = await tx
-      .select({ id: appointmentsTable.id })
-      .from(appointmentsTable)
-      .where(
-        and(
-          eq(appointmentsTable.organizationId, organizationId),
-          ne(appointmentsTable.id, appointmentId),
-          eq(appointmentsTable.type, "inspection"),
-          inArray(appointmentsTable.status, ["scheduled", "confirmed"]),
-          lt(appointmentsTable.scheduledStart, end),
-          gt(
-            sql`coalesce(${appointmentsTable.scheduledEnd}, ${appointmentsTable.scheduledStart} + interval '2 hours')`,
-            start,
-          ),
-        ),
-      )
-      .limit(maxBookingsPerWindow);
-    if (conflicts.length >= maxBookingsPerWindow) return "conflict";
-    // Persist the (possibly inferred) end so future overlap checks see the
-    // full window this booking occupies.
-    const [row] = await tx
-      .update(appointmentsTable)
-      .set({ ...set, scheduledEnd: end })
-      .where(
-        and(
-          eq(appointmentsTable.id, appointmentId),
-          eq(appointmentsTable.organizationId, organizationId),
-        ),
-      )
-      .returning();
-    return row ?? null;
+  const values = {
+    ...current,
+    ...set,
+    organizationId,
+    id: appointmentId,
+    scheduledStart: window.start,
+    scheduledEnd: end,
+  };
+  const source = await sourceFor(tx, values);
+  const before = nativeSchedulingCandidate(
+    "appointment",
+    current,
+    await sourceFor(tx, current),
+  );
+  const candidate = nativeSchedulingCandidate(
+    "appointment",
+    { ...values, schedulingReservation: null },
+    source,
+  );
+  try {
+    const admission = await prepareInspectionInTransaction(tx, {
+      organizationId,
+      candidate,
+      before,
+    });
+    return (
+      (
+        await tx
+          .update(appointmentsTable)
+          .set({
+            ...set,
+            scheduledStart: window.start,
+            scheduledEnd: end,
+            schedulingReservation: admission.snapshot,
+          })
+          .where(where)
+          .returning()
+      )[0] ?? null
+    );
+  } catch (error) {
+    if (capacityConflict(error)) return "conflict";
+    throw error;
+  }
 }

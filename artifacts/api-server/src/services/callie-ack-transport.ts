@@ -1,4 +1,4 @@
-import { assertOutboundDeliveryAllowed } from "./outbound-hold";
+import { postSmsOnce } from "./sms-carrier-transport";
 
 export interface CallieDispatchIdentity {
   accountSid: string;
@@ -12,12 +12,21 @@ export interface CallieDispatchIdentity {
 
 /** One physical attempt only. Resolve current authority immediately before POST. */
 export async function postCallieAcknowledgment(current: () => Promise<CallieDispatchIdentity>, onDispatch: () => void) {
-  const identity = await current();
-  assertOutboundDeliveryAllowed();
-  onDispatch();
-  return fetch(`https://api.twilio.com/2010-04-01/Accounts/${identity.accountSid}/Messages.json`, {
-    method: "POST", redirect: "error", signal: AbortSignal.timeout(10_000),
-    headers: { "content-type": "application/x-www-form-urlencoded", authorization: `Basic ${Buffer.from(`${identity.apiKeySid}:${identity.apiKeySecret}`).toString("base64")}` },
-    body: new URLSearchParams({ To: identity.to, MessagingServiceSid: identity.messagingServiceSid, Body: identity.message, StatusCallback: identity.callbackUrl }).toString(),
+  return postSmsOnce({
+    provider: "twilio",
+    current: async () => {
+      const identity = await current();
+      // Preserve this wrapper's original closed wire shape, even at runtime.
+      return {
+        accountSid: identity.accountSid,
+        apiKeySid: identity.apiKeySid,
+        apiKeySecret: identity.apiKeySecret,
+        messagingServiceSid: identity.messagingServiceSid,
+        to: identity.to,
+        message: identity.message,
+        callbackUrl: identity.callbackUrl,
+      };
+    },
+    onDispatch,
   });
 }

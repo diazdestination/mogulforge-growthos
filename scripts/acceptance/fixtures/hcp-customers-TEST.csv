@@ -1,0 +1,6 @@
+Customer ID,First Name,Last Name,Email,Mobile Number,Address,City,State,Zip,Tags
+TEST-HCP-0001,TEST,Customer One,test-hcp-0001@example.invalid,(202) 555-0101,1 TEST Lane,Testville,NY,10001,TEST
+TEST-HCP-0002,TEST,Customer Two,test-hcp-0002@example.invalid,(202) 555-0102,2 TEST Lane,Testville,NY,10001,TEST
+TEST-HCP-0003,TEST,Customer Three,,(202) 555-0103,3 TEST Lane,Testville,NY,10001,TEST
+TEST-HCP-0004,TEST,Customer Four,test-hcp-0004@example.invalid,,4 TEST Lane,Testville,NY,10001,TEST
+TEST-HCP-0005,TEST,No Contact,,,5 TEST Lane,Testville,NY,10001,TEST

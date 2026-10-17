@@ -100,6 +100,25 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { Redirect } from 'wouter';
 import { Loader2, Settings2, Trash2, Copy, Zap, RefreshCw, Pencil, ShieldAlert } from 'lucide-react';
 import { canManageSettings } from '@/lib/permissions';
+import {
+  getSchedulingPolicy,
+  saveSchedulingPolicy,
+} from "@workspace/api-client-react";
+import {
+  policySaveInputSchema,
+  schedulingPolicySchema,
+  schedulingReviewContextSchema,
+} from "@workspace/scheduling-core";
+import type {
+  PolicySaveInput,
+  PolicySaveResult,
+  PolicyViewState,
+} from "@/lib/scheduling-ui-contract";
+import { SchedulingPolicyEditor } from "@/components/scheduling-policy-editor";
+import {
+  useSchedulingAuthority,
+  useSchedulingContext,
+} from "@/hooks/use-scheduling-review";
 import { toLocalDateInputValue } from '@/lib/date-input';
 import { EmailConnectionsCard } from '@/components/email-connections-card';
 import { memberAuthorityScope } from '@/lib/member-authority-scope';
@@ -1135,7 +1154,7 @@ export default function Settings() {
           <TabsContent value="integrations"><EmailConnectionsCard key={memberAuthorityScope(me)} scopeKey={memberAuthorityScope(me)} callbackState={gmailReturn} returnPath="/settings" /></TabsContent>
           <TabsContent value="team"><TeamTab meId={me.id} meRole={me.role} /></TabsContent>
           <TabsContent value="services"><ServicesTab /></TabsContent>
-          <TabsContent value="scheduling" className="space-y-6"><SchedulingTab /><ReminderTab /><LeadAlertRouting /></TabsContent>
+          <TabsContent value="scheduling" className="space-y-6"><SchedulingPolicySettings /><SchedulingTab /><ReminderTab /><LeadAlertRouting /></TabsContent>
           <TabsContent value="scoring"><ScoringTab /></TabsContent>
           <TabsContent value="ai"><AiTab /></TabsContent>
           <TabsContent value="automations" className="space-y-6"><AutomationsTab /><SendingHoursTab /></TabsContent>
@@ -2783,6 +2802,172 @@ function KnowledgeTab() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export function SchedulingPolicySettings() {
+  const authority = useSchedulingAuthority(undefined, "manage");
+  const read = useSchedulingContext({
+    authority,
+    identity: "company-policy",
+    enabled: authority.allowed,
+    load: () => getSchedulingPolicy(),
+  });
+  const [draft, setDraft] = useState<PolicySaveInput | null>(null);
+  const [held, setHeld] = useState<{
+    identity: string;
+    state: PolicyViewState;
+  } | null>(null);
+  const running = useRef(false),
+    completed = useRef(false),
+    client = useQueryClient();
+  const value = read.value;
+  useEffect(() => {
+    setHeld(null);
+    if (!value) {
+      setDraft(null);
+      return;
+    }
+    setDraft({
+      expectedRevision: value.context.policyRevision,
+      expectedCompanyTimeZone: value.context.companyTimeZone,
+      enabled: value.policy?.enabled ?? false,
+      minimumTravelGapMinutes: value.policy?.minimumTravelGapMinutes ?? 0,
+      maxConcurrentReservations:
+        value.policy?.maxConcurrentReservations ?? null,
+      durationPresets:
+        value.policy?.durationPresets.map((preset) => ({ ...preset })) ?? [],
+    });
+  }, [value, authority.identity]);
+  if (!authority.allowed || !authority.profile?.organization)
+    return <p role="status">Current settings management access is required.</p>;
+  const scope = {
+    organizationId: authority.profile.organization.id,
+    actorUserId: authority.profile.id,
+  };
+  const state: PolicyViewState =
+    held?.identity === authority.identity
+      ? held.state
+      : read.error
+        ? { kind: "read_error", scope, message: read.error }
+        : !value
+          ? { kind: "loading", scope }
+          : { kind: value.policy ? "loaded" : "unconfigured", scope, value };
+  const onSave = async (input: PolicySaveInput): Promise<PolicySaveResult> => {
+    if (
+      !authority.isCurrent() ||
+      !value ||
+      running.current ||
+      completed.current ||
+      !["loaded", "unconfigured"].includes(state.kind)
+    )
+      return {
+        kind: "refused",
+        message: "Refresh current scheduling authority before saving.",
+      };
+    const original = policySaveInputSchema.parse(structuredClone(input));
+    if (
+      original.expectedRevision !== value.context.policyRevision ||
+      original.expectedCompanyTimeZone !== value.context.companyTimeZone
+    )
+      return {
+        kind: "stale",
+        message: "Scheduling review changed. Refresh and review again.",
+      };
+    running.current = true;
+    completed.current = true;
+    setHeld({
+      identity: authority.identity,
+      state: {
+        kind: "saving",
+        scope,
+        value,
+        draft: original,
+        message: "Saving the reviewed scheduling policy.",
+      },
+    });
+    try {
+      const raw = await saveSchedulingPolicy(original);
+      if (!authority.isCurrent())
+        return {
+          kind: "unknown",
+          message: "Current settings authority changed.",
+        };
+      const policy =
+          raw.policy === null ? null : schedulingPolicySchema.parse(raw.policy),
+        context = schedulingReviewContextSchema.parse(raw.context);
+      if (
+        !policy ||
+        context.organizationId !== scope.organizationId ||
+        policy.revision !== original.expectedRevision + 1 ||
+        context.policyRevision !== policy.revision ||
+        context.policyDigest !== policy.digest ||
+        context.companyTimeZone !== original.expectedCompanyTimeZone ||
+        policy.timeZone !== context.companyTimeZone
+      )
+        throw new Error("Unbound policy result");
+      if (
+        policy.enabled !== original.enabled ||
+        policy.minimumTravelGapMinutes !== original.minimumTravelGapMinutes ||
+        policy.maxConcurrentReservations !==
+          original.maxConcurrentReservations ||
+        policy.durationPresets.length !== original.durationPresets.length ||
+        policy.durationPresets.some((preset, index) => {
+          const intended = original.durationPresets[index];
+          return (
+            preset.label !== intended.label ||
+            preset.elapsedMinutes !== intended.elapsedMinutes ||
+            (intended.id !== null && intended.id !== preset.id)
+          );
+        })
+      )
+        throw new Error("Saved policy differs from the reviewed command");
+      // An explicit refresh is the next review; a PUT is never retried by this host.
+      setHeld({
+        identity: authority.identity,
+        state: { kind: "loaded", scope, value },
+      });
+      void client.invalidateQueries({
+        queryKey: ["/api/v1/scheduling/review-context"],
+      });
+      return { kind: "saved", value: { policy, context } };
+    } catch (failure) {
+      const kind =
+        failure instanceof ApiError && failure.status === 409
+          ? "stale"
+          : "unknown";
+      const message =
+        kind === "stale"
+          ? "Scheduling authority changed. Refresh and review before saving again."
+          : "The policy result is unconfirmed. Refresh the saved policy before another explicit review.";
+      if (authority.isCurrent())
+        setHeld({
+          identity: authority.identity,
+          state: { kind, scope, value, draft: original, message },
+        });
+      return { kind, message };
+    } finally {
+      running.current = false;
+    }
+  };
+  return (
+    <SchedulingPolicyEditor
+      state={state}
+      draft={draft}
+      canManage={authority.allowed}
+      onDraftChange={(next) => {
+        if (authority.isCurrent() && !running.current && !completed.current)
+          setDraft(structuredClone(next));
+      }}
+      onSave={onSave}
+      onRefresh={() => {
+        if (authority.isCurrent() && !running.current) {
+          completed.current = false;
+          setHeld(null);
+          void read.refresh();
+        }
+      }}
+    />
   );
 }
 

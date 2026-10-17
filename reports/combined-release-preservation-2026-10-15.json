@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "repository": "diazdestination/mogulforge-growthos",
+  "product": "91b7fd2c1fd98d441848e0357954e35c9f65d688",
+  "operations": "c285c4781145fead9fa2baa39360412f2846f66d",
+  "main": "7091af816715cfd437925eb0af82fb47d3411e34",
+  "common": "8df64dc72009832f93b2b491031acd1bb2afb903",
+  "productSource": "f56e6cef452b5b564838a72202c0d37cd2caf384",
+  "scope": {
+    "paths": [
+      "artifacts/api-server",
+      "lib"
+    ],
+    "count": 2115,
+    "sha256": "a1131335d2d44c1204d36a2c1115350cd704782baecda2a3a94d2b4d9e78184c"
+  },
+  "protected": [
+    {
+      "path": "scripts/saved-scheduling-recovery-fixture.mjs",
+      "blob": "1666e4da09da8b771c88e54a1c155049c0fc3d37",
+      "bytes": 34156,
+      "sha256": "d02a6b29dc099d284414717c0e6eae3fa381c6dff84a0f734f5235cff305771d"
+    },
+    {
+      "path": "scripts/contractor-recovery-drill.mjs",
+      "blob": "febe0f6e0691f3aa809f3d470b8d7973aaaac29d",
+      "bytes": 37572,
+      "sha256": "06bfaab57255357ab249ff5c82785c305dc51e8a09eb58b5e5a54a2e9e98ccae"
+    },
+    {
+      "path": "scripts/contractor-recovery-app-probe.mjs",
+      "blob": "1dde18dc04f5639e425222e021a9577cf2c4531d",
+      "bytes": 35572,
+      "sha256": "a51cd3a498720c406b69c2f65b041a6e4639e515d04cb87ae67257c1aebda94e"
+    },
+    {
+      "path": "scripts/release-schema.mjs",
+      "blob": "94dd2afa4dd6cb349e93cc4af40ce0f47a489c25",
+      "bytes": 3610,
+      "sha256": "d2ddfc8c040144632e949117d1dcb851d678d6c1626f56344e448d065c5b79b8"
+    },
+    {
+      "path": "artifacts/api-server/build.mjs",
+      "blob": "1c730d91d09f651e0ac6eeafcff7eff8cac68f44",
+      "bytes": 4327,
+      "sha256": "7a630e8c1e0df733f518f9d6b4ee51966c47f580fe7e129460ad80a950f147fc"
+    },
+    {
+      "path": "artifacts/api-server/build-identity.mjs",
+      "blob": "ab91f01a6cce56bf317863c9d7879ed4fb9e01a8",
+      "bytes": 2131,
+      "sha256": "88b5c1ef603f8d953e83c14a53ed6876b39fd8dc8f18ee8ac17b405ffbadea14"
+    },
+    {
+      "path": "artifacts/api-server/scripts/contractor-recovery-entry.ts",
+      "blob": "33f484ec1bc75202b18b42d883638e50791fe6bd",
+      "bytes": 155,
+      "sha256": "cc98de0cca7c586aa38b09c1bea734056938cd9474152872b8eb6eae421a2b5d"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "blob": "14f8cb317178369bd995cb25258bf9d4529b5c82",
+      "bytes": 306022,
+      "sha256": "1ce9d652f019f2c906a0d0952cd3571761062214629a08253ec99777dd477c06"
+    }
+  ],
+  "legacySql": [
+    {
+      "path": "reports/staging-schema-preview-2026-09-30/0000_isolated-staging-initial.sql",
+      "bytes": 116856,
+      "sha256": "b27d33a59a8a0f083fefe3271936d197309db5d683bd4254bbd28d7bc7315a10"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-09-30/0001_pilot-email-sender.sql",
+      "bytes": 318,
+      "sha256": "8d2d49f344e4900e5304d1f7b23ce23b929121f9af04362d50902a692605883f"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0002_mobile-microsoft-pilot.sql",
+      "bytes": 5182,
+      "sha256": "eec075e1009718e9307a0e88b905098749b337211abc87f0bfdb49c38c5138d0"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0003_swarm-foundation.sql",
+      "bytes": 1064,
+      "sha256": "dac2d1782d71d89e7f14ae1dc73d06a9e094b25a77a1c3ea6e5abbd5b1ba44fc"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0004_beta-operations.sql",
+      "bytes": 3713,
+      "sha256": "2f4a87900b0e2f6b7c85f4ac177d2d64c44ac49c40fbd4f429777ec71b2b6e95"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0005_contractor-operations.sql",
+      "bytes": 5224,
+      "sha256": "8cd09ae5ce8f6fc19a4a89cd80fa728dc9dc68918f4e87c86a3d2bede3ea10d8"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0006_native-contractor-day.sql",
+      "bytes": 8008,
+      "sha256": "4406ec9b61bedfdf2fd172272fbb7782f863b023eeb3d0ff28a867f1a6ca9c80"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0007_customer-care.sql",
+      "bytes": 3748,
+      "sha256": "028297f0c78268dad1c42815513b633f9b1cb742f5a1bf5605dab1006e8dabcb"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0008_operations-wave.sql",
+      "bytes": 16278,
+      "sha256": "33dcb364229ab9bf8a05270cae9b17e4052fdbd1ed2db0fb83d050cd1acb36f6"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0009_launch-communications.sql",
+      "bytes": 15004,
+      "sha256": "813d3fca929f462644d7399f5314ff4e358f24ff05817f9f7851f290a8ff89ca"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0010_lead-replies.sql",
+      "bytes": 3976,
+      "sha256": "f385f2a11f08f709788395a937ced3a3508af9aa1d570064106182f520085717"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0011_invoice-recovery.sql",
+      "bytes": 5882,
+      "sha256": "c9491ff8eef505d8e784e004cf97af7192cefa9701f5fa2eeb3d599e6a0de063"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0012_callie-intake.sql",
+      "bytes": 11938,
+      "sha256": "ef48cf4d68d3da7aeb97acf4c5a97c06152c2f7eae2d4319c4aa2153cb7ce480"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0013_standing-service.sql",
+      "bytes": 15206,
+      "sha256": "010c13b648a442f34801b9c30f5dde6f824cce0f897d7a98866e8f8a4a1beb39"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0014_source-nurture.sql",
+      "bytes": 17176,
+      "sha256": "958aebae4e5509acd28892b0b30a9413bfe8c9ddebed868a2f7a0defaec3b83e"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0015_callie-conversation.sql",
+      "bytes": 12455,
+      "sha256": "8b75fecb5250a5e9920fac2e7bcd9b734a3ba8f20c8a78d21f66f4853639dc33"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0016_contractor-workday.sql",
+      "bytes": 15706,
+      "sha256": "aa15f891c013ce6a5e71107d973f04ee3cc4c46ca6030e54ac4490cf52147b89"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0017_returning-customer-work.sql",
+      "bytes": 9675,
+      "sha256": "d6d0319830a26ab9387a6ef5952dd5409adb4feeac76a8a2d71d78c7e0e07da8"
+    },
+    {
+      "path": "reports/staging-schema-preview-2026-10-01/0018_lead-alert-coverage.sql",
+      "bytes": 2335,
+      "sha256": "b5c6425dc7942460e4d734e14f971e8fc062b1bdfe292d69d22a88e34be587a1"
+    }
+  ],
+  "scheduling0019": {
+    "path": "reports/staging-schema-preview-2026-10-01/0019_saved-scheduling-policy.sql",
+    "bytes": 8126,
+    "rawSha256": "76e88d3410235f1b6a8a20e595b126455fd5711b46f87055b586786b28f81ca9",
+    "blob": "f242fadd3659439fa6bd9fae72d8f92cb63cda51"
+  },
+  "approvals": {
+    "design": {
+      "path": "docs/superpowers/specs/2026-10-15-combined-release-design.md",
+      "sha256": "edadffad4fc17251f1741e48e4505db45767f494f50c4117b65c7de64f1c2204"
+    },
+    "plan": {
+      "path": "docs/superpowers/plans/2026-10-15-combined-release.md",
+      "sha256": "b198a77fec33d12c97c3a79e6bac3c0f94ea270bdb7c63b5814f2718115154cb"
+    }
+  }
+}

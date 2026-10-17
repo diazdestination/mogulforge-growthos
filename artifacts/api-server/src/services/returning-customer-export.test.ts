@@ -231,7 +231,12 @@ describe("returning-work core export", () => {
     const result = await createCustomerLifecycleExporter({
       createClient: () => client as never,
     })(id(1), "fictional-owner");
-    expect(result.manifest.tables).toHaveLength(27);
+    expect(result.manifest.tables).toHaveLength(28);
+    expect(result.organization.schedulingHistory).toEqual([]);
+    expect(result.manifest.schedulingHistory).toEqual({count:0,withheldInvalidLinks:0,withheldInvalidRecords:0});
+    expect(result.data.projects[0].scheduling_reservation).toBeNull();
+    expect(result.data.projects[0].scheduling_evidence).toBe("legacy");
+    expect(result.manifest.dataSha256).toBe(createHash("sha256").update(JSON.stringify(result.data)).digest("hex"));
     expect(result.data.customer_work_roots.map((row) => row.id)).toEqual([
       id(6),
       id(7),

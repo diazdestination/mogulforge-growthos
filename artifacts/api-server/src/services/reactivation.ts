@@ -1,6 +1,7 @@
 import {
   activitiesTable,
   appointmentsTable,
+  auditEventsTable,
   contactsTable,
   db,
   importedOpportunityHistorySchema,
@@ -18,8 +19,9 @@ import {
   type ReactivationSegment,
   type SendingHoursSettings,
 } from "@workspace/db";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, notInArray, or, sql } from "drizzle-orm";
+import { z } from "zod/v4";
 
 import { recordAudit } from "./audit";
 import { OUTREACH_ACTIVE_STATUSES, enrollLead, stopEnrollmentById } from "./playbooks";
@@ -39,39 +41,51 @@ import { needsSourceVerification, parseSourceAmount, parseSourceDate, SourceHist
 // CSV parsing (RFC 4180-ish, dependency-free)
 // ---------------------------------------------------------------------------
 
+export class CsvParseError extends Error {
+  constructor() { super("The CSV contains invalid quoting. No rows were imported."); }
+}
+
 export function parseCsv(text: string): string[][] {
+  const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
   let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
+  let afterQuote = false;
+  for (let i = 0; i < source.length; i++) {
+    const c = source[i];
     if (inQuotes) {
       if (c === '"') {
-        if (text[i + 1] === '"') {
+        if (source[i + 1] === '"') {
           field += '"';
           i++;
         } else {
           inQuotes = false;
+          afterQuote = true;
         }
       } else {
         field += c;
       }
     } else if (c === '"') {
+      if (field !== "" || afterQuote) throw new CsvParseError();
       inQuotes = true;
     } else if (c === ",") {
       row.push(field);
       field = "";
+      afterQuote = false;
     } else if (c === "\n" || c === "\r") {
-      if (c === "\r" && text[i + 1] === "\n") i++;
+      if (c === "\r" && source[i + 1] === "\n") i++;
       row.push(field);
       field = "";
+      afterQuote = false;
       if (row.some((f) => f.trim() !== "")) rows.push(row);
       row = [];
     } else {
+      if (afterQuote) throw new CsvParseError();
       field += c;
     }
   }
+  if (inQuotes) throw new CsvParseError();
   row.push(field);
   if (row.some((f) => f.trim() !== "")) rows.push(row);
   return rows;
@@ -120,15 +134,46 @@ const VALID_STATUSES = new Set([
 
 const MAX_IMPORT_ROWS = 10_000;
 const MAX_ERROR_SAMPLES = 20;
+const MAX_PREVIEW_ERROR_SAMPLES = 200;
+
+const PREVIEW_BUDGET_MS = 45_000;
+class DryRunRollback extends Error {}
+class PreviewTooSlow extends Error {}
+/** What an import would do. Nothing is saved and no import record is created. */
+export interface LeadImportPreview {
+  dryRun: true;
+  fileName: string | null;
+  totalRows: number;
+  imported: number;
+  updated: number;
+  duplicates: number;
+  conflicts: number;
+  skipped: number;
+  suppressed: number;
+  errors: string[];
+  errorsTruncated: boolean;
+  sourceKey: string | null;
+  snapshotAsOf: string | null;
+}
 
 function clean(v: string | undefined, max = 200): string | null {
   const s = (v ?? "").trim();
   return s ? s.slice(0, max) : null;
 }
 
+type ImportLeadsResult<P> = P extends { dryRun: true }
+  ? LeadImportPreview | { error: string }
+  : P extends { dryRun: boolean }
+    ? LeadImport | LeadImportPreview | { error: string }
+    : LeadImport | { error: string };
+export function importLeads<P extends ImportLeadsParams>(organizationId: string, params: P): Promise<ImportLeadsResult<P>>;
 export async function importLeads(
   organizationId: string,
-  params: {
+  params: ImportLeadsParams,
+): Promise<LeadImport | LeadImportPreview | { error: string }> {
+  return runLeadImport(organizationId, params);
+}
+interface ImportLeadsParams {
     csv: string;
     /** Map of import field → 0-based CSV column index. */
     mapping: Partial<Record<ImportField, number>>;
@@ -141,9 +186,28 @@ export async function importLeads(
     /** When the source export was captured, not when this upload occurred. */
     snapshotAsOf?: string;
     createdByUserId?: string | null;
-  },
-): Promise<LeadImport | { error: string }> {
-  const all = parseCsv(params.csv);
+    /** Run every row check and match in one transaction, then roll it back. */
+    dryRun?: boolean;
+    /**
+     * "customers" brings in existing customers (e.g. a Housecall Pro customer
+     * list) as contacts only: no lead, so no pipeline stage, lead count or
+     * nurture. Each created contact gets a provenance audit event.
+     */
+    mode?: "leads" | "customers";
+}
+const CUSTOMER_IMPORT_FIELDS = new Set<ImportField>(["firstName", "lastName", "email", "phone", "externalCustomerId"]);
+/** Per-contact provenance for customer-mode imports (contacts have no source columns). */
+export const CUSTOMER_IMPORTED_ACTION = "customer.imported";
+async function runLeadImport(
+  organizationId: string,
+  params: ImportLeadsParams,
+): Promise<LeadImport | LeadImportPreview | { error: string }> {
+  let all: string[][];
+  try { all = parseCsv(params.csv); }
+  catch (error) {
+    if (error instanceof CsvParseError) return { error: error.message };
+    throw error;
+  }
   const rows = params.hasHeader === false ? all : all.slice(1);
   if (rows.length === 0) return { error: "No data rows found in the file" };
   if (rows.length > MAX_IMPORT_ROWS) {
@@ -174,6 +238,15 @@ export async function importLeads(
   if (m.externalOpportunityId !== undefined && !sourceKey) {
     return { error: "A stable source key is required when mapping external opportunity IDs" };
   }
+  const customers = params.mode === "customers";
+  if (customers && Object.keys(m).some((key) => !CUSTOMER_IMPORT_FIELDS.has(key as ImportField))) {
+    return { error: "A customer import only uses name, email, phone and customer ID columns" };
+  }
+  if (customers && m.externalCustomerId !== undefined && !sourceKey) {
+    return { error: "A stable source key is required when mapping customer IDs" };
+  }
+  // Links every contact a customer import creates, for review or later correction.
+  const batchId = randomUUID();
   const receivedAt = new Date();
   let snapshotAsOf: string | null;
   try { snapshotAsOf = parseSourceDate(params.snapshotAsOf, "Snapshot date", receivedAt); }
@@ -186,6 +259,10 @@ export async function importLeads(
   let skipped = 0;
   let suppressedCount = 0;
   const errors: string[] = [];
+  // A preview is for reviewing every problem row before anything is saved.
+  const maxErrors = params.dryRun ? MAX_PREVIEW_ERROR_SAMPLES : MAX_ERROR_SAMPLES;
+  type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+  let runRow = <T>(work: (tx: Tx) => Promise<T>): Promise<T> => db.transaction(work);
 
   // Suppression list snapshot for flagging (send gate re-checks at send time).
   const suppressions = await db
@@ -194,29 +271,47 @@ export async function importLeads(
     .where(eq(suppressionsTable.organizationId, organizationId));
   const suppressedSet = new Set(suppressions.map((s) => `${s.channel}:${s.value}`));
 
+  const processRows = async () => {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const rowNo = i + (params.hasHeader === false ? 1 : 2);
     if (Object.values(m).some((index) => index >= row.length) ||
         (params.hasHeader !== false && row.length !== all[0].length)) {
       skipped++;
-      if (errors.length < MAX_ERROR_SAMPLES) errors.push(`Row ${rowNo}: column count does not match the header or mapping; no values were applied`);
+      if (errors.length < maxErrors) errors.push(`Row ${rowNo}: column count does not match the header or mapping; no values were applied`);
       continue;
     }
     const get = (f: ImportField) => (m[f] === undefined ? undefined : row[m[f]!]);
     const firstName = clean(get("firstName"), 100);
-    const email = clean(get("email"), 200)?.toLowerCase() ?? null;
-    const phone = clean(get("phone"), 40);
+    const rawEmail = get("email") ?? "";
+    const rawPhone = get("phone") ?? "";
+    const email = rawEmail.trim().toLowerCase() || null;
+    const phone = rawPhone.trim() || null;
     const phoneDigits = phone ? phone.replace(/\D/g, "") : null;
+    // Validate every supplied mapped address before trimming/truncation can hide
+    // a malformed value. Keep the source phone format and existing normalization.
+    const controls = /[\x00-\x1f\x7f-\x9f]/;
+    const emailInvalid = controls.test(rawEmail) || rawEmail.length > 200 || (email !== null && !z.email().safeParse(email).success);
+    // Use the bounded formatting/extension policy from customer corrections,
+    // also retaining international slash separators, the seven-digit minimum
+    // and this import's existing 40-character bound.
+    const phoneInvalid = controls.test(rawPhone) || rawPhone.length > 40 || (phone !== null &&
+      (!/^(?:\+?[0-9(][0-9 ()./-]*[0-9])(?:\s*(?:x|ext\.?)\s*\d{1,8})?$/i.test(phone) ||
+       !phoneDigits || phoneDigits.length < 7 || phoneDigits.length > 23));
+    if (emailInvalid || phoneInvalid) {
+      skipped++;
+      if (errors.length < maxErrors) errors.push(`Row ${rowNo}: ${emailInvalid ? "email must be a valid address of at most 200 characters" : "phone must be a valid number of at most 40 characters"}; no values were applied`);
+      continue;
+    }
 
     if (!firstName) {
       skipped++;
-      if (errors.length < MAX_ERROR_SAMPLES) errors.push(`Row ${rowNo}: missing first name`);
+      if (errors.length < maxErrors) errors.push(`Row ${rowNo}: missing first name`);
       continue;
     }
     if (!email && (!phoneDigits || phoneDigits.length < 7)) {
       skipped++;
-      if (errors.length < MAX_ERROR_SAMPLES) {
+      if (errors.length < maxErrors) {
         errors.push(`Row ${rowNo}: needs a valid email or phone`);
       }
       continue;
@@ -281,7 +376,7 @@ export async function importLeads(
         firstImportedAt: receivedAt.toISOString(), lastImportedAt: receivedAt.toISOString(),
       };
       importedOpportunityHistorySchema.parse(history);
-      const outcome = await db.transaction(async (tx) => {
+      const outcome = await runRow(async (tx) => {
         // Import requests for one tenant serialize contact matching and opportunity creation.
         // The unique index remains the final protection against duplicate source IDs.
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`lead-import:${organizationId}`}))`);
@@ -297,6 +392,60 @@ export async function importLeads(
         if (contact && ((email && contact.email && normalizeAddress("email", contact.email) !== email) ||
             (phone && contact.phone && normalizeAddress("sms", contact.phone) !== normalizeAddress("sms", phone)))) {
           return { kind: "conflict", reason: "a matched person has conflicting contact details; reconcile before linking this opportunity" } as const;
+        }
+        // A source customer ID is remembered on imported leads and, for customer
+        // imports, in customer.imported provenance. Both modes honor both.
+        const externalCustomerId = history.externalCustomerId;
+        let known: { contactId: string | null }[] = [];
+        if (sourceKey && externalCustomerId) {
+          known = await tx.selectDistinct({ contactId: auditEventsTable.entityId }).from(auditEventsTable).where(and(
+            eq(auditEventsTable.organizationId, organizationId), eq(auditEventsTable.action, CUSTOMER_IMPORTED_ACTION),
+            sql`${auditEventsTable.metadata}->>'sourceKey' = ${sourceKey}`,
+            sql`${auditEventsTable.metadata}->>'externalCustomerId' = ${externalCustomerId}`,
+          )).limit(2);
+          if (known.length && (!contact || known.some((k) => k.contactId !== contact.id))) {
+            return { kind: "conflict", reason: "this source customer ID was imported before as different contact details; reconcile before import" } as const;
+          }
+          if (contact) {
+            const [linkedElsewhere] = await tx.select({ id: auditEventsTable.id }).from(auditEventsTable).where(and(
+              eq(auditEventsTable.organizationId, organizationId), eq(auditEventsTable.action, CUSTOMER_IMPORTED_ACTION),
+              eq(auditEventsTable.entityId, contact.id), sql`${auditEventsTable.metadata}->>'sourceKey' = ${sourceKey}`,
+              sql`${auditEventsTable.metadata}->>'externalCustomerId' IS NOT NULL`,
+              sql`${auditEventsTable.metadata}->>'externalCustomerId' <> ${externalCustomerId}`,
+            )).limit(1);
+            if (linkedElsewhere) return { kind: "conflict", reason: "these contact details belong to a different source customer ID; reconcile before import" } as const;
+          }
+        }
+        if (customers) {
+          if (sourceKey && externalCustomerId) {
+            // Imported-lead history for the same source account is also binding.
+            const leadLinks = await tx.selectDistinct({ contactId: leadsTable.contactId, id: sql<string>`${leadsTable.importedHistory}->>'externalCustomerId'` }).from(leadsTable).where(and(
+              eq(leadsTable.organizationId, organizationId), eq(leadsTable.importSourceKey, sourceKey),
+              sql`${leadsTable.importedHistory}->>'externalCustomerId' IS NOT NULL`,
+              contact
+                ? or(eq(leadsTable.contactId, contact.id), sql`${leadsTable.importedHistory}->>'externalCustomerId' = ${externalCustomerId}`)
+                : sql`${leadsTable.importedHistory}->>'externalCustomerId' = ${externalCustomerId}`,
+            )).limit(5);
+            if (leadLinks.some((link) => link.contactId !== contact?.id || link.id !== externalCustomerId)) {
+              return { kind: "conflict", reason: "imported lead history links this customer ID or person differently; reconcile before import" } as const;
+            }
+          }
+          const provenance = (contactId: string, matchedExisting: boolean) => tx.insert(auditEventsTable).values({
+            organizationId, actorUserId: params.createdByUserId ?? null, action: CUSTOMER_IMPORTED_ACTION,
+            entityType: "contact", entityId: contactId,
+            metadata: { batchId, sourceKey, externalCustomerId, snapshotAsOf, fileName: clean(params.fileName, 200), matchedExisting },
+          });
+          if (contact) {
+            // Remember which existing person this source ID is, so a later
+            // re-import with changed details is flagged rather than duplicated.
+            if (sourceKey && externalCustomerId && !known.length) await provenance(contact.id, true);
+            return { kind: "duplicate" } as const;
+          }
+          const [created] = await tx.insert(contactsTable).values({
+            organizationId, firstName, lastName: clean(get("lastName"), 100), email, phone,
+          }).returning({ id: contactsTable.id });
+          await provenance(created.id, false);
+          return { kind: "imported" } as const;
         }
         if (sourceKey && history.externalCustomerId) {
           const knownCustomers = await tx.selectDistinct({ contactId: leadsTable.contactId }).from(leadsTable).where(and(
@@ -380,7 +529,7 @@ export async function importLeads(
       });
       if (outcome.kind === "conflict") {
         conflicts++;
-        if (errors.length < MAX_ERROR_SAMPLES) errors.push(`Row ${rowNo}: ${outcome.reason}`);
+        if (errors.length < maxErrors) errors.push(`Row ${rowNo}: ${outcome.reason}`);
       } else if (outcome.kind === "duplicate") duplicates++;
       else {
         if (outcome.kind === "updated") updated++;
@@ -388,12 +537,50 @@ export async function importLeads(
         if (isSuppressed) suppressedCount++;
       }
     } catch (err) {
+      // A preview must not report an unexpected database failure (such as a
+      // lock or time limit) as an ordinary skipped row.
+      if (params.dryRun && !(err instanceof SourceHistoryValidationError)) throw err;
       skipped++;
       // Only our validation errors are safe to show; never leak SQL or uploaded values.
       const message = err instanceof SourceHistoryValidationError ? err.message : "failed to save";
-      if (errors.length < MAX_ERROR_SAMPLES) errors.push(`Row ${rowNo}: ${message}`);
+      if (errors.length < maxErrors) errors.push(`Row ${rowNo}: ${message}`);
     }
   }
+  };
+
+  if (params.dryRun) {
+    // Rows run as savepoints of one outer transaction, so later rows see earlier
+    // rows of the same file exactly as a real import would; then all of it is undone.
+    // The transaction holds this tenant's import lock, so it is bounded.
+    const deadline = Date.now() + PREVIEW_BUDGET_MS;
+    let tooSlow = false;
+    await db
+      .transaction(async (outer) => {
+        await outer.execute(sql`select set_config('lock_timeout','3000ms',true), set_config('statement_timeout','10000ms',true), set_config('idle_in_transaction_session_timeout','15000ms',true)`);
+        runRow = (work) => {
+          if (Date.now() > deadline) throw new PreviewTooSlow();
+          return outer.transaction(work);
+        };
+        await processRows();
+        throw new DryRunRollback();
+      })
+      .catch((err) => {
+        if (err instanceof DryRunRollback) return;
+        const code = (err as { code?: unknown; cause?: { code?: unknown } }).code ?? (err as { cause?: { code?: unknown } }).cause?.code;
+        // 55P03 lock_not_available, 57014 query_canceled (statement timeout).
+        if (err instanceof PreviewTooSlow || code === "55P03" || code === "57014") { tooSlow = true; return; }
+        throw err;
+      });
+    if (tooSlow) {
+      return { error: "The preview could not finish in time (the file is large or another import is running). Nothing was saved. Try again, or split the file and preview each part." };
+    }
+    return {
+      dryRun: true, fileName: clean(params.fileName, 200), totalRows: rows.length,
+      imported, updated, duplicates, conflicts, skipped, suppressed: suppressedCount,
+      errors, errorsTruncated: errors.length >= maxErrors, sourceKey, snapshotAsOf,
+    };
+  }
+  await processRows();
 
   const [record] = await db
     .insert(leadImportsTable)
@@ -416,10 +603,10 @@ export async function importLeads(
   await recordAudit({
     organizationId,
     actorUserId: params.createdByUserId ?? null,
-    action: "leads.imported",
+    action: customers ? "customers.imported" : "leads.imported",
     entityType: "lead_import",
     entityId: record.id,
-    metadata: { imported, updated, duplicates, conflicts, skipped, sourceKey, snapshotAsOf },
+    metadata: { imported, updated, duplicates, conflicts, skipped, sourceKey, snapshotAsOf, ...(customers ? { mode: "customers", batchId } : {}) },
   });
   return record;
 }

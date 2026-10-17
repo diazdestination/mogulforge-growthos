@@ -2,8 +2,11 @@ import { randomUUID } from "node:crypto";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { z } from "zod/v4";
 import { db, usersTable } from "@workspace/db";
-import { GetCalliePolicyResponse, GetCallieIntakeResponse, ListCallieIntakesResponse, ReviewCallieCallerBody, ReviewCallieCallerResponse, BookCallieVisitBody, BookCallieVisitResponse, PreviewCalliePolicyResponse, ApproveCalliePolicyResponse, UpdateCallieOfficeResponse } from "@workspace/api-zod";
+import { GetCalliePolicyResponse, GetCallieIntakeResponse, ListCallieIntakesResponse, ReviewCallieCallerBody, ReviewCallieCallerResponse, PreviewCalliePolicyResponse, ApproveCalliePolicyResponse, UpdateCallieOfficeResponse } from "@workspace/api-zod";
+import { callieBookingSchema, callieBookingOutcomeSchema, callieSchedulingContextReadSchema } from "../../services/callie-office-contract";
+import { careFingerprint } from "../../services/service-care-policy";
 import app from "../../app";
 import { createSession, deleteSession } from "../../lib/auth";
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
@@ -70,18 +73,35 @@ describe("CALLIE human-session HTTP and generated contracts", () => {
     const saved = await request("/policy/approve", { expectedVersion: preview.expectedVersion, expectedSnapshot: preview.expectedSnapshot, previewHash: preview.previewHash, confirmed: true });
     expect(saved.status).toBe(200); expect(ApproveCalliePolicyResponse.safeParse(await saved.json()).success).toBe(true);
   });
-  it("executes real caller review and native booking with current strict generated request/response types", async () => {
+  it("executes actual caller review and reviewed booking with a closed original outcome", async () => {
     const initial = await (await request(`/${f.intake.id}`)).json() as { version: number; expectedFingerprint: string };
     const review = { requestId: randomUUID(), expectedVersion: initial.version, expectedFingerprint: initial.expectedFingerprint, action: "link_contact", contactId: f.contact.id, staffConfirmed: true };
     expect(ReviewCallieCallerBody.safeParse(review).success).toBe(true);
     expect((await request(`/${f.intake.id}/review-caller`, review, { cookie: `sid=${viewerSession}` })).status).toBe(403);
     const result = await request(`/${f.intake.id}/review-caller`, review); expect(result.status).toBe(200);
     const reviewed = await result.json() as { detail: { version: number; expectedFingerprint: string } }; expect(ReviewCallieCallerResponse.safeParse(reviewed).success).toBe(true);
-    const book = { requestId: randomUUID(), expectedVersion: reviewed.detail.version, expectedFingerprint: reviewed.detail.expectedFingerprint, contactId: f.contact.id, leadId: null, propertyId: f.property.id, assignedUserId: f.office.id, type: "other", scheduledStart: "2035-02-03T15:00:00.000Z", scheduledEnd: "2035-02-03T16:00:00.000Z", confirmationNote: "Fictional customer expressly agreed to the exact visit and office assignment.", customerConfirmed: true };
-    expect(BookCallieVisitBody.safeParse(book).success).toBe(true);
+    const contextResult = await request(`/${f.intake.id}/scheduling-context?appointmentType=other&propertyId=${f.property.id}`);
+    expect(contextResult.status).toBe(200); expect(contextResult.headers.get("cache-control")).toBe("no-store");
+    const contextRead = callieSchedulingContextReadSchema.parse(await contextResult.json());
+    if (contextRead.review.state !== "ready") throw Error("Fixture scheduling context held");
+    const book = callieBookingSchema.parse({ requestId: randomUUID(), expectedVersion: reviewed.detail.version, expectedFingerprint: reviewed.detail.expectedFingerprint, contactId: f.contact.id, leadId: null, propertyId: f.property.id, assignedUserId: f.office.id, type: "other", scheduledStart: "2035-02-03T15:00:00.000Z", scheduledEnd: "2035-02-03T16:00:00.000Z", confirmationNote: "Fictional customer expressly agreed to the exact visit and office assignment.", customerConfirmed: true,
+      schedulingReview: { context: contextRead.review.context, duration: { kind: "explicit", preset: null }, startWallTime: null, endWallTime: null } });
+    // Existing detail schema is unchanged. Root owns generated booking-contract integration.
+    const responseSchema = z.object({ detail: GetCallieIntakeResponse.nullable(), replayed: z.boolean(), bookingOutcome: callieBookingOutcomeSchema }).strict();
     expect((await request(`/${f.intake.id}/book`, { ...book, customerConfirmed: false })).status).toBe(400);
-    const saved = await request(`/${f.intake.id}/book`, book); expect(saved.status).toBe(200); expect(BookCallieVisitResponse.safeParse(await saved.json()).success).toBe(true);
-    const repeated = await request(`/${f.intake.id}/book`, book); expect(repeated.status).toBe(200); expect((await repeated.json() as { replayed: boolean }).replayed).toBe(true);
+    const { schedulingReview: _review, ...missing } = book;
+    const refused = await request(`/${f.intake.id}/book`, missing); expect(refused.status).toBe(409); expect(await refused.json()).toMatchObject({ code: "stale_scheduling_review" });
+    const saved = await request(`/${f.intake.id}/book`, book); expect(saved.status).toBe(200); const first = responseSchema.parse(await saved.json());
+    expect(first.bookingOutcome).toMatchObject({ organizationId: f.org, actorUserId: f.owner.id, intakeId: f.intake.id, requestId: book.requestId, requestFingerprint: careFingerprint(book), expectedVersion: book.expectedVersion, expectedFingerprint: book.expectedFingerprint, customerConfirmed: true });
+    const repeated = await request(`/${f.intake.id}/book`, book); expect(repeated.status).toBe(200); expect(responseSchema.parse(await repeated.json())).toEqual({ detail: null, replayed: true, bookingOutcome: first.bookingOutcome });
+  });
+  it("protects the dedicated context query and returns an explicit unreviewed hold", async () => {
+    const path = `/${other.intake.id}/scheduling-context`, headers = { cookie: `sid=${otherSession}` };
+    for (const query of ["", "?appointmentType=project", "?appointmentType=other&actorUserId=forged", "?appointmentType=other&propertyId=wrong"]) expect((await request(path + query, undefined, headers)).status).toBe(400);
+    expect((await request(path + "?appointmentType=other")).status).toBe(404);
+    expect((await request(path + "?appointmentType=other", undefined, { ...headers, "x-api-key": "not-resolved" })).status).toBe(403);
+    const read = await request(path + "?appointmentType=other", undefined, headers);
+    expect(callieSchedulingContextReadSchema.parse(await read.json())).toMatchObject({ source: null, review: { state: "held", code: "caller_review_required" } });
   });
   it("matches a real explicit office-close response and never grants a send or booking", async () => {
     const read = await (await request(`/${other.intake.id}`, undefined, { cookie: `sid=${otherSession}` })).json() as { version: number; expectedFingerprint: string };
