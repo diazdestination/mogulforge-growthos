@@ -1,12 +1,14 @@
 name: CI
 
 # Cost-aware lanes (Option 2, docs: GROWTHOS_CI_COST_PROPOSAL_2026-10-16):
-#   changes -> decides the lane from the event, draft state, base branch and paths.
+#   changes -> decides the lane from the event, draft state and base branch.
 #   full    -> the unchanged merge-gate suite. PRs to main, merge queue, manual runs.
 #   fast    -> stacked PRs (base != main): install, typecheck, affected-package tests.
 #   gate    -> always-reporting aggregator named "Test, typecheck, and build" so a
 #              branch-protection required check never hangs or passes on a failure.
-# Draft PRs run nothing billable. Markdown-only PRs run only `changes`.
+# Draft PRs run nothing billable. Every non-draft run executes a lane whatever
+# paths changed: tests and scripts read Markdown and JSON under docs/ and
+# reports/ (e.g. the Smart Site hookup runbook), so no path class is skipped.
 # Never add workflow-level paths/paths-ignore: that leaves required checks pending.
 #
 # Runner target: GitHub-hosted ubuntu-latest unless the repository variable
@@ -53,18 +55,14 @@ jobs:
       self_hosted: ${{ steps.lane.outputs.self_hosted }}
     steps:
       # pull_request events read the changed-file list from the API; no checkout.
-      - name: Classify changed paths
+      # Paths never select or skip a lane. `shared` only widens the fast lane's
+      # package selection to every package when workspace-wide config changed.
+      - name: Detect shared workspace configuration changes
         id: filter
         if: ${{ github.event_name == 'pull_request' }}
         uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4 (MIT)
         with:
-          predicate-quantifier: every
-          # Only Markdown prose is documentation. JSON and other files under
-          # reports/ and docs/ are source/recovery descriptors hash-pinned by
-          # scripts (e.g. scripts/c1-source-preservation.mjs), so they are code.
           filters: |
-            code:
-              - '!**/*.md'
             shared:
               - '{package.json,pnpm-lock.yaml,pnpm-workspace.yaml,tsconfig.json,tsconfig.base.json,.npmrc}'
 
@@ -74,14 +72,11 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
           IS_DRAFT: ${{ github.event.pull_request.draft || false }}
-          HAS_CODE: ${{ steps.filter.outputs.code }}
           RUNNER_KIND: ${{ runner.environment }}
         run: |
           lane=full
           if [ "$EVENT_NAME" = "pull_request" ]; then
             if [ "$IS_DRAFT" = "true" ]; then
-              lane=skip
-            elif [ "$HAS_CODE" != "true" ]; then
               lane=skip
             elif [ "$BASE_REF" = "main" ]; then
               lane=full
@@ -96,7 +91,7 @@ jobs:
             runner='"ubuntu-latest"'
             self_hosted=false
           fi
-          echo "event=$EVENT_NAME base=$BASE_REF draft=$IS_DRAFT code=$HAS_CODE -> lane=$lane runner=$runner"
+          echo "event=$EVENT_NAME base=$BASE_REF draft=$IS_DRAFT -> lane=$lane runner=$runner"
           {
             echo "lane=$lane"
             echo "runner=$runner"
@@ -321,8 +316,8 @@ jobs:
 
   gate:
     # This exact name may be a branch-protection required check. It always
-    # reports for non-draft, non-docs-only runs and fails if the selected lane
-    # did not succeed. Skipped (draft/docs-only) counts as success.
+    # reports for every non-draft run and fails if the selected lane did not
+    # succeed. Draft PRs run no jobs; ready_for_review then runs the gate.
     name: Test, typecheck, and build
     needs: [changes, full, fast]
     if: ${{ always() && !(github.event_name == 'pull_request' && github.event.pull_request.draft) && needs.changes.outputs.lane != 'skip' }}
