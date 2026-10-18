@@ -1,20 +1,108 @@
 name: CI
 
+# Cost-aware lanes (Option 2, docs: GROWTHOS_CI_COST_PROPOSAL_2026-10-16):
+#   changes -> decides the lane from the event, draft state and base branch.
+#   full    -> the unchanged merge-gate suite. PRs to main, merge queue, manual runs.
+#   fast    -> stacked PRs (base != main): install, typecheck, affected-package tests.
+#   gate    -> always-reporting aggregator named "Test, typecheck, and build" so a
+#              branch-protection required check never hangs or passes on a failure.
+# Draft PRs run nothing billable. Every non-draft run executes a lane whatever
+# paths changed: tests and scripts read Markdown and JSON under docs/ and
+# reports/ (e.g. the Smart Site hookup runbook), so no path class is skipped.
+# Never add workflow-level paths/paths-ignore: that leaves required checks pending.
+#
+# Runner target: GitHub-hosted ubuntu-latest unless the repository variable
+# CI_RUNNER is "self-hosted" (or a manual run picks it). Fork PRs never reach the
+# self-hosted runner.
+
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner target for this manual run (default follows vars.CI_RUNNER)"
+        type: choice
+        default: default
+        options:
+          - default
+          - github-hosted
+          - self-hosted
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: Test, typecheck, and build
-    runs-on: ubuntu-latest
+  changes:
+    name: Select CI lane
+    # Drafts get no jobs at all. Marking the PR ready (ready_for_review) runs CI.
+    if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.draft) }}
+    runs-on: ${{ ((inputs.runner == 'self-hosted' || (inputs.runner != 'github-hosted' && vars.CI_RUNNER == 'self-hosted')) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)) && fromJSON('["self-hosted","linux","x64","growthos-ci"]') || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      lane: ${{ steps.lane.outputs.lane }}
+      shared: ${{ steps.filter.outputs.shared || 'true' }}
+      runner: ${{ steps.lane.outputs.runner }}
+      self_hosted: ${{ steps.lane.outputs.self_hosted }}
+    steps:
+      # pull_request events read the changed-file list from the API; no checkout.
+      # Paths never select or skip a lane. `shared` only widens the fast lane's
+      # package selection to every package when workspace-wide config changed.
+      - name: Detect shared workspace configuration changes
+        id: filter
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4 (MIT)
+        with:
+          filters: |
+            shared:
+              - '{package.json,pnpm-lock.yaml,pnpm-workspace.yaml,tsconfig.json,tsconfig.base.json,.npmrc}'
+
+      - name: Decide lane
+        id: lane
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          IS_DRAFT: ${{ github.event.pull_request.draft || false }}
+          RUNNER_KIND: ${{ runner.environment }}
+        run: |
+          lane=full
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ "$IS_DRAFT" = "true" ]; then
+              lane=skip
+            elif [ "$BASE_REF" = "main" ]; then
+              lane=full
+            else
+              lane=fast
+            fi
+          fi
+          if [ "$RUNNER_KIND" = "self-hosted" ]; then
+            runner='["self-hosted","linux","x64","growthos-ci"]'
+            self_hosted=true
+          else
+            runner='"ubuntu-latest"'
+            self_hosted=false
+          fi
+          echo "event=$EVENT_NAME base=$BASE_REF draft=$IS_DRAFT -> lane=$lane runner=$runner"
+          {
+            echo "lane=$lane"
+            echo "runner=$runner"
+            echo "self_hosted=$self_hosted"
+          } >> "$GITHUB_OUTPUT"
+
+  full:
+    name: Full suite (main gate)
+    needs: changes
+    if: ${{ needs.changes.outputs.lane == 'full' && (needs.changes.outputs.self_hosted != 'true' || github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
     timeout-minutes: 45
 
     services:
@@ -43,18 +131,18 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1 (MIT)
         with:
           fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0 (MIT)
         with:
           version: 11.3.0
           run_install: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0 (MIT)
         with:
           node-version: 22
           cache: pnpm
@@ -104,6 +192,155 @@ jobs:
       - name: Build API server
         run: pnpm --filter @workspace/api-server run build
 
+      # Docker parity runs only in this lane. No GHA layer cache: the Dockerfile's
+      # `COPY . .` precedes `pnpm install`, so every source change invalidates the
+      # expensive layers. See the CI-cost receipt for the Dockerfile follow-up.
       - name: Run Docker staging-parity gate
         shell: pwsh
         run: ./scripts/verify-docker-staging-parity.ps1
+
+  fast:
+    name: Fast lane (stacked PR)
+    needs: changes
+    if: ${{ needs.changes.outputs.lane == 'fast' && (needs.changes.outputs.self_hosted != 'true' || github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mogulforge_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mogulforge_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      FORGE_SCHEDULING_PG_FIXTURE: github-actions-postgres16
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/mogulforge_test
+      SESSION_SECRET: ci-only-session-secret-that-is-long-enough-for-validation
+      EMAIL_INGESTION_WEBHOOK_SECRET: ci-only-email-intake-signing-secret
+      EMAIL_INTELLIGENCE_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      OAUTH_TOKEN_ENCRYPTION_KEY: AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
+
+    steps:
+      # Full history so pnpm can diff against origin/<base_ref> (merge-base safe).
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1 (MIT)
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0 (MIT)
+        with:
+          version: 11.3.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0 (MIT)
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # Composite lib projects emit dist/*.d.ts plus .tsbuildinfo, and api-server
+      # keeps an incremental .tsbuildinfo. Outputs and build info are cached
+      # together so tsc never trusts build info whose outputs are missing.
+      - name: Restore TypeScript incremental cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0 (MIT)
+        with:
+          path: |
+            lib/**/dist
+            lib/**/*.tsbuildinfo
+            artifacts/api-server/.tsbuildinfo
+            !**/node_modules/**
+          key: tsc-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'tsconfig.base.json', 'lib/**/tsconfig.json', 'artifacts/*/tsconfig.json') }}-${{ github.sha }}
+          restore-keys: |
+            tsc-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'tsconfig.base.json', 'lib/**/tsconfig.json', 'artifacts/*/tsconfig.json') }}-
+
+      - name: Run TypeScript checks
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          pnpm_config_workspace_concurrency: "1"
+        run: pnpm run typecheck
+
+      - name: Select affected workspace packages
+        id: affected
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          SHARED_CHANGED: ${{ needs.changes.outputs.shared }}
+        run: |
+          if [ "$SHARED_CHANGED" = "true" ]; then
+            echo "Shared workspace configuration changed; selecting every package."
+            echo "selector=" >> "$GITHUB_OUTPUT"
+            selector_args=(-r)
+          else
+            selector="...[origin/${BASE_REF}]"
+            echo "selector=$selector" >> "$GITHUB_OUTPUT"
+            selector_args=(--filter "$selector")
+          fi
+          names=$(pnpm "${selector_args[@]}" list --depth -1 --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s||"[]");console.log(a.map(p=>p.name).filter(Boolean).join(" "))})')
+          echo "Affected packages: ${names:-<none>}"
+          api=false
+          case " $names " in *" @workspace/api-server "*) api=true ;; esac
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+
+      - name: Apply test database schema
+        run: pnpm --filter @workspace/db run push-force
+
+      - name: Run affected non-API test suites sequentially
+        env:
+          SELECTOR: ${{ steps.affected.outputs.selector }}
+        run: |
+          if [ -n "$SELECTOR" ]; then
+            pnpm --filter "$SELECTOR" --filter '!@workspace/api-server' --workspace-concurrency=1 --if-present run test --maxWorkers=1
+          else
+            pnpm -r --workspace-concurrency=1 --filter '!@workspace/api-server' --if-present run test --maxWorkers=1
+          fi
+
+      - name: Run API test suite in isolation (if affected)
+        if: ${{ steps.affected.outputs.api == 'true' }}
+        run: pnpm --filter @workspace/api-server run test --maxWorkers=1
+
+      - name: Verify reusable website delivery adapter
+        run: node --test examples/website-connection/adapter.test.mjs examples/website-connection/operations.test.mjs
+
+  gate:
+    # This exact name may be a branch-protection required check. It always
+    # reports for every non-draft run and fails if the selected lane did not
+    # succeed. Draft PRs run no jobs; ready_for_review then runs the gate.
+    name: Test, typecheck, and build
+    needs: [changes, full, fast]
+    if: ${{ always() && !(github.event_name == 'pull_request' && github.event.pull_request.draft) && needs.changes.outputs.lane != 'skip' }}
+    runs-on: ${{ (needs.changes.outputs.runner != '' && fromJSON(needs.changes.outputs.runner)) || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Verify selected lane result
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          LANE: ${{ needs.changes.outputs.lane }}
+          FULL_RESULT: ${{ needs.full.result }}
+          FAST_RESULT: ${{ needs.fast.result }}
+        run: |
+          echo "changes=$CHANGES_RESULT lane=$LANE full=$FULL_RESULT fast=$FAST_RESULT"
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "::error::Lane selection did not succeed ($CHANGES_RESULT)."; exit 1
+          fi
+          for r in "$FULL_RESULT" "$FAST_RESULT"; do
+            case "$r" in failure|cancelled) echo "::error::A CI lane did not pass ($r)."; exit 1 ;; esac
+          done
+          case "$LANE" in
+            full) [ "$FULL_RESULT" = "success" ] || { echo "::error::Full lane result: $FULL_RESULT"; exit 1; } ;;
+            fast) [ "$FAST_RESULT" = "success" ] || { echo "::error::Fast lane result: $FAST_RESULT"; exit 1; } ;;
+            *) echo "::error::Unexpected lane '$LANE'."; exit 1 ;;
+          esac
+          echo "Lane '$LANE' passed."
