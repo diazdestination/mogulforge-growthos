@@ -1,5 +1,12 @@
 # Full-workday acceptance script: Climate Simulation Solutions (HVAC)
 
+**October 27 scope correction:** The October 9 intake requires payment collection
+preparation for the switch. Older payment-deferral labels in this packet must
+not exempt collection, deposits, progress payments or financing from acceptance;
+signed approval is a separate requirement. Current blockers and evidence:
+[CSS readiness](../css-onboarding-readiness-2026-10-27.md). No live workflow was
+executed or accepted by this correction.
+
 **Card status: NOT ACCEPTED** (`HOUSECALL-PRO-REPLACEMENT-GATE.md:125-139`).
 Running this script does not change that status. Only the company owner, the
 office/field representatives and Adam can accept the card, and only after every

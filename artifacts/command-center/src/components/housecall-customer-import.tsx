@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { importLeadsCsv, type LeadImport, type LeadImportPreview } from "@workspace/api-client-react";
 import { parseCsvPreview, suggestCustomerMapping, type CustomerImportField } from "@/lib/csv-preview";
 
@@ -44,6 +44,7 @@ function errorText(err: unknown, dryRun: boolean) {
  */
 export function HousecallCustomerImport({ onImported }: { onImported: (result: LeadImport) => void }) {
   const prefix = useId();
+  const fileSelection = useRef(0);
   const [file, setFile] = useState<Loaded | null>(null);
   const [mapping, setMapping] = useState<Partial<Record<CustomerImportField, number>>>({});
   const [exportedOn, setExportedOn] = useState("");
@@ -68,6 +69,8 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
   const missing = mapping.firstName === undefined || (mapping.email === undefined && mapping.phone === undefined);
 
   async function load(selected: File | undefined) {
+    // Every selection, including a cleared or invalid file, supersedes pending reads.
+    const selection = ++fileSelection.current;
     setError(""); setPreview(null); setDone(null); setReviewed(false); setFile(null); setMapping({});
     if (!selected) return;
     if (/\.xlsx?$/i.test(selected.name)) {
@@ -77,11 +80,13 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
     if (selected.size > MAX_BYTES) { setError("The file is larger than 5 MB. Contact us and we will help split it."); return; }
     try {
       const text = await readText(selected);
+      if (selection !== fileSelection.current) return;
       const [header = [], ...samples] = parseCsvPreview(text, 6);
       if (header.length < 2) { setError("No columns were found. Upload the CSV file from the Housecall Pro email."); return; }
       setFile({ name: selected.name, text, header, samples });
       setMapping(suggestCustomerMapping(header));
     } catch {
+      if (selection !== fileSelection.current) return;
       setError("The CSV could not be read. Check that it is a valid CSV file and upload it again. Nothing was imported.");
     }
   }
@@ -109,6 +114,9 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
     <div className="mt-3 space-y-4 text-sm" data-testid="hcp-customer-import">
       <section aria-labelledby={`${prefix}-export`} className="space-y-2">
         <h3 id={`${prefix}-export`} className="font-medium">1. Export your customers from Housecall Pro</h3>
+        <p className="text-muted-foreground">
+          This step imports customer names and contact details only. Jobs, invoices, balances, equipment, photos, and documents need separate migration and reconciliation before switching systems.
+        </p>
         <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
           <li>Sign in to Housecall Pro as an admin (only admins can export).</li>
           <li>Open <strong>Customers</strong> and clear any filters so every customer is included.</li>
