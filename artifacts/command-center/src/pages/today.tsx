@@ -14,6 +14,17 @@ import type { IntervalInput } from "@/lib/scheduling-ui-contract";
 type Queue<T> = { items: T[]; total: number; truncated: boolean };
 export type ContractorDay = ContractorToday;
 
+type NextBestActionItem = {
+  leadId: string;
+  actionType: string;
+  title: string;
+  reasons: string[];
+  priority: number;
+  contactName?: string | null;
+  leadStatus: string;
+  score: number;
+};
+
 function serviceInterval(item: ContractorDay["appointments"]["items"][number] | ContractorDay["projects"]["items"][number], kind: "appointment" | "project"): IntervalInput {
   const reservation = item.schedulingReservation ?? null;
   const evidence = item.schedulingEvidence ?? "invalid";
@@ -184,6 +195,18 @@ function TodayContent({ me, scopeKey }: { me: MemberProfile; scopeKey: string })
     },
     retry: false,
   });
+  const opportunities = useQuery({
+    queryKey: ["revenue-opportunities", scopeKey],
+    enabled: !!companyId,
+    queryFn: async ({ signal }) => {
+      const result = await contractorRequest<{ actions: NextBestActionItem[] }>(
+        "/next-best-action/today-actions?limit=15",
+        { signal },
+      );
+      return result.actions ?? [];
+    },
+    retry: false,
+  });
   const data = day.data;
   return (
     <div className="flex-1 bg-background p-4 text-foreground md:p-6">
@@ -324,6 +347,37 @@ function TodayContent({ me, scopeKey }: { me: MemberProfile; scopeKey: string })
                 </p>
               )}
             </div>
+            {opportunities.data && opportunities.data.length > 0 && (
+              <section aria-label="Revenue Opportunities" className="overflow-hidden rounded-xl border border-primary/30 bg-primary/[0.04]">
+                <div className="border-b border-border p-4">
+                  <h2 className="font-semibold text-primary">Revenue Opportunities</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Prioritized next actions — reply holds and hot leads first. Human confirmation required.
+                  </p>
+                </div>
+                <ul className="divide-y divide-border">
+                  {opportunities.data.map((action) => (
+                    <li key={action.leadId} className="px-4 py-3">
+                      <Link
+                        href={`/leads/${action.leadId}`}
+                        className="block rounded py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="min-w-0 text-sm font-semibold">{action.title}</span>
+                          <span className="shrink-0 rounded bg-primary/10 px-2 py-1 text-xs text-primary">
+                            Priority {Math.round(action.priority)}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm">{action.contactName || "Unknown contact"}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {action.reasons.slice(0, 2).join(" · ")}
+                        </p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             <div className="grid items-start gap-5 lg:grid-cols-2">
               <WorkQueue
                 title="Appointments"

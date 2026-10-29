@@ -49,7 +49,8 @@ describe('exact C1 source preservation overlay', () => {
     expect(result.smartSiteAmendment.auxiliaryScope.count).toBe(3);
     expect(result.smartSiteAmendment.integration.scope).toEqual({count:2120,sha256:'99a7972dbcb95bf3bc32190bcb0deac1a18c6b59907f8e0184d8e0983fd5b254'});
     expect(result.launchGapAmendment.integration.scope).toEqual({count:2123,sha256:'f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472'});
-    expect(result.currentScope).toEqual({count:2123,sha256:'c0519f20f3cf8e0e26ac1aa6d19701e4c587450fd82d6c4d8b359070703ef497'});
+    expect(result.inquiryConsentAmendment.integration.scope).toEqual({count:2123,sha256:'c0519f20f3cf8e0e26ac1aa6d19701e4c587450fd82d6c4d8b359070703ef497'});
+    expect(result.currentScope).toEqual({count:2124,sha256:'e4dd528c0b4ace7d638df724bf704b74bc33bfc43a3879bd8f9000a88dab35ea'});
     expect(result.testOnlyAmendment.changedPaths).toHaveLength(7);
     expect(result.testOnlyAmendment.changedPaths.every(path=>/^artifacts\/api-server\/src\/.*(?:\.test\.ts|test-helpers\/[^/]+\.ts)$/.test(path))).toBe(true);
     expect(result.releaseEligible).toBe(false);
@@ -222,7 +223,7 @@ describe('separate exact inquiry-consent successor', () => {
     ]);
     expect(result.inquiryConsentAmendment.releaseEligible).toBe(false);
     expect(result.launchGapAmendment.integration.scope.sha256).toBe('f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472');
-    expect(result.currentScope.sha256).toBe('c0519f20f3cf8e0e26ac1aa6d19701e4c587450fd82d6c4d8b359070703ef497');
+    expect(result.inquiryConsentAmendment.integration.scope.sha256).toBe('c0519f20f3cf8e0e26ac1aa6d19701e4c587450fd82d6c4d8b359070703ef497');
     expect(result.releaseEligible).toBe(false);
   });
   it.each(['inquiryAmendment','inquiryOriginal','inquiryReviewed','inquiryCurrent'])('refuses same-size altered %s bytes', key => {
@@ -264,7 +265,7 @@ describe('separate exact inquiry-consent successor', () => {
     const snapshot=copy();expect(snapshot.inquiryPredecessorProduct).toBeDefined();
     snapshot.currentProduct=structuredClone(snapshot.inquiryPredecessorProduct);
     expect(snapshot.currentProduct).toHaveLength(2123);
-    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/inquiry/);
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/C1 revenue current complete source union changed/);
   });
   it('refuses an altered historical predecessor map independently of the new current map', () => {
     const snapshot=copy();expect(snapshot.inquiryPredecessorProduct).toBeDefined();
@@ -372,7 +373,7 @@ describe('separate exact reviewed launch-gap successor', () => {
   });
   it('refuses a predecessor current map even when the historical D source remains exact', () => {
     const snapshot=copy();snapshot.currentProduct=structuredClone(snapshot.integrationProduct);
-    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/launch-gap/);
+    expect(()=>verifyC1SourceSnapshot(snapshot)).toThrow(/C1 revenue current complete source union changed/);
   });
   it('refuses an ignored executable beneath the new A auxiliary source boundary', () => {
     const directory=fileURLToPath(new URL('./v2-migration/tmp/',import.meta.url));

@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "purpose": "Exact Revenue Opportunities source successor for owner-approved PR71. Preserve every historical descriptor and proof. This is source identity only and grants no hosted, provider, schema, or release authority.",
+  "releaseEligible": false,
+  "authorization": {
+    "pullRequest": "https://github.com/diazdestination/mogulforge-growthos/pull/71",
+    "approvedHead": "0db6be4cbffde55130dbbd1a7a61993489ed40c9",
+    "ownerApproval": "I approve",
+    "date": "2026-10-29"
+  },
+  "predecessor": {
+    "descriptorPath": "reports/c1-inquiry-consent-integration-amendment-2026-10-16.json",
+    "descriptorSha256": "05dbc2101e6d7e9993031a9fbab3d9bd9ba41093377a47ec6b98bbafd3ce61b1",
+    "integration": {
+      "sourceCommit": "975ad3a2529c909885abdf70371054505f124162",
+      "sourceTree": "8b19f0c045a53848e14880efd1c5c70350387d77",
+      "scope": {
+        "count": 2123,
+        "sha256": "c0519f20f3cf8e0e26ac1aa6d19701e4c587450fd82d6c4d8b359070703ef497"
+      }
+    }
+  },
+  "scopePaths": [
+    "artifacts/api-server",
+    "lib"
+  ],
+  "base": {
+    "sourceCommit": "f0d74ab4ab2db756637cf3b4ad306b33982c9688",
+    "sourceTree": "d2df1e226dc9b496c66909f9c2b2a8464e72eb43",
+    "parents": [
+      "2092314c132f5914a38e7268958de134a373583f",
+      "cb57c2058953bc2bddd0cae8d484eb087bad441a"
+    ],
+    "scope": {
+      "count": 2123,
+      "sha256": "c0519f20f3cf8e0e26ac1aa6d19701e4c587450fd82d6c4d8b359070703ef497"
+    }
+  },
+  "successor": {
+    "sourceCommit": "0db6be4cbffde55130dbbd1a7a61993489ed40c9",
+    "sourceTree": "58267423685da83830391266a459b38e86286178",
+    "parents": [
+      "832fa165dc3fc9e7c2f7ecdccb51d0aedc5a5c6c"
+    ],
+    "scope": {
+      "count": 2124,
+      "sha256": "e4dd528c0b4ace7d638df724bf704b74bc33bfc43a3879bd8f9000a88dab35ea"
+    }
+  },
+  "changes": [
+    {
+      "path": "artifacts/api-server/src/routes/v1/index.ts",
+      "before": {
+        "path": "artifacts/api-server/src/routes/v1/index.ts",
+        "mode": "100644",
+        "blob": "64c667a877f80af9ec5f7e76224064ffa69ec13d"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "b7e1b36355a77a0354381d0bd5d4fa906323fae1"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/next-best-action.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "c10f4f6063cc4f533924775fd13df2c4b023993d"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/route-inventory.test.ts",
+      "before": {
+        "path": "artifacts/api-server/src/routes/v1/route-inventory.test.ts",
+        "mode": "100644",
+        "blob": "8e9793c08ce0dc63dbc3226747fde218e9fdb73a"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "778fc11c5e33745788f65f5103b4a0b139c64e86"
+      }
+    }
+  ],
+  "originalBlobs": [
+    {
+      "path": "artifacts/api-server/src/routes/v1/index.ts",
+      "mode": "100644",
+      "blob": "64c667a877f80af9ec5f7e76224064ffa69ec13d",
+      "bytes": 5508,
+      "sha256": "73b8d8d5508b9b45d90215ede69521a36b56ecee9fcd971387ea20634f2bfa5c"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/route-inventory.test.ts",
+      "mode": "100644",
+      "blob": "8e9793c08ce0dc63dbc3226747fde218e9fdb73a",
+      "bytes": 29471,
+      "sha256": "b175ff19464aa82bac89d5ada32c9c7b32c266421d7b8197f26125fb4d8794e5"
+    }
+  ],
+  "currentBlobs": [
+    {
+      "path": "artifacts/api-server/src/routes/v1/index.ts",
+      "mode": "100644",
+      "blob": "b7e1b36355a77a0354381d0bd5d4fa906323fae1",
+      "bytes": 5597,
+      "sha256": "944740b81f6428c972233bade97b61e0c5cc3cb5e56d2d2ced5e42e031d43b77"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/next-best-action.ts",
+      "mode": "100644",
+      "blob": "c10f4f6063cc4f533924775fd13df2c4b023993d",
+      "bytes": 543,
+      "sha256": "8929de550cffc5e6e83513f566324b08ee878a1b29a0194605ac44ed11d3bf0c"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/route-inventory.test.ts",
+      "mode": "100644",
+      "blob": "778fc11c5e33745788f65f5103b4a0b139c64e86",
+      "bytes": 29524,
+      "sha256": "3bd31a4e4f53ca1c4d4bd73872ff9c75611650f01027d3de37bf543d7db00f1f"
+    }
+  ]
+}

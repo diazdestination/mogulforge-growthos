@@ -142,6 +142,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "POST /mailbox/microsoft/lead-monitoring": "crm.write",
   "POST /mailbox/microsoft/nurture-monitoring": "crm.write",
   "GET /contractor/today": "crm.read",
+  "GET /next-best-action/today-actions": "crm.read",
   "GET /tasks/:id": "crm.read",
   "GET /invoices": "invoices.read",
   "GET /invoices/delivery-worklist": "invoices.read",
