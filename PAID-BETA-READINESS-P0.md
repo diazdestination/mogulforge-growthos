@@ -1,5 +1,9 @@
 # GrowthOS Paid Beta Readiness — P0 Execution Order
 
+> **Current context — October 29, 2026:** Source is integrated through PR #68/69 at the documented baseline; existing exact-tree full CI is successful. Source gates do not close hosted recovery, real provider/device/company or cutover requirements. Earlier branch names, test totals and dated wave headings retain their original checkpoint meaning.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 **Status:** ACTIVE RELEASE DIRECTIVE  
 **Primary branch:** `agent/mogulforge-growthos-recovery`  
 **CI-green starting baseline:** `ee7f39cc124dfcfa299b9daa165ba2579166756b` (September 29; [run 36523072054](https://github.com/diazdestination/mogulforge-growthos/actions/runs/36523072054))

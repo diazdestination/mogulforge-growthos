@@ -1,5 +1,9 @@
 # GrowthOS agent team — brand and fulfillment contract
 
+> **Current context — October 29, 2026:** The technical contract and dated results below describe their recorded feature checkpoint. Current main includes later contractor, scheduling, service, mailbox and Twilio work; use the current inventory for implemented features and pending live acceptance. Older branch names, test totals and approvals do not become current by this documentation refresh.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 **Source:** [owner's concept image](design/agent-team-reference.jpg), supplied September 30, 2026.
 **Scope:** Product identity and an honest agent directory in the local Command Center branch. This is not a production activation or a claim that eight autonomous agents exist.
 

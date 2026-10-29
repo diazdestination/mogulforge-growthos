@@ -1,126 +1,79 @@
-# MogulForge GrowthOS Architecture
+# MogulForge GrowthOS architecture
 
-This document is the implementation contract for the canonical
-`diazdestination/mogulforge-growthos` product. It separates working local software
-from planned infrastructure so product messaging, demos, and patent materials
-never describe a roadmap component as shipped.
+Current source overview, October 29, 2026. See [CURRENT-BUILD.md](CURRENT-BUILD.md)
+for capabilities and evidence, and [PROJECT_STATE.md](PROJECT_STATE.md) for holds.
 
-## Product boundary
-
-MogulForge GrowthOS is an evidence-first operating layer for contractor
-revenue, claims, and customer workflows. The system of record is the
-tenant-scoped MogulForge API and PostgreSQL database. AI assists only inside
-explicitly bounded workflows; authorized humans retain issuance and write
-approval authority.
-
-## Current Claim Kernel foundation
-
-The local recovery branch implements these deterministic controls:
-
-1. Evidence artifacts have SHA-256 digests and explicit AI-use approval.
-2. An analysis run freezes an ordered, alias-scoped Evidence Manifest.
-3. Citations are validated only against the frozen, tenant-owned alias set.
-4. A Loss Evidence Certificate binds its content, source manifest, prompt/model
-   version, and human-review ledger into a canonical integrity package.
-5. An issued certificate may compile into a constraint-carrying Route Packet.
-6. A route packet includes an idempotency key, one-attempt write budget,
-   target adapter fingerprint, preconditions, postconditions, and capability
-   requirements.
-7. An indeterminate external-write state cannot retry until reconciliation.
-8. Native MogulForge estimates compile into canonical claim graphs with
-   node-level source paths, transformation rules, financial-conservation
-   invariants, and deterministic graph digests.
-9. Source-linked loss observations compile into a hash-bound corroboration
-   assessment that exposes spatial, temporal, directional, source-quality,
-   coverage, missingness, and contradiction components for human review.
-
-The route compiler does **not** execute a browser action, contact a carrier,
-or hold credentials. That separation is intentional.
-
-## Authoritative boundaries
+## Runtime and sources of truth
 
 ```text
-Contractor UI
-    -> MogulForge API / PostgreSQL (authoritative cases, certificates, route packets)
-    -> Object storage (large artifacts, immutable receipt evidence; planned)
-    -> Private claim kernel (local normalization and deterministic validation)
-    -> Isolated executor (target interaction only after preflight; planned)
+Contractor/office React + Vite UI and customer portal
+    -> Express API: authentication, tenant/role checks, reviewed commands
+    -> PostgreSQL + Drizzle: customer/property/lead/estimate/job/invoice history
+       scheduling, service work, evidence, consent, audit and effect ownership
+    -> Controlled adapters: selected mailboxes, Twilio, optional intelligence
+Smart Sites / existing website backends -> signed/scoped capture and delivery
 ```
 
-The API/database owns business state. Queue transport, edge services, and
-browser workers may not become a competing source of truth.
+The API and tenant-owned database hold canonical business state. The frontend,
+website adapters and provider callbacks cannot grant themselves business or
+send authority. React Query clients and Zod validation are generated from
+`lib/api-spec`; `lib/scheduling-core` shares saved scheduling/conflict rules.
 
-## User-owned communication identity
+## Product modules in current source
 
-GrowthOS does not use a platform owner's personal mailbox as a shared sending
-provider. Each member may authorize their own Gmail account with MogulForge's
-central Google OAuth application and the narrow `gmail.send` scope. Refresh
-tokens are encrypted with AES-256-GCM and bound to the exact organization and
-user; OAuth state is short-lived, single-use, and paired with PKCE. Disconnect
-revokes Google access where available and always removes the local credential.
+Today/Service Desk/customer workspaces join CRM, native estimates/jobs/invoices,
+equipment/checklists, saved capacity/travel scheduling, recurring service and
+communication history. Revenue Desk/BIE joins source facts, reviewed proposals,
+owned execution and value/outcome evidence. Smart Sites use site-specific server
+credentials and preserve delivery uncertainty. Customer portals and private
+photos remain contact/tenant scoped. Lifecycle inventory, exports, holds and
+offboarding/recovery controls operate on those same records.
 
-For approval-first BIE email, the executing user is the sender. A missing,
-revoked, or failing connection blocks visibly and never falls back to another
-person's mailbox. Unattended organization-level campaigns require a separately
-selected organization sender and policy; that behavior is not yet implemented.
+Evidence Intelligence retains explicit artifact approval, frozen manifests,
+validated citations, deterministic hashes, human-reviewed certificates, native
+estimate claim graphs and corroboration. Route packets describe a bounded
+handoff; their existence does not prove a live external claims executor.
+See [EVIDENCE-INTELLIGENCE.md](EVIDENCE-INTELLIGENCE.md).
 
-## Permissioned Google Business Graph
+## Identity, communications and effects
 
-The Google connection is a modular business-data surface, not a Gmail-only
-special case or blanket “super connector.” Users authorize capabilities
-incrementally and may keep any module off. Source content is normalized into
-provenance-carrying Business Graph facts before BIE uses it; connected content
-is untrusted data and can never grant an agent instructions or tool authority.
-The module/scoping and continuous-scouting contract is maintained in
-[GOOGLE-BUSINESS-GRAPH.md](GOOGLE-BUSINESS-GRAPH.md).
+- Self-hosted email/password authentication and database sessions; invitations,
+  accepted membership and tenant/role checks guard private work.
+- Gmail/Microsoft sending resolves the selected authorized same-company staff
+  mailbox. Platform transactional mail is separate and never an implicit
+  contractor sender. Microsoft tracked reply/source workflows are opt-in.
+- One Twilio organization/account/number binding controls signatures, secret
+  references, flags, geography, limits and purpose-specific handset proof.
+  Staff bridge/missed-call and CALLIE keypad/conversation paths retain separate
+  authority. Current setup choice is Twilio; Telnyx is parked.
+- Permanent operation ownership and saved-payload review prevent duplicate
+  effects. Unknown provider outcomes stay uncertain until evidence-backed
+  reconciliation; a new key is not permission to resend.
+- Background work retains scheduler/outbound/lifecycle controls. A browserless
+  scheduler requires a separately verified runtime; configured min-machines is
+  not proof that a deployed scheduler is awake.
 
-## Delivery sequence
+## Storage and build
 
-### Stage 1 — evidence integrity and controlled handoff
+Private uploads use the PostgreSQL-backed storage implementation by default;
+legacy optional storage/connector packages may remain. Their presence does not
+make Replit an application-auth requirement. The Cloudflare email-intake Worker
+is a separate optional transport, not a second customer database. Large-scale
+object storage/external executors and broad Google adapters must not be promoted
+from strategy to shipped integrations.
 
-Implemented locally: manifest freezing, canonical hashing, certificate binding,
-route compilation, review/issuance gates, deterministic tests, and audit events.
+The Dockerfile uses Node 22 and pnpm 11.3.0, installs the frozen lockfile with
+lifecycle scripts disabled, builds the Vite UI and API, and stages the UI under
+`/app/public`. Express serves the production UI and API on port 3001. Compose is
+a separate local example; the supported test runner uses disposable PostgreSQL 16.
+See [DEPLOY.md](DEPLOY.md) and [DEV-LOCAL.md](DEV-LOCAL.md).
 
-### Stage 2 — provenance-preserving estimate compilation
+## Release boundary
 
-The native-estimate adapter, typed canonical claim graph, node-to-source mapping
-ledger, financial-conservation checks, versioned rule pack, and two
-vendor-neutral target profiles are implemented locally. Every target profile is
-replayable from a stored graph digest. Next: add unit dimensions, import
-adapters for external estimate artifacts, and real target adapters only after
-their respective platform agreements and test fixtures are available.
-
-### Stage 3 — deterministic loss corroboration
-
-Implemented locally: versioned, source-artifact-linked observations; explicit
-quality, coverage, and missing-field declarations; time-window relevance;
-great-circle distance; roof-facet directional alignment; cross-source
-contradiction detection; decomposable confidence; source-manifest and result
-hashes; and immutable contractor verification/rejection. A verified assessment
-may be bound as an optional precondition on a route packet. It does not call a
-weather service, infer missing evidence, or determine coverage, causation,
-safety, or damages. Provider adapters remain a separate future integration.
-
-### Stage 4 — proof-obligated target execution
-
-Add a tenant-scoped credential vault, registered and fingerprinted target
-adapters, executor-only short-lived capabilities, target-side postcondition
-evidence, immutable receipts, and reconciliation for unknown-write outcomes.
-
-### Stage 5 — production deployment
-
-Deploy only after approval: public edge/DNS, artifact object storage, queue
-transport, private compute, managed PostgreSQL, key management, monitoring,
-backups, incident response, and beta acceptance tests. No provider account,
-credential, spend, or live target action is implied by this repository.
-The exact no-memory implementation and verification handoff is maintained in
-[GROWTHOS-RESUME.md](GROWTHOS-RESUME.md).
-
-## Non-negotiable safety rules
-
-- No raw tenant artifact is used by AI without explicit authorization.
-- No AI draft is an issued certificate.
-- No certificate reaches an execution path without a current integrity hash and
-  completed human review.
-- No target write is retried when a prior write may have occurred.
-- No implementation claim is made without a matching test or live verification.
+Code, local/native tests, CI, deployed source/schema, provider identity/delivery
+and customer acceptance are distinct. The current source has exact-tree full CI
+evidence; the last production check still found an older stopped image. Generic
+automatic schema reconciliation is retired. Fresh reviewed SQL/source/target,
+backup/credential custody, compatible recovery or complete mutation holds and
+explicit applicable release authority remain required. Preserve original
+history, retained target writes and consumed once-intents.

@@ -1,5 +1,9 @@
 # Existing-customer work and invoices
 
+> **Current context — October 29, 2026:** The technical contract and dated results below describe their recorded feature checkpoint. Current main includes later contractor, scheduling, service, mailbox and Twilio work; use the current inventory for implemented features and pending live acceptance. Older branch names, test totals and approvals do not become current by this documentation refresh.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 Source implementation guide, October 6, 2026. This is not provider activation,
 production migration, bank settlement or contractor replacement acceptance.
 See `reports/returning-customer-work-contract-2026-10-06.md` for engineering scope

@@ -1,5 +1,9 @@
 # GrowthOS coordinated delivery
 
+> **Current context — October 29, 2026:** The technical contract and dated results below describe their recorded feature checkpoint. Current main includes later contractor, scheduling, service, mailbox and Twilio work; use the current inventory for implemented features and pending live acceptance. Older branch names, test totals and approvals do not become current by this documentation refresh.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 Started October 1, 2026 on WILLOWFORGE. Adam explicitly requested parallel agents
 to advance the shared contractor platform toward a limited $500 beta and a
 $1,500 flagship. Product scope: `GROWTHOS-CONTRACTOR-PRODUCT.md`.

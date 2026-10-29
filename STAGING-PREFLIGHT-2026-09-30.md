@@ -1,5 +1,9 @@
 # GrowthOS staging preflight — September 30, 2026
 
+> **Current context — October 29, 2026:** The technical contract and dated results below describe their recorded feature checkpoint. Current main includes later contractor, scheduling, service, mailbox and Twilio work; use the current inventory for implemented features and pending live acceptance. Older branch names, test totals and approvals do not become current by this documentation refresh.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 ## Latest controlled-pilot update — September 30 evening (October 1 UTC)
 
 The owner's subsequent request to finish controlled-pilot preparation

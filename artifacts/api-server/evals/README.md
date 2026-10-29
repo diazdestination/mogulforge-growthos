@@ -1,5 +1,9 @@
 # MogulForge Evidence Intelligence Proof Lab
 
+> **Current context — October 29, 2026:** The evidence trust-gate lab remains one part of the current product. Its synthetic results are not expert accuracy, provider activation or whole-product acceptance. Use an isolated test database for verification.
+> See [current build](../../../CURRENT-BUILD.md) and [documentation map](../../../docs/DOCUMENTATION-MAP.md).
+
+
 This is the release gate for the Evidence Intelligence workflow. The cases are synthetic and contain no customer data.
 
 ## Non-negotiable gates

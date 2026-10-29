@@ -1,5 +1,9 @@
 # Contractor pilot implementation and release boundary
 
+> **Current context — October 29, 2026:** The technical contract and dated results below describe their recorded feature checkpoint. Current main includes later contractor, scheduling, service, mailbox and Twilio work; use the current inventory for implemented features and pending live acceptance. Older branch names, test totals and approvals do not become current by this documentation refresh.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 September 30, 2026 — local code on the private GrowthOS beta-prep branch. **Not a production activation or claim that Painless and Climate Simulation Solutions are live.**
 
 Communications update: the owner chose to continue with Twilio after evaluating

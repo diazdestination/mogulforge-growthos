@@ -1,5 +1,9 @@
 # GrowthOS background-work operations
 
+> **Current context — October 29, 2026:** Background/reminder and permanent effect-ownership code exists. Prepared runtime minimums do not establish an active deployed scheduler, and a successful test does not authorize provider sends. Verify current holds, actual runtime and exact source before any hosted schedule/activation.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 Updated: 2026-09-30. Status: implementation and isolated acceptance; **not a deployment or paid-beta approval**.
 
 October 1 held-staging update: application candidate `c050067` now has actual

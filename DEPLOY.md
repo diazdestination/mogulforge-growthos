@@ -1,71 +1,55 @@
-# MogulForge — Self-Host Deploy
+# GrowthOS build and deployment model
 
-Runs **fully off Replit**: self-hosted email/password auth, Postgres, and a
-**single app container** where the API serves both the SPA and the API on one
-origin. One image, one URL.
+Current source reference, October 29, 2026. This is not deployment authorization.
+See [CURRENT-BUILD.md](CURRENT-BUILD.md) for release status and [DEV-LOCAL.md](DEV-LOCAL.md)
+for local preview/tests. Current source is not verified live in production.
 
-> **✅ VERIFIED (2026-08-04):** `docker compose build` succeeds and the container
-> runs end-to-end — one origin serves the SPA (`/`) and API (`/api/*`); register
-> → owner → branded dashboard all confirmed in a production container.
+## Image and runtime
 
-**For a live public beta URL, use [BETA-LAUNCH.md](BETA-LAUNCH.md) (Fly.io).**
-This file is the local / VPS self-host reference.
+| Piece | Checked-in implementation |
+| --- | --- |
+| Base | Dockerfile node:22-slim; pnpm 11.3.0 |
+| Install | Frozen lockfile, lifecycle scripts disabled |
+| Build | Command Center Vite build followed by API build |
+| Runtime | API dist/index.mjs and required runtime modules; frontend staged at /app/public |
+| Serving | Express serves UI and API on one origin, container port 3001 |
+| Database | PostgreSQL/Drizzle; exact deployed schema must be verified |
+| Local examples | Compose uses PostgreSQL 15/host8080/DB5433; isolated current tests use PostgreSQL 16 |
 
-## Local self-host (docker compose)
+Self-hosted email/password sessions, tenant roles and per-user provider identity
+are implemented. Optional legacy connector/storage packages do not make Replit
+an application-auth dependency. Private uploads use PostgreSQL-backed storage by
+default; optional storage adapters need their own approved configuration.
 
-```bash
-cp .env.example .env          # set SESSION_SECRET + BETA_SIGNUP_ALLOWLIST
-docker compose up -d db
-docker compose run --rm app sh -lc \
-  "cd /app && pnpm --filter @workspace/db exec drizzle-kit push --force"   # one-time schema
-docker compose up -d --build app
-# open http://localhost:8080 → register an email listed in BETA_SIGNUP_ALLOWLIST
-```
+## Why a generic deploy command is not the release procedure
 
-`docker compose down` stops it (keeps data); add `-v` to also wipe the DB volume.
+fly.toml selects mogulforge-growthos and retains a release command. That command
+(`node /app/scripts/release-schema.mjs`) deliberately refuses automatic schema
+reconciliation. AUTO_MIGRATE or a bare `fly deploy` is not a valid shortcut.
+Do not delete the refusal, force schema push or change the provider configuration
+to make an unreviewed release proceed.
 
-## The image
+The last recorded cutover restored the older image/settings/database binding
+together before reopen. Retained target TEST/scheduler writes and consumed
+once-intents require fresh reconciliation, not a repeated reset/copy/controller.
 
-| Piece | Detail |
-|---|---|
-| Base | `node:22-slim`, pnpm pinned to 11.3.0 |
-| Build | installs with `--ignore-scripts` (platform binaries come from optional deps, not build scripts), builds the SPA then the API |
-| Runtime | API bundle (`dist/index.mjs`) + `node_modules` (for externalized `zod`/`@resvg`/`pg`); SPA staged at `/app/public` (`STATIC_DIR`) |
-| Serving | `app.ts` serves `STATIC_DIR` + SPA history fallback in production, so relative `/api/*` calls need no proxy |
-| Port | `3001` (compose maps host `8080`) |
+## Required release packet
 
-## How auth was decoupled from Replit
+1. Verify active account/org, exact app/Machine, source/tree, image digest, schema,
+   original full config and secret names; keep secret values out of logs/Git.
+2. Bind the reviewed source/SQL/image/operator and backup/credential custody to
+   the exact target. Resolve current clock/readiness prerequisites and retained
+   target-write disposition. An old successful rollback is historical evidence.
+3. Define finite maintenance, writer/scheduler/outbound holds, backup, independent
+   comparison and private acceptance. Keep real provider effects disabled until
+   their separately scoped approval and tests.
+4. Require exact health/auth/tenant/log/scheduler and compatible-recovery evidence
+   before reopen. Pre-reopen failure restores the original image/settings/binding
+   together under the approved plan. After target writes/reopen, use the reviewed
+   hold/forward-recovery decision rather than repointing at stale data.
+5. Verify each actual provider, handset and contractor workflow separately;
+   preserve full replacement, migration and workday gates.
 
-- **Login** is self-hosted email/password (`POST /api/auth/register · /login ·
-  /logout`) using Node's built-in **scrypt** + the DB-backed session store — no
-  OIDC, no `REPL_ID`. Per-IP brute-force limiting. Production self-registration
-  is fail-closed behind `BETA_SIGNUP_ALLOWLIST`; pre-provisioned team invites
-  remain valid without an allowlist entry.
-- Replit OIDC routes remain but are dormant without `REPL_ID`.
-- Private image uploads use signed, short-lived URLs backed by Postgres by
-  default, so assessment and portal photos work in Docker/Fly without the
-  Replit Object Storage sidecar. The legacy Replit/GCS adapter remains opt-in.
-- Gmail through the Replit connector is optional. Resend is the portable email
-  provider; without either provider, development uses an explicit no-delivery
-  mock and surfaces that state in the UI/logs.
-
-## Production notes
-
-- **HTTPS:** the session cookie is `Secure` in production — serve behind TLS on a
-  real domain (Fly gives this automatically; on a VPS use Caddy/Cloudflare).
-  `localhost` is exempt, so the compose demo works over http locally.
-- **Migrations:** quick-start uses `drizzle-kit push --force` (fine for a fresh
-  DB / early beta). Switch to generated migrations as the schema stabilizes.
-- **Secrets:** never commit `.env`. `SESSION_SECRET` must be stable across
-  restarts or all sessions invalidate.
-- **Public origin:** set `APP_ORIGIN` to the canonical HTTPS origin. It is used
-  for trusted same-origin checks and outbound links.
-- **Beta access:** set `BETA_SIGNUP_ALLOWLIST` to approved new-company owner
-  emails. Invited teammates are approved through the in-app invite flow.
-- **Object storage:** `OBJECT_STORAGE_PROVIDER=postgres` is the zero-service
-  default. For larger production media volumes, add a dedicated S3/R2 adapter
-  behind the same object-service interface before moving bytes out of Postgres.
-- **Image size:** the runtime copies the whole built workspace for simplicity;
-  `pnpm deploy --filter @workspace/api-server` can slim it later.
-- **Repository:** this deployment belongs to the private
-  `diazdestination/mogulforge-growthos` repository, not the older CRM template.
+The configured application address, prepared min-machines value and a green
+source test do not prove availability or authorize new hosting cost. No production
+command, purchase, provider activation or public launch is implied by this file.

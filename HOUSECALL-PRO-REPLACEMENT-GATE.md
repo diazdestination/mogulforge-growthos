@@ -1,5 +1,9 @@
 # Housecall Pro replacement gate
 
+> **Current context — October 29, 2026:** Current source includes native estimates/jobs/invoices, saved capacity/travel scheduling, service reminders/replies, workday equipment and mailbox/Twilio foundations. Full actual company migration and replacement acceptance remain open. Later CSS intake restored payment preparation to scope; the older payment deferral is not the complete current company requirement. Do not invent provider/financing implementation or silently accept a reduced pilot.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 October 8 current source addendum: main `2162aa2` and exact-main CI `37500458053`
 include returning-customer estimates/jobs/invoices, external refund accounting,
 Contractor Workday and CALLIE conversation. Older missing-feature descriptions

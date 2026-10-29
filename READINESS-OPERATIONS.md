@@ -1,5 +1,9 @@
 # Public liveness and database readiness
 
+> **Current context — October 29, 2026:** Readiness endpoints, local tests and historical drills each prove only their recorded scope. The last production check found an older stopped image; retained target writes and consumed cutover intents require fresh reconciliation. Do not revive generic schema pushes or treat local readiness as live acceptance.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 These probes are operational checks, not proof that a contractor is onboarded or
 that email, SMS, phone, AI, calendar, payment, or scheduler workflows work.
 

@@ -1,5 +1,9 @@
 # Professional character theme — October 9, 2026
 
+> **Current context — October 29, 2026:** The technical contract and dated results below describe their recorded feature checkpoint. Current main includes later contractor, scheduling, service, mailbox and Twilio work; use the current inventory for implemented features and pending live acceptance. Older branch names, test totals and approvals do not become current by this documentation refresh.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 final result: passed
 
 The owner supplied the eight-specialist image as a general reference and explicitly requested improved text and a professional SaaS presentation. This is an adaptation of the existing product, not a pixel-for-pixel poster recreation. Source and the latest directory capture were opened together in one comparison input. Reference width1280, rendered desktop1280; the implementation is taller to support larger readable copy. Mobile was checked at390 CSS pixels (375 content width with scrollbar on directory/site).

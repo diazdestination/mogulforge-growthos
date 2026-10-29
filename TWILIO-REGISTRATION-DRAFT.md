@@ -1,5 +1,9 @@
 # MogulForge registration draft — do not submit yet
 
+> **Current context — October 29, 2026:** Historical platform-specific registration wording and prices below are not ready Painless/CSS submissions or current quotes. Prepare each actual client sender/use case from verified facts and current official provider requirements. No legal submission, account approval or price authority is implied.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 September 27, 2026. No submission, registration SID, fee payment or approval exists from this run. Adam Mach is the user's self-reported legal name; Adam@mogulforge.ai is the supplied business email. MogulForge's legal entity, EIN, legal address, representative title and legal formation remain unverified. Do not infer an address from Dawsonville, treat the brand as an LLC, or substitute Kingdom AI Group. Painless is outside authorization.
 
 ## Proposed number and billing structure

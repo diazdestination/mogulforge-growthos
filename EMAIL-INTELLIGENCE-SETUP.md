@@ -1,5 +1,9 @@
 # Email Intelligence Inbox setup
 
+> **Current context — October 29, 2026:** The described Worker/intake path exists as source. Treat its domain/provider setup as a proposed configuration until actual routing, secrets and live intake are verified; the words selected transport do not establish a live inbox connection.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 ## Selected beta transport
 
 The founding beta uses Cloudflare Email Routing on the dedicated

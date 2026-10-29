@@ -1,50 +1,31 @@
-# MogulForge GrowthOS — Claude Code Boot
-
-This file is the mandatory project entrypoint for every Claude Code session in this
-repository. Read the imported resume pack before planning or editing.
+# GrowthOS — Claude Code entry point
 
 @GROWTHOS-RESUME.md
 
-## Identity and scope
+## Current identity and coordination
 
-- Canonical local checkout: `C:\Users\diazd\dev\projects\mogulforge`
-- Canonical private repository: `diazdestination/mogulforge-growthos`
-- Working branch: `agent/mogulforge-growthos-recovery`
-- `main` stays unchanged until Diego explicitly approves a merge.
-- This is MogulForge GrowthOS. Do not add Jarvis branding or terminology to product
-  source, documentation, or UI.
+Canonical product: `diazdestination/mogulforge-growthos`, formerly
+`mogulforge-crm`; last verified visibility public. Use your assigned isolated
+checkout/branch and inspect current status/ancestry. There is no mandatory old
+Windows directory or recovery branch. Adam is the owner; obsolete Diego references
+in historical records are not current approval routing.
 
-## Hard safety boundaries
+Read [AGENTS.md](AGENTS.md), [CURRENT-BUILD.md](CURRENT-BUILD.md),
+[PROJECT_STATE.md](PROJECT_STATE.md) and [NEXT_ACTIONS.md](NEXT_ACTIONS.md).
+Preserve other agents' edits and the existing product/tenant branding. The old
+CRM template, corporate marketing and client-site repos are separate surfaces.
 
-- Never use or push to `diazdestination/MogulForge-crm-template-`. Its stale local clone
-  was removed on 2026-08-06; do not recreate it for product work.
-- The private `diazdestination/MogulForge` repository is the separate marketing site. Its
-  old local clone was removed on 2026-08-06 so this CRM is the sole local MogulForge repo.
-- Do not push, merge, deploy, publish, create paid resources, change DNS, enable billing,
-  or use production credentials without Diego's explicit approval for that action.
-- Preserve unrelated working-tree items. In particular, do not delete or commit
-  `pnpm-workspace.yaml.bak` unless Diego explicitly asks.
-- Never claim the broad API suite, a public deployment, a payment flow, or a provider
-  integration is working without the matching live verification evidence.
+For Forge work, read `C:/Forge/AGENTS.md`, `C:/Forge/AI_COLLABORATION.md` and the
+applicable assignment. Claude may do assigned local work; shared-project pushes
+require Codex review/permission. Exclusive ownership requires Adam's explicit
+assignment. Do not infer it from an agent task or a historical owner table.
 
-## Start-of-session verification
+Keep secrets/customer data out of outputs and public Git. Use reviewed PRs;
+never overwrite unrelated work or force-push shared branches. Deployment,
+provider activation, paid resources, legal submissions, real customer contact
+and public launch retain applicable owner approvals. Source/CI success is not
+hosted/provider/customer acceptance. Do not replay old consumed cutover intents.
 
-Before editing, verify all of the following and stop if any identity check differs:
-
-```powershell
-git rev-parse --show-toplevel
-git status --short --branch
-git remote -v
-git log -5 --oneline --decorate
-```
-
-The top level must be the canonical local checkout and `origin` must be the private
-`mogulforge-crm` remote. Then follow `GROWTHOS-RESUME.md` for architecture, implemented
-seams, tests, deployment gates, and the current next phase.
-
-## Completion discipline
-
-- Keep implementation state in this repository, especially `GROWTHOS-RESUME.md` and
-  `GROWTHOS-ARCHITECTURE.md`, not only in chat or global machine notes.
-- Run proportionate focused tests and a production build before declaring a change done.
-- Commit only intentional files to the recovery branch. Do not push by implication.
+Record actual changes, exact source/tests and limitations. Update current guides
+when behavior changes; keep frozen reports/fixtures as original evidence. No
+documentation instruction changes Adam's existing scope or release boundaries.

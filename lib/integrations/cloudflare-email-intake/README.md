@@ -1,5 +1,9 @@
 # Cloudflare Email Intelligence intake
 
+> **Current context — October 29, 2026:** The Worker is implemented optional intake source. Its dedicated-domain routing/secret/provider setup remains subject to actual activation evidence; these instructions do not assert an active customer inbox.
+> See [current build](../../../CURRENT-BUILD.md) and [documentation map](../../../docs/DOCUMENTATION-MAP.md).
+
+
 This Worker is the inbound transport boundary for the GrowthOS founding beta.
 Cloudflare Email Routing receives mail only on the dedicated
 `intake.mogulforge.ai` subdomain. The Worker parses the message in memory,

@@ -1,5 +1,9 @@
 # MogulForge GrowthOS — Client Template
 
+> **Current context — October 29, 2026:** This is a legacy client export description, not the canonical GrowthOS product README or a verified current deployment. Current product development is in mogulforge-growthos; exporting/syncing a template is a separate reviewed distribution action.
+> See [current build](../../CURRENT-BUILD.md) and [documentation map](../../docs/DOCUMENTATION-MAP.md).
+
+
 A full-stack roofing CRM: pipeline board, lead management, scheduling, automated emails, portal access for homeowners, and an AI roof concierge. Built on React + Vite (frontend) and Node/Fastify + PostgreSQL (API server).
 
 ---

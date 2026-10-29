@@ -1,5 +1,9 @@
 # GrowthOS contractor operations and Housecall Pro replacement
 
+> **Current context — October 29, 2026:** Current source includes native customer work, estimates/jobs/invoices, external receipts, workday equipment/checklists and saved capacity/travel scheduling. Full migration/company/device/provider acceptance remains separate. Later CSS intake restores payment preparation to scope without claiming a finished collection/financing provider.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 Owner direction, October 1, 2026. This supersedes the assumption that GrowthOS
 must remain an add-on to Housecall Pro. It does not establish replacement
 readiness or authorize a customer cutover, charge, message or public launch.

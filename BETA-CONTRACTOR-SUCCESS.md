@@ -1,5 +1,9 @@
 # Make the first two contractor accounts successful
 
+> **Current context — October 29, 2026:** Native estimates/jobs/invoices and reviewed initial estimate/invoice email exist in source; live delivery, complete migration and actual company workdays remain unaccepted. Later CSS intake restored payment preparation to scope, without proving a selected/working processor or financing. Earlier company/price facts and deferrals below are historical and must be reverified before any live offer.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 Working operator plan. No new customer promises, price changes or activation.
 
 ## Offer and scope

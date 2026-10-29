@@ -1,5 +1,9 @@
 # Smart Sites client onboarding — local acceptance
 
+> **Current context — October 29, 2026:** The technical contract and dated results below describe their recorded feature checkpoint. Current main includes later contractor, scheduling, service, mailbox and Twilio work; use the current inventory for implemented features and pending live acceptance. Older branch names, test totals and approvals do not become current by this documentation refresh.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 September 12, 2026. Local implementation passed. **Not a public release or completed production onboarding.**
 
 ## What is now usable

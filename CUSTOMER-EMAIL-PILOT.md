@@ -1,5 +1,9 @@
 # Customer email pilot configuration
 
+> **Current context — October 29, 2026:** Selected Gmail/Microsoft sending and tracked Microsoft reply workflows exist in current source. The October 1 staging observation below is historical, not proof of current connected mailboxes, inbox arrival or production rollout. Platform transactional sending remains separate from contractor messages.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 Customer messages require a specific active staff member's selected Gmail or
 Microsoft 365 / Outlook connection within the same organization. Microsoft
 support was deployed to isolated, outbound-held staging in source 77f6d63 on

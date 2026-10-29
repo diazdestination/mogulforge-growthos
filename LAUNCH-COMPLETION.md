@@ -1,5 +1,9 @@
 # GrowthOS contractor launch-completion checklist
 
+> **Current context — October 29, 2026:** Use the current feature inventory to distinguish implemented scheduling/workday/invoice/communications source from unfinished acceptance and additional scope. This checklist remains a requirements record; its old table rows are not evidence that already-merged features must be rebuilt. Payment collection/financing, full migration and real company/provider/device acceptance remain unresolved.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 ## October 8 current source snapshot
 
 Main `2162aa296281473dda170291ff95d64e0e6e9b79` passed exact-main CI `37500458053`.

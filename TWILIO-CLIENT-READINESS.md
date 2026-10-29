@@ -1,5 +1,9 @@
 # Painless Twilio integration readiness — September 28, 2026
 
+> **Current context — October 29, 2026:** The current source uses dedicated per-organization account/number bindings rather than the original global fallback. Twilio is selected; neither client has verified sender/account/registration or live handset acceptance in this documentation snapshot. Prior September account balances, source/host observations and outstanding implementation lists are historical, not current inventories.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 ## September 30 tenant-binding engineering update (local only)
 
 The global single-organization account/number fallback described below has
