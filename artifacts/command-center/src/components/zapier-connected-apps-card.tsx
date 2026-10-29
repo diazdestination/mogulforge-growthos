@@ -73,6 +73,17 @@ type Execution = {
 };
 
 const EMBED_SCRIPT = 'https://mcp.zapier.com/embed/v1/mcp.js';
+const EMPTY_STATUS: ZapierStatus = {
+  configured: false,
+  embedId: null,
+  connected: false,
+  serverMode: null,
+  toolCount: null,
+  connectedAt: null,
+  lastUsedAt: null,
+  lastErrorAt: null,
+  lastErrorCode: null,
+};
 
 declare module 'react' {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -135,9 +146,11 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
         api<{ capabilities: Capability[] }>('/integrations/zapier/capabilities'),
         api<{ executions: Execution[] }>('/integrations/zapier/executions?limit=25'),
       ]);
-      setStatus(nextStatus);
-      setCapabilities(nextCapabilities.capabilities);
-      setExecutions(nextExecutions.executions);
+      // Defensive: an unexpected payload shape must degrade to "nothing yet",
+      // never crash the Settings page.
+      setStatus(nextStatus && typeof nextStatus.configured === 'boolean' ? nextStatus : { ...EMPTY_STATUS });
+      setCapabilities(Array.isArray(nextCapabilities?.capabilities) ? nextCapabilities.capabilities : []);
+      setExecutions(Array.isArray(nextExecutions?.executions) ? nextExecutions.executions : []);
     } catch (error) {
       toast({ title: error instanceof Error ? error.message : 'Could not load Zapier Connected Apps', variant: 'destructive' });
     } finally {
@@ -153,7 +166,7 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
     setBusy('actions');
     try {
       const response = await api<{ actions: LiveAction[] }>('/integrations/zapier/actions');
-      setActions(response.actions);
+      setActions(Array.isArray(response?.actions) ? response.actions : []);
     } catch (error) {
       toast({ title: error instanceof Error ? error.message : 'Could not list Zapier actions', variant: 'destructive' });
     } finally {
