@@ -136,6 +136,20 @@ function smsCandidate(app: string, appName: string, action: string, actionName: 
   };
 }
 
+function leadAdsCandidate(app: string, appName: string): ZapierActionCandidate {
+  return {
+    app,
+    appName,
+    action: "new_lead",
+    actionName: "New Lead",
+    configFields: [
+      { key: "page", label: "Facebook Page", required: true },
+      { key: "form_id", label: "Lead form", required: false },
+    ],
+    toParams: (_raw, config) => ({ page: config.page, form_id: config.form_id ?? undefined }),
+  };
+}
+
 export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
   {
     key: "scout.reviews.list",
@@ -177,30 +191,21 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
     defaultMode: "auto",
     defaultDailyBudget: 96,
     candidates: [
+      leadAdsCandidate("FacebookLeadsCLIAPI", "Facebook Lead Ads"),
+      leadAdsCandidate("FacebookLeadAdsCLIAPI", "Facebook Lead Ads (for Business admins)"),
       {
-        app: "FacebookLeadAdsCLIAPI",
-        appName: "Facebook Lead Ads",
-        action: "new_lead",
-        actionName: "New Lead",
-        configFields: [
-          { key: "page", label: "Facebook Page", required: true },
-          { key: "form_id", label: "Lead form", required: false },
-        ],
-        toParams: (_raw, config) => ({ page: config.page, form_id: config.form_id ?? undefined }),
-      },
-      {
-        app: "AngiLeadsCLIAPI",
-        appName: "Angi Leads",
-        action: "new_lead",
-        actionName: "New Lead",
+        app: "HousecallProCLIAPI",
+        appName: "Housecall Pro",
+        action: "new_customer",
+        actionName: "New Customer",
         configFields: [],
         toParams: () => ({}),
       },
       {
-        app: "ThumbtackCLIAPI",
-        appName: "Thumbtack",
-        action: "new_lead",
-        actionName: "New Lead",
+        app: "JobberCLIAPI",
+        appName: "Jobber",
+        action: "new_request",
+        actionName: "New Request",
         configFields: [],
         toParams: () => ({}),
       },
@@ -233,7 +238,7 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
     defaultDailyBudget: 25,
     candidates: [
       {
-        app: "QuickBooksCLIAPI",
+        app: "QuickBooksV3CLIAPI",
         appName: "QuickBooks Online",
         action: "invoice",
         actionName: "Create Invoice",
@@ -306,7 +311,7 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
       },
       {
         app: "OpenPhoneCLIAPI",
-        appName: "OpenPhone",
+        appName: "Quo",
         action: "call_completed",
         actionName: "Call Completed",
         configFields: [{ key: "phone_number_id", label: "OpenPhone number", required: false }],
@@ -326,7 +331,7 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
     defaultDailyBudget: 40,
     candidates: [
       smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),
-      smsCandidate("OpenPhoneCLIAPI", "OpenPhone", "send_message", "Send Message", "from"),
+      smsCandidate("OpenPhoneCLIAPI", "Quo", "send_message", "Send Message", "from"),
     ],
   },
   {
@@ -341,7 +346,7 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
     defaultDailyBudget: 40,
     candidates: [
       smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),
-      smsCandidate("OpenPhoneCLIAPI", "OpenPhone", "send_message", "Send Message", "from"),
+      smsCandidate("OpenPhoneCLIAPI", "Quo", "send_message", "Send Message", "from"),
     ],
   },
 ];

@@ -130,7 +130,7 @@ beforeEach(() => {
           },
           {
             app: "QuickBooks Online",
-            selected_api: "QuickBooksCLIAPI",
+            selected_api: "QuickBooksV3CLIAPI",
             actions: [
               { key: "invoice", name: "Create Invoice", action_type: "write" },
               { key: "find_customer", name: "Find Customer", action_type: "read" },
@@ -138,7 +138,7 @@ beforeEach(() => {
           },
           {
             app: "Facebook Lead Ads",
-            selected_api: "FacebookLeadAdsCLIAPI",
+            selected_api: "FacebookLeadsCLIAPI",
             actions: [{ key: "new_lead", name: "New Lead", action_type: "read" }],
           },
         ],
@@ -184,7 +184,7 @@ describe("Zapier connection", () => {
 
   it("binds a capability only to an enabled, direction-matched, reviewed action", async () => {
     await expect(
-      bindZapierCapability({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "invo.accounting.create_invoice", app: "QuickBooksCLIAPI", action: "find_customer" }),
+      bindZapierCapability({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "invo.accounting.create_invoice", app: "QuickBooksV3CLIAPI", action: "find_customer" }),
     ).rejects.toThrow(/write action/);
     await expect(
       bindZapierCapability({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "appt.calendar.create_event", app: "GoogleCalendarCLIAPI", action: "detailed_event" }),
@@ -198,8 +198,8 @@ describe("Zapier connection", () => {
       config: { calendarid: "primary", "../evil": "x" },
     });
     expect(binding.bindingConfig).toEqual({ calendarid: "primary" });
-    await bindZapierCapability({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "invo.accounting.create_invoice", app: "QuickBooksCLIAPI", action: "invoice" });
-    await bindZapierCapability({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "scout.leads.list", app: "FacebookLeadAdsCLIAPI", action: "new_lead", config: { page: "123" } });
+    await bindZapierCapability({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "invo.accounting.create_invoice", app: "QuickBooksV3CLIAPI", action: "invoice" });
+    await bindZapierCapability({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "scout.leads.list", app: "FacebookLeadsCLIAPI", action: "new_lead", config: { page: "123" } });
     const views = await listZapierCapabilities(orgIds[0]!);
     expect(views.find((view) => view.key === "invo.accounting.create_invoice")?.policy.mode).toBe("approve");
     expect(views.find((view) => view.key === "appt.calendar.create_event")?.policy.mode).toBe("auto");
@@ -297,7 +297,7 @@ describe("Zapier execution ledger", () => {
     expect(approved.state).toBe("succeeded");
     expect(approved.approvedByUserId).toBe(userIds[0]);
     expect(fake.calls).toHaveLength(1);
-    expect(fake.calls[0]!.args).toMatchObject({ selected_api: "QuickBooksCLIAPI", action: "invoice" });
+    expect(fake.calls[0]!.args).toMatchObject({ selected_api: "QuickBooksV3CLIAPI", action: "invoice" });
     await expect(approveZapierAction({ organizationId: orgIds[0]!, executionId: pending.execution.id, userId: userIds[0]! })).rejects.toThrow(/pending/);
     expect(fake.calls).toHaveLength(1);
   });

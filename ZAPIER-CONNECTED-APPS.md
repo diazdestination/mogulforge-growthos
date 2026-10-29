@@ -126,9 +126,14 @@ database with the MCP transport faked in memory.
 - No live Zapier round trip has been run from this repository. A real embed id,
   embed secret, and a contractor Zapier account with connected apps are
   required before the feature is called beta-ready.
-- Zapier app ids and action keys in the registry are reviewed names; the live
-  binding step matches by id *or* display name against the contractor's
-  server, and the first live run per app should confirm parameter names.
+- Zapier app ids in the registry were verified against Zapier's catalog on
+  2026-10-29 (`QuickBooksV3CLIAPI`, `GoogleCalendarCLIAPI`, `CallRailCLIAPI`,
+  `TwilioCLIAPI`, `GoogleMyBusinessCLIAPI`, `FacebookLeadsCLIAPI`,
+  `FacebookLeadAdsCLIAPI`, `OpenPhoneCLIAPI` (listed as Quo), `XeroCLIAPI`,
+  `MicrosoftOutlookCLIAPI`, `HousecallProCLIAPI`, `JobberCLIAPI`). Action keys
+  and parameter names were not verified against a live server; the binding
+  step also matches by display name, and the first live run per app must
+  confirm the action's parameter names. Angi and Thumbtack have no Zapier app.
 - MAINTAIN, ESTI and BILL have no Zapier capabilities yet.
 - No Zapier *trigger* (push) integration: reads are polled by the scheduler.
 - No "GrowthOS as a Zapier app" listing; that is a separate partner-program

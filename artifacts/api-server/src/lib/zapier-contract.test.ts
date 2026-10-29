@@ -101,7 +101,7 @@ describe("Zapier capability registry", () => {
 
   it("formats money for accounting as decimal strings and keeps totals", () => {
     const definition = getZapierCapability("invo.accounting.create_invoice")!;
-    const candidate = findZapierCandidate(definition, { app: "QuickBooksCLIAPI", action: "invoice" })!;
+    const candidate = findZapierCandidate(definition, { app: "QuickBooksV3CLIAPI", action: "invoice" })!;
     const input = ACCOUNTING_INVOICE_INPUT.parse({
       invoiceNumber: "INV-42",
       customerName: "Jane Doe",
