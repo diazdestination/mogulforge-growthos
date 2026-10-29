@@ -1295,6 +1295,11 @@ export async function processScheduledWork(organizationId?: string, observe?: St
     const { purgeExpiredLeadReplyContent } = await import("./mailbox-communication");
     await purgeExpiredLeadReplyContent();
   });
+  // Read-only specialist syncs through the contractor's own Zapier server.
+  await stage("zapier-connected-apps", async () => {
+    const { processZapierConnectedApps } = await import("./zapier/zapier-runtime");
+    await processZapierConnectedApps(organizationId);
+  });
   // Email org admins once when an active API key nears its expiry date.
   await stage("api-key-expiry-reminders", async () => {
     const { processApiKeyExpiryReminders } = await import(

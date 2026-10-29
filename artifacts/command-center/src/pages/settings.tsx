@@ -121,6 +121,7 @@ import {
 } from "@/hooks/use-scheduling-review";
 import { toLocalDateInputValue } from '@/lib/date-input';
 import { EmailConnectionsCard } from '@/components/email-connections-card';
+import { ZapierConnectedAppsCard } from '@/components/zapier-connected-apps-card';
 import { memberAuthorityScope } from '@/lib/member-authority-scope';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1151,7 +1152,7 @@ export default function Settings() {
             <TabsTrigger value="data-privacy">Data & privacy</TabsTrigger>
           </TabsList>
           <TabsContent value="business" className="space-y-6"><BusinessProfileTab /><FallbackInboxTab /></TabsContent>
-          <TabsContent value="integrations"><EmailConnectionsCard key={memberAuthorityScope(me)} scopeKey={memberAuthorityScope(me)} callbackState={gmailReturn} returnPath="/settings" /></TabsContent>
+          <TabsContent value="integrations"><div className="space-y-6"><EmailConnectionsCard key={memberAuthorityScope(me)} scopeKey={memberAuthorityScope(me)} callbackState={gmailReturn} returnPath="/settings" /><ZapierConnectedAppsCard key={`zapier:${memberAuthorityScope(me)}`} signUp={{ email: me.email, firstName: me.firstName, lastName: me.lastName }} canManage={canManageSettings(me.role)} /></div></TabsContent>
           <TabsContent value="team"><TeamTab meId={me.id} meRole={me.role} /></TabsContent>
           <TabsContent value="services"><ServicesTab /></TabsContent>
           <TabsContent value="scheduling" className="space-y-6"><SchedulingPolicySettings /><SchedulingTab /><ReminderTab /><LeadAlertRouting /></TabsContent>

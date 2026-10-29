@@ -379,6 +379,31 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "GET /integrations/google/modules": "crm.read",
   "POST /integrations/google/modules/:module/connect": "crm.read",
   "PUT /integrations/google/modules/:module": "crm.read",
+  // Zapier Connected Apps: the organization-level connection, bindings and
+  // policies are settings authority (and session-only in the router); the
+  // execution ledger is readable by members; approvals and specialist flows
+  // need the same permission as the GrowthOS record they act on.
+  "GET /integrations/zapier": "crm.read",
+  "POST /integrations/zapier/server-url": "settings.manage",
+  "DELETE /integrations/zapier": "settings.manage",
+  "GET /integrations/zapier/actions": "settings.manage",
+  "GET /integrations/zapier/actions/search": "settings.manage",
+  "POST /integrations/zapier/actions/enable": "settings.manage",
+  "GET /integrations/zapier/capabilities": "crm.read",
+  "PUT /integrations/zapier/capabilities/:capability/binding": "settings.manage",
+  "DELETE /integrations/zapier/capabilities/:capability/binding": "settings.manage",
+  "PUT /integrations/zapier/capabilities/:capability/policy": "settings.manage",
+  "GET /integrations/zapier/executions": "crm.read",
+  "GET /integrations/zapier/executions/:id": "crm.read",
+  "POST /integrations/zapier/executions/:id/approve": "crm.write",
+  "POST /integrations/zapier/executions/:id/reject": "crm.write",
+  "POST /integrations/zapier/flows/scout/leads": "crm.write",
+  "POST /integrations/zapier/flows/scout/reviews": "crm.write",
+  "POST /integrations/zapier/flows/callie/calls": "crm.write",
+  "POST /integrations/zapier/flows/callie/text-back": "crm.write",
+  "POST /integrations/zapier/flows/appointments/:id/calendar": "crm.write",
+  "POST /integrations/zapier/flows/invoices/:id/accounting": "invoices.manage",
+  "POST /integrations/zapier/flows/sched/day-sheet": "crm.write",
   // Email Intelligence source configuration is owner/admin controlled. All
   // members may inspect tenant facts; writers disposition findings.
   "GET /email-intelligence": "crm.read",
@@ -486,6 +511,10 @@ const DELETE_EXEMPTIONS: Record<string, Permission> = {
   // Personal, per-user authorization — revokes only the caller's own Gmail
   // token and cannot remove another member's connection or organization data.
   "DELETE /integrations/gmail": "crm.read",
+  // Organization-level Zapier connection and bindings are configuration, not
+  // tenant records; settings authority plus the session-only gate is the bar.
+  "DELETE /integrations/zapier": "settings.manage",
+  "DELETE /integrations/zapier/capabilities/:capability/binding": "settings.manage",
   // Removes one photo path from a lead's activity row, not the lead itself;
   // write-level access is the correct bar.
   "DELETE /leads/:id/photos": "crm.write",

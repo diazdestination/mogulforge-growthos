@@ -98,7 +98,7 @@ export function validateRestoreMode(env: NodeJS.ProcessEnv = process.env): {
   // Restore ciphertext keys/session signing are local application secrets,
   // whereas provider credentials could contact an external account.
   const forbidden =
-    /^(RESEND_|SENDGRID_|TWILIO_|STRIPE_|OPENAI_|ELEVENLABS_|ANTHROPIC_|GOOGLE_|GMAIL_|SMTP_|REPLIT_|AI_INTEGRATIONS_|AZURE_OPENAI_|MICROSOFT_|MS_GRAPH_|EMAIL_INGESTION_WEBHOOK_SECRET$|GOOGLE_APPLICATION_CREDENTIALS$)/;
+    /^(RESEND_|SENDGRID_|TWILIO_|STRIPE_|ZAPIER_|OPENAI_|ELEVENLABS_|ANTHROPIC_|GOOGLE_|GMAIL_|SMTP_|REPLIT_|AI_INTEGRATIONS_|AZURE_OPENAI_|MICROSOFT_|MS_GRAPH_|EMAIL_INGESTION_WEBHOOK_SECRET$|GOOGLE_APPLICATION_CREDENTIALS$)/;
   if (
     Object.entries(env).some(
       ([name, value]) => forbidden.test(name) && Boolean(value?.trim()),
