@@ -1,5 +1,9 @@
 # GrowthOS communications-provider review — September 30, 2026
 
+> **Current context — October 29, 2026:** Historical provider comparison. October 29 direction selects the already-implemented Twilio path; partial Telnyx work is parked. Neither a recommendation nor source code proves an active client number or live delivery.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 Status: **historical evaluation, superseded by the owner's decision to continue
 with Twilio later on September 30**. The alternatives analysis remains useful
 if provider choice is revisited; its numbered product decision below is no

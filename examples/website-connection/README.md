@@ -1,5 +1,9 @@
 # Private website → GrowthOS adapter
 
+> **Current context — October 29, 2026:** This Node adapter is implemented source with a persistent local-journal requirement. The mentioned client integration/source checkpoint does not establish the current deployed website or real GrowthOS capture acceptance. Separate edge adapters are different deployment surfaces.
+> See [current build](../../CURRENT-BUILD.md) and [documentation map](../../docs/DOCUMENTATION-MAP.md).
+
+
 This is a working server-side adapter for a Smart Site or an existing website's backend. It is a **private Node deployment candidate**, not a hosted connector. A complete Next.js integration is in the private Climate Simulation Solutions repository (`src/lib/growthos-server.mjs`, `/api/requests`, `/api/requests/status`, `/api/internal/growthos`).
 
 ## Runtime boundary

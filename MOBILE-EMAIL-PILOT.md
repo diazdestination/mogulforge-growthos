@@ -1,5 +1,9 @@
 # Mobile lead response and Microsoft email pilot
 
+> **Current context — October 29, 2026:** Current source includes selected Microsoft/Gmail sending, opt-in Microsoft tracked reply workflows and staff Web Push. Older statements that there is no Outlook reply reader are superseded for the bounded implemented workflow, not for unrestricted/shared-mailbox access. Real mailbox/device acceptance remains separate.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 ## Scope and evidence boundary
 
 October 1, 2026: the user explicitly requested this narrow controlled-pilot

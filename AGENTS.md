@@ -1,5 +1,9 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+> **Current context — October 29, 2026:** Read CURRENT-BUILD.md, PROJECT_STATE.md and NEXT_ACTIONS.md for the October 29 source/status. Previous dated wave headers are historical assignments, not current dispatch instructions. All existing owner, tenant, collaboration and release boundaries below remain in force.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 ## October 9 UTC / October 8 Pacific alert-coverage continuation
 
 Adam requested further engineering while GEEKOM works on UI design. The current

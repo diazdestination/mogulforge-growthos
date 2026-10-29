@@ -1,5 +1,9 @@
 # Professional GrowthOS specialists
 
+> **Current context — October 29, 2026:** Specialist identities and contextual guidance exist in current source. Local preview ports and publication checkpoints below are historical. Artwork does not establish provider activation or new autonomous capabilities.
+> See [current build](../../CURRENT-BUILD.md) and [documentation map](../../docs/DOCUMENTATION-MAP.md).
+
+
 Owner direction: use the existing characters throughout GrowthOS and to a lesser degree on the MogulForge website, while preserving a professional business SaaS appearance. The October9 reference establishes art direction; its text is not authoritative product capability documentation.
 
 Use characters as secondary workspace identities, contextual guides and restrained onboarding/marketing introductions. Keep business page names, work records and actions primary. No ranks, points, collectible character numbers, game terminology, quest flows, unsolicited character chat or new autonomous actions.

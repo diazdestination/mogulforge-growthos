@@ -1,5 +1,9 @@
 # GrowthOS Google Business Graph
 
+> **Current context — October 29, 2026:** This remains a module strategy/permission contract. Current Gmail/Microsoft sending and opt-in Microsoft reply workflows exist; the catalog below does not declare all Google source adapters implemented or provider-accepted.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 ## Decision
 
 GrowthOS will offer one Google connection experience with independently

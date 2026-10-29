@@ -1,5 +1,9 @@
 # GrowthOS Twilio client binding — local engineering state
 
+> **Current context — October 29, 2026:** The per-client binding contract below is implemented in current source. Twilio is selected; configuration drafts remain disabled and real account/sender/registration/handset acceptance is pending. October 29 local checks do not activate either client.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 One `twilio_client_bindings` row maps one GrowthOS organization to one dedicated
 Twilio account SID and one number. That account may be a platform-managed
 subaccount or an approved client-owned account; the ownership/billing model is

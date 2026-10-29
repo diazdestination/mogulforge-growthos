@@ -1,5 +1,9 @@
 # Historical Twilio ISV onboarding reference — not a submission packet
 
+> **Current context — October 29, 2026:** Twilio is selected, but the actual platform/client account relationship, identity and approved resources still require authenticated inventory. This guide does not prove legal/brand/campaign approval. Recheck current official requirements before any submission; a provider choice does not authorize legal or financial actions.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 **Status:** SUPERSEDED for this rollout by [TWILIO-IMPLEMENTATION.md](TWILIO-IMPLEMENTATION.md) and [TWILIO-REGISTRATION-DRAFT.md](TWILIO-REGISTRATION-DRAFT.md). Do not submit this historical draft.
 **Architecture:** ISV Type #1 — one Twilio subaccount + Messaging Service per contractor customer  
 **Prospective demo only:** Painless Roofing & Water Restoration. Its exact legal name, entity type and authority to send are unverified; registration and communications are not authorized. Any older business claims below are unverified historical draft text.

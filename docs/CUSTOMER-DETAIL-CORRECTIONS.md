@@ -1,5 +1,9 @@
 # Staff customer-detail corrections
 
+> **Current context — October 29, 2026:** This audited staff correction workflow exists in current source. Its dated test totals are historical evidence, not a new run or permission to correct real customer records.
+> See [current build](../CURRENT-BUILD.md) and [documentation map](DOCUMENTATION-MAP.md).
+
+
 The customer workspace lets active, accepted owner, admin and office staff correct a customer's name, email, phone and an explicitly selected property's address. Staff first load the current details. Contact-only editing is the default; changing an address requires selecting its property.
 
 All three private routes require the signed-in session, trusted application origin and CRM permission. API-key headers are refused, including empty headers. Responses use no-store and no-referrer headers.

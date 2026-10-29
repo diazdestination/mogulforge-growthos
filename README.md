@@ -1,128 +1,101 @@
 # MogulForge GrowthOS
 
-**Revenue Intelligence and Recovery Operating System for home-services businesses.**
+**Contractor operations, revenue intelligence and controlled follow-up for home-service businesses.**
 
-[MogulForge](https://mogulforge.ai) helps operators turn fragmented customer,
-pipeline, communication, and operational data into clear next actions. GrowthOS
-combines a multi-tenant CRM with evidence-backed business intelligence,
-approval-first automation, and an expanding permissioned business-data graph.
+GrowthOS joins customer history, scheduling, estimates, jobs, invoices and service
+follow-up in one tenant-scoped workspace. Its Business Intelligence Engine (BIE)
+turns business records into explainable recommendations and reviewable actions.
+Roofing and HVAC are the current contractor workflows.
 
-The product is designed for roofing and adjacent home-services businesses where
-slow follow-up, disconnected systems, and incomplete operational visibility can
-cause otherwise recoverable opportunities to disappear.
+**Updated October 29, 2026.** These are source capabilities. External provider
+connections, deployed behavior and customer acceptance require separate evidence.
+See [the current build](CURRENT-BUILD.md) for source links and release limits.
 
-## Platform
+## What is in the build
 
-### Revenue Command Center
+- **Daily contractor work:** Today, customer/property records, pipeline, tasks,
+  appointments, crews, saved capacity/travel rules and conflict checks.
+- **Estimates through invoices:** new and returning customer work, native jobs,
+  issued invoice snapshots, equipment/warranty details and staff-recorded external
+  receipts, allocations and balances.
+- **Service Desk:** recurring obligations, reviewed reminder policies, inbound
+  service replies, reply holds and accountable follow-up tasks.
+- **Revenue Desk and BIE:** evidence-backed opportunities, saved-payload approval,
+  execution receipts, outcome tracking and value reporting.
+- **Smart Sites and existing websites:** isolated site credentials, capture,
+  response ownership, onboarding checks and durable delivery adapters.
+- **Communications:** selected Gmail/Microsoft senders, reviewed initial estimate
+  and invoice email, Twilio SMS/staff phone bridging, missed-call tasks and CALLIE
+  keypad/conversation workflow foundations.
+- **Office and customer surfaces:** customer workspaces, decision rooms/portal,
+  private photos, invitations, role-aware access and opt-in staff Web Push.
+- **Evidence and operations:** approved artifacts, redaction, frozen manifests,
+  citation validation, human review, audit history, exports and recovery controls.
 
-- Lead, customer, property, appointment, task, estimate, and pipeline workflows
-- Attribution and operational reporting
-- Organization-aware access and tenant isolation
-- Homeowner communication and lead-capture experiences
+## Release status
 
-### Business Intelligence Engine
-
-- Deterministic opportunity detection grounded in tenant-owned records
-- Evidence-backed explanations with confidence and limitations
-- Reviewable action proposals with approve, edit, reject, and execution states
-- Guardrailed automation policies and immutable activity history
-- Outcome tracking designed to distinguish recovered revenue from pipeline value
-
-### Evidence Intelligence
-
-- Approved, tenant-scoped source artifacts
-- Local redaction and citation-bounded AI drafting
-- Human review before conclusions are finalized
-- Tamper-evident Loss Evidence Certificates
-
-### Permissioned Business Graph
-
-- Per-user Gmail sending foundation with no platform-account fallback
-- Incremental Google module authorization and explicit scope disclosure
-- Planned connectors for Calendar, selected Drive and Sheets assets, Analytics,
-  Search Console, Google Ads, and Business Profile
-- Phased email intelligence architecture that begins with customer-controlled
-  sources and reserves unrestricted mailbox analysis for formal verification
-
-## Trust principles
-
-- Tenant-private by default
-- Least-privilege, incremental authorization
-- Human approval before consequential outbound actions
-- Connected documents and messages treated as untrusted data, never instructions
-- Evidence and provenance retained for material recommendations
-- No shared-model training on customer data by default
-- Clear separation between implemented foundations, verified integrations, and
-  planned capabilities
-
-## Current status
-
-| Surface | Status |
+| Area | October 29 evidence |
 | --- | --- |
-| Corporate site | Live at [mogulforge.ai](https://mogulforge.ai) |
-| Founding-beta application | Live at [app.mogulforge.ai](https://app.mogulforge.ai) on the approved production baseline |
-| Current development branch | Under review; not deployed to production |
-| Per-user Gmail sending | Secure application foundation implemented; real production OAuth acceptance remains pending |
-| Google Business Graph | Permission and module foundation implemented; source adapters remain in development |
-| Email Intelligence Inbox | Secure tenant intake, redaction, retention, review, and synthetic-test foundation implemented; live provider routing remains pending |
-| Full Gmail inbox intelligence | Restricted-scope connector intentionally deferred pending verification and security readiness |
+| Canonical product | `diazdestination/mogulforge-growthos`; former `mogulforge-crm` redirects here |
+| Source baseline | `f0d74ab4ab2db756637cf3b4ad306b33982c9688`; this refresh changes docs only |
+| Existing full CI | [39174960772](https://github.com/diazdestination/mogulforge-growthos/actions/runs/39174960772) passed on the identical file tree to that baseline |
+| Local communications checks | 314 PostgreSQL workflow tests and 45 UI tests passed; earlier isolated Twilio suite: 79 passed |
+| Production | Last October 29 operator check found the older image stopped; current source is not a verified live release |
+| SMS/calling | Twilio selected; account/sender inventory, installed credentials and real-phone acceptance pending. Telnyx work parked |
+| Contractor acceptance | Full migration, provider/device/workday and cutover evidence remain open |
 
-Product documentation does not imply that an unfinished connector is available
-to customers. Release claims must be supported by the exact deployed version and
-its acceptance evidence.
+The configured application address is [app.mogulforge.ai](https://app.mogulforge.ai).
+An address or a test does not establish uptime. Contractor payment collection,
+financing, automatic after-hours replies and live AI phone answering are not
+advertised as finished capabilities.
 
-## Technology
+## Build and local development
 
-- React, TypeScript, and Vite command center
-- Express API and background services
-- PostgreSQL with Drizzle ORM
-- Self-hosted email/password authentication
-- Optional OpenAI, Google, Stripe, and communications adapters
-- Single-container production build with Docker Compose and Fly.io configuration
+React/TypeScript/Vite frontend; Express API; PostgreSQL/Drizzle; generated OpenAPI
+clients; one Docker app image serving UI and API. CI/container builds use Node 22;
+the local runner supports Node 22 or 24. Use **pnpm 11.3.0** and the frozen lockfile.
 
-```text
-artifacts/
-  api-server/       Express API and background services
-  command-center/   React and Vite application
-lib/
-  api-spec/         OpenAPI source
-  api-zod/          Generated request and response schemas
-  api-client-react/ Generated React Query client
-  db/               Drizzle schema and database tooling
-```
-
-## Development
-
-Copy `.env.example` to `.env`, provide development-only values, and start the
-local stack:
+From an isolated checkout:
 
 ```powershell
-docker compose up -d --build
+node scripts/local-dev.mjs setup
+node scripts/local-dev.mjs run
 ```
 
-The application is then available at `http://localhost:8080`, with PostgreSQL on
-`localhost:5433`. Never commit `.env` or expose secret values in logs.
+The second command starts a fictional, outbound-held preview at
+`http://127.0.0.1:4193`; it does not connect a contractor or enable a provider.
+See [DEV-LOCAL.md](DEV-LOCAL.md) for disposable PostgreSQL tests and other commands.
 
-For the Windows development workflow and database bootstrap, see
-[DEV-LOCAL.md](DEV-LOCAL.md).
+```text
+artifacts/api-server/          Express API, services and tests
+artifacts/command-center/      React/Vite contractor and office app
+lib/db/                       Tenant-owned PostgreSQL schema
+lib/scheduling-core/          Saved scheduling and conflict rules
+lib/api-spec/                 OpenAPI source
+lib/api-zod/                  Generated validation
+lib/api-client-react/         Generated React Query client
+examples/website-connection/   Server-side website adapter
+```
 
-## Operations and architecture
+## Documentation
 
-- [BETA-SUCCESS-PLAN.md](BETA-SUCCESS-PLAN.md) — founding-beta gates and success measures
-- [DEPLOY.md](DEPLOY.md) — container and self-hosting model
-- [BETA-LAUNCH.md](BETA-LAUNCH.md) — Fly.io release checklist
-- [EVIDENCE-INTELLIGENCE.md](EVIDENCE-INTELLIGENCE.md) — evidence architecture and trust gates
-- [GOOGLE-OAUTH-SETUP.md](GOOGLE-OAUTH-SETUP.md) — per-user Gmail authorization
-- [GOOGLE-BUSINESS-GRAPH.md](GOOGLE-BUSINESS-GRAPH.md) — permissioned Google source strategy
-- [EMAIL-INTELLIGENCE-ARCHITECTURE.md](EMAIL-INTELLIGENCE-ARCHITECTURE.md) — phased email intelligence model
-- [EMAIL-INTELLIGENCE-SETUP.md](EMAIL-INTELLIGENCE-SETUP.md) — Cloudflare intake bridge and activation gates
-- [GROWTHOS-RESUME.md](GROWTHOS-RESUME.md) — verified implementation state and continuation point
+- [Current build and features](CURRENT-BUILD.md)
+- [Documentation map](docs/DOCUMENTATION-MAP.md) — all Markdown, including dated evidence
+- [Architecture](GROWTHOS-ARCHITECTURE.md)
+- [Project state](PROJECT_STATE.md) and [next actions](NEXT_ACTIONS.md)
+- [Local development](DEV-LOCAL.md), [operations](RUNBOOK.md), [deployment](DEPLOY.md)
+- [Twilio binding](TWILIO-TENANT-BINDING.md) and [contractor replacement gate](HOUSECALL-PRO-REPLACEMENT-GATE.md)
+
+Dated reports, plans and recovery fixtures keep their original results and
+limits. They are indexed as historical evidence rather than rewritten to imply
+that an old approval or test applies to today's build.
 
 ## Repository policy
 
-This private repository contains the GrowthOS application. The corporate
-marketing site and upstream reference template are maintained separately.
-Changes reach production only after review, validation, and explicit deployment
-authorization.
+This is the GrowthOS product repository. Last verified GitHub visibility: public.
+Never commit credentials or private tenant data. The old CRM export template,
+marketing and client-site repositories are separate surfaces. Use reviewed
+branches/PRs against canonical main; deployment, provider activation, spending
+and public launch retain their separate approvals.
 
 Copyright © 2026 MogulForge. All rights reserved.

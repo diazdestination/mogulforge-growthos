@@ -1,5 +1,9 @@
 # Revenue Desk review and refresh reliability
 
+> **Current context — October 29, 2026:** The technical contract and dated results below describe their recorded feature checkpoint. Current main includes later contractor, scheduling, service, mailbox and Twilio work; use the current inventory for implemented features and pending live acceptance. Older branch names, test totals and approvals do not become current by this documentation refresh.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 Date: October 1, 2026. WILLOWFORGE task branch: `agent/growthos-revenue-queue-hardening`.
 Base: `2c12ddc1f5c431fee1f3f99f5290b6566546cd13` on `agent/mogulforge-growthos-recovery`.
 

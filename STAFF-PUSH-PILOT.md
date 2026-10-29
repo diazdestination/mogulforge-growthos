@@ -1,5 +1,9 @@
 # Staff lead alerts — controlled pilot contract
 
+> **Current context — October 29, 2026:** The technical contract and dated results below describe their recorded feature checkpoint. Current main includes later contractor, scheduling, service, mailbox and Twilio work; use the current inventory for implemented features and pending live acceptance. Older branch names, test totals and approvals do not become current by this documentation refresh.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 This is the bounded staff-notification path for the existing lead workspace, not
 customer SMS, an emergency dispatch guarantee, or proof of iPhone delivery.
 Code/tests do not activate providers, create a real customer tenant, choose real

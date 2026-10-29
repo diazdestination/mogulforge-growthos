@@ -1,5 +1,9 @@
 # Twilio client onboarding: timing and fastest safe sequence
 
+> **Current context — October 29, 2026:** This dated timing comparison is historical. Current selected setup is Twilio; inspect existing approved resources before estimating a registration wait. Recheck official provider timing and actual account state rather than treating September estimates as guarantees.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 Checked September 30, 2026. **Planning guidance, not an approval guarantee or
 evidence that either Painless or the HVAC client is registered.** No provider
 resources, legal submissions, forwarding, messages or calls were changed.

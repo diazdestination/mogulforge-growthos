@@ -1,5 +1,9 @@
 # Twilio implementation and access audit
 
+> **Current context — October 29, 2026:** Twilio is the selected current SMS/basic calling setup path. Main already includes per-client bindings, signed callbacks, SMS/service/voice/missed-call and CALLIE foundations. October 29 selected native314/UI45 checks and earlier isolated79 passed. Account/sender approvals, credential installation and real-phone acceptance are pending; the old single-global-binding baseline below is historical.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 ## September 28 update: Painless readiness and independent voice configuration
 
 Local voice routing and signed voice callbacks no longer require an SMS Messaging Service. SMS still requires its service, registration, consent and launch controls. Voice now requires an explicit bounded `TWILIO_VOICE_BUSINESS_NAME`; both caller and staff prompts use that name with XML escaping, and the missed-call fallback has no platform URL. Missing/invalid names disable voice. The tested [disabled client template](TWILIO-CLIENT-DISABLED.env.example) contains Painless's draft display name, empty account/tenant/credential bindings and all live flags off.

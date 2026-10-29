@@ -1,5 +1,9 @@
 # Per-user Gmail OAuth setup
 
+> **Current context — October 29, 2026:** The technical contract and dated results below describe their recorded feature checkpoint. Current main includes later contractor, scheduling, service, mailbox and Twilio work; use the current inventory for implemented features and pending live acceptance. Older branch names, test totals and approvals do not become current by this documentation refresh.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 GrowthOS uses one MogulForge-owned Google OAuth application. Each GrowthOS
 member signs in directly with Google and grants the narrow Gmail send
 permission to their own account. MogulForge never receives the user's Google

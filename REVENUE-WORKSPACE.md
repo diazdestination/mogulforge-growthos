@@ -1,5 +1,9 @@
 # GrowthOS Revenue Workspace v1
 
+> **Current context — October 29, 2026:** The original Revenue Workspace contract below is historical implementation detail. Current source also supports selected Microsoft sending and native contractor/service work; older Gmail-only or missing-Outlook statements are not the complete current build. Revenue attribution and provider/customer acceptance still require evidence.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 September 14, 2026 · Local implementation and synthetic acceptance, not a production release.
 
 ## What this release delivers

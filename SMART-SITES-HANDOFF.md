@@ -1,5 +1,9 @@
 # GrowthOS Smart Sites — local integration milestone
 
+> **Current context — October 29, 2026:** Current source includes tenant/site onboarding, response ownership, launch checks and durable delivery/reconciliation. Separate client websites can be published while CRM/provider capture remains held. A website preview or old source receipt is not current full client integration acceptance.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 September 12, 2026. Implemented and locally verified; not a production release.
 
 ## Latest checkpoint — Launch Guard

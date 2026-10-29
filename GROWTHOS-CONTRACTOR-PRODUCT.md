@@ -1,5 +1,9 @@
 # GrowthOS contractor product and subscription direction
 
+> **Current context — October 29, 2026:** Read the current source inventory before interpreting old product/packaging stages. Core contractor operations, saved scheduling, service and communication foundations are implemented; prices, entitlements and future add-ons are not live offers or proven acceptance. Full contractor replacement remains the requirement.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 Owner direction: October 1, 2026. Working product specification, not a published
 offer, purchase, customer contract, entitlement migration or production release.
 

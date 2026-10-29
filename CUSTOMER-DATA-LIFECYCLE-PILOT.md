@@ -1,5 +1,9 @@
 # Customer data lifecycle — controlled-pilot engineering plan
 
+> **Current context — October 29, 2026:** The technical contract and dated results below describe their recorded feature checkpoint. Current main includes later contractor, scheduling, service, mailbox and Twilio work; use the current inventory for implemented features and pending live acceptance. Older branch names, test totals and approvals do not become current by this documentation refresh.
+> See [current build](CURRENT-BUILD.md) and [documentation map](docs/DOCUMENTATION-MAP.md).
+
+
 Source review: 2026-10-01. Owner: product owner plus assigned engineering/operator reviewer.
 
 **Status: bounded database-count preview implemented; P0-7 remains open.** No complete inventory, export, offboarding, deletion, retention policy, or legal disclosure is implemented by this work. It authorizes no purge, provider change, or customer communication. The [P0-7 gate](PAID-BETA-READINESS-P0.md#p0-7--finish-trust-privacy-and-customer-data-lifecycle) requires behavior that is defined, tested, supportable, and accurately disclosed before external paid beta.
