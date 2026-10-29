@@ -18,9 +18,9 @@ Inspect ancestry before resuming old dependent PRs that may already be included.
 
 ## Verification
 
-Existing fullCI39174960772SUCCESS checked out7b4cbc3; its tree equals baseline
-main d2df1e226dc9b496c66909f9c2b2a8464e72eb43. Linux Node 22.23.3 tests/types/builds/
-Docker parity passed. October 29 selected314 native PostgreSQL tests and 45 UI tests
+Existing full CI 39174960772 succeeded on checkout `7b4cbc3`; its tree equals
+baseline main `d2df1e226dc9b496c66909f9c2b2a8464e72eb43`. Linux Node 22.23.3 tests/types/builds/
+Docker parity passed. October 29 selected 314 native PostgreSQL tests and 45 UI tests
 passed, zero skips; earlier Twilio/PGlite: 79 passed. These are scoped source proofs,
 not hosted/provider/device/customer acceptance or new CI for a documentation SHA.
 
