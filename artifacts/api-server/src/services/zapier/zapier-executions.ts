@@ -17,6 +17,7 @@ import {
 } from "./zapier-capabilities";
 import {
   getZapierBinding,
+  getZapierConnection,
   getZapierPolicy,
   defaultPolicyFor,
   markZapierConnectionUsed,
@@ -62,6 +63,7 @@ type PreparedRequest = {
   app: string;
   action: string;
   zapierConnectionId: string | null;
+  serverFingerprint: string;
   params: Record<string, unknown>;
   requestDigest: string;
   requestSummary: Record<string, unknown>;
@@ -83,15 +85,18 @@ async function prepareRequest(organizationId: string, capability: string, input:
     actionName: binding.zapierActionName,
   });
   if (!candidate) return { blocked: "The bound action is no longer a reviewed match for this capability." };
+  const connection = await getZapierConnection(organizationId);
+  if (!connection) return { blocked: "Zapier is not connected for this organization." };
   const params = candidate.toParams(parsed.data, binding.bindingConfig);
   const requestDigest = sha256Hex(
-    canonicalJson({ capability: definition.key, app: binding.zapierApp, action: binding.zapierAction, params }),
+    canonicalJson({ capability: definition.key, app: binding.zapierApp, action: binding.zapierAction, connectionId: binding.zapierConnectionId, serverFingerprint: connection.serverUrlFingerprint, params }),
   );
   return {
     definition,
     app: binding.zapierApp,
     action: binding.zapierAction,
     zapierConnectionId: binding.zapierConnectionId,
+    serverFingerprint: connection.serverUrlFingerprint,
     params,
     requestDigest,
     requestSummary: summarizeZapierInput(definition, parsed.data),
@@ -333,6 +338,21 @@ async function execute(
   let serverMode: "agentic" | "managed" | "unknown";
   try {
     const resolved = await requireZapierServerUrl(organizationId);
+    if (resolved.connection.serverUrlFingerprint !== prepared.serverFingerprint) {
+      const blocked = await transition(organizationId, execution.id, ["executing"], {
+        state: "blocked", detail: "The Zapier account changed before dispatch. Review the connection and request this action again.",
+        errorCode: "stale_request", completedAt: new Date(),
+      });
+      return { execution: blocked ?? (await readExecution(organizationId, execution.id)) };
+    }
+    const policy = await getZapierPolicy(organizationId, prepared.definition.key);
+    if (!policy || policy.mode === "off" || policy.dailyBudget === 0) {
+      const blocked = await transition(organizationId, execution.id, ["executing"], {
+        state: "blocked", detail: "This flow is off or its daily limit is zero. Review its policy before requesting again.",
+        errorCode: "policy_off", completedAt: new Date(),
+      });
+      return { execution: blocked ?? (await readExecution(organizationId, execution.id)) };
+    }
     serverUrl = resolved.serverUrl;
     serverMode = resolved.connection.serverMode;
   } catch (error) {
@@ -452,7 +472,7 @@ export async function approveZapierAction(input: {
   if (prepared.requestDigest !== existing.requestDigest) {
     const blocked = await transition(input.organizationId, existing.id, ["pending_approval"], {
       state: "blocked",
-      detail: "The underlying record changed since this action was requested. Request it again.",
+      detail: "The record, app settings or Zapier account changed since this action was requested. Review them and request it again.",
       errorCode: "stale_request",
       completedAt: new Date(),
     });

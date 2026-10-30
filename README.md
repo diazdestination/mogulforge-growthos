@@ -11,6 +11,11 @@ The product is designed for roofing and adjacent home-services businesses where
 slow follow-up, disconnected systems, and incomplete operational visibility can
 cause otherwise recoverable opportunities to disappear.
 
+Client app connections and supported specialist flows are documented in
+[Zapier client setup](ZAPIER-CLIENT-SETUP.md). Stripe sandbox configuration has
+its own [setup and acceptance guide](STRIPE-SANDBOX-SETUP.md). These source guides
+keep local verification separate from deployed provider acceptance.
+
 ## Platform
 
 ### Revenue Command Center

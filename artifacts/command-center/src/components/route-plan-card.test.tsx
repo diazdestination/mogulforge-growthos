@@ -10,7 +10,11 @@ afterEach(() => {
 });
 
 const stop = (id: string, name: string, hour: number, located = true) => ({
+  routeId: id,
+  kind: 'appointment',
   appointmentId: id,
+  projectId: null,
+  continuesFromPreviousDay: false,
   scheduledStart: `2026-11-04T${hour}:00:00.000Z`,
   type: 'inspection',
   customerName: name,
@@ -59,4 +63,19 @@ it('renders nothing on a day without stops', async () => {
   const { container } = render(<RoutePlanCard date="2026-11-04" canWrite />);
   await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
   expect(container.textContent).toBe('');
+});
+
+it('renders jobs and appointments with distinct identity and truthful multi-day start dates', async () => {
+  const jobs = [
+    { ...stop('same', 'Synthetic job customer', 13), routeId: 'project:same', kind: 'project', appointmentId: null, projectId: 'same', continuesFromPreviousDay: true, scheduledStart: '2026-11-03T13:00:00.000Z' },
+    stop('same', 'Synthetic visit customer', 14),
+  ];
+  vi.stubGlobal('fetch', vi.fn(async () => json({ ...plan, stops: jobs, currentOrder: ['project:same', 'same'], suggestedOrder: ['project:same', 'same'], savedMiles: 0, unlocatedCount: 0 })));
+  render(<RoutePlanCard date="2026-11-04" canWrite />);
+  expect(await screen.findByText('Synthetic job customer')).toBeTruthy();
+  expect(screen.getByText('Synthetic visit customer')).toBeTruthy();
+  expect(screen.getByText('Job')).toBeTruthy();
+  expect(screen.getByText('Appointment')).toBeTruthy();
+  expect(screen.getByText(/Started Nov 3/)).toBeTruthy();
+  expect(screen.getAllByRole('listitem')).toHaveLength(2);
 });

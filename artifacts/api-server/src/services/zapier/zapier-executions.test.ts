@@ -65,6 +65,7 @@ import {
   bindZapierCapability,
   disconnectZapier,
   getZapierStatus,
+  listZapierEnabledActions,
   listZapierCapabilities,
   registerZapierServerUrl,
   setZapierPolicy,
@@ -77,7 +78,7 @@ import {
   ZapierExecutionError,
 } from "./zapier-executions";
 import { ZapierMcpError } from "./zapier-mcp-client";
-import { apptPushAppointmentToCalendar, invoPushInvoiceToAccounting, scoutSyncMarketplaceLeads } from "./zapier-specialist-flows";
+import { apptPushAppointmentToCalendar, buildAppointmentCalendarInput, invoPushInvoiceToAccounting, scoutSyncMarketplaceLeads } from "./zapier-specialist-flows";
 import { processZapierConnectedApps } from "./zapier-runtime";
 
 const previousEnv = {
@@ -201,10 +202,56 @@ describe("Zapier connection", () => {
     await bindZapierCapability({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "invo.accounting.create_invoice", app: "QuickBooksV3CLIAPI", action: "invoice" });
     await bindZapierCapability({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "scout.leads.list", app: "FacebookLeadsCLIAPI", action: "new_lead", config: { page: "123" } });
     const views = await listZapierCapabilities(orgIds[0]!);
-    expect(views.find((view) => view.key === "invo.accounting.create_invoice")?.policy.mode).toBe("approve");
-    expect(views.find((view) => view.key === "appt.calendar.create_event")?.policy.mode).toBe("auto");
+    expect(views.find((view) => view.key === "invo.accounting.create_invoice")?.policy.mode).toBe("off");
+    expect(views.find((view) => view.key === "appt.calendar.create_event")?.policy.mode).toBe("off");
     // Tenant B sees nothing of tenant A's bindings.
     expect((await listZapierCapabilities(orgIds[1]!)).every((view) => view.binding === null)).toBe(true);
+  });
+
+  it.each(["", "   ", null, false, 0])("rejects an empty or non-text required app setting: %j", async (calendarid) => {
+    await expect(bindZapierCapability({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "appt.calendar.create_event", app: "GoogleCalendarCLIAPI", action: "detailed_event", config: { calendarid } })).rejects.toThrow(/Missing required setting: Calendar/);
+    const view = (await listZapierCapabilities(orgIds[0]!)).find((item) => item.key === "appt.calendar.create_event");
+    expect(view?.binding?.config).toEqual({ calendarid: "primary" });
+  });
+
+  it("pauses a saved flow until its owner explicitly chooses a policy again", async () => {
+    await setZapierPolicy({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "appt.calendar.create_event", mode: "auto", dailyBudget: 17 });
+    await bindZapierCapability({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "appt.calendar.create_event", app: "GoogleCalendarCLIAPI", action: "detailed_event", config: { calendarid: "primary" } });
+    expect((await listZapierCapabilities(orgIds[0]!)).find((item) => item.key === "appt.calendar.create_event")?.policy).toMatchObject({ mode: "off", dailyBudget: 17 });
+  });
+
+  it("reports discovery errors instead of presenting a false empty app list", async () => {
+    fake.respond = () => ({ value: { error: "untrusted-provider-detail" }, isError: true });
+    await expect(listZapierEnabledActions(orgIds[0]!)).rejects.toMatchObject({ code: "tool_failed" });
+    expect((await getZapierStatus(orgIds[0]!)).lastErrorCode).toBe("tool_failed");
+    expect((await getZapierStatus(orgIds[1]!)).lastErrorCode).toBe(null);
+  });
+
+  it("reports a per-app discovery error rather than binding a partial app list", async () => {
+    fake.respond = (_name, args) => args.selected_api
+      ? { value: { error: "untrusted-provider-detail" }, isError: true }
+      : { value: [{ app: "Google Calendar", selected_api: "GoogleCalendarCLIAPI" }] };
+    await expect(listZapierEnabledActions(orgIds[0]!)).rejects.toMatchObject({ code: "tool_failed" });
+  });
+
+  it("refreshes discovery metadata and recovers from a zero-tool initial connection", async () => {
+    await db.update(zapierMcpConnectionsTable).set({ serverMode: "unknown", toolCount: 0, lastToolsRefreshedAt: new Date("2000-01-01T00:00:00Z") }).where(eq(zapierMcpConnectionsTable.organizationId, orgIds[0]!));
+    expect((await listZapierEnabledActions(orgIds[0]!)).some((item) => item.appName === "Google Calendar")).toBe(true);
+    const status = await getZapierStatus(orgIds[0]!);
+    expect(status.serverMode).toBe("agentic");
+    expect(status.toolCount).toBe(3);
+    expect(new Date(status.lastToolsRefreshedAt!).getFullYear()).toBeGreaterThan(2000);
+    expect(status.lastErrorCode).toBe(null);
+  });
+
+  it("retains authority for the same server but pauses flows when switching accounts", async () => {
+    await setZapierPolicy({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "appt.calendar.create_event", mode: "auto", dailyBudget: 17 });
+    await registerZapierServerUrl({ organizationId: orgIds[0]!, userId: userIds[0]!, serverUrl: SERVER_URL });
+    const policy = async () => (await listZapierCapabilities(orgIds[0]!)).find((item) => item.key === "appt.calendar.create_event")?.policy;
+    expect(await policy()).toMatchObject({ mode: "auto", dailyBudget: 17 });
+    await registerZapierServerUrl({ organizationId: orgIds[0]!, userId: userIds[0]!, serverUrl: "https://mcp.zapier.com/api/mcp/s/other-synthetic-account/mcp" });
+    expect(await policy()).toMatchObject({ mode: "off", dailyBudget: 17 });
+    expect((await listZapierCapabilities(orgIds[1]!)).every((view) => view.policy.mode === "off")).toBe(true);
   });
 });
 
@@ -213,6 +260,9 @@ describe("Zapier execution ledger", () => {
   let invoiceId: string;
 
   beforeAll(async () => {
+    await setZapierPolicy({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "appt.calendar.create_event", mode: "auto", dailyBudget: 50 });
+    await setZapierPolicy({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "invo.accounting.create_invoice", mode: "approve", dailyBudget: 25 });
+    await setZapierPolicy({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "scout.leads.list", mode: "auto", dailyBudget: 96 });
     const [contact] = await db
       .insert(contactsTable)
       .values({ organizationId: orgIds[0]!, firstName: "Jane", lastName: "Doe", email: "jane@example.test" })
@@ -281,6 +331,33 @@ describe("Zapier execution ledger", () => {
     const replay = await apptPushAppointmentToCalendar({ organizationId: orgIds[0]!, appointmentId, actorUserId: userIds[0]! });
     expect(replay.execution.id).toBe(first.execution.id);
     expect(fake.calls).toHaveLength(1);
+  });
+
+  it("does not approve an old request against a replacement app server", async () => {
+    await setZapierPolicy({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "appt.calendar.create_event", mode: "approve" });
+    const built = await buildAppointmentCalendarInput(orgIds[0]!, appointmentId);
+    const pending = await requestZapierAction({ organizationId: orgIds[0]!, capability: "appt.calendar.create_event", input: built.input, idempotencyKey: "server-switch-approval", linkedEntityType: "appointment", linkedEntityId: appointmentId });
+    expect(pending.execution.state).toBe("pending_approval");
+    await registerZapierServerUrl({ organizationId: orgIds[0]!, userId: userIds[0]!, serverUrl: SERVER_URL });
+    fake.calls.length = 0;
+    const result = await approveZapierAction({ organizationId: orgIds[0]!, executionId: pending.execution.id, userId: userIds[0]! });
+    expect(result.state).toBe("blocked");
+    expect(fake.calls).toHaveLength(0);
+    await setZapierPolicy({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "appt.calendar.create_event", mode: "auto" });
+    await setZapierPolicy({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "invo.accounting.create_invoice", mode: "approve" });
+    await setZapierPolicy({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "scout.leads.list", mode: "auto" });
+  });
+
+  it("honors a paused policy when approving an otherwise unchanged request", async () => {
+    await setZapierPolicy({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "appt.calendar.create_event", mode: "approve" });
+    const built = await buildAppointmentCalendarInput(orgIds[0]!, appointmentId);
+    const pending = await requestZapierAction({ organizationId: orgIds[0]!, capability: "appt.calendar.create_event", input: built.input, idempotencyKey: "paused-policy-approval", linkedEntityType: "appointment", linkedEntityId: appointmentId });
+    await setZapierPolicy({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "appt.calendar.create_event", mode: "off" });
+    fake.calls.length = 0;
+    const result = await approveZapierAction({ organizationId: orgIds[0]!, executionId: pending.execution.id, userId: userIds[0]! });
+    expect(result).toMatchObject({ state: "blocked", errorCode: "policy_off" });
+    expect(fake.calls).toHaveLength(0);
+    await setZapierPolicy({ organizationId: orgIds[0]!, userId: userIds[0]!, capability: "appt.calendar.create_event", mode: "auto" });
   });
 
   it("parks an approve-mode write, rejects stale approvals, and executes an approved one exactly once", async () => {

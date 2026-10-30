@@ -118,8 +118,8 @@ export async function markZapierConnectionUsed(organizationId: string, error?: Z
 /**
  * Register the server URL the Zapier embed handed the signed-in member. The
  * URL is validated, probed once for its tool list, and stored encrypted.
- * Reconnecting replaces the previous URL in place; bindings and policies are
- * kept because they are the contractor's choices, not Zapier's state.
+ * Reconnecting replaces the previous URL in place. Saved app choices remain,
+ * but a different server pauses policies until the owner reviews that account.
  */
 export async function registerZapierServerUrl(input: {
   organizationId: string;
@@ -138,7 +138,7 @@ export async function registerZapierServerUrl(input: {
   const now = new Date();
   await db.transaction(async (tx) => {
     const [existing] = await tx
-      .select({ id: zapierMcpConnectionsTable.id })
+      .select({ id: zapierMcpConnectionsTable.id, fingerprint: zapierMcpConnectionsTable.serverUrlFingerprint })
       .from(zapierMcpConnectionsTable)
       .where(eq(zapierMcpConnectionsTable.organizationId, input.organizationId));
     const values = {
@@ -157,6 +157,9 @@ export async function registerZapierServerUrl(input: {
       revokedAt: null,
     };
     if (existing) {
+      if (existing.fingerprint !== fingerprint) {
+        await tx.update(zapierSpecialistPoliciesTable).set({ mode: "off", updatedByUserId: input.userId, updatedAt: now }).where(eq(zapierSpecialistPoliciesTable.organizationId, input.organizationId));
+      }
       await tx.update(zapierMcpConnectionsTable).set(values).where(eq(zapierMcpConnectionsTable.id, existing.id));
     } else {
       await tx.insert(zapierMcpConnectionsTable).values(values);
@@ -239,28 +242,32 @@ function asArray(value: unknown): unknown[] {
  */
 export async function listZapierEnabledActions(organizationId: string): Promise<ZapierLiveAction[]> {
   const { connection, serverUrl } = await requireZapierServerUrl(organizationId);
-  if (connection.serverMode === "managed") {
-    return withZapierMcpSession(serverUrl, async (session) => {
-      const tools = await session.listTools();
-      return tools.map((tool) => ({
-        app: "managed",
-        appName: "Managed server",
-        action: tool.name,
-        actionName: tool.name,
-        actionType: /create|send|update|delete|post|add/i.test(tool.name) ? "write" : "read",
-        description: tool.description,
-      }));
-    });
-  }
+  const currentConnection = and(
+    eq(zapierMcpConnectionsTable.id, connection.id),
+    eq(zapierMcpConnectionsTable.serverUrlFingerprint, connection.serverUrlFingerprint),
+    isNull(zapierMcpConnectionsTable.revokedAt),
+  );
   try {
-    const actions = await withZapierMcpSession(serverUrl, async (session) => {
+    const discovery = await withZapierMcpSession(serverUrl, async (session) => {
+      const tools = await session.listTools();
+      const serverMode = detectServerMode(tools);
+      if (serverMode !== "agentic") {
+        return { tools, serverMode, actions: tools.map((tool) => ({
+          app: "managed", appName: "Managed server", action: tool.name,
+          actionName: tool.name,
+          actionType: /create|send|update|delete|post|add/i.test(tool.name) ? "write" as const : "read" as const,
+          description: tool.description,
+        })) };
+      }
       const apps = await session.callTool(ZAPIER_META_TOOLS.inspect, {});
+      if (apps.isError) throw new ZapierMcpError("Zapier could not list your enabled apps. Check your connections in Zapier, then refresh.", "tool_failed");
       const rows = asArray(apps.value) as InspectAppRow[];
       const results: ZapierLiveAction[] = [];
       for (const row of rows) {
         const selectedApi = row.selected_api ?? "";
         if (!selectedApi) continue;
         const detail = await session.callTool(ZAPIER_META_TOOLS.inspect, { selected_api: selectedApi });
+        if (detail.isError) throw new ZapierMcpError("Zapier could not list an app's enabled actions. Check your connections in Zapier, then refresh.", "tool_failed");
         for (const appRow of asArray(detail.value) as InspectAppRow[]) {
           for (const action of appRow.actions ?? []) {
             if (!action.key) continue;
@@ -275,12 +282,19 @@ export async function listZapierEnabledActions(organizationId: string): Promise<
           }
         }
       }
-      return results;
+      return { tools, serverMode, actions: results };
     });
-    await markZapierConnectionUsed(organizationId);
-    return actions;
+    await db.update(zapierMcpConnectionsTable).set({
+      serverMode: discovery.serverMode,
+      toolCount: discovery.tools.length,
+      lastToolsRefreshedAt: new Date(),
+      lastUsedAt: new Date(),
+      lastErrorAt: null,
+      lastErrorCode: null,
+    }).where(currentConnection);
+    return discovery.actions;
   } catch (error) {
-    if (error instanceof ZapierMcpError) await markZapierConnectionUsed(organizationId, error);
+    if (error instanceof ZapierMcpError) await db.update(zapierMcpConnectionsTable).set({ lastErrorAt: new Date(), lastErrorCode: error.code }).where(currentConnection);
     throw error;
   }
 }
@@ -340,7 +354,7 @@ export type ZapierCapabilityView = {
 };
 
 export function defaultPolicyFor(definition: ZapierCapabilityDefinition): { mode: ZapierPolicyMode; dailyBudget: number } {
-  return { mode: definition.defaultMode, dailyBudget: definition.defaultDailyBudget };
+  return { mode: "off", dailyBudget: definition.defaultDailyBudget };
 }
 
 export async function listZapierCapabilities(organizationId: string): Promise<ZapierCapabilityView[]> {
@@ -431,7 +445,7 @@ export async function bindZapierCapability(input: {
   const candidate = findZapierCandidate(definition, live);
   if (!candidate) throw new ZapierBindingError("That action is not a reviewed match for this capability.");
   const config = sanitizeBindingConfig(input.config);
-  const missing = candidate.configFields.filter((field) => field.required && config[field.key] === undefined);
+  const missing = candidate.configFields.filter((field) => field.required && (typeof config[field.key] !== "string" || !(config[field.key] as string).trim()));
   if (missing.length > 0) {
     throw new ZapierBindingError(`Missing required setting: ${missing.map((field) => field.label).join(", ")}.`);
   }
@@ -449,26 +463,25 @@ export async function bindZapierCapability(input: {
     boundByUserId: input.userId,
     verifiedAt: new Date(),
   };
-  const [row] = await db
-    .insert(zapierCapabilityBindingsTable)
-    .values(values)
-    .onConflictDoUpdate({
-      target: [zapierCapabilityBindingsTable.organizationId, zapierCapabilityBindingsTable.capability],
-      set: values,
-    })
-    .returning();
-  // A fresh binding starts with the capability's default authority unless the
-  // contractor already chose one.
-  await db
-    .insert(zapierSpecialistPoliciesTable)
-    .values({
+  const row = await db.transaction(async (tx) => {
+    // Save the binding and paused policy together; the owner chooses authority next.
+    await tx.insert(zapierSpecialistPoliciesTable).values({
       organizationId: input.organizationId,
       capability: definition.key,
       specialistId: definition.specialistId,
       ...defaultPolicyFor(definition),
       updatedByUserId: input.userId,
-    })
-    .onConflictDoNothing();
+    }).onConflictDoUpdate({
+      target: [zapierSpecialistPoliciesTable.organizationId, zapierSpecialistPoliciesTable.capability],
+      set: { mode: "off", updatedByUserId: input.userId, updatedAt: new Date() },
+    });
+    const [saved] = await tx.insert(zapierCapabilityBindingsTable).values(values)
+      .onConflictDoUpdate({
+        target: [zapierCapabilityBindingsTable.organizationId, zapierCapabilityBindingsTable.capability],
+        set: values,
+      }).returning();
+    return saved!;
+  });
   await recordAudit({
     organizationId: input.organizationId,
     actorUserId: input.userId,

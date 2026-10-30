@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2, MapPin, Navigation, Route } from 'lucide-react';
 
 type Stop = {
-  appointmentId: string;
+  routeId: string;
+  kind: 'appointment' | 'project';
+  appointmentId: string | null;
+  projectId: string | null;
+  continuesFromPreviousDay: boolean;
   scheduledStart: string;
   type: string;
   customerName: string;
@@ -84,7 +88,8 @@ export function RoutePlanCard({ date, canWrite }: { date: string; canWrite: bool
   if (!plan || plan.stops.length === 0) return null;
 
   const time = new Intl.DateTimeFormat('en-US', { timeZone: plan.timeZone, hour: 'numeric', minute: '2-digit' });
-  const byId = new Map(plan.stops.map((stop) => [stop.appointmentId, stop]));
+  const byId = new Map(plan.stops.map((stop) => [stop.routeId, stop]));
+  const priorTime = new Intl.DateTimeFormat('en-US', { timeZone: plan.timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   const reorder = plan.savedMiles > 0 && plan.suggestedOrder.join() !== plan.currentOrder.join();
 
   return (
@@ -106,10 +111,11 @@ export function RoutePlanCard({ date, canWrite }: { date: string; canWrite: bool
       </div>
       <ol className="divide-y divide-border">
         {plan.stops.map((stop) => (
-          <li key={stop.appointmentId} className="flex flex-wrap items-center gap-3 px-4 py-2 text-sm">
-            <span className="w-16 shrink-0 font-mono text-xs text-muted-foreground">{time.format(new Date(stop.scheduledStart))}</span>
+          <li key={stop.routeId} className="flex flex-wrap items-center gap-3 px-4 py-2 text-sm">
+            <span className="shrink-0 font-mono text-xs text-muted-foreground">{stop.continuesFromPreviousDay ? `Started ${priorTime.format(new Date(stop.scheduledStart))}` : time.format(new Date(stop.scheduledStart))}</span>
+            <span className="text-xs text-muted-foreground">{stop.kind === 'project' ? 'Job' : 'Appointment'}</span>
             <span className="font-medium">{stop.customerName}</span>
-            <span className="min-w-0 flex-1 truncate text-muted-foreground">{stop.address ?? 'No property on this appointment'}</span>
+            <span className="min-w-0 flex-1 truncate text-muted-foreground">{stop.address ?? `No property on this ${stop.kind === 'project' ? 'job' : 'appointment'}`}</span>
             {!stop.located && stop.address && <MapPin className="h-4 w-4 text-amber-500" aria-label="Not on the map yet" />}
           </li>
         ))}

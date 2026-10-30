@@ -12,9 +12,10 @@ import {
   type InvoiceDocument,
   type ZapierActionExecution,
 } from "@workspace/db";
-import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { createContact, createLead, createTask } from "../crm";
+import { getRoutePlan, RoutePlanError } from "../route-plan";
 import { getZapierBinding } from "./zapier-connection";
 import { requestZapierAction, ZapierExecutionError, type ZapierActionOutcome } from "./zapier-executions";
 import { sha256Hex } from "./zapier-mcp-client";
@@ -402,26 +403,6 @@ export async function callieRequestTextBack(input: {
 
 export const SCHED_DAY_SHEET_ENTITY = "user";
 
-function dayBounds(dateIso: string, timezone: string): { start: Date; end: Date } {
-  // Resolve local midnight for the organization's timezone without a tz library:
-  // take the UTC offset in effect at noon of that date in the zone.
-  const noonUtc = new Date(`${dateIso}T12:00:00Z`);
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).formatToParts(noonUtc);
-  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
-  const localAsUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"));
-  const offsetMs = localAsUtc - noonUtc.getTime();
-  const start = new Date(Date.UTC(...(dateIso.split("-").map(Number) as [number, number, number])) - offsetMs);
-  return { start, end: new Date(start.getTime() + 24 * 60 * 60_000) };
-}
-
 export async function buildCrewDaySheetInput(organizationId: string, userId: string, dateIso: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) throw new ZapierExecutionError("Date must be YYYY-MM-DD.", "invalid_input");
   const binding = await getZapierBinding(organizationId, "sched.sms.send");
@@ -431,39 +412,33 @@ export async function buildCrewDaySheetInput(organizationId: string, userId: str
   }
   const [organization] = await db.select().from(organizationsTable).where(eq(organizationsTable.id, organizationId));
   if (!organization) throw new ZapierExecutionError("Organization not found.", "not_found");
-  const { start, end } = dayBounds(dateIso, organization.timezone);
-  const rows = await db
-    .select({ appointment: appointmentsTable, contact: contactsTable, property: propertiesTable })
-    .from(appointmentsTable)
-    .leftJoin(contactsTable, eq(contactsTable.id, appointmentsTable.contactId))
-    .leftJoin(propertiesTable, eq(propertiesTable.id, appointmentsTable.propertyId))
-    .where(
-      and(
-        eq(appointmentsTable.organizationId, organizationId),
-        eq(appointmentsTable.assignedUserId, userId),
-        inArray(appointmentsTable.status, ["scheduled", "confirmed"]),
-        gte(appointmentsTable.scheduledStart, start),
-        lt(appointmentsTable.scheduledStart, end),
-      ),
-    )
-    .orderBy(appointmentsTable.scheduledStart);
-  const time = new Intl.DateTimeFormat("en-US", { timeZone: organization.timezone, hour: "numeric", minute: "2-digit" });
-  const lines = rows.map(({ appointment, contact, property }) => {
-    const when = time.format(appointment.scheduledStart);
-    const who = fullName(contact?.firstName, contact?.lastName);
-    const where = addressLine(property) ?? "address on file";
-    return `${when} ${appointment.type.replace(/_/g, " ")} - ${who}, ${where}`;
+  // Route-plan reads use scheduling-core's real company-day boundaries, verify
+  // crew ownership and mask malformed historical customer/property links. This
+  // read includes booked jobs and appointments and never dispatches geocoding.
+  const plan = await getRoutePlan(organizationId, userId, { date: dateIso, userId }).catch((error: unknown) => {
+    if (error instanceof RoutePlanError) throw new ZapierExecutionError(error.message, error.code === "not_found" ? "not_found" : "invalid_input");
+    throw error;
   });
-  const body = (
+  const time = new Intl.DateTimeFormat("en-US", { timeZone: plan.timeZone, hour: "numeric", minute: "2-digit" });
+  const lines = plan.stops.map((stop) => {
+    const when = stop.continuesFromPreviousDay ? "Continuing" : time.format(new Date(stop.scheduledStart));
+    const type = stop.kind === "project" ? "job" : stop.type.replace(/_/g, " ");
+    return `${when} ${type} - ${stop.customerName}, ${stop.address ?? "address unavailable"}`;
+  });
+  const body =
     lines.length === 0
       ? `${organization.name} day sheet for ${dateIso}: no jobs scheduled.`
-      : `${organization.name} day sheet for ${dateIso}:\n${lines.join("\n")}`
-  ).slice(0, 1200);
-  const signature = sha256Hex(rows.map(({ appointment }) => `${appointment.id}:${appointment.updatedAt.getTime()}`).join("|")).slice(0, 16);
+      : `${organization.name} day sheet for ${dateIso} (${plan.timeZone}):\n${lines.join("\n")}`;
+  if (body.length > 1200) {
+    throw new ZapierExecutionError("The complete day sheet is too long for one text. Open the route plan to review every stop and share the complete schedule through another approved channel.", "invalid_input");
+  }
+  // Use the complete semantic message and destination, so changing a customer's
+  // name/address or crew phone cannot reuse a prior message's request identity.
+  const signature = sha256Hex(JSON.stringify({ toPhone: phone, body })).slice(0, 32);
   return {
     idempotencyKey: `sched-daysheet:${userId}:${dateIso}:${signature}`,
     input: { toPhone: phone, body },
-    jobs: rows.length,
+    jobs: plan.stops.length,
   };
 }
 
