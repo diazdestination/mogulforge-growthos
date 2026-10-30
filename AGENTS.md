@@ -1,5 +1,17 @@
 # MogulForge GrowthOS — Codex Operating Charter
 
+## October 27 CSS onboarding scope reconciliation
+
+For Climate Simulation Solutions, the October 9 owner intake in
+`C:/Forge/CSS_OWNER_INTAKE_2026-10-09.md` supersedes the older payment-deferral
+statements below. Customer payment collection is required engineering scope for
+the switch; signed estimates, deposits, progress payments and financing must be
+tracked separately. No provider has been selected or activated by this record.
+Do not mark CSS ready using contact import, external receipts, or a smaller pilot
+as substitutes for its required workflows. See
+`reports/css-onboarding-readiness-2026-10-27.md` for current evidence and order.
+Preserve all release, financial, provider and customer-contact boundaries.
+
 ## October 9 UTC / October 8 Pacific alert-coverage continuation
 
 Adam requested further engineering while GEEKOM works on UI design. The current

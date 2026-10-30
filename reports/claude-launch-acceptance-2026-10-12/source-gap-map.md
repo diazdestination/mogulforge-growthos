@@ -1,5 +1,11 @@
 # Source-gap map
 
+**October 27 CSS correction:** Any `OWNER-DEFERRED` payment classification below
+is superseded for CSS by its October 9 intake. Collection preparation is required
+for the switch; no provider choice, activation or financial action is approved
+by that requirement. Historical source observations remain dated. See
+[current CSS readiness](../css-onboarding-readiness-2026-10-27.md).
+
 Prepared against PR #35 head `87adc3e`. In this file:
 
 - `api/` means `artifacts/api-server/src/`.

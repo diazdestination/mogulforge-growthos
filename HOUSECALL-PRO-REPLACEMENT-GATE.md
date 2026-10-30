@@ -1,5 +1,15 @@
 # Housecall Pro replacement gate
 
+## October 27 CSS acceptance correction
+
+CSS remains **NOT ACCEPTED**. Its October 9 intake supersedes the October 2
+payment deferral quoted below: prepare collection for the switch, including the
+separate signed-estimate, deposit, progress-payment and financing requirements.
+Neither customer-only import nor staff-recorded external receipts establishes
+full migration or collection. The historical matrices below retain their dated
+evidence; use [current CSS readiness](reports/css-onboarding-readiness-2026-10-27.md)
+to interpret open requirements. No company requirement or release gate is waived.
+
 October 8 current source addendum: main `2162aa2` and exact-main CI `37500458053`
 include returning-customer estimates/jobs/invoices, external refund accounting,
 Contractor Workday and CALLIE conversation. Older missing-feature descriptions
