@@ -18,10 +18,12 @@ export const ZAPIER_CAPABILITY_KEYS = [
   "scout.reviews.list",
   "scout.leads.list",
   "appt.calendar.create_event",
+  "appt.sms.send",
   "invo.accounting.create_invoice",
   "callie.calls.list",
   "callie.sms.send",
   "sched.sms.send",
+  "maintain.sms.send",
 ] as const;
 export type ZapierCapabilityKey = (typeof ZAPIER_CAPABILITY_KEYS)[number];
 
@@ -227,6 +229,21 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
     ],
   },
   {
+    key: "appt.sms.send",
+    specialistId: "appt",
+    direction: "write",
+    label: "Text appointment reminders",
+    description: "APPT texts a consented customer their appointment reminder from the contractor's own number.",
+    inputSchema: SMS_SEND_INPUT,
+    summaryFields: ["toPhone"],
+    defaultMode: "approve",
+    defaultDailyBudget: 60,
+    candidates: [
+      smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),
+      smsCandidate("OpenPhoneCLIAPI", "Quo", "send_message", "Send Message", "from"),
+    ],
+  },
+  {
     key: "invo.accounting.create_invoice",
     specialistId: "invo",
     direction: "write",
@@ -340,6 +357,21 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
     direction: "write",
     label: "Text crews their day sheet",
     description: "SCHED texts each crew member tomorrow's jobs from the contractor's own number.",
+    inputSchema: SMS_SEND_INPUT,
+    summaryFields: ["toPhone"],
+    defaultMode: "approve",
+    defaultDailyBudget: 40,
+    candidates: [
+      smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),
+      smsCandidate("OpenPhoneCLIAPI", "Quo", "send_message", "Send Message", "from"),
+    ],
+  },
+  {
+    key: "maintain.sms.send",
+    specialistId: "maintain",
+    direction: "write",
+    label: "Text service reminders",
+    description: "MAINTAIN texts a consented customer one reminder that a recorded service is due, from the contractor's own number.",
     inputSchema: SMS_SEND_INPUT,
     summaryFields: ["toPhone"],
     defaultMode: "approve",

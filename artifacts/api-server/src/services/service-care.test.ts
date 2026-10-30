@@ -1,7 +1,7 @@
 import { randomUUID, webcrypto } from "node:crypto";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { activitiesTable, appointmentsTable, auditEventsTable, consentRecordsTable, contactsTable, crmTasksTable, customerLifecycleTable, db, pool, propertiesTable, DEFAULT_INSPECTION_AVAILABILITY, emailIntelligenceSourcesTable, emailResponseReviewsTable, leadsTable, organizationsTable, orgSettingsTable, revenueExecutionsTable, scheduledActionsTable, serviceObligationsTable, twilioClientBindingsTable, twilioConsentProofsTable, usersTable } from "@workspace/db";
+import { activitiesTable, appointmentsTable, auditEventsTable, consentRecordsTable, contactsTable, crmTasksTable, customerLifecycleTable, db, pool, propertiesTable, DEFAULT_INSPECTION_AVAILABILITY, emailIntelligenceSourcesTable, emailResponseReviewsTable, leadsTable, organizationsTable, orgSettingsTable, revenueExecutionsTable, scheduledActionsTable, zapierActionExecutionsTable, serviceObligationsTable, twilioClientBindingsTable, twilioConsentProofsTable, usersTable } from "@workspace/db";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import { syntheticTwilioNumber, syntheticTwilioSid } from "../test-helpers/synthetic-twilio";
 import { approveServiceCare, bookServiceCareVisit, executeServiceCareReminder, getServiceCare, preflightServiceCareReminder, recordServiceCareResponse } from "./service-care";
@@ -499,4 +499,11 @@ describe("closed service-care wire contract and browser hash vectors", () => {
     expect(serviceCareBookingOutcomeSchema.safeParse({ ...outcome, available: true }).success).toBe(false);
     expect(serviceCareBookingResultSchema.safeParse({ appointmentId: legacy.requestId, replayed: true, bookingOutcome: outcome }).success).toBe(false);
   });
+});
+
+it.each(["pending_approval", "succeeded", "indeterminate"] as const)("holds built-in individual reminders when own-number service authority is %s", async state => {
+  const f = await fixture(); const input = await approvalInput(f);
+  await db.insert(zapierActionExecutionsTable).values({ organizationId: f.org, capability: "maintain.sms.send", specialistId: "maintain", direction: "write", zapierApp: "Synthetic", zapierAction: "send", idempotencyKey: `maintain-reminder-text:${f.obligation.id}:1`, requestDigest: "a".repeat(64), state, linkedEntityType: "service_obligation", linkedEntityId: f.obligation.id });
+  await expect(approveServiceCare(f.org, f.staff, f.obligation.id, input)).rejects.toMatchObject({ code: "reminder_exists" });
+  expect(effects).toHaveLength(0);
 });

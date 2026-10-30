@@ -125,7 +125,7 @@ export async function contactTouchTimes(reader: Pick<typeof db, "select">, org: 
 /** Only existing original action identities are accepted by the server callers. */
 export async function reserveContactTouch(tx: NurtureTx, input: ContactTouchClaim) {
   await acquireNurtureLocks(tx, input.organizationId, input.leadId ? [input.leadId] : []);
-  if (!/^(scheduled:|bie:|source-outreach:|playbook:|automation-run:)/.test(input.logicalKey)) throw new ContactTouchError("invalid_touch_identity");
+  if (!/^(scheduled:|bie:|source-outreach:|playbook:|automation-run:)/.test(input.logicalKey) && !/^zapier:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(input.logicalKey)) throw new ContactTouchError("invalid_touch_identity");
   const address = touchAddress(input.channel, input.address), payloadHash = sourceFingerprint(input.payload);
   const [existing] = await tx.select().from(reservations).where(and(eq(reservations.organizationId, input.organizationId), eq(reservations.logicalKey, input.logicalKey))).for("update");
   if (existing) {
@@ -156,8 +156,8 @@ export async function acceptContactTouch(org: string, logicalKey: string) {
   await db.update(reservations).set({ acceptedAt: new Date() }).where(and(eq(reservations.organizationId, org), eq(reservations.logicalKey, logicalKey)));
 }
 /** Trace only, never send/replay authority; invoke only at the physical boundary. */
-export async function markContactTouchDispatchStarted(org: string, logicalKey: string) {
-  await db.update(reservations).set({ dispatchStartedAt: new Date() }).where(and(eq(reservations.organizationId, org), eq(reservations.logicalKey, logicalKey), sql`${reservations.dispatchStartedAt} is null`));
+export async function markContactTouchDispatchStarted(org: string, logicalKey: string, writer: Pick<typeof db, "update"> = db) {
+  await writer.update(reservations).set({ dispatchStartedAt: new Date() }).where(and(eq(reservations.organizationId, org), eq(reservations.logicalKey, logicalKey), sql`${reservations.dispatchStartedAt} is null`));
 }
 /** Narrow SMS adapter proof; immutable digest is reread, never supplied consent. */
 export async function assertSmsContactTouch(input: { organizationId: string; contactId: string; to: string; logicalKey: string; payloadHash: string }) {

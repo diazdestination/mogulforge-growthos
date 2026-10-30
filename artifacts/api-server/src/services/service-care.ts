@@ -195,6 +195,7 @@ export async function approveServiceCare(org: string, actor: string, id: string,
     if (current.contact.updatedAt.getTime() !== contact.updatedAt.getTime()) fail("preview_changed", "Customer details changed. Refresh and review again.");
     activeUnbooked(current.obligation);
     if (await isBooked(org, current.obligation, tx)) fail("already_booked", "A visit is already scheduled.");
+    if (await (await import("./zapier/zapier-specialist-flows")).otherOpenText(org, "maintain.sms.send", "service_obligation", id, "", tx)) fail("reminder_exists", "A connected phone app reminder already owns this service. Review its receipt.");
     if (await latest(org, id, APPROVED, tx)) fail("reminder_exists", "This service already has a reminder receipt. Review it; another key or channel cannot resend it.");
     if (await latest(org, id, RESPONSE, tx)) fail("response_exists", "A customer response is already recorded. Continue office follow-up instead of another automated reminder.");
     if (await hasServiceMailboxReplyHold(org, id, tx) || await hasServiceSmsReplyHold(org, id, tx)) fail("service_reply_held", "Review the reply to this service before further customer work.");

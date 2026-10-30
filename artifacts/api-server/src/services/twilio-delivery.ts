@@ -91,6 +91,12 @@ export async function sendTwilioSms(
     }),
   );
   const operation = await db.transaction(async (tx) => {
+    const appointmentReminder = /^appointment:([0-9a-f-]{36}):reminder:/.exec(context.idempotencyKey);
+    if (appointmentReminder) {
+      await (await import("./source-outreach-ownership")).acquireNurtureLocks(tx, context.organizationId);
+      const { otherOpenText } = await import("./zapier/zapier-specialist-flows");
+      if (await otherOpenText(context.organizationId, "appt.sms.send", "appointment_reminder", appointmentReminder[1]!, "", tx)) throw new Error("The connected phone app owns this appointment reminder; inspect the original receipt.");
+    }
     // Serialize the daily allowance and ownership claim across processes.
     await lockTwilioSmsBudget(tx, context.organizationId);
     if (await callieOwnsSmsOperation(tx, context.organizationId, context.idempotencyKey))

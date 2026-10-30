@@ -1,6 +1,6 @@
 # Connect your apps and choose a flow
 
-Open **Settings -> Integrations -> Zapier Connected Apps**. An owner, admin or other member with settings-management permission manages the company's connection. Each company connects its own Zapier account and app accounts.
+Open **Settings -> Connections -> Zapier Connected Apps**. An owner, admin or other member with settings-management permission manages the company's connection. Each company connects its own Zapier account and app accounts.
 
 ## Client setup
 
@@ -19,14 +19,25 @@ Open **Settings -> Integrations -> Zapier Connected Apps**. An owner, admin or o
 | Watch reviews | Google Business Profile; Facebook Pages | Business location or page. Creates follow-up tasks; does not post review replies. |
 | Pull marketplace leads | Facebook Lead Ads; Housecall Pro; Jobber | Facebook page, optional form; other candidates need no extra GrowthOS setting. Reads available records into opportunities. This does not import historical jobs or invoices. |
 | Create calendar event | Google Calendar; Microsoft Outlook | Calendar setting. Select an existing appointment to request event creation. This is not calendar availability sync or automatic job-to-calendar mirroring. |
+| Text appointment reminder | Twilio; Quo | Sender and an existing appointment for a customer with SMS consent. Built-in and own-number reminders share ownership checks. |
 | Export issued invoice | QuickBooks Online; Xero | Select an issued invoice. Export does not collect payment, record a customer receipt or prove settlement. |
 | Log calls | CallRail; Quo | Optional company/number. Automatic call sync can also request missed-call texts under the separately chosen text-back policy. |
 | Text missed callers | Twilio; Quo | Approved sender and eligible callback context. Policy and consent/authority gates still apply. |
 | Text crew day sheet | Twilio; Quo | Sender, named crew member's mobile, company date. Includes that member's booked jobs and appointments. |
+| Text service reminder | Twilio; Quo | Sender and an eligible service due within its notice window. Requires SMS consent, sending hours, shared contact allowance, no reply hold and no prior reminder ownership. |
 
 The exact enabled app/action choices displayed in GrowthOS are authoritative for this version. Zapier's larger app catalog does not mean every app has a reviewed GrowthOS mapping. Request a mapping for a missing app or use a separately reviewed Zapier workflow; do not select a similar-looking action as a substitute.
 
 Reviews, marketplace leads and calls can run as hourly-idempotent reads through the GrowthOS scheduler when their policy is Automatic. CALLIE call sync may also request texts under its separate SMS policy. Calendar events, accounting exports and crew sheets require explicit requests; Automatic controls how those requests execute, rather than creating a new trigger. The client action panel intentionally excludes call sync and standalone text-back because it cannot yet present callback eligibility and send-consent review. Their existing governed API/scheduler paths are separate.
+
+Appointment and service texts add an explicit client request. The automated
+appointment reminder may use the enabled own-number route when built-in texting
+is off; service texts through Zapier are requested by staff. Choose Approve each
+when first enabling either flow. An uncertain text must be reconciled rather
+than retried or followed by fallback email. Replies and STOP requests arrive in
+the contractor's phone app; record an opt-out as do not text in GrowthOS too.
+The contractor's own number and provider must have their required approvals;
+connecting Zapier does not remove carrier registration requirements.
 
 ## Fix a blocked setup
 

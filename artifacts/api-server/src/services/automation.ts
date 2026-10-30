@@ -27,7 +27,7 @@ import { recordAudit } from "./audit";
 import { runDurableAction } from "./durable-execution";
 import { assertContactTouchCurrent, acceptContactTouch, markContactTouchDispatchStarted, type ContactTouchClaim } from "./contact-touch-claim";
 import { sourceFingerprint } from "./source-adoption-contract";
-import { formatAppointmentWindow, lockContractorSchedule, type ScheduleTransaction } from "./contractor-scheduling";
+import { lockContractorSchedule, type ScheduleTransaction } from "./contractor-scheduling";
 import { customerWorkAllowedSql, customerWorkHeld } from "./customer-lifecycle-runtime";
 import { isLegacyDefaultOrg } from "../lib/orgFlavor";
 import {
@@ -749,39 +749,9 @@ async function executeAction(
         return { type: action.type, status: "skipped", detail: "contact not found" };
       }
 
-      const settings = await getOrgSettings(organizationId);
-      const businessName =
-        await getBusinessName(organizationId);
-      const businessPhone = settings.businessProfile.phone ?? "";
-      // Resolve the same company timezone used by Today. Invalid or missing
-      // settings are shown explicitly as UTC, never as a host-wide default.
-      const configuredZone = settings.inspectionAvailability?.timezone;
-      const zones = await db.execute(sql`select name from pg_timezone_names where name=${configuredZone ?? "UTC"} limit 1`);
-      const windowLabel = formatAppointmentWindow(appointment.scheduledStart, zones.rows[0]?.name ?? "UTC");
-      const reschedule = businessPhone
-        ? `Need to reschedule? Call or text us at ${businessPhone}.`
-        : "Need to reschedule? Contact our office and we'll find a time that works.";
-      // Admin-customizable copy (org settings), rendered with the same
-      // placeholder syntax message templates use. Defaults keep the built-in
-      // wording.
-      const reminderSettings = await getAppointmentReminderSettings(
-        organizationId,
-      );
-      const reminderVars: Record<string, string> = {
-        "contact.firstName": contact.firstName ?? "there",
-        "business.name": businessName,
-        "business.phone": businessPhone,
-        "appointment.window": windowLabel,
-        "reschedule.line": reschedule,
-      };
-      const renderReminder = (input: string) =>
-        input.replace(
-          /\{\{\s*([\w.]+)\s*\}\}/g,
-          (_, key: string) => reminderVars[key] ?? "",
-        );
-      const smsBody = renderReminder(reminderSettings.smsBody);
-      const emailSubject = renderReminder(reminderSettings.emailSubject);
-      const emailBody = renderReminder(reminderSettings.emailBody);
+      const { renderAppointmentReminderCopy } = await import("./appointment-reminder-copy");
+      const { settings, businessName, configuredZone, reminderSettings, windowLabel, smsBody, emailSubject, emailBody } =
+        await renderAppointmentReminderCopy(organizationId, appointment, contact.firstName);
 
       // Channel choice: honor the homeowner's preferred contact method —
       // explicit booking-time preference (concierge) first, then the
@@ -837,6 +807,51 @@ async function executeAction(
           status: "skipped",
           detail: "no reachable channel (missing details or SMS consent)",
         };
+      }
+      // No built-in texting for this company, but APPT can text from the
+      // contractor's own number through their Zapier connection. The Zapier
+      // ledger owns approval, budget, idempotency and indeterminate outcomes.
+      if (channel === "sms") {
+        const flows = await import("./zapier/zapier-specialist-flows");
+        if (await flows.zapierCustomerSmsRoute(organizationId, "appt.sms.send")) {
+          let state: string;
+          try {
+            const outcome = await flows.apptRequestReminderText({ organizationId, appointmentId, actorUserId: null, expectedStart: appointment.scheduledStart.toISOString(), scheduledActionId });
+            state = outcome.execution.state;
+          } catch (error) {
+            // A conflict or database/audit error may follow an external effect.
+            // Retain the original receipt and hold; an exception never proves no text.
+            throw error;
+          }
+          if (["pending_approval", "executing", "succeeded", "indeterminate"].includes(state)) {
+            if (appointment.leadId) {
+              await db.insert(activitiesTable).values({
+                organizationId,
+                leadId: appointment.leadId,
+                contactId: contact.id,
+                type: "appointment_reminder_sent",
+                title: state === "pending_approval" ? "Inspection reminder text waiting for approval" : "Inspection reminder text requested from your number",
+                body: `Reminder for the ${windowLabel} inspection window, by text through your connected phone app to ${contact.phone}. Delivery is not confirmed.`,
+                metadata: { appointmentId, channel: "sms", provider: "zapier", zapierState: state, scheduledStart: appointment.scheduledStart.toISOString() },
+              });
+            }
+            await audit({ appointmentId, channel: "sms", provider: "zapier", zapierState: state, to: contact.phone });
+            return { type: action.type, status: "success", detail: `sms:zapier:${state}` };
+          }
+          if (state !== "blocked") return { type: action.type, status: "skipped", detail: `connected text outcome held (${state}); inspect original receipt` };
+          // Only a ledger refusal before provider dispatch permits email fallback.
+          if (!emailAllowed) {
+            await audit({ blocked: "zapier_text_not_requested", appointmentId, contactId: contact.id, zapierState: state });
+            return { type: action.type, status: "skipped", detail: `text through connected app not requested (${state})` };
+          }
+          channel = "email";
+        }
+      }
+      {
+        // Every built-in channel shares the original reminder authority. A later
+        // SMS opt-out or email preference cannot duplicate an attempted text.
+        try { await (await import("./zapier/zapier-specialist-flows")).reserveBuiltInAppointmentReminder(organizationId, appointmentId, appointment.scheduledStart.toISOString()); }
+        catch (error) { if (!(error instanceof (await import("./zapier/zapier-executions")).ZapierExecutionError)) throw error; return { type: action.type, status: "skipped", detail: error.message }; }
       }
       const [emailRule] = channel === "email" ? await db.select().from(automationsTable).where(and(eq(automationsTable.organizationId, organizationId), eq(automationsTable.id, automationId))) : [];
       const beforeDispatch = async () => {

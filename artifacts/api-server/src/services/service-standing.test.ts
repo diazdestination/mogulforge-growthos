@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { activitiesTable, auditEventsTable, contactsTable, crmTasksTable, customerLifecycleTable, db, gmailConnectionsTable, leadsTable, orgSettingsTable, revenueExecutionsTable, scheduledActionsTable, serviceObligationsTable, usersTable } from "@workspace/db";
+import { activitiesTable, auditEventsTable, contactsTable, crmTasksTable, customerLifecycleTable, db, gmailConnectionsTable, leadsTable, orgSettingsTable, revenueExecutionsTable, scheduledActionsTable, zapierActionExecutionsTable, serviceObligationsTable, usersTable } from "@workspace/db";
 import { serviceStandingEnrollmentsTable as enrollments, serviceStandingPolicyRevisionsTable as revisions } from "../../../../lib/db/src/schema/service-standing";
 import { contactTouchReservationsTable } from "../../../../lib/db/src/schema/contact-touch-reservations";
 import { serviceStandingFixture } from "../test-helpers/service-standing-fixture";
@@ -301,4 +301,11 @@ describe("shared pending/unknown service contact allowance", () => {
     release(); await first;
     expect(await db.select().from(revenueExecutionsTable).where(eq(revenueExecutionsTable.organizationId, f.org))).toHaveLength(1);
   });
+});
+
+it.each(["pending_approval", "succeeded", "indeterminate"] as const)("holds standing admission when own-number service authority is %s", async state => {
+  const f = await fixture(); const view = await approve(f); atNotice(f);
+  await db.insert(zapierActionExecutionsTable).values({ organizationId: f.org, capability: "maintain.sms.send", specialistId: "maintain", direction: "write", zapierApp: "Synthetic", zapierAction: "send", idempotencyKey: `maintain-reminder-text:${f.obligation.id}:1`, requestDigest: "a".repeat(64), state, linkedEntityType: "service_obligation", linkedEntityId: f.obligation.id });
+  const result = await admitStandingServiceReminder(f.org, view.enrollmentId!);
+  expect(result.code).toBe("reminder_already_owned"); expect(effects).toHaveLength(0);
 });

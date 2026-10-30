@@ -6,6 +6,8 @@
  * automations from borrowing the initial customer-care SMS program.
  */
 import {
+  appointmentsTable,
+  zapierActionExecutionsTable,
   automationRunsTable,
   consentRecordsTable,
   contactsTable,
@@ -287,4 +289,14 @@ describe("automation → send_sms → Twilio round-trip", () => {
       expect(attempts).toBe(1);
     } finally { providers.sms = original; }
   });
+});
+
+it.each(["pending_approval", "succeeded", "indeterminate"] as const)("blocks canonical built-in appointment transport after own-number ownership is %s", async state => {
+  stubTwilioEnv(); const calls = stubTwilioFetch();
+  const start = new Date(Date.now() + 2 * 86_400_000);
+  const [visit] = await db.insert(appointmentsTable).values({ organizationId: org.id, contactId: contact.id, status: "scheduled", scheduledStart: start }).returning();
+  await db.insert(twilioConsentProofsTable).values({ organizationId: org.id, contactId: contact.id, phone: recipient, purpose: "appointments", granted: true, disclosureVersion: SMS_DISCLOSURE_VERSION, source: "synthetic original appointment proof" });
+  await db.insert(zapierActionExecutionsTable).values({ organizationId: org.id, specialistId: "appt", capability: "appt.sms.send", direction: "write", zapierApp: "Synthetic", zapierAction: "send", idempotencyKey: `appt-reminder-text:${visit.id}:${start.toISOString()}`, requestDigest: "e".repeat(64), linkedEntityType: "appointment_reminder", linkedEntityId: visit.id, state });
+  await expect(twilioSmsProvider.send(recipient, "Original appointment reminder", { organizationId: org.id, contactId: contact.id, purpose: "appointments", idempotencyKey: `appointment:${visit.id}:reminder:${start.toISOString()}` })).rejects.toThrow(/connected phone app owns/);
+  expect(calls).toHaveLength(0);
 });

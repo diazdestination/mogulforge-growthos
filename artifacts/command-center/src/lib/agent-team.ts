@@ -158,12 +158,12 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Customer confirmations",
         "stage": "setup",
-        "reality": "Customer-facing confirmations and reminders require approved delivery setup and consent. A draft or staff booking alone does not send a message."
+        "reality": "Appointment reminders go by email, or by text to customers who agreed to texts: through GrowthOS texting, or from your own business number once your phone app is connected through Zapier. A draft or staff booking alone does not send a message."
       },
       {
         "title": "Add bookings to your calendar",
         "stage": "setup",
-        "reality": "From Settings → Integrations, request a calendar event for a booked appointment through your own Google or Outlook account connected with Zapier. This flow supports event creation only; reschedules, cancellations and changes made in the outside calendar do not sync, so the GrowthOS schedule stays the source of truth."
+        "reality": "From Settings → Connections, request a calendar event for a booked appointment through your own Google or Outlook account connected with Zapier. This flow supports event creation only; reschedules, cancellations and changes made in the outside calendar do not sync, so the GrowthOS schedule stays the source of truth."
       }
     ]
   },
@@ -227,7 +227,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Customer service reminders",
         "stage": "setup",
-        "reality": "Customer reminders require approved company delivery setup and contact consent. Staff follow-up tasks do not send customer reminders themselves."
+        "reality": "A due service can get one reminder by email or text to customers who agreed to it, including a text from your own business number through Zapier. Staff follow-up tasks do not send customer reminders themselves."
       }
     ]
   },

@@ -1,4 +1,8 @@
 import {
+  twilioDispatchesTable,
+  activitiesTable,
+  revenueExecutionsTable,
+  scheduledActionsTable,
   appointmentsTable,
   contactsTable,
   crmTasksTable,
@@ -7,16 +11,27 @@ import {
   leadsTable,
   organizationsTable,
   propertiesTable,
+  serviceObligationsTable,
+  auditEventsTable,
   usersTable,
   zapierActionExecutionsTable,
   type InvoiceDocument,
   type ZapierActionExecution,
 } from "@workspace/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 
+import { renderAppointmentReminderCopy } from "../appointment-reminder-copy";
 import { createContact, createLead, createTask } from "../crm";
+import { hasServiceMailboxReplyHold } from "../mailbox-communication";
 import { getRoutePlan, RoutePlanError } from "../route-plan";
-import { getZapierBinding } from "./zapier-connection";
+import { checkSendEligibility } from "../send-gate";
+import { serviceCareMessage } from "../service-care-policy";
+import { serviceNoticeAt } from "../service-obligations";
+import { hasServiceSmsReplyHold } from "../service-sms";
+import { readStandingService, standingLineage, standingCompanyProjection } from "../service-standing-policy";
+import { phoneE164, twilioForOrganization } from "../twilio-controls";
+import { getZapierCapability } from "./zapier-capabilities";
+import { defaultPolicyFor, getZapierBinding, getZapierPolicy } from "./zapier-connection";
 import { requestZapierAction, ZapierExecutionError, type ZapierActionOutcome } from "./zapier-executions";
 import { sha256Hex } from "./zapier-mcp-client";
 
@@ -461,6 +476,243 @@ export async function schedSendCrewDaySheet(input: {
   return { ...outcome, jobs: built.jobs };
 }
 
+// ---------- customer texts from the contractor's own number ----------
+
+export const OPT_OUT_LINE = "Reply STOP to opt out.";
+
+/** Every customer text sent through a contractor's own number carries an opt-out line. */
+export function withOptOut(body: string): string {
+  return body.trimEnd().endsWith(OPT_OUT_LINE) ? body.trimEnd() : `${body.trimEnd()} ${OPT_OUT_LINE}`;
+}
+
+export type CustomerSmsCapability = "appt.sms.send" | "maintain.sms.send";
+
+/**
+ * True when automated customer texts for this capability should go through
+ * the contractor's own number: built-in texting is not active for the company,
+ * and the capability is bound and not switched off. Built-in texting, when
+ * active, always wins so a customer never gets the same reminder twice.
+ */
+export async function zapierCustomerSmsRoute(organizationId: string, capability: CustomerSmsCapability): Promise<boolean> {
+  if ((await twilioForOrganization(organizationId))?.smsEnabled) return false;
+  const binding = await getZapierBinding(organizationId, capability);
+  if (!binding) return false;
+  const definition = getZapierCapability(capability)!;
+  const policy = (await getZapierPolicy(organizationId, capability)) ?? defaultPolicyFor(definition);
+  return policy.mode !== "off" && policy.dailyBudget > 0;
+}
+
+const OPEN_LEDGER_STATES = ["pending_approval", "executing", "succeeded", "indeterminate", "failed"] as const;
+
+export async function otherOpenText(organizationId: string, capability: CustomerSmsCapability, entityType: string, entityId: string, idempotencyKey = "", reader: Pick<typeof db, "select"> = db) {
+  const [appointment] = capability === "appt.sms.send" ? await reader.select({ start: appointmentsTable.scheduledStart }).from(appointmentsTable).where(and(eq(appointmentsTable.organizationId, organizationId), eq(appointmentsTable.id, entityId))) : [];
+  const currentAppointmentKey = appointment ? `appt-reminder-text:${entityId}:${appointment.start.toISOString()}` : null;
+  const [row] = await reader
+    .select({ id: zapierActionExecutionsTable.id, state: zapierActionExecutionsTable.state })
+    .from(zapierActionExecutionsTable)
+    .where(
+      and(
+        eq(zapierActionExecutionsTable.organizationId, organizationId),
+        eq(zapierActionExecutionsTable.capability, capability),
+        eq(zapierActionExecutionsTable.linkedEntityType, entityType),
+        eq(zapierActionExecutionsTable.linkedEntityId, entityId),
+        inArray(zapierActionExecutionsTable.state, [...OPEN_LEDGER_STATES]),
+        ne(zapierActionExecutionsTable.idempotencyKey, idempotencyKey),
+        currentAppointmentKey ? or(ne(zapierActionExecutionsTable.state, "succeeded"), eq(zapierActionExecutionsTable.idempotencyKey, currentAppointmentKey)) : undefined,
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+function textBlocked(reason: string): never {
+  const readable: Record<string, string> = {
+    no_sms_consent: "this customer has not agreed to receive texts",
+    do_not_contact: "this customer is marked do not contact",
+    do_not_contact_sms: "this customer is marked do not text",
+    no_phone: "this customer has no phone number",
+    invalid_phone: "this customer's phone number is not valid",
+    customer_lifecycle_paused: "customer messaging is paused for this company",
+  };
+  const why = readable[reason] ?? (reason.startsWith("suppressed:") ? "this number opted out or is suppressed" : reason.replace(/_/g, " "));
+  throw new ZapierExecutionError(`No text was requested: ${why}.`, "invalid_input");
+}
+
+// APPT: appointment reminder text
+
+export const APPT_REMINDER_TEXT_ENTITY = "appointment_reminder";
+const APPT_REMINDER_KEY = /^appt-reminder-text:([0-9a-f-]{36}):(\d{4}-\d{2}-\d{2}T[\d:.]+Z)$/;
+
+export async function buildAppointmentReminderTextInput(organizationId: string, appointmentId: string, expectedStart?: string) {
+  const [row] = await db
+    .select({ appointment: appointmentsTable, contact: contactsTable, lead: leadsTable })
+    .from(appointmentsTable)
+    .leftJoin(leadsTable, and(eq(leadsTable.id, appointmentsTable.leadId), eq(leadsTable.organizationId, organizationId)))
+    .leftJoin(
+      contactsTable,
+      and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, appointmentsTable.contactId)),
+    )
+    .where(and(eq(appointmentsTable.organizationId, organizationId), eq(appointmentsTable.id, appointmentId)));
+  if (!row) throw new ZapierExecutionError("Appointment not found.", "not_found");
+  const { appointment } = row;
+  if (!["scheduled", "confirmed"].includes(appointment.status)) {
+    throw new ZapierExecutionError("Only a booked appointment can get a reminder text.", "invalid_input");
+  }
+  if (expectedStart && appointment.scheduledStart.toISOString() !== expectedStart) {
+    throw new ZapierExecutionError("The appointment was rescheduled after this text was requested. Request a new reminder.", "invalid_input");
+  }
+  if (appointment.scheduledStart.getTime() <= Date.now()) {
+    throw new ZapierExecutionError("This appointment has already started.", "invalid_input");
+  }
+  const contact = await appointmentTextCustomer(db, organizationId, appointment);
+  const gate = await checkSendEligibility({ organizationId, leadId: appointment.leadId, contact, channel: "sms", kind: "transactional" });
+  if (!gate.ok) textBlocked(gate.reason);
+  const toPhone = phoneE164(contact.phone ?? "");
+  if (!toPhone) textBlocked("invalid_phone");
+  const copy = await renderAppointmentReminderCopy(organizationId, appointment, contact.firstName);
+  const body = withOptOut(copy.smsBody);
+  if (body.length > 1200) throw new ZapierExecutionError("The reminder text is too long. Shorten it in Settings.", "invalid_input");
+  return {
+    idempotencyKey: `appt-reminder-text:${appointment.id}:${appointment.scheduledStart.toISOString()}`,
+    input: { toPhone, body },
+    contactId: contact.id,
+    leadId: appointment.leadId,
+  };
+}
+
+export async function apptRequestReminderText(input: {
+  organizationId: string;
+  appointmentId: string;
+  actorUserId: string | null;
+  expectedStart?: string;
+  scheduledActionId?: string;
+}): Promise<ZapierActionOutcome> {
+  const built = await buildAppointmentReminderTextInput(input.organizationId, input.appointmentId, input.expectedStart);
+  return requestZapierAction({
+    organizationId: input.organizationId,
+    capability: "appt.sms.send",
+    appointmentReminderScheduledActionId: input.scheduledActionId,
+    input: built.input,
+    idempotencyKey: built.idempotencyKey,
+    requestedByUserId: input.actorUserId,
+    linkedEntityType: APPT_REMINDER_TEXT_ENTITY,
+    linkedEntityId: input.appointmentId,
+  });
+}
+
+// MAINTAIN: one service-due reminder text
+
+export const MAINTAIN_REMINDER_TEXT_ENTITY = "service_obligation";
+const MAINTAIN_REMINDER_KEY = /^maintain-reminder-text:([0-9a-f-]{36}):(\d+)$/;
+
+export async function buildServiceReminderTextInput(organizationId: string, obligationId: string, expectedVersion?: number, touchLogicalKey?: string) {
+  const [row] = await db
+    .select({ obligation: serviceObligationsTable, contact: contactsTable })
+    .from(serviceObligationsTable)
+    .innerJoin(
+      contactsTable,
+      and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, serviceObligationsTable.contactId)),
+    )
+    .where(and(eq(serviceObligationsTable.organizationId, organizationId), eq(serviceObligationsTable.id, obligationId)));
+  if (!row) throw new ZapierExecutionError("Service not found.", "not_found");
+  const { obligation, contact } = row;
+  await assertServiceTextParents(db, organizationId, obligation);
+  const version = obligation.updatedAt.getTime();
+  if (expectedVersion !== undefined && version !== expectedVersion) {
+    throw new ZapierExecutionError("The service changed after this text was requested. Review it and request a new reminder.", "invalid_input");
+  }
+  if (obligation.status !== "active") throw new ZapierExecutionError("Only an active service can get a reminder text.", "invalid_input");
+  if (obligation.appointmentId) {
+    const [visit] = await db
+      .select({ status: appointmentsTable.status })
+      .from(appointmentsTable)
+      .where(and(eq(appointmentsTable.organizationId, organizationId), eq(appointmentsTable.id, obligation.appointmentId)));
+    if (visit && ["scheduled", "confirmed"].includes(visit.status)) {
+      throw new ZapierExecutionError("A visit is already booked for this service.", "invalid_input");
+    }
+  }
+  const [prior] = await db
+    .select({ action: auditEventsTable.action })
+    .from(auditEventsTable)
+    .where(
+      and(
+        eq(auditEventsTable.organizationId, organizationId),
+        eq(auditEventsTable.entityType, "service_obligation"),
+        eq(auditEventsTable.entityId, obligation.id),
+        inArray(auditEventsTable.action, ["service.care_reminder_approved", "service.care_response_recorded"]),
+      ),
+    )
+    .limit(1);
+  if (prior) {
+    throw new ZapierExecutionError(
+      prior.action === "service.care_response_recorded"
+        ? "A customer response is already recorded for this service. Follow up from the office instead."
+        : "This service already has a reminder from GrowthOS. Review it instead of texting again.",
+      "invalid_input",
+    );
+  }
+  if ((await hasServiceMailboxReplyHold(organizationId, obligation.id)) || (await hasServiceSmsReplyHold(organizationId, obligation.id))) {
+    throw new ZapierExecutionError("A customer reply to this service needs office review first.", "invalid_input");
+  }
+  const noticeAt = serviceNoticeAt(obligation.dueAt, obligation.noticeDays);
+  if (noticeAt.getTime() > Date.now()) {
+    throw new ZapierExecutionError(`This reminder can be sent from ${noticeAt.toISOString().slice(0, 10)}.`, "invalid_input");
+  }
+  if (!touchLogicalKey) {
+    const [original] = await db.select({ id: zapierActionExecutionsTable.id }).from(zapierActionExecutionsTable).where(and(eq(zapierActionExecutionsTable.organizationId, organizationId), eq(zapierActionExecutionsTable.capability, "maintain.sms.send"), eq(zapierActionExecutionsTable.idempotencyKey, `maintain-reminder-text:${obligation.id}:${version}`))).limit(1);
+    if (original) touchLogicalKey = `zapier:${original.id}`;
+  }
+  const company = await standingCompanyProjection(db, organizationId);
+  // Service reminders use the stricter outreach gate (quiet hours, caps and
+  // reply holds), matching the built-in MAINTAIN reminder.
+  const gate = await checkSendEligibility({ organizationId, contact, channel: "sms", kind: "outreach", sendingHours: company.hours, touchLogicalKey });
+  if (!gate.ok) {
+    if (gate.outcome === "deferred") {
+      throw new ZapierExecutionError(`Outside your sending hours. Try again after ${gate.resumeAt.toISOString()}.`, "invalid_input");
+    }
+    textBlocked(gate.reason);
+  }
+  const toPhone = phoneE164(contact.phone ?? "");
+  if (!toPhone) textBlocked("invalid_phone");
+  const message = serviceCareMessage({
+    businessName: company.businessName,
+    equipmentLabel: obligation.equipmentLabel,
+    kind: obligation.kind,
+    dueDate: obligation.dueAt.toISOString().slice(0, 10),
+  });
+  return {
+    idempotencyKey: `maintain-reminder-text:${obligation.id}:${version}`,
+    input: { toPhone, body: withOptOut(message.body) },
+    contactId: contact.id,
+  };
+}
+
+export async function maintainRequestServiceText(input: {
+  organizationId: string;
+  obligationId: string;
+  actorUserId: string | null;
+}): Promise<ZapierActionOutcome> {
+  const built = await buildServiceReminderTextInput(input.organizationId, input.obligationId);
+  const open = await otherOpenText(input.organizationId, "maintain.sms.send", MAINTAIN_REMINDER_TEXT_ENTITY, input.obligationId, built.idempotencyKey);
+  if (open) {
+    throw new ZapierExecutionError(
+      open.state === "pending_approval"
+        ? "A reminder text for this service is already waiting for approval."
+        : "A reminder text was already sent or attempted for this service.",
+      "conflict",
+    );
+  }
+  return requestZapierAction({
+    organizationId: input.organizationId,
+    capability: "maintain.sms.send",
+    input: built.input,
+    idempotencyKey: built.idempotencyKey,
+    requestedByUserId: input.actorUserId,
+    linkedEntityType: MAINTAIN_REMINDER_TEXT_ENTITY,
+    linkedEntityId: input.obligationId,
+  });
+}
+
 // ---------- approval re-derivation ----------
 
 /**
@@ -487,6 +739,17 @@ export async function rebuildZapierRequestInput(execution: ZapierActionExecution
       if (!match) throw new ZapierExecutionError("Day sheet request is not rebuildable.", "invalid_input");
       return (await buildCrewDaySheetInput(execution.organizationId, match[1]!, match[2]!)).input;
     }
+    case "appt.sms.send": {
+      const match = execution.idempotencyKey.match(APPT_REMINDER_KEY);
+      if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("Reminder text request is not rebuildable.", "invalid_input");
+      await assertAppointmentOwnNumberAvailable(db, execution.organizationId, match[1]!, typeof execution.requestSummary?.appointmentReminderScheduledActionId === "string" ? execution.requestSummary.appointmentReminderScheduledActionId : undefined);
+      return (await buildAppointmentReminderTextInput(execution.organizationId, match[1]!, match[2]!)).input;
+    }
+    case "maintain.sms.send": {
+      const match = execution.idempotencyKey.match(MAINTAIN_REMINDER_KEY);
+      if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("Service text request is not rebuildable.", "invalid_input");
+      return (await buildServiceReminderTextInput(execution.organizationId, match[1]!, Number(match[2]), `zapier:${execution.id}`)).input;
+    }
     default:
       throw new ZapierExecutionError("This capability has no approval path.", "invalid_input");
   }
@@ -507,4 +770,118 @@ export async function latestZapierExecutionFor(organizationId: string, entityTyp
     .orderBy(desc(zapierActionExecutionsTable.createdAt))
     .limit(1);
   return row ?? null;
+}
+
+/** Shared original receipts, observed under lifecycle/schedule ownership locks. */
+export async function assertAppointmentOwnNumberAvailable(reader: Pick<typeof db, "select">, org: string, appointmentId: string, scheduledActionId?: string) {
+  const [appointment] = await reader.select().from(appointmentsTable).where(and(eq(appointmentsTable.organizationId, org), eq(appointmentsTable.id, appointmentId)));
+  if (!appointment) throw new ZapierExecutionError("Appointment is unavailable.", "not_found");
+  const start = appointment.scheduledStart.toISOString();
+  if (scheduledActionId) {
+    const [scheduled] = await reader.select().from(scheduledActionsTable).where(and(eq(scheduledActionsTable.organizationId, org), eq(scheduledActionsTable.id, scheduledActionId)));
+    const [original] = await reader.select({ id: revenueExecutionsTable.id }).from(revenueExecutionsTable).where(and(eq(revenueExecutionsTable.organizationId, org), eq(revenueExecutionsTable.actionKey, `scheduled:${scheduledActionId}`), eq(revenueExecutionsTable.kind, "appointment_reminder")));
+    if (!scheduled || !original || scheduled.action.type !== "appointment_reminder" || scheduled.context.event !== "appointment.reminder" || scheduled.context.appointmentId !== appointmentId ||
+      (scheduled.context.fields as Record<string, unknown> | undefined)?.["appointment.scheduledStart"] !== start) throw new ZapierExecutionError("Original scheduled reminder context is unavailable.", "conflict");
+  }
+  if ((await twilioForOrganization(org, reader))?.smsEnabled) throw new ZapierExecutionError("Built-in appointment texting is active. Review its reminder instead.", "conflict");
+  const accepted = await reader.select().from(activitiesTable).where(and(eq(activitiesTable.organizationId, org), eq(activitiesTable.type, "appointment_reminder_sent"), sql`${activitiesTable.metadata}->>'appointmentId' = ${appointmentId}`, sql`coalesce(${activitiesTable.metadata}->>'provider', '') <> 'zapier'`));
+  const acceptedStarts = new Set(accepted.map(row => row.metadata?.scheduledStart).filter((value): value is string => typeof value === "string"));
+  const reserved = await reader.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, org), eq(auditEventsTable.entityType, "appointment"), eq(auditEventsTable.entityId, appointmentId), eq(auditEventsTable.action, "appointment.reminder_builtin_reserved")));
+  const receipts = await reader.select({ receipt: revenueExecutionsTable, scheduled: scheduledActionsTable }).from(revenueExecutionsTable).innerJoin(scheduledActionsTable, and(eq(scheduledActionsTable.organizationId, org), sql`${revenueExecutionsTable.actionKey} = 'scheduled:' || ${scheduledActionsTable.id}::text`)).where(and(eq(revenueExecutionsTable.organizationId, org), sql`${scheduledActionsTable.action}->>'type' = 'appointment_reminder'`, sql`${scheduledActionsTable.context}->>'appointmentId' = ${appointmentId}`, scheduledActionId ? ne(scheduledActionsTable.id, scheduledActionId) : undefined));
+  const dispatches = await reader.select().from(twilioDispatchesTable).where(and(eq(twilioDispatchesTable.organizationId, org), sql`${twilioDispatchesTable.idempotencyKey} like ${`appointment:${appointmentId}:reminder:%`}`));
+  // A new start is legitimate only after a successful earlier start. Pending,
+  // unproven, or unknown ownership survives a reschedule and still needs review.
+  const heldReservation = reserved.some(row => row.metadata.scheduledStart === start || typeof row.metadata.scheduledStart !== "string" || !acceptedStarts.has(row.metadata.scheduledStart));
+  const heldReceipt = receipts.some(row => {
+    const previousStart = (row.scheduled.context.fields as Record<string, unknown> | undefined)?.["appointment.scheduledStart"];
+    return previousStart === start || typeof previousStart !== "string" || row.receipt.state !== "succeeded" || !acceptedStarts.has(previousStart);
+  });
+  const heldDispatch = dispatches.some(row => row.idempotencyKey === `appointment:${appointmentId}:reminder:${start}` || !["accepted", "queued", "sending", "sent", "delivered"].includes(row.status));
+  if (heldReservation || acceptedStarts.has(start) || heldReceipt || heldDispatch) throw new ZapierExecutionError("This appointment already has built-in reminder ownership. Review the original receipt.", "conflict");
+}
+
+/** Caller holds the existing shared lock order before inserting its ledger row. */
+export async function assertCustomerTextOwnership(reader: ReminderReader, input: { organizationId: string; capability: string; linkedEntityId?: string | null; idempotencyKey: string; appointmentReminderScheduledActionId?: string; expectedPhone: string }) {
+  if (!input.linkedEntityId) throw new ZapierExecutionError("Missing customer reminder record.", "invalid_input");
+  const org = input.organizationId, id = input.linkedEntityId;
+  if (input.capability === "appt.sms.send") {
+    await assertAppointmentOwnNumberAvailable(reader, org, id, input.appointmentReminderScheduledActionId);
+    const [appointment] = await reader.select().from(appointmentsTable).where(and(eq(appointmentsTable.organizationId, org), eq(appointmentsTable.id, id)));
+    if (!appointment || input.idempotencyKey !== `appt-reminder-text:${id}:${appointment.scheduledStart.toISOString()}` || !["scheduled", "confirmed"].includes(appointment.status) || appointment.scheduledStart.getTime() <= Date.now()) invalidReminderParents();
+    const contact = await appointmentTextCustomer(reader, org, appointment);
+    if (phoneE164(contact.phone ?? "") !== input.expectedPhone) throw new ZapierExecutionError("The customer number changed before dispatch.", "conflict");
+    const gate = await checkSendEligibility({ organizationId: org, leadId: appointment.leadId, contact, channel: "sms", kind: "transactional" }, reader);
+    if (!gate.ok) textBlocked(gate.reason);
+    if (await otherOpenText(org, "appt.sms.send", APPT_REMINDER_TEXT_ENTITY, id, input.idempotencyKey, reader)) throw new ZapierExecutionError("An earlier text owns this appointment reminder.", "conflict");
+  } else if (input.capability === "maintain.sms.send") {
+    const [service] = await reader.select().from(serviceObligationsTable).where(and(eq(serviceObligationsTable.organizationId, org), eq(serviceObligationsTable.id, id)));
+    if (!service || service.status !== "active" || input.idempotencyKey !== `maintain-reminder-text:${id}:${service.updatedAt.getTime()}`) invalidReminderParents();
+    const { contact } = await assertServiceTextParents(reader, org, service);
+    const [original] = await reader.select({ id: zapierActionExecutionsTable.id }).from(zapierActionExecutionsTable).where(and(eq(zapierActionExecutionsTable.organizationId, org), eq(zapierActionExecutionsTable.idempotencyKey, input.idempotencyKey)));
+    const gate = await checkSendEligibility({ organizationId: org, contact, channel: "sms", kind: "outreach", sendingHours: (await standingCompanyProjection(reader, org)).hours, touchLogicalKey: original ? `zapier:${original.id}` : undefined }, reader);
+    if (!gate.ok) textBlocked(gate.reason);
+    if (await hasServiceMailboxReplyHold(org, id, reader) || await hasServiceSmsReplyHold(org, id, reader)) throw new ZapierExecutionError("A customer reply needs office review first.", "invalid_input");
+    const [prior] = await reader.select({ id: auditEventsTable.id }).from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, org), eq(auditEventsTable.entityType, "service_obligation"), eq(auditEventsTable.entityId, id), inArray(auditEventsTable.action, ["service.care_reminder_approved", "service.care_response_recorded"]))).limit(1);
+    if (prior || await otherOpenText(org, "maintain.sms.send", MAINTAIN_REMINDER_TEXT_ENTITY, id, input.idempotencyKey, reader)) throw new ZapierExecutionError("An earlier reminder or office response owns this service.", "conflict");
+  }
+}
+
+/** Claim built-in dispatch before releasing locks; retained on every unknown outcome. */
+export async function reserveBuiltInAppointmentReminder(org: string, appointmentId: string, expectedStart: string) {
+  const { acquireNurtureLocks } = await import("../source-outreach-ownership");
+  return db.transaction(async tx => {
+    await acquireNurtureLocks(tx, org);
+    if (await otherOpenText(org, "appt.sms.send", APPT_REMINDER_TEXT_ENTITY, appointmentId, "", tx)) throw new ZapierExecutionError("The connected phone app owns this appointment reminder. Review its original receipt.", "conflict");
+    const [appointment] = await tx.select({ start: appointmentsTable.scheduledStart }).from(appointmentsTable).where(and(eq(appointmentsTable.organizationId, org), eq(appointmentsTable.id, appointmentId)));
+    if (!appointment) throw new ZapierExecutionError("Appointment unavailable before built-in claim.", "not_found");
+    const start = appointment.start.toISOString();
+    if (start !== expectedStart) throw new ZapierExecutionError("Appointment changed before reminder claim.", "conflict");
+    const existing = await tx.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, org), eq(auditEventsTable.entityType, "appointment"), eq(auditEventsTable.entityId, appointmentId), eq(auditEventsTable.action, "appointment.reminder_builtin_reserved")));
+    const accepted = await tx.select().from(activitiesTable).where(and(eq(activitiesTable.organizationId, org), eq(activitiesTable.type, "appointment_reminder_sent"), sql`${activitiesTable.metadata}->>'appointmentId' = ${appointmentId}`, sql`coalesce(${activitiesTable.metadata}->>'provider', '') <> 'zapier'`));
+    if (existing.some(row => row.metadata.scheduledStart === start || typeof row.metadata.scheduledStart !== "string" || !accepted.some(activity => activity.metadata?.scheduledStart === row.metadata.scheduledStart))) throw new ZapierExecutionError("The original built-in reminder owns this appointment. Do not replay.", "conflict");
+    await tx.insert(auditEventsTable).values({ organizationId: org, action: "appointment.reminder_builtin_reserved", entityType: "appointment", entityId: appointmentId, metadata: { scheduledStart: start, customerMessageSent: false } });
+  });
+}
+
+type ReminderReader = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+function invalidReminderParents(): never { throw new ZapierExecutionError("The reminder's customer or work references are unavailable or inconsistent. Review the original record.", "invalid_input"); }
+/** SELECT-only validation: optional parents stay optional; supplied parents never disappear silently. */
+async function reminderContact(reader: ReminderReader, org: string, refs: { contactId?: string | null; leadId?: string | null; propertyId?: string | null }) {
+  const [lead] = refs.leadId ? await reader.select().from(leadsTable).where(and(eq(leadsTable.organizationId, org), eq(leadsTable.id, refs.leadId))) : [];
+  if (refs.leadId && (!lead || !lead.contactId || (refs.contactId && refs.contactId !== lead.contactId))) invalidReminderParents();
+  const contactId = refs.contactId ?? lead?.contactId;
+  if (!contactId) invalidReminderParents();
+  const [contact] = await reader.select().from(contactsTable).where(and(eq(contactsTable.organizationId, org), eq(contactsTable.id, contactId)));
+  if (!contact) invalidReminderParents();
+  if (refs.propertyId && lead?.propertyId && refs.propertyId !== lead.propertyId) invalidReminderParents();
+  for (const propertyId of new Set([refs.propertyId, lead?.propertyId].filter((id): id is string => !!id))) {
+    const [property] = await reader.select().from(propertiesTable).where(and(eq(propertiesTable.organizationId, org), eq(propertiesTable.id, propertyId)));
+    if (!property || property.contactId !== contact.id) invalidReminderParents();
+  }
+  return contact;
+}
+async function appointmentTextCustomer(reader: ReminderReader, org: string, appointment: typeof appointmentsTable.$inferSelect) {
+  const contact = await reminderContact(reader, org, appointment);
+  if (appointment.assignedUserId) {
+    const [staff] = await reader.select({ id: usersTable.id }).from(usersTable).where(and(eq(usersTable.organizationId, org), eq(usersTable.id, appointment.assignedUserId)));
+    if (!staff) invalidReminderParents();
+  }
+  return contact;
+}
+async function assertServiceTextParents(reader: ReminderReader, org: string, obligation: typeof serviceObligationsTable.$inferSelect) {
+  const current = await readStandingService(reader, org, obligation.id);
+  await reminderContact(reader, org, { contactId: obligation.contactId, propertyId: obligation.propertyId, leadId: current.task.leadId });
+  if (current.task.assignedUserId) {
+    const [staff] = await reader.select({ id: usersTable.id }).from(usersTable).where(and(eq(usersTable.organizationId, org), eq(usersTable.id, current.task.assignedUserId)));
+    if (!staff) invalidReminderParents();
+  }
+  if (obligation.appointmentId) {
+    const [visit] = await reader.select().from(appointmentsTable).where(and(eq(appointmentsTable.organizationId, org), eq(appointmentsTable.id, obligation.appointmentId)));
+    if (!visit || (await appointmentTextCustomer(reader, org, visit)).id !== obligation.contactId || (obligation.propertyId && visit.propertyId !== obligation.propertyId)) invalidReminderParents();
+    if (["scheduled", "confirmed"].includes(visit.status)) throw new ZapierExecutionError("A visit is already booked for this service.", "invalid_input");
+  }
+  for (const ancestor of await standingLineage(reader, org, obligation.id)) {
+    if (ancestor.contactId !== obligation.contactId || ancestor.propertyId !== obligation.propertyId) invalidReminderParents();
+  }
+  return current;
 }
