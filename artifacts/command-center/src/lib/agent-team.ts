@@ -161,9 +161,9 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
         "reality": "Appointment reminders go by email, or by text to customers who agreed to texts: through GrowthOS texting, or from your own business number once your phone app is connected through Zapier. A draft or staff booking alone does not send a message."
       },
       {
-        "title": "External calendar sync",
-        "stage": "planned",
-        "reality": "Full external calendar synchronization remains planned; the GrowthOS schedule is the available workspace."
+        "title": "Add bookings to your calendar",
+        "stage": "setup",
+        "reality": "From Settings → Integrations, request a calendar event for a booked appointment through your own Google or Outlook account connected with Zapier. This flow supports event creation only; reschedules, cancellations and changes made in the outside calendar do not sync, so the GrowthOS schedule stays the source of truth."
       }
     ]
   },
