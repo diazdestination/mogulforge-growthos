@@ -404,6 +404,13 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "POST /integrations/zapier/flows/appointments/:id/calendar": "crm.write",
   "POST /integrations/zapier/flows/invoices/:id/accounting": "invoices.manage",
   "POST /integrations/zapier/flows/sched/day-sheet": "crm.write",
+  // ESTI price book: members read prices and preview margin on drafts;
+  // changing the company's prices is settings authority.
+  "GET /price-book/items": "crm.read",
+  "POST /price-book/items": "settings.manage",
+  "PATCH /price-book/items/:id": "settings.manage",
+  "DELETE /price-book/items/:id": "settings.manage",
+  "POST /price-book/margin-preview": "crm.read",
   // Email Intelligence source configuration is owner/admin controlled. All
   // members may inspect tenant facts; writers disposition findings.
   "GET /email-intelligence": "crm.read",

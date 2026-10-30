@@ -188,6 +188,14 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     for (const [table,value] of Object.entries(zapierBefore.tables)) assert.deepEqual(zapierAfter.tables[table],value);
     for (const table of ['zapier_mcp_connections','zapier_capability_bindings','zapier_specialist_policies','zapier_action_executions']) assert.equal(zapierAfter.tables[table].count,0);
     migrations.push({ file: '0020_zapier-connected-apps.sql', sha256: sha(zapierSql) });
+    // 0021 adds the ESTI price book table; again every prior definition must be unchanged.
+    const priceBookSql = (await readFile(new URL('../reports/staging-schema-preview-2026-10-01/0021_esti-price-book.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
+    await source.exec(priceBookSql);
+    const priceBookAfter = await fingerprints(source);
+    assert.equal(Object.keys(priceBookAfter.tables).length,147);
+    for (const [table,value] of Object.entries(zapierAfter.tables)) assert.deepEqual(priceBookAfter.tables[table],value);
+    assert.equal(priceBookAfter.tables.price_book_items.count,0);
+    migrations.push({ file: '0021_esti-price-book.sql', sha256: sha(priceBookSql) });
     const currentSchema = await tsImport('../lib/db/src/schema/index.ts', import.meta.url);
     const expected = generateDrizzleJson(currentSchema).tables;
     const actual = (await source.query("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,column_name")).rows;

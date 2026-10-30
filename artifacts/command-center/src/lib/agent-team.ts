@@ -34,8 +34,8 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       },
       {
         "title": "Price books & margin guidance",
-        "stage": "planned",
-        "reality": "Governed trade price books and automatic margin recommendations remain planned. Staff enter and review pricing today."
+        "stage": "workspace",
+        "reality": "Keep your own costs and prices per trade in the Price Book. ESTI flags estimate lines below cost or below your target margin and offers a target-meeting price; your team decides."
       }
     ]
   },
@@ -283,6 +283,16 @@ const contexts: readonly [string,SpecialistContextInfo][] = [
     {
       "workspace": "Estimates",
       "summary": "Scope, line items and the next decision on the estimate.",
+      "ids": [
+        "esti"
+      ]
+    }
+  ],
+  [
+    "/price-book",
+    {
+      "workspace": "Price Book",
+      "summary": "Your costs, prices and target margins per trade.",
       "ids": [
         "esti"
       ]
