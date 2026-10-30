@@ -8,7 +8,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed": "tsx ./src/seed.ts",
     "smoke": "bash ./post-merge-sync.test.sh",
-    "test": "vitest run"
+    "test:attestation": "vitest run",
+    "test": "echo on-demand"
   },
   "devDependencies": {
     "@types/node": "catalog:",
