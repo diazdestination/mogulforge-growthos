@@ -5,10 +5,11 @@ import { useGetMe, type MemberProfile, type ContractorToday } from "@workspace/a
 import { addElapsedMinutes, isoSchema, timeZoneSchema } from "@workspace/scheduling-core";
 import { ArrowRight, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { contractorRequest } from "@/lib/contractor-api";
-import { canManageSettings } from "@/lib/permissions";
+import { canManageSettings, canWrite } from "@/lib/permissions";
 import { memberAuthorityScope } from "@/lib/member-authority-scope";
 import { customerWorkLocation, customerWorkPath } from "@/lib/customer-work-links";
 import { SchedulingReservationSummary } from "@/components/scheduling-reservation-summary";
+import { RoutePlanCard } from "@/components/route-plan-card";
 import type { IntervalInput } from "@/lib/scheduling-ui-contract";
 
 type Queue<T> = { items: T[]; total: number; truncated: boolean };
@@ -378,6 +379,7 @@ function TodayContent({ me, scopeKey }: { me: MemberProfile; scopeKey: string })
                 </ul>
               </section>
             )}
+            <RoutePlanCard key={data.date} date={data.date} canWrite={canWrite(me.role)} />
             <div className="grid items-start gap-5 lg:grid-cols-2">
               <WorkQueue
                 title="Appointments"

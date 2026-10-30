@@ -420,6 +420,10 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "DELETE /payments/stripe": "settings.manage",
   "GET /invoices/:id/payment-links": "invoices.read",
   "POST /invoices/:id/payment-links": "invoices.manage",
+  // SCHED route plan: read-only for members; filling map locations writes
+  // property coordinates.
+  "GET /route-plan": "crm.read",
+  "POST /route-plan/locate": "crm.write",
   // Email Intelligence source configuration is owner/admin controlled. All
   // members may inspect tenant facts; writers disposition findings.
   "GET /email-intelligence": "crm.read",

@@ -53,7 +53,7 @@ are code to write.
 | ESTI | — | Price books & margin guidance — **built (Price Book page + ESTI margin check on estimates)** |
 | BILL | Card & bank collection — **built on Stripe Connect; needs Connect enabled + `STRIPE_CONNECT_WEBHOOK_SECRET`** | — |
 | INVO | Invoice email delivery (Gmail OAuth / Resend) | — |
-| SCHED | — | Automatic route optimization |
+| SCHED | — | Route planning & optimization — **built: Today route plan (this branch)** |
 | APPT | Customer confirmations (SMS/email) | External calendar sync — **closed by Zapier Connected Apps (PR #73)** |
 | CALLIE | Keypad/voice intake, approved human handoff (Twilio/ElevenLabs) | — |
 | MAINTAIN | Customer service reminders (SMS/email) | — |
