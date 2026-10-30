@@ -13,6 +13,7 @@ type PaymentLink = {
   expiresAt: string | null;
   paidAt: string | null;
   createdAt: string;
+  sourceReference?: string | null;
 };
 
 type AccountStatus = { configured: boolean; connected: boolean; chargesEnabled: boolean };
@@ -44,6 +45,7 @@ export function InvoicePaymentLinks({ invoice, canManage }: { invoice: InvoiceDe
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [sessionIds, setSessionIds] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     try {
@@ -64,7 +66,8 @@ export function InvoicePaymentLinks({ invoice, canManage }: { invoice: InvoiceDe
 
   if (!account?.configured || invoice.status !== 'issued') return null;
   const balance = invoice.balanceDueCents ?? 0;
-  const open = links.find((link) => link.state === 'open' && link.url);
+  const pending = links.some(link => ['open', 'processing', 'needs_reconciliation'].includes(link.state));
+  const open = links.find((link) => link.state === 'open' && link.url && link.invoiceVersion === invoice.version && link.amountCents === balance && (!link.expiresAt || new Date(link.expiresAt) > new Date()));
 
   const create = async () => {
     setBusy(true);
@@ -89,12 +92,22 @@ export function InvoicePaymentLinks({ invoice, canManage }: { invoice: InvoiceDe
     }
   };
 
+  const reconcile = async (link: PaymentLink, expire = false) => {
+    setBusy(true); setError(null);
+    try {
+      const checkoutSessionId = sessionIds[link.id]?.trim();
+      await api(`/invoices/${invoice.id}/payment-links/${link.id}/reconcile`, { method: 'POST', body: JSON.stringify({ ...(checkoutSessionId ? { checkoutSessionId } : {}), ...(expire ? { expire: true } : {}) }) });
+      await load();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not resolve this payment'); }
+    finally { setBusy(false); }
+  };
+
   return (
     <div className="space-y-3 rounded-md border p-3" aria-label="Online payment">
       <div className="flex flex-wrap items-center gap-2">
         <CreditCard className="w-4 h-4" />
-        <span className="font-semibold">Online payment (card or bank)</span>
-        {canManage && account.connected && account.chargesEnabled && balance >= 50 && !open && (
+        <span className="font-semibold">Sandbox online payment</span>
+        {canManage && account.connected && account.chargesEnabled && balance >= 50 && !pending && (
           <button type="button" className={`${invoiceButton} ml-auto`} disabled={busy} onClick={() => void create()}>
             {busy && <Loader2 className="w-4 h-4 animate-spin" />} Create payment link for {money(balance)}
           </button>
@@ -120,6 +133,12 @@ export function InvoicePaymentLinks({ invoice, canManage }: { invoice: InvoiceDe
               <span className="text-muted-foreground">{money(link.amountCents)}</span>
               <span className="ml-auto text-xs text-muted-foreground">{new Date(link.createdAt).toLocaleString()}</span>
               {link.state === 'needs_reconciliation' && <span className="basis-full text-xs text-muted-foreground">{link.detail}</span>}
+              {link.state === 'needs_reconciliation' && link.sourceReference && <span className="basis-full text-xs">Receipt reference: <code>{link.sourceReference}</code></span>}
+              {canManage && ['open', 'processing', 'needs_reconciliation'].includes(link.state) && <div className="basis-full flex flex-wrap gap-2">
+                {link.state === 'needs_reconciliation' && <input aria-label="Original sandbox Checkout session ID" placeholder="Original Checkout session ID, if known" value={sessionIds[link.id] ?? ''} onChange={event => setSessionIds(current => ({ ...current, [link.id]: event.target.value }))} className="min-w-0 flex-1 rounded border bg-background px-2 py-1 text-xs" />}
+                <button type="button" className={invoiceButton} disabled={busy} onClick={() => void reconcile(link)}>Check original payment</button>
+                {link.state === 'open' && <button type="button" className={invoiceButton} disabled={busy} onClick={() => void reconcile(link, true)}>Close unpaid link</button>}
+              </div>}
             </li>
           ))}
         </ul>

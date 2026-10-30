@@ -94,3 +94,9 @@ describe("estimate margin guidance", () => {
     expect(guidance.lines.map((line) => line.status)).toEqual(["no_cost", "no_cost"]);
   });
 });
+it("withholds suggestions exceeding supported unit or estimate amounts", () => {
+  expect(computeMarginGuidance([{ description: shingles.name, quantity: 1, unitPriceCents: 1 }], [{ ...shingles, unitCostCents: 100_000_000, targetMarginBps: 3000 }]).lines[0]!.suggestedUnitPriceCents).toBeNull();
+  expect(computeMarginGuidance([{ description: shingles.name, quantity: 1, unitPriceCents: 1 }], [{ ...shingles, unitCostCents: 100_000_000, targetMarginBps: 0 }]).lines[0]!.suggestedUnitPriceCents).toBe(100_000_000);
+  expect(computeMarginGuidance([{ description: shingles.name, quantity: 1, unitPriceCents: 1 }], [{ ...shingles, unitCostCents: 100_000_000, targetMarginBps: 9999 }]).lines[0]!.suggestedUnitPriceCents).toBeNull();
+  expect(computeMarginGuidance([{ description: shingles.name, quantity: 100_000, unitPriceCents: 1 }, { description: "Other", quantity: 1, unitPriceCents: 999_999_999 }], [shingles]).lines[0]!.suggestedUnitPriceCents).toBeNull();
+});

@@ -68,13 +68,13 @@ export function suggestOrder(points: Point[], start?: Point | null): number[] {
     remaining.delete(best);
     current = points[best]!;
   }
-  // 2-opt on an open path; with no fixed start the first stop may move too.
+  // Preserve the booked first stop when no separate origin was supplied.
   let improved = true;
   let guard = 0;
   while (improved && guard < 200) {
     improved = false;
     guard += 1;
-    for (let i = 0; i < n - 1; i += 1) {
+    for (let i = start ? 0 : 1; i < n - 1; i += 1) {
       for (let k = i + 1; k < n; k += 1) {
         const candidate = [...order.slice(0, i), ...order.slice(i, k + 1).reverse(), ...order.slice(k + 1)];
         if (routeMiles(points, candidate, start) < routeMiles(points, order, start) - 1e-6) {
@@ -89,14 +89,19 @@ export function suggestOrder(points: Point[], start?: Point | null): number[] {
 
 /** Google Maps multi-stop directions URL (no API key; opens in the user's maps app). */
 export function mapsDirectionsUrl(addresses: string[]): string | null {
-  const stops = addresses.map((address) => address.trim()).filter(Boolean);
+  const stops = addresses.map((address) => address.trim());
+  if (stops.some((stop) => !stop) || stops.length > 11) return null;
   if (stops.length === 0) return null;
   const encode = (value: string) => encodeURIComponent(value);
-  if (stops.length === 1) return `https://www.google.com/maps/search/?api=1&query=${encode(stops[0]!)}`;
+  if (stops.length === 1) {
+    const url = `https://www.google.com/maps/search/?api=1&query=${encode(stops[0]!)}`;
+    return url.length <= 2048 ? url : null;
+  }
   const destination = stops[stops.length - 1]!;
   const origin = stops[0]!;
-  const waypoints = stops.slice(1, -1).slice(0, 9);
-  return `https://www.google.com/maps/dir/?api=1&origin=${encode(origin)}&destination=${encode(destination)}${
+  const waypoints = stops.slice(1, -1);
+  const url = `https://www.google.com/maps/dir/?api=1&origin=${encode(origin)}&destination=${encode(destination)}${
     waypoints.length ? `&waypoints=${waypoints.map(encode).join("%7C")}` : ""
   }&travelmode=driving`;
+  return url.length <= 2048 ? url : null;
 }

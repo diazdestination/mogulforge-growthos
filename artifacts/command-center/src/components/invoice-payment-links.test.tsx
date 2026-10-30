@@ -12,6 +12,21 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('does not offer another link while a bank payment is clearing', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/v1/payments/stripe' ? json({ configured: true, connected: true, chargesEnabled: true }) : json({ links: [{ id: 'held', invoiceVersion: 2, amountCents: 25000, state: 'processing', url: null, createdAt: '2026-10-30T00:00:00Z' }] })));
+  render(<InvoicePaymentLinks invoice={invoice} canManage />);
+  expect(await screen.findByText('Bank payment clearing')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: /Create payment link/ })).toBeNull();
+});
+
+it('hides a stale-version link and keeps collection reserved for review', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/v1/payments/stripe' ? json({ configured: true, connected: true, chargesEnabled: true }) : json({ links: [{ id: 'held', invoiceVersion: 1, amountCents: 25000, state: 'open', url: 'https://checkout.stripe.test/stale', createdAt: '2026-10-30T00:00:00Z' }] })));
+  render(<InvoicePaymentLinks invoice={invoice} canManage />);
+  expect(await screen.findByText('Waiting for payment')).toBeTruthy();
+  expect(screen.queryByRole('textbox', { name: 'Payment link' })).toBeNull();
+  expect(screen.queryByRole('button', { name: /Create payment link/ })).toBeNull();
+});
+
 it('creates a payment link for the balance and shows it for copying', async () => {
   let links: unknown[] = [];
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {

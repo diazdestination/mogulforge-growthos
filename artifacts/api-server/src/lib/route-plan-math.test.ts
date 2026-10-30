@@ -45,3 +45,12 @@ describe("route math", () => {
     expect(url).toContain("waypoints=B%20St");
   });
 });
+it("keeps first booked stop fixed even when moving it would shorten the path", () => {
+  const points = [{latitude:34,longitude:-84}, {latitude:34,longitude:-84.1}, {latitude:34,longitude:-83.9}];
+  expect(suggestOrder(points)[0]).toBe(0);
+});
+it("refuses itineraries that cannot fit instead of dropping stops", () => {
+  expect(mapsDirectionsUrl(Array.from({length:12}, (_, i) => `${i} Main St`))).toBeNull();
+  expect(mapsDirectionsUrl(['A'.repeat(2100)])).toBeNull();
+  expect(mapsDirectionsUrl(['A', '', 'B'])).toBeNull();
+});

@@ -64,3 +64,11 @@ it('adds a price-book item through the picker', async () => {
   fireEvent.change(select, { target: { value: 'a' } });
   expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ id: 'a', name: 'Architectural shingles' }));
 });
+it("removes old index actions immediately when the draft changes", async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => json(guidance)));
+  const use = vi.fn();
+  const { rerender } = render(<EstimateMarginPanel lines={[{ description: 'Architectural shingles', quantity: 10, unitPriceCents: 16000 }]} onUsePrice={use} />);
+  await screen.findByRole('button', { name: /Use/ });
+  rerender(<EstimateMarginPanel lines={[{ description: 'Different row', quantity: 1, unitPriceCents: 123 }]} onUsePrice={use} />);
+  expect(screen.queryByRole('button', { name: /Use/ })).toBeNull();
+});

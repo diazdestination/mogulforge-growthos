@@ -288,6 +288,9 @@ export async function updateProperty(
   // work create either commits first, or rereads this committed parent change.
   const [current] = await tx.select().from(propertiesTable).where(and(eq(propertiesTable.id,id),eq(propertiesTable.organizationId,organizationId))).for("update");
   if (!current) return null;
+  if ((["addressLine1", "addressLine2", "city", "state", "postalCode"] as const).some(field => input[field] !== undefined && input[field] !== current[field])) {
+    safe.latitude = null; safe.longitude = null;
+  }
   if (input.contactId !== undefined && input.contactId !== current.contactId) {
     if(await hasRetainedEstimateEmailParticipant(tx,organizationId,"propertyId",id)) customerWorkFail(ESTIMATE_EMAIL_HISTORY_RETAINED,"This property retains its original estimate email customer.");
     const [retained] = await tx.select({id:customerWorkRootsTable.id}).from(customerWorkRootsTable).where(and(eq(customerWorkRootsTable.organizationId,organizationId),eq(customerWorkRootsTable.propertyId,id))).limit(1);

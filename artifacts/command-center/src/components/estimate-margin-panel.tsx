@@ -52,21 +52,22 @@ export function EstimateMarginPanel({
   lines: MarginDraftLine[];
   onUsePrice: (lineIndex: number, unitPriceCents: number) => void;
 }) {
-  const [guidance, setGuidance] = useState<MarginGuidance | null>(null);
+  const [result, setResult] = useState<{ key: string; guidance: MarginGuidance } | null>(null);
   const [loading, setLoading] = useState(false);
   const key = JSON.stringify(lines);
+  const guidance = result?.key === key ? result.guidance : null;
 
   useEffect(() => {
     if (lines.length === 0) {
-      setGuidance(null);
+      setResult(null);
       return;
     }
     let alive = true;
     setLoading(true);
     const timer = window.setTimeout(() => {
       previewMargin(lines)
-        .then((next) => { if (alive) setGuidance(next); })
-        .catch(() => { if (alive) setGuidance(null); })
+        .then((next) => { if (alive) setResult({ key, guidance: next }); })
+        .catch(() => { if (alive) setResult(null); })
         .finally(() => { if (alive) setLoading(false); });
     }, 350);
     return () => {

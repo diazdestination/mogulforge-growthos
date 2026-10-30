@@ -90,6 +90,7 @@ export function computeMarginGuidance(
     byName.set(key, byName.has(key) ? null : entry);
   }
 
+  const draftTotal = lines.reduce((sum, line) => sum + Math.round(line.quantity * line.unitPriceCents), 0);
   const results: MarginLineResult[] = lines.map((line, index) => {
     const quantity = Number.isFinite(line.quantity) && line.quantity > 0 ? line.quantity : 0;
     const revenueCents = Math.round(quantity * Math.max(0, Math.trunc(line.unitPriceCents)));
@@ -118,6 +119,10 @@ export function computeMarginGuidance(
     const lineMargin = marginBps(revenueCents, costCents);
     const status: MarginLineStatus =
       revenueCents < costCents ? "below_cost" : (lineMargin ?? -1) < target ? "below_target" : "on_target";
+    const suggested = priceForTargetMargin(entry.unitCostCents, target);
+    const nextTotal = draftTotal - revenueCents + Math.round(quantity * suggested);
+    const usable = Number.isSafeInteger(suggested) && suggested <= 100_000_000 &&
+      Number.isSafeInteger(nextTotal) && nextTotal <= 1_000_000_000;
     return {
       index,
       description: line.description,
@@ -129,7 +134,7 @@ export function computeMarginGuidance(
       marginCents: revenueCents - costCents,
       marginBps: lineMargin,
       targetMarginBps: target,
-      suggestedUnitPriceCents: priceForTargetMargin(entry.unitCostCents, target),
+      suggestedUnitPriceCents: usable ? suggested : null,
       status,
     };
   });

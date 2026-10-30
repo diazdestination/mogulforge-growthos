@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
-import { getRoutePlan, locateDayStops, RoutePlanError, setGeocoderForTests } from "./route-plan";
+import { geocoderEnabled, getRoutePlan, locateDayStops, RoutePlanError, setGeocoderForTests } from "./route-plan";
 
 const orgIds: string[] = [];
 const userIds: string[] = [];
@@ -83,7 +83,7 @@ describe("SCHED route plan", () => {
     const names = plan.suggestedOrder.map((id) => plan.stops.find((stop) => stop.appointmentId === id)!.customerName);
     expect(names).toEqual(["Customer A", "Customer B", "Customer D"]);
     expect(plan.mapsUrl).toContain("google.com/maps/dir");
-    expect(plan.suggestedMapsUrl).toContain("google.com/maps/dir");
+    expect(plan.suggestedMapsUrl).toBeNull(); // A suggested link must never omit the unlocated visit.
   });
 
   it("fills missing coordinates without overwriting existing ones", async () => {
@@ -110,4 +110,59 @@ describe("SCHED route plan", () => {
     await expect(getRoutePlan(orgIds[0]!, userIds[0]!, { date: "2026-02-30" })).rejects.toBeInstanceOf(RoutePlanError);
     expect((await getRoutePlan(orgIds[1]!, userIds[1]!, { date: DAY })).stops).toEqual([]);
   });
+});
+
+it("hides malformed foreign and mismatched parent records", async () => {
+  const [foreign] = await db.insert(contactsTable).values({ organizationId: orgIds[1]!, firstName: "SECRET foreign" }).returning();
+  const [local] = await db.insert(contactsTable).values({ organizationId: orgIds[0]!, firstName: "Local" }).returning();
+  const [property] = await db.insert(propertiesTable).values({ organizationId: orgIds[1]!, contactId: foreign!.id, addressLine1: "SECRET street", city: "Hidden", state: "GA", postalCode: "00000" }).returning();
+  const [wrongParent] = await db.insert(propertiesTable).values({ organizationId: orgIds[0]!, contactId: local!.id, addressLine1: "Wrong parent street", city: "Hidden", state: "GA", postalCode: "00000" }).returning();
+  const inserted = await db.insert(appointmentsTable).values([
+    { organizationId: orgIds[0]!, assignedUserId: userIds[0]!, contactId: foreign!.id, propertyId: property!.id, scheduledStart: new Date(`${DAY}T18:00:00Z`) },
+    { organizationId: orgIds[0]!, assignedUserId: userIds[0]!, contactId: foreign!.id, propertyId: wrongParent!.id, scheduledStart: new Date(`${DAY}T19:00:00Z`) },
+  ]).returning();
+  try {
+    const plan = await getRoutePlan(orgIds[0]!, userIds[0]!, { date: DAY });
+    for (const item of inserted) expect(plan.stops.find(s => s.appointmentId === item.id)).toMatchObject({ customerName: "Customer", address: null, propertyId: null, located: false });
+    expect(plan.mapsUrl).toBeNull();
+  } finally { for (const item of inserted) await db.delete(appointmentsTable).where(eq(appointmentsTable.id, item.id)); }
+});
+
+it("checks outbound permission before every lookup including test overrides", async () => {
+  const { vi } = await import("vitest");
+  const lookup = vi.fn(async () => null);
+  setGeocoderForTests(lookup);
+  vi.stubEnv("GROWTHOS_OUTBOUND_HOLD", "true");
+  try { await expect(locateDayStops(orgIds[0]!, userIds[0]!, { date: DAY })).rejects.toBeInstanceOf(RoutePlanError); expect(lookup).not.toHaveBeenCalled(); }
+  finally { vi.unstubAllEnvs(); setGeocoderForTests(undefined); }
+});
+
+it("rejects stale geocoding and clears old coordinates on address changes", async () => {
+  const { updateProperty } = await import("./crm");
+  const [contact] = await db.insert(contactsTable).values({ organizationId: orgIds[0]!, firstName: "CAS" }).returning();
+  const [property] = await db.insert(propertiesTable).values({ organizationId: orgIds[0]!, contactId: contact!.id, addressLine1: "Old", city: "Test", state: "GA", postalCode: "00000", latitude: "34", longitude: "-84" }).returning();
+  const changed = await updateProperty(orgIds[0]!, property!.id, { addressLine1: "New" });
+  expect(changed).toMatchObject({ latitude: null, longitude: null });
+  const [appointment] = await db.insert(appointmentsTable).values({ organizationId: orgIds[0]!, assignedUserId: userIds[0]!, contactId: contact!.id, propertyId: property!.id, scheduledStart: new Date(`${DAY}T20:00:00Z`) }).returning();
+  setGeocoderForTests(async () => { await updateProperty(orgIds[0]!, property!.id, { addressLine1: "Newest" }); return { latitude: 35, longitude: -85 }; });
+  try {
+    await locateDayStops(orgIds[0]!, userIds[0]!, { date: DAY });
+    const [current] = await db.select().from(propertiesTable).where(eq(propertiesTable.id, property!.id));
+    expect(current).toMatchObject({ addressLine1: "Newest", latitude: null, longitude: null });
+  } finally { setGeocoderForTests(undefined); await db.delete(appointmentsTable).where(eq(appointmentsTable.id, appointment!.id)); }
+});
+
+it("requires census opt-in and staging approval without calling a provider", async () => {
+  const { vi } = await import("vitest");
+  setGeocoderForTests(undefined);
+  try {
+    vi.stubEnv("GROWTHOS_OUTBOUND_HOLD", "false");
+    vi.stubEnv("PROPERTY_GEOCODER", undefined);
+    expect(geocoderEnabled()).toBe(false);
+    vi.stubEnv("PROPERTY_GEOCODER", "unknown"); expect(geocoderEnabled()).toBe(false);
+    vi.stubEnv("PROPERTY_GEOCODER", "census"); expect(geocoderEnabled()).toBe(true);
+    vi.stubEnv("FLY_APP_NAME", "mogulforge-growthos-staging");
+    vi.stubEnv("STAGING_OUTBOUND_APPROVED", undefined); expect(geocoderEnabled()).toBe(false);
+    vi.stubEnv("STAGING_OUTBOUND_APPROVED", "true"); expect(geocoderEnabled()).toBe(true);
+  } finally { vi.unstubAllEnvs(); }
 });

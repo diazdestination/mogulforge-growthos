@@ -108,6 +108,7 @@ export async function saveCustomerDetailCorrection(input: DetailCorrectionContex
         savedContact = row;
       }
       if (Object.keys(propertyPatch).length && selected) {
+        propertyPatch.latitude = null; propertyPatch.longitude = null;
         propertyPatch.updatedAt = new Date(Math.max(Date.now(), selected.updatedAt.getTime() + 1));
         const [row] = await tx.update(propertiesTable).set(propertyPatch).where(and(eq(propertiesTable.organizationId, c.organizationId), eq(propertiesTable.id, selected.id))).returning();
         if (!row) throw new DetailCorrectionError(503, "detail_correction_snapshot_unavailable");

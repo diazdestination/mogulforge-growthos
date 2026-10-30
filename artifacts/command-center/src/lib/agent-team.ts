@@ -67,7 +67,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Card & bank collection",
         "stage": "setup",
-        "reality": "Connect your own Stripe account in Settings, then send a card or bank payment link from any issued invoice. Stripe-confirmed payments are recorded on the invoice; money goes straight to you."
+        "reality": "Test invoice Checkout in a configured Stripe sandbox. Confirmed test payments are recorded on the invoice; live collection is unavailable and no real money moves."
       }
     ]
   },

@@ -70,10 +70,9 @@ export function StripePaymentsCard({ canManage }: { canManage: boolean }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Card & bank payments (Stripe)</CardTitle>
+        <CardTitle>Stripe sandbox payments</CardTitle>
         <CardDescription>
-          BILL collects invoice payments by card or bank transfer through your own Stripe account. Money goes straight to
-          you; GrowthOS records each confirmed payment on its invoice.
+          Test BILL invoice collection through your own Stripe sandbox account. Sandbox transactions move no real money.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -86,7 +85,7 @@ export function StripePaymentsCard({ canManage }: { canManage: boolean }) {
         ) : (
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant={ready ? 'default' : 'secondary'}>
-              {ready ? 'Accepting payments' : status.connected ? 'Finish Stripe setup' : 'Not connected'}
+              {ready ? 'Ready for sandbox testing' : status.connected ? 'Finish sandbox setup' : 'Not connected'}
             </Badge>
             {status.connected && !status.payoutsEnabled && <span className="text-sm text-muted-foreground">Payouts are not enabled yet in Stripe.</span>}
             <div className="ml-auto flex gap-2">

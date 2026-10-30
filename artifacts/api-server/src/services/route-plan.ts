@@ -7,10 +7,11 @@ import {
   usersTable,
 } from "@workspace/db";
 import { companyDayBounds } from "@workspace/scheduling-core";
-import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { recordAudit } from "./audit";
+import { outboundDeliveryHeld } from "./outbound-hold";
 import {
   estimatedMinutes,
   mapsDirectionsUrl,
@@ -105,10 +106,11 @@ async function dayRows(organizationId: string, date: string, userId: string) {
     throw new RoutePlanError("Choose a valid calendar date.", "invalid");
   }
   const rows = await db
-    .select({ appointment: appointmentsTable, contact: contactsTable, property: propertiesTable })
+    .select({ appointment: appointmentsTable, contact: contactsTable, property: propertiesTable,
+      propertyVersion: sql<string | null>`${propertiesTable.updatedAt}::text` })
     .from(appointmentsTable)
-    .leftJoin(contactsTable, eq(contactsTable.id, appointmentsTable.contactId))
-    .leftJoin(propertiesTable, eq(propertiesTable.id, appointmentsTable.propertyId))
+    .leftJoin(contactsTable, and(eq(contactsTable.id, appointmentsTable.contactId), eq(contactsTable.organizationId, organizationId)))
+    .leftJoin(propertiesTable, and(eq(propertiesTable.id, appointmentsTable.propertyId), eq(propertiesTable.organizationId, organizationId), eq(propertiesTable.contactId, contactsTable.id)))
     .where(
       and(
         eq(appointmentsTable.organizationId, organizationId),
@@ -118,8 +120,7 @@ async function dayRows(organizationId: string, date: string, userId: string) {
         lt(appointmentsTable.scheduledStart, new Date(bounds.to)),
       ),
     )
-    .orderBy(asc(appointmentsTable.scheduledStart), asc(appointmentsTable.id))
-    .limit(40);
+    .orderBy(asc(appointmentsTable.scheduledStart), asc(appointmentsTable.id));
   return { timeZone: org.timezone, rows };
 }
 
@@ -171,8 +172,8 @@ export async function getRoutePlan(organizationId: string, viewerUserId: string,
     currentDriveMinutes: estimatedMinutes(currentMiles),
     suggestedDriveMinutes: estimatedMinutes(suggestedMiles),
     unlocatedCount: stops.filter((stop) => !stop.located).length,
-    mapsUrl: mapsDirectionsUrl(stops.map((stop) => stop.address ?? "").filter(Boolean)),
-    suggestedMapsUrl: finalOrder === timeOrder ? null : mapsDirectionsUrl(addressesFor(finalOrder)),
+    mapsUrl: mapsDirectionsUrl(stops.map((stop) => stop.address ?? "")),
+    suggestedMapsUrl: finalOrder === timeOrder || located.length !== stops.length ? null : mapsDirectionsUrl(addressesFor(finalOrder)),
     estimateNote: "Miles and drive times are straight-line estimates adjusted for roads, not turn-by-turn navigation.",
   };
 }
@@ -203,8 +204,9 @@ const censusGeocoder: Geocoder = async (address) => {
 };
 
 function activeGeocoder(): Geocoder | null {
+  try { if (outboundDeliveryHeld()) return null; } catch { return null; }
   if (geocoderOverride !== undefined) return geocoderOverride;
-  return process.env.PROPERTY_GEOCODER?.trim().toLowerCase() === "off" ? null : censusGeocoder;
+  return process.env.PROPERTY_GEOCODER?.trim().toLowerCase() === "census" ? censusGeocoder : null;
 }
 
 export function geocoderEnabled(): boolean {
@@ -222,11 +224,14 @@ export async function locateDayStops(
   if (!geocode) throw new RoutePlanError("Address lookup is turned off on this deployment.", "invalid");
   const userId = input.userId ?? actorUserId;
   const { rows } = await dayRows(organizationId, input.date, userId);
-  const pending = new Map<string, typeof propertiesTable.$inferSelect>();
-  for (const { property } of rows) if (property && !pointOf(property)) pending.set(property.id, property);
+  const pending = new Map<string, { property: typeof propertiesTable.$inferSelect; version: string }>();
+  for (const { property, propertyVersion } of rows) {
+    if (property && propertyVersion && !pointOf(property)) pending.set(property.id, { property, version: propertyVersion });
+  }
   let located = 0;
   let notFound = 0;
-  for (const property of [...pending.values()].slice(0, 25)) {
+  for (const { property, version } of [...pending.values()].slice(0, 25)) {
+    if (!activeGeocoder()) throw new RoutePlanError("Address lookup is held on this deployment.", "invalid");
     const address = addressOf(property);
     let point: Point | null = null;
     try {
@@ -234,14 +239,22 @@ export async function locateDayStops(
     } catch {
       point = null;
     }
-    if (!point) {
+    if (!point || !Number.isFinite(point.latitude) || !Number.isFinite(point.longitude) || Math.abs(point.latitude) > 90 || Math.abs(point.longitude) > 180) {
       notFound += 1;
       continue;
     }
     const updated = await db
       .update(propertiesTable)
       .set({ latitude: point.latitude.toFixed(6), longitude: point.longitude.toFixed(6) })
-      .where(and(eq(propertiesTable.organizationId, organizationId), eq(propertiesTable.id, property.id)))
+      .where(and(eq(propertiesTable.organizationId, organizationId), eq(propertiesTable.id, property.id),
+        property.contactId === null ? isNull(propertiesTable.contactId) : eq(propertiesTable.contactId, property.contactId),
+        // Keep PostgreSQL microseconds: a JS Date would truncate this CAS version.
+        sql`${propertiesTable.updatedAt}::text = ${version}`,
+        eq(propertiesTable.addressLine1, property.addressLine1),
+        property.addressLine2 === null ? isNull(propertiesTable.addressLine2) : eq(propertiesTable.addressLine2, property.addressLine2),
+        eq(propertiesTable.city, property.city), eq(propertiesTable.state, property.state), eq(propertiesTable.postalCode, property.postalCode),
+        property.latitude === null ? isNull(propertiesTable.latitude) : eq(propertiesTable.latitude, property.latitude),
+        property.longitude === null ? isNull(propertiesTable.longitude) : eq(propertiesTable.longitude, property.longitude)))
       .returning({ id: propertiesTable.id });
     if (updated.length > 0) located += 1;
   }

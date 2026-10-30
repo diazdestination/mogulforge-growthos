@@ -10,6 +10,7 @@ import {
   getPaymentAccountStatus,
   listInvoicePaymentLinks,
   refreshStripeAccount,
+  reconcileInvoicePaymentLink,
   StripeConnectError,
 } from "../../services/stripe-connect";
 
@@ -86,6 +87,13 @@ router.post("/invoices/:id/payment-links", requireMember("invoices.manage"), asy
   } catch (error) {
     fail(res, error);
   }
+});
+
+router.post("/invoices/:id/payment-links/:linkId/reconcile", requireMember("invoices.manage"), sessionOnly, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const options = z.object({ checkoutSessionId: z.string().regex(/^cs_test_[A-Za-z0-9_]+$/).max(200).optional(), expire: z.boolean().optional() }).strict().parse(req.body ?? {});
+    res.json({ link: await reconcileInvoicePaymentLink(req.member!.organizationId, req.member!.user.id, invoiceId.parse(String(req.params.id)), invoiceId.parse(String(req.params.linkId)), options) });
+  } catch (error) { fail(res, error); }
 });
 
 export default router;
