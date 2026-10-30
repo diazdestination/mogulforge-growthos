@@ -20,6 +20,7 @@ import {
 } from '@workspace/api-client-react';
 import { Loader2, Plus, Trash2, Edit, FileText, Send, CheckCircle, XCircle, HardHat, X } from 'lucide-react';
 import { EstimateDelivery } from '@/components/estimate-delivery';
+import { EstimateMarginPanel, PriceBookPicker } from '@/components/estimate-margin-panel';
 import LeadSelect from '@/components/lead-select';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useToast, toast as globalToast } from '@/hooks/use-toast';
@@ -382,6 +383,8 @@ interface LineItemDraft {
   description: string;
   quantity: string;
   unitPrice: string;
+  /** Draft-only link to the ESTI price book; never saved on the estimate. */
+  priceBookItemId?: string | null;
 }
 
 function EstimateFormModal({ estimate, initialLeadId, onClose, onReturning, actor }: { estimate: Estimate | null; initialLeadId?: string; onClose: () => void; onReturning: () => void; actor: CustomerWorkActor }) {
@@ -425,6 +428,20 @@ function EstimateFormModal({ estimate, initialLeadId, onClose, onReturning, acto
 
   const setItem = (index: number, patch: Partial<LineItemDraft>) => {
     setItems(prev => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  };
+
+  const marginRows = items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.description.trim());
+  const marginLines = marginRows.map(({ item }) => ({
+    description: item.description.trim(),
+    quantity: parseFloat(item.quantity) || 0,
+    unitPriceCents: Math.round((parseFloat(item.unitPrice) || 0) * 100),
+    priceBookItemId: item.priceBookItemId ?? null,
+  }));
+  const addFromPriceBook = (entry: { id: string; name: string; unitPriceCents: number }) => {
+    const line: LineItemDraft = { description: entry.name, quantity: '1', unitPrice: (entry.unitPriceCents / 100).toString(), priceBookItemId: entry.id };
+    setItems(prev => (prev.length === 1 && !prev[0]!.description.trim() && !prev[0]!.unitPrice ? [line] : [...prev, line]));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -499,9 +516,12 @@ function EstimateFormModal({ estimate, initialLeadId, onClose, onReturning, acto
               <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                  <div className="w-1.5 h-1.5 rounded-full bg-primary" /> Line Items
               </label>
-              <button type="button" onClick={() => setItems(prev => [...prev, { description: '', quantity: '1', unitPrice: '' }])} className="text-xs font-bold text-primary hover:text-primary/80 bg-primary/10 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors active:scale-95">
-                <Plus className="w-3 h-3" /> Add Item
-              </button>
+              <div className="flex items-center gap-2">
+                <PriceBookPicker onPick={addFromPriceBook} disabled={isSubmitting} />
+                <button type="button" onClick={() => setItems(prev => [...prev, { description: '', quantity: '1', unitPrice: '' }])} className="text-xs font-bold text-primary hover:text-primary/80 bg-primary/10 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors active:scale-95">
+                  <Plus className="w-3 h-3" /> Add Item
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               {items.map((item, index) => (
@@ -524,6 +544,14 @@ function EstimateFormModal({ estimate, initialLeadId, onClose, onReturning, acto
               ))}
             </div>
           </div>
+
+          <EstimateMarginPanel
+            lines={marginLines}
+            onUsePrice={(lineIndex, cents) => {
+              const row = marginRows[lineIndex];
+              if (row) setItem(row.index, { unitPrice: (cents / 100).toString() });
+            }}
+          />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/10 p-4 rounded-2xl border border-border">
             <div className="space-y-1.5">

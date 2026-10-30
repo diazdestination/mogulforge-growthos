@@ -9,6 +9,7 @@ import {
   db,
   estimatesTable,
   invoiceOperationsTable as operations,
+  invoicePaymentLinksTable,
   invoiceReceiptAllocationsTable as allocations,
   invoiceSequencesTable as sequences,
   invoicesTable as invoices,
@@ -693,6 +694,7 @@ async function mutate(
     resultId?: string | null;
   }>,
   effectiveRole?: UserRole,
+  providerReceipt = false,
 ): Promise<InvoiceMutation> {
   const hash = fingerprint({ action, id, input });
   return db.transaction(async (tx) => {
@@ -702,6 +704,13 @@ async function mutate(
     const prior = await replay(tx, org, input.requestId, hash,userId,effectiveRole);
     if (prior) return prior;
     const row = await load(tx, org, id, true);
+    if (!providerReceipt) {
+      const [collecting] = await tx.select({ id: invoicePaymentLinksTable.id }).from(invoicePaymentLinksTable).where(and(
+        eq(invoicePaymentLinksTable.organizationId, org), eq(invoicePaymentLinksTable.invoiceId, id),
+        or(inArray(invoicePaymentLinksTable.state, ["open", "processing"]), and(eq(invoicePaymentLinksTable.state, "needs_reconciliation"), isNull(invoicePaymentLinksTable.paidAt))),
+      )).limit(1);
+      if (collecting) return conflict("invoice_collection_pending", "Resolve the outstanding Stripe collection before changing this invoice or its recorded balance.");
+    }
     if (row.customerWorkId) {
       await customerWorkActor(tx,org,{userId,effectiveRole},"invoices.manage",true);
       await assertCustomerWorkActive(tx,org);
@@ -985,6 +994,7 @@ export async function recordInvoicePayment(
   id: string,
   raw: unknown,
   effectiveRole?: UserRole,
+  options: { evidence?: "staff_recorded" | "stripe_checkout" } = {},
 ) {
   const parsed = invoicePaymentSchema.parse(raw);
   const input = {
@@ -1054,12 +1064,12 @@ export async function recordInvoicePayment(
         ...(row.customerWorkId ? {customerWorkId:row.customerWorkId} : {}),
         invoiceId: row.id,
         kind: "payment",
-        evidence: "staff_recorded",
+        evidence: options.evidence ?? "staff_recorded",
         providerEffect: false,
       },
     });
     return { row: await advance(tx, org, row), resultId: allocation.id };
-  },effectiveRole);
+  },effectiveRole, options.evidence === "stripe_checkout");
 }
 /** Staff records a refund that happened outside GrowthOS; no processor is called. */
 export async function recordInvoiceRefund(org:string,userId:string,id:string,raw:unknown,effectiveRole?:UserRole) {

@@ -5,6 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, Router as WouterRouter, Link, Redirect, useRoute } from 'wouter';
 import { useAuth } from '@workspace/replit-auth-web';
+import { PaymentReturn } from '@/components/payment-return';
 import { Shell } from '@/components/shell';
 import { AccessGate } from '@/components/access-gate';
 import { Loader2 } from 'lucide-react';
@@ -28,6 +29,7 @@ import Contacts from '@/pages/contacts';
 import CustomerWorkspace from '@/pages/customer-workspace';
 import Properties from '@/pages/properties';
 import Estimates from '@/pages/estimates';
+import PriceBook from '@/pages/price-book';
 import Projects from '@/pages/projects';
 import Tasks from '@/pages/tasks';
 import Appointments from '@/pages/appointments';
@@ -495,7 +497,10 @@ function IdentityActionScreen({ kind }: { kind: IdentityActionKind }) {
 
 function Router() {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const [isPaymentComplete] = useRoute('/pay/complete');
+  const [isPaymentCanceled] = useRoute('/pay/canceled');
   const [isProjectRoom, projectParams] = useRoute('/project-room/:workspace/:leadId');
+  if (isPaymentComplete || isPaymentCanceled) return <PaymentReturn canceled={isPaymentCanceled} />;
   if (isProjectRoom && projectParams) return <ProjectRoom key={`${projectParams.workspace}:${projectParams.leadId}`} workspace={projectParams.workspace} leadId={projectParams.leadId} />;
 
   if (isLoading) {
@@ -605,6 +610,7 @@ function AuthedApp({ authUserId }: { authUserId: string }) {
           <Route path="/contacts" component={Contacts} />
           <Route path="/properties" component={Properties} />
           <Route path="/estimates" component={Estimates} />
+          <Route path="/price-book" component={PriceBook} />
           <Route path="/projects" component={Projects} />
           <Route path="/tasks" component={Tasks} />
           <Route path="/appointments" component={Appointments} />

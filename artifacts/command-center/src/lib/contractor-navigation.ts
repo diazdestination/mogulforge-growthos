@@ -1,6 +1,7 @@
 import type { UserRole } from "@workspace/api-client-react";
 import {
   BadgeDollarSign,
+  BookOpen,
   Bot,
   Building,
   CalendarDays,
@@ -67,6 +68,7 @@ const items: ContractorNavigationItem[] = [
       "/projects",
       "/properties",
       "/estimates",
+      "/price-book",
       "/pipeline",
       "/leads",
     ],
@@ -121,6 +123,13 @@ const items: ContractorNavigationItem[] = [
     icon: FileText,
     group: "Customers & Jobs",
     keywords: "quotes proposals",
+  },
+  {
+    title: "Price Book",
+    href: "/price-book",
+    icon: BookOpen,
+    group: "Customers & Jobs",
+    keywords: "pricing catalog materials labor cost margin",
   },
   {
     title: "Properties",

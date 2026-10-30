@@ -34,8 +34,8 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       },
       {
         "title": "Price books & margin guidance",
-        "stage": "planned",
-        "reality": "Governed trade price books and automatic margin recommendations remain planned. Staff enter and review pricing today."
+        "stage": "workspace",
+        "reality": "Keep your own costs and prices per trade in the Price Book. ESTI flags estimate lines below cost or below your target margin and offers a target-meeting price; your team decides."
       }
     ]
   },
@@ -66,8 +66,8 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       },
       {
         "title": "Card & bank collection",
-        "stage": "planned",
-        "reality": "Taking customer card or bank payments is a future add-on. Use your established payment process today."
+        "stage": "setup",
+        "reality": "Test invoice Checkout in a configured Stripe sandbox. Confirmed test payments are recorded on the invoice; live collection is unavailable and no real money moves."
       }
     ]
   },
@@ -129,9 +129,9 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
         "reality": "Review the current appointment when a change is uncertain; no reschedule is repeated automatically."
       },
       {
-        "title": "Automatic route optimization",
-        "stage": "planned",
-        "reality": "Cross-crew route optimization and an automatic conflict resolver remain planned. Your team controls assignments and scheduling."
+        "title": "Route planning & optimization",
+        "stage": "workspace",
+        "reality": "Each crew member's day shows as a mapped route with estimated miles, a one-tap Maps link and a shorter stop order when one exists. Suggestions never move a booked time; your team decides."
       }
     ]
   },
@@ -283,6 +283,16 @@ const contexts: readonly [string,SpecialistContextInfo][] = [
     {
       "workspace": "Estimates",
       "summary": "Scope, line items and the next decision on the estimate.",
+      "ids": [
+        "esti"
+      ]
+    }
+  ],
+  [
+    "/price-book",
+    {
+      "workspace": "Price Book",
+      "summary": "Your costs, prices and target margins per trade.",
       "ids": [
         "esti"
       ]

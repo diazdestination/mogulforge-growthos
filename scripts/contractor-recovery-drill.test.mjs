@@ -14,7 +14,7 @@ it('upgrades the full prior schema, restores both synthetic companies, boots a r
   expect(result.scheduling.identity.sourceTree).toBe(result.scheduling.checkout.tree);
   expect(result.scheduling.sourceFiles.map(file=>file.path)).toContain('scripts/c1-source-preservation.mjs');
   expect(result.scheduling.sourceFiles.map(file=>file.path)).toContain('reports/c1-source-preservation-2026-10-16.json');
-  expect(result.tableCount).toBe(146);
+  expect(result.tableCount).toBe(149);
   expect(result.alertCoveragePreviousTableCount).toBe(141);
   expect(result.alertCoveragePriorRowsUnchanged).toBe(true);
   expect(result.alertCoverageConstraintChecks).toBe(12);

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { InvoicePaymentLinks } from "@/components/invoice-payment-links";
 import type { useInvoiceCommand } from "@/hooks/use-invoice-command";
 import { invoiceRefundSchema } from '../../../api-server/src/services/invoice-contract';
 import {
@@ -445,6 +446,7 @@ export function InvoiceActions({
           </div>
         </form>
       )}
+      {invoice.status === "issued" && <InvoicePaymentLinks invoice={invoice} canManage />}
     </section>
   );
 }

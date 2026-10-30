@@ -19,7 +19,7 @@ const additions = [
   ['appointments', 'scheduling_reservation', 'appointments_scheduling_reservation_ck'],
   ['projects', 'scheduling_reservation', 'projects_scheduling_reservation_ck'],
 ];
-const SUCCESSOR_0020_TABLES = ['public.zapier_action_executions', 'public.zapier_capability_bindings', 'public.zapier_mcp_connections', 'public.zapier_specialist_policies'];
+const SUCCESSOR_0020_TABLES = ['public.invoice_payment_links', 'public.price_book_items', 'public.stripe_connect_accounts', 'public.zapier_action_executions', 'public.zapier_capability_bindings', 'public.zapier_mcp_connections', 'public.zapier_specialist_policies'];
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 function guard(value, code) { if (!value) throw new Error(`scheduling_${code}`); }
 

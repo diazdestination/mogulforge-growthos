@@ -50,10 +50,10 @@ are code to write.
 
 | Specialist | Setup (needs a credential) | Planned (needs code) |
 | --- | --- | --- |
-| ESTI | — | Price books & margin guidance |
-| BILL | — | Card & bank collection (Stripe) |
+| ESTI | — | Price books & margin guidance — **built (Price Book page + ESTI margin check on estimates)** |
+| BILL | Card & bank collection — **sandbox source built; separate Connect sandbox key, opt-in and signed webhook required; actual provider acceptance pending** ([setup](STRIPE-SANDBOX-SETUP.md)) | Live collection, refund/dispute operations and production acceptance |
 | INVO | Invoice email delivery (Gmail OAuth / Resend) | — |
-| SCHED | — | Automatic route optimization |
+| SCHED | — | Route planning & optimization — **built: Today route plan (this branch)** |
 | APPT | Customer confirmations (SMS/email) | External calendar sync — **closed by Zapier Connected Apps (PR #73)** |
 | CALLIE | Keypad/voice intake, approved human handoff (Twilio/ElevenLabs) | — |
 | MAINTAIN | Customer service reminders (SMS/email) | — |
