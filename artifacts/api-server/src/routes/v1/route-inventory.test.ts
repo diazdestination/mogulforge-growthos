@@ -404,6 +404,10 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "POST /integrations/zapier/flows/appointments/:id/calendar": "crm.write",
   "POST /integrations/zapier/flows/invoices/:id/accounting": "invoices.manage",
   "POST /integrations/zapier/flows/sched/day-sheet": "crm.write",
+  // SCHED route plan: read-only for members; filling map locations writes
+  // property coordinates.
+  "GET /route-plan": "crm.read",
+  "POST /route-plan/locate": "crm.write",
   // Email Intelligence source configuration is owner/admin controlled. All
   // members may inspect tenant facts; writers disposition findings.
   "GET /email-intelligence": "crm.read",

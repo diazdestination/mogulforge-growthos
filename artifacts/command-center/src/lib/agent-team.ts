@@ -129,9 +129,9 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
         "reality": "Review the current appointment when a change is uncertain; no reschedule is repeated automatically."
       },
       {
-        "title": "Automatic route optimization",
-        "stage": "planned",
-        "reality": "Cross-crew route optimization and an automatic conflict resolver remain planned. Your team controls assignments and scheduling."
+        "title": "Route planning & optimization",
+        "stage": "workspace",
+        "reality": "Each crew member's day shows as a mapped route with estimated miles, a one-tap Maps link and a shorter stop order when one exists. Suggestions never move a booked time; your team decides."
       }
     ]
   },
