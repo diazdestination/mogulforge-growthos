@@ -59,9 +59,11 @@ are code to write.
 | MAINTAIN | Customer service reminders (SMS/email) | — |
 | SCOUT | Consented outreach (email/SMS) | — |
 
-Zapier Connected Apps (`ZAPIER-CONNECTED-APPS.md`) lets CALLIE, SCHED and
-MAINTAIN text customers from the contractor's own number, which does not
-depend on MogulForge's Twilio A2P registration.
+Zapier Connected Apps (`ZAPIER-CONNECTED-APPS.md`) lets CALLIE (missed-call
+text-back), SCHED (crew day sheets), APPT (appointment reminders) and MAINTAIN
+(service reminders) text from the contractor's own number in Quo or their own
+Twilio account, which does not depend on MogulForge's Twilio A2P registration.
+The contractor completes carrier registration inside their phone app.
 
 ## Owner inputs still required
 

@@ -36,6 +36,21 @@ vi.mock("./providers", async (importOriginal) => {
   };
 });
 
+// APPT's own-number texting through Zapier is controlled per test.
+const zapierFlow = vi.hoisted(() => ({ route: false, state: "pending_approval", calls: [] as unknown[] }));
+vi.mock("./zapier/zapier-specialist-flows", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./zapier/zapier-specialist-flows")>();
+  return {
+    ...actual,
+    zapierCustomerSmsRoute: vi.fn(async () => zapierFlow.route),
+    apptRequestReminderText: vi.fn(async (input: unknown) => {
+      zapierFlow.calls.push(input);
+      if (zapierFlow.state.startsWith("throw")) throw new Error("No text was requested: this customer is marked do not text.");
+      return { execution: { state: zapierFlow.state } };
+    }),
+  };
+});
+
 import {
   APPOINTMENT_REMINDER_EVENT,
   cancelAppointmentReminders,
@@ -328,6 +343,57 @@ describe("appointment reminders", () => {
     });
     await runReminderNow(appt!.id);
     expect(await sentChannelFor(l.id)).toEqual(["sms"]);
+  });
+
+  it("texts from the contractor's own number through Zapier when built-in texting is off", async () => {
+    zapierFlow.route = true;
+    zapierFlow.state = "pending_approval";
+    zapierFlow.calls.length = 0;
+    vi.mocked(providers.sms.send).mockClear();
+    try {
+      const { contact: c, lead: l } = await makeContactLead({
+        preferredContactMethod: "text",
+        email: "zap-text@example.com",
+        phone: "+15550000011",
+        smsConsent: true,
+      });
+      const start = new Date(Date.now() + 30 * HOUR);
+      const appt = await createAppointment(org.id, { leadId: l.id, contactId: c.id, scheduledStart: start });
+      await runReminderNow(appt!.id);
+      expect(zapierFlow.calls).toEqual([
+        { organizationId: org.id, appointmentId: appt!.id, actorUserId: null, expectedStart: appt!.scheduledStart.toISOString() },
+      ]);
+      expect(providers.sms.send).not.toHaveBeenCalled();
+      const [activity] = await db
+        .select()
+        .from(activitiesTable)
+        .where(and(eq(activitiesTable.leadId, l.id), eq(activitiesTable.type, "appointment_reminder_sent")));
+      expect(activity.metadata).toMatchObject({ channel: "sms", provider: "zapier", zapierState: "pending_approval" });
+      expect(activity.title).toMatch(/waiting for approval/);
+    } finally {
+      zapierFlow.route = false;
+    }
+  });
+
+  it("falls back to email when the own-number text is refused", async () => {
+    zapierFlow.route = true;
+    zapierFlow.state = "throw";
+    vi.mocked(providers.sms.send).mockClear();
+    try {
+      const { contact: c, lead: l } = await makeContactLead({
+        preferredContactMethod: "text",
+        email: "zap-fallback@example.com",
+        phone: "+15550000012",
+        smsConsent: true,
+      });
+      const appt = await createAppointment(org.id, { leadId: l.id, contactId: c.id, scheduledStart: new Date(Date.now() + 30 * HOUR) });
+      await runReminderNow(appt!.id);
+      expect(providers.sms.send).not.toHaveBeenCalled();
+      expect(await sentChannelFor(l.id)).toEqual(["email"]);
+    } finally {
+      zapierFlow.route = false;
+      zapierFlow.state = "pending_approval";
+    }
   });
 
   it("falls back to email when text is preferred but SMS consent is missing", async () => {

@@ -9,6 +9,7 @@ const crew = capability('sched.sms.send', 'approve', { crew_phone_tech: '+155555
 const records = (url: string) => {
   if (url === '/api/v1/appointments') return [{ id: 'visit', leadLabel: 'Morgan Lee', type: 'inspection', status: 'confirmed', scheduledStart: '2035-07-01T14:00:00Z' }];
   if (url.startsWith('/api/v1/invoices?')) return { items: [{ id: 'invoice', customerName: 'Morgan Lee', invoiceNumber: 'INV-001', status: 'issued', issuedAt: '2035-07-01T14:00:00Z' }, { id: 'draft', customerName: 'Draft customer', status: 'draft' }], page: 0, total: 1, pageSize: 25 };
+  if (url === '/api/v1/service-obligations?status=active') return [{ obligation: { id: 'svc', status: 'active', equipmentLabel: 'Heat pump', dueAt: '2035-07-10T00:00:00Z' }, contact: { firstName: 'Morgan', lastName: 'Lee' } }];
   if (url === '/api/v1/users') return [{ id: 'tech', firstName: 'Robin', lastName: 'Crew', isActive: true, operationallyEligible: true }, { id: 'inactive', firstName: 'Inactive', isActive: false, operationallyEligible: false }];
   throw new Error(`Unexpected local request: ${url}`);
 };
@@ -155,4 +156,27 @@ it('holds an unrecognized execution state instead of assuming the action failed 
   fireEvent.click(button);
   await screen.findByText(/Outcome could not be confirmed/);
   expect((button as HTMLButtonElement).disabled).toBe(true);
+});
+
+it('texts an appointment reminder and a service reminder from the contractor number', async () => {
+  const s = setup([capability('appt.sms.send'), capability('maintain.sms.send')]);
+  fireEvent.change(await screen.findByLabelText('Appointment to remind'), { target: { value: 'visit' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Text appointment reminder' }));
+  expect(await screen.findByText(/Awaiting approval/)).toBeTruthy();
+  expect(s.fetchMock).toHaveBeenCalledWith('/api/v1/integrations/zapier/flows/appointments/visit/reminder-text', expect.objectContaining({ method: 'POST' }));
+  await screen.findByRole('option', { name: /Morgan Lee · Heat pump · due 2035-07-10/ });
+  fireEvent.change(screen.getByLabelText('Service due'), { target: { value: 'svc' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Text service reminder' }));
+  await vi.waitFor(() => expect(s.fetchMock).toHaveBeenCalledWith('/api/v1/integrations/zapier/flows/services/svc/reminder-text', expect.objectContaining({ method: 'POST' })));
+});
+
+it('shows a pre-dispatch refusal reason and keeps the text button usable', async () => {
+  const s = setup([capability('appt.sms.send')]);
+  s.fetchMock.mockImplementation(async (url: string, init?: RequestInit) => init?.method === 'POST'
+    ? Response.json({ error: 'No text was requested: this customer has not agreed to receive texts.', code: 'invalid_input' }, { status: 400 })
+    : Response.json(records(url)));
+  fireEvent.change(await screen.findByLabelText('Appointment to remind'), { target: { value: 'visit' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Text appointment reminder' }));
+  expect(await screen.findByText(/has not agreed to receive texts/)).toBeTruthy();
+  await vi.waitFor(() => expect((screen.getByRole('button', { name: 'Text appointment reminder' }) as HTMLButtonElement).disabled).toBe(false));
 });

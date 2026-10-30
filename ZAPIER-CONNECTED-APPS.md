@@ -7,7 +7,7 @@ not built, and how to verify it. It uses MogulForge GrowthOS terminology only.
 ## What it is
 
 GrowthOS specialists are bounded workflows, not autonomous agents. Zapier
-Connected Apps gives five of them a narrow set of *bound capabilities* in the
+Connected Apps gives six of them a narrow set of *bound capabilities* in the
 apps a contractor already uses, through the contractor's own Zapier account:
 
 | Specialist | Capability | Direction | Default policy |
@@ -15,10 +15,35 @@ apps a contractor already uses, through the contractor's own Zapier account:
 | SCOUT | `scout.reviews.list` — new public reviews become follow-up tasks | read | on (scheduled) |
 | SCOUT | `scout.leads.list` — marketplace leads become GrowthOS opportunities once | read | on (scheduled) |
 | APPT | `appt.calendar.create_event` — one calendar event per booked appointment | write | automatic |
+| APPT | `appt.sms.send` — appointment reminder texted to a consented customer from the contractor's number | write | approve each |
 | INVO | `invo.accounting.create_invoice` — issued invoice to accounting, once | write | approve each |
 | CALLIE | `callie.calls.list` — phone-system calls become callback tasks | read | on (scheduled) |
 | CALLIE | `callie.sms.send` — one text back to a missed caller | write | approve each |
 | SCHED | `sched.sms.send` — tomorrow's day sheet texted to a crew member | write | approve each |
+| MAINTAIN | `maintain.sms.send` — one service-due reminder texted to a consented customer | write | approve each |
+
+### Customer texts from the contractor's own number
+
+`appt.sms.send` and `maintain.sms.send` (and CALLIE's text-back) let a
+contractor text customers from the business number in their own phone app
+(Quo or their own Twilio account) with no MogulForge texting registration.
+
+- Consent is enforced by the same send gate as built-in texting: do not
+  contact, per-channel opt-out, suppression and SMS consent. MAINTAIN also uses
+  the outreach gate (sending hours, caps, reply holds) and its notice window.
+- Every text ends with "Reply STOP to opt out." Replies and STOP requests land
+  in the contractor's phone app, not GrowthOS; staff mark an opted-out
+  customer do not text on the customer record.
+- The automated appointment reminder uses `appt.sms.send` only when built-in
+  texting is not active for the company and the capability is bound with a
+  policy that is not off. Built-in texting always wins, so a customer never
+  gets both. If the own-number text is refused or blocked, the reminder falls
+  back to email when email is allowed.
+- Approval re-derives the exact text from the appointment or service. A
+  reschedule, cancellation, consent change or service edit after the request
+  blocks the approval instead of sending stale copy. A service gets at most one
+  own-number reminder while any earlier one is pending, sent or uncertain, and
+  never after a built-in MAINTAIN reminder or a recorded customer response.
 
 The registry lives in
 `artifacts/api-server/src/services/zapier/zapier-capabilities.ts`. Each
@@ -134,7 +159,7 @@ database with the MCP transport faked in memory.
   and parameter names were not verified against a live server; the binding
   step also matches by display name, and the first live run per app must
   confirm the action's parameter names. Angi and Thumbtack have no Zapier app.
-- MAINTAIN, ESTI and BILL have no Zapier capabilities yet.
+- ESTI and BILL have no Zapier capabilities yet. MAINTAIN's standing (automatic) reminder policy still uses built-in delivery; own-number service texts are requested by staff.
 - No Zapier *trigger* (push) integration: reads are polled by the scheduler.
 - No "GrowthOS as a Zapier app" listing; that is a separate partner-program
   decision.

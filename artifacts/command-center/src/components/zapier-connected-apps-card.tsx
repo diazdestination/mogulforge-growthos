@@ -18,6 +18,8 @@ import { ZapierFlowActions } from './zapier-flow-actions';
  * one enabled action and governed by an off / approve / auto policy.
  */
 
+const CUSTOMER_TEXT_KEYS = ['appt.sms.send', 'maintain.sms.send', 'callie.sms.send'];
+
 type ZapierStatus = {
   configured: boolean;
   embedId: string | null;
@@ -591,6 +593,9 @@ function CapabilityRow({ capability, actions, canManage, busy, onBound, onUnbind
       </div>
       <p className="text-sm text-muted-foreground">{capability.description}</p>
       <p className="break-words text-xs text-muted-foreground">Supported: {capability.candidates.map(item => `${item.appName} → ${item.actionName}`).join('; ')}</p>
+      {CUSTOMER_TEXT_KEYS.includes(capability.key) && (
+        <p className="text-xs text-muted-foreground">Texts go only to customers who agreed to receive them and end with "Reply STOP to opt out." Replies and STOP requests arrive in your phone app, not GrowthOS. If a customer opts out, mark them do not text on their customer record.</p>
+      )}
       <p className="text-xs text-muted-foreground">{!capability.binding ? 'Select and configure a supported action to set up this flow.' : !configured ? 'Required settings are missing. Save a complete binding before choosing a policy.' : capability.policy.mode === 'off' ? 'Configured · Off. Choose a policy to allow this flow.' : capability.policy.dailyBudget === 0 ? 'Paused · Daily limit is 0.' : 'Configured · Policy enabled. Provider execution has not been verified by this setup.'}</p>
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">

@@ -15,6 +15,7 @@ type Outcome = { execution?: { state?: string }; received?: number; created?: nu
 const KEYS = {
   leads: 'scout.leads.list', reviews: 'scout.reviews.list', calendar: 'appt.calendar.create_event',
   accounting: 'invo.accounting.create_invoice', crew: 'sched.sms.send',
+  apptText: 'appt.sms.send', serviceText: 'maintain.sms.send',
 };
 const timestamp = (value: string | null) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : 'Date unavailable';
 const selectClass = 'h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm';
@@ -26,6 +27,8 @@ export function ZapierFlowActions({ capabilities, canManage, disabled: setupBusy
   const [held, setHeld] = useState<string[]>([]);
   const [result, setResult] = useState('');
   const [appointment, setAppointment] = useState('');
+  const [reminderAppointment, setReminderAppointment] = useState('');
+  const [service, setService] = useState('');
   const [invoice, setInvoice] = useState('');
   const [member, setMember] = useState('');
   const [date, setDate] = useState('');
@@ -46,9 +49,13 @@ export function ZapierFlowActions({ capabilities, canManage, disabled: setupBusy
         method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
       });
       // A missing/malformed response cannot prove that no external action happened.
-      const outcome = await response.json() as Outcome;
+      const outcome = await response.json() as Outcome & { error?: unknown; code?: unknown };
       const state = outcome.execution?.state;
-      if (!response.ok || !state) {
+      // A 400/404 refusal with a reason is raised before any app is contacted
+      // (missing consent, wrong record, outside sending hours), so it is safe to fix and retry.
+      if ((response.status === 400 || response.status === 404) && !state && typeof outcome.error === 'string' && ['invalid_input', 'not_found'].includes(String(outcome.code))) {
+        setResult(outcome.error);
+      } else if (!response.ok || !state) {
         setHeld(current => [...current, key]);
         setResult('Outcome could not be confirmed. Review recent actions and reconcile the destination before making another request.');
       } else if (state === 'pending_approval') {
@@ -97,6 +104,16 @@ export function ZapierFlowActions({ capabilities, canManage, disabled: setupBusy
         <p className="text-xs text-muted-foreground">Creates an event in your connected calendar. Review existing events before requesting another export.</p>
         <Button type="button" className="h-auto whitespace-normal" disabled={disabled(KEYS.calendar) || !appointment} onClick={() => void request(KEYS.calendar, `appointments/${encodeURIComponent(appointment)}/calendar`)}>Create calendar event</Button>
       </div>}
+      {ready(KEYS.apptText) && <div className="space-y-2 rounded-md border p-3">
+        <RecordPicker kind="appointments" label="Appointment to remind" disabled={disabled(KEYS.apptText)} onChange={setReminderAppointment} />
+        <p className="text-xs text-muted-foreground">Texts the customer their appointment reminder from your number. Only customers who agreed to texts can receive it. Automatic reminders also use this when GrowthOS texting is not set up.</p>
+        <Button type="button" className="h-auto whitespace-normal" disabled={disabled(KEYS.apptText) || !reminderAppointment} onClick={() => void request(KEYS.apptText, `appointments/${encodeURIComponent(reminderAppointment)}/reminder-text`)}>Text appointment reminder</Button>
+      </div>}
+      {ready(KEYS.serviceText) && <div className="space-y-2 rounded-md border p-3">
+        <RecordPicker kind="services" label="Service due" disabled={disabled(KEYS.serviceText)} onChange={setService} />
+        <p className="text-xs text-muted-foreground">Texts the customer one reminder that this service is due, from your number. It sends once per service, only inside your sending hours and notice window, and only to customers who agreed to texts.</p>
+        <Button type="button" className="h-auto whitespace-normal" disabled={disabled(KEYS.serviceText) || !service} onClick={() => void request(KEYS.serviceText, `services/${encodeURIComponent(service)}/reminder-text`)}>Text service reminder</Button>
+      </div>}
       {ready(KEYS.accounting) && <div className="space-y-2 rounded-md border p-3">
         <RecordPicker kind="invoices" label="Issued invoice" disabled={disabled(KEYS.accounting)} onChange={setInvoice} />
         <p className="text-xs text-muted-foreground">Creates an invoice in your connected accounting app. This does not record a customer payment.</p>
@@ -119,7 +136,7 @@ function validDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 }
 
-function RecordPicker({ kind, label, disabled, eligibleIds = '', onChange }: { kind: 'appointments' | 'invoices' | 'users'; label: string; disabled: boolean; eligibleIds?: string; onChange: (id: string) => void }) {
+function RecordPicker({ kind, label, disabled, eligibleIds = '', onChange }: { kind: 'appointments' | 'invoices' | 'users' | 'services'; label: string; disabled: boolean; eligibleIds?: string; onChange: (id: string) => void }) {
   const id = useId();
   const [options, setOptions] = useState<Option[]>([]);
   const [selected, setSelected] = useState('');
@@ -133,7 +150,8 @@ function RecordPicker({ kind, label, disabled, eligibleIds = '', onChange }: { k
     setLoading(true); setError(false); setOptions([]); setSelected(''); onChange('');
     void (async () => {
       try {
-        const response = await fetch(`/api/v1/${kind}${kind === 'invoices' ? `?status=issued&page=${page}` : ''}`, { credentials: 'include' });
+        const path = kind === 'services' ? 'service-obligations?status=active' : `${kind}${kind === 'invoices' ? `?status=issued&page=${page}` : ''}`;
+        const response = await fetch(`/api/v1/${path}`, { credentials: 'include' });
         if (!response.ok) throw new Error('Read unavailable');
         const body = await response.json();
         let next: Option[];
@@ -142,7 +160,9 @@ function RecordPicker({ kind, label, disabled, eligibleIds = '', onChange }: { k
           next = body.items.filter((row: { status: string; invoiceNumber: string | null }) => row.status === 'issued' && row.invoiceNumber).map((row: { id: string; invoiceNumber: string; customerName: string; issuedAt: string | null }) => ({ id: row.id, label: `${row.invoiceNumber} · ${row.customerName} · ${timestamp(row.issuedAt)}` }));
         } else {
           if (!Array.isArray(body)) throw new Error('Invalid list');
-          next = kind === 'appointments'
+          next = kind === 'services'
+            ? body.filter((row: { obligation?: { status?: string } }) => row?.obligation?.status === 'active').map((row: { obligation: { id: string; equipmentLabel: string; dueAt: string }; contact: { firstName: string | null; lastName: string | null } }) => ({ id: row.obligation.id, label: `${[row.contact?.firstName, row.contact?.lastName].filter(Boolean).join(' ') || 'Customer'} · ${row.obligation.equipmentLabel} · due ${row.obligation.dueAt.slice(0, 10)}` }))
+            : kind === 'appointments'
             ? body.filter((row: { status: string }) => ['scheduled', 'confirmed'].includes(row.status)).map((row: { id: string; leadLabel: string | null; type: string; scheduledStart: string }) => ({ id: row.id, label: `${row.leadLabel || 'Customer unavailable'} · ${row.type.replace(/_/g, ' ')} · ${timestamp(row.scheduledStart)}` }))
             : body.filter((row: { id: string; isActive: boolean; operationallyEligible: boolean }) => row.isActive && row.operationallyEligible && eligibleIds.split('|').includes(row.id)).map((row: { id: string; firstName: string | null; lastName: string | null; email: string }) => ({ id: row.id, label: [row.firstName, row.lastName].filter(Boolean).join(' ') || row.email }));
         }

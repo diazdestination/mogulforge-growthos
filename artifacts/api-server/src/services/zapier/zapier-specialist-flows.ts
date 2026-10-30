@@ -7,16 +7,27 @@ import {
   leadsTable,
   organizationsTable,
   propertiesTable,
+  serviceObligationsTable,
+  auditEventsTable,
   usersTable,
   zapierActionExecutionsTable,
   type InvoiceDocument,
   type ZapierActionExecution,
 } from "@workspace/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 
+import { renderAppointmentReminderCopy } from "../appointment-reminder-copy";
 import { createContact, createLead, createTask } from "../crm";
+import { hasServiceMailboxReplyHold } from "../mailbox-communication";
 import { getRoutePlan, RoutePlanError } from "../route-plan";
-import { getZapierBinding } from "./zapier-connection";
+import { checkSendEligibility } from "../send-gate";
+import { serviceCareMessage } from "../service-care-policy";
+import { serviceNoticeAt } from "../service-obligations";
+import { hasServiceSmsReplyHold } from "../service-sms";
+import { standingCompanyProjection } from "../service-standing-policy";
+import { phoneE164, twilioForOrganization } from "../twilio-controls";
+import { getZapierCapability } from "./zapier-capabilities";
+import { defaultPolicyFor, getZapierBinding, getZapierPolicy } from "./zapier-connection";
 import { requestZapierAction, ZapierExecutionError, type ZapierActionOutcome } from "./zapier-executions";
 import { sha256Hex } from "./zapier-mcp-client";
 
@@ -461,6 +472,239 @@ export async function schedSendCrewDaySheet(input: {
   return { ...outcome, jobs: built.jobs };
 }
 
+// ---------- customer texts from the contractor's own number ----------
+
+export const OPT_OUT_LINE = "Reply STOP to opt out.";
+
+/** Every customer text sent through a contractor's own number carries an opt-out line. */
+export function withOptOut(body: string): string {
+  return /\bSTOP\b/.test(body) ? body : `${body.trimEnd()} ${OPT_OUT_LINE}`;
+}
+
+export type CustomerSmsCapability = "appt.sms.send" | "maintain.sms.send";
+
+/**
+ * True when automated customer texts for this capability should go through
+ * the contractor's own number: built-in texting is not active for the company,
+ * and the capability is bound and not switched off. Built-in texting, when
+ * active, always wins so a customer never gets the same reminder twice.
+ */
+export async function zapierCustomerSmsRoute(organizationId: string, capability: CustomerSmsCapability): Promise<boolean> {
+  if ((await twilioForOrganization(organizationId))?.smsEnabled) return false;
+  const binding = await getZapierBinding(organizationId, capability);
+  if (!binding) return false;
+  const definition = getZapierCapability(capability)!;
+  const policy = (await getZapierPolicy(organizationId, capability)) ?? defaultPolicyFor(definition);
+  return policy.mode !== "off" && policy.dailyBudget > 0;
+}
+
+const OPEN_LEDGER_STATES = ["pending_approval", "executing", "succeeded", "indeterminate"] as const;
+
+async function otherOpenText(organizationId: string, capability: CustomerSmsCapability, entityType: string, entityId: string, idempotencyKey: string) {
+  const [row] = await db
+    .select({ id: zapierActionExecutionsTable.id, state: zapierActionExecutionsTable.state })
+    .from(zapierActionExecutionsTable)
+    .where(
+      and(
+        eq(zapierActionExecutionsTable.organizationId, organizationId),
+        eq(zapierActionExecutionsTable.capability, capability),
+        eq(zapierActionExecutionsTable.linkedEntityType, entityType),
+        eq(zapierActionExecutionsTable.linkedEntityId, entityId),
+        inArray(zapierActionExecutionsTable.state, [...OPEN_LEDGER_STATES]),
+        ne(zapierActionExecutionsTable.idempotencyKey, idempotencyKey),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+function textBlocked(reason: string): never {
+  const readable: Record<string, string> = {
+    no_sms_consent: "this customer has not agreed to receive texts",
+    do_not_contact: "this customer is marked do not contact",
+    do_not_contact_sms: "this customer is marked do not text",
+    no_phone: "this customer has no phone number",
+    invalid_phone: "this customer's phone number is not valid",
+    customer_lifecycle_paused: "customer messaging is paused for this company",
+  };
+  const why = readable[reason] ?? (reason.startsWith("suppressed:") ? "this number opted out or is suppressed" : reason.replace(/_/g, " "));
+  throw new ZapierExecutionError(`No text was requested: ${why}.`, "invalid_input");
+}
+
+// APPT: appointment reminder text
+
+export const APPT_REMINDER_TEXT_ENTITY = "appointment_reminder";
+const APPT_REMINDER_KEY = /^appt-reminder-text:([0-9a-f-]{36}):(\d{4}-\d{2}-\d{2}T[\d:.]+Z)$/;
+
+export async function buildAppointmentReminderTextInput(organizationId: string, appointmentId: string, expectedStart?: string) {
+  const [row] = await db
+    .select({ appointment: appointmentsTable, contact: contactsTable, lead: leadsTable })
+    .from(appointmentsTable)
+    .leftJoin(leadsTable, and(eq(leadsTable.id, appointmentsTable.leadId), eq(leadsTable.organizationId, organizationId)))
+    .leftJoin(
+      contactsTable,
+      and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, appointmentsTable.contactId)),
+    )
+    .where(and(eq(appointmentsTable.organizationId, organizationId), eq(appointmentsTable.id, appointmentId)));
+  if (!row) throw new ZapierExecutionError("Appointment not found.", "not_found");
+  const { appointment } = row;
+  if (!["scheduled", "confirmed"].includes(appointment.status)) {
+    throw new ZapierExecutionError("Only a booked appointment can get a reminder text.", "invalid_input");
+  }
+  if (expectedStart && appointment.scheduledStart.toISOString() !== expectedStart) {
+    throw new ZapierExecutionError("The appointment was rescheduled after this text was requested. Request a new reminder.", "invalid_input");
+  }
+  if (appointment.scheduledStart.getTime() <= Date.now()) {
+    throw new ZapierExecutionError("This appointment has already started.", "invalid_input");
+  }
+  let contact = row.contact;
+  if (!contact && row.lead?.contactId) {
+    [contact] = await db
+      .select()
+      .from(contactsTable)
+      .where(and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, row.lead.contactId)));
+  }
+  if (!contact) throw new ZapierExecutionError("This appointment has no customer to text.", "invalid_input");
+  const gate = await checkSendEligibility({ organizationId, leadId: appointment.leadId, contact, channel: "sms", kind: "transactional" });
+  if (!gate.ok) textBlocked(gate.reason);
+  const toPhone = phoneE164(contact.phone ?? "");
+  if (!toPhone) textBlocked("invalid_phone");
+  const copy = await renderAppointmentReminderCopy(organizationId, appointment, contact.firstName);
+  const body = withOptOut(copy.smsBody);
+  if (body.length > 1200) throw new ZapierExecutionError("The reminder text is too long. Shorten it in Settings.", "invalid_input");
+  return {
+    idempotencyKey: `appt-reminder-text:${appointment.id}:${appointment.scheduledStart.toISOString()}`,
+    input: { toPhone, body },
+    contactId: contact.id,
+    leadId: appointment.leadId,
+  };
+}
+
+export async function apptRequestReminderText(input: {
+  organizationId: string;
+  appointmentId: string;
+  actorUserId: string | null;
+  expectedStart?: string;
+}): Promise<ZapierActionOutcome> {
+  const built = await buildAppointmentReminderTextInput(input.organizationId, input.appointmentId, input.expectedStart);
+  return requestZapierAction({
+    organizationId: input.organizationId,
+    capability: "appt.sms.send",
+    input: built.input,
+    idempotencyKey: built.idempotencyKey,
+    requestedByUserId: input.actorUserId,
+    linkedEntityType: APPT_REMINDER_TEXT_ENTITY,
+    linkedEntityId: input.appointmentId,
+  });
+}
+
+// MAINTAIN: one service-due reminder text
+
+export const MAINTAIN_REMINDER_TEXT_ENTITY = "service_obligation";
+const MAINTAIN_REMINDER_KEY = /^maintain-reminder-text:([0-9a-f-]{36}):(\d+)$/;
+
+export async function buildServiceReminderTextInput(organizationId: string, obligationId: string, expectedVersion?: number) {
+  const [row] = await db
+    .select({ obligation: serviceObligationsTable, contact: contactsTable })
+    .from(serviceObligationsTable)
+    .innerJoin(
+      contactsTable,
+      and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, serviceObligationsTable.contactId)),
+    )
+    .where(and(eq(serviceObligationsTable.organizationId, organizationId), eq(serviceObligationsTable.id, obligationId)));
+  if (!row) throw new ZapierExecutionError("Service not found.", "not_found");
+  const { obligation, contact } = row;
+  const version = obligation.updatedAt.getTime();
+  if (expectedVersion !== undefined && version !== expectedVersion) {
+    throw new ZapierExecutionError("The service changed after this text was requested. Review it and request a new reminder.", "invalid_input");
+  }
+  if (obligation.status !== "active") throw new ZapierExecutionError("Only an active service can get a reminder text.", "invalid_input");
+  if (obligation.appointmentId) {
+    const [visit] = await db
+      .select({ status: appointmentsTable.status })
+      .from(appointmentsTable)
+      .where(and(eq(appointmentsTable.organizationId, organizationId), eq(appointmentsTable.id, obligation.appointmentId)));
+    if (visit && ["scheduled", "confirmed"].includes(visit.status)) {
+      throw new ZapierExecutionError("A visit is already booked for this service.", "invalid_input");
+    }
+  }
+  const [prior] = await db
+    .select({ action: auditEventsTable.action })
+    .from(auditEventsTable)
+    .where(
+      and(
+        eq(auditEventsTable.organizationId, organizationId),
+        eq(auditEventsTable.entityType, "service_obligation"),
+        eq(auditEventsTable.entityId, obligation.id),
+        inArray(auditEventsTable.action, ["service.care_reminder_approved", "service.care_response_recorded"]),
+      ),
+    )
+    .limit(1);
+  if (prior) {
+    throw new ZapierExecutionError(
+      prior.action === "service.care_response_recorded"
+        ? "A customer response is already recorded for this service. Follow up from the office instead."
+        : "This service already has a reminder from GrowthOS. Review it instead of texting again.",
+      "invalid_input",
+    );
+  }
+  if ((await hasServiceMailboxReplyHold(organizationId, obligation.id)) || (await hasServiceSmsReplyHold(organizationId, obligation.id))) {
+    throw new ZapierExecutionError("A customer reply to this service needs office review first.", "invalid_input");
+  }
+  const noticeAt = serviceNoticeAt(obligation.dueAt, obligation.noticeDays);
+  if (noticeAt.getTime() > Date.now()) {
+    throw new ZapierExecutionError(`This reminder can be sent from ${noticeAt.toISOString().slice(0, 10)}.`, "invalid_input");
+  }
+  const company = await standingCompanyProjection(db, organizationId);
+  // Service reminders use the stricter outreach gate (quiet hours, caps and
+  // reply holds), matching the built-in MAINTAIN reminder.
+  const gate = await checkSendEligibility({ organizationId, contact, channel: "sms", kind: "outreach", sendingHours: company.hours });
+  if (!gate.ok) {
+    if (gate.outcome === "deferred") {
+      throw new ZapierExecutionError(`Outside your sending hours. Try again after ${gate.resumeAt.toISOString()}.`, "invalid_input");
+    }
+    textBlocked(gate.reason);
+  }
+  const toPhone = phoneE164(contact.phone ?? "");
+  if (!toPhone) textBlocked("invalid_phone");
+  const message = serviceCareMessage({
+    businessName: company.businessName,
+    equipmentLabel: obligation.equipmentLabel,
+    kind: obligation.kind,
+    dueDate: obligation.dueAt.toISOString().slice(0, 10),
+  });
+  return {
+    idempotencyKey: `maintain-reminder-text:${obligation.id}:${version}`,
+    input: { toPhone, body: withOptOut(message.body) },
+  };
+}
+
+export async function maintainRequestServiceText(input: {
+  organizationId: string;
+  obligationId: string;
+  actorUserId: string | null;
+}): Promise<ZapierActionOutcome> {
+  const built = await buildServiceReminderTextInput(input.organizationId, input.obligationId);
+  const open = await otherOpenText(input.organizationId, "maintain.sms.send", MAINTAIN_REMINDER_TEXT_ENTITY, input.obligationId, built.idempotencyKey);
+  if (open) {
+    throw new ZapierExecutionError(
+      open.state === "pending_approval"
+        ? "A reminder text for this service is already waiting for approval."
+        : "A reminder text was already sent or attempted for this service.",
+      "conflict",
+    );
+  }
+  return requestZapierAction({
+    organizationId: input.organizationId,
+    capability: "maintain.sms.send",
+    input: built.input,
+    idempotencyKey: built.idempotencyKey,
+    requestedByUserId: input.actorUserId,
+    linkedEntityType: MAINTAIN_REMINDER_TEXT_ENTITY,
+    linkedEntityId: input.obligationId,
+  });
+}
+
 // ---------- approval re-derivation ----------
 
 /**
@@ -486,6 +730,16 @@ export async function rebuildZapierRequestInput(execution: ZapierActionExecution
       const match = execution.idempotencyKey.match(/^sched-daysheet:([^:]+):(\d{4}-\d{2}-\d{2}):/);
       if (!match) throw new ZapierExecutionError("Day sheet request is not rebuildable.", "invalid_input");
       return (await buildCrewDaySheetInput(execution.organizationId, match[1]!, match[2]!)).input;
+    }
+    case "appt.sms.send": {
+      const match = execution.idempotencyKey.match(APPT_REMINDER_KEY);
+      if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("Reminder text request is not rebuildable.", "invalid_input");
+      return (await buildAppointmentReminderTextInput(execution.organizationId, match[1]!, match[2]!)).input;
+    }
+    case "maintain.sms.send": {
+      const match = execution.idempotencyKey.match(MAINTAIN_REMINDER_KEY);
+      if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("Service text request is not rebuildable.", "invalid_input");
+      return (await buildServiceReminderTextInput(execution.organizationId, match[1]!, Number(match[2]))).input;
     }
     default:
       throw new ZapierExecutionError("This capability has no approval path.", "invalid_input");

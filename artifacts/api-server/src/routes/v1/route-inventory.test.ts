@@ -402,6 +402,8 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "POST /integrations/zapier/flows/callie/calls": "crm.write",
   "POST /integrations/zapier/flows/callie/text-back": "crm.write",
   "POST /integrations/zapier/flows/appointments/:id/calendar": "crm.write",
+  "POST /integrations/zapier/flows/appointments/:id/reminder-text": "crm.write",
+  "POST /integrations/zapier/flows/services/:id/reminder-text": "crm.write",
   "POST /integrations/zapier/flows/invoices/:id/accounting": "invoices.manage",
   "POST /integrations/zapier/flows/sched/day-sheet": "crm.write",
   // ESTI price book: members read prices and preview margin on drafts;

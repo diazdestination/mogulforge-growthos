@@ -26,9 +26,11 @@ import {
 import { ZapierMcpError } from "../../services/zapier/zapier-mcp-client";
 import {
   apptPushAppointmentToCalendar,
+  apptRequestReminderText,
   callieRequestTextBack,
   callieSyncCalls,
   invoPushInvoiceToAccounting,
+  maintainRequestServiceText,
   schedSendCrewDaySheet,
   scoutSyncMarketplaceLeads,
   scoutSyncReviews,
@@ -335,6 +337,42 @@ router.post(
         await apptPushAppointmentToCalendar({
           organizationId: req.member!.organizationId,
           appointmentId: String(req.params.id),
+          actorUserId: req.member!.user.id,
+        }),
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+router.post(
+  "/integrations/zapier/flows/appointments/:id/reminder-text",
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(
+        await apptRequestReminderText({
+          organizationId: req.member!.organizationId,
+          appointmentId: String(req.params.id),
+          actorUserId: req.member!.user.id,
+        }),
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+router.post(
+  "/integrations/zapier/flows/services/:id/reminder-text",
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(
+        await maintainRequestServiceText({
+          organizationId: req.member!.organizationId,
+          obligationId: String(req.params.id),
           actorUserId: req.member!.user.id,
         }),
       );
