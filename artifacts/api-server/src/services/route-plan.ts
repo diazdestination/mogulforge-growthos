@@ -1,13 +1,17 @@
 import {
   appointmentsTable,
   contactsTable,
+  customerWorkRootsTable,
   db,
+  estimatesTable,
+  leadsTable,
   organizationsTable,
+  projectsTable,
   propertiesTable,
   usersTable,
 } from "@workspace/db";
 import { companyDayBounds } from "@workspace/scheduling-core";
-import { and, asc, eq, gte, inArray, lt, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, inArray, lt, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { recordAudit } from "./audit";
@@ -42,7 +46,12 @@ export const routePlanQuery = z
   .strict();
 
 export type RouteStop = {
-  appointmentId: string;
+  /** Existing appointment route IDs are unchanged; projects have a distinct namespace. */
+  routeId: string;
+  kind: "appointment" | "project";
+  appointmentId: string | null;
+  projectId: string | null;
+  continuesFromPreviousDay: boolean;
   scheduledStart: string;
   scheduledEnd: string | null;
   type: string;
@@ -105,7 +114,7 @@ async function dayRows(organizationId: string, date: string, userId: string) {
   } catch {
     throw new RoutePlanError("Choose a valid calendar date.", "invalid");
   }
-  const rows = await db
+  const appointments = await db
     .select({ appointment: appointmentsTable, contact: contactsTable, property: propertiesTable,
       propertyVersion: sql<string | null>`${propertiesTable.updatedAt}::text` })
     .from(appointmentsTable)
@@ -121,6 +130,44 @@ async function dayRows(organizationId: string, date: string, userId: string) {
       ),
     )
     .orderBy(asc(appointmentsTable.scheduledStart), asc(appointmentsTable.id));
+  const projects = await db
+    .select({ project: projectsTable, contact: contactsTable, property: propertiesTable,
+      estimateId: estimatesTable.id,
+      propertyVersion: sql<string | null>`${propertiesTable.updatedAt}::text` })
+    .from(projectsTable)
+    .leftJoin(leadsTable, and(eq(leadsTable.id, projectsTable.leadId), eq(leadsTable.organizationId, organizationId), isNull(projectsTable.customerWorkId)))
+    .leftJoin(customerWorkRootsTable, and(eq(customerWorkRootsTable.id, projectsTable.customerWorkId), eq(customerWorkRootsTable.organizationId, organizationId), isNull(projectsTable.leadId)))
+    .leftJoin(contactsTable, and(eq(contactsTable.id, sql`coalesce(${leadsTable.contactId}, ${customerWorkRootsTable.contactId})`), eq(contactsTable.organizationId, organizationId)))
+    .leftJoin(propertiesTable, and(eq(propertiesTable.id, sql`coalesce(${leadsTable.propertyId}, ${customerWorkRootsTable.propertyId})`), eq(propertiesTable.organizationId, organizationId), eq(propertiesTable.contactId, contactsTable.id)))
+    .leftJoin(estimatesTable, and(eq(estimatesTable.id, projectsTable.estimateId), eq(estimatesTable.organizationId, organizationId),
+      sql`${estimatesTable.leadId} is not distinct from ${projectsTable.leadId}`,
+      sql`${estimatesTable.customerWorkId} is not distinct from ${projectsTable.customerWorkId}`))
+    .where(and(eq(projectsTable.organizationId, organizationId),
+      sql`${projectsTable.crewUserIds} @> ${JSON.stringify([userId])}::jsonb`,
+      inArray(projectsTable.status, ["scheduled", "in_progress"]),
+      lt(projectsTable.scheduledStart, new Date(bounds.to)),
+      // Match scheduling-core's legacy project fallback: 24 elapsed hours.
+      gt(sql`coalesce(${projectsTable.scheduledEnd}, ${projectsTable.scheduledStart} + interval '24 hours')`, new Date(bounds.from))));
+  const rows = [
+    ...appointments.map(({ appointment, ...parents }) => ({
+      ...parents, routeId: appointment.id, kind: "appointment" as const,
+      appointmentId: appointment.id, projectId: null, scheduledStart: appointment.scheduledStart,
+      scheduledEnd: appointment.scheduledEnd, type: appointment.type, status: appointment.status,
+      continuesFromPreviousDay: false,
+    })),
+    ...projects.map(({ project, contact, property, propertyVersion, estimateId }) => {
+      // Historical ID-only links must not expose another work's customer/address.
+      const coherent = !project.estimateId || estimateId !== null;
+      return {
+        contact: coherent ? contact : null, property: coherent ? property : null,
+        propertyVersion: coherent ? propertyVersion : null,
+        routeId: `project:${project.id}`, kind: "project" as const,
+        appointmentId: null, projectId: project.id, scheduledStart: project.scheduledStart!,
+        scheduledEnd: project.scheduledEnd, type: "project", status: project.status,
+        continuesFromPreviousDay: project.scheduledStart! < new Date(bounds.from),
+      };
+    }),
+  ].sort((a, b) => a.scheduledStart.getTime() - b.scheduledStart.getTime() || a.routeId.localeCompare(b.routeId));
   return { timeZone: org.timezone, rows };
 }
 
@@ -129,12 +176,10 @@ export async function getRoutePlan(organizationId: string, viewerUserId: string,
   const userId = input.userId ?? viewerUserId;
   const { timeZone, rows } = await dayRows(organizationId, input.date, userId);
 
-  const stops: RouteStop[] = rows.map(({ appointment, contact, property }) => ({
-    appointmentId: appointment.id,
-    scheduledStart: appointment.scheduledStart.toISOString(),
-    scheduledEnd: appointment.scheduledEnd?.toISOString() ?? null,
-    type: appointment.type,
-    status: appointment.status,
+  const stops: RouteStop[] = rows.map(({ contact, property, propertyVersion: _version, ...stop }) => ({
+    ...stop,
+    scheduledStart: stop.scheduledStart.toISOString(),
+    scheduledEnd: stop.scheduledEnd?.toISOString() ?? null,
     customerName: [contact?.firstName, contact?.lastName].filter(Boolean).join(" ") || "Customer",
     address: addressOf(property),
     propertyId: property?.id ?? null,
@@ -164,8 +209,8 @@ export async function getRoutePlan(organizationId: string, viewerUserId: string,
     timeZone,
     userId,
     stops,
-    currentOrder: timeOrder.map((index) => located[index]!.row.appointment.id),
-    suggestedOrder: finalOrder.map((index) => located[index]!.row.appointment.id),
+    currentOrder: timeOrder.map((index) => located[index]!.row.routeId),
+    suggestedOrder: finalOrder.map((index) => located[index]!.row.routeId),
     currentMiles: round(currentMiles),
     suggestedMiles: round(suggestedMiles),
     savedMiles: round(currentMiles - suggestedMiles),

@@ -1,4 +1,4 @@
-import { appointmentsTable, contactsTable, db, organizationsTable, propertiesTable, usersTable } from "@workspace/db";
+import { appointmentsTable, contactsTable, customerWorkRootsTable, db, estimatesTable, leadsTable, organizationsTable, projectsTable, propertiesTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -65,11 +65,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   setGeocoderForTests(undefined);
-  for (let index = 0; index < userIds.length; index += 1) {
-    await db.update(usersTable).set({ organizationId: null }).where(eq(usersTable.id, userIds[index]!));
-    await deleteTestOrgs(orgIds[index]!);
-    await db.delete(usersTable).where(eq(usersTable.id, userIds[index]!));
-  }
+  // Returning-work roots retain their creator's composite company/user key.
+  // The shared helper deletes all fixtures together in FK-safe order.
+  await deleteTestOrgs(...orgIds);
 });
 
 describe("SCHED route plan", () => {
@@ -165,4 +163,107 @@ it("requires census opt-in and staging approval without calling a provider", asy
     vi.stubEnv("STAGING_OUTBOUND_APPROVED", undefined); expect(geocoderEnabled()).toBe(false);
     vi.stubEnv("STAGING_OUTBOUND_APPROVED", "true"); expect(geocoderEnabled()).toBe(true);
   } finally { vi.unstubAllEnvs(); }
+});
+
+async function mixedFixture() {
+  const { randomUUID } = await import("node:crypto");
+  const [org] = await db.insert(organizationsTable).values({ name: "SYNTHETIC mixed route", slug: randomUUID(), timezone: "America/Los_Angeles" }).returning();
+  const [user] = await db.insert(usersTable).values({ organizationId: org.id, role: "owner", isActive: true, emailVerifiedAt: new Date() }).returning();
+  orgIds.push(org.id); userIds.push(user.id);
+  const [contact] = await db.insert(contactsTable).values({ organizationId: org.id, firstName: "Synthetic route customer" }).returning();
+  const properties = await db.insert(propertiesTable).values([-84.1, -83.8, -84.0, -83.9].map((longitude, index) => ({ organizationId: org.id, contactId: contact.id, addressLine1: `${index + 1} Synthetic Route`, city: "Example", state: "GA", postalCode: "00000", latitude: "34.4", longitude: String(longitude) }))).returning();
+  const [lead] = await db.insert(leadsTable).values({ organizationId: org.id, contactId: contact.id, propertyId: properties[0]!.id }).returning();
+  const [root] = await db.insert(customerWorkRootsTable).values({ organizationId: org.id, contactId: contact.id, propertyId: properties[1]!.id, createdByUserId: user.id }).returning();
+  const job = { organizationId: org.id, leadId: lead.id, name: "Synthetic route job", crewUserIds: [user.id] };
+  return { org: org.id, user: user.id, contact, properties, lead, root, job };
+}
+
+it("merges lead and returning jobs with visits using distinct route identities and complete maps", async () => {
+  const f = await mixedFixture();
+  const [leadJob, returningJob] = await db.insert(projectsTable).values([
+    { ...f.job, scheduledStart: new Date(`${DAY}T13:00:00Z`), scheduledEnd: new Date(`${DAY}T13:45:00Z`) },
+    { ...f.job, leadId: null, customerWorkId: f.root.id, workVersion: 1, status: "in_progress", scheduledStart: new Date(`${DAY}T14:00:00Z`), scheduledEnd: new Date(`${DAY}T14:45:00Z`) },
+  ]).returning();
+  const visits = await db.insert(appointmentsTable).values([2, 3].map((index) => ({
+    // IDs are table-scoped; a project and appointment may have equal UUIDs.
+    ...(index === 2 ? { id: leadJob.id } : {}), organizationId: f.org, contactId: f.contact.id, propertyId: f.properties[index]!.id,
+    assignedUserId: f.user, scheduledStart: new Date(`${DAY}T${13 + index}:00:00Z`),
+  }))).returning();
+  const plan = await getRoutePlan(f.org, f.user, { date: DAY });
+  const ids = [`project:${leadJob.id}`, `project:${returningJob.id}`, visits[0]!.id, visits[1]!.id];
+  expect(plan.currentOrder).toEqual(ids);
+  expect(new Set(ids).size).toBe(4);
+  expect(plan.stops[0]).toMatchObject({ routeId: ids[0], kind: "project", projectId: leadJob.id, appointmentId: null, propertyId: f.properties[0]!.id });
+  expect(plan.stops[1]).toMatchObject({ kind: "project", projectId: returningJob.id, propertyId: f.properties[1]!.id });
+  expect(plan.stops[2]).toMatchObject({ kind: "appointment", appointmentId: visits[0]!.id, projectId: null });
+  expect(plan.suggestedOrder).toEqual([ids[0], ids[2], ids[3], ids[1]]);
+  expect(plan.savedMiles).toBeGreaterThan(0);
+  for (const link of [plan.mapsUrl, plan.suggestedMapsUrl]) {
+    const params = new URL(link!).searchParams;
+    expect([params.get("origin"), ...(params.get("waypoints")?.split("|") ?? []), params.get("destination")].sort()).toEqual(plan.stops.map(stop => stop.address).sort());
+  }
+  expect(await getRoutePlan(f.org, f.user, { date: DAY })).toEqual(plan);
+  expect(await db.select().from(projectsTable).where(eq(projectsTable.organizationId, f.org))).toEqual([leadJob, returningJob]);
+});
+
+it("includes overlapping multi-day jobs using company days and elapsed legacy ends, excluding other crew and closed work", async () => {
+  const f = await mixedFixture();
+  const rows = await db.insert(projectsTable).values([
+    { ...f.job, scheduledStart: new Date("2026-11-03T13:00:00Z"), scheduledEnd: new Date("2026-11-06T13:00:00Z") },
+    { ...f.job, status: "in_progress", scheduledStart: new Date("2026-11-03T12:00:00Z"), scheduledEnd: null },
+    { ...f.job, scheduledStart: new Date("2026-11-03T08:00:00Z"), scheduledEnd: new Date("2026-11-04T08:00:00Z") },
+    { ...f.job, scheduledStart: new Date("2026-11-05T08:00:00Z"), scheduledEnd: new Date("2026-11-05T09:00:00Z") },
+    { ...f.job, crewUserIds: [], scheduledStart: new Date(`${DAY}T13:00:00Z`) },
+    { ...f.job, status: "completed", scheduledStart: new Date(`${DAY}T13:00:00Z`) },
+    { ...f.job, status: "cancelled", scheduledStart: new Date(`${DAY}T13:00:00Z`) },
+  ]).returning();
+  const plan = await getRoutePlan(f.org, f.user, { date: DAY });
+  expect(plan.stops.map(stop => stop.projectId)).toEqual([rows[1]!.id, rows[0]!.id]);
+  expect(plan.stops.every(stop => stop.continuesFromPreviousDay)).toBe(true);
+  expect(plan.stops[0]).toMatchObject({ scheduledStart: "2026-11-03T12:00:00.000Z", scheduledEnd: null });
+  expect((await getRoutePlan(orgIds[1]!, userIds[1]!, { date: DAY })).stops).toEqual([]);
+});
+
+it("hides malformed job parents and mismatched estimate lineage without leaking addresses or geocoding them", async () => {
+  const f = await mixedFixture(), foreign = await mixedFixture();
+  const [wrongEstimate] = await db.insert(estimatesTable).values({ organizationId: f.org, leadId: foreign.lead.id, title: "Synthetic malformed history" }).returning();
+  const jobs = await db.insert(projectsTable).values([
+    { ...f.job, leadId: foreign.lead.id, scheduledStart: new Date(`${DAY}T13:00:00Z`) },
+    { ...f.job, estimateId: wrongEstimate.id, scheduledStart: new Date(`${DAY}T14:00:00Z`) },
+  ]).returning();
+  const plan = await getRoutePlan(f.org, f.user, { date: DAY });
+  for (const job of jobs) expect(plan.stops.find(stop => stop.projectId === job.id)).toMatchObject({ customerName: "Customer", address: null, propertyId: null, located: false });
+  expect(plan.mapsUrl).toBeNull(); expect(plan.suggestedMapsUrl).toBeNull();
+  const { vi } = await import("vitest");
+  const geocode = vi.fn(async () => ({ latitude: 34, longitude: -84 }));
+  setGeocoderForTests(geocode);
+  try { await locateDayStops(f.org, f.user, { date: DAY }); expect(geocode).not.toHaveBeenCalled(); }
+  finally { setGeocoderForTests(undefined); }
+});
+
+it("deduplicates a shared visit/job property lookup, honors holds and rejects stale job geocoding", async () => {
+  const f = await mixedFixture();
+  const property = f.properties[0]!;
+  await db.update(propertiesTable).set({ latitude: null, longitude: null }).where(eq(propertiesTable.id, property.id));
+  await db.insert(projectsTable).values({ ...f.job, scheduledStart: new Date(`${DAY}T13:00:00Z`) });
+  await db.insert(appointmentsTable).values({ organizationId: f.org, contactId: f.contact.id, propertyId: property.id, assignedUserId: f.user, scheduledStart: new Date(`${DAY}T14:00:00Z`) });
+  const { vi } = await import("vitest");
+  const geocode = vi.fn(async () => ({ latitude: 34, longitude: -84 }));
+  setGeocoderForTests(geocode);
+  vi.stubEnv("GROWTHOS_OUTBOUND_HOLD", "true");
+  try { await expect(locateDayStops(f.org, f.user, { date: DAY })).rejects.toBeInstanceOf(RoutePlanError); expect(geocode).not.toHaveBeenCalled(); }
+  finally { vi.unstubAllEnvs(); }
+  try {
+    const result = await locateDayStops(f.org, f.user, { date: DAY });
+    expect(geocode).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ located: 1, plan: { unlocatedCount: 0 } });
+    await db.update(propertiesTable).set({ latitude: null, longitude: null }).where(eq(propertiesTable.id, property.id));
+    setGeocoderForTests(async () => {
+      const { updateProperty } = await import("./crm");
+      await updateProperty(f.org, property.id, { addressLine1: "Changed synthetic job address" });
+      return { latitude: 35, longitude: -85 };
+    });
+    expect((await locateDayStops(f.org, f.user, { date: DAY })).located).toBe(0);
+    expect((await db.select().from(propertiesTable).where(eq(propertiesTable.id, property.id)))[0]).toMatchObject({ latitude: null, longitude: null });
+  } finally { setGeocoderForTests(undefined); }
 });
