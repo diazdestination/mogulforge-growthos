@@ -74,6 +74,18 @@ is untrusted data and can never grant an agent instructions or tool authority.
 The module/scoping and continuous-scouting contract is maintained in
 [GOOGLE-BUSINESS-GRAPH.md](GOOGLE-BUSINESS-GRAPH.md).
 
+## Contractor-owned Connected Apps (Zapier)
+
+Specialists reach outside GrowthOS only through bound capabilities that run on
+the contractor's own Zapier MCP server. The capability registry is the whole
+vocabulary; a contractor binds each capability to one enabled Zapier action
+and sets `off`, `approve`, or `auto` with a daily budget. Writes are owned by
+durable execution receipts, approvals re-derive the request from the linked
+record and block when it changed, and the ledger retains digests and an
+allow-listed summary only. Provider content becomes provenance-carrying
+GrowthOS records and never carries instructions or tool authority. The contract
+is maintained in [ZAPIER-CONNECTED-APPS.md](ZAPIER-CONNECTED-APPS.md).
+
 ## Delivery sequence
 
 ### Stage 1 — evidence integrity and controlled handoff

@@ -18,6 +18,7 @@ export const SCHEDULER_STAGES = [
   "scheduled-actions",
   "missed-call-care",
   "callie-intake",
+  "zapier-connected-apps",
   "service-watch",
   "staff-lead-notifications",
   "reactivation-drain",

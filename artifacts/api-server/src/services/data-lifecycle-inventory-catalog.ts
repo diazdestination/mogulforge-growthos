@@ -3,8 +3,8 @@
  * deletion order, retention policy, or proof of complete account ownership.
  * Every new table must receive an explicit classification before preview runs.
  */
-export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-09.inventory-v16";
-export const DATA_LIFECYCLE_EXPECTED_TABLES = 142;
+export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-29.inventory-v17";
+export const DATA_LIFECYCLE_EXPECTED_TABLES = 146;
 export const DATA_LIFECYCLE_ROW_LIMIT = 10_000;
 
 export type InventoryCategory =
@@ -171,6 +171,10 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("value_entries", "crm"),
   direct("webhook_deliveries", "communications"),
   direct("webhook_endpoints", "configuration"),
+  direct("zapier_action_executions", "audit"),
+  direct("zapier_capability_bindings", "configuration"),
+  direct("zapier_mcp_connections", "account_access"),
+  direct("zapier_specialist_policies", "configuration"),
 ];
 
 /** Always present, including on an empty tenant. No cross-tenant probes. */

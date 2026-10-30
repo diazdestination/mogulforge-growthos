@@ -21,8 +21,9 @@ export const RELEASE_FILES = {
     "70d8a0396fb6b85ab787919dc6b9d82ffb1754e9c78d6a157d77be892aa12558",
   "artifacts/api-server/src/lib/token-encryption.ts":
     "6b17db99dff3eafe9ad85a599022af4ba8d972197234ffdeadbf760b95df0fd5",
+  // Re-pinned by owner-approved PR73: ZAPIER_ joins the refused provider prefixes.
   "artifacts/api-server/src/lib/restore-mode.ts":
-    "112623d2708c243264f895b9e35de3474f22c5718bcdb5da53333a5234a40166",
+    "fc138e7d13de2b1428927fbd0720c6e6cac4c43cf2f5fa231e893d6a4b9565ff",
   "artifacts/api-server/src/index.ts":
     "3afcf97711b43e83c37e929a7272941cb572eecbbc81eca8cbc5d92488d3c242",
   "artifacts/api-server/src/app.ts":

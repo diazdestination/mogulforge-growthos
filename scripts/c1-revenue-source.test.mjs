@@ -10,7 +10,7 @@ describe('exact Revenue Opportunities source successor', () => {
     const proof = verifyC1SourceSnapshot(original);
     expect(proof.inquiryConsentAmendment.integration.scope.sha256).toBe('c0519f20f3cf8e0e26ac1aa6d19701e4c587450fd82d6c4d8b359070703ef497');
     expect(proof.revenueOpportunitiesAmendment.sourceCommit).toBe('0db6be4cbffde55130dbbd1a7a61993489ed40c9');
-    expect(proof.currentScope).toEqual({ count: 2124, sha256: 'e4dd528c0b4ace7d638df724bf704b74bc33bfc43a3879bd8f9000a88dab35ea' });
+    expect(proof.revenueOpportunitiesAmendment.scope).toEqual({ count: 2124, sha256: 'e4dd528c0b4ace7d638df724bf704b74bc33bfc43a3879bd8f9000a88dab35ea' });
     expect(proof.revenueOpportunitiesAmendment.changedPaths).toHaveLength(3);
     expect(proof.revenueOpportunitiesAmendment.releaseEligible).toBe(false);
     expect(proof.releaseEligible).toBe(false);

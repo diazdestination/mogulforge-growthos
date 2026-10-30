@@ -184,6 +184,21 @@ success is necessary evidence, not proof of a public deployment.
   DB-backed two-tenant/two-sender suite remain required before this is called
   beta-ready. Docker/Postgres was stopped during this checkpoint.
 
+## Zapier Connected Apps — 2026-10-29
+
+- [ZAPIER-CONNECTED-APPS.md](ZAPIER-CONNECTED-APPS.md) is the contract for the
+  specialist capability layer that runs through each contractor's own Zapier
+  MCP server (SCOUT reviews/leads, APPT calendar, INVO accounting, CALLIE
+  calls/text-back, SCHED day sheets).
+- Branch `feat/zapier-connected-apps` adds four tables (reviewed preview
+  `0020_zapier-connected-apps.sql`, source totals 146), the capability
+  registry, the execution ledger on top of `runDurableAction`, policy/budget
+  gates, the `zapier-connected-apps` scheduler stage, routes with inventory
+  entries, and the Settings → Connections card with the Zapier embed.
+- Deterministic tests pass on PGlite (14 ledger tests, 10 contract tests) and
+  both typechecks pass. No live Zapier round trip has been run; it requires
+  `ZAPIER_MCP_EMBED_ID`/`ZAPIER_MCP_EMBED_SECRET` and a contractor account.
+
 ## Completion discipline
 
 When any future phase finishes:

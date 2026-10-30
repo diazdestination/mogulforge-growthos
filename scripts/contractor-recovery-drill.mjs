@@ -177,6 +177,17 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     assert.deepEqual(await legacyFingerprint(),returningLegacyFingerprint);
     const schedulingSchema=await applySchedulingRecoveryDelta(source,{baseSha256:sha(base),migrations});
     migrations.push({file:'0019_saved-scheduling-policy.sql',sha256:schedulingSchema.delta.executedSha256});
+    // 0020 is additive only: four Zapier Connected Apps tables. Every prior
+    // table definition must be byte-identical before and after it applies.
+    const zapierBefore = await fingerprints(source);
+    assert.equal(Object.keys(zapierBefore.tables).length,142);
+    const zapierSql = (await readFile(new URL('../reports/staging-schema-preview-2026-10-01/0020_zapier-connected-apps.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
+    await source.exec(zapierSql);
+    const zapierAfter = await fingerprints(source);
+    assert.equal(Object.keys(zapierAfter.tables).length,146);
+    for (const [table,value] of Object.entries(zapierBefore.tables)) assert.deepEqual(zapierAfter.tables[table],value);
+    for (const table of ['zapier_mcp_connections','zapier_capability_bindings','zapier_specialist_policies','zapier_action_executions']) assert.equal(zapierAfter.tables[table].count,0);
+    migrations.push({ file: '0020_zapier-connected-apps.sql', sha256: sha(zapierSql) });
     const currentSchema = await tsImport('../lib/db/src/schema/index.ts', import.meta.url);
     const expected = generateDrizzleJson(currentSchema).tables;
     const actual = (await source.query("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,column_name")).rows;

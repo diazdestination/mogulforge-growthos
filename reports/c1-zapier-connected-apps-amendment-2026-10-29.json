@@ -1,0 +1,493 @@
+{
+  "version": 1,
+  "purpose": "Exact Zapier Connected Apps source successor for owner-approved PR73. Preserve every historical descriptor and proof. This is source identity only and grants no hosted, provider, schema, or release authority.",
+  "releaseEligible": false,
+  "authorization": {
+    "pullRequest": "https://github.com/diazdestination/mogulforge-growthos/pull/73",
+    "approvedHead": "7e5a5832041b00686dacbde68e977efde7527366",
+    "ownerApproval": "I approve",
+    "date": "2026-10-29"
+  },
+  "predecessor": {
+    "descriptorPath": "reports/c1-revenue-opportunities-amendment-2026-10-29.json",
+    "descriptorSha256": "33d9c44e46dbbc9d8ff071e6e46072c2a2dbd05eccdd35f35333481547824436",
+    "integration": {
+      "sourceCommit": "0db6be4cbffde55130dbbd1a7a61993489ed40c9",
+      "sourceTree": "58267423685da83830391266a459b38e86286178",
+      "scope": {
+        "count": 2124,
+        "sha256": "e4dd528c0b4ace7d638df724bf704b74bc33bfc43a3879bd8f9000a88dab35ea"
+      }
+    }
+  },
+  "scopePaths": [
+    "artifacts/api-server",
+    "lib"
+  ],
+  "base": {
+    "sourceCommit": "92bc8328825032579bbbbbd959231aadec8dad56",
+    "sourceTree": "d0aa5d98297a142fbe1bd65336ab17a52352bb98",
+    "parents": [
+      "f0d74ab4ab2db756637cf3b4ad306b33982c9688",
+      "6040545d9ad74bb318b71459e8816258a2616f11"
+    ],
+    "scope": {
+      "count": 2124,
+      "sha256": "e4dd528c0b4ace7d638df724bf704b74bc33bfc43a3879bd8f9000a88dab35ea"
+    }
+  },
+  "successor": {
+    "sourceCommit": "7e5a5832041b00686dacbde68e977efde7527366",
+    "sourceTree": "436cf70d055374f659f6088f9abed972563e599f",
+    "parents": [
+      "322ba89e5c508138063489720f09caf5e65819ad"
+    ],
+    "scope": {
+      "count": 2134,
+      "sha256": "0291108bb05805ab9a16f7cbdc9ff9e5b44f9f880d74ad613bc7ad7b880a3997"
+    }
+  },
+  "changes": [
+    {
+      "path": "artifacts/api-server/package.json",
+      "before": {
+        "path": "artifacts/api-server/package.json",
+        "mode": "100644",
+        "blob": "bbe35ebf0b11e33e6238f8512d9d3e978f07ecc9"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "aa1bd2caf773fb863edb31c55b07f5bc126e203d"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/lib/restore-mode.ts",
+      "before": {
+        "path": "artifacts/api-server/src/lib/restore-mode.ts",
+        "mode": "100644",
+        "blob": "0bfdd0f7ff22d6eda0735d657aadfa47dad6bca9"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "0eb47cf049af313594829b98f595283cda760ee9"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/lib/zapier-contract.test.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "7c6bf524ee3aae18359b08b2c67e70fd51b16d9d"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/index.ts",
+      "before": {
+        "path": "artifacts/api-server/src/routes/v1/index.ts",
+        "mode": "100644",
+        "blob": "b7e1b36355a77a0354381d0bd5d4fa906323fae1"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "212a94cfe6cd91a323f1b233264fb0936a81caa0"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/route-inventory.test.ts",
+      "before": {
+        "path": "artifacts/api-server/src/routes/v1/route-inventory.test.ts",
+        "mode": "100644",
+        "blob": "778fc11c5e33745788f65f5103b4a0b139c64e86"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "ef8600433e5ababe78b0a0aaee53045ad2ddebe7"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/zapier-integrations.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "49a6246e45fe7184fb38d77db8e501cb9c1138d9"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/automation.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/automation.ts",
+        "mode": "100644",
+        "blob": "8526dd57a2bae58d8ecf9be25882cc3701098a63"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "a1e91151cdebc9234e27d41da3d7f319194fd925"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/data-lifecycle-inventory-catalog.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/data-lifecycle-inventory-catalog.ts",
+        "mode": "100644",
+        "blob": "7cf140e7aa7ec879cb4142624c91b9664ed315af"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "10dfed0cf8ac2467e62b537352b94fdf5af26459"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/data-lifecycle-inventory.test.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/data-lifecycle-inventory.test.ts",
+        "mode": "100644",
+        "blob": "dff4cc580a745cf4a4b30dd330314bd8fd8648f7"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "432b62545b4d7371761c209152cc852679f29f00"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/scheduler-runtime.ts",
+      "before": {
+        "path": "artifacts/api-server/src/services/scheduler-runtime.ts",
+        "mode": "100644",
+        "blob": "454fa95e821ba6c54a8a0beaec58e56c7b8339cf"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "d1db7961bc2ce6d6b1e70f5aa95561dcf29c1c4d"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-capabilities.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "d3d0d0ef96d5425b965ce4816aad452c750ae558"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-connection.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "e40a39bc26ca09275e0b94e5e566766f4212de97"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-executions.test.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "bc4f3b15299f60e02c6fd2b41696bba446f60be0"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-executions.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "fbc75c130dffd5ee113d9ab71be4df7031089b6f"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-mcp-client.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "436cfe03f71c97c4441ac47f49f4b944f1e9e961"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-runtime.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "f4bb365d28e588e29b73dfe7e2b4ebfec8995848"
+      }
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-specialist-flows.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "dc825b21e1d2e4196e587063ee1b6740b67c924d"
+      }
+    },
+    {
+      "path": "lib/db/src/schema/index.ts",
+      "before": {
+        "path": "lib/db/src/schema/index.ts",
+        "mode": "100644",
+        "blob": "825b54f7161130daae2b25a5fc5659bdc0a4c2df"
+      },
+      "after": {
+        "mode": "100644",
+        "blob": "0adfa9df772c2b017bc27210e2149af07d916984"
+      }
+    },
+    {
+      "path": "lib/db/src/schema/zapier-connected-apps.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "blob": "646a5e5fc0eb2bf6498787d9fd11a27d706c1d36"
+      }
+    }
+  ],
+  "protectedChanges": [
+    {
+      "path": "artifacts/api-server/package.json",
+      "before": {
+        "path": "artifacts/api-server/package.json",
+        "mode": "100644",
+        "blob": "bbe35ebf0b11e33e6238f8512d9d3e978f07ecc9",
+        "bytes": 1791,
+        "sha256": "b798222fff9d3c40bf8ca68b254d4074bccba674c3f447a1085b15b70da029c0"
+      },
+      "after": {
+        "path": "artifacts/api-server/package.json",
+        "mode": "100644",
+        "blob": "aa1bd2caf773fb863edb31c55b07f5bc126e203d",
+        "bytes": 1835,
+        "sha256": "7d1c0f9f866ddb9a2059aaaa3f808f1670606b5d0febce9fff498294e12383ca"
+      }
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "before": {
+        "path": "pnpm-lock.yaml",
+        "blob": "14f8cb317178369bd995cb25258bf9d4529b5c82",
+        "bytes": 306022,
+        "sha256": "1ce9d652f019f2c906a0d0952cd3571761062214629a08253ec99777dd477c06",
+        "mode": "100644"
+      },
+      "after": {
+        "path": "pnpm-lock.yaml",
+        "mode": "100644",
+        "blob": "9e30fd8d75642d8d5d9d7ab1c44689801af1487b",
+        "bytes": 306119,
+        "sha256": "abd9e76a853e10ece56e628489e01ea23b07b39a71d7c2a513933b2283bf536b"
+      }
+    },
+    {
+      "path": "scripts/contractor-recovery-drill.mjs",
+      "before": {
+        "path": "scripts/contractor-recovery-drill.mjs",
+        "mode": "100644",
+        "blob": "a545aee81670ff6c587cfa6f8aefbcb589ca82ff",
+        "bytes": 40064,
+        "sha256": "2a66cc6a882240bd1c256cb94bce35b8c6935484361d18df8f335f6aad813ebe"
+      },
+      "after": {
+        "path": "scripts/contractor-recovery-drill.mjs",
+        "mode": "100644",
+        "blob": "d8c7aed1c0663a51479f4d43ef9ac15e4feb59f1",
+        "bytes": 41052,
+        "sha256": "fe3e5c7dfb643aa5171738a212795125a52e7729b02af640e0deb92154deeb38"
+      }
+    }
+  ],
+  "originalBlobs": [
+    {
+      "path": "artifacts/api-server/package.json",
+      "mode": "100644",
+      "blob": "bbe35ebf0b11e33e6238f8512d9d3e978f07ecc9",
+      "bytes": 1791,
+      "sha256": "b798222fff9d3c40bf8ca68b254d4074bccba674c3f447a1085b15b70da029c0"
+    },
+    {
+      "path": "artifacts/api-server/src/lib/restore-mode.ts",
+      "mode": "100644",
+      "blob": "0bfdd0f7ff22d6eda0735d657aadfa47dad6bca9",
+      "bytes": 5922,
+      "sha256": "112623d2708c243264f895b9e35de3474f22c5718bcdb5da53333a5234a40166"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/index.ts",
+      "mode": "100644",
+      "blob": "b7e1b36355a77a0354381d0bd5d4fa906323fae1",
+      "bytes": 5597,
+      "sha256": "944740b81f6428c972233bade97b61e0c5cc3cb5e56d2d2ced5e42e031d43b77"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/route-inventory.test.ts",
+      "mode": "100644",
+      "blob": "778fc11c5e33745788f65f5103b4a0b139c64e86",
+      "bytes": 29524,
+      "sha256": "3bd31a4e4f53ca1c4d4bd73872ff9c75611650f01027d3de37bf543d7db00f1f"
+    },
+    {
+      "path": "artifacts/api-server/src/services/automation.ts",
+      "mode": "100644",
+      "blob": "8526dd57a2bae58d8ecf9be25882cc3701098a63",
+      "bytes": 80693,
+      "sha256": "7337986389bba11b81f906f568e5a915ca6a6710cd4dade06a8fa8d379e67aa4"
+    },
+    {
+      "path": "artifacts/api-server/src/services/data-lifecycle-inventory-catalog.ts",
+      "mode": "100644",
+      "blob": "7cf140e7aa7ec879cb4142624c91b9664ed315af",
+      "bytes": 10596,
+      "sha256": "482565e5f32dd7521fee6c1041001c918a4fdd3d9e4ac532d7bbbe8fa1aa6717"
+    },
+    {
+      "path": "artifacts/api-server/src/services/data-lifecycle-inventory.test.ts",
+      "mode": "100644",
+      "blob": "dff4cc580a745cf4a4b30dd330314bd8fd8648f7",
+      "bytes": 17462,
+      "sha256": "5a1450923155ad8609d336b3672bdb8bfd7d37b70c789aae414b584cab06aba2"
+    },
+    {
+      "path": "artifacts/api-server/src/services/scheduler-runtime.ts",
+      "mode": "100644",
+      "blob": "454fa95e821ba6c54a8a0beaec58e56c7b8339cf",
+      "bytes": 7620,
+      "sha256": "4ce420ff139623ccebdaf4175ad12b1c9355d5f66fff25c27f8646ecf8661073"
+    },
+    {
+      "path": "lib/db/src/schema/index.ts",
+      "mode": "100644",
+      "blob": "825b54f7161130daae2b25a5fc5659bdc0a4c2df",
+      "bytes": 2204,
+      "sha256": "b6f46fd2a27a0eb82651f2ea27accbaecbe47d7f5e25a0e36a5d15bb984cb25e"
+    }
+  ],
+  "currentBlobs": [
+    {
+      "path": "artifacts/api-server/package.json",
+      "mode": "100644",
+      "blob": "aa1bd2caf773fb863edb31c55b07f5bc126e203d",
+      "bytes": 1835,
+      "sha256": "7d1c0f9f866ddb9a2059aaaa3f808f1670606b5d0febce9fff498294e12383ca"
+    },
+    {
+      "path": "artifacts/api-server/src/lib/restore-mode.ts",
+      "mode": "100644",
+      "blob": "0eb47cf049af313594829b98f595283cda760ee9",
+      "bytes": 5930,
+      "sha256": "fc138e7d13de2b1428927fbd0720c6e6cac4c43cf2f5fa231e893d6a4b9565ff"
+    },
+    {
+      "path": "artifacts/api-server/src/lib/zapier-contract.test.ts",
+      "mode": "100644",
+      "blob": "7c6bf524ee3aae18359b08b2c67e70fd51b16d9d",
+      "bytes": 6008,
+      "sha256": "c073a08860914fb8223fcdd98bac6b55169b5f58021883e273a994850c4262ef"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/index.ts",
+      "mode": "100644",
+      "blob": "212a94cfe6cd91a323f1b233264fb0936a81caa0",
+      "bytes": 5697,
+      "sha256": "4d09b3e849add1d55b6fa9a91edb5e33c771a4c612fc0f477996b3128cdf6cd7"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/route-inventory.test.ts",
+      "mode": "100644",
+      "blob": "ef8600433e5ababe78b0a0aaee53045ad2ddebe7",
+      "bytes": 31477,
+      "sha256": "6b9cc9170ec3191a32e11d66c614aa3cb434615ef4cd552c797766dc384e2344"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/v1/zapier-integrations.ts",
+      "mode": "100644",
+      "blob": "49a6246e45fe7184fb38d77db8e501cb9c1138d9",
+      "bytes": 12748,
+      "sha256": "1d2f729c8b32c641237003d15acc79028b02f3f0aa5174d2da3871e106dd155b"
+    },
+    {
+      "path": "artifacts/api-server/src/services/automation.ts",
+      "mode": "100644",
+      "blob": "a1e91151cdebc9234e27d41da3d7f319194fd925",
+      "bytes": 80966,
+      "sha256": "267ff88088c38578e3cac757702a9d01b35a2acce654c7191feeefd0b5bd3b5b"
+    },
+    {
+      "path": "artifacts/api-server/src/services/data-lifecycle-inventory-catalog.ts",
+      "mode": "100644",
+      "blob": "10dfed0cf8ac2467e62b537352b94fdf5af26459",
+      "bytes": 10811,
+      "sha256": "d99067911a23f8862e31e79f7a3c9d444162abc643cc56a1dfffe362658c7008"
+    },
+    {
+      "path": "artifacts/api-server/src/services/data-lifecycle-inventory.test.ts",
+      "mode": "100644",
+      "blob": "432b62545b4d7371761c209152cc852679f29f00",
+      "bytes": 17462,
+      "sha256": "d563ab92974ff7ff4c85052253bc4b3af8187d43a57d4d959e71409b8998dfa8"
+    },
+    {
+      "path": "artifacts/api-server/src/services/scheduler-runtime.ts",
+      "mode": "100644",
+      "blob": "d1db7961bc2ce6d6b1e70f5aa95561dcf29c1c4d",
+      "bytes": 7647,
+      "sha256": "735e496e416136a1e3d506292b1a2b7c5662fbc7b0f7a1a2f38ad242b1a6458d"
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-capabilities.ts",
+      "mode": "100644",
+      "blob": "d3d0d0ef96d5425b965ce4816aad452c750ae558",
+      "bytes": 14133,
+      "sha256": "63faf4bd2573b4e030e3f3d0d227e507f9b561e2de81644870385df627031022"
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-connection.ts",
+      "mode": "100644",
+      "blob": "e40a39bc26ca09275e0b94e5e566766f4212de97",
+      "bytes": 20721,
+      "sha256": "040b209aacbb6743d2e67f3645efa874f48e738239f5d32b08d00cb40360e911"
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-executions.test.ts",
+      "mode": "100644",
+      "blob": "bc4f3b15299f60e02c6fd2b41696bba446f60be0",
+      "bytes": 22687,
+      "sha256": "ba59b744c6d075df97833f77706259d52dec177c5682c32555c4baee47286a92"
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-executions.ts",
+      "mode": "100644",
+      "blob": "fbc75c130dffd5ee113d9ab71be4df7031089b6f",
+      "bytes": 20358,
+      "sha256": "b9146244074178633ee4c9e9e322c4e30a5ba2e9ff88741e2157cb0c50e4ca75"
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-mcp-client.ts",
+      "mode": "100644",
+      "blob": "436cfe03f71c97c4441ac47f49f4b944f1e9e961",
+      "bytes": 9292,
+      "sha256": "8f5bc1887e64ce7ce76142d491a263dcba3065fa91d1e0cac2db21027f0ce9e1"
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-runtime.ts",
+      "mode": "100644",
+      "blob": "f4bb365d28e588e29b73dfe7e2b4ebfec8995848",
+      "bytes": 2923,
+      "sha256": "76ac06140d35163e8d5d99ba830da62bacfe0926212450d99c467218b621d963"
+    },
+    {
+      "path": "artifacts/api-server/src/services/zapier/zapier-specialist-flows.ts",
+      "mode": "100644",
+      "blob": "dc825b21e1d2e4196e587063ee1b6740b67c924d",
+      "bytes": 23327,
+      "sha256": "bb426c00640d236f23e3ba8d020ef8e0ff6e73b3cc454aa04833bb28577b98ab"
+    },
+    {
+      "path": "lib/db/src/schema/index.ts",
+      "mode": "100644",
+      "blob": "0adfa9df772c2b017bc27210e2149af07d916984",
+      "bytes": 2245,
+      "sha256": "2506ee69fbc2c34efaa5cb344b6d14cdb7f6ab021f7c7b88658da2e16faddb29"
+    },
+    {
+      "path": "lib/db/src/schema/zapier-connected-apps.ts",
+      "mode": "100644",
+      "blob": "646a5e5fc0eb2bf6498787d9fd11a27d706c1d36",
+      "bytes": 9678,
+      "sha256": "266e9266e83b0ba4709ac8bde4f13303049bbe74f51e5fc5131252c642c5c070"
+    }
+  ]
+}

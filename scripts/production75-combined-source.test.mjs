@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PINNED_FILES, SOURCE_COMMIT } from './production75-pins.mjs';
 import { assertC1SourcePreserved } from './c1-source-preservation.mjs';
@@ -26,11 +27,17 @@ test('combined source retains all19 original SQL Git bytes and original main lin
 
 test('combined source retains all eight original proof objects and validates the separate C1 proof extension', () => {
   assert.equal(manifest.protected.length, 8);
+  // The owner-approved PR73 amendment re-pins the lockfile (one promoted api-server
+  // dependency); its historical blob stays verifiable while the index follows the amendment.
+  const zapier = JSON.parse(readFileSync(new URL('../reports/c1-zapier-connected-apps-amendment-2026-10-29.json', import.meta.url), 'utf8'));
   for (const pin of manifest.protected) {
     checkBytes(git('cat-file','blob',pin.blob), pin);
+    const repin = zapier.protectedChanges.find(change => change.path === pin.path);
     if(pin.path!=='scripts/contractor-recovery-drill.mjs') {
-      checkBytes(indexedBytes(pin.path),pin);
-      assert.equal(git('rev-parse', `:${pin.path}`).toString().trim(),pin.blob);
+      const current = repin ? { ...pin, ...repin.after } : pin;
+      if (repin) assert.equal(repin.before.blob, pin.blob, `${pin.path}: amendment base blob`);
+      checkBytes(indexedBytes(pin.path),current);
+      assert.equal(git('rev-parse', `:${pin.path}`).toString().trim(),current.blob);
     }
   }
   // The index hash checks are also meaningful for an unstaged local worktree.
@@ -49,7 +56,7 @@ test('a same-size altered protected buffer fails the same preservation check', (
   assert.throws(() => checkBytes(altered, pin), /exact Git bytes/);
 });
 
-test('complete API and library index equals the approved revenue successor while preserving the inquiry proof', () => {
+test('complete API and library index equals the approved Zapier Connected Apps successor while preserving the revenue proof', () => {
   const entries = git('ls-files', '--stage', '--', ...manifest.scope.paths).toString().trim().split('\n').map(line => {
     const [meta, path] = line.split('\t');
     const [mode, blob, stage] = meta.split(' ');
@@ -64,8 +71,9 @@ test('complete API and library index equals the approved revenue successor while
   assert.deepEqual(proof.smartSiteAmendment.integration.scope,{count:2120,sha256:'99a7972dbcb95bf3bc32190bcb0deac1a18c6b59907f8e0184d8e0983fd5b254'});
   assert.deepEqual(proof.launchGapAmendment.integration.scope,{count:2123,sha256:'f8ea5fb8a91a065097e3649996fe4fdfc0e5063f5a0cda1843626b95c99ec472'});
   assert.deepEqual(proof.inquiryConsentAmendment.integration.scope,{count:2123,sha256:'c0519f20f3cf8e0e26ac1aa6d19701e4c587450fd82d6c4d8b359070703ef497'});
-  assert.equal(entries.length,2124);
-  assert.equal(proof.currentScope.sha256,'e4dd528c0b4ace7d638df724bf704b74bc33bfc43a3879bd8f9000a88dab35ea');
+  assert.deepEqual(proof.revenueOpportunitiesAmendment.scope,{count:2124,sha256:'e4dd528c0b4ace7d638df724bf704b74bc33bfc43a3879bd8f9000a88dab35ea'});
+  assert.equal(entries.length,2134);
+  assert.equal(proof.currentScope.sha256,'0291108bb05805ab9a16f7cbdc9ff9e5b44f9f880d74ad613bc7ad7b880a3997');
   assert.equal(entries.length,proof.currentScope.count);
   assert.equal(sha(JSON.stringify(entries)),proof.currentScope.sha256);
   assert.equal(proof.releaseEligible,false);

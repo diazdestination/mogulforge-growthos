@@ -49,6 +49,31 @@ const REVENUE_PATHS = [
   'artifacts/api-server/src/routes/v1/next-best-action.ts',
   'artifacts/api-server/src/routes/v1/route-inventory.test.ts',
 ];
+// Owner-approved PR73 is a separate successor; every historical pin stays frozen.
+const zapierAmendmentPath = 'reports/c1-zapier-connected-apps-amendment-2026-10-29.json';
+const zapierAmendmentSha256 = 'd3c65fda9efaf1dbda7ada0184484d89090c037378fd2196376612fb08b8c811';
+const ZAPIER_PROTECTED_PATHS = ['artifacts/api-server/package.json','pnpm-lock.yaml','scripts/contractor-recovery-drill.mjs'];
+const ZAPIER_PATHS = [
+  'artifacts/api-server/package.json',
+  'artifacts/api-server/src/lib/restore-mode.ts',
+  'artifacts/api-server/src/lib/zapier-contract.test.ts',
+  'artifacts/api-server/src/routes/v1/index.ts',
+  'artifacts/api-server/src/routes/v1/route-inventory.test.ts',
+  'artifacts/api-server/src/routes/v1/zapier-integrations.ts',
+  'artifacts/api-server/src/services/automation.ts',
+  'artifacts/api-server/src/services/data-lifecycle-inventory-catalog.ts',
+  'artifacts/api-server/src/services/data-lifecycle-inventory.test.ts',
+  'artifacts/api-server/src/services/scheduler-runtime.ts',
+  'artifacts/api-server/src/services/zapier/zapier-capabilities.ts',
+  'artifacts/api-server/src/services/zapier/zapier-connection.ts',
+  'artifacts/api-server/src/services/zapier/zapier-executions.test.ts',
+  'artifacts/api-server/src/services/zapier/zapier-executions.ts',
+  'artifacts/api-server/src/services/zapier/zapier-mcp-client.ts',
+  'artifacts/api-server/src/services/zapier/zapier-runtime.ts',
+  'artifacts/api-server/src/services/zapier/zapier-specialist-flows.ts',
+  'lib/db/src/schema/index.ts',
+  'lib/db/src/schema/zapier-connected-apps.ts',
+];
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const json = bytes => JSON.parse(Buffer.from(bytes).toString('utf8'));
 const sorted = entries => [...entries].sort((a,b) => Buffer.compare(Buffer.from(a.path),Buffer.from(b.path)));
@@ -92,6 +117,10 @@ function checkedInquiryAmendment(bytes) {
 }
 function checkedRevenueAmendment(bytes) {
   assert.equal(hash(bytes),revenueAmendmentSha256,'C1 Revenue Opportunities amendment changed');
+  return json(bytes);
+}
+function checkedZapierAmendment(bytes) {
+  assert.equal(hash(bytes),zapierAmendmentSha256,'C1 Zapier Connected Apps amendment changed');
   return json(bytes);
 }
 /** Applies the reviewed amendment to the exact C1 overlay map; only test-only paths may change. */
@@ -153,6 +182,18 @@ export function applyC1RevenueAmendment(expected, changes) {
   }
   return next;
 }
+/** Only the exact approved Zapier Connected Apps successor may extend the prior complete map; new files have no base entry. */
+export function applyC1ZapierAmendment(expected, changes) {
+  assert.equal(new Set(changes.map(change=>change.path)).size,changes.length,'C1 zapier duplicate path');
+  assert.deepEqual(sorted(changes).map(change=>change.path),ZAPIER_PATHS,'C1 zapier path coverage changed');
+  const next=new Map(expected);
+  for(const change of changes){
+    assert.deepEqual(next.get(change.path)??null,change.before,'C1 zapier base path changed');
+    assert.ok(change.after,'C1 zapier successor cannot delete source');
+    next.set(change.path,{path:change.path,...change.after});
+  }
+  return next;
+}
 /** Reconstruct a complete source body; no product code is imported or executed. */
 export function composeC1InquiryManualSms(predecessorBytes,componentBytes) {
   const predecessor=Buffer.from(predecessorBytes).toString('utf8'),component=Buffer.from(componentBytes).toString('utf8');
@@ -175,6 +216,7 @@ export function loadC1SourceSnapshot() {
   const launchGapAmendment=git('show',`:${launchGapAmendmentPath}`),g=checkedLaunchGapAmendment(launchGapAmendment);
   const inquiryAmendment=git('show',`:${inquiryAmendmentPath}`),i=checkedInquiryAmendment(inquiryAmendment);
   const revenueAmendment=git('show',`:${revenueAmendmentPath}`),r=checkedRevenueAmendment(revenueAmendment);
+  const zapierAmendment=git('show',`:${zapierAmendmentPath}`),z=checkedZapierAmendment(zapierAmendment);
   const index=parseC1Index(git('ls-files','--stage'));
   const indexed = new Map(index.map(row=>[row.path,row]));
   const rows = pins => pins.map(pin=>({path:pin.path,...indexed.get(pin.path),bytes:git('show',`:${pin.path}`)}));
@@ -194,13 +236,20 @@ export function loadC1SourceSnapshot() {
   const gapAuxiliaryPaths=g.auxiliary.flatMap(group=>group.paths);
   const protectedPaths=[...new Set([descriptorPath,amendmentPath,smartSiteAmendmentPath,launchGapAmendmentPath,inquiryAmendmentPath,...gapAuxiliaryPaths,...s.auxiliary.paths,...d.scopePaths,...d.originalProtected.map(p=>p.path),...d.sql.map(p=>p.path),...d.runtime.map(p=>p.path),...d.approvals.map(p=>p.path),'scripts/c1-source-preservation.mjs','scripts/c1-source-preservation.test.mjs','scripts/production75-combined-source.test.mjs'])];
   protectedPaths.push(revenueAmendmentPath,'scripts/c1-revenue-source.test.mjs');
+  protectedPaths.push(zapierAmendmentPath,'scripts/c1-zapier-source.test.mjs');
   return {
     descriptor,
     revenueAmendment,
     revenueBase:revenueIdentity(r.base),
     revenueSource:revenueIdentity(r.successor),
     revenueOriginal:historicalRows(r.base.sourceCommit,r.originalBlobs),
-    revenueCurrent:rows(r.currentBlobs),
+    // PR73 changes two revenue paths, so the revenue successor's bytes are read at its exact commit, not the live index.
+    revenueCurrent:historicalRows(z.base.sourceCommit,r.currentBlobs),
+    zapierAmendment,
+    zapierBase:revenueIdentity(z.base),
+    zapierSource:revenueIdentity(z.successor),
+    zapierOriginal:historicalRows(z.base.sourceCommit,z.originalBlobs),
+    zapierCurrent:rows(z.currentBlobs),
     legacyManifest:git('show',`${d.overlay.sourceCommit}:${d.legacyManifest.path}`),
     currentManifest:git('show',`:${d.legacyManifest.path}`),
     legacyTree:text('rev-parse',`${d.legacy.sourceCommit}^{tree}`),
@@ -398,6 +447,30 @@ function verifyRevenue(snapshot,inquiry,scopePaths) {
   verifyIndexedRows(snapshot.revenueCurrent,r.currentBlobs);
   return {...r.successor,changedPaths:r.changes.map(change=>change.path),amendmentSha256:revenueAmendmentSha256,releaseEligible:false};
 }
+function verifyZapier(snapshot,revenue,scopePaths) {
+  const z=checkedZapierAmendment(snapshot.zapierAmendment);
+  assert.equal(z.releaseEligible,false,'C1 zapier amendment cannot grant release');
+  assert.deepEqual(z.predecessor,{descriptorPath:revenueAmendmentPath,descriptorSha256:revenueAmendmentSha256,integration:{sourceCommit:revenue.sourceCommit,sourceTree:revenue.sourceTree,scope:revenue.scope}},'C1 zapier predecessor changed');
+  assert.deepEqual(z.scopePaths,scopePaths,'C1 zapier scope paths changed');
+  assert.deepEqual(z.base.scope,revenue.scope,'C1 zapier historical base scope changed');
+  for(const [key,pin] of [['zapierBase',z.base],['zapierSource',z.successor]]){
+    const actual=snapshot[key];
+    assert.equal(actual.commit,pin.sourceCommit,'C1 zapier commit changed');
+    assert.equal(actual.tree,pin.sourceTree,'C1 zapier tree changed');
+    assert.deepEqual(actual.parents,pin.parents,'C1 zapier parents changed');
+    assert.equal(actual.isAncestor,true,'C1 zapier lineage changed');
+    assert.deepEqual(scope(actual.product),pin.scope,'C1 zapier historical complete product map changed');
+  }
+  const expected=sorted([...applyC1ZapierAmendment(new Map(snapshot.zapierBase.product.map(row=>[row.path,row])),z.changes).values()]);
+  assert.deepEqual(sorted(snapshot.zapierSource.product),expected,'C1 zapier approved source union changed');
+  assert.deepEqual(sorted(snapshot.currentProduct),expected,'C1 zapier current complete source union changed');
+  assert.deepEqual(scope(snapshot.currentProduct),z.successor.scope,'C1 zapier current complete scope changed');
+  assert.deepEqual(z.originalBlobs.map(({path,mode,blob})=>({path,mode,blob})),z.changes.filter(change=>change.before).map(change=>change.before),'C1 zapier original pin coverage changed');
+  assert.deepEqual(z.currentBlobs.map(({path,mode,blob})=>({path,mode,blob})),z.changes.map(change=>({path:change.path,...change.after})),'C1 zapier current pin coverage changed');
+  verifyIndexedRows(snapshot.zapierOriginal,z.originalBlobs);
+  verifyIndexedRows(snapshot.zapierCurrent,z.currentBlobs);
+  return {...z.successor,changedPaths:z.changes.map(change=>change.path),amendmentSha256:zapierAmendmentSha256,releaseEligible:false};
+}
 export function verifyC1SourceSnapshot(snapshot) {
   const d=checkedDescriptor(snapshot.descriptor);
   assert.equal(hash(snapshot.legacyManifest),d.legacyManifest.sha256,'C1 historical manifest changed');
@@ -457,7 +530,8 @@ export function verifyC1SourceSnapshot(snapshot) {
   // Re-run the unchanged launch-gap contract against its exact historical predecessor view.
   const launchGapAmendment=verifyLaunchGap({...snapshot,currentProduct:snapshot.inquiryPredecessorProduct},composed,s,d.scopePaths);
   const inquiryConsentAmendment=verifyInquiry({...snapshot,currentProduct:snapshot.revenueBase.product},launchGapAmendment,d.scopePaths);
-  const revenueOpportunitiesAmendment=verifyRevenue(snapshot,inquiryConsentAmendment,d.scopePaths);
+  const revenueOpportunitiesAmendment=verifyRevenue({...snapshot,currentProduct:snapshot.zapierBase.product},inquiryConsentAmendment,d.scopePaths);
+  const zapierConnectedAppsAmendment=verifyZapier(snapshot,revenueOpportunitiesAmendment,d.scopePaths);
   assert.deepEqual(s.originalBlobs.map(pin=>pin.path),s.changes.filter(change=>change.before).map(change=>change.path),'C1 Smart Site original coverage changed');
   assert.deepEqual(s.currentBlobs.map(pin=>pin.path),SMART_SITE_PATHS,'C1 Smart Site current coverage changed');
   verifyRows(snapshot.smartSiteOriginal,s.originalBlobs.map(({mode,...pin})=>pin));
@@ -473,13 +547,27 @@ export function verifyC1SourceSnapshot(snapshot) {
   verifyRows(snapshot.historicalProtected,d.originalProtected);
   verifyRows(snapshot.historicalProduct,d.originalProductBlobs.map(({mode,...pin})=>pin));
   verifyRows(snapshot.currentProductBytes,d.currentProductBlobs);
-  verifyRows(snapshot.currentProtected,d.originalProtected.map(pin=>pin.path===d.amendedDrill.path?d.amendedDrill:{...pin,mode:d.originalProtectedModes[pin.path]}));
-  verifyRows(snapshot.sql,d.sql);verifyRows(snapshot.runtime,d.runtime);verifyRows(snapshot.approvals,d.approvals);
+  // PR73 extends the recovery drill with the additive 0020 preview and promotes one api-server dependency
+  // (package.json + lockfile). The approved amendment re-pins exactly those three protected files; every other pin stays frozen.
+  const protectedBefore=d.originalProtected.map(pin=>pin.path===d.amendedDrill.path?d.amendedDrill:{...pin,mode:d.originalProtectedModes[pin.path]});
+  const z=checkedZapierAmendment(snapshot.zapierAmendment);
+  assert.deepEqual(sorted(z.protectedChanges).map(change=>change.path),ZAPIER_PROTECTED_PATHS,'C1 zapier protected coverage changed');
+  const repinned=pins=>pins.map(pin=>{
+    const change=z.protectedChanges.find(item=>item.path===pin.path);
+    if(!change)return pin;
+    assert.equal(change.before.blob,pin.blob,'C1 zapier protected base pin changed');
+    assert.equal(change.before.bytes,pin.bytes,'C1 zapier protected base pin changed');
+    assert.equal(change.before.sha256,pin.sha256,'C1 zapier protected base pin changed');
+    assert.equal(change.after.path,pin.path,'C1 zapier protected path changed');
+    return {...pin,...Object.fromEntries(Object.entries(change.after).filter(([key])=>key in pin))};
+  });
+  verifyRows(snapshot.currentProtected,repinned(protectedBefore));
+  verifyRows(snapshot.sql,d.sql);verifyRows(snapshot.runtime,repinned(d.runtime));verifyRows(snapshot.approvals,d.approvals);
   assert.equal(snapshot.workingDiff,'','C1 scoped worktree differs from its index');
   assert.equal(snapshot.untracked,'','C1 untracked scoped source is not reviewed');
   assert.equal(snapshot.auxiliaryUntracked,'','C1 untracked auxiliary executable source is not reviewed');
   return {legacy:d.legacy,overlay:d.overlay,changedProductPaths:d.changes.map(change=>change.path),amendedProof:d.amendedDrill,descriptorSha256,
     testOnlyAmendment:{...a.amendment,changedPaths:a.changes.map(change=>change.path),amendmentSha256},
-    smartSiteAmendment:{...s.smartSite,changedPaths:s.changes.map(change=>change.path),reviewedB:s.reviewedB,integration:s.integration,auxiliaryScope:s.auxiliary.scope,amendmentSha256:smartSiteAmendmentSha256},launchGapAmendment,inquiryConsentAmendment,revenueOpportunitiesAmendment,currentScope:revenueOpportunitiesAmendment.scope,releaseEligible:false};
+    smartSiteAmendment:{...s.smartSite,changedPaths:s.changes.map(change=>change.path),reviewedB:s.reviewedB,integration:s.integration,auxiliaryScope:s.auxiliary.scope,amendmentSha256:smartSiteAmendmentSha256},launchGapAmendment,inquiryConsentAmendment,revenueOpportunitiesAmendment,zapierConnectedAppsAmendment,currentScope:zapierConnectedAppsAmendment.scope,releaseEligible:false};
 }
 export const assertC1SourcePreserved = () => verifyC1SourceSnapshot(loadC1SourceSnapshot());
