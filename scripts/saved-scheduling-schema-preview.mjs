@@ -19,6 +19,7 @@ const additions = [
   ['appointments', 'scheduling_reservation', 'appointments_scheduling_reservation_ck'],
   ['projects', 'scheduling_reservation', 'projects_scheduling_reservation_ck'],
 ];
+const SUCCESSOR_0020_TABLES = ['public.zapier_action_executions', 'public.zapier_capability_bindings', 'public.zapier_mcp_connections', 'public.zapier_specialist_policies'];
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 function guard(value, code) { if (!value) throw new Error(`scheduling_${code}`); }
 
@@ -91,6 +92,11 @@ export async function runSchedulingSchemaPreview({ writeMigration = false } = {}
     for (const file of files) await writeFile(join(temporary, basename(file)), execFileSync('git', ['show', `${base}:${file}`], { cwd: root, windowsHide: true }), { flag: 'wx' });
     const before = generateDrizzleJson(await tsImport(pathToFileURL(join(temporary, 'index.ts')).href, import.meta.url));
     const after = generateDrizzleJson(await tsImport('../lib/db/src/schema/index.ts', import.meta.url));
+    // Owner-approved PR73 (reviewed preview 0020) adds exactly four tables after 0019. They are
+    // verified by the recovery drill; here they are set aside so the 0019 delta stays exact.
+    const successorTables = Object.keys(after.tables).filter(identity => !before.tables[identity]).sort();
+    guard(successorTables.join(',') === SUCCESSOR_0020_TABLES.join(','), 'successor_tables_changed');
+    for (const identity of SUCCESSOR_0020_TABLES) delete after.tables[identity];
     const delta = verifySchedulingDelta(before, after);
     const statements = await generateMigration(before, after);
     guard(statements.length === 6, 'migration_statement_count');
@@ -100,7 +106,7 @@ export async function runSchedulingSchemaPreview({ writeMigration = false } = {}
       '-- Three nullable JSONB columns and bounded envelope CHECKs only. No default/backfill.\n' + generatedSql, { flag: 'wx' });
     const migrationBytes = await readFile(migrationUrl);
     verifyMigrationSql(migrationBytes.toString('utf8'), statements);
-    return { base, ...delta, statements: statements.length, predecessorFiles: pins.files.length, canonicalPredecessors: predecessors.length,
+    return { base, ...delta, successorTables: successorTables.length, statements: statements.length, predecessorFiles: pins.files.length, canonicalPredecessors: predecessors.length,
       pinnedFiles: pins.files, predecessors, migrationSha256: sha(migrationBytes), databaseOpened: false };
   } finally {
     // Remove only this call's validated fresh schema child.
