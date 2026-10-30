@@ -1,3 +1,5 @@
+> **Superseded on 2026-10-29 by [BETA-LAUNCH-PLAN.md](BETA-LAUNCH-PLAN.md).** Kept as history.
+
 # GrowthOS public-launch readiness ledger — September 30, 2026
 
 **Decision: not ready for public launch or paid beta.** This ledger is an

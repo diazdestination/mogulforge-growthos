@@ -5,6 +5,10 @@ repository. Read the imported resume pack before planning or editing.
 
 @GROWTHOS-RESUME.md
 
+The working plan is [BETA-LAUNCH-PLAN.md](BETA-LAUNCH-PLAN.md) (2026-10-29). The
+feature freeze, the C1 source-preservation amendment ritual and the Fly
+migration path are retired; the safety boundaries below are not.
+
 ## Identity and scope
 
 - Canonical local checkout: `C:\Users\diazd\dev\projects\mogulforge`
