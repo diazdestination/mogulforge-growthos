@@ -1,3 +1,5 @@
+> **Superseded on 2026-10-29 by [BETA-LAUNCH-PLAN.md](BETA-LAUNCH-PLAN.md).** The P0 directive and its feature freeze are no longer binding; this file is kept as history.
+
 # GrowthOS Paid Beta Readiness — P0 Execution Order
 
 **Status:** ACTIVE RELEASE DIRECTIVE  
