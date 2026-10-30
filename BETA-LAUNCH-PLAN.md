@@ -51,7 +51,7 @@ are code to write.
 | Specialist | Setup (needs a credential) | Planned (needs code) |
 | --- | --- | --- |
 | ESTI | — | Price books & margin guidance — **built (Price Book page + ESTI margin check on estimates)** |
-| BILL | — | Card & bank collection (Stripe) |
+| BILL | Card & bank collection — **built on Stripe Connect; needs Connect enabled + `STRIPE_CONNECT_WEBHOOK_SECRET`** | — |
 | INVO | Invoice email delivery (Gmail OAuth / Resend) | — |
 | SCHED | — | Automatic route optimization |
 | APPT | Customer confirmations (SMS/email) | External calendar sync — **closed by Zapier Connected Apps (PR #73)** |

@@ -66,8 +66,8 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       },
       {
         "title": "Card & bank collection",
-        "stage": "planned",
-        "reality": "Taking customer card or bank payments is a future add-on. Use your established payment process today."
+        "stage": "setup",
+        "reality": "Connect your own Stripe account in Settings, then send a card or bank payment link from any issued invoice. Stripe-confirmed payments are recorded on the invoice; money goes straight to you."
       }
     ]
   },

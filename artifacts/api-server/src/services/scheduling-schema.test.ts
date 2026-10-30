@@ -143,7 +143,7 @@ afterAll(async () => {
 it('provisions all three nullable no-default JSONB fields explicitly in the runner schema', async () => {
   const actual = await catalog(current);
   for (const surface of surfaces) expect(actual.columns.find(row => row.table_name === surface.table && row.column_name === surface.column)).toMatchObject({ data_type: 'jsonb', is_nullable: 'YES', column_default: null });
-  expect(actual.tables).toHaveLength(147);
+  expect(actual.tables).toHaveLength(149);
 });
 
 it('appends 0019 to all 19 predecessors without changing any prior catalog definition or row', async () => {

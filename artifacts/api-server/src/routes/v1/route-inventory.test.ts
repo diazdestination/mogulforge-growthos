@@ -411,6 +411,15 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "PATCH /price-book/items/:id": "settings.manage",
   "DELETE /price-book/items/:id": "settings.manage",
   "POST /price-book/margin-preview": "crm.read",
+  // BILL card & bank collection (Stripe Connect). Connecting the company's
+  // account is settings authority (session-only in the router); payment links
+  // need invoice management; link state is readable with invoice access.
+  "GET /payments/stripe": "invoices.read",
+  "POST /payments/stripe/connect": "settings.manage",
+  "POST /payments/stripe/refresh": "settings.manage",
+  "DELETE /payments/stripe": "settings.manage",
+  "GET /invoices/:id/payment-links": "invoices.read",
+  "POST /invoices/:id/payment-links": "invoices.manage",
   // Email Intelligence source configuration is owner/admin controlled. All
   // members may inspect tenant facts; writers disposition findings.
   "GET /email-intelligence": "crm.read",

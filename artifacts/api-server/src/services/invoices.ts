@@ -985,6 +985,7 @@ export async function recordInvoicePayment(
   id: string,
   raw: unknown,
   effectiveRole?: UserRole,
+  options: { evidence?: "staff_recorded" | "stripe_checkout" } = {},
 ) {
   const parsed = invoicePaymentSchema.parse(raw);
   const input = {
@@ -1054,7 +1055,7 @@ export async function recordInvoicePayment(
         ...(row.customerWorkId ? {customerWorkId:row.customerWorkId} : {}),
         invoiceId: row.id,
         kind: "payment",
-        evidence: "staff_recorded",
+        evidence: options.evidence ?? "staff_recorded",
         providerEffect: false,
       },
     });

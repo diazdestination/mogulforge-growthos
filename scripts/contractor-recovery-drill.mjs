@@ -196,6 +196,14 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     for (const [table,value] of Object.entries(zapierAfter.tables)) assert.deepEqual(priceBookAfter.tables[table],value);
     assert.equal(priceBookAfter.tables.price_book_items.count,0);
     migrations.push({ file: '0021_esti-price-book.sql', sha256: sha(priceBookSql) });
+    // 0022 adds the BILL Stripe Connect tables; every prior definition must be unchanged.
+    const stripeSql = (await readFile(new URL('../reports/staging-schema-preview-2026-10-01/0022_bill-stripe-collection.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
+    await source.exec(stripeSql);
+    const stripeAfter = await fingerprints(source);
+    assert.equal(Object.keys(stripeAfter.tables).length,149);
+    for (const [table,value] of Object.entries(priceBookAfter.tables)) assert.deepEqual(stripeAfter.tables[table],value);
+    for (const table of ['stripe_connect_accounts','invoice_payment_links']) assert.equal(stripeAfter.tables[table].count,0);
+    migrations.push({ file: '0022_bill-stripe-collection.sql', sha256: sha(stripeSql) });
     const currentSchema = await tsImport('../lib/db/src/schema/index.ts', import.meta.url);
     const expected = generateDrizzleJson(currentSchema).tables;
     const actual = (await source.query("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,column_name")).rows;
