@@ -18,7 +18,7 @@ import { ZapierFlowActions } from './zapier-flow-actions';
  * one enabled action and governed by an off / approve / auto policy.
  */
 
-const CUSTOMER_TEXT_KEYS = ['appt.sms.send', 'maintain.sms.send', 'callie.sms.send'];
+const CUSTOMER_TEXT_KEYS = ['appt.sms.send', 'maintain.sms.send'];
 
 type ZapierStatus = {
   configured: boolean;
@@ -449,7 +449,7 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
                     <div className="min-w-0 flex-1 text-sm">
                       <div className="font-medium">{execution.specialistId.toUpperCase()} · {execution.capability}</div>
                       <div className="truncate text-muted-foreground">
-                        {Object.entries(execution.requestSummary).map(([key, value]) => `${key}: ${String(value)}`).join(' · ') || execution.detail}
+                        {Object.entries(execution.requestSummary).filter(([key]) => key !== 'appointmentReminderScheduledActionId').map(([key, value]) => `${key}: ${String(value)}`).join(' · ') || execution.detail}
                       </div>
                     </div>
                     <Button size="sm" onClick={() => void decide(execution, 'approve')} disabled={busy !== null || !canManage}>

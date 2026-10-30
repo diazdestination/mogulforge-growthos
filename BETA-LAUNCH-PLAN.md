@@ -63,7 +63,9 @@ Zapier Connected Apps (`ZAPIER-CONNECTED-APPS.md`) lets CALLIE (missed-call
 text-back), SCHED (crew day sheets), APPT (appointment reminders) and MAINTAIN
 (service reminders) text from the contractor's own number in Quo or their own
 Twilio account, which does not depend on MogulForge's Twilio A2P registration.
-The contractor completes carrier registration inside their phone app.
+The contractor completes the registration and sender approval required by their
+own provider before enabling customer texts. App connection is not proof of
+delivery or carrier approval.
 
 ## Owner inputs still required
 

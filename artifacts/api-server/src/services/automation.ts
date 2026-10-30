@@ -816,10 +816,12 @@ async function executeAction(
         if (await flows.zapierCustomerSmsRoute(organizationId, "appt.sms.send")) {
           let state: string;
           try {
-            const outcome = await flows.apptRequestReminderText({ organizationId, appointmentId, actorUserId: null, expectedStart: appointment.scheduledStart.toISOString() });
+            const outcome = await flows.apptRequestReminderText({ organizationId, appointmentId, actorUserId: null, expectedStart: appointment.scheduledStart.toISOString(), scheduledActionId });
             state = outcome.execution.state;
           } catch (error) {
-            state = `refused: ${error instanceof Error ? error.message : "unknown"}`;
+            // A conflict or database/audit error may follow an external effect.
+            // Retain the original receipt and hold; an exception never proves no text.
+            throw error;
           }
           if (["pending_approval", "executing", "succeeded", "indeterminate"].includes(state)) {
             if (appointment.leadId) {
@@ -836,13 +838,20 @@ async function executeAction(
             await audit({ appointmentId, channel: "sms", provider: "zapier", zapierState: state, to: contact.phone });
             return { type: action.type, status: "success", detail: `sms:zapier:${state}` };
           }
-          // The Zapier route refused or was blocked: fall back to email when it is allowed.
+          if (state !== "blocked") return { type: action.type, status: "skipped", detail: `connected text outcome held (${state}); inspect original receipt` };
+          // Only a ledger refusal before provider dispatch permits email fallback.
           if (!emailAllowed) {
             await audit({ blocked: "zapier_text_not_requested", appointmentId, contactId: contact.id, zapierState: state });
             return { type: action.type, status: "skipped", detail: `text through connected app not requested (${state})` };
           }
           channel = "email";
         }
+      }
+      {
+        // Every built-in channel shares the original reminder authority. A later
+        // SMS opt-out or email preference cannot duplicate an attempted text.
+        try { await (await import("./zapier/zapier-specialist-flows")).reserveBuiltInAppointmentReminder(organizationId, appointmentId, appointment.scheduledStart.toISOString()); }
+        catch (error) { if (!(error instanceof (await import("./zapier/zapier-executions")).ZapierExecutionError)) throw error; return { type: action.type, status: "skipped", detail: error.message }; }
       }
       const [emailRule] = channel === "email" ? await db.select().from(automationsTable).where(and(eq(automationsTable.organizationId, organizationId), eq(automationsTable.id, automationId))) : [];
       const beforeDispatch = async () => {

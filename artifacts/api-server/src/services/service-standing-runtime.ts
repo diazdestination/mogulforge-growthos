@@ -56,7 +56,8 @@ export async function admitStandingServiceReminder(org: string, enrollmentId: st
     const fresh = await assertStandingAuthority(tx, org, revision.id, id, new Date());
     if (await latestOccurrence(tx, org, enrollment.seriesRootObligationId) !== id || fresh.obligation.updatedAt.toISOString() !== saved.updatedAt || fresh.contact.updatedAt.getTime() !== current.contact.updatedAt.getTime()) denyStanding("service_changed_during_admission");
     const [existing] = await tx.select().from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, org), eq(auditEventsTable.entityType, "service_obligation"), eq(auditEventsTable.entityId, id), eq(auditEventsTable.action, "service.care_reminder_approved"))).limit(1);
-    if (existing) return { code: "reminder_already_owned", nextCheckAt: new Date(Date.now() + 15 * 60_000), obligationId: id, approvalId: existing.id };
+    const ownNumber = await (await import("./zapier/zapier-specialist-flows")).otherOpenText(org, "maintain.sms.send", "service_obligation", id, "", tx);
+    if (existing || ownNumber) return { code: "reminder_already_owned", nextCheckAt: new Date(Date.now() + 15 * 60_000), obligationId: id, approvalId: existing?.id ?? ownNumber!.id };
     const [response] = await tx.select({ id: auditEventsTable.id }).from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, org), eq(auditEventsTable.entityId, id), eq(auditEventsTable.action, "service.care_response_recorded"))).limit(1);
     if (response || await hasServiceMailboxReplyHold(org, id, tx) || await hasServiceSmsReplyHold(org, id, tx)) denyStanding("service_reply_requires_office");
     const expectedBody = fresh.snapshot.template.body.replace("[occurrence service date]", fresh.obligation.dueAt.toISOString().slice(0, 10)).replace("[occurrence service reference]", serviceSmsReplyReference(org, id));

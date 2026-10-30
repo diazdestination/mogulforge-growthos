@@ -1,6 +1,7 @@
 import {
   db,
   zapierActionExecutionsTable,
+  serviceObligationsTable,
   type ZapierActionExecution,
   type ZapierExecutionState,
 } from "@workspace/db";
@@ -8,6 +9,9 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { recordAudit } from "../audit";
 import { runDurableAction } from "../durable-execution";
+import { acquireNurtureLocks, type NurtureTx } from "../source-outreach-ownership";
+import { reserveContactTouch, assertContactTouchCurrent, markContactTouchDispatchStarted, acceptContactTouch } from "../contact-touch-claim";
+import { contactTouchReservationsTable } from "../../../../../lib/db/src/schema/contact-touch-reservations";
 import { outboundDeliveryHeld } from "../outbound-hold";
 import {
   findZapierCandidate,
@@ -69,14 +73,14 @@ type PreparedRequest = {
   requestSummary: Record<string, unknown>;
 };
 
-async function prepareRequest(organizationId: string, capability: string, input: unknown): Promise<PreparedRequest | { blocked: string }> {
+async function prepareRequest(organizationId: string, capability: string, input: unknown, reader: Pick<typeof db, "select"> = db): Promise<PreparedRequest | { blocked: string }> {
   const definition = getZapierCapability(capability);
   if (!definition) throw new ZapierExecutionError("Unknown Zapier capability.", "invalid_input");
   const parsed = definition.inputSchema.safeParse(input);
   if (!parsed.success) {
     throw new ZapierExecutionError(`Invalid input for ${definition.key}: ${parsed.error.issues[0]?.message ?? "schema"}`, "invalid_input");
   }
-  const binding = await getZapierBinding(organizationId, definition.key);
+  const binding = await getZapierBinding(organizationId, definition.key, reader);
   if (!binding) return { blocked: "This capability is not bound to a Zapier action yet." };
   const candidate = findZapierCandidate(definition, {
     app: binding.zapierApp,
@@ -85,7 +89,7 @@ async function prepareRequest(organizationId: string, capability: string, input:
     actionName: binding.zapierActionName,
   });
   if (!candidate) return { blocked: "The bound action is no longer a reviewed match for this capability." };
-  const connection = await getZapierConnection(organizationId);
+  const connection = await getZapierConnection(organizationId, reader);
   if (!connection) return { blocked: "Zapier is not connected for this organization." };
   const params = candidate.toParams(parsed.data, binding.bindingConfig);
   const requestDigest = sha256Hex(
@@ -105,10 +109,10 @@ async function prepareRequest(organizationId: string, capability: string, input:
 
 const COUNTED_STATES: ZapierExecutionState[] = ["executing", "succeeded", "indeterminate", "pending_approval"];
 
-async function usedToday(organizationId: string, capability: string): Promise<number> {
+async function usedToday(organizationId: string, capability: string, reader: Pick<typeof db, "select"> = db): Promise<number> {
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
-  const [row] = await db
+  const [row] = await reader
     .select({ count: sql<number>`count(*)::int` })
     .from(zapierActionExecutionsTable)
     .where(
@@ -116,7 +120,7 @@ async function usedToday(organizationId: string, capability: string): Promise<nu
         eq(zapierActionExecutionsTable.organizationId, organizationId),
         eq(zapierActionExecutionsTable.capability, capability),
         gte(zapierActionExecutionsTable.createdAt, startOfDay),
-        inArray(zapierActionExecutionsTable.state, COUNTED_STATES),
+        inArray(zapierActionExecutionsTable.state, [...COUNTED_STATES, ...(isCustomerText(capability) ? ["failed" as const] : [])]),
       ),
     );
   return row?.count ?? 0;
@@ -158,6 +162,8 @@ export type ZapierActionRequest = {
   /** Caller-stable key, e.g. `invoice:${invoiceId}:v${version}`. */
   idempotencyKey: string;
   requestedByUserId?: string | null;
+  /** Original scheduled invocation only; retained for approval ownership checks. */
+  appointmentReminderScheduledActionId?: string;
   linkedEntityType?: string | null;
   linkedEntityId?: string | null;
 };
@@ -230,7 +236,7 @@ export async function requestZapierAction(request: ZapierActionRequest): Promise
     errorCode: null,
   });
   if (inserted.reused) return { execution: inserted.execution };
-  if (needsApproval) {
+  if (inserted.execution.state === "pending_approval") {
     await recordAudit({
       organizationId: request.organizationId,
       actorUserId: request.requestedByUserId ?? null,
@@ -241,6 +247,7 @@ export async function requestZapierAction(request: ZapierActionRequest): Promise
     });
     return { execution: inserted.execution };
   }
+  if (inserted.execution.state !== "executing") return { execution: inserted.execution };
   return execute(inserted.execution, prepared, request.requestedByUserId ?? null);
 }
 
@@ -257,8 +264,30 @@ async function insertOrReuse(
     detail: string;
     errorCode: string | null;
   },
+  reader?: NurtureTx,
 ): Promise<{ execution: ZapierActionExecution; reused: boolean }> {
-  const [row] = await db
+  if (!reader && isCustomerText(request.capability) && ["pending_approval", "executing"].includes(values.state)) {
+    return db.transaction(async tx => {
+      await acquireNurtureLocks(tx, request.organizationId);
+      const { assertCustomerTextOwnership } = await import("./zapier-specialist-flows");
+      await assertCustomerTextOwnership(tx, { ...request, expectedPhone: (request.input as { toPhone: string }).toPhone });
+      const [original] = await tx.select().from(zapierActionExecutionsTable).where(and(eq(zapierActionExecutionsTable.organizationId, request.organizationId), eq(zapierActionExecutionsTable.idempotencyKey, idempotencyKey)));
+      if (!original || original.state === "blocked") {
+        const policy = (await getZapierPolicy(request.organizationId, request.capability, tx)) ?? defaultPolicyFor(definition);
+        if (policy.mode === "off" || policy.dailyBudget <= 0 || await usedToday(request.organizationId, request.capability, tx) >= policy.dailyBudget) {
+          return insertOrReuse(request, definition, idempotencyKey, { ...values, state: "blocked", detail: "This flow is off or its current daily budget is exhausted.", errorCode: policy.mode === "off" ? "policy_off" : "budget_exhausted" }, tx);
+        }
+        if (policy.mode === "approve") values = { ...values, state: "pending_approval", detail: "Waiting for a human to approve this action." };
+      }
+      const inserted = await insertOrReuse(request, definition, idempotencyKey, values, tx);
+      if (!inserted.reused && request.capability === "maintain.sms.send") {
+        await reserveContactTouch(tx, await serviceTextTouch(tx, inserted.execution, request.input));
+      }
+      return inserted;
+    });
+  }
+  const writer = reader ?? db;
+  const [row] = await writer
     .insert(zapierActionExecutionsTable)
     .values({
       organizationId: request.organizationId,
@@ -269,7 +298,7 @@ async function insertOrReuse(
       zapierAction: values.action,
       idempotencyKey,
       requestDigest: values.requestDigest,
-      requestSummary: values.requestSummary,
+      requestSummary: { ...values.requestSummary, ...(request.appointmentReminderScheduledActionId ? { appointmentReminderScheduledActionId: request.appointmentReminderScheduledActionId } : {}) },
       state: values.state,
       detail: values.detail,
       errorCode: values.errorCode,
@@ -282,7 +311,7 @@ async function insertOrReuse(
     .onConflictDoNothing()
     .returning();
   if (row) return { execution: row, reused: false };
-  const [existing] = await db
+  const [existing] = await writer
     .select()
     .from(zapierActionExecutionsTable)
     .where(
@@ -295,13 +324,13 @@ async function insertOrReuse(
   // A blocked receipt may be retried once the block is lifted; anything that
   // may have reached Zapier is final.
   if (existing.state === "blocked" && values.state !== "blocked") {
-    const [reopened] = await db
+    const [reopened] = await writer
       .update(zapierActionExecutionsTable)
       .set({
         zapierApp: values.app,
         zapierAction: values.action,
         requestDigest: values.requestDigest,
-        requestSummary: values.requestSummary,
+        requestSummary: { ...values.requestSummary, ...(request.appointmentReminderScheduledActionId ? { appointmentReminderScheduledActionId: request.appointmentReminderScheduledActionId } : {}) },
         state: values.state,
         detail: values.detail,
         errorCode: null,
@@ -331,6 +360,7 @@ async function execute(
       errorCode: "outbound_hold",
       completedAt: new Date(),
     });
+    if (blocked?.capability === "maintain.sms.send") await releaseUndispatchedServiceTouch(blocked);
     return { execution: blocked ?? (await readExecution(organizationId, execution.id)) };
   }
 
@@ -343,6 +373,7 @@ async function execute(
         state: "blocked", detail: "The Zapier account changed before dispatch. Review the connection and request this action again.",
         errorCode: "stale_request", completedAt: new Date(),
       });
+      if (blocked?.capability === "maintain.sms.send") await releaseUndispatchedServiceTouch(blocked);
       return { execution: blocked ?? (await readExecution(organizationId, execution.id)) };
     }
     const policy = await getZapierPolicy(organizationId, prepared.definition.key);
@@ -351,6 +382,7 @@ async function execute(
         state: "blocked", detail: "This flow is off or its daily limit is zero. Review its policy before requesting again.",
         errorCode: "policy_off", completedAt: new Date(),
       });
+      if (blocked?.capability === "maintain.sms.send") await releaseUndispatchedServiceTouch(blocked);
       return { execution: blocked ?? (await readExecution(organizationId, execution.id)) };
     }
     serverUrl = resolved.serverUrl;
@@ -362,6 +394,7 @@ async function execute(
       errorCode: error instanceof ZapierMcpError ? error.code : "not_configured",
       completedAt: new Date(),
     });
+    if (blocked?.capability === "maintain.sms.send") await releaseUndispatchedServiceTouch(blocked);
     return { execution: blocked ?? (await readExecution(organizationId, execution.id)) };
   }
 
@@ -372,6 +405,26 @@ async function execute(
   const callZapier = async (): Promise<{ state: "succeeded" | "blocked"; detail: string }> => {
     try {
       const result = await withZapierMcpSession(serverUrl, async (session) => {
+        if (isCustomerText(execution.capability)) {
+          const { rebuildZapierRequestInput, assertCustomerTextOwnership } = await import("./zapier-specialist-flows");
+          const rebuilt = await rebuildZapierRequestInput(execution);
+          const current = await prepareRequest(organizationId, execution.capability, rebuilt);
+          if ("blocked" in current || current.requestDigest !== execution.requestDigest) throw new ZapierExecutionError("Customer reminder changed before dispatch.", "conflict");
+          await db.transaction(async tx => {
+            await acquireNurtureLocks(tx, organizationId);
+            await assertCustomerTextOwnership(tx, { ...execution, appointmentReminderScheduledActionId: originalScheduledAction(execution), expectedPhone: (rebuilt as { toPhone: string }).toPhone });
+            const latest = await prepareRequest(organizationId, execution.capability, rebuilt, tx);
+            const policy = await getZapierPolicy(organizationId, execution.capability, tx);
+            if (outboundDeliveryHeld() || !policy || policy.mode === "off" || policy.dailyBudget <= 0 || (policy.mode === "approve" && (!execution.approvedAt || !execution.approvedByUserId)) ||
+              "blocked" in latest || latest.requestDigest !== execution.requestDigest || latest.serverFingerprint !== prepared.serverFingerprint) throw new ZapierExecutionError("Customer text policy, sender or outbound authority changed before dispatch.", "conflict");
+            if (execution.capability === "maintain.sms.send") {
+              await assertContactTouchCurrent(tx, await serviceTextTouch(tx, execution, rebuilt));
+              // Advance an older pending allowance inside the same locked budget
+              // decision, so another worker cannot take today's slot in between.
+              await markContactTouchDispatchStarted(organizationId, `zapier:${execution.id}`, tx);
+            }
+          });
+        }
         if (serverMode === "managed") return session.callTool(prepared.action, prepared.params);
         const tool = prepared.definition.direction === "write" ? ZAPIER_META_TOOLS.executeWrite : ZAPIER_META_TOOLS.executeRead;
         const args: Record<string, unknown> = {
@@ -390,7 +443,7 @@ async function execute(
       }
       return { state: "succeeded", detail: "Zapier action completed." };
     } catch (error) {
-      failure = error instanceof ZapierMcpError ? error : new ZapierMcpError("Zapier call failed.", "tool_failed");
+      failure = error instanceof ZapierMcpError ? error : new ZapierMcpError("Zapier call failed.", "tool_failed", isCustomerText(execution.capability));
       if (failure.indeterminate) throw failure; // durable kernel records indeterminate
       return { state: "blocked", detail: failure.message };
     }
@@ -423,6 +476,7 @@ async function execute(
     }
   }
 
+  if (execution.capability === "maintain.sms.send" && finalState === "succeeded") await acceptContactTouch(organizationId, `zapier:${execution.id}`);
   await markZapierConnectionUsed(organizationId, failure);
   const updated = await transition(organizationId, execution.id, ["executing"], {
     state: finalState,
@@ -467,6 +521,7 @@ export async function approveZapierAction(input: {
       errorCode: "unbound",
       completedAt: new Date(),
     });
+    if (blocked?.capability === "maintain.sms.send") await releaseUndispatchedServiceTouch(blocked);
     return blocked ?? existing;
   }
   if (prepared.requestDigest !== existing.requestDigest) {
@@ -476,6 +531,7 @@ export async function approveZapierAction(input: {
       errorCode: "stale_request",
       completedAt: new Date(),
     });
+    if (blocked?.capability === "maintain.sms.send") await releaseUndispatchedServiceTouch(blocked);
     return blocked ?? existing;
   }
   const claimed = await transition(input.organizationId, existing.id, ["pending_approval"], {
@@ -510,6 +566,7 @@ export async function rejectZapierAction(input: {
     approvedAt: new Date(),
     completedAt: new Date(),
   });
+  if (rejected?.capability === "maintain.sms.send") await releaseUndispatchedServiceTouch(rejected);
   if (!rejected) throw new ZapierExecutionError("Only a pending action can be rejected.", "not_pending");
   await recordAudit({
     organizationId: input.organizationId,
@@ -539,4 +596,18 @@ export async function listZapierExecutions(
 
 export async function getZapierExecution(organizationId: string, id: string): Promise<ZapierActionExecution> {
   return readExecution(organizationId, id);
+}
+
+function isCustomerText(capability: string) { return capability === "appt.sms.send" || capability === "maintain.sms.send"; }
+function originalScheduledAction(execution: ZapierActionExecution) { const value = execution.requestSummary.appointmentReminderScheduledActionId; return typeof value === "string" ? value : undefined; }
+async function serviceTextTouch(reader: Pick<typeof db, "select">, execution: ZapierActionExecution, input: unknown) {
+  const [service] = await reader.select({ contactId: serviceObligationsTable.contactId }).from(serviceObligationsTable).where(and(eq(serviceObligationsTable.organizationId, execution.organizationId), eq(serviceObligationsTable.id, execution.linkedEntityId!)));
+  if (!service) throw new ZapierExecutionError("Service unavailable before contact claim.", "invalid_input");
+  return { organizationId: execution.organizationId, logicalKey: `zapier:${execution.id}`, contactId: service.contactId, address: (input as { toPhone: string }).toPhone, channel: "sms" as const, sourceKind: "service" as const, payload: input };
+}
+async function releaseUndispatchedServiceTouch(execution: ZapierActionExecution) {
+  await db.transaction(async tx => {
+    await acquireNurtureLocks(tx, execution.organizationId);
+    await tx.delete(contactTouchReservationsTable).where(and(eq(contactTouchReservationsTable.organizationId, execution.organizationId), eq(contactTouchReservationsTable.logicalKey, `zapier:${execution.id}`), sql`${contactTouchReservationsTable.dispatchStartedAt} is null`, sql`${contactTouchReservationsTable.acceptedAt} is null`));
+  });
 }

@@ -361,7 +361,7 @@ describe("appointment reminders", () => {
       const appt = await createAppointment(org.id, { leadId: l.id, contactId: c.id, scheduledStart: start });
       await runReminderNow(appt!.id);
       expect(zapierFlow.calls).toEqual([
-        { organizationId: org.id, appointmentId: appt!.id, actorUserId: null, expectedStart: appt!.scheduledStart.toISOString() },
+        { organizationId: org.id, appointmentId: appt!.id, actorUserId: null, expectedStart: appt!.scheduledStart.toISOString(), scheduledActionId: expect.any(String) },
       ]);
       expect(providers.sms.send).not.toHaveBeenCalled();
       const [activity] = await db
@@ -375,7 +375,7 @@ describe("appointment reminders", () => {
     }
   });
 
-  it("falls back to email when the own-number text is refused", async () => {
+  it("holds without email when the own-number request throws an untyped exception", async () => {
     zapierFlow.route = true;
     zapierFlow.state = "throw";
     vi.mocked(providers.sms.send).mockClear();
@@ -389,11 +389,24 @@ describe("appointment reminders", () => {
       const appt = await createAppointment(org.id, { leadId: l.id, contactId: c.id, scheduledStart: new Date(Date.now() + 30 * HOUR) });
       await runReminderNow(appt!.id);
       expect(providers.sms.send).not.toHaveBeenCalled();
-      expect(await sentChannelFor(l.id)).toEqual(["email"]);
+      expect(await sentChannelFor(l.id)).toEqual([]);
     } finally {
       zapierFlow.route = false;
       zapierFlow.state = "pending_approval";
     }
+  });
+
+  it("falls back to email for a persisted local predispatch block", async () => {
+    zapierFlow.route = true;
+    zapierFlow.state = "blocked";
+    vi.mocked(providers.sms.send).mockClear();
+    try {
+      const { contact: c, lead: l } = await makeContactLead({ preferredContactMethod: "text", email: "local-block@example.test", phone: "+15550000013", smsConsent: true });
+      const appt = await createAppointment(org.id, { leadId: l.id, contactId: c.id, scheduledStart: new Date(Date.now() + 30 * HOUR) });
+      await runReminderNow(appt!.id);
+      expect(providers.sms.send).not.toHaveBeenCalled();
+      expect(await sentChannelFor(l.id)).toEqual(["email"]);
+    } finally { zapierFlow.route = false; zapierFlow.state = "pending_approval"; }
   });
 
   it("falls back to email when text is preferred but SMS consent is missing", async () => {

@@ -56,8 +56,8 @@ export type ZapierConnectionStatus = {
   lastToolsRefreshedAt: string | null;
 };
 
-export async function getZapierConnection(organizationId: string): Promise<ZapierMcpConnection | null> {
-  const [row] = await db
+export async function getZapierConnection(organizationId: string, reader: Pick<typeof db, "select"> = db): Promise<ZapierMcpConnection | null> {
+  const [row] = await reader
     .select()
     .from(zapierMcpConnectionsTable)
     .where(
@@ -524,8 +524,8 @@ export async function unbindZapierCapability(organizationId: string, userId: str
   return true;
 }
 
-export async function getZapierBinding(organizationId: string, capability: string): Promise<ZapierCapabilityBinding | null> {
-  const [row] = await db
+export async function getZapierBinding(organizationId: string, capability: string, reader: Pick<typeof db, "select"> = db): Promise<ZapierCapabilityBinding | null> {
+  const [row] = await reader
     .select()
     .from(zapierCapabilityBindingsTable)
     .where(
@@ -537,8 +537,8 @@ export async function getZapierBinding(organizationId: string, capability: strin
   return row ?? null;
 }
 
-export async function getZapierPolicy(organizationId: string, capability: string): Promise<ZapierSpecialistPolicy | null> {
-  const [row] = await db
+export async function getZapierPolicy(organizationId: string, capability: string, reader: Pick<typeof db, "select"> = db): Promise<ZapierSpecialistPolicy | null> {
+  const [row] = await reader
     .select()
     .from(zapierSpecialistPoliciesTable)
     .where(

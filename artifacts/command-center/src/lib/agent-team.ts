@@ -163,7 +163,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Add bookings to your calendar",
         "stage": "setup",
-        "reality": "From Settings → Integrations, request a calendar event for a booked appointment through your own Google or Outlook account connected with Zapier. This flow supports event creation only; reschedules, cancellations and changes made in the outside calendar do not sync, so the GrowthOS schedule stays the source of truth."
+        "reality": "From Settings → Connections, request a calendar event for a booked appointment through your own Google or Outlook account connected with Zapier. This flow supports event creation only; reschedules, cancellations and changes made in the outside calendar do not sync, so the GrowthOS schedule stays the source of truth."
       }
     ]
   },

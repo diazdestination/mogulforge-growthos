@@ -12,38 +12,51 @@ apps a contractor already uses, through the contractor's own Zapier account:
 
 | Specialist | Capability | Direction | Default policy |
 | --- | --- | --- | --- |
-| SCOUT | `scout.reviews.list` — new public reviews become follow-up tasks | read | on (scheduled) |
-| SCOUT | `scout.leads.list` — marketplace leads become GrowthOS opportunities once | read | on (scheduled) |
-| APPT | `appt.calendar.create_event` — one calendar event per booked appointment | write | automatic |
-| APPT | `appt.sms.send` — appointment reminder texted to a consented customer from the contractor's number | write | approve each |
-| INVO | `invo.accounting.create_invoice` — issued invoice to accounting, once | write | approve each |
-| CALLIE | `callie.calls.list` — phone-system calls become callback tasks | read | on (scheduled) |
-| CALLIE | `callie.sms.send` — one text back to a missed caller | write | approve each |
-| SCHED | `sched.sms.send` — tomorrow's day sheet texted to a crew member | write | approve each |
-| MAINTAIN | `maintain.sms.send` — one service-due reminder texted to a consented customer | write | approve each |
+| SCOUT | `scout.reviews.list` — new public reviews become follow-up tasks | read | off |
+| SCOUT | `scout.leads.list` — marketplace leads become GrowthOS opportunities | read | off |
+| APPT | `appt.calendar.create_event` — explicitly request a calendar event for a booked appointment | write | off |
+| APPT | `appt.sms.send` — appointment reminder texted to a consented customer from the contractor's number | write | off |
+| INVO | `invo.accounting.create_invoice` — request an issued invoice export to accounting | write | off |
+| CALLIE | `callie.calls.list` — phone-system calls become callback tasks | read | off |
+| CALLIE | `callie.sms.send` — text back a missed caller through the existing governed path | write | off |
+| SCHED | `sched.sms.send` — selected company-date day sheet texted to a crew member | write | off |
+| MAINTAIN | `maintain.sms.send` — service-due reminder texted to a consented customer | write | off |
+
+Saving or changing a binding sets its policy Off. The client explicitly enables
+its policy afterward; Approve each is the recommended starting authority for
+customer texts. A registry's suggested mode does not activate a saved binding.
 
 ### Customer texts from the contractor's own number
 
-`appt.sms.send` and `maintain.sms.send` (and CALLIE's text-back) let a
+`appt.sms.send` and `maintain.sms.send` let a
 contractor text customers from the business number in their own phone app
-(Quo or their own Twilio account) with no MogulForge texting registration.
+(Quo or their own Twilio account). This uses the contractor's own provider
+setup; it does not bypass that provider's carrier registration or sender
+approval. See [Twilio's US 10DLC prerequisites](https://www.twilio.com/docs/messaging/compliance/a2p-10dlc/quickstart)
+and [Quo's business-texting registration](https://learn.quo.com/setting-up-quo/registering-for-business-texting/what-is-a2p-why-matters).
 
 - Consent is enforced by the same send gate as built-in texting: do not
   contact, per-channel opt-out, suppression and SMS consent. MAINTAIN also uses
   the outreach gate (sending hours, caps, reply holds) and its notice window.
-- Every text ends with "Reply STOP to opt out." Replies and STOP requests land
+- Every APPT/MAINTAIN customer text ends with "Reply STOP to opt out." Replies and STOP requests land
   in the contractor's phone app, not GrowthOS; staff mark an opted-out
   customer do not text on the customer record.
 - The automated appointment reminder uses `appt.sms.send` only when built-in
   texting is not active for the company and the capability is bound with a
-  policy that is not off. Built-in texting always wins, so a customer never
-  gets both. If the own-number text is refused or blocked, the reminder falls
-  back to email when email is allowed.
+  policy that is not off. Built-in and own-number reminder paths share
+  ownership checks. Email fallback is allowed only after a proven no-effect
+  refusal and when email is eligible; an unknown or previously owned text
+  remains held for review rather than causing a second contact.
 - Approval re-derives the exact text from the appointment or service. A
   reschedule, cancellation, consent change or service edit after the request
   blocks the approval instead of sending stale copy. A service gets at most one
   own-number reminder while any earlier one is pending, sent or uncertain, and
   never after a built-in MAINTAIN reminder or a recorded customer response.
+
+CALLIE's existing phone-sync/text-back path is separate. The client action panel
+does not expose it while callback eligibility and customer-consent review are
+unavailable there; the APPT/MAINTAIN footer and send-gate claims above must not be
+applied to that legacy path.
 
 The registry lives in
 `artifacts/api-server/src/services/zapier/zapier-capabilities.ts`. Each
@@ -64,8 +77,9 @@ parameters. Adding an app means adding a reviewed candidate there.
    `POST /api/v1/integrations/zapier/server-url`. The server validates the host
    is `mcp.zapier.com`, probes the server's tool list once, and stores the URL
    AES-256-GCM encrypted with AAD `${organizationId}:zapier-mcp`
-   (`zapier_mcp_connections`). The plaintext URL never leaves the API.
-4. The contractor loads the enabled actions from their server and **binds**
+   (`zapier_mcp_connections`). The API never returns the stored plaintext URL.
+4. GrowthOS loads enabled actions automatically and refreshes them when Zapier
+   reports tool changes. The contractor selects an available action and **binds**
    each capability to one of them (`zapier_capability_bindings`), supplying
    any non-secret binding settings (calendar id, sending number, Facebook Page,
    crew phone numbers for SCHED).
