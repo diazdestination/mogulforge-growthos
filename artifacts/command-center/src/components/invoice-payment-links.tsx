@@ -24,7 +24,7 @@ const STATE_LABEL: Record<PaymentLink['state'], string> = {
   paid: 'Paid and recorded',
   failed: 'Payment failed',
   expired: 'Expired',
-  needs_reconciliation: 'Paid — needs manual recording',
+  needs_reconciliation: 'Payment needs review',
 };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {

@@ -27,6 +27,14 @@ it('hides a stale-version link and keeps collection reserved for review', async 
   expect(screen.queryByRole('button', { name: /Create payment link/ })).toBeNull();
 });
 
+it('does not describe an unknown Checkout outcome as paid', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/v1/payments/stripe' ? json({ configured: true, connected: true, chargesEnabled: true }) : json({ links: [{ id: 'unknown', invoiceVersion: 2, amountCents: 25000, state: 'needs_reconciliation', url: null, paidAt: null, detail: 'Checkout creation was not confirmed.', createdAt: '2026-10-30T00:00:00Z' }] })));
+  render(<InvoicePaymentLinks invoice={invoice} canManage />);
+  expect(await screen.findByText('Payment needs review')).toBeTruthy();
+  expect(screen.queryByText(/Paid —/)).toBeNull();
+  expect(screen.queryByRole('button', { name: /Create payment link/ })).toBeNull();
+});
+
 it('creates a payment link for the balance and shows it for copying', async () => {
   let links: unknown[] = [];
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
