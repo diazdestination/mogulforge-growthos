@@ -161,9 +161,9 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
         "reality": "Customer-facing confirmations and reminders require approved delivery setup and consent. A draft or staff booking alone does not send a message."
       },
       {
-        "title": "External calendar sync",
-        "stage": "planned",
-        "reality": "Full external calendar synchronization remains planned; the GrowthOS schedule is the available workspace."
+        "title": "Add bookings to your calendar",
+        "stage": "setup",
+        "reality": "From Settings → Integrations, request a calendar event for a booked appointment through your own Google or Outlook account connected with Zapier. This flow supports event creation only; reschedules, cancellations and changes made in the outside calendar do not sync, so the GrowthOS schedule stays the source of truth."
       }
     ]
   },
