@@ -25,7 +25,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Estimate status & follow-up",
         "stage": "workspace",
-        "reality": "Track drafts, decisions and follow-up. Changing a status does not itself deliver a proposal or contact a customer."
+        "reality": "Track drafts, decisions and follow-up. Changing a status does not itself deliver a proposal or contact a customer. A draft can be emailed from your own Gmail or Outlook connected through Zapier, after your approval."
       },
       {
         "title": "Returning-customer estimates",
@@ -84,7 +84,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Draft & issue invoices",
         "stage": "workspace",
-        "reality": "Authorized staff can prepare a draft, review its saved details and issue a customer invoice. Issued document history is retained."
+        "reality": "Authorized staff can prepare a draft, review its saved details and issue a customer invoice. Issued document history is retained. An issued invoice, and each payment recorded against it, can be sent to QuickBooks or Xero through Zapier after your approval."
       },
       {
         "title": "Document & customer review",
@@ -94,7 +94,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Invoice email delivery",
         "stage": "setup",
-        "reality": "The delivery worklist exposes pending and uncertain attempts. Sending requires an approved mailbox, recipient and company delivery setup; uncertain sends are not retried automatically."
+        "reality": "The delivery worklist exposes pending and uncertain attempts. Sending requires an approved mailbox, recipient and company delivery setup; uncertain sends are not retried automatically. You can instead email an issued invoice from your own Gmail or Outlook through Zapier; each invoice uses one path, not both."
       },
       {
         "title": "Exceptions & audit history",
@@ -180,7 +180,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Call & callback review",
         "stage": "workspace",
-        "reality": "Review call records and callback outcomes, then assign the appropriate staff follow-up."
+        "reality": "Review call records and callback outcomes, then assign the appropriate staff follow-up. With your phone app connected through Zapier, customer text replies are logged for follow-up and STOP replies stop GrowthOS texts to that number."
       },
       {
         "title": "Reviewed opportunity intake",
@@ -254,12 +254,12 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Recorded activity & insights",
         "stage": "workspace",
-        "reality": "Inspect pipeline and activity reports. Recommendations support a staff decision; they do not prove additional revenue by themselves."
+        "reality": "Inspect pipeline and activity reports. Recommendations support a staff decision; they do not prove additional revenue by themselves. Customer email replies from a mailbox connected through Zapier are logged on the customer record with a follow-up task; mail from unknown senders is ignored."
       },
       {
         "title": "Consented outreach",
         "stage": "setup",
-        "reality": "Campaign and delivery controls require approved providers, consent and company setup before customer contact. Your team reviews the action."
+        "reality": "Campaign and delivery controls require approved providers, consent and company setup before customer contact. Your team reviews the action. A review request can be texted from your own number once per finished visit or job, only to customers who agreed to texts."
       }
     ]
   }

@@ -54,7 +54,13 @@ export type ZapierConnectionStatus = {
   lastErrorAt: string | null;
   lastErrorCode: string | null;
   lastToolsRefreshedAt: string | null;
+  /** Scheduled reads spend at most one Zapier task per capability per window. */
+  pollIntervalMinutes: number;
+  pollIntervalChoices: readonly number[];
 };
+
+export const ZAPIER_POLL_INTERVAL_CHOICES = [60, 120, 240, 360, 720, 1440] as const;
+export const ZAPIER_DEFAULT_POLL_INTERVAL_MINUTES = 240;
 
 export async function getZapierConnection(organizationId: string, reader: Pick<typeof db, "select"> = db): Promise<ZapierMcpConnection | null> {
   const [row] = await reader
@@ -83,7 +89,42 @@ export async function getZapierStatus(organizationId: string): Promise<ZapierCon
     lastErrorAt: connection?.lastErrorAt?.toISOString() ?? null,
     lastErrorCode: connection?.lastErrorCode ?? null,
     lastToolsRefreshedAt: connection?.lastToolsRefreshedAt?.toISOString() ?? null,
+    pollIntervalMinutes: connection?.pollIntervalMinutes ?? ZAPIER_DEFAULT_POLL_INTERVAL_MINUTES,
+    pollIntervalChoices: ZAPIER_POLL_INTERVAL_CHOICES,
   };
+}
+
+/**
+ * Start of the current scheduled-read window for this company. Read flows use
+ * it in their idempotency keys, so every scheduler pass (and any manual sync)
+ * inside one window reuses the same ledger receipt instead of a Zapier task.
+ */
+export async function zapierPollWindow(organizationId: string, now = new Date()): Promise<string> {
+  const connection = await getZapierConnection(organizationId);
+  const minutes = connection?.pollIntervalMinutes ?? ZAPIER_DEFAULT_POLL_INTERVAL_MINUTES;
+  const size = Math.max(15, minutes) * 60_000;
+  return new Date(Math.floor(now.getTime() / size) * size).toISOString();
+}
+
+export async function setZapierPollInterval(input: { organizationId: string; userId: string; minutes: number }): Promise<ZapierConnectionStatus> {
+  if (!(ZAPIER_POLL_INTERVAL_CHOICES as readonly number[]).includes(input.minutes)) {
+    throw new ZapierBindingError(`Choose a sync interval of ${ZAPIER_POLL_INTERVAL_CHOICES.join(", ")} minutes.`);
+  }
+  const rows = await db
+    .update(zapierMcpConnectionsTable)
+    .set({ pollIntervalMinutes: input.minutes })
+    .where(and(eq(zapierMcpConnectionsTable.organizationId, input.organizationId), isNull(zapierMcpConnectionsTable.revokedAt)))
+    .returning({ id: zapierMcpConnectionsTable.id });
+  if (rows.length === 0) throw new ZapierBindingError("Connect Zapier before choosing a sync interval.");
+  await recordAudit({
+    organizationId: input.organizationId,
+    actorUserId: input.userId,
+    action: "integration.zapier_poll_interval_changed",
+    entityType: "zapier_mcp_connection",
+    entityId: rows[0]!.id,
+    metadata: { pollIntervalMinutes: input.minutes },
+  });
+  return getZapierStatus(input.organizationId);
 }
 
 /** Decrypt the tenant's server URL. Internal to the Zapier services only. */

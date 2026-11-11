@@ -74,6 +74,8 @@ export const zapierMcpConnectionsTable = pgTable(
     serverHost: text("server_host").notNull(),
     serverMode: text("server_mode").$type<"agentic" | "managed" | "unknown">().notNull().default("unknown"),
     toolCount: integer("tool_count"),
+    /** How often scheduled reads may spend a Zapier task, per capability. */
+    pollIntervalMinutes: integer("poll_interval_minutes").notNull().default(240),
     lastToolsRefreshedAt: timestamp("last_tools_refreshed_at", { withTimezone: true }),
     connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),

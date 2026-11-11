@@ -252,6 +252,20 @@ export async function assertEstimateEmailEligibility(
       "estimate_email_held",
       "The original recipient is unavailable or changed.",
     );
+  const { zapierEstimateEmailOwner } = await import(
+    "./zapier/zapier-owned-app-flows"
+  );
+  if (
+    await zapierEstimateEmailOwner(
+      snapshot.organizationId,
+      snapshot.estimateId,
+      reader,
+    )
+  )
+    held(
+      "estimate_email_held",
+      "This estimate has an email request through your connected mailbox (Zapier). Review it in Settings > Connections first.",
+    );
   try {
     assertOutboundDeliveryAllowed({
       channel: "email",

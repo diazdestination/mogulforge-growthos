@@ -38,6 +38,9 @@ import {
 
 export { summarizeZapierResult };
 
+/** Mirrors zapier-owned-app-flows; kept here so the ledger has no static import cycle. */
+const OWNED_APP_DISPATCH_RECHECK = new Set(["invo.email.send", "esti.email.send", "scout.sms.review_request", "invo.accounting.record_payment"]);
+
 /**
  * The execution ledger is the only path from a specialist to a Zapier action.
  *
@@ -401,8 +404,23 @@ async function execute(
   let value: unknown = undefined;
   let digest: string | null = null;
   let failure: ZapierMcpError | null = null;
+  let stoppedCode: string | null = null;
 
   const callZapier = async (): Promise<{ state: "succeeded" | "blocked"; detail: string }> => {
+    if (OWNED_APP_DISPATCH_RECHECK.has(execution.capability)) {
+      // Re-derive from current GrowthOS records right before dispatch, so a
+      // change after approval (or an auto request racing an edit) never sends
+      // stale content. Nothing has reached Zapier yet, so this is a clean stop.
+      try {
+        const { rebuildZapierRequestInput } = await import("./zapier-specialist-flows");
+        const current = await prepareRequest(organizationId, execution.capability, await rebuildZapierRequestInput(execution));
+        if ("blocked" in current || current.requestDigest !== execution.requestDigest) throw new ZapierExecutionError("The record, app settings or Zapier account changed.", "conflict");
+      } catch (error) {
+        stoppedCode = "stale_request";
+        const reason = error instanceof ZapierExecutionError ? error.message : "The record could not be re-checked.";
+        return { state: "blocked", detail: `Stopped before dispatch: ${reason}`.slice(0, 1000) };
+      }
+    }
     try {
       const result = await withZapierMcpSession(serverUrl, async (session) => {
         if (isCustomerText(execution.capability)) {
@@ -481,7 +499,7 @@ async function execute(
   const updated = await transition(organizationId, execution.id, ["executing"], {
     state: finalState,
     detail: detail.slice(0, 1000),
-    errorCode: failure ? (failure as ZapierMcpError).code : null,
+    errorCode: failure ? (failure as ZapierMcpError).code : stoppedCode,
     responseDigest: digest,
     resultSummary: summarizeZapierResult(value),
     durableExecutionId,
@@ -496,6 +514,16 @@ async function execute(
     metadata: { capability: prepared.definition.key, app: prepared.app, action: prepared.action, errorCode: failure ? (failure as ZapierMcpError).code : null },
   });
   const final = updated ?? (await readExecution(organizationId, execution.id));
+  if (OWNED_APP_DISPATCH_RECHECK.has(final.capability)) {
+    try {
+      const { settleOwnedAppExecution } = await import("./zapier-owned-app-flows");
+      await settleOwnedAppExecution(final);
+    } catch {
+      // The ledger row is authoritative; a lost follow-up record never changes
+      // the outcome or permits a second send. No error objects are logged.
+      console.error("[zapier] could not record the outcome on the GrowthOS record; review the Zapier execution ledger");
+    }
+  }
   return finalState === "succeeded" && prepared.definition.direction === "read" ? { execution: final, value } : { execution: final };
 }
 

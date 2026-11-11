@@ -13,6 +13,7 @@ import {
   registerZapierServerUrl,
   searchZapierActions,
   setZapierPolicy,
+  setZapierPollInterval,
   unbindZapierCapability,
   ZapierBindingError,
 } from "../../services/zapier/zapier-connection";
@@ -35,6 +36,14 @@ import {
   scoutSyncMarketplaceLeads,
   scoutSyncReviews,
 } from "../../services/zapier/zapier-specialist-flows";
+import {
+  estiRequestMailboxEstimateEmail,
+  invoRequestAccountingPayment,
+  invoRequestMailboxInvoiceEmail,
+  scoutRequestReviewText,
+  scoutSyncInboxReplies,
+  callieSyncSmsReplies,
+} from "../../services/zapier/zapier-owned-app-flows";
 
 /**
  * Zapier Connected Apps. Mirrors the Gmail/Microsoft integration surface:
@@ -85,6 +94,8 @@ const bindingBody = z.object({
   config: z.record(z.string(), z.unknown()).optional(),
 });
 const policyBody = z.object({ mode: z.enum(["off", "approve", "auto"]), dailyBudget: z.number().int().min(0).max(500).optional() });
+const recordId = z.string().uuid();
+const pollIntervalBody = z.object({ minutes: z.number().int() });
 const rejectBody = z.object({ reason: z.string().max(500).optional() });
 const daySheetBody = z.object({ userId: z.string().min(1).max(120), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
 const textBackBody = z.object({ taskId: z.string().uuid(), toPhone: z.string().regex(/^\+?[1-9]\d{6,14}$/).optional() });
@@ -121,6 +132,20 @@ router.delete(
   sessionOnly,
   async (req: Request, res: Response): Promise<void> => {
     res.json({ disconnected: await disconnectZapier(req.member!.organizationId, req.member!.user.id) });
+  },
+);
+
+router.put(
+  "/integrations/zapier/poll-interval",
+  requireMember("settings.manage"),
+  sessionOnly,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const body = pollIntervalBody.parse(req.body);
+      res.json(await setZapierPollInterval({ organizationId: req.member!.organizationId, userId: req.member!.user.id, minutes: body.minutes }));
+    } catch (error) {
+      fail(res, error);
+    }
   },
 );
 
@@ -415,5 +440,71 @@ router.post("/integrations/zapier/flows/sched/day-sheet", requireMember("crm.wri
     fail(res, error);
   }
 });
+
+router.post("/integrations/zapier/flows/scout/inbox", requireMember("crm.write"), async (req: Request, res: Response): Promise<void> => {
+  try {
+    res.json(await scoutSyncInboxReplies({ organizationId: req.member!.organizationId, actorUserId: req.member!.user.id }));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+router.post("/integrations/zapier/flows/callie/sms-replies", requireMember("crm.write"), async (req: Request, res: Response): Promise<void> => {
+  try {
+    res.json(await callieSyncSmsReplies({ organizationId: req.member!.organizationId, actorUserId: req.member!.user.id }));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+router.post(
+  "/integrations/zapier/flows/invoices/:id/email",
+  requireMember("invoices.manage"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(await invoRequestMailboxInvoiceEmail({ organizationId: req.member!.organizationId, invoiceId: recordId.parse(req.params.id), actorUserId: req.member!.user.id }));
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+router.post(
+  "/integrations/zapier/flows/invoices/:id/receipts/:allocationId/accounting",
+  requireMember("invoices.manage"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(await invoRequestAccountingPayment({ organizationId: req.member!.organizationId, invoiceId: recordId.parse(req.params.id), allocationId: recordId.parse(req.params.allocationId), actorUserId: req.member!.user.id }));
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+router.post(
+  "/integrations/zapier/flows/estimates/:id/email",
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(await estiRequestMailboxEstimateEmail({ organizationId: req.member!.organizationId, estimateId: recordId.parse(req.params.id), actorUserId: req.member!.user.id }));
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+for (const [path, kind] of [["appointments", "appointment"], ["projects", "project"]] as const) {
+  router.post(
+    `/integrations/zapier/flows/${path}/:id/review-request`,
+    requireMember("crm.write"),
+    async (req: Request, res: Response): Promise<void> => {
+      try {
+        res.json(await scoutRequestReviewText({ organizationId: req.member!.organizationId, kind, id: recordId.parse(req.params.id), actorUserId: req.member!.user.id }));
+      } catch (error) {
+        fail(res, error);
+      }
+    },
+  );
+}
 
 export default router;

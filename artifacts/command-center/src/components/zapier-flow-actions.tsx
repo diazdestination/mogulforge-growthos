@@ -16,7 +16,10 @@ const KEYS = {
   leads: 'scout.leads.list', reviews: 'scout.reviews.list', calendar: 'appt.calendar.create_event',
   accounting: 'invo.accounting.create_invoice', crew: 'sched.sms.send',
   apptText: 'appt.sms.send', serviceText: 'maintain.sms.send',
+  inbox: 'scout.inbox.list', reviewText: 'scout.sms.review_request', smsInbox: 'callie.sms.inbox.list',
+  invoiceEmail: 'invo.email.send', estimateEmail: 'esti.email.send', payment: 'invo.accounting.record_payment',
 };
+type PickerKind = 'appointments' | 'invoices' | 'users' | 'services' | 'estimates' | 'finishedVisits' | 'finishedJobs' | 'receipts';
 const timestamp = (value: string | null) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : 'Date unavailable';
 const selectClass = 'h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm';
 
@@ -32,6 +35,12 @@ export function ZapierFlowActions({ capabilities, canManage, disabled: setupBusy
   const [invoice, setInvoice] = useState('');
   const [member, setMember] = useState('');
   const [date, setDate] = useState('');
+  const [emailInvoice, setEmailInvoice] = useState('');
+  const [estimate, setEstimate] = useState('');
+  const [visit, setVisit] = useState('');
+  const [job, setJob] = useState('');
+  const [paidInvoice, setPaidInvoice] = useState('');
+  const [receipt, setReceipt] = useState('');
   const id = useId();
   const ready = (key: string) => canManage && capabilities.some(capability => capability.key === key && capability.binding && capability.policy.mode !== 'off' && capability.policy.dailyBudget > 0);
   const disabled = (key: string) => setupBusy || busy !== null || held.includes(key);
@@ -54,6 +63,10 @@ export function ZapierFlowActions({ capabilities, canManage, disabled: setupBusy
       // A 400/404 refusal with a reason is raised before any app is contacted
       // (missing consent, wrong record, outside sending hours), so it is safe to fix and retry.
       if ((response.status === 400 || response.status === 404) && !state && typeof outcome.error === 'string' && ['invalid_input', 'not_found'].includes(String(outcome.code))) {
+        setResult(outcome.error);
+      } else if (response.status === 409 && !state && outcome.code === 'conflict' && typeof outcome.error === 'string') {
+        // Another request already owns this record; show why and keep the button held.
+        setHeld(current => [...current, key]);
         setResult(outcome.error);
       } else if (!response.ok || !state) {
         setHeld(current => [...current, key]);
@@ -98,7 +111,11 @@ export function ZapierFlowActions({ capabilities, canManage, disabled: setupBusy
       <div className="flex flex-wrap gap-2">
         {ready(KEYS.leads) && <Button type="button" className="h-auto whitespace-normal text-left" disabled={disabled(KEYS.leads)} onClick={() => void request(KEYS.leads, 'scout/leads')}>Sync marketplace leads into GrowthOS</Button>}
         {ready(KEYS.reviews) && <Button type="button" className="h-auto whitespace-normal text-left" disabled={disabled(KEYS.reviews)} onClick={() => void request(KEYS.reviews, 'scout/reviews')}>Sync reviews into follow-up tasks</Button>}
+        {ready(KEYS.inbox) && <Button type="button" className="h-auto whitespace-normal text-left" disabled={disabled(KEYS.inbox)} onClick={() => void request(KEYS.inbox, 'scout/inbox')}>Log customer email replies</Button>}
+        {ready(KEYS.smsInbox) && <Button type="button" className="h-auto whitespace-normal text-left" disabled={disabled(KEYS.smsInbox)} onClick={() => void request(KEYS.smsInbox, 'callie/sms-replies')}>Log customer text replies and opt-outs</Button>}
       </div>
+      {ready(KEYS.smsInbox) && <p className="text-xs text-muted-foreground">Reads texts received on your number. STOP stops all GrowthOS texts to that number; START lifts the stop, but you must record fresh consent before texting again. Replies from known customers are logged with a follow-up task; other numbers are not logged.</p>}
+      {ready(KEYS.inbox) && <p className="text-xs text-muted-foreground">Reads recent mail from your connected mailbox. Only mail from a known customer address is logged on their record, with a follow-up task; other senders are ignored. Email content is stored as a note and never acted on.</p>}
       {ready(KEYS.calendar) && <div className="space-y-2 rounded-md border p-3">
         <RecordPicker kind="appointments" label="Appointment" disabled={disabled(KEYS.calendar)} onChange={setAppointment} />
         <p className="text-xs text-muted-foreground">Creates an event in your connected calendar. Review existing events before requesting another export.</p>
@@ -119,6 +136,29 @@ export function ZapierFlowActions({ capabilities, canManage, disabled: setupBusy
         <p className="text-xs text-muted-foreground">Creates an invoice in your connected accounting app. This does not record a customer payment.</p>
         <Button type="button" className="h-auto whitespace-normal" disabled={disabled(KEYS.accounting) || !invoice} onClick={() => void request(KEYS.accounting, `invoices/${encodeURIComponent(invoice)}/accounting`)}>Export invoice to accounting</Button>
       </div>}
+      {ready(KEYS.invoiceEmail) && <div className="space-y-2 rounded-md border p-3">
+        <RecordPicker kind="invoices" label="Invoice to email" disabled={disabled(KEYS.invoiceEmail)} onChange={setEmailInvoice} />
+        <p className="text-xs text-muted-foreground">Emails this issued invoice to the customer from your connected mailbox. Use it instead of GrowthOS invoice delivery, not as well: an invoice already sent there cannot be sent here.</p>
+        <Button type="button" className="h-auto whitespace-normal" disabled={disabled(KEYS.invoiceEmail) || !emailInvoice} onClick={() => void request(KEYS.invoiceEmail, `invoices/${encodeURIComponent(emailInvoice)}/email`)}>Email invoice from my mailbox</Button>
+      </div>}
+      {ready(KEYS.estimateEmail) && <div className="space-y-2 rounded-md border p-3">
+        <RecordPicker kind="estimates" label="Draft estimate" disabled={disabled(KEYS.estimateEmail)} onChange={setEstimate} />
+        <p className="text-xs text-muted-foreground">Emails this draft estimate to the customer from your connected mailbox and marks it sent once your mail app accepts it. An estimate already sent through GrowthOS cannot be sent here.</p>
+        <Button type="button" className="h-auto whitespace-normal" disabled={disabled(KEYS.estimateEmail) || !estimate} onClick={() => void request(KEYS.estimateEmail, `estimates/${encodeURIComponent(estimate)}/email`)}>Email estimate from my mailbox</Button>
+      </div>}
+      {ready(KEYS.reviewText) && <div className="space-y-2 rounded-md border p-3">
+        <p className="text-xs text-muted-foreground">Texts the customer your review link from your number after finished work. It sends once per job, at most once per customer every 90 days, inside your sending hours, and only to customers who agreed to texts. Each text ends with the opt-out line.</p>
+        <RecordPicker kind="finishedVisits" label="Finished visit" disabled={disabled(KEYS.reviewText)} onChange={setVisit} />
+        <Button type="button" className="h-auto whitespace-normal" disabled={disabled(KEYS.reviewText) || !visit} onClick={() => void request(KEYS.reviewText, `appointments/${encodeURIComponent(visit)}/review-request`)}>Text review request for visit</Button>
+        <RecordPicker kind="finishedJobs" label="Finished job" disabled={disabled(KEYS.reviewText)} onChange={setJob} />
+        <Button type="button" className="h-auto whitespace-normal" disabled={disabled(KEYS.reviewText) || !job} onClick={() => void request(KEYS.reviewText, `projects/${encodeURIComponent(job)}/review-request`)}>Text review request for job</Button>
+      </div>}
+      {ready(KEYS.payment) && <div className="space-y-2 rounded-md border p-3">
+        <RecordPicker kind="invoices" label="Paid invoice" disabled={disabled(KEYS.payment)} onChange={setPaidInvoice} />
+        {paidInvoice && <RecordPicker kind="receipts" parentId={paidInvoice} label="Recorded payment" disabled={disabled(KEYS.payment)} onChange={setReceipt} />}
+        <p className="text-xs text-muted-foreground">Records this payment against the invoice you already exported to your accounting app. Each payment is sent once; an invoice that was never exported is refused.</p>
+        <Button type="button" className="h-auto whitespace-normal" disabled={disabled(KEYS.payment) || !paidInvoice || !receipt} onClick={() => void request(KEYS.payment, `invoices/${encodeURIComponent(paidInvoice)}/receipts/${encodeURIComponent(receipt)}/accounting`)}>Record payment in accounting</Button>
+      </div>}
       {ready(KEYS.crew) && <div className="space-y-2 rounded-md border p-3">
         <RecordPicker kind="users" label="Team member" disabled={disabled(KEYS.crew)} eligibleIds={crewPhones} onChange={setMember} />
         <Label htmlFor={`${id}-date`}>Day sheet date (company timezone)</Label>
@@ -126,7 +166,7 @@ export function ZapierFlowActions({ capabilities, canManage, disabled: setupBusy
         <p className="text-xs text-muted-foreground">Texts this member's schedule for the chosen company date to their saved crew phone number.</p>
         <Button type="button" className="h-auto whitespace-normal" disabled={disabled(KEYS.crew) || !member || !validDate(date)} onClick={() => { if (validDate(date)) void request(KEYS.crew, 'sched/day-sheet', { userId: member, date }); }}>Send crew day sheet by text</Button>
       </div>}
-      {capabilities.some(capability => capability.key.startsWith('callie.')) && <p className="text-xs text-muted-foreground">Call sync can also request missed-call texts. Call sync and text-back requests are not available from this panel while callback eligibility and send consent cannot be reviewed here.</p>}
+      {capabilities.some(capability => capability.key === 'callie.calls.list' || capability.key === 'callie.sms.send') && <p className="text-xs text-muted-foreground">Call sync can also request missed-call texts. Call sync and text-back requests are not available from this panel while callback eligibility and send consent cannot be reviewed here.</p>}
       {result && <p role="status" className="break-words text-sm">{result}</p>}
     </section>
   );
@@ -136,7 +176,13 @@ function validDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 }
 
-function RecordPicker({ kind, label, disabled, eligibleIds = '', onChange }: { kind: 'appointments' | 'invoices' | 'users' | 'services'; label: string; disabled: boolean; eligibleIds?: string; onChange: (id: string) => void }) {
+const PICKER_PATHS: Partial<Record<PickerKind, string>> = {
+  services: 'service-obligations?status=active', estimates: 'estimates?status=draft&limit=100',
+  finishedVisits: 'appointments', finishedJobs: 'projects?status=completed&limit=100',
+};
+type Named = { id: string; status: string; leadLabel: string | null; updatedAt?: string | null };
+
+function RecordPicker({ kind, label, disabled, eligibleIds = '', parentId = '', onChange }: { kind: PickerKind; label: string; disabled: boolean; eligibleIds?: string; parentId?: string; onChange: (id: string) => void }) {
   const id = useId();
   const [options, setOptions] = useState<Option[]>([]);
   const [selected, setSelected] = useState('');
@@ -150,12 +196,22 @@ function RecordPicker({ kind, label, disabled, eligibleIds = '', onChange }: { k
     setLoading(true); setError(false); setOptions([]); setSelected(''); onChange('');
     void (async () => {
       try {
-        const path = kind === 'services' ? 'service-obligations?status=active' : `${kind}${kind === 'invoices' ? `?status=issued&page=${page}` : ''}`;
+        const path = kind === 'receipts' ? `invoices/${encodeURIComponent(parentId)}` : PICKER_PATHS[kind] ?? `${kind}${kind === 'invoices' ? `?status=issued&page=${page}` : ''}`;
         const response = await fetch(`/api/v1/${path}`, { credentials: 'include' });
         if (!response.ok) throw new Error('Read unavailable');
         const body = await response.json();
         let next: Option[];
-        if (kind === 'invoices') {
+        if (kind === 'receipts') {
+          if (!Array.isArray(body.allocations)) throw new Error('Invalid detail');
+          next = body.allocations.filter((row: { kind: string; reversedAt: string | null }) => row.kind === 'payment' && !row.reversedAt).map((row: { id: string; amountCents: number; occurredAt: string | null; sourceReference: string | null }) => ({ id: row.id, label: `${(row.amountCents / 100).toFixed(2)} · ${timestamp(row.occurredAt)}${row.sourceReference ? ` · ${row.sourceReference}` : ''}` }));
+        } else if (kind === 'estimates' || kind === 'finishedJobs' || kind === 'finishedVisits') {
+          if (!Array.isArray(body)) throw new Error('Invalid list');
+          next = kind === 'estimates'
+            ? body.filter((row: Named) => row.status === 'draft').map((row: Named & { title: string }) => ({ id: row.id, label: `${row.leadLabel || 'Customer unavailable'} · ${row.title}` }))
+            : kind === 'finishedJobs'
+            ? body.filter((row: Named) => row.status === 'completed').map((row: Named & { name: string }) => ({ id: row.id, label: `${row.leadLabel || 'Customer unavailable'} · ${row.name}` }))
+            : body.filter((row: Named) => row.status === 'completed').map((row: Named & { type: string; scheduledStart: string }) => ({ id: row.id, label: `${row.leadLabel || 'Customer unavailable'} · ${row.type.replace(/_/g, ' ')} · ${timestamp(row.scheduledStart)}` }));
+        } else if (kind === 'invoices') {
           if (!Array.isArray(body.items) || !Number.isFinite(body.total)) throw new Error('Invalid list');
           next = body.items.filter((row: { status: string; invoiceNumber: string | null }) => row.status === 'issued' && row.invoiceNumber).map((row: { id: string; invoiceNumber: string; customerName: string; issuedAt: string | null }) => ({ id: row.id, label: `${row.invoiceNumber} · ${row.customerName} · ${timestamp(row.issuedAt)}` }));
         } else {
@@ -166,12 +222,12 @@ function RecordPicker({ kind, label, disabled, eligibleIds = '', onChange }: { k
             ? body.filter((row: { status: string }) => ['scheduled', 'confirmed'].includes(row.status)).map((row: { id: string; leadLabel: string | null; type: string; scheduledStart: string }) => ({ id: row.id, label: `${row.leadLabel || 'Customer unavailable'} · ${row.type.replace(/_/g, ' ')} · ${timestamp(row.scheduledStart)}` }))
             : body.filter((row: { id: string; isActive: boolean; operationallyEligible: boolean }) => row.isActive && row.operationallyEligible && eligibleIds.split('|').includes(row.id)).map((row: { id: string; firstName: string | null; lastName: string | null; email: string }) => ({ id: row.id, label: [row.firstName, row.lastName].filter(Boolean).join(' ') || row.email }));
         }
-        if (active) { setOptions(next); setTotal(kind === 'invoices' ? body.total : body.length); }
+        if (active) { setOptions(next); setTotal(kind === 'invoices' ? body.total : kind === 'receipts' ? next.length : body.length); }
       } catch { if (active) setError(true); }
       finally { if (active) setLoading(false); }
     })();
     return () => { active = false; };
-  }, [kind, page, reload, eligibleIds, onChange]);
+  }, [kind, page, reload, eligibleIds, parentId, onChange]);
   return <div className="min-w-0 space-y-2">
     <Label htmlFor={id}>{label}</Label>
     <select id={id} className={selectClass} value={selected} disabled={disabled || loading || error} onChange={event => { const value = options.some(option => option.id === event.target.value) ? event.target.value : ''; setSelected(value); onChange(value); }}>
@@ -180,7 +236,7 @@ function RecordPicker({ kind, label, disabled, eligibleIds = '', onChange }: { k
     </select>
     {error ? <div className="space-y-2"><p role="alert" className="text-sm">Could not load {label.toLowerCase()} records.</p><Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => setReload(value => value + 1)}>Reload {label.toLowerCase()} records</Button></div>
       : !loading && !options.length && <p className="text-xs text-muted-foreground">No eligible records on this page.{kind === 'users' ? ' Add a saved crew phone for an active team member in the flow settings.' : ''}</p>}
-    {kind === 'appointments' && !loading && total >= 200 && <p className="text-xs text-muted-foreground">Showing the latest 200 appointments. Older records are not listed here.</p>}
+    {(kind === 'appointments' || kind === 'finishedVisits') && !loading && total >= 200 && <p className="text-xs text-muted-foreground">Showing the latest 200 appointments. Older records are not listed here.</p>}
     {kind === 'invoices' && !loading && !error && total > 25 && <div className="flex flex-wrap items-center gap-2"><Button type="button" size="sm" variant="outline" disabled={disabled || page === 0} onClick={() => setPage(value => value - 1)}>Previous invoices</Button><span className="text-xs">Page {page + 1}</span><Button type="button" size="sm" variant="outline" disabled={disabled || (page + 1) * 25 >= total} onClick={() => setPage(value => value + 1)}>Next invoices</Button></div>}
   </div>;
 }
