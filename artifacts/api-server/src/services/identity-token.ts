@@ -66,7 +66,7 @@ export async function consumeIdentityToken(params: {
   token: string;
   purpose: IdentityTokenPurpose;
   now?: Date;
-}): Promise<{ userId: string } | null> {
+}): Promise<{ userId: string; tokenId: string } | null> {
   if (!params.token || params.token.length > 512) return null;
   const now = params.now ?? new Date();
   const [consumed] = await db
@@ -80,6 +80,6 @@ export async function consumeIdentityToken(params: {
         gt(identityTokensTable.expiresAt, now),
       ),
     )
-    .returning({ userId: identityTokensTable.userId });
+    .returning({ userId: identityTokensTable.userId, tokenId: identityTokensTable.id });
   return consumed ?? null;
 }

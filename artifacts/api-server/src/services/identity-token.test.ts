@@ -35,7 +35,7 @@ describe("identity tokens", () => {
 
     await expect(
       consumeIdentityToken({ token, purpose: "email_verification" }),
-    ).resolves.toEqual({ userId });
+    ).resolves.toEqual({ userId, tokenId: expect.any(String) });
     await expect(
       consumeIdentityToken({ token, purpose: "email_verification" }),
     ).resolves.toBeNull();
@@ -52,7 +52,7 @@ describe("identity tokens", () => {
     ).resolves.toBeNull();
     await expect(
       consumeIdentityToken({ token, purpose: "password_reset" }),
-    ).resolves.toEqual({ userId });
+    ).resolves.toEqual({ userId, tokenId: expect.any(String) });
   });
 
   it("rejects expired tokens", async () => {
@@ -85,6 +85,6 @@ describe("identity tokens", () => {
     ).resolves.toBeNull();
     await expect(
       consumeIdentityToken({ token: replacement, purpose: "password_reset" }),
-    ).resolves.toEqual({ userId });
+    ).resolves.toEqual({ userId, tokenId: expect.any(String) });
   });
 });
