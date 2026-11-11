@@ -48,5 +48,8 @@ overwrite a database as rollback.
   mailbox through the existing audited, rate-limited identity flow.
 - Failed service feeds appear in the command-center warning. An incomplete read
   no longer claims everything is caught up; retry excludes hidden invoice feeds.
+- Invoice previews identify remaining invoices and link to the full list. A
+  partial page never claims nobody owes money; displayed partial balances are
+  explicitly lower bounds.
 
 Local/source verification does not establish hosted or contractor acceptance.

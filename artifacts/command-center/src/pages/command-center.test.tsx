@@ -93,6 +93,17 @@ describe("Command center home", () => {
     expect(open.getAttribute("href")).toBe("/tech");
   });
 
+  it('does not claim all work is caught up when issued invoices extend beyond the preview', async () => {
+    renderHome('owner', {
+      '/invoices': url => url.searchParams.get('status') === 'issued'
+        ? json({ items: Array.from({ length: 25 }, (_, index) => ({ id: `paid-${index}`, status: 'issued', title: 'Paid invoice', customerName: 'Fictional customer', totalCents: 10000, balanceDueCents: 0, dueDate: today, paymentState: 'paid' })), total: 26, page: 0, pageSize: 25 })
+        : json({ items: [], total: 0, page: 0, pageSize: 25 }),
+    });
+    expect(await screen.findByText('More invoices to review')).toBeTruthy();
+    expect(screen.queryByText("You're all caught up")).toBeNull();
+    expect(screen.getByRole('link', { name: 'Review all invoices' }).getAttribute('href')).toBe('/invoices');
+  });
+
   it('reports a failed service check and retries only feeds the member can read', async () => {
     const user = userEvent.setup();
     let attempts = 0;

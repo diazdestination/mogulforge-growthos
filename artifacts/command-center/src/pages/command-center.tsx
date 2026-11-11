@@ -95,7 +95,7 @@ function CommandCenterContent({ me, scopeKey }: { me: MemberProfile; scopeKey: s
   const calls = useSafeQuery<{ items: CallbackItem[] }>(["command-center", scopeKey, "callie"], "/communications/callie?scope=attention&offset=0");
   const service = useSafeQuery<{ items: unknown[] }>(["command-center", scopeKey, "service"], "/service-watch?scope=attention&offset=0");
   const estimates = useSafeQuery<EstimateRow[]>(["command-center", scopeKey, "estimates"], "/estimates?status=sent&limit=50");
-  const issued = useSafeQuery<{ items: InvoiceRow[] }>(["command-center", scopeKey, "invoices", "issued"], seesMoney ? "/invoices?page=0&status=issued" : null);
+  const issued = useSafeQuery<{ items: InvoiceRow[]; total: number }>(["command-center", scopeKey, "invoices", "issued"], seesMoney ? "/invoices?page=0&status=issued" : null);
   const drafts = useSafeQuery<{ total: number }>(["command-center", scopeKey, "invoices", "draft"], seesMoney ? "/invoices?page=0&status=draft" : null);
 
   const dayData = day.data && day.data.organizationId === companyId && day.data.appointments ? day.data : null;
@@ -107,6 +107,7 @@ function CommandCenterContent({ me, scopeKey }: { me: MemberProfile; scopeKey: s
     day: dayData,
     callbacks: listOf(calls.data?.items),
     invoices: listOf(issued.data?.items),
+    invoiceTotal: issued.data?.total,
     draftInvoiceCount: typeof drafts.data?.total === "number" ? drafts.data.total : null,
     estimates: listOf(estimates.data),
     serviceAttention: listOf(service.data?.items)?.length ?? null,
@@ -127,6 +128,7 @@ function CommandCenterContent({ me, scopeKey }: { me: MemberProfile; scopeKey: s
   const statuses = agentStatuses(inputs, loading);
   const feeds = [day, nba, calls, service, estimates, ...(seesMoney ? [issued, drafts] : [])];
   const failed = feeds.filter((q) => q.isError).length;
+  const moreInvoices = seesMoney && typeof issued.data?.total === 'number' && issued.data.total > (inputs.invoices?.length ?? 0);
   const visible = showAll ? needs : needs.slice(0, SHOW_FIRST);
   const refreshAll = () => {
     for (const q of feeds) void q.refetch();
@@ -142,7 +144,7 @@ function CommandCenterContent({ me, scopeKey }: { me: MemberProfile; scopeKey: s
         <div className="cc-hero__copy">
           <p className="cc-hero__date">{dateLine}</p>
           <h1 id="cc-greeting">{greeting(now, timeZone, firstName)}</h1>
-          <p className="cc-hero__summary" aria-live="polite">{failed > 0 && needs.length === 0 ? "We couldn't check all your work yet." : summaryLine(needs, anyLoading)}</p>
+          <p className="cc-hero__summary" aria-live="polite">{failed > 0 && needs.length === 0 ? "We couldn't check all your work yet." : moreInvoices && needs.length === 0 ? 'Review your remaining invoices to finish checking your day.' : summaryLine(needs, anyLoading)}</p>
           <div className="cc-hero__actions">
             {isFieldRole(role) && (
               <Link href="/tech" className="cc-btn cc-btn--primary">
@@ -186,6 +188,7 @@ function CommandCenterContent({ me, scopeKey }: { me: MemberProfile; scopeKey: s
               <button type="button" onClick={refreshAll}>Try again</button>
             </p>
           )}
+          {moreInvoices && <p className="cc-warning">Some invoices aren't included in this preview. <Link href="/invoices" className="underline">Review all invoices</Link></p>}
           {anyLoading && needs.length === 0 ? (
             <ul className="cc-needs__list" aria-busy="true">
               {[0, 1, 2].map((i) => (
@@ -196,8 +199,8 @@ function CommandCenterContent({ me, scopeKey }: { me: MemberProfile; scopeKey: s
             <div className="cc-empty">
               <CheckCircle2 aria-hidden />
               <div>
-                <p className="cc-empty__title">{failed > 0 ? 'Your work needs another check' : "You're all caught up"}</p>
-                <p>{failed > 0 ? 'Try again to see what needs you today.' : 'Nothing needs you right now. New calls, leads and payments will show up here.'}</p>
+                <p className="cc-empty__title">{failed > 0 ? 'Your work needs another check' : moreInvoices ? 'No urgent items in this preview' : "You're all caught up"}</p>
+                <p>{failed > 0 ? 'Try again to see what needs you today.' : moreInvoices ? 'Review the rest of your invoices before finishing your day.' : 'Nothing needs you right now. New calls, leads and payments will show up here.'}</p>
               </div>
             </div>
           ) : (

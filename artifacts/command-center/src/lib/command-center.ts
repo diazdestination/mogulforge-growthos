@@ -164,6 +164,7 @@ export interface CommandInputs {
   day?: WorkDay | null;
   callbacks?: CallbackItem[] | null;
   invoices?: InvoiceRow[] | null;
+  invoiceTotal?: number | null;
   draftInvoiceCount?: number | null;
   estimates?: EstimateRow[] | null;
   serviceAttention?: number | null;
@@ -412,10 +413,11 @@ export function agentStatuses(input: CommandInputs, loading: Partial<Record<Agen
       case "bill": {
         if (!input.invoices) return unknown;
         const open = input.invoices.filter((i) => i.status === "issued" && (i.paymentState === "unpaid" || i.paymentState === "partial"));
+        const incomplete = typeof input.invoiceTotal === 'number' && input.invoiceTotal > input.invoices.length;
         const owed = open.reduce((sum, i) => sum + Math.max(0, i.balanceDueCents ?? i.totalCents), 0);
         const late = open.filter((i) => i.dueDate && dayStart(i.dueDate.slice(0, 10)) < dayStart(today)).length;
-        if (!open.length) return { agent, line: "Nobody owes you right now", count: 0, state: "clear" };
-        return { agent, line: `${money(owed)} owed${late ? ` · ${late} late` : ""}`, count: open.length, state: late ? "needs-you" : "clear" };
+        if (!open.length) return incomplete ? { agent, line: 'More invoices to review', count: 0, state: 'unknown' } : { agent, line: "Nobody owes you right now", count: 0, state: "clear" };
+        return { agent, line: `${incomplete ? 'At least ' : ''}${money(owed)} owed${late ? ` · ${late} late` : ""}`, count: open.length, state: late ? "needs-you" : incomplete ? 'unknown' : "clear" };
       }
       case "invo": {
         if (input.draftInvoiceCount == null) return unknown;
