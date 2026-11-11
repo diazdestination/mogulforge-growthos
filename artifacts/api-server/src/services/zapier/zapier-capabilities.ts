@@ -598,7 +598,7 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
     specialistId: "bill",
     direction: "write",
     label: "Text invoice pay links",
-    description: "BILL texts a consented customer the open sandbox pay link for an issued invoice's current balance, from the contractor's own number.",
+    description: "BILL texts a consented customer the open Stripe pay link for an issued invoice's current balance, from the contractor's own number.",
     inputSchema: SMS_SEND_INPUT,
     summaryFields: ["toPhone"],
     // A team member taps Send for one customer with fixed copy; that tap is the approval.

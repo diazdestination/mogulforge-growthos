@@ -6,7 +6,7 @@ import {
   db, organizationsTable, usersTable, contactsTable, consentRecordsTable, twilioClientBindingsTable,
   twilioCallsTable, twilioConsentProofsTable, twilioDispatchesTable, twilioInboundEventsTable,
   missedCallCareCasesTable as cases, missedCallCarePoliciesTable as policies, revenueExecutionsTable as receipts,
-  missedCallHandoffsTable as handoffs, crmTasksTable, customerLifecycleTable, leadsTable, staffPushDeliveriesTable,
+  missedCallHandoffsTable as handoffs, crmTasksTable, customerLifecycleTable, leadsTable, staffPushDeliveriesTable, zapierActionExecutionsTable,
 } from "@workspace/db";
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
 import { syntheticTwilioNumber } from "../test-helpers/synthetic-twilio";
@@ -163,6 +163,23 @@ describe("reviewed missed-call recovery", () => {
     expect(preview.snapshot.ownerUserId).toBe(afterOwner); expect(preview.eligibility.resumeAt).toBe("2026-10-02T17:00:00.000Z");
     await approve(); await processMissedCallCare(org);
     expect((await row()).state).toBe("deferred"); expect(await records()).toHaveLength(0); expect(provider).not.toHaveBeenCalled();
+  });
+  it("never texts outside 8am-9pm in the company time zone, even inside an always-open care window", async () => {
+    // 16:00Z is 01:00 in Tokyo; the next allowed instant is 08:00 local (23:00Z).
+    await db.update(organizationsTable).set({ timezone: "Asia/Tokyo" }).where(eq(organizationsTable.id, org));
+    await reviewed();
+    const preview = await previewMissedCallCare(org, call);
+    expect(preview.eligibility).toMatchObject({ ready: true, reason: "quiet_hours", resumeAt: "2026-10-02T23:00:00.000Z" });
+    await approve(); await processMissedCallCare(org);
+    expect((await row()).state).toBe("deferred"); expect(provider).not.toHaveBeenCalled(); expect(await records()).toHaveLength(0);
+  });
+  it("shares the one-per-caller text-back cap with the own-number CALLIE path", async () => {
+    await db.insert(zapierActionExecutionsTable).values({ organizationId: org, specialistId: "callie", capability: "callie.sms.send", direction: "write", zapierApp: "OpenPhoneCLIAPI", zapierAction: "send_message",
+      idempotencyKey: `callie-textback:${randomUUID()}`, requestDigest: "e".repeat(64), requestSummary: { toPhone: phone }, state: "succeeded", createdAt: new Date(Date.now() - 3_600_000) });
+    await reviewed();
+    expect((await previewMissedCallCare(org, call)).eligibility.reason).toBe("frequency_cap");
+    await approve(); await processMissedCallCare(org);
+    expect((await row()).state).toBe("deferred"); expect(provider).not.toHaveBeenCalled();
   });
   it("caps another response to the same phone across different calls", async () => {
     await reviewed(); await approve(); await processMissedCallCare(org);

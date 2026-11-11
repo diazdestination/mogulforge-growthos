@@ -12,7 +12,7 @@ import { canWrite } from "@/lib/permissions";
 /**
  * Phone-first "My day" for the person doing the work: today's assigned jobs,
  * tap-to-call, directions, On My Way, the visit checklist/photos/completion,
- * and collecting the invoice balance in person (sandbox pay link + QR).
+ * and collecting the invoice balance in person (Stripe pay link + QR).
  */
 
 export type MyDayInvoice = { id: string; invoiceNumber: string | null; title: string; totalCents: number; balanceDueCents: number | null; paymentState: string };
@@ -45,7 +45,8 @@ export type MyDay = {
   today: MyDayJob[];
   upcoming: MyDayJob[];
 };
-type PayLink = { id: string; amountCents: number; url: string | null; state: string; expiresAt: string | null };
+type PayLink = { id: string; amountCents: number; url: string | null; state: string; expiresAt: string | null; createdAt?: string };
+type PayReadiness = { configured: boolean; mode: "test" | "live"; canCreateLinks: boolean; message: string | null };
 type FlowOutcome = { execution?: { state?: string; detail?: string }; error?: string; code?: string };
 
 const big = "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-base font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
@@ -268,6 +269,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 function CollectPayment({ job, day }: { job: MyDayJob; day: MyDay }) {
   const invoice = job.invoices?.find((item) => (item.balanceDueCents ?? 0) > 0) ?? null;
   const [links, setLinks] = useState<PayLink[] | null>(null);
+  const [readiness, setReadiness] = useState<PayReadiness | null>(null);
   const [qr, setQr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -280,8 +282,11 @@ function CollectPayment({ job, day }: { job: MyDayJob; day: MyDay }) {
   async function loadLinks() {
     if (!invoice) return;
     try {
-      const list = await api<{ links?: PayLink[] }>(`${jobInvoicePath}/payment-links`);
-      if (current.current === invoice.id) setLinks(Array.isArray(list.links) ? list.links : []);
+      const list = await api<{ links?: PayLink[]; readiness?: PayReadiness }>(`${jobInvoicePath}/payment-links`);
+      if (current.current === invoice.id) {
+        setLinks(Array.isArray(list.links) ? list.links : []);
+        setReadiness(list.readiness && typeof list.readiness.canCreateLinks === "boolean" ? list.readiness : null);
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Pay links could not be loaded.");
     }
@@ -304,6 +309,9 @@ function CollectPayment({ job, day }: { job: MyDayJob; day: MyDay }) {
   const balance = invoice.balanceDueCents ?? 0;
   const open = links?.find((link) => link.state === "open" && !!link.url && link.amountCents === balance && (!link.expiresAt || Date.parse(link.expiresAt) > Date.now())) ?? null;
   const pending = links?.some((link) => ["processing", "needs_reconciliation"].includes(link.state)) ?? false;
+  const latest = links?.[0] ?? null;
+  const blocked = readiness !== null && !readiness.canCreateLinks;
+  const live = readiness?.mode === "live";
 
   async function createLink() {
     setBusy(true); setError(null);
@@ -331,18 +339,24 @@ function CollectPayment({ job, day }: { job: MyDayJob; day: MyDay }) {
     <section className={card} aria-label="Collect payment">
       <h2 className="text-lg font-semibold">Collect payment</h2>
       <p className="text-base">Invoice {invoice.invoiceNumber ?? ""} · Balance due <strong>{money(balance)}</strong></p>
-      <p className="text-xs text-muted-foreground">Stripe test mode (sandbox): no real cards are charged. Payment is recorded on the invoice when Stripe confirms it.</p>
+      <p className="text-xs text-muted-foreground">{live
+        ? "Live: the customer's card or bank is charged for real. Payment is recorded on the invoice when Stripe confirms it."
+        : "Stripe test mode: no real cards are charged. Payment is recorded on the invoice when Stripe confirms it."}</p>
       {links === null && !error && <p role="status" className="text-sm">Checking pay links…</p>}
       {pending && <p className="text-sm">A payment is clearing or needs review. Check the invoice before collecting again.</p>}
-      {links !== null && !open && !pending && (day.canCollectPayments
-        ? <button type="button" className={primary} disabled={busy} onClick={() => void createLink()}>Create pay link for {money(balance)}</button>
-        : <p className="text-sm">Ask the office to create a pay link for this balance.</p>)}
+      {!open && !pending && latest?.state === "expired" && <p className="text-sm">The last pay link expired unused. Make a new one for the current balance.</p>}
+      {!open && !pending && latest?.state === "failed" && <p className="text-sm">The last payment did not go through. Make a new pay link to try again.</p>}
+      {links !== null && !open && !pending && (blocked
+        ? <p role="status" className="text-sm font-medium">{readiness?.message ?? "Pay links are off right now."} Ask the office to collect another way.</p>
+        : day.canCollectPayments
+          ? <button type="button" className={primary} disabled={busy} onClick={() => void createLink()}>{busy ? "Making pay link…" : `Create pay link for ${money(balance)}`}</button>
+          : <p className="text-sm">Ask the office to create a pay link for this balance.</p>)}
       {open && (
         <div className="space-y-2">
           {qr ? (
             <figure className="flex flex-col items-center gap-2 rounded-lg bg-white p-3">
               <img src={qr} alt={`QR code to pay ${money(balance)}`} className="h-auto w-full max-w-[280px]" />
-              <figcaption className="text-center text-sm text-black">Have the customer scan this with their phone camera to pay {money(balance)}.</figcaption>
+              <figcaption className="text-center text-sm text-black">Have the customer scan this with their phone camera to pay {money(balance)}. If their card is declined, they can try another card on the same page.</figcaption>
             </figure>
           ) : (
             <button type="button" className={primary} disabled={busy} onClick={() => void showQr()}>Show QR code</button>

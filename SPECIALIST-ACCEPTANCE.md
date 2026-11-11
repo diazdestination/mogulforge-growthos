@@ -31,6 +31,8 @@ cd artifacts/api-server && source <envfile> && LOG_LEVEL=silent pnpm exec vitest
 | APPT | Can request a calendar event | APPT > requests a calendar event for a booked appointment with approval |
 | CALLIE | Missed calls become callback tasks with caller details; team reviews the next step | CALLIE > turns missed calls into callback tasks with caller details and parks the text-back for review |
 | CALLIE | Text-back requires a verified business-number connection | CALLIE > does not text a missed caller back without a verified business-number connection |
+| CALLIE | Text-back is one branded informational text with the opt-out line; STOP is honoured | CALLIE > sends one approved, branded text-back with the opt-out line, then skips a STOPped caller |
+| CALLIE | Text-back cannot be switched on until texting registration is confirmed | CALLIE > refuses to switch text-back on until the texting registration is confirmed |
 | MAINTAIN | Installed equipment, warranty terms, service due dates | MAINTAIN > tracks installed equipment, warranty terms and service due dates |
 | MAINTAIN | Service-due texts need a supported business-number connection | MAINTAIN > texts a service-due reminder only through a supported business number, with approval, and only once |
 | MAINTAIN | Replies and opt-outs are recorded | MAINTAIN > records a customer's STOP and reply on the business number and refuses later service texts; MAINTAIN > refuses a service text after staff record an opt-out on the customer |
@@ -71,7 +73,11 @@ cd artifacts/api-server && source <envfile> && LOG_LEVEL=silent pnpm exec vitest
 - An owner can switch any Zapier write capability, customer texts included, to automatic. After that, texts go
   out without per-message approval. Consent, opt-out and do-not-contact checks still apply at dispatch. Every
   capability starts switched off after binding.
-- A CALLIE text-back to a missed caller does not check SMS consent (the caller phoned first). It still needs the
-  business-number connection and staff approval. Decide whether that matches your compliance stance.
+- A CALLIE text-back to a missed caller relies on the missed inbound call as conversational consent for one
+  informational reply; it does not need recorded SMS consent, and that basis is never usable as consent by any
+  other text. It still needs the business-number connection, a confirmed texting registration in Settings, the
+  caller not opted out or suppressed, a valid US mobile-capable number, the per-caller window and 8am-9pm company
+  time. The owner chooses Approve each or Automatic. Built to support texting rules, not a guarantee of legal
+  compliance; decide whether that matches your compliance stance (see ZAPIER-CONNECTED-APPS.md).
 - A staff-recorded receipt keeps its method (check, cash, external card) only in the free-text reference.
   There is no structured method field.

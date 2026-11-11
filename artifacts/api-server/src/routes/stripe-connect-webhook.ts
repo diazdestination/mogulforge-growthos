@@ -11,7 +11,8 @@ const router: IRouter = Router();
 /**
  * Public Stripe Connect webhook (events from contractors' connected accounts).
  * Verified against STRIPE_CONNECT_WEBHOOK_SECRET using the raw body captured in
- * app.ts. Mounted at /api/billing/connect-webhook.
+ * app.ts. Mounted at /api/billing/connect-webhook. Events must match the
+ * deployment's STRIPE_CONNECT_MODE; each event id is processed once.
  */
 router.post("/billing/connect-webhook", async (req: Request, res: Response): Promise<void> => {
   if (!connectWebhookConfigured()) {

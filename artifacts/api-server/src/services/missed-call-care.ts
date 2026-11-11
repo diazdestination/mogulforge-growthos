@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 import { and, asc, desc, eq, gt, inArray, isNull, lte, notExists, sql } from "drizzle-orm";
 import {
-  activitiesTable, auditEventsTable, contactsTable, crmTasksTable, db, leadsTable,
+  activitiesTable, auditEventsTable, contactsTable, crmTasksTable, db, leadsTable, organizationsTable,
   missedCallHandoffsTable as handoffs, missedCallCareCasesTable as cases, missedCallCarePoliciesTable as policies,
   revenueExecutionsTable as executions, twilioCallsTable as calls, twilioConsentProofsTable as proofs,
   twilioDispatchesTable as dispatches, twilioInboundEventsTable as inbound, usersTable,
@@ -17,6 +17,7 @@ import { phoneE164, twilioForOrganization } from "./twilio-controls";
 import { sendTwilioSms } from "./twilio-delivery";
 import { callieIntakesTable } from "../../../../lib/db/src/schema/callie";
 import { latestTwilioSmsToPhone } from "./twilio-sms-budget";
+import { getCallieTextBackSettings, latestTextBackTo, nextTextingHour, safeTimeZone } from "./callie-text-back";
 import { CARE_BODY, CARE_TEMPLATE_VERSION, DEFAULT_CARE_POLICY, careOperationKey, careOwnerAt, isMissedInbound, missedCallCarePolicySchema, nextCareWindow, type CarePolicyInput } from "./missed-call-care-policy";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -141,9 +142,28 @@ async function currentEligibility(context: Awaited<ReturnType<typeof careContext
   if (reply) deny("caller_reply_requires_review");
   const quietUntil = nextCareWindow(context.config, now);
   const recent = await latestTwilioSmsToPhone(db, org, call.phone, new Date(now.getTime() - 86400_000), careOperationKey(call.id));
-  const capUntil = recent ? new Date(recent.getTime() + 86400_000 + 60_000) : null;
-  const resume = [quietUntil, capUntil].filter((date): date is Date => date !== null).sort((a, b) => b.getTime() - a.getTime())[0];
-  return resume ? { resumeAt: nextCareWindow(context.config, resume) ?? resume, reason: capUntil ? "frequency_cap" : "quiet_hours" } : null;
+  // Shared missed-call text-back cap: one text-back per caller per company
+  // window across this path and the own-number (Zapier) CALLIE path.
+  const textBack = await getCallieTextBackSettings(org);
+  const windowMs = textBack.windowHours * 3_600_000;
+  const otherTextBack = await latestTextBackTo(db, org, call.phone, new Date(now.getTime() - windowMs), careOperationKey(call.id));
+  const capUntil = [recent ? new Date(recent.getTime() + 86400_000 + 60_000) : null, otherTextBack ? new Date(otherTextBack.getTime() + windowMs + 60_000) : null]
+    .filter((date): date is Date => date !== null).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+  // Never text before 8:00 or from 21:00 in the company time zone (the
+  // caller's own zone is unknown), whatever the approved care window says.
+  const [company] = await db.select({ timezone: organizationsTable.timezone }).from(organizationsTable).where(eq(organizationsTable.id, org));
+  const zone = safeTimeZone(company?.timezone);
+  const textingUntil = nextTextingHour(now, zone);
+  const resume = [quietUntil, capUntil, textingUntil].filter((date): date is Date => date !== null).sort((a, b) => b.getTime() - a.getTime())[0];
+  if (!resume) return null;
+  let at = resume;
+  for (let i = 0; i < 16; i++) {
+    const care = nextCareWindow(context.config, at) ?? at;
+    const next = nextTextingHour(care, zone) ?? care;
+    if (next.getTime() === at.getTime()) break;
+    at = next;
+  }
+  return { resumeAt: at, reason: capUntil ? "frequency_cap" : "quiet_hours" };
 }
 
 export async function previewMissedCallCare(org: string, callId: string) {

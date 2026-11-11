@@ -305,6 +305,21 @@ export type StageBehaviorAction =
   | "complete"
   | "cancel"
   | "enroll";
+/**
+ * CALLIE missed-call text-back setup (own-number path through Zapier). The
+ * registration flag is the owner's confirmation that their texting setup is
+ * approved by the carrier registry (Twilio A2P 10DLC brand + campaign, or
+ * Quo's business-texting registration). GrowthOS cannot verify it; it records
+ * who confirmed it and when, and text-back cannot be switched on without it.
+ */
+export interface CallieTextBackSettings {
+  messagingRegistered: boolean;
+  registeredByUserId: string | null;
+  registeredAt: string | null;
+  /** At most one text-back per caller number per company in this many hours. */
+  windowHours: number;
+}
+
 /** Google Business Profile connection for the reviews widget. */
 export interface GoogleReviewsConfig {
   placeId?: string;
@@ -430,6 +445,8 @@ export const orgSettingsTable = pgTable(
     concierge: jsonb("concierge").$type<Partial<ConciergeSettings> | null>(),
     /** Quiet hours + frequency caps for automated outreach. */
     sendingHours: jsonb("sending_hours").$type<Partial<SendingHoursSettings> | null>(),
+    /** CALLIE missed-call text-back: messaging registration confirmation and caller window. */
+    callieTextBack: jsonb("callie_text_back").$type<Partial<CallieTextBackSettings> | null>(),
     /** Per-stage behavior for live acquisition playbook enrollments. */
     playbookStageBehaviors: jsonb("playbook_stage_behaviors").$type<PlaybookStageBehaviors | null>(),
     // Brute-force security alerts recorded at or before this instant have been

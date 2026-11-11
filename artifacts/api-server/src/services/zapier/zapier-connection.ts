@@ -14,6 +14,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { decryptSecret, encryptSecret } from "../../lib/token-encryption";
 import { recordAudit } from "../audit";
+import { CALLIE_TEXTBACK_CAPABILITY, describeCallieTextBackSettings, getCallieTextBackSettings, type CallieTextBackView } from "../callie-text-back";
 import {
   detectServerMode,
   sha256Hex,
@@ -394,6 +395,8 @@ export type ZapierCapabilityView = {
     verifiedAt: string | null;
   } | null;
   policy: { mode: ZapierPolicyMode; dailyBudget: number; updatedAt: string | null };
+  /** CALLIE text-back only: the company's messaging-registration confirmation and caller window. */
+  textBack?: CallieTextBackView;
 };
 
 export function defaultPolicyFor(definition: ZapierCapabilityDefinition): { mode: ZapierPolicyMode; dailyBudget: number } {
@@ -407,6 +410,7 @@ export async function listZapierCapabilities(organizationId: string): Promise<Za
   ]);
   const bindingByKey = new Map(bindings.map((row) => [row.capability, row]));
   const policyByKey = new Map(policies.map((row) => [row.capability, row]));
+  const textBack = await describeCallieTextBackSettings(organizationId);
   return ZAPIER_CAPABILITIES.map((definition) => {
     const binding = bindingByKey.get(definition.key) ?? null;
     const policy = policyByKey.get(definition.key) ?? null;
@@ -439,6 +443,7 @@ export async function listZapierCapabilities(organizationId: string): Promise<Za
       policy: policy
         ? { mode: policy.mode, dailyBudget: policy.dailyBudget, updatedAt: policy.updatedAt.toISOString() }
         : { ...defaultPolicyFor(definition), updatedAt: null },
+      ...(definition.key === CALLIE_TEXTBACK_CAPABILITY ? { textBack } : {}),
     };
   });
 }
@@ -607,6 +612,9 @@ export async function setZapierPolicy(input: {
     throw new ZapierBindingError("Policy mode must be off, approve, or auto.");
   }
   const mode = input.mode as ZapierPolicyMode;
+  if (definition.key === CALLIE_TEXTBACK_CAPABILITY && mode !== "off" && !(await getCallieTextBackSettings(input.organizationId)).messagingRegistered) {
+    throw new ZapierBindingError("Confirm that your texting setup is registered (Twilio A2P 10DLC or Quo business texting) before turning on missed-call text-back.");
+  }
   const dailyBudget = Math.min(Math.max(Math.trunc(input.dailyBudget ?? definition.defaultDailyBudget), 0), 500);
   const values = {
     organizationId: input.organizationId,
