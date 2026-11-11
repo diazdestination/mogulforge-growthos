@@ -93,6 +93,7 @@ router.get(
       lastName: user.lastName,
       role: user.role,
       isActive: user.isActive,
+      emailVerified: !!user.emailVerifiedAt,
       organization: organization
         ? {
             id: organization.id,

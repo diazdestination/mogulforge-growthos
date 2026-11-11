@@ -58,7 +58,7 @@ describe('Shell sidebar admin-link gating', () => {
       expect(screen.queryAllByText('Settings')).toHaveLength(0);
       expect(screen.queryAllByText('Audit Log')).toHaveLength(0);
       // Sanity: regular nav items are still there.
-      expect(screen.getAllByText('Dashboard').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Business overview').length).toBeGreaterThan(0);
     },
   );
 

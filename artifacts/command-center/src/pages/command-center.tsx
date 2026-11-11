@@ -120,15 +120,16 @@ function CommandCenterContent({ me, scopeKey }: { me: MemberProfile; scopeKey: s
     esti: estimates.isPending,
     bill: seesMoney && issued.isPending,
     invo: seesMoney && drafts.isPending,
-    maintain: day.isPending && service.isPending,
+    maintain: day.isPending || service.isPending,
   };
   const anyLoading = Object.values(loading).some(Boolean);
   const needs = buildNeeds(inputs);
   const statuses = agentStatuses(inputs, loading);
-  const failed = [day, nba, calls, estimates, ...(seesMoney ? [issued, drafts] : [])].filter((q) => q.isError).length;
+  const feeds = [day, nba, calls, service, estimates, ...(seesMoney ? [issued, drafts] : [])];
+  const failed = feeds.filter((q) => q.isError).length;
   const visible = showAll ? needs : needs.slice(0, SHOW_FIRST);
   const refreshAll = () => {
-    for (const q of [day, nba, calls, service, estimates, issued, drafts]) void q.refetch();
+    for (const q of feeds) void q.refetch();
   };
 
   const firstName = me.firstName?.trim() || null;
@@ -141,7 +142,7 @@ function CommandCenterContent({ me, scopeKey }: { me: MemberProfile; scopeKey: s
         <div className="cc-hero__copy">
           <p className="cc-hero__date">{dateLine}</p>
           <h1 id="cc-greeting">{greeting(now, timeZone, firstName)}</h1>
-          <p className="cc-hero__summary" aria-live="polite">{summaryLine(needs, anyLoading)}</p>
+          <p className="cc-hero__summary" aria-live="polite">{failed > 0 && needs.length === 0 ? "We couldn't check all your work yet." : summaryLine(needs, anyLoading)}</p>
           <div className="cc-hero__actions">
             {isFieldRole(role) && (
               <Link href="/tech" className="cc-btn cc-btn--primary">
@@ -195,8 +196,8 @@ function CommandCenterContent({ me, scopeKey }: { me: MemberProfile; scopeKey: s
             <div className="cc-empty">
               <CheckCircle2 aria-hidden />
               <div>
-                <p className="cc-empty__title">You're all caught up</p>
-                <p>Nothing needs you right now. New calls, leads and payments will show up here.</p>
+                <p className="cc-empty__title">{failed > 0 ? 'Your work needs another check' : "You're all caught up"}</p>
+                <p>{failed > 0 ? 'Try again to see what needs you today.' : 'Nothing needs you right now. New calls, leads and payments will show up here.'}</p>
               </div>
             </div>
           ) : (

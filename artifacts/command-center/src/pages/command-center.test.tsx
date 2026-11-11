@@ -93,6 +93,21 @@ describe("Command center home", () => {
     expect(open.getAttribute("href")).toBe("/tech");
   });
 
+  it('reports a failed service check and retries only feeds the member can read', async () => {
+    const user = userEvent.setup();
+    let attempts = 0;
+    const requested = renderHome('sales_rep', {
+      '/service-watch': () => ++attempts === 1 ? json({ error: 'unavailable' }, 503) : json({ items: [] }),
+    });
+    const warning = await screen.findByRole('alert');
+    expect(screen.queryByText("You're all caught up")).toBeNull();
+    expect(screen.getByText("We couldn't check all your work yet.")).toBeTruthy();
+    await user.click(within(warning).getByRole('button', { name: 'Try again' }));
+    await screen.findByText("You're all caught up");
+    expect(attempts).toBe(2);
+    expect(requested.some(url => url.includes('/invoices') || url.includes('null'))).toBe(false);
+  });
+
   it("says plainly when part of the team couldn't check in, and lets them try again", async () => {
     const user = userEvent.setup();
     let calls = 0;

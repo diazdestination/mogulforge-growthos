@@ -40,6 +40,37 @@ describe('AccessGate', () => {
     expect(screen.queryByTestId('access-revoked')).toBeNull();
   });
 
+  it('holds staff pages for an unverified member and requests verification for their account', async () => {
+    const fetch = mockApi('owner', {
+      me: { emailVerified: false },
+      handler: (method, path) => method === 'POST' && path === '/api/auth/resend-verification'
+        ? new Response('{}', { status: 202 }) : undefined,
+    });
+    renderWithQuery(<AccessGate><div data-testid="crm-content">CRM</div></AccessGate>);
+    const button = await screen.findByRole('button', { name: 'Send verification email' });
+    expect(screen.queryByTestId('crm-content')).toBeNull();
+    expect(logout).not.toHaveBeenCalled();
+    fireEvent.click(button);
+    expect(await screen.findByRole('status')).toHaveProperty('textContent', expect.stringContaining('Verification requested'));
+    expect(fetch).toHaveBeenCalledWith('/api/auth/resend-verification', expect.objectContaining({
+      method: 'POST', credentials: 'include', body: JSON.stringify({ email: 'user@example.com' }),
+    }));
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('keeps verification failures visible and allows another request', async () => {
+    mockApi('owner', {
+      me: { emailVerified: false },
+      handler: (_method, path) => path === '/api/auth/resend-verification'
+        ? new Response('{}', { status: 503 }) : undefined,
+    });
+    renderWithQuery(<AccessGate><p>Private work</p></AccessGate>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Send verification email' }));
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('could not request'));
+    expect(screen.queryByText('Private work')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Send verification email' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('blocks a deactivated member (403) and offers immediate sign-out', async () => {
     mockApi('sales_rep', { meStatus: 403 });
     renderWithQuery(

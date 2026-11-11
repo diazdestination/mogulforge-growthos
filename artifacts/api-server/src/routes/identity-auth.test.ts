@@ -160,3 +160,29 @@ describe("password recovery", () => {
     expect(newLogin.headers.get("set-cookie")).toContain("sid=");
   });
 });
+
+describe('staff email verification', () => {
+  it('lets an active identity-provider account verify without a local password and consumes the link once', async () => {
+    await db.update(usersTable).set({ passwordHash: null, emailVerifiedAt: null }).where(eq(usersTable.id, userId));
+    const send = vi.spyOn(resendEmailProvider, 'send').mockResolvedValue({ id: randomUUID(), provider: 'resend' });
+    const request = await fetch(`${baseUrl}/api/auth/resend-verification`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }),
+    });
+    expect(request.status).toBe(202);
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0][0]).toBe(email);
+    const url = send.mock.calls[0][2].split('\n').find(line => line.startsWith('https://'));
+    const token = new URL(url!).searchParams.get('token');
+    expect(token).toBeTruthy();
+    const verify = () => fetch(`${baseUrl}/api/auth/verify-email`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token }),
+    });
+    const confirmed = await verify();
+    expect(confirmed.status).toBe(200);
+    const cookie = confirmed.headers.get('set-cookie')!.split(';')[0];
+    const profile = await fetch(`${baseUrl}/api/v1/me`, { headers: { cookie } });
+    expect(profile.status).toBe(200);
+    expect(await profile.json()).toMatchObject({ id: userId, emailVerified: true });
+    expect((await verify()).status).toBe(400);
+  });
+});

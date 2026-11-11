@@ -11,8 +11,9 @@ kill_timeout = 30
 [build]
   dockerfile = 'Dockerfile'
 
-[deploy]
-  release_command = "node /app/scripts/release-schema.mjs"
+# The beta schema is provisioned separately on the confirmed fresh database.
+# The retired release-schema.mjs deliberately refuses automatic reconciliation.
+# Verify the current schema before deploying; this config never changes it.
 
 [env]
   APP_ORIGIN = 'https://app.mogulforge.ai'
