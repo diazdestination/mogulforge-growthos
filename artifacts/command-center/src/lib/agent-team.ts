@@ -67,7 +67,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Card & bank collection",
         "stage": "setup",
-        "reality": "Test invoice Checkout in a configured Stripe sandbox. Confirmed test payments are recorded on the invoice; live collection is unavailable and no real money moves."
+        "reality": "Test invoice Checkout in a configured Stripe sandbox. On the job, a tech can create the pay link for an invoice linked to their own assigned job, show it as a QR code, or text it from your own business number through Zapier to a customer who agreed to texts (sent on the tech's tap, or after office approval if you choose Approve each). Confirmed test payments are recorded on the invoice; live collection is unavailable and no real money moves."
       }
     ]
   },
@@ -158,7 +158,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Customer confirmations",
         "stage": "setup",
-        "reality": "Appointment reminders go by email, or by text to customers who agreed to texts: through GrowthOS texting, or from your own business number once your phone app is connected through Zapier. A draft or staff booking alone does not send a message, and a business-number text waits for staff approval unless an owner switches that connection to automatic."
+        "reality": "Appointment reminders go by email, or by text to customers who agreed to texts: through GrowthOS texting, or from your own business number once your phone app is connected through Zapier. From My day, a tech can also request one On My Way text per job per day with an ETA; Settings recommends sending it on the tech's tap (Automatic); choose Approve each to have the office approve it first. A draft or staff booking alone does not send a message, and other business-number texts wait for staff approval unless an owner switches that connection to automatic."
       },
       {
         "title": "Add bookings to your calendar",

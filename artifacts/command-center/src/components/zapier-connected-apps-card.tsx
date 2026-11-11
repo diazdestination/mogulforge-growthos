@@ -18,7 +18,7 @@ import { ZapierFlowActions } from './zapier-flow-actions';
  * one enabled action and governed by an off / approve / auto policy.
  */
 
-const CUSTOMER_TEXT_KEYS = ['appt.sms.send', 'maintain.sms.send', 'scout.sms.review_request'];
+const CUSTOMER_TEXT_KEYS = ['appt.sms.send', 'maintain.sms.send', 'scout.sms.review_request', 'appt.sms.on_my_way', 'bill.sms.payment_link'];
 const CUSTOMER_EMAIL_KEYS = ['invo.email.send', 'esti.email.send'];
 const pollLabel = (minutes: number) => minutes % 60 === 0 ? `Every ${minutes / 60 === 1 ? 'hour' : `${minutes / 60} hours`}` : `Every ${minutes} minutes`;
 
@@ -51,6 +51,7 @@ type Capability = {
   direction: 'read' | 'write';
   label: string;
   description: string;
+  recommendedMode?: 'approve' | 'auto';
   candidates: { app: string; appName: string; action: string; actionName: string; configFields: { key: string; label: string; required: boolean }[] }[];
   binding: {
     app: string;
@@ -635,6 +636,9 @@ function CapabilityRow({ capability, actions, canManage, busy, onBound, onUnbind
         <p className="text-xs text-muted-foreground">Sends from your own mailbox as plain text, only to customers who can be emailed. "Accepted" means your mail app took the message, not that it was delivered. Replies arrive in your mailbox; customer email reply logging can record them here.</p>
       )}
       <p className="text-xs text-muted-foreground">{!capability.binding ? 'Select and configure a supported action to set up this flow.' : !configured ? 'Required settings are missing. Save a complete binding before choosing a policy.' : capability.policy.mode === 'off' ? 'Configured · Off. Choose a policy to allow this flow.' : capability.policy.dailyBudget === 0 ? 'Paused · Daily limit is 0.' : 'Configured · Policy enabled. Provider execution has not been verified by this setup.'}</p>
+      {CUSTOMER_TEXT_KEYS.includes(capability.key) && capability.recommendedMode === 'auto' && (
+        <p className="text-xs text-muted-foreground">Recommended: Automatic. A team member taps Send for one customer with fixed wording, so that tap is the approval. Choose Approve each to have the office review every text first.</p>
+      )}
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <Label htmlFor={`${id}-policy`} className="text-xs">Policy</Label>

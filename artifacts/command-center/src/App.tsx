@@ -18,6 +18,7 @@ import { NotificationLeadGuard, TenantMobileBoundary } from '@/components/mobile
 // Pages
 import Dashboard from '@/pages/dashboard';
 import Today from '@/pages/today';
+import TechDay from '@/pages/tech';
 import Invoices from '@/pages/invoices';
 import FinancialMigrations from '@/pages/financial-migrations';
 import Assistant from '@/pages/assistant';
@@ -595,6 +596,7 @@ function AuthedApp({ authUserId }: { authUserId: string }) {
           </Route>
           <Route path="/" component={Today} />
           <Route path="/today" component={Today} />
+          <Route path="/tech" component={TechDay} />
           <Route path="/bie" component={Bie} />
           <Route path="/agent-team">
             <AgentTeam />

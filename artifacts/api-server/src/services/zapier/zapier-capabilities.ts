@@ -30,6 +30,8 @@ export const ZAPIER_CAPABILITY_KEYS = [
   "scout.sms.review_request",
   "invo.accounting.record_payment",
   "callie.sms.inbox.list",
+  "appt.sms.on_my_way",
+  "bill.sms.payment_link",
 ] as const;
 export type ZapierCapabilityKey = (typeof ZAPIER_CAPABILITY_KEYS)[number];
 
@@ -87,6 +89,11 @@ export const ACCOUNTING_PAYMENT_INPUT = z.object({
   paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   /** The recorded receipt's own reference (check number, Stripe sandbox id, ...). */
   reference: z.string().min(1).max(120),
+});
+
+/** On My Way text: the ETA the tech chose is kept in the ledger summary so approval can rebuild the exact copy. */
+export const ON_MY_WAY_SMS_INPUT = SMS_SEND_INPUT.extend({
+  etaMinutes: z.number().int().min(1).max(240).optional(),
 });
 
 export const LIST_SINCE_INPUT = z.object({
@@ -567,6 +574,38 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
           };
         },
       },
+    ],
+  },
+  {
+    key: "appt.sms.on_my_way",
+    specialistId: "appt",
+    direction: "write",
+    label: "Text On My Way",
+    description: "APPT texts a consented customer that their technician is on the way, with an optional ETA, from the contractor's own number. Once per appointment per day.",
+    inputSchema: ON_MY_WAY_SMS_INPUT,
+    summaryFields: ["toPhone", "etaMinutes"],
+    // A team member taps Send for one customer with fixed copy; that tap is the approval.
+    defaultMode: "auto",
+    defaultDailyBudget: 60,
+    candidates: [
+      smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),
+      smsCandidate("OpenPhoneCLIAPI", "Quo", "send_message", "Send Message", "from"),
+    ],
+  },
+  {
+    key: "bill.sms.payment_link",
+    specialistId: "bill",
+    direction: "write",
+    label: "Text invoice pay links",
+    description: "BILL texts a consented customer the open sandbox pay link for an issued invoice's current balance, from the contractor's own number.",
+    inputSchema: SMS_SEND_INPUT,
+    summaryFields: ["toPhone"],
+    // A team member taps Send for one customer with fixed copy; that tap is the approval.
+    defaultMode: "auto",
+    defaultDailyBudget: 40,
+    candidates: [
+      smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),
+      smsCandidate("OpenPhoneCLIAPI", "Quo", "send_message", "Send Message", "from"),
     ],
   },
 ];

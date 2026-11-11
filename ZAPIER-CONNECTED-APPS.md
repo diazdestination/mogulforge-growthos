@@ -27,10 +27,13 @@ apps a contractor already uses, through the contractor's own Zapier account:
 | CALLIE | `callie.sms.send` — text back a missed caller through the existing governed path | write | off |
 | SCHED | `sched.sms.send` — selected company-date day sheet texted to a crew member | write | off |
 | MAINTAIN | `maintain.sms.send` — service-due reminder texted to a consented customer | write | off |
+| APPT | `appt.sms.on_my_way` — On My Way text (tech name, company, optional ETA) to a consented customer, once per appointment per company day | write | off |
+| BILL | `bill.sms.payment_link` — open sandbox pay link for an issued invoice's current balance, texted to a consented customer | write | off |
 
 Saving or changing a binding sets its policy Off. The client explicitly enables
 its policy afterward; Approve each is the recommended starting authority for
-customer texts. A registry's suggested mode does not activate a saved binding.
+customer texts, except the two tap-sent field texts below (Automatic). A
+registry's suggested mode does not activate a saved binding.
 
 ### Customer texts from the contractor's own number
 
@@ -109,6 +112,34 @@ connection or a MogulForge Microsoft app. Code: `zapier-owned-app-flows.ts`.
 - **Payment**: once per receipt allocation, refused unless
   `invo.accounting.create_invoice` succeeded for the invoice to the same app,
   and refused at approval if the receipt was reversed.
+
+### Field texts from My day (`/tech`)
+
+`appt.sms.on_my_way` and `bill.sms.payment_link` are requested by staff from
+the phone-first My day screen (`GET /contractor/my-day`, the signed-in member's
+own assigned appointments). Both use the same consent gate, opt-out line,
+nurture-lock serialization and pre-dispatch re-derivation as the reminders.
+On My Way keys on `appt-omw:<appointment>:<company date>`; the chosen ETA is
+kept in the ledger summary so approval rebuilds the identical copy, and a
+cancelled visit, another day or withdrawn consent blocks it. The pay-link text
+keys on `bill-paylink-text:<link>:v<invoice version>:<balance cents>` and is
+rebuilt from the current open link and invoice balance; an expired, paid or
+replaced link, a changed balance, or missing invoice access refuses approval.
+Routes: `POST /integrations/zapier/flows/appointments/:id/on-my-way`
+(`crm.write`, body `{ etaMinutes?: 1-240 }`),
+`POST /integrations/zapier/flows/invoices/:id/pay-link-text` (`invoices.manage`)
+and, for a tech on their own job,
+`POST /integrations/zapier/flows/appointments/:appointmentId/invoices/:id/pay-link-text`
+(`payments.collect`; the invoice must be linked to that job, and approval re-checks
+that the job is still theirs).
+
+These two are fixed-copy texts that a person sends by tapping a button for one
+customer, so their registry default is Automatic: the tap is the approval. Like
+every flow they stay Off until the owner binds them and picks a policy in
+Settings; Settings recommends Automatic and the owner can choose Approve each
+(office approves every text) or Off. All other capabilities keep their defaults.
+Status on My day reads Sending, Sent to Zapier (the phone app accepted it, not
+that the customer read it) or Waiting for approval.
 
 CALLIE's existing phone-sync/text-back path is separate. The client action panel
 does not expose it while callback eligibility and customer-consent review are
@@ -232,9 +263,8 @@ database with the MCP transport faked in memory.
   and parameter names were not verified against a live server; the binding
   step also matches by display name, and the first live run per app must
   confirm the action's parameter names. Angi and Thumbtack have no Zapier app.
-- BILL has no Zapier capabilities on this branch (payment-link texts are
-  separate work). Invoice/estimate email is not a sender option inside native
-  delivery (see above). MAINTAIN's standing (automatic) reminder policy still uses built-in delivery; own-number service texts are requested by staff.
+- BILL only texts an existing sandbox pay link. Invoice/estimate email is not
+  a sender option inside native delivery (see above). MAINTAIN's standing (automatic) reminder policy still uses built-in delivery; own-number service texts are requested by staff.
 - No Zapier *trigger* (push) integration: reads are polled by the scheduler.
 - No "GrowthOS as a Zapier app" listing; that is a separate partner-program
   decision.

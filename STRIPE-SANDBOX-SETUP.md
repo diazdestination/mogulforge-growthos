@@ -29,6 +29,22 @@ Use an approved finite test window; actual staging also requires its existing
 Keep scheduler autostart disabled and other outbound providers disabled.
 Restore the outbound hold when the test window ends.
 
+### Collecting on the job (My day)
+
+The phone-first My day screen (`/tech`) reuses the same link. Field techs
+collect with the narrow `payments.collect` permission (owner, admin, office,
+sales rep, inspector, production; never API keys): only for an issued invoice
+linked to an appointment assigned to them, not cancelled, within 7 days of now.
+A job with a lead links to that lead's invoices; a job with no lead links to the
+customer's returning-work invoices at the same property. The server checks this
+on every call, so an arbitrary invoice id is refused (403 not linked, 404 not
+your job). Routes: `GET`/`POST /appointments/:appointmentId/invoices/:id/payment-links`
+(create or reuse the link for the current balance) and
+`GET /appointments/:appointmentId/invoices/:id/payment-links/:linkId/qr` (PNG
+data URL, only while the link is open). Office roles keep `/invoices/:id/...`.
+The screen can also request the BILL `bill.sms.payment_link` text through
+Zapier. Sandbox only; nothing here changes the live-key refusal.
+
 ## Recovery and acceptance
 
 One durable invoice reservation covers creation, open Checkout and bank clearing.

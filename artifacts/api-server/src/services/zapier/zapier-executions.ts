@@ -629,7 +629,9 @@ export async function getZapierExecution(organizationId: string, id: string): Pr
   return readExecution(organizationId, id);
 }
 
-function isCustomerText(capability: string) { return capability === "appt.sms.send" || capability === "maintain.sms.send"; }
+/** Customer texts are serialized under the nurture locks and re-derived from GrowthOS records right before dispatch. */
+const CUSTOMER_TEXT_CAPABILITIES = new Set(["appt.sms.send", "maintain.sms.send", "appt.sms.on_my_way", "bill.sms.payment_link"]);
+function isCustomerText(capability: string) { return CUSTOMER_TEXT_CAPABILITIES.has(capability); }
 function originalScheduledAction(execution: ZapierActionExecution) { const value = execution.requestSummary.appointmentReminderScheduledActionId; return typeof value === "string" ? value : undefined; }
 async function serviceTextTouch(reader: Pick<typeof db, "select">, execution: ZapierActionExecution, input: unknown) {
   const [service] = await reader.select({ contactId: serviceObligationsTable.contactId }).from(serviceObligationsTable).where(and(eq(serviceObligationsTable.organizationId, execution.organizationId), eq(serviceObligationsTable.id, execution.linkedEntityId!)));
