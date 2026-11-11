@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import {
+  auditEventsTable,
   db,
   invoicePaymentLinksTable,
   invoiceReceiptAllocationsTable,
@@ -10,10 +11,13 @@ import {
   valueEntriesTable,
   type InvoicePaymentLink,
   type InvoicePaymentLinkState,
+  type InvoicePaymentReviewFlag,
+  type StripeAccountRequirements,
   type StripeConnectAccount,
+  type StripeConnectMode,
   type UserRole,
 } from "@workspace/db";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import Stripe from "stripe";
 
 import { recordAudit } from "./audit";
@@ -21,6 +25,7 @@ import { readFieldInvoice } from "./field-collect";
 import { getInvoice, readInvoiceDetail, recordInvoicePayment } from "./invoices";
 import { outboundDeliveryHeld } from "./outbound-hold";
 import { lockCustomerWork } from "./customer-work-lineage";
+import { resolveConnectConfig } from "./stripe-mode";
 
 /**
  * BILL card & bank collection through Stripe Connect.
@@ -34,6 +39,11 @@ import { lockCustomerWork } from "./customer-work-lineage";
  *   payment is recorded on the invoice as the staff member who created the
  *   link, with Stripe evidence. Anything that cannot be recorded exactly is
  *   held as `needs_reconciliation` for a human; nothing is guessed or retried.
+ * - One Stripe mode per deployment (STRIPE_CONNECT_MODE, see stripe-mode.ts).
+ *   Accounts, links, sessions and events carry their mode; anything from the
+ *   other mode is refused or held, never recorded.
+ * - Refunds and disputes are flagged on the link for office review with an
+ *   audit event; they never change the invoice balance automatically.
  */
 
 export class StripeConnectError extends Error {
@@ -56,7 +66,7 @@ export class StripeConnectWebhookVerificationError extends Error {
 type StripeLike = Pick<Stripe, "accounts" | "accountLinks" | "checkout" | "webhooks">;
 
 let override: StripeLike | null | undefined;
-let cached: StripeLike | null | undefined;
+let cached: { key: string; client: StripeLike } | undefined;
 
 /** Test seam: inject a fake client (or null to simulate "not configured"). */
 export function setConnectStripeForTests(client: StripeLike | null | undefined): void {
@@ -64,22 +74,76 @@ export function setConnectStripeForTests(client: StripeLike | null | undefined):
   cached = undefined;
 }
 
-function connectStripe(): StripeLike | null {
-  if (override !== undefined) return override;
-  if (process.env.STRIPE_CONNECT_ENABLED !== "true") return null;
-  if (cached !== undefined) return cached;
-  // This rollout is sandbox-only. Never let a subscription key enable invoice
-  // collection, or allow a live key to enter a sandbox deployment.
-  const secret = process.env.STRIPE_CONNECT_SECRET_KEY?.trim();
-  if (!secret || !/^(?:sk|rk)_test_/.test(secret)) return null;
-  cached = secret ? new Stripe(secret, { timeout: 10_000, maxNetworkRetries: 0 }) : null;
-  return cached;
+function currentConfig() {
+  return resolveConnectConfig(process.env, override !== undefined && override !== null);
 }
 
-function requireStripe(): StripeLike {
-  const client = connectStripe();
-  if (!client || !process.env.STRIPE_CONNECT_WEBHOOK_SECRET?.trim()) throw new StripeConnectError("Sandbox payments need their own Stripe key and receipt webhook configuration.", "not_configured");
-  return client;
+function connectStripe(): StripeLike | null {
+  if (override === null) return null;
+  const config = currentConfig();
+  // Never let the subscription key (STRIPE_SECRET_KEY) enable invoice
+  // collection, and never let a key of the other mode in (see stripe-mode.ts).
+  if (!config.enabled || !config.ok) return null;
+  if (override !== undefined) return override;
+  if (cached?.key !== config.secretKey) cached = { key: config.secretKey!, client: new Stripe(config.secretKey!, { timeout: 10_000, maxNetworkRetries: 0 }) };
+  return cached.client;
+}
+
+type Connected = { stripe: StripeLike; mode: StripeConnectMode; live: boolean; webhookSecret: string };
+
+function requireStripe(): Connected {
+  const config = currentConfig();
+  const stripe = connectStripe();
+  if (!stripe || !config.enabled || !config.ok) {
+    throw new StripeConnectError("Online payments are not set up on this deployment yet. Ask your MogulForge contact to finish the payment setup.", "not_configured");
+  }
+  return { stripe, mode: config.mode, live: config.mode === "live", webhookSecret: config.webhookSecret };
+}
+
+/** The deployment's configured Stripe mode and any configuration problem (never a key). */
+export function stripeConnectConfigSummary(): { enabled: boolean; mode: StripeConnectMode; issue: string | null } {
+  if (override === null) return { enabled: false, mode: "test", issue: null };
+  const config = currentConfig();
+  return { enabled: config.enabled, mode: config.mode, issue: config.issue };
+}
+
+/** Startup check: refuse (log) a key/mode mismatch before anyone tries to collect. */
+export function logStripeConnectConfig(logger: { info: (obj: object, msg: string) => void; error: (obj: object, msg: string) => void }): void {
+  const summary = stripeConnectConfigSummary();
+  if (!summary.enabled) return;
+  if (summary.issue) logger.error({ mode: summary.mode, issue: summary.issue }, "Stripe Connect collection is not configured; payment links are refused");
+  else logger.info({ mode: summary.mode }, "Stripe Connect collection configured");
+}
+
+const SESSION_PREFIX: Record<StripeConnectMode, string> = { test: "cs_test_", live: "cs_live_" };
+const modeName = (mode: StripeConnectMode) => (mode === "live" ? "live" : "test");
+
+/** Map a Stripe SDK error to a plain staff message. `released` = Stripe never executed the request. */
+export function stripeFailure(error: unknown, action: string): StripeConnectError & { released: boolean } {
+  const { type, code } = (error ?? {}) as { type?: string; code?: string };
+  const make = (message: string, errorCode: StripeConnectError["code"], released = false) =>
+    Object.assign(new StripeConnectError(message, errorCode), { released });
+  switch (type) {
+    case "StripeRateLimitError":
+      return make("Stripe is busy right now. Wait a minute, then try again.", "provider_failed", true);
+    case "StripeAuthenticationError":
+    case "StripePermissionError":
+      return make("Stripe rejected this deployment's payment key. Ask your MogulForge contact to check the payment setup.", "not_configured", true);
+    case "StripeConnectionError":
+    case "StripeAPIError":
+      return make(`Stripe is not responding right now, so it could not ${action}. Try again in a few minutes.`, "provider_failed");
+    case "StripeIdempotencyError":
+      return make("Stripe saw a conflicting earlier request. This collection is held for office review.", "held");
+    case "StripeCardError":
+      return make("The card was declined. The customer can try another card or bank account on the Stripe payment page.", "invalid");
+    case "StripeInvalidRequestError":
+      if (code && /account|capabilit|onboard|charges/i.test(code)) {
+        return make("The company's Stripe account is not ready to take this payment. The owner can check Stripe setup in Settings → Connections.", "not_ready");
+      }
+      return make(`Stripe could not ${action}. Try again in a moment.`, "provider_failed");
+    default:
+      return make(`Stripe could not ${action}. Try again in a moment.`, "provider_failed");
+  }
 }
 
 function assertDispatchAllowed(): void {
@@ -107,65 +171,123 @@ export function stableUuid(key: string): string {
 
 // ---------- connected account ----------
 
+/** not_started → needs_info → ready; restricted when Stripe paused the account. */
+export type OnboardingState = "not_started" | "needs_info" | "ready" | "restricted";
+
 export type PaymentAccountStatus = {
   configured: boolean;
+  mode: StripeConnectMode;
+  /** Why collection is refused on this deployment (plain text, never a key). */
+  configIssue: string | null;
   connected: boolean;
   chargesEnabled: boolean;
   payoutsEnabled: boolean;
   detailsSubmitted: boolean;
   lastSyncedAt: string | null;
+  onboarding: OnboardingState;
+  onboardingDetail: string;
+  requirementsDue: number;
+  currentDeadline: string | null;
 };
 
-async function activeAccount(organizationId: string): Promise<StripeConnectAccount | null> {
+const RESTRICTED_REASONS = /^(?:rejected\.|listed$|under_review$|platform_paused$|other$)/;
+
+export function onboardingState(account: Pick<StripeConnectAccount, "chargesEnabled" | "payoutsEnabled" | "detailsSubmitted" | "requirements"> | null): { state: OnboardingState; detail: string; due: number } {
+  if (!account) return { state: "not_started", detail: "Connect your company's own Stripe account so customers can pay invoices by card or bank.", due: 0 };
+  const req = account.requirements;
+  const due = new Set([...(req?.currentlyDue ?? []), ...(req?.pastDue ?? [])]).size;
+  const reason = req?.disabledReason ?? null;
+  if (account.chargesEnabled) {
+    const notes = ["Ready to take card and bank payments."];
+    if (!account.payoutsEnabled) notes.push("Stripe has not turned on payouts yet; payments wait in Stripe until it does.");
+    if (due > 0) notes.push(`Stripe needs ${due} more detail${due === 1 ? "" : "s"} to keep payments on.`);
+    return { state: "ready", detail: notes.join(" "), due };
+  }
+  if (reason && (RESTRICTED_REASONS.test(reason) || (reason === "requirements.past_due" && account.detailsSubmitted))) {
+    return { state: "restricted", detail: "Stripe has paused payments on this account. Open Stripe setup to see what Stripe needs.", due };
+  }
+  if (reason === "requirements.pending_verification" || (account.detailsSubmitted && due === 0)) {
+    return { state: "needs_info", detail: "Stripe is checking your details. This usually takes minutes, sometimes a day.", due };
+  }
+  return { state: "needs_info", detail: due > 0 ? `Finish Stripe setup: ${due} detail${due === 1 ? "" : "s"} still needed.` : "Finish Stripe setup to take payments.", due };
+}
+
+async function activeAccount(organizationId: string, mode: StripeConnectMode): Promise<StripeConnectAccount | null> {
   const [row] = await db
     .select()
     .from(stripeConnectAccountsTable)
-    .where(and(eq(stripeConnectAccountsTable.organizationId, organizationId), isNull(stripeConnectAccountsTable.disconnectedAt)));
+    .where(and(eq(stripeConnectAccountsTable.organizationId, organizationId), eq(stripeConnectAccountsTable.mode, mode), isNull(stripeConnectAccountsTable.disconnectedAt)));
   return row ?? null;
 }
 
 export async function getPaymentAccountStatus(organizationId: string): Promise<PaymentAccountStatus> {
-  const account = await activeAccount(organizationId);
+  const summary = stripeConnectConfigSummary();
+  const account = await activeAccount(organizationId, summary.mode);
+  const onboarding = onboardingState(account);
   return {
     configured: connectWebhookConfigured(),
+    mode: summary.mode,
+    configIssue: summary.issue,
     connected: account !== null,
     chargesEnabled: account?.chargesEnabled ?? false,
     payoutsEnabled: account?.payoutsEnabled ?? false,
     detailsSubmitted: account?.detailsSubmitted ?? false,
     lastSyncedAt: account?.lastSyncedAt?.toISOString() ?? null,
+    onboarding: onboarding.state,
+    onboardingDetail: onboarding.detail,
+    requirementsDue: onboarding.due,
+    currentDeadline: account?.requirements?.currentDeadline ?? null,
   };
 }
 
-/** Create (once) the contractor's Stripe account and return a Stripe-hosted onboarding URL. */
+/**
+ * Live only: test-mode collections can never move real money, so they are
+ * retired (expired, audited) once the company collects in live mode and no
+ * longer block the invoice. Live collections are never retired automatically.
+ */
+async function retireTestModeCollections(organizationId: string, actorUserId: string | null): Promise<void> {
+  const rows = await db
+    .update(invoicePaymentLinksTable)
+    .set({ state: "expired", checkoutUrl: null, detail: "Retired: created in Stripe test mode before this company switched to live payments. No real money was involved." })
+    .where(and(eq(invoicePaymentLinksTable.organizationId, organizationId), eq(invoicePaymentLinksTable.mode, "test"), inArray(invoicePaymentLinksTable.state, ["open", "processing", "needs_reconciliation"])))
+    .returning({ id: invoicePaymentLinksTable.id, invoiceId: invoicePaymentLinksTable.invoiceId });
+  for (const row of rows) {
+    await recordAudit({ organizationId, actorUserId, action: "payments.invoice_link_retired_test_mode", entityType: "invoice_payment_link", entityId: row.id, metadata: { invoiceId: row.invoiceId, mode: "test" } });
+  }
+}
+
+/** Create (once per mode) the contractor's Stripe account and return a Stripe-hosted onboarding URL. */
 export async function beginStripeConnect(organizationId: string, userId: string): Promise<{ url: string }> {
-  const stripe = requireStripe();
+  const { stripe, mode, live } = requireStripe();
   assertDispatchAllowed();
-  let account = await activeAccount(organizationId);
+  if (live) await retireTestModeCollections(organizationId, userId);
+  let account = await activeAccount(organizationId, mode);
   if (!account) {
     const [user] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, userId));
     let created: Stripe.Account;
     try {
       created = await stripe.accounts.create(
         { type: "standard", ...(user?.email ? { email: user.email } : {}), metadata: { growthosOrganizationId: organizationId } },
-        { idempotencyKey: `growthos:connect:${organizationId}` },
+        // Stripe keeps idempotency keys per mode; the live key is distinct for clarity in logs.
+        { idempotencyKey: live ? `growthos:connect:live:${organizationId}` : `growthos:connect:${organizationId}` },
       );
-    } catch {
-      throw new StripeConnectError("Stripe could not create the payment account. Try again in a moment.", "provider_failed");
+    } catch (error) {
+      throw stripeFailure(error, "create the payment account");
     }
     const [existing] = await db
       .select()
       .from(stripeConnectAccountsTable)
-      .where(eq(stripeConnectAccountsTable.organizationId, organizationId));
+      .where(and(eq(stripeConnectAccountsTable.organizationId, organizationId), eq(stripeConnectAccountsTable.mode, mode)));
     if (existing) {
       [account] = await db
         .update(stripeConnectAccountsTable)
-        .set({ stripeAccountId: created.id, disconnectedAt: null, connectedByUserId: userId, chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false })
+        .set({ stripeAccountId: created.id, disconnectedAt: null, connectedByUserId: userId, chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false, requirements: null, lastSyncedAt: null })
         .where(eq(stripeConnectAccountsTable.id, existing.id))
         .returning();
     } else {
       [account] = await db
         .insert(stripeConnectAccountsTable)
-        .values({ organizationId, stripeAccountId: created.id, connectedByUserId: userId })
+        .values({ organizationId, stripeAccountId: created.id, mode, connectedByUserId: userId })
         .returning();
     }
     await recordAudit({
@@ -174,6 +296,7 @@ export async function beginStripeConnect(organizationId: string, userId: string)
       action: "payments.stripe_account_created",
       entityType: "stripe_connect_account",
       entityId: account!.id,
+      metadata: { mode },
     });
   }
   try {
@@ -185,40 +308,58 @@ export async function beginStripeConnect(organizationId: string, userId: string)
       return_url: `${appOrigin()}/settings?stripe=return`,
     });
     return { url: link.url };
-  } catch {
-    throw new StripeConnectError("Stripe could not start onboarding. Try again in a moment.", "provider_failed");
+  } catch (error) {
+    throw stripeFailure(error, "start onboarding");
   }
 }
 
-function accountFlags(account: Pick<Stripe.Account, "charges_enabled" | "payouts_enabled" | "details_submitted">) {
+function accountRequirements(account: Pick<Stripe.Account, "requirements">): StripeAccountRequirements {
+  const req = account.requirements;
+  return {
+    currentlyDue: [...(req?.currently_due ?? [])],
+    pastDue: [...(req?.past_due ?? [])],
+    pendingVerification: [...(req?.pending_verification ?? [])],
+    disabledReason: req?.disabled_reason ?? null,
+    currentDeadline: req?.current_deadline ? new Date(req.current_deadline * 1000).toISOString() : null,
+  };
+}
+
+function accountFlags(account: Pick<Stripe.Account, "charges_enabled" | "payouts_enabled" | "details_submitted" | "requirements">, asOf = new Date()) {
   return {
     chargesEnabled: Boolean(account.charges_enabled),
     payoutsEnabled: Boolean(account.payouts_enabled),
     detailsSubmitted: Boolean(account.details_submitted),
-    lastSyncedAt: new Date(),
+    requirements: accountRequirements(account),
+    // "State as of": a webhook older than this never overwrites newer state.
+    lastSyncedAt: asOf,
   };
 }
 
-export async function refreshStripeAccount(organizationId: string): Promise<PaymentAccountStatus> {
-  const stripe = requireStripe();
+export async function refreshStripeAccount(organizationId: string, userId: string | null = null): Promise<PaymentAccountStatus> {
+  const { stripe, mode } = requireStripe();
   assertDispatchAllowed();
-  const account = await activeAccount(organizationId);
+  const account = await activeAccount(organizationId, mode);
   if (!account) throw new StripeConnectError("Connect a Stripe account first.", "not_connected");
   let remote: Stripe.Account;
   try {
     remote = await stripe.accounts.retrieve(account.stripeAccountId);
-  } catch {
-    throw new StripeConnectError("Stripe did not answer. Try again in a moment.", "provider_failed");
+  } catch (error) {
+    throw stripeFailure(error, "check the account");
   }
-  await db.update(stripeConnectAccountsTable).set(accountFlags(remote)).where(eq(stripeConnectAccountsTable.id, account.id));
+  const flags = accountFlags(remote);
+  await db.update(stripeConnectAccountsTable).set(flags).where(eq(stripeConnectAccountsTable.id, account.id));
+  if (flags.chargesEnabled !== account.chargesEnabled || flags.payoutsEnabled !== account.payoutsEnabled) {
+    await recordAudit({ organizationId, actorUserId: userId, action: "payments.stripe_account_synced", entityType: "stripe_connect_account", entityId: account.id, metadata: { mode, chargesEnabled: flags.chargesEnabled, payoutsEnabled: flags.payoutsEnabled, via: "refresh" } });
+  }
   return getPaymentAccountStatus(organizationId);
 }
 
 export async function disconnectStripe(organizationId: string, userId: string): Promise<boolean> {
+  const { mode } = stripeConnectConfigSummary();
   const rows = await db
     .update(stripeConnectAccountsTable)
     .set({ disconnectedAt: new Date() })
-    .where(and(eq(stripeConnectAccountsTable.organizationId, organizationId), isNull(stripeConnectAccountsTable.disconnectedAt)))
+    .where(and(eq(stripeConnectAccountsTable.organizationId, organizationId), eq(stripeConnectAccountsTable.mode, mode), isNull(stripeConnectAccountsTable.disconnectedAt)))
     .returning({ id: stripeConnectAccountsTable.id });
   if (rows.length === 0) return false;
   await recordAudit({
@@ -227,6 +368,7 @@ export async function disconnectStripe(organizationId: string, userId: string): 
     action: "payments.stripe_account_disconnected",
     entityType: "stripe_connect_account",
     entityId: rows[0]!.id,
+    metadata: { mode },
   });
   return true;
 }
@@ -245,6 +387,9 @@ export type InvoicePaymentLinkView = {
   paidAt: string | null;
   createdAt: string;
   sourceReference: string | null;
+  mode: StripeConnectMode;
+  /** Refunds and disputes Stripe reported, waiting for office review. */
+  review: InvoicePaymentReviewFlag[];
 };
 
 function linkView(row: InvoicePaymentLink): InvoicePaymentLinkView {
@@ -253,14 +398,34 @@ function linkView(row: InvoicePaymentLink): InvoicePaymentLinkView {
     invoiceId: row.invoiceId,
     invoiceVersion: row.invoiceVersion,
     amountCents: row.amountCents,
-    url: row.state === "open" ? row.checkoutUrl : null,
+    // A link from the other Stripe mode is never offered as payable.
+    url: row.state === "open" && row.mode === stripeConnectConfigSummary().mode ? row.checkoutUrl : null,
     state: row.state,
     detail: row.detail,
     expiresAt: row.expiresAt?.toISOString() ?? null,
     paidAt: row.paidAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     sourceReference: row.paymentIntentId ? `stripe:${row.paymentIntentId}` : row.checkoutSessionId ? `stripe:${row.checkoutSessionId}` : null,
+    mode: row.mode,
+    review: Array.isArray(row.reviewFlags) ? row.reviewFlags : [],
   };
+}
+
+/** What the pay-link screens need to explain why a link can or cannot be made. */
+export type PaymentReadiness = { configured: boolean; mode: StripeConnectMode; onboarding: OnboardingState; canCreateLinks: boolean; message: string | null };
+
+export async function getPaymentReadiness(organizationId: string): Promise<PaymentReadiness> {
+  const status = await getPaymentAccountStatus(organizationId);
+  const message = !status.configured
+    ? "Online payments are not set up on this deployment yet."
+    : status.onboarding === "not_started"
+      ? "Stripe is not connected yet. An owner or admin connects it in Settings → Connections."
+      : status.onboarding === "restricted"
+        ? "Stripe has paused payments for this company. The owner can check Stripe setup in Settings → Connections."
+        : status.onboarding === "needs_info"
+          ? "Stripe setup is not finished, so pay links are off. The owner can finish it in Settings → Connections."
+          : null;
+  return { configured: status.configured, mode: status.mode, onboarding: status.onboarding, canCreateLinks: status.configured && status.chargesEnabled, message };
 }
 
 export async function listInvoicePaymentLinks(organizationId: string, invoiceId: string): Promise<InvoicePaymentLinkView[]> {
@@ -289,15 +454,19 @@ export async function createInvoicePaymentLink(
   /** Field collection from My day: the invoice must be linked to this appointment assigned to the user (payments.collect). */
   field?: { appointmentId: string; effectiveRole?: UserRole },
 ): Promise<InvoicePaymentLinkView> {
-  const stripe = requireStripe();
+  const { mode, live } = requireStripe();
   if (outboundDeliveryHeld()) {
     throw new StripeConnectError("Payment links are disabled by the staging safety hold.", "held");
   }
-  const account = await activeAccount(organizationId);
-  if (!account) throw new StripeConnectError("Connect a Stripe account in Settings first.", "not_connected");
+  const account = await activeAccount(organizationId, mode);
+  if (!account) throw new StripeConnectError("Stripe is not connected yet. An owner or admin connects it in Settings → Connections before pay links can be made.", "not_connected");
   if (!account.chargesEnabled) {
-    throw new StripeConnectError("Finish Stripe onboarding before collecting payments.", "not_ready");
+    const restricted = onboardingState(account).state === "restricted";
+    throw new StripeConnectError(restricted
+      ? "Stripe has paused payments for this company, so pay links are off. The owner can check Stripe setup in Settings → Connections."
+      : "Stripe has not turned on card payments for this company yet. The owner can finish Stripe setup in Settings → Connections.", "not_ready");
   }
+  if (live) await retireTestModeCollections(organizationId, userId);
   // Own the balance before the provider call. A second request sees the durable
   // reservation even if this process loses the Checkout response or stops.
   const reservation = await db.transaction(async tx => {
@@ -314,10 +483,10 @@ export async function createInvoicePaymentLink(
     ));
     if (pending.length) {
       const reusable = pending.length === 1 ? pending[0] : null;
-      if (reusable?.state === "open" && reusable.checkoutUrl && reusable.invoiceVersion === invoice.version && reusable.amountCents === amountCents && reusable.stripeAccountId === account.stripeAccountId && reusable.expiresAt && reusable.expiresAt > new Date()) return { existing: reusable, invoice, link: reusable };
+      if (reusable?.state === "open" && reusable.mode === mode && reusable.checkoutUrl && reusable.invoiceVersion === invoice.version && reusable.amountCents === amountCents && reusable.stripeAccountId === account.stripeAccountId && reusable.expiresAt && reusable.expiresAt > new Date()) return { existing: reusable, invoice, link: reusable };
       throw new StripeConnectError("An existing collection is pending or needs review. Resolve it in Stripe before creating another link.", "held");
     }
-    const [link] = await tx.insert(invoicePaymentLinksTable).values({ organizationId, invoiceId, invoiceVersion: invoice.version, amountCents, stripeAccountId: account.stripeAccountId, createdByUserId: userId, state: "open", detail: "Checkout creation is pending; do not create another collection." }).returning();
+    const [link] = await tx.insert(invoicePaymentLinksTable).values({ organizationId, invoiceId, invoiceVersion: invoice.version, amountCents, stripeAccountId: account.stripeAccountId, mode, createdByUserId: userId, state: "open", detail: "Checkout creation is pending; do not create another collection." }).returning();
     return { existing: null, invoice, link: link! };
   });
   if (reservation.existing) return linkView(reservation.existing);
@@ -325,8 +494,9 @@ export async function createInvoicePaymentLink(
 }
 
 async function createReservedCheckout(link: InvoicePaymentLink, invoice: Awaited<ReturnType<typeof readInvoiceDetail>>, auditContext: Record<string, string> = {}): Promise<InvoicePaymentLinkView> {
-  const stripe = requireStripe();
+  const { stripe, mode, live } = requireStripe();
   const { organizationId, invoiceId, createdByUserId: userId } = link;
+  if (link.mode !== mode) throw new StripeConnectError(`This collection was reserved in Stripe ${modeName(link.mode)} mode. Resolve it in the Stripe ${modeName(link.mode)} dashboard.`, "held");
   const amountCents = link.amountCents;
   const fee = applicationFeeCents(amountCents);
   const metadata = { growthosOrganizationId: organizationId, growthosInvoiceId: invoiceId, growthosPaymentLinkId: link!.id };
@@ -353,21 +523,31 @@ async function createReservedCheckout(link: InvoicePaymentLink, invoice: Awaited
       },
       { stripeAccount: link.stripeAccountId, idempotencyKey: `growthos:invoice-pay:${link!.id}` },
     );
-  } catch {
+  } catch (error) {
+    const failure = stripeFailure(error, "create the payment link");
+    // Only a request Stripe certainly never executed (rate limit, rejected key)
+    // releases the reservation. Anything else may have created a session, so it
+    // stays held and recovery reuses the original idempotency key.
     await db
       .update(invoicePaymentLinksTable)
-      .set({ state: "needs_reconciliation", detail: "Checkout creation was not confirmed. Review this reservation in Stripe; do not start another collection." })
-      .where(and(eq(invoicePaymentLinksTable.id, link!.id), isNull(invoicePaymentLinksTable.checkoutSessionId)));
-    throw new StripeConnectError("Stripe could not create the payment link. Try again in a moment.", "provider_failed");
+      .set(failure.released
+        ? { state: "failed", detail: `Stripe refused the request before creating a link, so nothing was created. ${failure.message}` }
+        : { state: "needs_reconciliation", detail: "Checkout creation was not confirmed. Use Check original payment; do not start another collection." })
+      .where(and(eq(invoicePaymentLinksTable.id, link!.id), isNull(invoicePaymentLinksTable.checkoutSessionId), inArray(invoicePaymentLinksTable.state, ["open", "needs_reconciliation"])));
+    throw failure;
   }
-  if (session.livemode === true || !session.id.startsWith("cs_test_")) throw new StripeConnectError("Stripe returned a session outside the sandbox. Collection remains held.", "held");
+  if ((session.livemode === true) !== live || !session.id.startsWith(SESSION_PREFIX[mode])) {
+    await transition(link.id, ["open", "needs_reconciliation"], { state: "needs_reconciliation", detail: `Stripe returned a session that is not in ${modeName(mode)} mode. Review it in Stripe; nothing was recorded.` });
+    await recordAudit({ organizationId, actorUserId: userId, action: "payments.invoice_link_needs_reconciliation", entityType: "invoice_payment_link", entityId: link.id, metadata: { invoiceId, mode, reason: "session_mode_mismatch" } });
+    throw new StripeConnectError(`Stripe returned a payment session outside ${modeName(mode)} mode. Collection remains held.`, "held");
+  }
   const [updated] = await db
     .update(invoicePaymentLinksTable)
     .set({
       checkoutSessionId: session.id,
       checkoutUrl: session.url ?? null,
       expiresAt: session.expires_at ? new Date(session.expires_at * 1000) : null,
-      detail: "Waiting for payment in the Stripe sandbox.",
+      detail: live ? "Waiting for payment." : "Waiting for payment (Stripe test mode, no real money).",
       state: "open",
     })
     .where(and(eq(invoicePaymentLinksTable.id, link!.id), inArray(invoicePaymentLinksTable.state, ["open", "needs_reconciliation"]), isNull(invoicePaymentLinksTable.paidAt)))
@@ -378,7 +558,7 @@ async function createReservedCheckout(link: InvoicePaymentLink, invoice: Awaited
     action: "payments.invoice_link_created",
     entityType: "invoice_payment_link",
     entityId: link!.id,
-    metadata: { invoiceId, invoiceVersion: invoice.version, amountCents, applicationFeeCents: fee, ...auditContext },
+    metadata: { invoiceId, invoiceVersion: invoice.version, amountCents, applicationFeeCents: fee, mode, ...auditContext },
   });
   if (updated) return linkView(updated);
   const [current] = await db.select().from(invoicePaymentLinksTable).where(eq(invoicePaymentLinksTable.id, link.id));
@@ -386,17 +566,20 @@ async function createReservedCheckout(link: InvoicePaymentLink, invoice: Awaited
 }
 
 /** Explicit staff recovery. Unknown creates reuse their original key only within
- * a 23-hour safety window; older attempts require an exact sandbox session. */
+ * a 23-hour safety window; older attempts require the exact Checkout session id. */
 export async function reconcileInvoicePaymentLink(organizationId: string, userId: string, invoiceId: string, linkId: string, options: { checkoutSessionId?: string; expire?: boolean } = {}): Promise<InvoicePaymentLinkView> {
-  const stripe = requireStripe();
+  const { stripe, mode, live } = requireStripe();
   assertDispatchAllowed();
   const invoice = await getInvoice(organizationId, userId, invoiceId);
   let [link] = await db.select().from(invoicePaymentLinksTable).where(and(eq(invoicePaymentLinksTable.id, linkId), eq(invoicePaymentLinksTable.organizationId, organizationId), eq(invoicePaymentLinksTable.invoiceId, invoiceId)));
   if (!link) throw new StripeConnectError("Payment link not found.", "not_found");
   if (link.state === "paid") return linkView(link);
+  if (link.mode !== mode) throw new StripeConnectError(`This collection was made in Stripe ${modeName(link.mode)} mode. Resolve it in the Stripe ${modeName(link.mode)} dashboard.`, "held");
+  // A create Stripe refused outright has no session to find; never create one now.
+  if (link.state === "failed" && !link.checkoutSessionId && !options.checkoutSessionId) return linkView(link);
   let sessionId = link.checkoutSessionId ?? options.checkoutSessionId;
   if (!sessionId) {
-    if (Date.now() - link.createdAt.getTime() >= 23 * 60 * 60_000 || invoice.version !== link.invoiceVersion || invoice.balanceDueCents !== link.amountCents) throw new StripeConnectError("The original request cannot safely be retried. Find the exact Checkout session in Stripe and provide its sandbox session ID for review.", "held");
+    if (Date.now() - link.createdAt.getTime() >= 23 * 60 * 60_000 || invoice.version !== link.invoiceVersion || invoice.balanceDueCents !== link.amountCents) throw new StripeConnectError("The original request cannot safely be retried. Find the exact Checkout session in Stripe and enter its session ID for review.", "held");
     await recordAudit({ organizationId, actorUserId: userId, action: "payments.invoice_link_original_request_recovery", entityType: "invoice_payment_link", entityId: link.id });
     await createReservedCheckout(link, invoice);
     const [recovered] = await db.select().from(invoicePaymentLinksTable).where(eq(invoicePaymentLinksTable.id, link.id));
@@ -404,11 +587,16 @@ export async function reconcileInvoicePaymentLink(organizationId: string, userId
     sessionId = link.checkoutSessionId ?? undefined;
     if (!sessionId) throw new StripeConnectError("Stripe has not returned the original session. Keep this collection on hold.", "held");
   }
-  if (!sessionId.startsWith("cs_test_") || (options.checkoutSessionId && options.checkoutSessionId !== sessionId)) throw new StripeConnectError("Provide the original sandbox Checkout session.", "invalid");
+  if (!sessionId.startsWith(SESSION_PREFIX[mode]) || (options.checkoutSessionId && options.checkoutSessionId !== sessionId)) throw new StripeConnectError(`Enter the original ${modeName(mode)}-mode Checkout session ID (it starts with ${SESSION_PREFIX[mode]}).`, "invalid");
   assertDispatchAllowed();
-  let session = await stripe.checkout.sessions.retrieve(sessionId, {}, { stripeAccount: link.stripeAccountId });
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId, {}, { stripeAccount: link.stripeAccountId });
+  } catch (error) {
+    throw stripeFailure(error, "find the original payment");
+  }
   const metadata = session.metadata;
-  if (session.id !== sessionId || session.livemode !== false || metadata?.growthosPaymentLinkId !== link.id || metadata?.growthosInvoiceId !== invoiceId || metadata?.growthosOrganizationId !== organizationId || session.amount_total !== link.amountCents || session.currency !== "usd") throw new StripeConnectError("Stripe session does not match this reserved collection.", "held");
+  if (session.id !== sessionId || session.livemode !== live || metadata?.growthosPaymentLinkId !== link.id || metadata?.growthosInvoiceId !== invoiceId || metadata?.growthosOrganizationId !== organizationId || session.amount_total !== link.amountCents || session.currency !== "usd") throw new StripeConnectError("Stripe session does not match this reserved collection.", "held");
   if (!link.checkoutSessionId) {
     const [bound] = await db.update(invoicePaymentLinksTable).set({ checkoutSessionId: session.id, checkoutUrl: session.url, expiresAt: new Date(session.expires_at * 1000) }).where(and(eq(invoicePaymentLinksTable.id, link.id), isNull(invoicePaymentLinksTable.checkoutSessionId))).returning();
     if (!bound) throw new StripeConnectError("Collection changed; refresh before reviewing it again.", "held");
@@ -421,15 +609,19 @@ export async function reconcileInvoicePaymentLink(organizationId: string, userId
   } else {
     if (options.expire && session.status === "open") {
       assertDispatchAllowed();
-      session = await stripe.checkout.sessions.expire(session.id, {}, { stripeAccount: link.stripeAccountId });
+      try {
+        session = await stripe.checkout.sessions.expire(session.id, {}, { stripeAccount: link.stripeAccountId });
+      } catch (error) {
+        throw stripeFailure(error, "close the payment link");
+      }
     }
-    if (session.status === "expired" && session.payment_status === "unpaid" && session.id === sessionId && session.livemode === false) {
+    if (session.status === "expired" && session.payment_status === "unpaid" && session.id === sessionId && session.livemode === live) {
       await transition(link.id, ["open", "needs_reconciliation"], { state: "expired", detail: "Stripe confirmed this Checkout expired without payment.", paidAt: null });
     } else if (session.status === "open" && invoice.version === link.invoiceVersion && invoice.balanceDueCents === link.amountCents) {
-      await transition(link.id, ["needs_reconciliation"], { state: "open", detail: "Original sandbox Checkout recovered.", checkoutUrl: session.url, expiresAt: new Date(session.expires_at * 1000) });
+      await transition(link.id, ["needs_reconciliation"], { state: "open", detail: "Original Checkout recovered.", checkoutUrl: session.url, expiresAt: new Date(session.expires_at * 1000) });
     } else throw new StripeConnectError("Stripe has not confirmed a safe resolution. Keep the collection on hold.", "held");
   }
-  await recordAudit({ organizationId, actorUserId: userId, action: "payments.invoice_link_reconciled", entityType: "invoice_payment_link", entityId: link.id, metadata: { sessionId, requestedExpiry: options.expire === true } });
+  await recordAudit({ organizationId, actorUserId: userId, action: "payments.invoice_link_reconciled", entityType: "invoice_payment_link", entityId: link.id, metadata: { sessionId, requestedExpiry: options.expire === true, mode } });
   const [current] = await db.select().from(invoicePaymentLinksTable).where(eq(invoicePaymentLinksTable.id, link.id));
   return linkView(current!);
 }
@@ -449,12 +641,16 @@ async function transition(
   return row ?? null;
 }
 
-async function linkForSession(session: Stripe.Checkout.Session, account: string | undefined): Promise<InvoicePaymentLink | null> {
-  if (!account) return null;
+async function linkForSession(session: Stripe.Checkout.Session, account: StripeConnectAccount): Promise<InvoicePaymentLink | null> {
   const [row] = await db
     .select()
     .from(invoicePaymentLinksTable)
-    .where(and(eq(invoicePaymentLinksTable.checkoutSessionId, session.id), eq(invoicePaymentLinksTable.stripeAccountId, account)));
+    .where(and(
+      eq(invoicePaymentLinksTable.organizationId, account.organizationId),
+      eq(invoicePaymentLinksTable.checkoutSessionId, session.id),
+      eq(invoicePaymentLinksTable.stripeAccountId, account.stripeAccountId),
+      eq(invoicePaymentLinksTable.mode, account.mode),
+    ));
   return row ?? null;
 }
 
@@ -497,7 +693,7 @@ async function recordPaid(link: InvoicePaymentLink, session: Stripe.Checkout.Ses
       action: "payments.invoice_link_needs_reconciliation",
       entityType: "invoice_payment_link",
       entityId: link.id,
-      metadata: { invoiceId: link.invoiceId, amountCents, sourceReference },
+      metadata: { invoiceId: link.invoiceId, amountCents, sourceReference, mode: link.mode },
     });
   };
   if (amountCents !== link.amountCents || session.currency !== "usd" || session.payment_status !== "paid") {
@@ -539,7 +735,7 @@ async function recordPaid(link: InvoicePaymentLink, session: Stripe.Checkout.Ses
         occurredAt: link.paidAt!.toISOString(),
       },
       undefined,
-      { evidence: "stripe_checkout" },
+      { evidence: "stripe_checkout", stripeMode: link.mode },
     );
   } catch {
     const committed = await recordedEntry(link, sourceReference);
@@ -553,58 +749,190 @@ async function recordPaid(link: InvoicePaymentLink, session: Stripe.Checkout.Ses
 }
 
 export function connectWebhookConfigured(): boolean {
-  return Boolean(process.env.STRIPE_CONNECT_WEBHOOK_SECRET?.trim()) && connectStripe() !== null;
+  const config = currentConfig();
+  return config.enabled && config.ok && connectStripe() !== null;
 }
 
-export async function handleConnectWebhook(rawBody: Buffer, signature: string | undefined): Promise<string> {
-  const stripe = requireStripe();
-  const secret = process.env.STRIPE_CONNECT_WEBHOOK_SECRET?.trim();
-  if (!secret || !signature) throw new StripeConnectWebhookVerificationError();
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(rawBody, signature, secret);
-  } catch {
-    throw new StripeConnectWebhookVerificationError();
+/** Events the Connect endpoint acts on; anything else is acknowledged and ignored. */
+export const CONNECT_WEBHOOK_EVENTS = [
+  "account.updated",
+  "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+  "checkout.session.async_payment_failed",
+  "checkout.session.expired",
+  "charge.refunded",
+  "charge.dispute.created",
+  "charge.dispute.closed",
+] as const;
+const HANDLED = new Set<string>(CONNECT_WEBHOOK_EVENTS);
+
+type Disposition = string;
+
+function intentOf(value: string | { id: string } | null | undefined): string | null {
+  if (!value) return null;
+  return typeof value === "string" ? value : value.id;
+}
+
+/** The link a charge-level event (refund, dispute) belongs to, on this account and mode only. */
+async function linkForCharge(account: StripeConnectAccount, paymentIntent: string | null, metadataLinkId: string | undefined): Promise<InvoicePaymentLink | null> {
+  const scope = [
+    eq(invoicePaymentLinksTable.organizationId, account.organizationId),
+    eq(invoicePaymentLinksTable.stripeAccountId, account.stripeAccountId),
+    eq(invoicePaymentLinksTable.mode, account.mode),
+  ];
+  if (paymentIntent) {
+    const [row] = await db.select().from(invoicePaymentLinksTable).where(and(...scope, eq(invoicePaymentLinksTable.paymentIntentId, paymentIntent)));
+    if (row) return row;
   }
-  if (event.livemode !== false) throw new StripeConnectWebhookVerificationError();
-  const account = event.account ?? undefined;
+  if (metadataLinkId && /^[0-9a-f-]{36}$/.test(metadataLinkId)) {
+    const [row] = await db.select().from(invoicePaymentLinksTable).where(and(...scope, eq(invoicePaymentLinksTable.id, metadataLinkId)));
+    if (row && (!row.paymentIntentId || row.paymentIntentId === paymentIntent)) return row;
+  }
+  return null;
+}
+
+/**
+ * Add or advance one review flag on a link (refund amount only grows; a dispute
+ * status follows Stripe). Never touches the invoice balance. Audited once per change.
+ */
+async function flagForReview(link: InvoicePaymentLink, flag: InvoicePaymentReviewFlag, eventId: string): Promise<Disposition> {
+  return db.transaction(async (tx) => {
+    const [row] = await tx.select().from(invoicePaymentLinksTable).where(eq(invoicePaymentLinksTable.id, link.id)).for("update");
+    if (!row) return "unmatched";
+    const flags = Array.isArray(row.reviewFlags) ? [...row.reviewFlags] : [];
+    const index = flags.findIndex((item) => item.kind === flag.kind && item.stripeId === flag.stripeId);
+    const prior = index >= 0 ? flags[index]! : null;
+    if (prior) {
+      // Refunds only grow; a dispute follows Stripe's newest status. Late, older events change nothing.
+      const newer = Date.parse(flag.updatedAt) >= Date.parse(prior.updatedAt ?? prior.flaggedAt);
+      const changed = flag.kind === "refund" ? flag.amountCents > prior.amountCents : newer && (flag.status !== prior.status || flag.amountCents !== prior.amountCents);
+      if (!changed) return "flag_unchanged";
+    }
+    const next: InvoicePaymentReviewFlag = prior
+      ? { ...prior, amountCents: flag.amountCents, status: flag.status, reason: flag.reason ?? prior.reason, updatedAt: flag.updatedAt }
+      : flag;
+    if (index >= 0) flags[index] = next; else flags.push(next);
+    await tx.update(invoicePaymentLinksTable).set({ reviewFlags: flags }).where(eq(invoicePaymentLinksTable.id, row.id));
+    await tx.insert(auditEventsTable).values({
+      organizationId: row.organizationId,
+      actorUserId: null,
+      action: flag.kind === "refund" ? "payments.invoice_refund_flagged" : "payments.invoice_dispute_flagged",
+      entityType: "invoice_payment_link",
+      entityId: row.id,
+      metadata: { invoiceId: row.invoiceId, stripeId: next.stripeId, amountCents: next.amountCents, status: next.status, reason: next.reason, mode: row.mode, stripeEventId: eventId, balanceChanged: false },
+    });
+    return prior ? "flag_updated" : "flagged";
+  });
+}
+
+async function processConnectEvent(event: Stripe.Event, account: StripeConnectAccount): Promise<Disposition> {
+  const mode = account.mode;
+  const eventAt = new Date(Number.isFinite(event.created) ? event.created * 1000 : Date.now());
+  const sessionEvent = async (handle: (link: InvoicePaymentLink, session: Stripe.Checkout.Session) => Promise<Disposition>) => {
+    const session = event.data.object as Stripe.Checkout.Session;
+    if (!session.id?.startsWith(SESSION_PREFIX[mode])) return "wrong_mode_session";
+    const link = await linkForSession(session, account);
+    return link ? handle(link, session) : "unmatched";
+  };
   switch (event.type) {
     case "account.updated": {
       const remote = event.data.object as Stripe.Account;
-      await db
+      if (remote.id !== account.stripeAccountId) return "unmatched";
+      const asOf = eventAt;
+      // Out-of-order safety: an event older than the state we hold never rewinds it.
+      const [updated] = await db
         .update(stripeConnectAccountsTable)
-        .set(accountFlags(remote))
-        .where(eq(stripeConnectAccountsTable.stripeAccountId, remote.id));
-      break;
+        .set(accountFlags(remote, asOf))
+        .where(and(
+          eq(stripeConnectAccountsTable.id, account.id),
+          // Stripe event times are whole seconds; an event from the same second still applies.
+          or(isNull(stripeConnectAccountsTable.lastSyncedAt), sql`date_trunc('second', ${stripeConnectAccountsTable.lastSyncedAt}) <= ${asOf}`),
+        ))
+        .returning({ id: stripeConnectAccountsTable.id });
+      return updated ? "account_synced" : "stale_ignored";
     }
-    case "checkout.session.completed": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const link = await linkForSession(session, account);
-      if (!link) break;
-      if (session.payment_status === "paid") await recordPaid(link, session);
-      else await transition(link.id, ["open"], { state: "processing", detail: "Bank payment submitted; waiting for it to clear." });
-      break;
+    case "checkout.session.completed":
+      return sessionEvent(async (link, session) => {
+        if (session.payment_status === "paid") { await recordPaid(link, session); return "paid"; }
+        const moved = await transition(link.id, ["open"], { state: "processing", detail: "Bank payment submitted; waiting for it to clear.", paymentIntentId: paymentIntentId(session) });
+        return moved ? "processing" : "no_change";
+      });
+    case "checkout.session.async_payment_succeeded":
+      return sessionEvent(async (link, session) => { await recordPaid(link, session); return "paid"; });
+    case "checkout.session.async_payment_failed":
+      return sessionEvent(async (link) => (await transition(link.id, ["open", "processing"], { state: "failed", detail: "The bank payment did not clear." })) ? "failed" : "no_change");
+    case "checkout.session.expired":
+      return sessionEvent(async (link) => (await transition(link.id, ["open"], { state: "expired", detail: "The payment link expired unused.", checkoutUrl: null })) ? "expired" : "no_change");
+    case "charge.refunded": {
+      const charge = event.data.object as Stripe.Charge;
+      const link = await linkForCharge(account, intentOf(charge.payment_intent), charge.metadata?.growthosPaymentLinkId);
+      if (!link) return "unmatched";
+      return flagForReview(link, {
+        kind: "refund", stripeId: charge.id, amountCents: charge.amount_refunded ?? 0,
+        status: charge.refunded ? "full" : "partial", reason: null, flaggedAt: eventAt.toISOString(), updatedAt: eventAt.toISOString(),
+      }, event.id);
     }
-    case "checkout.session.async_payment_succeeded": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const link = await linkForSession(session, account);
-      if (link) await recordPaid(link, session);
-      break;
-    }
-    case "checkout.session.async_payment_failed": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const link = await linkForSession(session, account);
-      if (link) await transition(link.id, ["open", "processing"], { state: "failed", detail: "The bank payment did not clear." });
-      break;
-    }
-    case "checkout.session.expired": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const link = await linkForSession(session, account);
-      if (link) await transition(link.id, ["open"], { state: "expired", detail: "The payment link expired unused." });
-      break;
+    case "charge.dispute.created":
+    case "charge.dispute.closed": {
+      const dispute = event.data.object as Stripe.Dispute;
+      const link = await linkForCharge(account, intentOf(dispute.payment_intent), dispute.metadata?.growthosPaymentLinkId);
+      if (!link) return "unmatched";
+      return flagForReview(link, {
+        kind: "dispute", stripeId: dispute.id, amountCents: dispute.amount ?? 0,
+        status: dispute.status ?? null, reason: dispute.reason ?? null, flaggedAt: eventAt.toISOString(), updatedAt: eventAt.toISOString(),
+      }, event.id);
     }
     default:
-      break;
+      return "ignored";
   }
+}
+
+/**
+ * Verify, then process each Connect event at most once (by Stripe event id).
+ * Wrong-mode events are refused. Unknown events, accounts and sessions are
+ * acknowledged and ignored. Processing errors roll back so Stripe redelivers.
+ */
+export async function handleConnectWebhook(rawBody: Buffer, signature: string | undefined): Promise<string> {
+  const { stripe, mode, live, webhookSecret } = requireStripe();
+  if (!signature) throw new StripeConnectWebhookVerificationError();
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+  } catch {
+    throw new StripeConnectWebhookVerificationError();
+  }
+  if (event.livemode !== live) throw new StripeConnectWebhookVerificationError();
+  if (!HANDLED.has(event.type)) return event.type;
+  const accountId = event.account ?? undefined;
+  if (!accountId) return event.type;
+  const [account] = await db
+    .select()
+    .from(stripeConnectAccountsTable)
+    .where(and(eq(stripeConnectAccountsTable.stripeAccountId, accountId), eq(stripeConnectAccountsTable.mode, mode)));
+  if (!account) return event.type;
+  type Reader = Pick<typeof db, "select">;
+  const seen = async (reader: Reader) => (await reader.select({ id: auditEventsTable.id }).from(auditEventsTable).where(and(
+    eq(auditEventsTable.organizationId, account.organizationId),
+    eq(auditEventsTable.action, "payments.stripe_event_processed"),
+    sql`${auditEventsTable.metadata}->>'stripeEventId' = ${event.id}`,
+  )).limit(1)).length > 0;
+  // A replay of an event already processed changes nothing.
+  if (await seen(db)) return event.type;
+  // Every handler is idempotent on its own (state-guarded transitions, one receipt per
+  // session, monotonic review flags), so concurrent duplicates converge. No connection
+  // is held while processing; a failure leaves no marker and Stripe redelivers.
+  const disposition = await processConnectEvent(event, account);
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`stripe-connect-event:${event.id}`}))`);
+    if (await seen(tx)) return;
+    await tx.insert(auditEventsTable).values({
+      organizationId: account.organizationId,
+      actorUserId: null,
+      action: "payments.stripe_event_processed",
+      entityType: "stripe_connect_account",
+      entityId: account.id,
+      metadata: { stripeEventId: event.id, eventType: event.type, mode, disposition },
+    });
+  });
   return event.type;
 }

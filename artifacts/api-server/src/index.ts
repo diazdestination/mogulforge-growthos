@@ -13,6 +13,7 @@ import {
 import { ensureDefaultServiceAreas, getOrgSettings } from "./services/settings";
 import { ensureInstallation } from "./services/installation";
 import { ensurePlatformAdmins } from "./services/org";
+import { logStripeConnectConfig } from "./services/stripe-connect";
 
 const rawPort = process.env["PORT"];
 
@@ -45,6 +46,8 @@ async function main(): Promise<void> {
     }
 
     logger.info({ port }, "Server listening");
+    // Refuse a Stripe key/mode mismatch loudly at startup; collection stays refused until fixed.
+    logStripeConnectConfig(logger);
     if (restoreOnly) {
       logger.info(
         "Restore-only inspection: scheduler and startup seeding are disabled",

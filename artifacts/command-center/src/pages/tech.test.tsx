@@ -146,6 +146,19 @@ describe("My day tech screen", () => {
     ]);
   });
 
+  it("says why a pay link can't be made and labels live mode", async () => {
+    renderTech(day(), {
+      path: "/tech?job=a1",
+      handler: (method, path) => (path.endsWith("/appointments/a1/invoices/i1/payment-links") && method === "GET"
+        ? json({ links: [], readiness: { configured: true, mode: "live", onboarding: "needs_info", canCreateLinks: false, message: "Stripe setup is not finished, so pay links are off. The owner can finish it in Settings → Connections." } })
+        : undefined),
+    });
+    const section = await screen.findByRole("region", { name: "Collect payment" });
+    expect(await within(section).findByText(/Stripe setup is not finished, so pay links are off/)).toBeTruthy();
+    expect(within(section).getByText(/Live: the customer's card or bank is charged for real/)).toBeTruthy();
+    expect(within(section).queryByRole("button", { name: /Create pay link/ })).toBeNull();
+  });
+
   it("shows what is needed when there is no invoice, or no invoice access, instead of inventing one", async () => {
     renderTech(day({ today: [job({ invoices: [] })] }), { path: "/tech?job=a1" });
     const section = await screen.findByRole("region", { name: "Collect payment" });

@@ -1132,7 +1132,7 @@ export default function Settings() {
         </div>
       </header>
       <div className="flex-1 overflow-auto p-6 max-w-4xl w-full">
-        <Tabs defaultValue={gmailReturn || new URLSearchParams(window.location.search).get('microsoft') ? 'integrations' : 'business'}>
+        <Tabs defaultValue={gmailReturn || new URLSearchParams(window.location.search).get('microsoft') || new URLSearchParams(window.location.search).get('stripe') ? 'integrations' : 'business'}>
           <TabsList className="mb-4 flex-wrap h-auto">
             <TabsTrigger value="business">Business</TabsTrigger>
             <TabsTrigger value="integrations">Connections</TabsTrigger>
