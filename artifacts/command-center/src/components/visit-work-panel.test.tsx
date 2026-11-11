@@ -102,6 +102,7 @@ it('does not publish a late completion to the surrounding schedule after semanti
 it('retains immutable historical completion and appends an attributed correction without replacing originals', async () => {
   const api = workdayServer(req => req.path.endsWith('/corrections') ? mutate(req, { ...api.state.work, corrections: [{ id: wid(40), originalCompletionId: completion().id, note: req.body.note, recordedAt: instant, recordedByUserId: 'staff-a' }] }) : undefined);
   api.state.work = work({ completion: completion(), entries: [entry({ state: 'finalized', completionId: completion().id })], capabilities: { canPrepare: false, canEdit: false, canCancel: false, canComplete: false, canCorrect: true, requiresActingNote: false, reasons: [] } }); mountWorkday(panel()); await screen.findByRole('region', { name: 'Recorded work completion' });
+  await waitFor(() => expect((screen.getByLabelText('Correction note').closest('fieldset') as HTMLFieldSetElement).disabled).toBe(false));
   expect(screen.queryByRole('button', { name: /Save progress/ })).toBeNull(); fireEvent.change(screen.getByLabelText('Correction note'), { target: { value: 'Correction: recorded label was transcribed incorrectly.' } }); fireEvent.click(screen.getByRole('button', { name: 'Append correction note' })); await screen.findByText(/Correction appended/);
   expect(screen.getByText('Original completed visit summary')).toBeTruthy(); expect(api.writes()[0].body).toEqual({ requestId: expect.any(String), note: 'Correction: recorded label was transcribed incorrectly.' });
 });
