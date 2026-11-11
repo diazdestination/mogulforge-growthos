@@ -204,6 +204,14 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     for (const [table,value] of Object.entries(priceBookAfter.tables)) assert.deepEqual(stripeAfter.tables[table],value);
     for (const table of ['stripe_connect_accounts','invoice_payment_links']) assert.equal(stripeAfter.tables[table].count,0);
     migrations.push({ file: '0022_bill-stripe-collection.sql', sha256: sha(stripeSql) });
+    // 0023 adds the ESTI customer approval table; every prior definition must be unchanged.
+    const approvalSql = (await readFile(new URL('../reports/staging-schema-preview-2026-10-01/0023_esti-estimate-approvals.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
+    await source.exec(approvalSql);
+    const approvalAfter = await fingerprints(source);
+    assert.equal(Object.keys(approvalAfter.tables).length,150);
+    for (const [table,value] of Object.entries(stripeAfter.tables)) assert.deepEqual(approvalAfter.tables[table],value);
+    assert.equal(approvalAfter.tables.estimate_approvals.count,0);
+    migrations.push({ file: '0023_esti-estimate-approvals.sql', sha256: sha(approvalSql) });
     const currentSchema = await tsImport('../lib/db/src/schema/index.ts', import.meta.url);
     const expected = generateDrizzleJson(currentSchema).tables;
     const actual = (await source.query("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,column_name")).rows;

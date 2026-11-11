@@ -21,6 +21,7 @@ import {
 import { and, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 
 import { renderAppointmentReminderCopy } from "../appointment-reminder-copy";
+import { EstimateApprovalError, readWaitingApprovalForText } from "../estimate-approvals";
 import { createContact, createLead, createTask } from "../crm";
 import { hasServiceMailboxReplyHold } from "../mailbox-communication";
 import { getRoutePlan, RoutePlanError } from "../route-plan";
@@ -485,7 +486,7 @@ export function withOptOut(body: string): string {
   return body.trimEnd().endsWith(OPT_OUT_LINE) ? body.trimEnd() : `${body.trimEnd()} ${OPT_OUT_LINE}`;
 }
 
-export type CustomerSmsCapability = "appt.sms.send" | "maintain.sms.send";
+export type CustomerSmsCapability = "appt.sms.send" | "maintain.sms.send" | "esti.sms.approval_link";
 
 /**
  * True when automated customer texts for this capability should go through
@@ -713,6 +714,69 @@ export async function maintainRequestServiceText(input: {
   });
 }
 
+// ESTI: estimate approval link text
+
+export const ESTI_APPROVAL_TEXT_ENTITY = "estimate";
+const ESTI_APPROVAL_KEY = /^esti-approval-text:([0-9a-f-]{36}):([0-9a-f-]{36})$/;
+
+function approvalUnavailable(error: unknown): never {
+  if (error instanceof EstimateApprovalError) {
+    throw new ZapierExecutionError(`No text was requested: ${error.message}`, error.status === 404 ? "not_found" : "invalid_input");
+  }
+  throw error;
+}
+
+/**
+ * The approval-link text for an estimate's one open, current approval link.
+ * A revoked, expired or outdated link (or a different link than the request
+ * named) refuses, so an approval can never send a stale link.
+ */
+export async function buildEstimateApprovalTextInput(organizationId: string, estimateId: string, expectedApprovalId?: string, reader: ReminderReader = db) {
+  const open = await readWaitingApprovalForText(reader, organizationId, estimateId).catch(approvalUnavailable);
+  if (expectedApprovalId && open.approval.id !== expectedApprovalId) {
+    throw new ZapierExecutionError("The approval link changed after this text was requested. Request a new text.", "invalid_input");
+  }
+  if (!open.lead || !open.contact) invalidReminderParents();
+  const contact = await reminderContact(reader, organizationId, { leadId: open.lead.id, contactId: open.contact.id });
+  const gate = await checkSendEligibility({ organizationId, leadId: open.lead.id, contact, channel: "sms", kind: "transactional" }, reader);
+  if (!gate.ok) textBlocked(gate.reason);
+  const toPhone = phoneE164(contact.phone ?? "");
+  if (!toPhone) textBlocked("invalid_phone");
+  // The company name frozen with the link: what the customer will see on the page.
+  const company = open.approval.snapshot.companyName.slice(0, 80);
+  const title = open.estimate.title.length > 80 ? `${open.estimate.title.slice(0, 77)}...` : open.estimate.title;
+  const total = (open.approval.snapshot.totalCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+  const greeting = contact.firstName?.trim() ? `Hi ${contact.firstName.trim().slice(0, 40)}, ` : "";
+  const body = withOptOut(`${greeting}${company} sent your estimate "${title}" (${total}). Review and approve it here: ${open.url}`);
+  return {
+    idempotencyKey: `esti-approval-text:${estimateId}:${open.approval.id}`,
+    input: { toPhone, body },
+    contactId: contact.id,
+    approvalId: open.approval.id,
+  };
+}
+
+export async function estiRequestApprovalLinkText(input: {
+  organizationId: string;
+  estimateId: string;
+  actorUserId: string | null;
+}): Promise<ZapierActionOutcome> {
+  const built = await buildEstimateApprovalTextInput(input.organizationId, input.estimateId);
+  const open = await otherOpenText(input.organizationId, "esti.sms.approval_link", ESTI_APPROVAL_TEXT_ENTITY, input.estimateId, built.idempotencyKey);
+  if (open?.state === "pending_approval") {
+    throw new ZapierExecutionError("An approval-link text for this estimate is already waiting for approval.", "conflict");
+  }
+  return requestZapierAction({
+    organizationId: input.organizationId,
+    capability: "esti.sms.approval_link",
+    input: built.input,
+    idempotencyKey: built.idempotencyKey,
+    requestedByUserId: input.actorUserId,
+    linkedEntityType: ESTI_APPROVAL_TEXT_ENTITY,
+    linkedEntityId: input.estimateId,
+  });
+}
+
 // ---------- approval re-derivation ----------
 
 /**
@@ -744,6 +808,11 @@ export async function rebuildZapierRequestInput(execution: ZapierActionExecution
       if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("Reminder text request is not rebuildable.", "invalid_input");
       await assertAppointmentOwnNumberAvailable(db, execution.organizationId, match[1]!, typeof execution.requestSummary?.appointmentReminderScheduledActionId === "string" ? execution.requestSummary.appointmentReminderScheduledActionId : undefined);
       return (await buildAppointmentReminderTextInput(execution.organizationId, match[1]!, match[2]!)).input;
+    }
+    case "esti.sms.approval_link": {
+      const match = execution.idempotencyKey.match(ESTI_APPROVAL_KEY);
+      if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("Approval-link text request is not rebuildable.", "invalid_input");
+      return (await buildEstimateApprovalTextInput(execution.organizationId, match[1]!, match[2]!)).input;
     }
     case "maintain.sms.send": {
       const match = execution.idempotencyKey.match(MAINTAIN_REMINDER_KEY);
@@ -823,6 +892,11 @@ export async function assertCustomerTextOwnership(reader: ReminderReader, input:
     if (await hasServiceMailboxReplyHold(org, id, reader) || await hasServiceSmsReplyHold(org, id, reader)) throw new ZapierExecutionError("A customer reply needs office review first.", "invalid_input");
     const [prior] = await reader.select({ id: auditEventsTable.id }).from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, org), eq(auditEventsTable.entityType, "service_obligation"), eq(auditEventsTable.entityId, id), inArray(auditEventsTable.action, ["service.care_reminder_approved", "service.care_response_recorded"]))).limit(1);
     if (prior || await otherOpenText(org, "maintain.sms.send", MAINTAIN_REMINDER_TEXT_ENTITY, id, input.idempotencyKey, reader)) throw new ZapierExecutionError("An earlier reminder or office response owns this service.", "conflict");
+  } else if (input.capability === "esti.sms.approval_link") {
+    const match = input.idempotencyKey.match(ESTI_APPROVAL_KEY);
+    if (!match || match[1] !== id) invalidReminderParents();
+    const built = await buildEstimateApprovalTextInput(org, id, match![2]!, reader);
+    if (built.input.toPhone !== input.expectedPhone) throw new ZapierExecutionError("The customer number changed before dispatch.", "conflict");
   }
 }
 

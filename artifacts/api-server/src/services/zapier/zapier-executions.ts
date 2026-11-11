@@ -598,7 +598,7 @@ export async function getZapierExecution(organizationId: string, id: string): Pr
   return readExecution(organizationId, id);
 }
 
-function isCustomerText(capability: string) { return capability === "appt.sms.send" || capability === "maintain.sms.send"; }
+function isCustomerText(capability: string) { return capability === "appt.sms.send" || capability === "maintain.sms.send" || capability === "esti.sms.approval_link"; }
 function originalScheduledAction(execution: ZapierActionExecution) { const value = execution.requestSummary.appointmentReminderScheduledActionId; return typeof value === "string" ? value : undefined; }
 async function serviceTextTouch(reader: Pick<typeof db, "select">, execution: ZapierActionExecution, input: unknown) {
   const [service] = await reader.select({ contactId: serviceObligationsTable.contactId }).from(serviceObligationsTable).where(and(eq(serviceObligationsTable.organizationId, execution.organizationId), eq(serviceObligationsTable.id, execution.linkedEntityId!)));

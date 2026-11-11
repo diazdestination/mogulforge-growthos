@@ -29,6 +29,7 @@ import {
   apptRequestReminderText,
   callieRequestTextBack,
   callieSyncCalls,
+  estiRequestApprovalLinkText,
   invoPushInvoiceToAccounting,
   maintainRequestServiceText,
   schedSendCrewDaySheet,
@@ -373,6 +374,24 @@ router.post(
         await maintainRequestServiceText({
           organizationId: req.member!.organizationId,
           obligationId: String(req.params.id),
+          actorUserId: req.member!.user.id,
+        }),
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+router.post(
+  "/integrations/zapier/flows/estimates/:id/approval-text",
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(
+        await estiRequestApprovalLinkText({
+          organizationId: req.member!.organizationId,
+          estimateId: String(req.params.id),
           actorUserId: req.member!.user.id,
         }),
       );

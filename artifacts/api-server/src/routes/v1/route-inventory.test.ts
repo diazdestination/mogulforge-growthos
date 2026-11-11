@@ -290,6 +290,10 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "POST /estimates": "crm.write",
   "GET /estimates/:id": "crm.read",
   "GET /estimates/:id/delivery": "crm.read",
+  "GET /estimates/:id/approval": "crm.read",
+  "GET /estimates/:id/approval/record": "crm.read",
+  "POST /estimates/:id/approval-link": "crm.write",
+  "POST /estimates/:id/approval-link/revoke": "crm.write",
   "POST /estimates/:id/delivery/preview": "crm.write",
   "POST /estimates/:id/delivery/send": "crm.write",
   "PATCH /estimates/:id": "crm.write",
@@ -404,6 +408,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "POST /integrations/zapier/flows/appointments/:id/calendar": "crm.write",
   "POST /integrations/zapier/flows/appointments/:id/reminder-text": "crm.write",
   "POST /integrations/zapier/flows/services/:id/reminder-text": "crm.write",
+  "POST /integrations/zapier/flows/estimates/:id/approval-text": "crm.write",
   "POST /integrations/zapier/flows/invoices/:id/accounting": "invoices.manage",
   "POST /integrations/zapier/flows/sched/day-sheet": "crm.write",
   // ESTI price book: members read prices and preview margin on drafts;

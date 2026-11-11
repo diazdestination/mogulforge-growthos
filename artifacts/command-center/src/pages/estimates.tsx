@@ -20,6 +20,7 @@ import {
 } from '@workspace/api-client-react';
 import { Loader2, Plus, Trash2, Edit, FileText, Send, CheckCircle, XCircle, HardHat, X } from 'lucide-react';
 import { EstimateDelivery } from '@/components/estimate-delivery';
+import { EstimateApprovalPanel } from '@/components/estimate-approval-panel';
 import { EstimateMarginPanel, PriceBookPicker } from '@/components/estimate-margin-panel';
 import LeadSelect from '@/components/lead-select';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
@@ -265,6 +266,7 @@ function EstimatesContent({ me, scopeKey }: { me: MemberProfile; scopeKey: strin
                 </div>
                 <EstimateDelivery estimate={estimate} organizationId={me.organization!.id} authorityScope={scopeKey} canSend={canEdit && ["office", "admin", "owner"].includes(me.role)} />
                 <p className="mt-3 text-xs text-muted-foreground">External send records are staff-reported status, separate from provider evidence.</p>
+                {!returningEstimate(estimate) && <EstimateApprovalPanel key={`${estimate.id}:${estimate.updatedAt}`} estimateId={estimate.id} canManage={canEdit} />}
                 {(canEdit || canDel) && (
                   <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-border">
                     {canEdit && !returningEstimate(estimate) && estimate.status === 'draft' && (

@@ -3,8 +3,8 @@
  * deletion order, retention policy, or proof of complete account ownership.
  * Every new table must receive an explicit classification before preview runs.
  */
-export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-10-30.inventory-v19";
-export const DATA_LIFECYCLE_EXPECTED_TABLES = 149;
+export const DATA_LIFECYCLE_CATALOG_VERSION = "2026-11-11.inventory-v20";
+export const DATA_LIFECYCLE_EXPECTED_TABLES = 150;
 export const DATA_LIFECYCLE_ROW_LIMIT = 10_000;
 
 export type InventoryCategory =
@@ -78,6 +78,7 @@ export const DATA_LIFECYCLE_CATALOG: readonly InventoryCatalogEntry[] = [
   direct("email_response_reviews", "communications"),
   direct("email_sender_preferences", "configuration"),
   direct("engagement_links", "account_access"),
+  direct("estimate_approvals", "crm"),
   direct("estimates", "crm"),
   direct("financial_migration_items", "audit"),
   direct("financial_migration_reviews", "audit"),

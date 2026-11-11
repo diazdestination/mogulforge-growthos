@@ -69,3 +69,4 @@ export * from "./customer-work";
 export * from "./zapier-connected-apps";
 export * from "./price-book";
 export * from "./stripe-payments";
+export * from "./estimate-approvals";

@@ -21,6 +21,7 @@ apps a contractor already uses, through the contractor's own Zapier account:
 | CALLIE | `callie.sms.send` — text back a missed caller through the existing governed path | write | off |
 | SCHED | `sched.sms.send` — selected company-date day sheet texted to a crew member | write | off |
 | MAINTAIN | `maintain.sms.send` — service-due reminder texted to a consented customer | write | off |
+| ESTI | `esti.sms.approval_link` — staff-requested text of an estimate's approval link to a consented customer | write | off |
 
 Saving or changing a binding sets its policy Off. The client explicitly enables
 its policy afterward; Approve each is the recommended starting authority for
@@ -28,7 +29,7 @@ customer texts. A registry's suggested mode does not activate a saved binding.
 
 ### Customer texts from the contractor's own number
 
-`appt.sms.send` and `maintain.sms.send` let a
+`appt.sms.send`, `maintain.sms.send` and `esti.sms.approval_link` let a
 contractor text customers from the business number in their own phone app
 (Quo or their own Twilio account). This uses the contractor's own provider
 setup; it does not bypass that provider's carrier registration or sender
@@ -38,7 +39,7 @@ and [Quo's business-texting registration](https://learn.quo.com/setting-up-quo/r
 - Consent is enforced by the same send gate as built-in texting: do not
   contact, per-channel opt-out, suppression and SMS consent. MAINTAIN also uses
   the outreach gate (sending hours, caps, reply holds) and its notice window.
-- Every APPT/MAINTAIN customer text ends with "Reply STOP to opt out." Replies and STOP requests land
+- Every APPT/MAINTAIN/ESTI customer text ends with "Reply STOP to opt out." Replies and STOP requests land
   in the contractor's phone app, not GrowthOS; staff mark an opted-out
   customer do not text on the customer record.
 - The automated appointment reminder uses `appt.sms.send` only when built-in
@@ -173,7 +174,7 @@ database with the MCP transport faked in memory.
   and parameter names were not verified against a live server; the binding
   step also matches by display name, and the first live run per app must
   confirm the action's parameter names. Angi and Thumbtack have no Zapier app.
-- ESTI and BILL have no Zapier capabilities yet. MAINTAIN's standing (automatic) reminder policy still uses built-in delivery; own-number service texts are requested by staff.
+- BILL has no Zapier capabilities yet. ESTI's only capability texts an approval link: the text is rebuilt from the link at approval and dispatch, and is refused once the link is revoked, expired, replaced or outdated by an estimate edit. MAINTAIN's standing (automatic) reminder policy still uses built-in delivery; own-number service texts are requested by staff.
 - No Zapier *trigger* (push) integration: reads are polled by the scheduler.
 - No "GrowthOS as a Zapier app" listing; that is a separate partner-program
   decision.

@@ -23,9 +23,9 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
         "reality": "Prepare quantities, prices and line items in the estimate workspace. Your team reviews the scope and totals."
       },
       {
-        "title": "Estimate status & follow-up",
+        "title": "Customer approval & signature",
         "stage": "workspace",
-        "reality": "Track drafts, decisions and follow-up. Changing a status does not itself deliver a proposal or contact a customer."
+        "reality": "Share a secure approval link for an opportunity estimate. The customer reviews it, signs and approves or declines; the signed record and estimate status update together. Creating a link does not contact the customer; your team shares it or requests a text that waits for approval."
       },
       {
         "title": "Returning-customer estimates",
