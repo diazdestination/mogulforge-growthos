@@ -69,6 +69,10 @@ router.get(
             : undefined,
         hasUnreadPortalMessage:
           req.query.hasUnreadPortalMessage === "true" ? true : undefined,
+        importedHistory:
+          req.query.importedHistory === "include" || req.query.importedHistory === "only"
+            ? req.query.importedHistory
+            : "hide",
       }),
     );
   },

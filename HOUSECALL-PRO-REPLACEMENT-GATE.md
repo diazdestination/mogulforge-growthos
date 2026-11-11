@@ -70,11 +70,11 @@ This gate supplements [contractor operations](GROWTHOS-CONTRACTOR-OPERATIONS.md)
 | Leads, websites and growth | Pipeline/website intake/CSV; versioned audited source adoption with retained provenance; independent exact-address marketing permission and separately approved one-touch email batches. | Generic imported playbooks/SMS remain held. Reviewed email is bounded to10/batch,25 rolling company reservations and one lifetime lead/address touch; unknown effects cannot be cloned/rearmed. Not paid-ad management. | Actual source cutoff and permission evidence; correct website/company/responder; permitted delivery, opt-out/reply holds, outcome evidence and failure recovery. |
 | Missed calls | Signed company-bound Twilio bridge, callback task, reviewed linking/new opportunity with canonical lead push; exact individually approved SMS, default-off hours/owner policy, receipt/reply review and deadline escalation. | Not an autonomous unknown-caller receptionist or conversational booking agent. Each call/message needs staff approval and actual consent; caller ID is not permission. No automatic reply sequence or guaranteed emergency dispatch. | Actual number/forwarding, answered/missed/busy/unreachable/voicemail/after-hours cases, owner escalation and safe consent/STOP/failure behavior. |
 | Estimates/jobs/schedule | Line-item estimates, project/crew windows, conflict/version guards, Today, booking and booked-appointment reminders; one invoice-preparation task on completion. | No native estimate e-signature/contract acceptance. External calendar sync, travel routing, split shifts and leave/holiday calendars are not implemented. | Quote authorization and real office/field day: multi-day roofing job, HVAC visit, reassignment, cancellation/no-show and failure recovery. Add conditional features only where needed to replace current usage. |
-| Invoices/external receipts | Native issue/void/print, exact cents and external receipt/reversal records; reviewed plain-text email; normalized historical invoice/receipt or non-cash opening-receivable import with exact original documents/IDs and atomic dedupe. | No connected delivery/bounce confirmation, public invoice portal, PDF attachment or approved resend/rearm. Financial loader is strict normalized v1, not an arbitrary Housecall Pro CSV adapter; unsupported adjustments require reconciliation. Contractor collection deferred. | Actual migration totals, original document/number/date/cutoff, receipt allocations, customer invoice receipt, partial/refund balances and accountant/owner acceptance. |
+| Invoices/external receipts | Native issue/void/print, exact cents and external receipt/reversal records; reviewed plain-text email; normalized historical invoice/receipt or non-cash opening-receivable import with exact original documents/IDs and atomic dedupe. | No connected delivery/bounce confirmation, public invoice portal, PDF attachment or approved resend/rearm. Financial loader is strict normalized v1; the Housecall Pro jobs-report adapter (see Move from Housecall Pro below) maps into it, no other vendor CSV; unsupported adjustments require reconciliation. Contractor collection deferred. | Actual migration totals, original document/number/date/cutoff, receipt allocations, customer invoice receipt, partial/refund balances and accountant/owner acceptance. |
 | Warranty/service plans | Evidence/recurrence and service care; bounded watch queue flags overdue/no recorded response/blocked or uncertain send/cancelled/no-show, with accepted owner, internal next-action deadline, retained history and typed staff notification. | Every occurrence still needs reminder approval. Office plans are not customer replies/booking. No autonomous mailbox/self-booking, warranty determination, renewal or service-plan billing. | Due -> permitted reminder -> reply/office escalation -> agreed visit -> completion -> next date; no-response/opt-out/expired agreement and missed office deadline cases. |
 | Email/replies | Selected Gmail/Microsoft sender, company default, no mailbox fallback; signed normalized reply identity and staff review/holds. | Send-only OAuth does not monitor a mailbox. Trusted live inbound bridge is not delivered by the reply wave. Complete platform identity/invite delivery ledger/callback reconciliation is unfinished. | Real mailbox send/receipt/reply, refresh/revocation, invitation/reset/verification delivery and safe unknown effects. Owner Azure first sign-in remains deferred. |
 | Owner/mobile | Canonical lead push/manual SMS drafts plus default-off typed service-watch alerts to the actual current accepted owner. Generic lock-screen text, service/company deep links, stale case/session/policy cancellation and final pre-network recheck. | Not general call/invoice exception paging. Service alerts are current-owner any-hour opt-in, separate from lead day/after-hours routing. Push acceptance is not receipt/read. Handset replies/STOP are not synced. | Each actual phone: install/permission, background/locked/Focus/offline, routing/ownership, correct lead/service/login/company, logout and manual compose/send. |
-| Migration/continuity | Opportunity/service CSVs, reviewed native adoption, normalized historical finance, bounded consistent20-dataset core export and company holds. Local111-table restore preserves typed push, watch, revoked adoption/claimed effects and non-cash opening balances. | No whole-business open-job/appointment/media loader; real export layouts need mapping. Core export excludes raw approvals, binary media, full communications/automation and secrets; expanded scope needs review. | Approved source counts/balances/history/exceptions, fresh hosted compatible backup/restore, one writer and cutoff per domain, rollback/export and both contractor sign-offs. |
+| Migration/continuity | Opportunity/service CSVs, reviewed native adoption, normalized historical finance, bounded consistent20-dataset core export and company holds. Local111-table restore preserves typed push, watch, revoked adoption/claimed effects and non-cash opening balances. | Move from Housecall Pro imports customers, job history, clean upcoming visits and invoices/balances from staff-mapped exports; no estimates/media loader; real export layouts still need staff-confirmed mapping. Core export excludes raw approvals, binary media, full communications/automation and secrets; expanded scope needs review. | Approved source counts/balances/history/exceptions, fresh hosted compatible backup/restore, one writer and cutoff per domain, rollback/export and both contractor sign-offs. |
 
 ## Exact source anchors
 
@@ -145,3 +145,84 @@ The owner has reported a new Azure account. **First sign-in remains deferred unt
 For each acceptance case record: company, agreed requirement, exact release/schema, authorized identities, timestamp, synthetic versus real evidence, provider receipt where applicable, independently observed outcome, exception/recovery result and named approver. Keep personal data and secrets out of repository evidence. Retain unknowns rather than passing them as zero or “not needed.”
 
 Go only when **both cards' actual required workflows are accepted** and the separate release/customer-activation gates pass. Missing critical functionality cannot be waived by green CI or backup success. An intentionally manual step or scope change requires explicit acceptance, not an engineering assumption. Maintain one writer per record domain and prevent old/new automations from duplicating sends or balances. Old-system subscription cancellation remains a separate owner action after acceptance.
+
+## Move from Housecall Pro import (2026-11-11)
+
+One page, `/move-from-housecall-pro` (linked from onboarding and Invoices), takes the
+contractor's own exports. Every step previews first (nothing saved), needs a ticked
+confirmation, is idempotent on re-run, is tenant-scoped and audited, and contacts no one.
+
+- **Customers** (`POST /lead-imports`, customers mode, source key `housecall-pro`):
+  contacts deduped by email/phone and HCP customer ID (existing people are enriched, never
+  duplicated or merged by guess); up to two complete service addresses become properties
+  (same street + ZIP is not added twice); tags, lead source and notes become one `note`
+  activity on the person (fingerprinted, so a re-run adds nothing).
+- **Jobs** (`POST /housecall-import/jobs`, `crm.write`): each HCP job becomes an imported
+  opportunity (`creationMethod=import`, `importSourceKey=housecall-pro`,
+  `externalOpportunityId=HCP Id`, unique per company) linked to the matched customer and
+  property, plus one append-only `imported_job` activity holding job number, description,
+  status, created/scheduled/finished dates, employee names as text, totals and tags
+  (shown in the customer timeline). Why leads + activities and not projects/appointments:
+  the opportunity is what existing import provenance, source-history outreach holds, ROI
+  exclusions and the financial loader already key on (invoices require a lead), and
+  activities have no edit route, so history stays read-only; projects/appointments drive
+  crews, reservations and reminders. A future `scheduled` job with a service address and a
+  normal length also gets an `other` appointment inserted directly — no reminder is
+  scheduled. Anything else open is history flagged "needs scheduling". Rows that match no
+  customer, or more than one, are listed and skipped (customers are never created from a
+  jobs file). A re-run skips identical jobs and updates a job that moved forward in HCP
+  only when GrowthOS has not edited it. Completed and lost imported jobs are history:
+  `GET /leads` hides them unless `importedHistory=include|only`, and the pipeline's
+  "Show imported history" toggle (`?imported=1`) includes them; the customer timeline
+  always shows them.
+- **Estimates** (`POST /housecall-import/estimates`, `crm.write`, preview/confirm like
+  jobs): open estimates become an imported opportunity (`externalOpportunityId =
+  estimate:<HCP Id>`, `importedHistory.externalEstimateId`) in `estimate_sent` or
+  `estimate_preparing`, with one native estimate (`sent` or `draft`, created through the
+  same saved-state history and `estimate.created` audit as a native estimate) and a
+  read-only `imported_estimate` timeline record. ESTI's estimate workspace and SCOUT's
+  stalled-estimate follow-up pick them up from the lead status and the HCP created date;
+  `sentAt` stays empty because the export has no send date. Approved, declined and
+  closed estimates are timeline history only (no opportunity, no estimate). Amount (tax
+  included, as in the jobs report) becomes one line item; without an amount the estimate
+  is $0 and flagged. A future estimate visit is flagged to book, not put on the calendar.
+  Re-runs skip identical rows; a row that changed after import is listed and the GrowthOS
+  record kept. Nothing is sent.
+- **Invoices/open balances** (`POST /housecall-import/invoices/preview|commit`,
+  `settings.manage`, same trusted-origin/no-API-key guard as `/financial-migrations`):
+  from the same jobs file, mapped into normalized financial migration v1
+  (`sourceSystem=housecall_pro`, `sourceAccount=jobs-report`, external IDs `job:<HCP Id>`
+  / `payment:<HCP Id>`) in loader reviews of 50, committed through the existing loader.
+  Due = 0 → full history with one external receipt for Paid Amount (date from Payment
+  History if readable, else the finished date, flagged); Due > 0 → opening receivable of
+  exactly Due (partial payments are noted, not recorded as cash). One summary line carries
+  Amount − Tax; original line items go in the notes. Rows where Paid + Due ≠ Amount
+  (tips, fees, credits), duplicate/used invoice numbers, or dates after the export date are
+  listed for hand reconciliation. Preview shows file count/sum vs ready, already imported,
+  unmatched and unreconciled, which must add up. Limits: 5 MB / 10,000 rows per file,
+  2,000 invoices per run (export one year per file).
+
+Header sources. **Confirmed** — jobs report (47 columns: `Invoice`/`Invoice Number`,
+`HCP Id`, `Created At`, `Date`, `End Time`, `Customer`, `First Name`, `Last Name`, `Email`,
+`Mobile Phone`, `Home Phone`, `Customer Tags`, `Street`, `Street Line 2`, `City`, `State`,
+`Zip`, `Description`, `Line Items`, `Amount`, `Subtotal`, `Payment History`, `Paid Amount`,
+`Due`, `Discount`, `Tax`, `Job Tags`, `Notes`, `Employee`, `Job Status`, `Finished`,
+`Invoice Sent`, `Tip Amount`, `Online Booking Source`, …) from help.housecallpro.com
+"Exported report breakdown" (article 2999685) and ServiceTitan's "Export your Housecall Pro
+data"; estimates report (22 columns, `Open Estimates` > `See all estimates` > all table
+columns with the `Estimate` column switched to `Invoice`: `Invoice`, `HCP Id`, `Created At`,
+`Date`, `End Time`, durations, `Customer`, `First Name`, `Last Name`, `Email`, `Company`,
+`Mobile Phone`, `Home Phone`, `Customer Tag`, `Address`, `Street`, `Street Line 2`, `City`,
+`State`, `Zip`) from the same ServiceTitan page and HCP article 4671115 (steps only). It
+has no status column, so staff state whether the open estimates were sent; unknown
+status wording is listed, never guessed; customers export (24 columns: `First Name`, `Last Name`, `Mobile Number`, `Email`,
+`Company`, `Tags`, `Notes`, `ID`, `Address_1 Street Line 1` … `Address_1 Postal Code`, twice)
+from the ServiceTitan page (HCP's own "Export customer list", article 2847823, documents only
+the steps). **Assumed** (aliases only, staff confirm): customer ID or lead source columns in
+the jobs report, a separate invoices export (HCP documents none; invoices are the jobs
+report), any status, amount, tax, description or employee column in the estimates
+report, date/money text formats, Payment History format,
+HCP status wording (complete rated/unrated, scheduled, unscheduled, in progress, canceled;
+unknown values are kept as history and flagged), and the second address block being a
+repeat of the `Address_1` names. Dates are read in the company time zone staff choose.
+

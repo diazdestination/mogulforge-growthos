@@ -329,9 +329,15 @@ export async function listLeads(
     limit?: number;
     offset?: number;
     hasUnreadPortalMessage?: boolean;
+    /** Imported Housecall Pro history (completed/lost jobs): hidden unless asked for. */
+    importedHistory?: "hide" | "include" | "only";
   } = {},
 ) {
   const conditions = [eq(leadsTable.organizationId, organizationId)];
+  // COALESCE: a native lead's NULL source key must never drop it from the list.
+  const importedHistory = sql`COALESCE(${leadsTable.importSourceKey} = 'housecall-pro' AND ${leadsTable.creationMethod} = 'import' AND ${leadsTable.status} IN ('completed', 'lost'), false)`;
+  if ((filters.importedHistory ?? "hide") === "hide") conditions.push(sql`NOT ${importedHistory}`);
+  else if (filters.importedHistory === "only") conditions.push(importedHistory);
   if (filters.status) {
     conditions.push(
       eq(leadsTable.status, filters.status as typeof leadsTable.$inferSelect.status),
