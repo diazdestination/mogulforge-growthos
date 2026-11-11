@@ -974,7 +974,7 @@ describe("Cross-cutting promises", () => {
     const caps = (await get(f.owner.sid, "/integrations/zapier/capabilities")).body.capabilities as Json[];
     const writes = caps.filter((row) => row.direction === "write");
     expect(writes.map((row) => row.key ?? row.capability).sort()).toEqual([
-      "appt.calendar.create_event", "appt.sms.on_my_way", "appt.sms.send", "bill.sms.payment_link", "callie.sms.send", "esti.email.send",
+      "appt.calendar.create_event", "appt.sms.on_my_way", "appt.sms.send", "bill.sms.payment_link", "callie.sms.send", "esti.email.send", "esti.sms.approval_link",
       "invo.accounting.create_invoice", "invo.accounting.record_payment", "invo.email.send", "maintain.sms.send", "sched.sms.send", "scout.sms.review_request",
     ]);
     expect(writes.filter((row) => (row.key ?? row.capability) !== "appt.sms.send").every((row) => (row.policy?.mode ?? "off") === "off")).toBe(true);
