@@ -11,6 +11,7 @@ import {
   createInvoicePaymentLink,
   disconnectStripe,
   getPaymentAccountStatus,
+  getPaymentReadiness,
   listInvoicePaymentLinks,
   refreshStripeAccount,
   reconcileInvoicePaymentLink,
@@ -65,7 +66,7 @@ router.post("/payments/stripe/connect", requireMember("settings.manage"), sessio
 
 router.post("/payments/stripe/refresh", requireMember("settings.manage"), async (req: Request, res: Response): Promise<void> => {
   try {
-    res.json(await refreshStripeAccount(req.member!.organizationId));
+    res.json(await refreshStripeAccount(req.member!.organizationId, req.member!.user.id));
   } catch (error) {
     fail(res, error);
   }
@@ -112,7 +113,9 @@ router.get("/appointments/:appointmentId/invoices/:id/payment-links", requireMem
   try {
     const { appointmentId, id } = fieldParams(req);
     await assertFieldCollectScope(db, req.member!.organizationId, fieldActor(req), id, appointmentId);
-    res.json({ links: await listInvoicePaymentLinks(req.member!.organizationId, id) });
+    // Readiness lets the tech see why a pay link can't be made (without office invoice access).
+    const [links, readiness] = await Promise.all([listInvoicePaymentLinks(req.member!.organizationId, id), getPaymentReadiness(req.member!.organizationId)]);
+    res.json({ links, readiness });
   } catch (error) {
     fail(res, error);
   }
@@ -149,7 +152,8 @@ router.post("/invoices/:id/payment-links", requireMember("invoices.manage"), asy
 
 router.post("/invoices/:id/payment-links/:linkId/reconcile", requireMember("invoices.manage"), sessionOnly, async (req: Request, res: Response): Promise<void> => {
   try {
-    const options = z.object({ checkoutSessionId: z.string().regex(/^cs_test_[A-Za-z0-9_]+$/).max(200).optional(), expire: z.boolean().optional() }).strict().parse(req.body ?? {});
+    // The service also checks the session prefix against the configured mode.
+    const options = z.object({ checkoutSessionId: z.string().regex(/^cs_(?:test|live)_[A-Za-z0-9_]+$/).max(200).optional(), expire: z.boolean().optional() }).strict().parse(req.body ?? {});
     res.json({ link: await reconcileInvoicePaymentLink(req.member!.organizationId, req.member!.user.id, invoiceId.parse(String(req.params.id)), invoiceId.parse(String(req.params.linkId)), options) });
   } catch (error) { fail(res, error); }
 });

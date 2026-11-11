@@ -51,7 +51,7 @@ are code to write.
 | Specialist | Setup (needs a credential) | Planned (needs code) |
 | --- | --- | --- |
 | ESTI | — | Price books & margin guidance — **built (Price Book page + ESTI margin check on estimates)** |
-| BILL | Card & bank collection — **sandbox source built; separate Connect sandbox key, opt-in and signed webhook required; actual provider acceptance pending** ([setup](STRIPE-SANDBOX-SETUP.md)) | Live collection, refund/dispute operations and production acceptance |
+| BILL | Card & bank collection — **test and live modes built (test by default); live is configuration only (mode, live key, live webhook secret, confirm flag); refunds/disputes flagged for office review; actual provider acceptance pending** ([setup](STRIPE-SETUP.md)) | Owner's first real live payment and production acceptance |
 | INVO | Invoice email delivery (Gmail OAuth / Resend) | — |
 | SCHED | — | Route planning & optimization — **built: Today route plan (this branch)** |
 | APPT | Customer confirmations (SMS/email) | External calendar sync — **closed by Zapier Connected Apps (PR #73)** |

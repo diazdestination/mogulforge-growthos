@@ -20,6 +20,7 @@ import {
   type UserRole,
 } from "@workspace/db";
 import { hasPermission, type Permission } from "../lib/permissions";
+import { configuredStripeMode } from "./stripe-mode";
 import { lockContractorSchedule } from "./contractor-scheduling";
 import { invoiceEquipment } from "./invoice-equipment";
 import { assertCustomerWorkActive, assertCustomerWorkReader, createCustomerWorkRoot, customerWorkActor, customerWorkHash, lockCustomerWork, readNativeWorkLineage } from "./customer-work-lineage";
@@ -710,6 +711,8 @@ async function mutate(
     if (!providerReceipt) {
       const [collecting] = await tx.select({ id: invoicePaymentLinksTable.id }).from(invoicePaymentLinksTable).where(and(
         eq(invoicePaymentLinksTable.organizationId, org), eq(invoicePaymentLinksTable.invoiceId, id),
+        // A live deployment never waits on a Stripe test-mode collection (no real money).
+        configuredStripeMode() === "live" ? eq(invoicePaymentLinksTable.mode, "live") : undefined,
         or(inArray(invoicePaymentLinksTable.state, ["open", "processing"]), and(eq(invoicePaymentLinksTable.state, "needs_reconciliation"), isNull(invoicePaymentLinksTable.paidAt))),
       )).limit(1);
       if (collecting) return conflict("invoice_collection_pending", "Resolve the outstanding Stripe collection before changing this invoice or its recorded balance.");
@@ -997,7 +1000,7 @@ export async function recordInvoicePayment(
   id: string,
   raw: unknown,
   effectiveRole?: UserRole,
-  options: { evidence?: "staff_recorded" | "stripe_checkout" } = {},
+  options: { evidence?: "staff_recorded" | "stripe_checkout"; stripeMode?: "test" | "live" } = {},
 ) {
   const parsed = invoicePaymentSchema.parse(raw);
   const input = {
@@ -1068,6 +1071,7 @@ export async function recordInvoicePayment(
         invoiceId: row.id,
         kind: "payment",
         evidence: options.evidence ?? "staff_recorded",
+        ...(options.stripeMode ? { stripeMode: options.stripeMode } : {}),
         providerEffect: false,
       },
     });

@@ -12,6 +12,8 @@ import {
   usersTable,
 } from "@workspace/db";
 
+import { eq } from "drizzle-orm";
+
 import app from "../../app";
 import { createSession, deleteSession } from "../../lib/auth";
 import { createInvoice, issueInvoice } from "../../services/invoices";
@@ -30,7 +32,8 @@ const fakeStripe = {
     sessions: {
       create: vi.fn(async (...args: unknown[]) => {
         checkouts.push(args);
-        return { id: `cs_test_field${checkouts.length}`, url: `https://checkout.stripe.test/c/field${checkouts.length}`, expires_at: Math.floor(Date.now() / 1000) + 86_400 };
+        const live = process.env.STRIPE_CONNECT_MODE === "live";
+        return { id: `cs_${live ? "live" : "test"}_field${checkouts.length}`, livemode: live, url: `https://checkout.stripe.test/c/field${checkouts.length}`, expires_at: Math.floor(Date.now() / 1000) + 86_400 };
       }),
     },
   },
@@ -139,7 +142,7 @@ describe("field day routes", () => {
     expect((await f.tech.call(`/invoices/${invoice.id}/payment-links`, { method: "POST", body: {} })).status).toBe(403);
     expect((await f.tech.call(`/invoices/${invoice.id}`)).status).toBe(403);
 
-    expect(await (await f.tech.call(`${base}/payment-links`)).json()).toEqual({ links: [] });
+    expect(await (await f.tech.call(`${base}/payment-links`)).json()).toMatchObject({ links: [], readiness: { configured: true, mode: "test", onboarding: "ready", canCreateLinks: true, message: null } });
     const created = await f.tech.call(`${base}/payment-links`, { method: "POST", body: {} });
     expect(created.status).toBe(201);
     const { link } = await created.json() as { link: { id: string; amountCents: number; url: string } };
@@ -170,5 +173,49 @@ describe("field day routes", () => {
     expect((await other.tech.call(`${base}/payment-links`)).status).toBe(404);
     expect((await other.tech.call(`${base}/payment-links/${link.id}/qr`)).status).toBe(404);
     expect(checkouts).toHaveLength(1);
+  });
+
+  it("keeps field collection scoped to the tech's own job in live mode, and explains an unready account", async () => {
+    vi.stubEnv("STRIPE_CONNECT_MODE", "live");
+    checkouts.length = 0;
+    try {
+      const f = await company();
+      // A test-mode account does not count in live mode.
+      await db.insert(stripeConnectAccountsTable).values({ organizationId: f.orgId, stripeAccountId: `acct_field_test_${f.orgId}`, mode: "test", chargesEnabled: true, detailsSubmitted: true });
+      const draft = (await createInvoice(f.orgId, f.owner.user.id, { requestId: randomUUID(), leadId: f.lead.id, document: { title: "Synthetic repair", currency: "USD", issuerName: "Synthetic", customerName: "Dana", lineItems: [{ description: "Work", quantity: "1", unitPriceCents: 12000 }], taxCents: 0 } })).invoice;
+      const invoice = (await issueInvoice(f.orgId, f.owner.user.id, draft.id, { requestId: randomUUID(), expectedVersion: draft.version, confirmed: true })).invoice;
+      const [mine] = await db.insert(appointmentsTable).values({ organizationId: f.orgId, leadId: f.lead.id, contactId: f.contact.id, assignedUserId: f.tech.user.id, scheduledStart: new Date(Date.now() - 30 * 60_000) }).returning();
+      const base = `/appointments/${mine!.id}/invoices/${invoice.id}`;
+
+      const notConnected = await (await f.tech.call(`${base}/payment-links`)).json() as { readiness: { mode: string; onboarding: string; canCreateLinks: boolean; message: string } };
+      expect(notConnected.readiness).toMatchObject({ mode: "live", onboarding: "not_started", canCreateLinks: false });
+      expect(notConnected.readiness.message).toMatch(/Stripe is not connected/);
+      const refused = await f.tech.call(`${base}/payment-links`, { method: "POST", body: {} });
+      expect(refused.status).toBe(409);
+      expect(await refused.json()).toMatchObject({ code: "not_connected" });
+
+      const [live] = await db.insert(stripeConnectAccountsTable).values({ organizationId: f.orgId, stripeAccountId: `acct_field_live_${f.orgId}`, mode: "live", detailsSubmitted: false, requirements: { currentlyDue: ["external_account"], pastDue: [], pendingVerification: [], disabledReason: "requirements.past_due", currentDeadline: null } }).returning();
+      const notReady = await f.tech.call(`${base}/payment-links`, { method: "POST", body: {} });
+      expect(notReady.status).toBe(409);
+      expect(await notReady.json()).toMatchObject({ code: "not_ready" });
+      expect(((await (await f.tech.call(`${base}/payment-links`)).json()) as { readiness: { onboarding: string } }).readiness.onboarding).toBe("needs_info");
+
+      await db.update(stripeConnectAccountsTable).set({ chargesEnabled: true, detailsSubmitted: true, requirements: null }).where(eq(stripeConnectAccountsTable.id, live!.id));
+      const created = await f.tech.call(`${base}/payment-links`, { method: "POST", body: {} });
+      expect(created.status).toBe(201);
+      const { link } = await created.json() as { link: { id: string; mode: string; url: string } };
+      expect(link).toMatchObject({ mode: "live", url: "https://checkout.stripe.test/c/field1" });
+      expect((checkouts[0] as [unknown, { stripeAccount: string }])[1].stripeAccount).toBe(`acct_field_live_${f.orgId}`);
+
+      // Still only the tech's own job, in live mode too.
+      const [theirs] = await db.insert(appointmentsTable).values({ organizationId: f.orgId, leadId: f.lead.id, contactId: f.contact.id, assignedUserId: f.owner.user.id, scheduledStart: new Date(Date.now() - 30 * 60_000) }).returning();
+      expect((await f.tech.call(`/appointments/${theirs!.id}/invoices/${invoice.id}/payment-links`, { method: "POST", body: {} })).status).toBe(404);
+      expect((await f.tech.call(`/appointments/${theirs!.id}/invoices/${invoice.id}/payment-links/${link.id}/qr`)).status).toBe(404);
+      const other = await company();
+      expect((await other.tech.call(`${base}/payment-links`)).status).toBe(404);
+      expect(checkouts).toHaveLength(1);
+    } finally {
+      vi.stubEnv("STRIPE_CONNECT_MODE", "test");
+    }
   });
 });
