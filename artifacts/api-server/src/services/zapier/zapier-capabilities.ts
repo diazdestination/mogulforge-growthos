@@ -24,6 +24,8 @@ export const ZAPIER_CAPABILITY_KEYS = [
   "callie.sms.send",
   "sched.sms.send",
   "maintain.sms.send",
+  "appt.sms.on_my_way",
+  "bill.sms.payment_link",
 ] as const;
 export type ZapierCapabilityKey = (typeof ZAPIER_CAPABILITY_KEYS)[number];
 
@@ -64,6 +66,11 @@ export const ACCOUNTING_INVOICE_INPUT = z.object({
 export const SMS_SEND_INPUT = z.object({
   toPhone: z.string().regex(/^\+?[1-9]\d{6,14}$/),
   body: z.string().min(1).max(1200),
+});
+
+/** On My Way text: the ETA the tech chose is kept in the ledger summary so approval can rebuild the exact copy. */
+export const ON_MY_WAY_SMS_INPUT = SMS_SEND_INPUT.extend({
+  etaMinutes: z.number().int().min(1).max(240).optional(),
 });
 
 export const LIST_SINCE_INPUT = z.object({
@@ -372,6 +379,36 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
     direction: "write",
     label: "Text service reminders",
     description: "MAINTAIN texts a consented customer one reminder that a recorded service is due, from the contractor's own number.",
+    inputSchema: SMS_SEND_INPUT,
+    summaryFields: ["toPhone"],
+    defaultMode: "approve",
+    defaultDailyBudget: 40,
+    candidates: [
+      smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),
+      smsCandidate("OpenPhoneCLIAPI", "Quo", "send_message", "Send Message", "from"),
+    ],
+  },
+  {
+    key: "appt.sms.on_my_way",
+    specialistId: "appt",
+    direction: "write",
+    label: "Text On My Way",
+    description: "APPT texts a consented customer that their technician is on the way, with an optional ETA, from the contractor's own number. Once per appointment per day.",
+    inputSchema: ON_MY_WAY_SMS_INPUT,
+    summaryFields: ["toPhone", "etaMinutes"],
+    defaultMode: "approve",
+    defaultDailyBudget: 60,
+    candidates: [
+      smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),
+      smsCandidate("OpenPhoneCLIAPI", "Quo", "send_message", "Send Message", "from"),
+    ],
+  },
+  {
+    key: "bill.sms.payment_link",
+    specialistId: "bill",
+    direction: "write",
+    label: "Text invoice pay links",
+    description: "BILL texts a consented customer the open sandbox pay link for an issued invoice's current balance, from the contractor's own number.",
     inputSchema: SMS_SEND_INPUT,
     summaryFields: ["toPhone"],
     defaultMode: "approve",

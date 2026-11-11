@@ -21,6 +21,8 @@ apps a contractor already uses, through the contractor's own Zapier account:
 | CALLIE | `callie.sms.send` — text back a missed caller through the existing governed path | write | off |
 | SCHED | `sched.sms.send` — selected company-date day sheet texted to a crew member | write | off |
 | MAINTAIN | `maintain.sms.send` — service-due reminder texted to a consented customer | write | off |
+| APPT | `appt.sms.on_my_way` — On My Way text (tech name, company, optional ETA) to a consented customer, once per appointment per company day | write | off |
+| BILL | `bill.sms.payment_link` — open sandbox pay link for an issued invoice's current balance, texted to a consented customer | write | off |
 
 Saving or changing a binding sets its policy Off. The client explicitly enables
 its policy afterward; Approve each is the recommended starting authority for
@@ -52,6 +54,22 @@ and [Quo's business-texting registration](https://learn.quo.com/setting-up-quo/r
   blocks the approval instead of sending stale copy. A service gets at most one
   own-number reminder while any earlier one is pending, sent or uncertain, and
   never after a built-in MAINTAIN reminder or a recorded customer response.
+
+### Field texts from My day (`/tech`)
+
+`appt.sms.on_my_way` and `bill.sms.payment_link` are requested by staff from
+the phone-first My day screen (`GET /contractor/my-day`, the signed-in member's
+own assigned appointments). Both use the same consent gate, opt-out line,
+nurture-lock serialization and pre-dispatch re-derivation as the reminders.
+On My Way keys on `appt-omw:<appointment>:<company date>`; the chosen ETA is
+kept in the ledger summary so approval rebuilds the identical copy, and a
+cancelled visit, another day or withdrawn consent blocks it. The pay-link text
+keys on `bill-paylink-text:<link>:v<invoice version>:<balance cents>` and is
+rebuilt from the current open link and invoice balance; an expired, paid or
+replaced link, a changed balance, or missing invoice access refuses approval.
+Routes: `POST /integrations/zapier/flows/appointments/:id/on-my-way`
+(`crm.write`, body `{ etaMinutes?: 1-240 }`) and
+`POST /integrations/zapier/flows/invoices/:id/pay-link-text` (`invoices.manage`).
 
 CALLIE's existing phone-sync/text-back path is separate. The client action panel
 does not expose it while callback eligibility and customer-consent review are
@@ -173,7 +191,7 @@ database with the MCP transport faked in memory.
   and parameter names were not verified against a live server; the binding
   step also matches by display name, and the first live run per app must
   confirm the action's parameter names. Angi and Thumbtack have no Zapier app.
-- ESTI and BILL have no Zapier capabilities yet. MAINTAIN's standing (automatic) reminder policy still uses built-in delivery; own-number service texts are requested by staff.
+- ESTI has no Zapier capabilities yet. BILL only texts an existing sandbox pay link. MAINTAIN's standing (automatic) reminder policy still uses built-in delivery; own-number service texts are requested by staff.
 - No Zapier *trigger* (push) integration: reads are polled by the scheduler.
 - No "GrowthOS as a Zapier app" listing; that is a separate partner-program
   decision.

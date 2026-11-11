@@ -26,7 +26,9 @@ import {
 import { ZapierMcpError } from "../../services/zapier/zapier-mcp-client";
 import {
   apptPushAppointmentToCalendar,
+  apptRequestOnMyWayText,
   apptRequestReminderText,
+  billRequestPayLinkText,
   callieRequestTextBack,
   callieSyncCalls,
   invoPushInvoiceToAccounting,
@@ -355,6 +357,46 @@ router.post(
         await apptRequestReminderText({
           organizationId: req.member!.organizationId,
           appointmentId: String(req.params.id),
+          actorUserId: req.member!.user.id,
+        }),
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+const onMyWayBody = z.object({ etaMinutes: z.number().int().min(1).max(240).nullable().optional() }).strict();
+
+router.post(
+  "/integrations/zapier/flows/appointments/:id/on-my-way",
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const body = onMyWayBody.parse(req.body ?? {});
+      res.json(
+        await apptRequestOnMyWayText({
+          organizationId: req.member!.organizationId,
+          appointmentId: z.string().uuid().parse(String(req.params.id)),
+          actorUserId: req.member!.user.id,
+          etaMinutes: body.etaMinutes ?? null,
+        }),
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+router.post(
+  "/integrations/zapier/flows/invoices/:id/pay-link-text",
+  requireMember("invoices.manage"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(
+        await billRequestPayLinkText({
+          organizationId: req.member!.organizationId,
+          invoiceId: z.string().uuid().parse(String(req.params.id)),
           actorUserId: req.member!.user.id,
         }),
       );

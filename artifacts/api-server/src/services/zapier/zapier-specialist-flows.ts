@@ -6,7 +6,9 @@ import {
   appointmentsTable,
   contactsTable,
   crmTasksTable,
+  customerWorkRootsTable,
   db,
+  invoicePaymentLinksTable,
   invoicesTable,
   leadsTable,
   organizationsTable,
@@ -19,8 +21,10 @@ import {
   type ZapierActionExecution,
 } from "@workspace/db";
 import { and, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { companyDayBounds } from "@workspace/scheduling-core";
 
 import { renderAppointmentReminderCopy } from "../appointment-reminder-copy";
+import { InvoiceError } from "../invoice-contract";
 import { createContact, createLead, createTask } from "../crm";
 import { hasServiceMailboxReplyHold } from "../mailbox-communication";
 import { getRoutePlan, RoutePlanError } from "../route-plan";
@@ -713,6 +717,197 @@ export async function maintainRequestServiceText(input: {
   });
 }
 
+// ---------- APPT: On My Way text from the tech in the field ----------
+
+export const APPT_ON_MY_WAY_ENTITY = "appointment_on_my_way";
+const APPT_ON_MY_WAY_KEY = /^appt-omw:([0-9a-f-]{36}):(\d{4}-\d{2}-\d{2})$/;
+
+/** The company calendar date of an instant, in the company's own time zone. */
+export function companyDateOf(now: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+function onMyWayBody(input: { customerFirstName: string | null; techFirstName: string | null; businessName: string; etaMinutes?: number }): string {
+  const greeting = input.customerFirstName?.trim() ? `Hi ${input.customerFirstName.trim()}, ` : "Hi, ";
+  const tech = input.techFirstName?.trim() || "Your technician";
+  const eta = input.etaMinutes ? `, about ${input.etaMinutes} minutes away` : "";
+  return withOptOut(`${greeting}${tech} from ${input.businessName} is on the way${eta}.`);
+}
+
+/**
+ * Build the On My Way text for a booked appointment happening today. The
+ * technician named is the appointment's assignee, else the requester. One per
+ * appointment per company day (the idempotency key).
+ */
+export async function buildOnMyWayTextInput(
+  organizationId: string,
+  appointmentId: string,
+  options: { etaMinutes?: number | null; requestedByUserId: string | null; expectedDate?: string; now?: Date },
+) {
+  const etaMinutes = options.etaMinutes ?? undefined;
+  if (etaMinutes !== undefined && (!Number.isInteger(etaMinutes) || etaMinutes < 1 || etaMinutes > 240)) {
+    throw new ZapierExecutionError("Choose an ETA between 1 and 240 minutes.", "invalid_input");
+  }
+  const [row] = await db
+    .select({ appointment: appointmentsTable, organization: organizationsTable })
+    .from(appointmentsTable)
+    .innerJoin(organizationsTable, eq(organizationsTable.id, appointmentsTable.organizationId))
+    .where(and(eq(appointmentsTable.organizationId, organizationId), eq(appointmentsTable.id, appointmentId)));
+  if (!row) throw new ZapierExecutionError("Appointment not found.", "not_found");
+  const { appointment, organization } = row;
+  if (!["scheduled", "confirmed"].includes(appointment.status)) {
+    throw new ZapierExecutionError("Only a booked appointment can get an On My Way text.", "invalid_input");
+  }
+  const date = companyDateOf(options.now ?? new Date(), organization.timezone);
+  if (options.expectedDate && options.expectedDate !== date) {
+    throw new ZapierExecutionError("This On My Way text was requested on an earlier day. Request a new one.", "invalid_input");
+  }
+  const bounds = companyDayBounds(date, organization.timezone);
+  const end = appointment.scheduledEnd ?? new Date(appointment.scheduledStart.getTime() + 2 * 60 * 60_000);
+  if (appointment.scheduledStart.getTime() >= Date.parse(bounds.to) || end.getTime() <= Date.parse(bounds.from)) {
+    throw new ZapierExecutionError("On My Way texts are only for today's appointments.", "invalid_input");
+  }
+  const contact = await appointmentTextCustomer(db, organizationId, appointment);
+  const gate = await checkSendEligibility({ organizationId, leadId: appointment.leadId, contact, channel: "sms", kind: "transactional" });
+  if (!gate.ok) textBlocked(gate.reason);
+  const toPhone = phoneE164(contact.phone ?? "");
+  if (!toPhone) textBlocked("invalid_phone");
+  const techId = appointment.assignedUserId ?? options.requestedByUserId;
+  const [tech] = techId
+    ? await db.select({ firstName: usersTable.firstName }).from(usersTable).where(and(eq(usersTable.organizationId, organizationId), eq(usersTable.id, techId)))
+    : [];
+  const company = await standingCompanyProjection(db, organizationId);
+  const body = onMyWayBody({ customerFirstName: contact.firstName, techFirstName: tech?.firstName ?? null, businessName: company.businessName, etaMinutes });
+  if (body.length > 1200) throw new ZapierExecutionError("The On My Way text is too long.", "invalid_input");
+  return {
+    idempotencyKey: `appt-omw:${appointment.id}:${date}`,
+    input: { toPhone, body, ...(etaMinutes ? { etaMinutes } : {}) },
+    contactId: contact.id,
+  };
+}
+
+export async function apptRequestOnMyWayText(input: {
+  organizationId: string;
+  appointmentId: string;
+  actorUserId: string | null;
+  etaMinutes?: number | null;
+}): Promise<ZapierActionOutcome> {
+  const built = await buildOnMyWayTextInput(input.organizationId, input.appointmentId, { etaMinutes: input.etaMinutes, requestedByUserId: input.actorUserId });
+  const [earlier] = await db
+    .select()
+    .from(zapierActionExecutionsTable)
+    .where(and(eq(zapierActionExecutionsTable.organizationId, input.organizationId), eq(zapierActionExecutionsTable.idempotencyKey, built.idempotencyKey)));
+  if (earlier && earlier.state !== "blocked" && (earlier.requestSummary.etaMinutes ?? null) !== (built.input.etaMinutes ?? null)) {
+    throw new ZapierExecutionError(
+      earlier.state === "pending_approval"
+        ? "An On My Way text for this appointment is already waiting for approval."
+        : "An On My Way text was already sent or attempted for this appointment today.",
+      "conflict",
+    );
+  }
+  return requestZapierAction({
+    organizationId: input.organizationId,
+    capability: "appt.sms.on_my_way",
+    input: built.input,
+    idempotencyKey: built.idempotencyKey,
+    requestedByUserId: input.actorUserId,
+    linkedEntityType: APPT_ON_MY_WAY_ENTITY,
+    linkedEntityId: input.appointmentId,
+  });
+}
+
+// ---------- BILL: text the open pay link for an invoice's current balance ----------
+
+export const BILL_PAY_LINK_TEXT_ENTITY = "invoice_payment_link";
+const BILL_PAY_LINK_KEY = /^bill-paylink-text:([0-9a-f-]{36}):v(\d+):(\d+)$/;
+
+const usd = (cents: number) => (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+
+/** The open, unexpired sandbox Checkout link that collects exactly this invoice version's balance. */
+function currentPayLink(links: (typeof invoicePaymentLinksTable.$inferSelect)[], version: number, balanceCents: number, now = new Date()) {
+  return links.find((link) =>
+    link.state === "open" && !!link.checkoutUrl && /^https:\/\//.test(link.checkoutUrl) && link.invoiceVersion === version &&
+    link.amountCents === balanceCents && !!link.expiresAt && link.expiresAt > now) ?? null;
+}
+
+/**
+ * Build the pay-link text from the invoice's current balance and its open pay
+ * link. Reading the invoice re-checks the actor's invoice authority.
+ */
+export async function buildPayLinkTextInput(
+  organizationId: string,
+  invoiceId: string,
+  actorUserId: string | null,
+  expected?: { linkId: string; version: number; amountCents: number },
+) {
+  if (!actorUserId) throw new ZapierExecutionError("A signed-in team member must request pay link texts.", "invalid_input");
+  const { getInvoice } = await import("../invoices");
+  const invoice = await getInvoice(organizationId, actorUserId, invoiceId).catch((error: unknown) => {
+    if (error instanceof InvoiceError) {
+      throw new ZapierExecutionError(error.status === 404 ? "Invoice not found." : error.message, error.status === 404 ? "not_found" : "invalid_input");
+    }
+    throw error;
+  });
+  if (invoice.status !== "issued" || !invoice.invoiceNumber) {
+    throw new ZapierExecutionError("Only an issued invoice can get a pay link text.", "invalid_input");
+  }
+  const balance = invoice.balanceDueCents;
+  if (balance === null || balance < 50) throw new ZapierExecutionError("This invoice has no balance to collect.", "invalid_input");
+  if (expected && (expected.version !== invoice.version || expected.amountCents !== balance)) {
+    throw new ZapierExecutionError("The invoice or its balance changed after this text was requested. Request a new pay link text.", "invalid_input");
+  }
+  const links = await db
+    .select()
+    .from(invoicePaymentLinksTable)
+    .where(and(eq(invoicePaymentLinksTable.organizationId, organizationId), eq(invoicePaymentLinksTable.invoiceId, invoiceId), eq(invoicePaymentLinksTable.state, "open")))
+    .orderBy(desc(invoicePaymentLinksTable.createdAt));
+  const link = currentPayLink(links, invoice.version, balance);
+  if (!link) {
+    throw new ZapierExecutionError(
+      expected ? "The pay link is no longer open for this balance. Request a new pay link text." : "Create a pay link for the current balance first.",
+      "invalid_input",
+    );
+  }
+  if (expected && expected.linkId !== link.id) {
+    throw new ZapierExecutionError("The pay link changed after this text was requested. Request a new pay link text.", "invalid_input");
+  }
+  const [contact] = await db.select().from(contactsTable).where(and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, invoice.contactId)));
+  if (!contact) throw new ZapierExecutionError("The invoice's customer is unavailable.", "invalid_input");
+  const gate = await checkSendEligibility({ organizationId, leadId: invoice.leadId, contact, channel: "sms", kind: "transactional" });
+  if (!gate.ok) textBlocked(gate.reason);
+  const toPhone = phoneE164(contact.phone ?? "");
+  if (!toPhone) textBlocked("invalid_phone");
+  const company = await standingCompanyProjection(db, organizationId);
+  const greeting = contact.firstName?.trim() ? `Hi ${contact.firstName.trim()}, ` : "Hi, ";
+  const body = withOptOut(`${greeting}this is ${company.businessName}. Invoice ${invoice.invoiceNumber} has a balance of ${usd(balance)}. Pay securely here: ${link.checkoutUrl}`);
+  if (body.length > 1200) throw new ZapierExecutionError("The pay link text is too long.", "invalid_input");
+  return {
+    idempotencyKey: `bill-paylink-text:${link.id}:v${invoice.version}:${balance}`,
+    input: { toPhone, body },
+    linkId: link.id,
+    contactId: contact.id,
+  };
+}
+
+export async function billRequestPayLinkText(input: {
+  organizationId: string;
+  invoiceId: string;
+  actorUserId: string | null;
+}): Promise<ZapierActionOutcome> {
+  const built = await buildPayLinkTextInput(input.organizationId, input.invoiceId, input.actorUserId);
+  return requestZapierAction({
+    organizationId: input.organizationId,
+    capability: "bill.sms.payment_link",
+    input: built.input,
+    idempotencyKey: built.idempotencyKey,
+    requestedByUserId: input.actorUserId,
+    linkedEntityType: BILL_PAY_LINK_TEXT_ENTITY,
+    linkedEntityId: built.linkId,
+  });
+}
+
 // ---------- approval re-derivation ----------
 
 /**
@@ -744,6 +939,23 @@ export async function rebuildZapierRequestInput(execution: ZapierActionExecution
       if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("Reminder text request is not rebuildable.", "invalid_input");
       await assertAppointmentOwnNumberAvailable(db, execution.organizationId, match[1]!, typeof execution.requestSummary?.appointmentReminderScheduledActionId === "string" ? execution.requestSummary.appointmentReminderScheduledActionId : undefined);
       return (await buildAppointmentReminderTextInput(execution.organizationId, match[1]!, match[2]!)).input;
+    }
+    case "appt.sms.on_my_way": {
+      const match = execution.idempotencyKey.match(APPT_ON_MY_WAY_KEY);
+      if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("On My Way request is not rebuildable.", "invalid_input");
+      const eta = execution.requestSummary?.etaMinutes;
+      return (await buildOnMyWayTextInput(execution.organizationId, match[1]!, {
+        etaMinutes: typeof eta === "number" ? eta : undefined,
+        requestedByUserId: execution.requestedByUserId,
+        expectedDate: match[2]!,
+      })).input;
+    }
+    case "bill.sms.payment_link": {
+      const match = execution.idempotencyKey.match(BILL_PAY_LINK_KEY);
+      if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("Pay link text request is not rebuildable.", "invalid_input");
+      const [link] = await db.select({ invoiceId: invoicePaymentLinksTable.invoiceId }).from(invoicePaymentLinksTable).where(and(eq(invoicePaymentLinksTable.organizationId, execution.organizationId), eq(invoicePaymentLinksTable.id, match[1]!)));
+      if (!link) throw new ZapierExecutionError("The pay link is unavailable.", "invalid_input");
+      return (await buildPayLinkTextInput(execution.organizationId, link.invoiceId, execution.requestedByUserId, { linkId: match[1]!, version: Number(match[2]), amountCents: Number(match[3]) })).input;
     }
     case "maintain.sms.send": {
       const match = execution.idempotencyKey.match(MAINTAIN_REMINDER_KEY);
@@ -823,6 +1035,28 @@ export async function assertCustomerTextOwnership(reader: ReminderReader, input:
     if (await hasServiceMailboxReplyHold(org, id, reader) || await hasServiceSmsReplyHold(org, id, reader)) throw new ZapierExecutionError("A customer reply needs office review first.", "invalid_input");
     const [prior] = await reader.select({ id: auditEventsTable.id }).from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, org), eq(auditEventsTable.entityType, "service_obligation"), eq(auditEventsTable.entityId, id), inArray(auditEventsTable.action, ["service.care_reminder_approved", "service.care_response_recorded"]))).limit(1);
     if (prior || await otherOpenText(org, "maintain.sms.send", MAINTAIN_REMINDER_TEXT_ENTITY, id, input.idempotencyKey, reader)) throw new ZapierExecutionError("An earlier reminder or office response owns this service.", "conflict");
+  } else if (input.capability === "appt.sms.on_my_way") {
+    const [row] = await reader.select({ appointment: appointmentsTable, timezone: organizationsTable.timezone }).from(appointmentsTable).innerJoin(organizationsTable, eq(organizationsTable.id, appointmentsTable.organizationId)).where(and(eq(appointmentsTable.organizationId, org), eq(appointmentsTable.id, id)));
+    if (!row || !["scheduled", "confirmed"].includes(row.appointment.status) || input.idempotencyKey !== `appt-omw:${id}:${companyDateOf(new Date(), row.timezone)}`) invalidReminderParents();
+    const contact = await appointmentTextCustomer(reader, org, row.appointment);
+    if (phoneE164(contact.phone ?? "") !== input.expectedPhone) throw new ZapierExecutionError("The customer number changed before dispatch.", "conflict");
+    const gate = await checkSendEligibility({ organizationId: org, leadId: row.appointment.leadId, contact, channel: "sms", kind: "transactional" }, reader);
+    if (!gate.ok) textBlocked(gate.reason);
+  } else if (input.capability === "bill.sms.payment_link") {
+    const [link] = await reader.select().from(invoicePaymentLinksTable).where(and(eq(invoicePaymentLinksTable.organizationId, org), eq(invoicePaymentLinksTable.id, id)));
+    const [invoice] = link ? await reader.select().from(invoicesTable).where(and(eq(invoicesTable.organizationId, org), eq(invoicesTable.id, link.invoiceId))) : [];
+    if (!link || !invoice || invoice.status !== "issued" || invoice.version !== link.invoiceVersion || !currentPayLink([link], invoice.version, link.amountCents) ||
+      input.idempotencyKey !== `bill-paylink-text:${id}:v${invoice.version}:${link.amountCents}`) throw new ZapierExecutionError("The pay link is no longer open for this invoice balance.", "conflict");
+    const contactId = invoice.leadId
+      ? (await reader.select({ contactId: leadsTable.contactId }).from(leadsTable).where(and(eq(leadsTable.organizationId, org), eq(leadsTable.id, invoice.leadId))))[0]?.contactId
+      : invoice.customerWorkId
+        ? (await reader.select({ contactId: customerWorkRootsTable.contactId }).from(customerWorkRootsTable).where(and(eq(customerWorkRootsTable.organizationId, org), eq(customerWorkRootsTable.id, invoice.customerWorkId))))[0]?.contactId
+        : null;
+    const [contact] = contactId ? await reader.select().from(contactsTable).where(and(eq(contactsTable.organizationId, org), eq(contactsTable.id, contactId))) : [];
+    if (!contact) invalidReminderParents();
+    if (phoneE164(contact.phone ?? "") !== input.expectedPhone) throw new ZapierExecutionError("The customer number changed before dispatch.", "conflict");
+    const gate = await checkSendEligibility({ organizationId: org, leadId: invoice.leadId, contact, channel: "sms", kind: "transactional" }, reader);
+    if (!gate.ok) textBlocked(gate.reason);
   }
 }
 

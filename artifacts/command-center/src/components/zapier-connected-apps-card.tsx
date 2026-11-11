@@ -18,7 +18,7 @@ import { ZapierFlowActions } from './zapier-flow-actions';
  * one enabled action and governed by an off / approve / auto policy.
  */
 
-const CUSTOMER_TEXT_KEYS = ['appt.sms.send', 'maintain.sms.send'];
+const CUSTOMER_TEXT_KEYS = ['appt.sms.send', 'maintain.sms.send', 'appt.sms.on_my_way', 'bill.sms.payment_link'];
 
 type ZapierStatus = {
   configured: boolean;

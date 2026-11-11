@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type RequestHandler, type Response } from "express";
+import QRCode from "qrcode";
 import { z } from "zod";
 
 import { requireMember } from "../../middlewares/requireMember";
@@ -75,6 +76,21 @@ router.delete("/payments/stripe", requireMember("settings.manage"), sessionOnly,
 router.get("/invoices/:id/payment-links", requireMember("invoices.read"), async (req: Request, res: Response): Promise<void> => {
   try {
     res.json({ links: await listInvoicePaymentLinks(req.member!.organizationId, invoiceId.parse(String(req.params.id))) });
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+// QR of the open pay link so a customer can pay on their own phone in person.
+router.get("/invoices/:id/payment-links/:linkId/qr", requireMember("invoices.read"), async (req: Request, res: Response): Promise<void> => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const id = invoiceId.parse(String(req.params.id)), linkId = invoiceId.parse(String(req.params.linkId));
+    const link = (await listInvoicePaymentLinks(req.member!.organizationId, id)).find(item => item.id === linkId);
+    if (!link) throw new StripeConnectError("Payment link not found.", "not_found");
+    if (link.state !== "open" || !link.url || !/^https:\/\//.test(link.url)) throw new StripeConnectError("This pay link is no longer open. Create a new one for the current balance.", "invalid");
+    const qrDataUrl = await QRCode.toDataURL(link.url, { margin: 1, width: 320, errorCorrectionLevel: "M" });
+    res.json({ linkId: link.id, url: link.url, amountCents: link.amountCents, expiresAt: link.expiresAt, qrDataUrl });
   } catch (error) {
     fail(res, error);
   }

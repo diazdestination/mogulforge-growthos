@@ -29,6 +29,16 @@ Use an approved finite test window; actual staging also requires its existing
 Keep scheduler autostart disabled and other outbound providers disabled.
 Restore the outbound hold when the test window ends.
 
+### Collecting on the job (My day)
+
+The phone-first My day screen (`/tech`) reuses the same link: a member with
+`invoices.manage` creates it for the current balance, the screen shows it as a
+QR code (`GET /invoices/:id/payment-links/:linkId/qr`, PNG data URL generated
+server-side, only while the link is open) or opens the Stripe page on the
+tech's phone, and can request the BILL `bill.sms.payment_link` text through
+Zapier (approval by default). Field roles without invoice access see a note to
+ask the office. Sandbox only; nothing here changes the live-key refusal.
+
 ## Recovery and acceptance
 
 One durable invoice reservation covers creation, open Checkout and bank clearing.
