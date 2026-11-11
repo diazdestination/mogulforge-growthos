@@ -23,9 +23,9 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
         "reality": "Prepare quantities, prices and line items in the estimate workspace. Your team reviews the scope and totals."
       },
       {
-        "title": "Estimate status & follow-up",
+        "title": "Customer approval & signature",
         "stage": "workspace",
-        "reality": "Track drafts, estimates awaiting the customer's answer and decisions. Changing a status does not contact a customer; emailing an estimate is a separate step your team previews and confirms from a connected mailbox. A draft can also be emailed from your own Gmail or Outlook connected through Zapier, after your approval."
+        "reality": "Share a secure approval link for an estimate, or include it in the reviewed estimate email. The customer reviews it, signs and approves or declines; the signed record and estimate status update together. Creating a link or changing a status does not contact the customer; your team shares the link, emails it with the estimate, or requests a text that waits for approval. A draft can also be emailed, without the approval link, from your own Gmail or Outlook connected through Zapier, after your approval."
       },
       {
         "title": "Returning-customer estimates",

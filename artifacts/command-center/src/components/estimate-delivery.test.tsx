@@ -119,6 +119,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("Estimate email review", () => {
+  it("says an approval link is added at send time without showing one", async () => {
+    const body = `${message.body}\n\nReview, sign and approve this estimate online:\n[Secure approval link: added when this email is sent]`;
+    mount((path) => (path.endsWith("/preview") ? { ...preview, message: { ...message, body } } : undefined));
+    await review();
+    expect(screen.getByTestId("approval-link-note").textContent).toMatch(/added when this email is sent/);
+    expect(window.document.body.textContent).not.toMatch(/\/approve\//);
+    cleanup();
+    mount();
+    await review();
+    expect(screen.queryByTestId("approval-link-note")).toBeNull();
+  });
   it.each([
     {
       quantity: 1,

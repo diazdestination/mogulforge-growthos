@@ -140,6 +140,9 @@ overrides:
   rollup>@rollup/rollup-win32-ia32-msvc: '-'
   rollup>@rollup/rollup-win32-x64-gnu: '-'
 
+patchedDependencies:
+  drizzle-kit@0.31.10: c568ab0493d42d62a1c3dfa037039b028dff116d4c4815380bfa82fad76d102c
+
 importers:
 
   .:
@@ -532,7 +535,7 @@ importers:
         version: 8.20.3
       drizzle-kit:
         specifier: ^0.31.10
-        version: 0.31.10
+        version: 0.31.10(patch_hash=c568ab0493d42d62a1c3dfa037039b028dff116d4c4815380bfa82fad76d102c)
 
   lib/inspection-availability:
     dependencies:
@@ -6371,7 +6374,7 @@ snapshots:
       '@babel/runtime': 7.29.7
       csstype: 3.2.3
 
-  drizzle-kit@0.31.10:
+  drizzle-kit@0.31.10(patch_hash=c568ab0493d42d62a1c3dfa037039b028dff116d4c4815380bfa82fad76d102c):
     dependencies:
       '@drizzle-team/brocli': 0.10.2
       '@esbuild-kit/esm-loader': tsx@4.23.5

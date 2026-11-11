@@ -18,7 +18,7 @@ import { ZapierFlowActions } from './zapier-flow-actions';
  * one enabled action and governed by an off / approve / auto policy.
  */
 
-const CUSTOMER_TEXT_KEYS = ['appt.sms.send', 'maintain.sms.send', 'scout.sms.review_request', 'appt.sms.on_my_way', 'bill.sms.payment_link'];
+const CUSTOMER_TEXT_KEYS = ['appt.sms.send', 'maintain.sms.send', 'scout.sms.review_request', 'appt.sms.on_my_way', 'bill.sms.payment_link', 'esti.sms.approval_link'];
 const CUSTOMER_EMAIL_KEYS = ['invo.email.send', 'esti.email.send'];
 const pollLabel = (minutes: number) => minutes % 60 === 0 ? `Every ${minutes / 60 === 1 ? 'hour' : `${minutes / 60} hours`}` : `Every ${minutes} minutes`;
 

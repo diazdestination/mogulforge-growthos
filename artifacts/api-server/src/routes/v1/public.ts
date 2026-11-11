@@ -46,6 +46,12 @@ import {
 } from "../../services/engagement-links";
 import { SubmitReferralBody } from "@workspace/api-zod";
 import { CustomerLifecycleHoldError } from "../../services/customer-lifecycle";
+import {
+  approveEstimate,
+  declineEstimate,
+  EstimateApprovalError,
+  getPublicEstimateApproval,
+} from "../../services/estimate-approvals";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -907,6 +913,94 @@ router.post(
     } catch (error) {
       if (!(error instanceof CustomerLifecycleHoldError)) throw error;
       res.status(423).json({ code: error.code, error: "This company is not accepting new requests right now." });
+    }
+  },
+);
+
+// ---------- ESTI customer estimate approval (token-authenticated) ----------
+
+function approvalNoStore(res: Response) {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Robots-Tag", "noindex");
+}
+
+function approvalFailure(res: Response, error: unknown): void {
+  if (error instanceof EstimateApprovalError) {
+    res.status(error.status).json({ error: error.message, code: error.code });
+    return;
+  }
+  if (error instanceof CustomerLifecycleHoldError) {
+    res.status(423).json({ code: error.code, error: "This company is not accepting approvals right now. Contact them directly." });
+    return;
+  }
+  res.status(503).json({ error: "Approval is unavailable right now. Nothing was recorded; try again shortly.", code: "estimate_approval_unavailable" });
+}
+
+router.get(
+  "/public/estimate-approvals/:token",
+  rateLimit({ windowMs: 60_000, max: 30, key: "estimate-approval-view" }),
+  async (req: Request, res: Response): Promise<void> => {
+    approvalNoStore(res);
+    try {
+      const view = await getPublicEstimateApproval(String(req.params.token));
+      if (!view) {
+        res.status(404).json({ error: "This approval link is not valid.", code: "estimate_approval_not_found" });
+        return;
+      }
+      res.json(view);
+    } catch (error) {
+      approvalFailure(res, error);
+    }
+  },
+);
+
+function approvalMeta(req: Request) {
+  const ip = normalizeIpAddress(req.ip || req.socket.remoteAddress);
+  const userAgent = req.get("user-agent");
+  return { ip: ip === "unknown" ? null : ip, userAgent: userAgent ?? null };
+}
+
+router.post(
+  "/public/estimate-approvals/:token/approve",
+  rateLimit({ windowMs: 60_000, max: 10, key: "estimate-approval-submit" }),
+  async (req: Request, res: Response): Promise<void> => {
+    approvalNoStore(res);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    try {
+      res.json(
+        await approveEstimate(
+          String(req.params.token),
+          {
+            signerName: typeof body.signerName === "string" ? body.signerName : "",
+            signatureDataUrl: typeof body.signatureDataUrl === "string" ? body.signatureDataUrl : "",
+            consent: body.consent === true,
+          },
+          approvalMeta(req),
+        ),
+      );
+    } catch (error) {
+      approvalFailure(res, error);
+    }
+  },
+);
+
+router.post(
+  "/public/estimate-approvals/:token/decline",
+  rateLimit({ windowMs: 60_000, max: 10, key: "estimate-approval-submit" }),
+  async (req: Request, res: Response): Promise<void> => {
+    approvalNoStore(res);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    try {
+      res.json(
+        await declineEstimate(
+          String(req.params.token),
+          { reason: typeof body.reason === "string" ? body.reason : null },
+          approvalMeta(req),
+        ),
+      );
+    } catch (error) {
+      approvalFailure(res, error);
     }
   },
 );

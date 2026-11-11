@@ -17,6 +17,7 @@ import {
   auditEventsTable,
   emailResponseReviewsTable,
   emailIntelligenceSourcesTable,
+  estimateApprovalsTable,
 } from "@workspace/db";
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
@@ -36,6 +37,11 @@ import {
 import * as kernel from "./estimate-delivery-execution";
 import * as lifecycle from "./customer-lifecycle";
 import { sendEmailForUser } from "./user-email";
+import { estimateApprovalUrl } from "./estimate-approvals";
+import {
+  ESTIMATE_APPROVAL_LINK_PLACEHOLDER,
+  renderApprovalLinkForSend,
+} from "./estimate-delivery-contract";
 
 const orgs: string[] = [],
   transporter = Object.getPrototypeOf(new OAuth2Client().transporter);
@@ -259,6 +265,18 @@ it.each(matrix)(
     );
     expect(evidence.state).toBe("accepted");
     expect(posts).toBe(1);
+    // The review holds a fixed placeholder; only the provider hand-off carries
+    // the approval link, rendered from the link created for this send.
+    expect(
+      original.message.body.endsWith(ESTIMATE_APPROVAL_LINK_PLACEHOLDER),
+    ).toBe(true);
+    const [approval] = await db
+      .select()
+      .from(estimateApprovalsTable)
+      .where(eq(estimateApprovalsTable.estimateId, f.estimate.id));
+    const url = estimateApprovalUrl(approval.id);
+    const sentBody = renderApprovalLinkForSend(original.message.body, url);
+    expect(sentBody.endsWith(`\n${url}`)).toBe(true);
     if (provider === "gmail") {
       const expectedMime = [
         `From: ${original.sender.senderEmail}`,
@@ -268,7 +286,7 @@ it.each(matrix)(
         'Content-Type: text/plain; charset="UTF-8"',
         "Content-Transfer-Encoding: 8bit",
         "",
-        original.message.body,
+        sentBody,
       ].join("\r\n");
       expect(
         gmailWire === expectedMime,
@@ -285,14 +303,14 @@ it.each(matrix)(
         "Gmail Unicode subject must decode exactly",
       ).toBe(true);
       expect(
-        bodyParts.join("\r\n\r\n") === original.message.body,
+        bodyParts.join("\r\n\r\n") === sentBody,
         "Gmail complete customer-facing body must be unchanged",
       ).toBe(true);
     } else {
       const expectedJson = {
         message: {
           subject: original.message.subject,
-          body: { contentType: "Text", content: original.message.body },
+          body: { contentType: "Text", content: sentBody },
           toRecipients: [
             { emailAddress: { address: original.message.recipient } },
           ],
@@ -304,7 +322,8 @@ it.each(matrix)(
         "Microsoft exact sendMail JSON must equal original review",
       ).toBe(true);
     }
-    // Closed retained evidence must describe the same message that reached POST.
+    // Closed retained evidence describes the reviewed message that reached POST,
+    // with the placeholder in place of the bearer link.
     expect(isDeepStrictEqual(evidence.message, original.message)).toBe(true);
   },
 );

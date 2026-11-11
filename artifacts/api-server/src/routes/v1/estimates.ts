@@ -26,6 +26,13 @@ import { requireMember } from "../../middlewares/requireMember";
 import { recordAudit } from "../../services/audit";
 import * as crm from "../../services/crm";
 import { contractorScheduleError } from "../../middlewares/contractor-mutation";
+import {
+  createEstimateApprovalLink,
+  EstimateApprovalError,
+  getEstimateApprovalStatus,
+  renderEstimateApprovalRecord,
+  revokeEstimateApprovalLink,
+} from "../../services/estimate-approvals";
 
 const router: IRouter = Router();
 
@@ -190,6 +197,63 @@ router.post(
         ),
       ),
     );
+  }),
+);
+
+// ---------- ESTI customer approval & e-signature (staff side) ----------
+
+const approvalSafe =
+  (work: (req: Request, res: Response, id: string) => Promise<void>) =>
+  async (req: Request, res: Response) => {
+    res.setHeader("Cache-Control", "no-store");
+    const parsed = z.uuid().safeParse(req.params.id);
+    if (!parsed.success) {
+      res.status(404).json({ error: "Estimate not found", code: "estimate_not_found" });
+      return;
+    }
+    try {
+      await work(req, res, parsed.data);
+    } catch (error) {
+      if (error instanceof EstimateApprovalError || error instanceof CustomerWorkError) {
+        res.status(error.status).json({ error: error.message, code: error.code });
+        return;
+      }
+      res.status(503).json({ error: "Estimate approval is unavailable. Nothing was changed.", code: "estimate_approval_unavailable" });
+    }
+  };
+
+router.get(
+  "/estimates/:id/approval",
+  requireMember("crm.read"),
+  approvalSafe(async (req, res, id) => {
+    res.json(await getEstimateApprovalStatus(req.member!.organizationId, id));
+  }),
+);
+router.post(
+  "/estimates/:id/approval-link",
+  requireMember("crm.write"),
+  approvalSafe(async (req, res, id) => {
+    res.json(await createEstimateApprovalLink(req.member!.organizationId, id, req.member!.user.id));
+  }),
+);
+router.post(
+  "/estimates/:id/approval-link/revoke",
+  requireMember("crm.write"),
+  approvalSafe(async (req, res, id) => {
+    res.json(await revokeEstimateApprovalLink(req.member!.organizationId, id, req.member!.user.id));
+  }),
+);
+router.get(
+  "/estimates/:id/approval/record",
+  requireMember("crm.read"),
+  approvalSafe(async (req, res, id) => {
+    const html = await renderEstimateApprovalRecord(req.member!.organizationId, id);
+    res
+      .status(200)
+      .setHeader("Content-Type", "text/html; charset=utf-8")
+      .setHeader("Content-Security-Policy", "default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'")
+      .setHeader("Referrer-Policy", "no-referrer")
+      .send(html);
   }),
 );
 

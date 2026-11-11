@@ -32,6 +32,7 @@ export const ZAPIER_CAPABILITY_KEYS = [
   "callie.sms.inbox.list",
   "appt.sms.on_my_way",
   "bill.sms.payment_link",
+  "esti.sms.approval_link",
 ] as const;
 export type ZapierCapabilityKey = (typeof ZAPIER_CAPABILITY_KEYS)[number];
 
@@ -602,6 +603,21 @@ export const ZAPIER_CAPABILITIES: readonly ZapierCapabilityDefinition[] = [
     summaryFields: ["toPhone"],
     // A team member taps Send for one customer with fixed copy; that tap is the approval.
     defaultMode: "auto",
+    defaultDailyBudget: 40,
+    candidates: [
+      smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),
+      smsCandidate("OpenPhoneCLIAPI", "Quo", "send_message", "Send Message", "from"),
+    ],
+  },
+  {
+    key: "esti.sms.approval_link",
+    specialistId: "esti",
+    direction: "write",
+    label: "Text estimate approval links",
+    description: "ESTI texts a consented customer the secure link to review, sign and approve their estimate, from the contractor's own number.",
+    inputSchema: SMS_SEND_INPUT,
+    summaryFields: ["toPhone"],
+    defaultMode: "approve",
     defaultDailyBudget: 40,
     candidates: [
       smsCandidate("TwilioCLIAPI", "Twilio", "send_sms", "Send SMS", "from_number"),

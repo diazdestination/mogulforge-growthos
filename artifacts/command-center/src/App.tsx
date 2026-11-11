@@ -48,6 +48,7 @@ import Onboarding from '@/pages/onboarding';
 import Platform from '@/pages/platform';
 import Bie from '@/pages/bie';
 import ProjectRoom from '@/pages/project-room';
+import EstimateApproval from '@/pages/estimate-approval';
 import EvidenceIntelligence from '@/pages/evidence-intelligence';
 import Account from '@/pages/account';
 import AgentTeam from '@/pages/agent-team';
@@ -502,7 +503,9 @@ function Router() {
   const [isPaymentComplete] = useRoute('/pay/complete');
   const [isPaymentCanceled] = useRoute('/pay/canceled');
   const [isProjectRoom, projectParams] = useRoute('/project-room/:workspace/:leadId');
+  const [isEstimateApproval, approvalParams] = useRoute('/approve/:token');
   if (isPaymentComplete || isPaymentCanceled) return <PaymentReturn canceled={isPaymentCanceled} />;
+  if (isEstimateApproval && approvalParams) return <EstimateApproval key={approvalParams.token} token={approvalParams.token} />;
   if (isProjectRoom && projectParams) return <ProjectRoom key={`${projectParams.workspace}:${projectParams.leadId}`} workspace={projectParams.workspace} leadId={projectParams.leadId} />;
 
   if (isLoading) {
