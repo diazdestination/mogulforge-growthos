@@ -204,6 +204,32 @@ export async function runContractorRecoveryDrill({ emit = console.log } = {}) {
     for (const [table,value] of Object.entries(priceBookAfter.tables)) assert.deepEqual(stripeAfter.tables[table],value);
     for (const table of ['stripe_connect_accounts','invoice_payment_links']) assert.equal(stripeAfter.tables[table].count,0);
     migrations.push({ file: '0022_bill-stripe-collection.sql', sha256: sha(stripeSql) });
+    // 0023 adds the Zapier poll-interval column with a default; every table's rows are unchanged.
+    const pollSql = (await readFile(new URL('../reports/staging-schema-preview-2026-10-01/0023_zapier-poll-interval.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
+    await source.exec(pollSql);
+    const pollAfter = await fingerprints(source);
+    assert.deepEqual(pollAfter.tables, stripeAfter.tables);
+    migrations.push({ file: '0023_zapier-poll-interval.sql', sha256: sha(pollSql) });
+    // 0024 adds the ESTI customer approval table; every prior definition must be unchanged.
+    const approvalSql = (await readFile(new URL('../reports/staging-schema-preview-2026-10-01/0024_esti-estimate-approvals.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
+    await source.exec(approvalSql);
+    const approvalAfter = await fingerprints(source);
+    assert.equal(Object.keys(approvalAfter.tables).length,150);
+    for (const [table,value] of Object.entries(pollAfter.tables)) assert.deepEqual(approvalAfter.tables[table],value);
+    assert.equal(approvalAfter.tables.estimate_approvals.count,0);
+    migrations.push({ file: '0024_esti-estimate-approvals.sql', sha256: sha(approvalSql) });
+    // 0025 adds BILL live-mode columns with defaults and widens one index; every table's rows are unchanged.
+    const liveModeSql = (await readFile(new URL('../reports/staging-schema-preview-2026-10-01/0025_bill-stripe-live-mode.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
+    await source.exec(liveModeSql);
+    const liveModeAfter = await fingerprints(source);
+    assert.deepEqual(liveModeAfter.tables, approvalAfter.tables);
+    migrations.push({ file: '0025_bill-stripe-live-mode.sql', sha256: sha(liveModeSql) });
+    // 0026 adds the CALLIE text-back settings column (nullable); every table's rows are unchanged.
+    const callieSql = (await readFile(new URL('../reports/staging-schema-preview-2026-10-01/0026_callie-text-back-settings.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
+    await source.exec(callieSql);
+    const callieAfter = await fingerprints(source);
+    assert.deepEqual(callieAfter.tables, liveModeAfter.tables);
+    migrations.push({ file: '0026_callie-text-back-settings.sql', sha256: sha(callieSql) });
     const currentSchema = await tsImport('../lib/db/src/schema/index.ts', import.meta.url);
     const expected = generateDrizzleJson(currentSchema).tables;
     const actual = (await source.query("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,column_name")).rows;

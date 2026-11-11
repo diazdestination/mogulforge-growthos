@@ -65,7 +65,7 @@ let fixture: Awaited<ReturnType<typeof invoiceAttemptFixture>>;
 let otherOrg: Awaited<ReturnType<typeof invoiceAttemptFixture>>;
 
 const event = (type: string, object: Record<string, unknown>, account = "acct_synthetic") =>
-  Buffer.from(JSON.stringify({ id: `evt_${Math.random()}`, type, account, livemode: false, data: { object } }));
+  Buffer.from(JSON.stringify({ id: `evt_${Math.random()}`, type, account, livemode: false, created: Math.floor(Date.now() / 1000), data: { object } }));
 
 beforeAll(async () => {
   process.env.STRIPE_CONNECT_WEBHOOK_SECRET = "whsec_synthetic";
@@ -332,7 +332,8 @@ describe("collection ownership regressions", () => {
     const paid = event("checkout.session.completed", { id: row!.checkoutSessionId, payment_status: "paid", amount_total: 10000, currency: "usd", payment_intent: `pi_${f.org}` }, row!.stripeAccountId);
     await handleConnectWebhook(paid, "valid");
     await db.update(invoicePaymentLinksTable).set({ state: "needs_reconciliation" }).where(eq(invoicePaymentLinksTable.id, link.id));
-    await handleConnectWebhook(paid, "valid");
+    // A later Stripe event for the same session (a new event id) finds the committed receipt.
+    await handleConnectWebhook(event("checkout.session.async_payment_succeeded", { id: row!.checkoutSessionId, payment_status: "paid", amount_total: 10000, currency: "usd", payment_intent: `pi_${f.org}` }, row!.stripeAccountId), "valid");
     expect((await listInvoicePaymentLinks(f.org, f.invoice.id))[0]!.state).toBe("paid");
     expect((await getInvoice(f.org, f.actor, f.invoice.id)).recordedPaidCents).toBe(10000);
   });

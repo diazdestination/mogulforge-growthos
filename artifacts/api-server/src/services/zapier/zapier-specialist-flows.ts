@@ -6,21 +6,29 @@ import {
   appointmentsTable,
   contactsTable,
   crmTasksTable,
+  customerWorkRootsTable,
   db,
+  invoicePaymentLinksTable,
   invoicesTable,
   leadsTable,
   organizationsTable,
+  orgSettingsTable,
   propertiesTable,
   serviceObligationsTable,
   auditEventsTable,
   usersTable,
   zapierActionExecutionsTable,
   type InvoiceDocument,
+  type UserRole,
   type ZapierActionExecution,
 } from "@workspace/db";
 import { and, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { companyDayBounds } from "@workspace/scheduling-core";
 
+import { hasPermission } from "../../lib/permissions";
 import { renderAppointmentReminderCopy } from "../appointment-reminder-copy";
+import { InvoiceError } from "../invoice-contract";
+import { EstimateApprovalError, readWaitingApprovalForText } from "../estimate-approvals";
 import { createContact, createLead, createTask } from "../crm";
 import { hasServiceMailboxReplyHold } from "../mailbox-communication";
 import { getRoutePlan, RoutePlanError } from "../route-plan";
@@ -31,8 +39,19 @@ import { hasServiceSmsReplyHold } from "../service-sms";
 import { readStandingService, standingLineage, standingCompanyProjection } from "../service-standing-policy";
 import { phoneE164, twilioForOrganization } from "../twilio-controls";
 import { getZapierCapability } from "./zapier-capabilities";
-import { defaultPolicyFor, getZapierBinding, getZapierPolicy } from "./zapier-connection";
-import { requestZapierAction, ZapierExecutionError, type ZapierActionOutcome } from "./zapier-executions";
+import { defaultPolicyFor, getZapierBinding, getZapierPolicy, zapierPollWindow } from "./zapier-connection";
+import { recordZapierSkip, requestZapierAction, ZapierExecutionError, ZapierSendSkipped, type ZapierActionOutcome } from "./zapier-executions";
+import {
+  businessLineE164,
+  callerCannotText,
+  checkTextBackEligibility,
+  isTextBackSkipReason,
+  readMissedCallBasis,
+  recordMissedCallBasis,
+  TEXTBACK_SKIP_DETAIL,
+  usMobileCapableE164,
+  type TextBackSkipReason,
+} from "../callie-text-back";
 import { sha256Hex } from "./zapier-mcp-client";
 
 /**
@@ -177,9 +196,9 @@ export async function invoPushInvoiceToAccounting(input: {
 
 // ---------- SCOUT: marketplace leads and reviews -> GrowthOS ----------
 
-type InboundRecord = Record<string, unknown>;
+export type InboundRecord = Record<string, unknown>;
 
-function pick(record: InboundRecord, keys: string[]): string | undefined {
+export function pick(record: InboundRecord, keys: string[]): string | undefined {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "string" && value.trim()) return value.trim().slice(0, 500);
@@ -188,7 +207,7 @@ function pick(record: InboundRecord, keys: string[]): string | undefined {
   return undefined;
 }
 
-function recordsOf(value: unknown): InboundRecord[] {
+export function recordsOf(value: unknown): InboundRecord[] {
   if (Array.isArray(value)) return value.filter((item) => item && typeof item === "object") as InboundRecord[];
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>;
@@ -219,7 +238,7 @@ export async function scoutSyncMarketplaceLeads(input: {
   actorUserId: string | null;
 }): Promise<ScoutSyncSummary> {
   const binding = await getZapierBinding(input.organizationId, "scout.leads.list");
-  const stamp = new Date().toISOString().slice(0, 13); // hourly idempotency window
+  const stamp = await zapierPollWindow(input.organizationId); // per-company read window
   const outcome = await requestZapierAction({
     organizationId: input.organizationId,
     capability: "scout.leads.list",
@@ -273,7 +292,7 @@ export async function scoutSyncReviews(input: {
   actorUserId: string | null;
 }): Promise<ScoutSyncSummary> {
   const binding = await getZapierBinding(input.organizationId, "scout.reviews.list");
-  const stamp = new Date().toISOString().slice(0, 13);
+  const stamp = await zapierPollWindow(input.organizationId);
   const outcome = await requestZapierAction({
     organizationId: input.organizationId,
     capability: "scout.reviews.list",
@@ -313,23 +332,44 @@ export async function scoutSyncReviews(input: {
   return { execution: outcome.execution, received: records.length, created, skipped };
 }
 
-// ---------- CALLIE: phone-system calls -> callback tasks + approved text-back ----------
+// ---------- CALLIE: phone-system calls -> callback tasks + compliant text-back ----------
 
 export const CALLIE_TEXTBACK_ENTITY = "crm_task";
 
+function isOutboundCall(record: InboundRecord): boolean {
+  const direction = (pick(record, ["direction", "call_direction", "Direction"]) ?? "").toLowerCase();
+  return /out/.test(direction);
+}
+
 function isMissedCall(record: InboundRecord): boolean {
+  // An unanswered outbound call (staff calling a customer) is not a missed call
+  // and gives no basis for a text-back.
+  if (isOutboundCall(record)) return false;
   const answered = record.answered ?? record.Answered;
   if (typeof answered === "boolean") return !answered;
   const status = (pick(record, ["status", "disposition", "call_status"]) ?? "").toLowerCase();
   return /missed|no.?answer|voicemail|abandon/.test(status);
 }
 
+function callTimeOf(record: InboundRecord): Date | null {
+  const raw = pick(record, ["start_time", "started_at", "startTime", "createdAt", "created_at", "completedAt", "completed_at", "date", "call_time", "timestamp"]);
+  if (!raw) return null;
+  const at = /^\d{10,13}$/.test(raw) ? new Date(raw.length === 10 ? Number(raw) * 1000 : Number(raw)) : new Date(raw);
+  return Number.isNaN(at.getTime()) ? null : at;
+}
+
+function businessNumberOf(record: InboundRecord): string | null {
+  return businessLineE164(pick(record, ["tracking_phone_number", "trackingPhoneNumber", "business_phone_number", "businessPhoneNumber", "to", "to_number", "toNumber", "called_number", "dialed_number"]));
+}
+
+export type CallieSyncSummary = ScoutSyncSummary & { textbacksRequested: number; textbacksSkipped: number };
+
 export async function callieSyncCalls(input: {
   organizationId: string;
   actorUserId: string | null;
-}): Promise<ScoutSyncSummary & { textbacksRequested: number }> {
+}): Promise<CallieSyncSummary> {
   const binding = await getZapierBinding(input.organizationId, "callie.calls.list");
-  const stamp = new Date().toISOString().slice(0, 13);
+  const stamp = await zapierPollWindow(input.organizationId);
   const outcome = await requestZapierAction({
     organizationId: input.organizationId,
     capability: "callie.calls.list",
@@ -341,6 +381,7 @@ export async function callieSyncCalls(input: {
   let created = 0;
   let skipped = 0;
   let textbacksRequested = 0;
+  let textbacksSkipped = 0;
   const base = `zapier.call:${binding?.zapierAppName ?? "unknown"}`;
   for (const record of records) {
     const externalId = externalIdOf(record, `${stamp}:${records.indexOf(record)}`);
@@ -354,7 +395,9 @@ export async function callieSyncCalls(input: {
       skipped += 1;
       continue;
     }
-    const caller = pick(record, ["customer_phone_number", "from", "from_number", "caller_number", "phone"]);
+    const caller = isOutboundCall(record)
+      ? pick(record, ["customer_phone_number", "to", "to_number", "phone"])
+      : pick(record, ["customer_phone_number", "from", "from_number", "caller_number", "phone"]);
     const callerName = pick(record, ["customer_name", "caller_name", "name"]) ?? "Unknown caller";
     const missed = isMissedCall(record);
     const task = await createTask(input.organizationId, {
@@ -369,49 +412,113 @@ export async function callieSyncCalls(input: {
       continue;
     }
     created += 1;
-    if (missed && caller && /^\+?[1-9]\d{6,14}$/.test(caller.replace(/[^\d+]/g, ""))) {
-      await callieRequestTextBack({ organizationId: input.organizationId, taskId: task.id, actorUserId: input.actorUserId, toPhone: caller.replace(/[^\d+]/g, "") });
-      textbacksRequested += 1;
+    if (!missed || !caller) continue;
+    // Data-level checks first: these never record a basis.
+    const phone = usMobileCapableE164(caller);
+    const calledAt = callTimeOf(record);
+    const businessNumber = businessNumberOf(record);
+    const dataSkip: TextBackSkipReason | null = !phone ? "invalid_number" : callerCannotText(record) ? "landline" : !calledAt || !businessNumber ? "missing_call_details" : null;
+    if (dataSkip) {
+      await recordZapierSkip({
+        organizationId: input.organizationId,
+        capability: "callie.sms.send",
+        idempotencyKey: callieTextBackKey(task.id),
+        reason: dataSkip,
+        detail: TEXTBACK_SKIP_DETAIL[dataSkip],
+        requestedByUserId: input.actorUserId,
+        linkedEntityType: CALLIE_TEXTBACK_ENTITY,
+        linkedEntityId: task.id,
+      });
+      textbacksSkipped += 1;
+      continue;
     }
+    // The missed inbound call is the basis for one informational reply only.
+    await recordMissedCallBasis(input.organizationId, task.id, { phone: phone!, calledAt: calledAt!.toISOString(), businessNumber: businessNumber!, callRef: sourceEvent });
+    const requested = await callieRequestTextBack({ organizationId: input.organizationId, taskId: task.id, actorUserId: input.actorUserId });
+    if (requested.execution.state === "blocked" && isTextBackSkipReason(requested.execution.errorCode)) textbacksSkipped += 1;
+    else textbacksRequested += 1;
   }
-  return { execution: outcome.execution, received: records.length, created, skipped, textbacksRequested };
+  return { execution: outcome.execution, received: records.length, created, skipped, textbacksRequested, textbacksSkipped };
 }
 
-export function textBackBody(organizationName: string): string {
-  return `Hi, this is ${organizationName}. Sorry we missed your call. Reply here or let us know a good time to call you back.`;
+/** Locked template: business name, informational only, opt-out line. No promotion, links or custom copy. */
+export function textBackBody(businessName: string): string {
+  const name = businessName.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) || "our office";
+  return withOptOut(`Hi, this is ${name}. Sorry we missed your call. Reply here with a good time and we will call you back.`);
 }
 
-export async function buildCallieTextBackInput(organizationId: string, taskId: string, toPhone?: string) {
-  const [row] = await db
-    .select({ task: crmTasksTable, organization: organizationsTable })
+export const callieTextBackKey = (taskId: string) => `callie-textback:${taskId}`;
+
+async function textBackBusinessName(reader: Pick<typeof db, "select">, organizationId: string): Promise<string> {
+  const [row] = await reader
+    .select({ name: organizationsTable.name, profile: orgSettingsTable.businessProfile })
+    .from(organizationsTable)
+    .leftJoin(orgSettingsTable, eq(orgSettingsTable.organizationId, organizationsTable.id))
+    .where(eq(organizationsTable.id, organizationId));
+  return row?.profile?.businessName?.trim() || row?.name?.trim() || "";
+}
+
+/**
+ * Build the one text-back for a callback task from its recorded missed-call
+ * basis. Throws ZapierSendSkipped (with the reason) when it must not be sent
+ * now; used at request, at approval and right before dispatch.
+ */
+export async function buildCallieTextBackInput(organizationId: string, taskId: string, options: { reader?: Pick<typeof db, "select">; now?: Date } = {}) {
+  const reader = options.reader ?? db;
+  const [task] = await reader
+    .select({ id: crmTasksTable.id })
     .from(crmTasksTable)
-    .innerJoin(organizationsTable, eq(organizationsTable.id, crmTasksTable.organizationId))
     .where(and(eq(crmTasksTable.organizationId, organizationId), eq(crmTasksTable.id, taskId)));
-  if (!row) throw new ZapierExecutionError("Callback task not found.", "not_found");
-  const phone = toPhone ?? row.task.title.match(/\((\+?\d{7,15})\)/)?.[1];
-  if (!phone) throw new ZapierExecutionError("The callback task has no caller number.", "invalid_input");
+  if (!task) throw new ZapierExecutionError("Callback task not found.", "not_found");
+  const idempotencyKey = callieTextBackKey(task.id);
+  const basis = await readMissedCallBasis(reader, organizationId, task.id);
+  if (!basis) throw new ZapierSendSkipped(TEXTBACK_SKIP_DETAIL.no_basis, "no_basis");
+  const verdict = await checkTextBackEligibility(reader, { organizationId, phone: basis.phone, calledAt: new Date(basis.calledAt), exceptKey: idempotencyKey, now: options.now });
+  if (!verdict.ok) throw new ZapierSendSkipped(verdict.detail, verdict.reason);
   return {
-    idempotencyKey: `callie-textback:${row.task.id}`,
-    input: { toPhone: phone, body: textBackBody(row.organization.name) },
+    idempotencyKey,
+    input: { toPhone: basis.phone, body: textBackBody(await textBackBusinessName(reader, organizationId)) },
+    basis,
   };
 }
 
+/**
+ * Request the missed-call text-back for a callback task. A compliance skip is
+ * recorded on the ledger (blocked, errorCode = reason) and returned, never
+ * thrown, so CALLIE's activity shows why no text went.
+ */
 export async function callieRequestTextBack(input: {
   organizationId: string;
   taskId: string;
   actorUserId: string | null;
-  toPhone?: string;
 }): Promise<ZapierActionOutcome> {
-  const built = await buildCallieTextBackInput(input.organizationId, input.taskId, input.toPhone);
-  return requestZapierAction({
-    organizationId: input.organizationId,
-    capability: "callie.sms.send",
-    input: built.input,
-    idempotencyKey: built.idempotencyKey,
-    requestedByUserId: input.actorUserId,
-    linkedEntityType: CALLIE_TEXTBACK_ENTITY,
-    linkedEntityId: input.taskId,
+  const skipped = async (error: ZapierSendSkipped) => ({
+    execution: await recordZapierSkip({
+      organizationId: input.organizationId,
+      capability: "callie.sms.send",
+      idempotencyKey: callieTextBackKey(input.taskId),
+      reason: error.reason,
+      detail: error.message,
+      requestedByUserId: input.actorUserId,
+      linkedEntityType: CALLIE_TEXTBACK_ENTITY,
+      linkedEntityId: input.taskId,
+    }),
   });
+  try {
+    const built = await buildCallieTextBackInput(input.organizationId, input.taskId);
+    return await requestZapierAction({
+      organizationId: input.organizationId,
+      capability: "callie.sms.send",
+      input: built.input,
+      idempotencyKey: built.idempotencyKey,
+      requestedByUserId: input.actorUserId,
+      linkedEntityType: CALLIE_TEXTBACK_ENTITY,
+      linkedEntityId: input.taskId,
+    });
+  } catch (error) {
+    if (error instanceof ZapierSendSkipped) return skipped(error);
+    throw error;
+  }
 }
 
 // ---------- SCHED: crew day sheets ----------
@@ -485,7 +592,7 @@ export function withOptOut(body: string): string {
   return body.trimEnd().endsWith(OPT_OUT_LINE) ? body.trimEnd() : `${body.trimEnd()} ${OPT_OUT_LINE}`;
 }
 
-export type CustomerSmsCapability = "appt.sms.send" | "maintain.sms.send";
+export type CustomerSmsCapability = "appt.sms.send" | "maintain.sms.send" | "esti.sms.approval_link";
 
 /**
  * True when automated customer texts for this capability should go through
@@ -525,7 +632,7 @@ export async function otherOpenText(organizationId: string, capability: Customer
   return row ?? null;
 }
 
-function textBlocked(reason: string): never {
+export function textBlocked(reason: string): never {
   const readable: Record<string, string> = {
     no_sms_consent: "this customer has not agreed to receive texts",
     do_not_contact: "this customer is marked do not contact",
@@ -713,6 +820,272 @@ export async function maintainRequestServiceText(input: {
   });
 }
 
+// ---------- APPT: On My Way text from the tech in the field ----------
+
+export const APPT_ON_MY_WAY_ENTITY = "appointment_on_my_way";
+const APPT_ON_MY_WAY_KEY = /^appt-omw:([0-9a-f-]{36}):(\d{4}-\d{2}-\d{2})$/;
+
+/** The company calendar date of an instant, in the company's own time zone. */
+export function companyDateOf(now: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+function onMyWayBody(input: { customerFirstName: string | null; techFirstName: string | null; businessName: string; etaMinutes?: number }): string {
+  const greeting = input.customerFirstName?.trim() ? `Hi ${input.customerFirstName.trim()}, ` : "Hi, ";
+  const tech = input.techFirstName?.trim() || "Your technician";
+  const eta = input.etaMinutes ? `, about ${input.etaMinutes} minutes away` : "";
+  return withOptOut(`${greeting}${tech} from ${input.businessName} is on the way${eta}.`);
+}
+
+/**
+ * Build the On My Way text for a booked appointment happening today. The
+ * technician named is the appointment's assignee, else the requester. One per
+ * appointment per company day (the idempotency key).
+ */
+export async function buildOnMyWayTextInput(
+  organizationId: string,
+  appointmentId: string,
+  options: { etaMinutes?: number | null; requestedByUserId: string | null; expectedDate?: string; now?: Date },
+) {
+  const etaMinutes = options.etaMinutes ?? undefined;
+  if (etaMinutes !== undefined && (!Number.isInteger(etaMinutes) || etaMinutes < 1 || etaMinutes > 240)) {
+    throw new ZapierExecutionError("Choose an ETA between 1 and 240 minutes.", "invalid_input");
+  }
+  const [row] = await db
+    .select({ appointment: appointmentsTable, organization: organizationsTable })
+    .from(appointmentsTable)
+    .innerJoin(organizationsTable, eq(organizationsTable.id, appointmentsTable.organizationId))
+    .where(and(eq(appointmentsTable.organizationId, organizationId), eq(appointmentsTable.id, appointmentId)));
+  if (!row) throw new ZapierExecutionError("Appointment not found.", "not_found");
+  const { appointment, organization } = row;
+  if (!["scheduled", "confirmed"].includes(appointment.status)) {
+    throw new ZapierExecutionError("Only a booked appointment can get an On My Way text.", "invalid_input");
+  }
+  const date = companyDateOf(options.now ?? new Date(), organization.timezone);
+  if (options.expectedDate && options.expectedDate !== date) {
+    throw new ZapierExecutionError("This On My Way text was requested on an earlier day. Request a new one.", "invalid_input");
+  }
+  const bounds = companyDayBounds(date, organization.timezone);
+  const end = appointment.scheduledEnd ?? new Date(appointment.scheduledStart.getTime() + 2 * 60 * 60_000);
+  if (appointment.scheduledStart.getTime() >= Date.parse(bounds.to) || end.getTime() <= Date.parse(bounds.from)) {
+    throw new ZapierExecutionError("On My Way texts are only for today's appointments.", "invalid_input");
+  }
+  const contact = await appointmentTextCustomer(db, organizationId, appointment);
+  const gate = await checkSendEligibility({ organizationId, leadId: appointment.leadId, contact, channel: "sms", kind: "transactional" });
+  if (!gate.ok) textBlocked(gate.reason);
+  const toPhone = phoneE164(contact.phone ?? "");
+  if (!toPhone) textBlocked("invalid_phone");
+  const techId = appointment.assignedUserId ?? options.requestedByUserId;
+  const [tech] = techId
+    ? await db.select({ firstName: usersTable.firstName }).from(usersTable).where(and(eq(usersTable.organizationId, organizationId), eq(usersTable.id, techId)))
+    : [];
+  const company = await standingCompanyProjection(db, organizationId);
+  const body = onMyWayBody({ customerFirstName: contact.firstName, techFirstName: tech?.firstName ?? null, businessName: company.businessName, etaMinutes });
+  if (body.length > 1200) throw new ZapierExecutionError("The On My Way text is too long.", "invalid_input");
+  return {
+    idempotencyKey: `appt-omw:${appointment.id}:${date}`,
+    input: { toPhone, body, ...(etaMinutes ? { etaMinutes } : {}) },
+    contactId: contact.id,
+  };
+}
+
+export async function apptRequestOnMyWayText(input: {
+  organizationId: string;
+  appointmentId: string;
+  actorUserId: string | null;
+  etaMinutes?: number | null;
+}): Promise<ZapierActionOutcome> {
+  const built = await buildOnMyWayTextInput(input.organizationId, input.appointmentId, { etaMinutes: input.etaMinutes, requestedByUserId: input.actorUserId });
+  const [earlier] = await db
+    .select()
+    .from(zapierActionExecutionsTable)
+    .where(and(eq(zapierActionExecutionsTable.organizationId, input.organizationId), eq(zapierActionExecutionsTable.idempotencyKey, built.idempotencyKey)));
+  if (earlier && earlier.state !== "blocked" && (earlier.requestSummary.etaMinutes ?? null) !== (built.input.etaMinutes ?? null)) {
+    throw new ZapierExecutionError(
+      earlier.state === "pending_approval"
+        ? "An On My Way text for this appointment is already waiting for approval."
+        : "An On My Way text was already sent or attempted for this appointment today.",
+      "conflict",
+    );
+  }
+  return requestZapierAction({
+    organizationId: input.organizationId,
+    capability: "appt.sms.on_my_way",
+    input: built.input,
+    idempotencyKey: built.idempotencyKey,
+    requestedByUserId: input.actorUserId,
+    linkedEntityType: APPT_ON_MY_WAY_ENTITY,
+    linkedEntityId: input.appointmentId,
+  });
+}
+
+// ---------- BILL: text the open pay link for an invoice's current balance ----------
+
+export const BILL_PAY_LINK_TEXT_ENTITY = "invoice_payment_link";
+const BILL_PAY_LINK_KEY = /^bill-paylink-text:([0-9a-f-]{36}):v(\d+):(\d+)$/;
+
+const usd = (cents: number) => (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+
+/** The open, unexpired sandbox Checkout link that collects exactly this invoice version's balance. */
+function currentPayLink(links: (typeof invoicePaymentLinksTable.$inferSelect)[], version: number, balanceCents: number, now = new Date()) {
+  return links.find((link) =>
+    link.state === "open" && !!link.checkoutUrl && /^https:\/\//.test(link.checkoutUrl) && link.invoiceVersion === version &&
+    link.amountCents === balanceCents && !!link.expiresAt && link.expiresAt > now) ?? null;
+}
+
+/**
+ * Build the pay-link text from the invoice's current balance and its open pay
+ * link. Reading the invoice re-checks the actor's invoice authority.
+ */
+export async function buildPayLinkTextInput(
+  organizationId: string,
+  invoiceId: string,
+  actorUserId: string | null,
+  expected?: { linkId: string; version: number; amountCents: number },
+  /** Field collection: the invoice must be linked to the requester's own assigned job (this one, or any current one when re-checking). */
+  field?: { appointmentId: string | null; effectiveRole?: UserRole },
+) {
+  if (!actorUserId) throw new ZapierExecutionError("A signed-in team member must request pay link texts.", "invalid_input");
+  const { getInvoice } = await import("../invoices");
+  const { readFieldInvoice, FieldCollectError } = await import("../field-collect");
+  const read = field
+    ? readFieldInvoice(db, organizationId, { userId: actorUserId, effectiveRole: field.effectiveRole }, invoiceId, field.appointmentId).then((result) => result.invoice)
+    : getInvoice(organizationId, actorUserId, invoiceId);
+  const invoice = await read.catch((error: unknown) => {
+    if (error instanceof InvoiceError) {
+      throw new ZapierExecutionError(error.status === 404 ? "Invoice not found." : error.message, error.status === 404 ? "not_found" : "invalid_input");
+    }
+    // A queued text whose requester no longer has this job is stale, not a new authorization question.
+    if (error instanceof FieldCollectError && expected) throw new ZapierExecutionError(error.message, "invalid_input");
+    throw error;
+  });
+  if (invoice.status !== "issued" || !invoice.invoiceNumber) {
+    throw new ZapierExecutionError("Only an issued invoice can get a pay link text.", "invalid_input");
+  }
+  const balance = invoice.balanceDueCents;
+  if (balance === null || balance < 50) throw new ZapierExecutionError("This invoice has no balance to collect.", "invalid_input");
+  if (expected && (expected.version !== invoice.version || expected.amountCents !== balance)) {
+    throw new ZapierExecutionError("The invoice or its balance changed after this text was requested. Request a new pay link text.", "invalid_input");
+  }
+  const links = await db
+    .select()
+    .from(invoicePaymentLinksTable)
+    .where(and(eq(invoicePaymentLinksTable.organizationId, organizationId), eq(invoicePaymentLinksTable.invoiceId, invoiceId), eq(invoicePaymentLinksTable.state, "open")))
+    .orderBy(desc(invoicePaymentLinksTable.createdAt));
+  const link = currentPayLink(links, invoice.version, balance);
+  if (!link) {
+    throw new ZapierExecutionError(
+      expected ? "The pay link is no longer open for this balance. Request a new pay link text." : "Create a pay link for the current balance first.",
+      "invalid_input",
+    );
+  }
+  if (expected && expected.linkId !== link.id) {
+    throw new ZapierExecutionError("The pay link changed after this text was requested. Request a new pay link text.", "invalid_input");
+  }
+  const [contact] = await db.select().from(contactsTable).where(and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, invoice.contactId)));
+  if (!contact) throw new ZapierExecutionError("The invoice's customer is unavailable.", "invalid_input");
+  const gate = await checkSendEligibility({ organizationId, leadId: invoice.leadId, contact, channel: "sms", kind: "transactional" });
+  if (!gate.ok) textBlocked(gate.reason);
+  const toPhone = phoneE164(contact.phone ?? "");
+  if (!toPhone) textBlocked("invalid_phone");
+  const company = await standingCompanyProjection(db, organizationId);
+  const greeting = contact.firstName?.trim() ? `Hi ${contact.firstName.trim()}, ` : "Hi, ";
+  const body = withOptOut(`${greeting}this is ${company.businessName}. Invoice ${invoice.invoiceNumber} has a balance of ${usd(balance)}. Pay securely here: ${link.checkoutUrl}`);
+  if (body.length > 1200) throw new ZapierExecutionError("The pay link text is too long.", "invalid_input");
+  return {
+    idempotencyKey: `bill-paylink-text:${link.id}:v${invoice.version}:${balance}`,
+    input: { toPhone, body },
+    linkId: link.id,
+    contactId: contact.id,
+  };
+}
+
+export async function billRequestPayLinkText(input: {
+  organizationId: string;
+  invoiceId: string;
+  actorUserId: string | null;
+  /** Set when a tech texts from My day; the invoice must be linked to this job assigned to them. */
+  field?: { appointmentId: string; effectiveRole?: UserRole };
+}): Promise<ZapierActionOutcome> {
+  const built = await buildPayLinkTextInput(input.organizationId, input.invoiceId, input.actorUserId, undefined, input.field);
+  return requestZapierAction({
+    organizationId: input.organizationId,
+    capability: "bill.sms.payment_link",
+    input: built.input,
+    idempotencyKey: built.idempotencyKey,
+    requestedByUserId: input.actorUserId,
+    linkedEntityType: BILL_PAY_LINK_TEXT_ENTITY,
+    linkedEntityId: built.linkId,
+  });
+}
+
+// ESTI: estimate approval link text
+
+export const ESTI_APPROVAL_TEXT_ENTITY = "estimate";
+const ESTI_APPROVAL_KEY = /^esti-approval-text:([0-9a-f-]{36}):([0-9a-f-]{36})$/;
+
+function approvalUnavailable(error: unknown): never {
+  if (error instanceof EstimateApprovalError) {
+    throw new ZapierExecutionError(`No text was requested: ${error.message}`, error.status === 404 ? "not_found" : "invalid_input");
+  }
+  throw error;
+}
+
+/**
+ * The approval-link text for an estimate's one open, current approval link.
+ * A revoked, expired or outdated link (or a different link than the request
+ * named) refuses, so an approval can never send a stale link.
+ */
+export async function buildEstimateApprovalTextInput(organizationId: string, estimateId: string, expectedApprovalId?: string, reader: ReminderReader = db) {
+  const open = await readWaitingApprovalForText(reader, organizationId, estimateId).catch(approvalUnavailable);
+  if (expectedApprovalId && open.approval.id !== expectedApprovalId) {
+    throw new ZapierExecutionError("The approval link changed after this text was requested. Request a new text.", "invalid_input");
+  }
+  // An opportunity estimate texts its lead's contact; a returning estimate its work root's contact.
+  if (!open.contact || (open.estimate.leadId && !open.lead)) invalidReminderParents();
+  const leadId = open.lead?.id ?? null;
+  const contact = await reminderContact(reader, organizationId, { leadId, contactId: open.contact!.id });
+  const gate = await checkSendEligibility({ organizationId, leadId, contact, channel: "sms", kind: "transactional" }, reader);
+  if (!gate.ok) textBlocked(gate.reason);
+  const toPhone = phoneE164(contact.phone ?? "");
+  if (!toPhone) textBlocked("invalid_phone");
+  // The company name frozen with the link: what the customer will see on the page.
+  const company = open.approval.snapshot.companyName.slice(0, 80);
+  const title = open.estimate.title.length > 80 ? `${open.estimate.title.slice(0, 77)}...` : open.estimate.title;
+  const total = (open.approval.snapshot.totalCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+  const greeting = contact.firstName?.trim() ? `Hi ${contact.firstName.trim().slice(0, 40)}, ` : "";
+  const body = withOptOut(`${greeting}${company} sent your estimate "${title}" (${total}). Review and approve it here: ${open.url}`);
+  return {
+    idempotencyKey: `esti-approval-text:${estimateId}:${open.approval.id}`,
+    input: { toPhone, body },
+    contactId: contact.id,
+    approvalId: open.approval.id,
+  };
+}
+
+export async function estiRequestApprovalLinkText(input: {
+  organizationId: string;
+  estimateId: string;
+  actorUserId: string | null;
+}): Promise<ZapierActionOutcome> {
+  const built = await buildEstimateApprovalTextInput(input.organizationId, input.estimateId);
+  const open = await otherOpenText(input.organizationId, "esti.sms.approval_link", ESTI_APPROVAL_TEXT_ENTITY, input.estimateId, built.idempotencyKey);
+  if (open?.state === "pending_approval") {
+    throw new ZapierExecutionError("An approval-link text for this estimate is already waiting for approval.", "conflict");
+  }
+  return requestZapierAction({
+    organizationId: input.organizationId,
+    capability: "esti.sms.approval_link",
+    input: built.input,
+    idempotencyKey: built.idempotencyKey,
+    requestedByUserId: input.actorUserId,
+    linkedEntityType: ESTI_APPROVAL_TEXT_ENTITY,
+    linkedEntityId: input.estimateId,
+  });
+}
+
 // ---------- approval re-derivation ----------
 
 /**
@@ -731,7 +1104,7 @@ export async function rebuildZapierRequestInput(execution: ZapierActionExecution
       return (await buildInvoiceAccountingInput(execution.organizationId, execution.linkedEntityId)).input;
     }
     case "callie.sms.send": {
-      if (!execution.linkedEntityId) throw new ZapierExecutionError("Missing linked callback task.", "invalid_input");
+      if (!execution.linkedEntityId || execution.idempotencyKey !== callieTextBackKey(execution.linkedEntityId)) throw new ZapierExecutionError("Text-back request is not rebuildable.", "invalid_input");
       return (await buildCallieTextBackInput(execution.organizationId, execution.linkedEntityId)).input;
     }
     case "sched.sms.send": {
@@ -745,13 +1118,42 @@ export async function rebuildZapierRequestInput(execution: ZapierActionExecution
       await assertAppointmentOwnNumberAvailable(db, execution.organizationId, match[1]!, typeof execution.requestSummary?.appointmentReminderScheduledActionId === "string" ? execution.requestSummary.appointmentReminderScheduledActionId : undefined);
       return (await buildAppointmentReminderTextInput(execution.organizationId, match[1]!, match[2]!)).input;
     }
+    case "appt.sms.on_my_way": {
+      const match = execution.idempotencyKey.match(APPT_ON_MY_WAY_KEY);
+      if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("On My Way request is not rebuildable.", "invalid_input");
+      const eta = execution.requestSummary?.etaMinutes;
+      return (await buildOnMyWayTextInput(execution.organizationId, match[1]!, {
+        etaMinutes: typeof eta === "number" ? eta : undefined,
+        requestedByUserId: execution.requestedByUserId,
+        expectedDate: match[2]!,
+      })).input;
+    }
+    case "bill.sms.payment_link": {
+      const match = execution.idempotencyKey.match(BILL_PAY_LINK_KEY);
+      if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("Pay link text request is not rebuildable.", "invalid_input");
+      const [link] = await db.select({ invoiceId: invoicePaymentLinksTable.invoiceId }).from(invoicePaymentLinksTable).where(and(eq(invoicePaymentLinksTable.organizationId, execution.organizationId), eq(invoicePaymentLinksTable.id, match[1]!)));
+      if (!link) throw new ZapierExecutionError("The pay link is unavailable.", "invalid_input");
+      // Re-read with the requester's authority: office invoice access, otherwise field collection on one of their current jobs.
+      const requester = execution.requestedByUserId
+        ? (await db.select({ role: usersTable.role }).from(usersTable).where(and(eq(usersTable.organizationId, execution.organizationId), eq(usersTable.id, execution.requestedByUserId))))[0]
+        : undefined;
+      const field = requester && !hasPermission(requester.role, "invoices.read") ? { appointmentId: null } : undefined;
+      return (await buildPayLinkTextInput(execution.organizationId, link.invoiceId, execution.requestedByUserId, { linkId: match[1]!, version: Number(match[2]), amountCents: Number(match[3]) }, field)).input;
+    }
+    case "esti.sms.approval_link": {
+      const match = execution.idempotencyKey.match(ESTI_APPROVAL_KEY);
+      if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("Approval-link text request is not rebuildable.", "invalid_input");
+      return (await buildEstimateApprovalTextInput(execution.organizationId, match[1]!, match[2]!)).input;
+    }
     case "maintain.sms.send": {
       const match = execution.idempotencyKey.match(MAINTAIN_REMINDER_KEY);
       if (!match || match[1] !== execution.linkedEntityId) throw new ZapierExecutionError("Service text request is not rebuildable.", "invalid_input");
       return (await buildServiceReminderTextInput(execution.organizationId, match[1]!, Number(match[2]), `zapier:${execution.id}`)).input;
     }
-    default:
-      throw new ZapierExecutionError("This capability has no approval path.", "invalid_input");
+    default: {
+      const { rebuildOwnedAppRequestInput } = await import("./zapier-owned-app-flows");
+      return rebuildOwnedAppRequestInput(execution);
+    }
   }
 }
 
@@ -823,6 +1225,39 @@ export async function assertCustomerTextOwnership(reader: ReminderReader, input:
     if (await hasServiceMailboxReplyHold(org, id, reader) || await hasServiceSmsReplyHold(org, id, reader)) throw new ZapierExecutionError("A customer reply needs office review first.", "invalid_input");
     const [prior] = await reader.select({ id: auditEventsTable.id }).from(auditEventsTable).where(and(eq(auditEventsTable.organizationId, org), eq(auditEventsTable.entityType, "service_obligation"), eq(auditEventsTable.entityId, id), inArray(auditEventsTable.action, ["service.care_reminder_approved", "service.care_response_recorded"]))).limit(1);
     if (prior || await otherOpenText(org, "maintain.sms.send", MAINTAIN_REMINDER_TEXT_ENTITY, id, input.idempotencyKey, reader)) throw new ZapierExecutionError("An earlier reminder or office response owns this service.", "conflict");
+  } else if (input.capability === "appt.sms.on_my_way") {
+    const [row] = await reader.select({ appointment: appointmentsTable, timezone: organizationsTable.timezone }).from(appointmentsTable).innerJoin(organizationsTable, eq(organizationsTable.id, appointmentsTable.organizationId)).where(and(eq(appointmentsTable.organizationId, org), eq(appointmentsTable.id, id)));
+    if (!row || !["scheduled", "confirmed"].includes(row.appointment.status) || input.idempotencyKey !== `appt-omw:${id}:${companyDateOf(new Date(), row.timezone)}`) invalidReminderParents();
+    const contact = await appointmentTextCustomer(reader, org, row.appointment);
+    if (phoneE164(contact.phone ?? "") !== input.expectedPhone) throw new ZapierExecutionError("The customer number changed before dispatch.", "conflict");
+    const gate = await checkSendEligibility({ organizationId: org, leadId: row.appointment.leadId, contact, channel: "sms", kind: "transactional" }, reader);
+    if (!gate.ok) textBlocked(gate.reason);
+  } else if (input.capability === "bill.sms.payment_link") {
+    const [link] = await reader.select().from(invoicePaymentLinksTable).where(and(eq(invoicePaymentLinksTable.organizationId, org), eq(invoicePaymentLinksTable.id, id)));
+    const [invoice] = link ? await reader.select().from(invoicesTable).where(and(eq(invoicesTable.organizationId, org), eq(invoicesTable.id, link.invoiceId))) : [];
+    if (!link || !invoice || invoice.status !== "issued" || invoice.version !== link.invoiceVersion || !currentPayLink([link], invoice.version, link.amountCents) ||
+      input.idempotencyKey !== `bill-paylink-text:${id}:v${invoice.version}:${link.amountCents}`) throw new ZapierExecutionError("The pay link is no longer open for this invoice balance.", "conflict");
+    const contactId = invoice.leadId
+      ? (await reader.select({ contactId: leadsTable.contactId }).from(leadsTable).where(and(eq(leadsTable.organizationId, org), eq(leadsTable.id, invoice.leadId))))[0]?.contactId
+      : invoice.customerWorkId
+        ? (await reader.select({ contactId: customerWorkRootsTable.contactId }).from(customerWorkRootsTable).where(and(eq(customerWorkRootsTable.organizationId, org), eq(customerWorkRootsTable.id, invoice.customerWorkId))))[0]?.contactId
+        : null;
+    const [contact] = contactId ? await reader.select().from(contactsTable).where(and(eq(contactsTable.organizationId, org), eq(contactsTable.id, contactId))) : [];
+    if (!contact) invalidReminderParents();
+    if (phoneE164(contact.phone ?? "") !== input.expectedPhone) throw new ZapierExecutionError("The customer number changed before dispatch.", "conflict");
+    const gate = await checkSendEligibility({ organizationId: org, leadId: invoice.leadId, contact, channel: "sms", kind: "transactional" }, reader);
+    if (!gate.ok) textBlocked(gate.reason);
+  } else if (input.capability === "callie.sms.send") {
+    // Serialized under the customer-text locks: the frequency cap and opt-out
+    // checks see every other text-back row before this one is inserted/sent.
+    if (input.idempotencyKey !== callieTextBackKey(id)) invalidReminderParents();
+    const built = await buildCallieTextBackInput(org, id, { reader });
+    if (built.input.toPhone !== input.expectedPhone) throw new ZapierExecutionError("The caller number changed before dispatch.", "conflict");
+  } else if (input.capability === "esti.sms.approval_link") {
+    const match = input.idempotencyKey.match(ESTI_APPROVAL_KEY);
+    if (!match || match[1] !== id) invalidReminderParents();
+    const built = await buildEstimateApprovalTextInput(org, id, match![2]!, reader);
+    if (built.input.toPhone !== input.expectedPhone) throw new ZapierExecutionError("The customer number changed before dispatch.", "conflict");
   }
 }
 

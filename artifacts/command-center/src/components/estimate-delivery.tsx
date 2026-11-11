@@ -14,6 +14,9 @@ import {
   formatEstimateDeliveryCents,
   type EstimateEmailPreview,
 } from "@/lib/estimate-delivery-ui";
+
+/** Mirrors the server's fixed final-line placeholder; the link itself is never shown or stored. */
+const APPROVAL_LINK_PLACEHOLDER = '[Secure approval link: added when this email is sent]';
 // Session-local ownership survives page/member/target remounts. A lost result
 // cannot turn a previous POST into a new review. The server owns permanent truth.
 const submissions = new WeakMap<QueryClient, Set<string>>();
@@ -310,6 +313,14 @@ export function EstimateDelivery({
           <pre className="whitespace-pre-wrap break-words text-sm font-sans rounded-lg bg-background p-3 border border-border">
             {preview.message.body}
           </pre>
+          {preview.message.body.endsWith(APPROVAL_LINK_PLACEHOLDER) && (
+            <p className="text-sm" data-testid="approval-link-note">
+              A secure approval link is added when this email is sent, so the
+              customer can review, sign and approve online. It uses this
+              estimate's open approval link, or creates one. If no valid link
+              can be made at that moment, the estimate is sent without it.
+            </p>
+          )}
           <p className="text-sm break-words">
             {preview.document.businessName} · {preview.document.customerLabel} ·{" "}
             {preview.document.propertyLabel ?? "No property linked"}
@@ -395,6 +406,12 @@ export function EstimateDelivery({
           <pre className="whitespace-pre-wrap break-words font-sans">
             {retained.message?.body}
           </pre>
+          {retained.message?.body.endsWith(APPROVAL_LINK_PLACEHOLDER) && (
+            <p className="text-sm">
+              The approval link is added only at send time and is never stored
+              with this record. Its status is under Customer approval.
+            </p>
+          )}
           <p>
             Provider: {retained.provider ?? "Unavailable"} · Receipt:{" "}
             {retained.providerMessageId ?? "Unavailable"}

@@ -8,7 +8,21 @@ const FIELDS: { key: CustomerImportField; label: string; required?: boolean }[] 
   { key: "email", label: "Email" },
   { key: "phone", label: "Phone" },
   { key: "externalCustomerId", label: "Housecall Pro customer ID" },
+  { key: "tags", label: "Tags" },
+  { key: "source", label: "Lead source" },
+  { key: "notes", label: "Customer notes" },
+  { key: "addressLine1", label: "Service address 1: street" },
+  { key: "addressLine2", label: "Service address 1: unit / line 2" },
+  { key: "city", label: "Service address 1: city" },
+  { key: "state", label: "Service address 1: state" },
+  { key: "postalCode", label: "Service address 1: ZIP" },
+  { key: "address2Line1", label: "Service address 2: street" },
+  { key: "address2Line2", label: "Service address 2: unit / line 2" },
+  { key: "address2City", label: "Service address 2: city" },
+  { key: "address2State", label: "Service address 2: state" },
+  { key: "address2PostalCode", label: "Service address 2: ZIP" },
 ];
+type Enriched = { propertiesCreated?: number; notesRecorded?: number };
 const SOURCE_KEY = "housecall-pro";
 const MAX_BYTES = 5_000_000;
 const button = "inline-flex min-h-10 items-center justify-center rounded-md border px-3 text-sm font-medium disabled:opacity-50";
@@ -186,6 +200,8 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
             <li>{preview.result.updated} updates</li>
             <li>{preview.result.conflicts} need review</li>
             <li>{preview.result.skipped} skipped</li>
+            <li>{(preview.result as Enriched).propertiesCreated ?? 0} service addresses added</li>
+            <li>{(preview.result as Enriched).notesRecorded ?? 0} customer notes (tags, lead source, notes)</li>
           </ul>
           {preview.result.errors.length > 0 && (
             <details open={preview.result.errors.length <= 10}>
@@ -197,7 +213,7 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
             </details>
           )}
           <p className="text-muted-foreground">
-            Customers are added as existing customers, not sales leads, and are not contacted automatically. Matching people are never merged by guess; rows that need review are left out.
+            Customers are added as existing customers, not sales leads, and are not contacted automatically. A customer whose email or phone is already in GrowthOS is kept as one person and gets any new service addresses. Matching people are never merged by guess; rows that need review are left out.
           </p>
           <label className="flex items-start gap-2">
             <input type="checkbox" className="mt-1" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} disabled={busy} />
@@ -211,7 +227,8 @@ export function HousecallCustomerImport({ onImported }: { onImported: (result: L
 
       {done && (
         <p role="status" data-testid="hcp-import-done">
-          Imported {done.imported} new and updated {done.updated}; {done.conflicts} need review and {done.skipped} were skipped. This import is recorded in your import history.
+          Imported {done.imported} new and updated {done.updated}; {done.conflicts} need review and {done.skipped} were skipped.
+          {" "}Added {(done as Enriched).propertiesCreated ?? 0} service addresses. This import is recorded in your import history.
         </p>
       )}
       {error && <p role="alert" className="text-destructive">{error}</p>}

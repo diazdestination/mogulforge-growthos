@@ -22,7 +22,7 @@ import {
   type BulkLeadActionRequest,
   type BulkLeadActionRequestAction,
 } from '@workspace/api-client-react';
-import { Loader2, LayoutGrid, List as ListIcon, Search, Download, Bookmark, BookmarkPlus, Trash2, Copy, X, Filter, MessageSquare, Globe, Camera } from 'lucide-react';
+import { Loader2, LayoutGrid, List as ListIcon, Search, Download, Bookmark, BookmarkPlus, Trash2, Copy, X, Filter, MessageSquare, Globe, Camera, History } from 'lucide-react';
 import { Link, useSearch } from 'wouter';
 import { format } from 'date-fns';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -104,6 +104,11 @@ export default function Pipeline() {
     const p = new URLSearchParams(rawSearch);
     return p.get('nationwide') === '1';
   });
+  // Completed or lost jobs imported from Housecall Pro stay off the board unless asked for.
+  const [showImportedHistory, setShowImportedHistory] = useState(() => {
+    const p = new URLSearchParams(rawSearch);
+    return p.get('imported') === '1';
+  });
   // '' = all owners, 'me' = current user, otherwise a specific user id.
   const [ownerFilter, setOwnerFilter] = useState<string>(() => {
     const p = new URLSearchParams(rawSearch);
@@ -120,11 +125,12 @@ export default function Pipeline() {
     if (search) p.set('search', search);
     if (needsReplyFilter) p.set('needsReply', '1');
     if (nationwideOnly) p.set('nationwide', '1');
+    if (showImportedHistory) p.set('imported', '1');
     if (ownerFilter) p.set('owner', ownerFilter);
     const qs = p.toString();
     window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, search, needsReplyFilter, nationwideOnly, ownerFilter]);
+  }, [statusFilter, search, needsReplyFilter, nationwideOnly, showImportedHistory, ownerFilter]);
 
   // Sync URL → state for back/forward navigation
   useEffect(() => {
@@ -137,6 +143,7 @@ export default function Pipeline() {
     setSearch(urlSearch);
     setNeedsReplyFilter(urlNeedsReply);
     setNationwideOnly(urlNationwide);
+    setShowImportedHistory(p.get('imported') === '1');
     setOwnerFilter(p.get('owner') ?? '');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawSearch]);
@@ -150,6 +157,7 @@ export default function Pipeline() {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(needsReplyFilter ? { hasUnreadPortalMessage: true } : {}),
     ...(ownerUserId ? { assignedUserId: ownerUserId } : {}),
+    ...(showImportedHistory ? { importedHistory: 'include' as const } : {}),
   };
   const { data: leads, isLoading, dataUpdatedAt } = useListLeads(leadParams);
 
@@ -418,6 +426,17 @@ export default function Pipeline() {
                     Nationwide Inquiry only
                     {nationwideOnly && <span className="ml-auto text-xs font-bold">ON</span>}
                   </button>
+                  <button
+                    type="button"
+                    data-testid="imported-history-filter-mobile"
+                    onClick={() => setShowImportedHistory(v => !v)}
+                    aria-pressed={showImportedHistory}
+                    className={`w-full flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${showImportedHistory ? 'bg-slate-500/15 border-slate-400/40 text-foreground' : 'bg-background border-border hover:bg-muted'}`}
+                  >
+                    <History className="w-4 h-4" />
+                    Show imported history
+                    {showImportedHistory && <span className="ml-auto text-xs font-bold">ON</span>}
+                  </button>
                 </div>
 
                 <div className="space-y-2 pt-4 border-t border-border">
@@ -507,6 +526,19 @@ export default function Pipeline() {
               <Globe className="w-4 h-4" />
               Nationwide
               {nationwideOnly && <X className="w-3.5 h-3.5 ml-0.5" aria-hidden />}
+            </button>
+
+            <button
+              type="button"
+              data-testid="imported-history-filter"
+              onClick={() => setShowImportedHistory(v => !v)}
+              aria-pressed={showImportedHistory}
+              title={showImportedHistory ? 'Showing completed and lost jobs imported from Housecall Pro — click to hide them' : 'Show completed and lost jobs imported from Housecall Pro'}
+              className={`flex items-center gap-1.5 text-sm px-3 py-2 border rounded-lg transition-colors shadow-sm ${showImportedHistory ? 'bg-slate-500/15 border-slate-400/40 text-foreground font-semibold hover:bg-slate-500/25' : 'bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            >
+              <History className="w-4 h-4" />
+              Show imported history
+              {showImportedHistory && <X className="w-3.5 h-3.5 ml-0.5" aria-hidden />}
             </button>
 
             {/* Saved filters */}

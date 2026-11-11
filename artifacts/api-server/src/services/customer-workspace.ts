@@ -307,14 +307,16 @@ function selection(
       WHERE t.resolved_contact_id=${contactId} OR EXISTS (SELECT 1 FROM valid_services s WHERE s.task_id=t.id)`;
     case "activity":
       return sql`SELECT a.id,'activity' AS kind,a.created_at AS "createdAt",a.created_at AS "_createdAt",
-      CASE WHEN a.type='note' THEN 'note' WHEN a.type IN ('lead_captured','lead_status_changed') THEN 'lead'
+      CASE WHEN a.type='note' THEN 'note' WHEN a.type IN ('lead_captured','lead_status_changed','imported_estimate') THEN 'lead'
         WHEN a.type IN ('appointment_scheduled','appointment_updated') THEN 'appointment'
-        WHEN a.type IN ('service_created','service_completed','service_updated') THEN 'service'
+        WHEN a.type IN ('service_created','service_completed','service_updated','imported_job') THEN 'service'
         WHEN a.type IN ('task_created','task_completed','task_updated') THEN 'task'
         WHEN a.type='invoice_event' THEN 'invoice' ELSE 'communication' END AS category,
       CASE WHEN a.type='note' THEN 'Note recorded' WHEN a.type IN ('lead_captured','lead_status_changed') THEN 'Opportunity updated'
         WHEN a.type IN ('appointment_scheduled','appointment_updated') THEN 'Visit updated'
         WHEN a.type IN ('service_created','service_completed','service_updated') THEN 'Service updated'
+        WHEN a.type='imported_job' THEN 'Housecall Pro job imported'
+        WHEN a.type='imported_estimate' THEN 'Housecall Pro estimate imported'
         WHEN a.type IN ('task_created','task_completed','task_updated') THEN 'Task updated'
         WHEN a.type='invoice_event' THEN 'Invoice updated'
         WHEN a.type IN ('customer_reply','portal_message') THEN 'Customer response recorded'
@@ -331,7 +333,7 @@ function selection(
           'service_created','service_completed','service_updated','task_created','task_completed','task_updated',
           'customer_reply','portal_message','email_sent','bie_email_sent','automation_message_sent',
           'playbook_touch_sent','confirmation_sent','appointment_reminder_sent','smart_site_contact_attempt',
-          'message_bounced','message_delivery_delayed','message_delivery_failed','message_unsubscribed','invoice_event')
+          'message_bounced','message_delivery_delayed','message_delivery_failed','message_unsubscribed','invoice_event','imported_job','imported_estimate')
         AND (a.type<>'invoice_event' OR ${canReadInvoices})`;
   }
 }

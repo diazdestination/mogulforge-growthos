@@ -62,12 +62,17 @@ app.use(
 // CSV lead imports post the raw file contents as a JSON string (up to 5MB
 // of CSV, ~6MB with JSON escaping); the route re-enforces the 5MB CSV cap.
 app.use("/api/v1/lead-imports", express.json({ limit: "8mb" }));
+// Housecall Pro jobs reports, same 5MB CSV cap as lead imports.
+app.use("/api/v1/housecall-import", express.json({ limit: "8mb" }));
 // Bounded normalized financial source plus JSON-string escaping; the route
 // independently rejects sourceJson above 512,000 bytes. No global limit change.
 app.use("/api/v1/financial-migrations", express.json({ limit: "1mb" }));
 // Evidence Intelligence accepts an explicitly approved artifact as base64 JSON.
 // The route itself enforces a 5MB raw cap and a strict MIME allowlist.
 app.use("/api/v1/bie/claims", express.json({ limit: "8mb" }));
+// Customer estimate approval posts a drawn signature (PNG data URL, capped at
+// 200,000 characters by the service and the table check).
+app.use("/api/v1/public/estimate-approvals", express.json({ limit: "300kb" }));
 // Keep the raw body around for webhook signature verification (Resend/svix
 // signs the exact bytes, not the re-serialized JSON).
 app.use(

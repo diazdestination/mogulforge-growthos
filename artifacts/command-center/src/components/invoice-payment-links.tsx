@@ -14,9 +14,26 @@ type PaymentLink = {
   paidAt: string | null;
   createdAt: string;
   sourceReference?: string | null;
+  mode?: 'test' | 'live';
+  review?: { kind: 'refund' | 'dispute'; stripeId: string; amountCents: number; status: string | null; reason: string | null }[];
 };
 
-type AccountStatus = { configured: boolean; connected: boolean; chargesEnabled: boolean };
+type AccountStatus = { configured: boolean; connected: boolean; chargesEnabled: boolean; mode?: 'test' | 'live'; onboarding?: 'not_started' | 'needs_info' | 'ready' | 'restricted' };
+
+/** Plain office text for a refund or dispute Stripe reported; nothing changes on the invoice by itself. */
+export function reviewText(flag: NonNullable<PaymentLink['review']>[number]): string {
+  if (flag.kind === 'refund') {
+    return `Stripe refunded ${money(flag.amountCents)}${flag.status === 'full' ? ' (full refund)' : ''}. The invoice balance was not changed — review it and record the refund on this invoice.`;
+  }
+  const closed = flag.status === 'won' ? ' Closed: you won.' : flag.status === 'lost' ? ' Closed: the customer won; record the lost amount.' : ' Respond in Stripe before its deadline.';
+  return `The customer disputed ${money(flag.amountCents)}${flag.reason ? ` (${flag.reason.replace(/_/g, ' ')})` : ''}.${closed}`;
+}
+
+function accountMessage(account: AccountStatus): string {
+  if (!account.connected || account.onboarding === 'not_started') return 'Stripe is not connected yet. An owner or admin connects it in Settings → Connections; pay links stay off until then.';
+  if (account.onboarding === 'restricted') return 'Stripe has paused payments for this company. The owner can check Stripe setup in Settings → Connections.';
+  return 'Stripe setup is not finished, so pay links are off. The owner can finish it in Settings → Connections.';
+}
 
 const STATE_LABEL: Record<PaymentLink['state'], string> = {
   open: 'Waiting for payment',
@@ -66,7 +83,8 @@ export function InvoicePaymentLinks({ invoice, canManage }: { invoice: InvoiceDe
 
   if (!account?.configured || invoice.status !== 'issued') return null;
   const balance = invoice.balanceDueCents ?? 0;
-  const pending = links.some(link => ['open', 'processing', 'needs_reconciliation'].includes(link.state));
+  const live = account.mode === 'live';
+  const pending = links.some(link => ['open', 'processing', 'needs_reconciliation'].includes(link.state) && (!live || link.mode !== 'test'));
   const open = links.find((link) => link.state === 'open' && link.url && link.invoiceVersion === invoice.version && link.amountCents === balance && (!link.expiresAt || new Date(link.expiresAt) > new Date()));
 
   const create = async () => {
@@ -106,7 +124,8 @@ export function InvoicePaymentLinks({ invoice, canManage }: { invoice: InvoiceDe
     <div className="space-y-3 rounded-md border p-3" aria-label="Online payment">
       <div className="flex flex-wrap items-center gap-2">
         <CreditCard className="w-4 h-4" />
-        <span className="font-semibold">Sandbox online payment</span>
+        <span className="font-semibold">Online payment</span>
+        <span className={`rounded px-1.5 py-0.5 text-xs ${live ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{live ? 'Live' : 'Test mode — no real money'}</span>
         {canManage && account.connected && account.chargesEnabled && balance >= 50 && !pending && (
           <button type="button" className={`${invoiceButton} ml-auto`} disabled={busy} onClick={() => void create()}>
             {busy && <Loader2 className="w-4 h-4 animate-spin" />} Create payment link for {money(balance)}
@@ -114,14 +133,14 @@ export function InvoicePaymentLinks({ invoice, canManage }: { invoice: InvoiceDe
         )}
       </div>
       {!account.connected || !account.chargesEnabled ? (
-        <p className="text-sm text-muted-foreground">Connect and finish your Stripe account in Settings → Connections to collect card and bank payments.</p>
+        <p className="text-sm text-muted-foreground">{accountMessage(account)}</p>
       ) : open ? (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <input readOnly value={open.url ?? ''} aria-label="Payment link" className="min-w-0 flex-1 rounded border bg-background px-2 py-1.5 font-mono text-xs" onFocus={(event) => event.target.select()} />
           <button type="button" className={invoiceButton} onClick={() => void copy(open.url!, open.id)}>
             {copied === open.id ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} {copied === open.id ? 'Copied' : 'Copy link'}
           </button>
-          <p className="basis-full text-xs text-muted-foreground">Send this link to your customer. When Stripe confirms the payment it is recorded on this invoice automatically.</p>
+          <p className="basis-full text-xs text-muted-foreground">Send this link to your customer. If a card is declined, they can try another card or bank on the Stripe page. When Stripe confirms the payment it is recorded on this invoice automatically.</p>
         </div>
       ) : null}
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -132,10 +151,12 @@ export function InvoicePaymentLinks({ invoice, canManage }: { invoice: InvoiceDe
               <span className={link.state === 'needs_reconciliation' || link.state === 'failed' ? 'font-semibold text-destructive' : 'font-medium'}>{STATE_LABEL[link.state]}</span>
               <span className="text-muted-foreground">{money(link.amountCents)}</span>
               <span className="ml-auto text-xs text-muted-foreground">{new Date(link.createdAt).toLocaleString()}</span>
-              {link.state === 'needs_reconciliation' && <span className="basis-full text-xs text-muted-foreground">{link.detail}</span>}
+              {link.mode && link.mode !== account.mode && <span className="text-xs text-muted-foreground">({link.mode === 'test' ? 'test mode' : 'live'})</span>}
+              {(link.state === 'needs_reconciliation' || link.state === 'failed' || (link.state === 'expired' && link.detail.startsWith('Retired'))) && link.detail && <span className="basis-full text-xs text-muted-foreground">{link.detail}</span>}
+              {(link.review ?? []).map(flag => <span key={`${flag.kind}:${flag.stripeId}`} role="note" className="basis-full rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">Needs office review: {reviewText(flag)}</span>)}
               {link.state === 'needs_reconciliation' && link.sourceReference && <span className="basis-full text-xs">Receipt reference: <code>{link.sourceReference}</code></span>}
-              {canManage && ['open', 'processing', 'needs_reconciliation'].includes(link.state) && <div className="basis-full flex flex-wrap gap-2">
-                {link.state === 'needs_reconciliation' && <input aria-label="Original sandbox Checkout session ID" placeholder="Original Checkout session ID, if known" value={sessionIds[link.id] ?? ''} onChange={event => setSessionIds(current => ({ ...current, [link.id]: event.target.value }))} className="min-w-0 flex-1 rounded border bg-background px-2 py-1 text-xs" />}
+              {canManage && ['open', 'processing', 'needs_reconciliation'].includes(link.state) && (!link.mode || link.mode === account.mode) && <div className="basis-full flex flex-wrap gap-2">
+                {link.state === 'needs_reconciliation' && <input aria-label="Original Checkout session ID" placeholder="Original Checkout session ID, if known" value={sessionIds[link.id] ?? ''} onChange={event => setSessionIds(current => ({ ...current, [link.id]: event.target.value }))} className="min-w-0 flex-1 rounded border bg-background px-2 py-1 text-xs" />}
                 <button type="button" className={invoiceButton} disabled={busy} onClick={() => void reconcile(link)}>Check original payment</button>
                 {link.state === 'open' && <button type="button" className={invoiceButton} disabled={busy} onClick={() => void reconcile(link, true)}>Close unpaid link</button>}
               </div>}

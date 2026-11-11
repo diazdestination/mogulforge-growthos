@@ -13,6 +13,7 @@ import {
   crmTasksTable,
   db,
   estimatesTable,
+  estimateApprovalsTable,
   emailResponseReviewsTable,
   invoicesTable,
   leadsTable,
@@ -24,7 +25,7 @@ import {
   usersTable,
   valueEntriesTable,
 } from "@workspace/db";
-import { and, count, desc, eq, gte, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 
 import {
   cancelAppointmentReminders,
@@ -329,9 +330,15 @@ export async function listLeads(
     limit?: number;
     offset?: number;
     hasUnreadPortalMessage?: boolean;
+    /** Imported Housecall Pro history (completed/lost jobs): hidden unless asked for. */
+    importedHistory?: "hide" | "include" | "only";
   } = {},
 ) {
   const conditions = [eq(leadsTable.organizationId, organizationId)];
+  // COALESCE: a native lead's NULL source key must never drop it from the list.
+  const importedHistory = sql`COALESCE(${leadsTable.importSourceKey} = 'housecall-pro' AND ${leadsTable.creationMethod} = 'import' AND ${leadsTable.status} IN ('completed', 'lost'), false)`;
+  if ((filters.importedHistory ?? "hide") === "hide") conditions.push(sql`NOT ${importedHistory}`);
+  else if (filters.importedHistory === "only") conditions.push(importedHistory);
   if (filters.status) {
     conditions.push(
       eq(leadsTable.status, filters.status as typeof leadsTable.$inferSelect.status),
@@ -2052,6 +2059,11 @@ export async function deleteEstimate(organizationId: string, id: string) {
     eq(invoicesTable.organizationId, organizationId), eq(invoicesTable.estimateId, id),
   )).limit(1);
   if (invoice) return INVOICE_HISTORY_RETAINED;
+  const [signed] = await tx.select({ id: estimateApprovalsTable.id }).from(estimateApprovalsTable).where(and(
+    eq(estimateApprovalsTable.organizationId, organizationId), eq(estimateApprovalsTable.estimateId, id), isNotNull(estimateApprovalsTable.decision),
+  )).limit(1);
+  if (signed) customerWorkFail("estimate_approval_retained", "This estimate retains the customer's signed approval or decline and cannot be deleted.");
+  await tx.delete(estimateApprovalsTable).where(and(eq(estimateApprovalsTable.organizationId, organizationId), eq(estimateApprovalsTable.estimateId, id)));
   const rows = await tx
     .delete(estimatesTable)
     .where(
@@ -2554,7 +2566,21 @@ export async function updateEstimate(
   },
   actor?: CustomerWorkActor,
 ) {
-  return db.transaction(async tx => {
+  return db.transaction(tx => updateEstimateInTransaction(tx, organizationId, id, input, actor));
+}
+
+/**
+ * The lead-estimate update/accept transition inside a caller's transaction, so
+ * customer approval can record its signature atomically with the status change.
+ */
+export async function updateEstimateInTransaction(
+  tx: ScheduleTransaction,
+  organizationId: string,
+  id: string,
+  input: Parameters<typeof updateEstimate>[2],
+  actor?: { userId: string | null },
+) {
+  {
     await lockCustomerWork(tx, organizationId);
     const [existing] = await tx.select().from(estimatesTable).where(and(eq(estimatesTable.organizationId, organizationId),eq(estimatesTable.id,id))).for("update");
     if (!existing) return null;
@@ -2595,7 +2621,7 @@ export async function updateEstimate(
       if(input.status !== undefined) await tx.insert(auditEventsTable).values({organizationId,actorUserId:actor?.userId??null,action:"estimate.status_changed",entityType:"estimate",entityId:row.id,metadata:{status:input.status}});
     }
     return row ?? null;
-  });
+  }
 }
 
 async function validateProjectRefs(

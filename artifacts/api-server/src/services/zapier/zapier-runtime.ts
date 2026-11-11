@@ -8,22 +8,31 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { zapierMcpConfigured } from "./zapier-mcp-client";
 import { callieSyncCalls, scoutSyncMarketplaceLeads, scoutSyncReviews } from "./zapier-specialist-flows";
+import { callieSyncSmsReplies, scoutSyncInboxReplies } from "./zapier-owned-app-flows";
 
 /**
  * Scheduler stage: run the read-only specialist syncs (SCOUT leads and
- * reviews, CALLIE calls) for every organization that connected Zapier, bound
- * the capability, and left it on `auto`. Each sync is idempotent within the
- * hour through the execution ledger, so the 60-second scheduler cadence never
- * spends more than one Zapier read per capability per hour.
+ * reviews and inbox replies, CALLIE calls) for every organization that
+ * connected Zapier, bound the capability, and left it on `auto`. Each sync is
+ * idempotent within the company's poll window (Settings, default 4 hours)
+ * through the execution ledger, so the 60-second scheduler cadence never
+ * spends more than one Zapier read per capability per window.
  *
- * Writes are never started from here: APPT, INVO, CALLIE text-back and SCHED
- * day sheets originate from a human action or an approved request.
+ * Writes are never started from here: APPT, INVO, ESTI, SCOUT review texts
+ * and SCHED day sheets originate from a human action or an approved request.
+ * The one exception is CALLIE's call sync, which may REQUEST one missed-call
+ * text-back per new missed inbound call. That request goes through the
+ * `callie.sms.send` policy (Off by default, cannot leave Off until texting
+ * registration is confirmed) and every text-back eligibility check, at
+ * request, at approval and again right before dispatch.
  */
 
 const READ_SYNCS = {
   "scout.leads.list": scoutSyncMarketplaceLeads,
   "scout.reviews.list": scoutSyncReviews,
   "callie.calls.list": callieSyncCalls,
+  "scout.inbox.list": scoutSyncInboxReplies,
+  "callie.sms.inbox.list": callieSyncSmsReplies,
 } as const;
 
 export async function processZapierConnectedApps(organizationId?: string): Promise<void> {

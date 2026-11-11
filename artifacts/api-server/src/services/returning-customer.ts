@@ -208,6 +208,7 @@ async function runCommand(
     version: number;
     previousEstimate?: Estimate;
   }>,
+  options: CustomerWorkCommandOptions = {},
 ) {
   const hash = customerWorkHash({
     action,
@@ -215,7 +216,7 @@ async function runCommand(
     input,
     actorUserId: actor.userId,
   });
-  return db.transaction(async (tx) => {
+  const body = async (tx: CustomerWorkTx) => {
     await lockCustomerWork(tx, org, true);
     await customerWorkActor(tx, org, actor, "crm.write", true);
     await tx.execute(
@@ -295,13 +296,17 @@ async function runCommand(
         requestId: input.requestId,
         customerWorkId: result.customerWorkId,
         workVersion: result.version,
-        staffRecorded: true,
+        staffRecorded: !options.customerApproval,
         providerEffect: false,
         ...(result.estimateId ? { savedStateVersion: 1 } : {}),
+        ...(options.customerApproval ? { customerApproval: options.customerApproval } : {}),
       },
     });
     return commandResponse(tx, org, command!, false);
-  });
+  };
+  // A customer decision runs inside the approval's own transaction so the
+  // signature and the versioned status change commit or roll back together.
+  return options.tx ? body(options.tx) : db.transaction(body);
 }
 function totals(input: {
   lineItems: {
@@ -364,11 +369,21 @@ export async function createCustomerWorkEstimate(
     return { customerWorkId: root.id, estimateId: row!.id, version: 1 };
   }) as Promise<CustomerWorkEstimateMutation>;
 }
+/**
+ * `customerApproval` marks a command recorded from a customer's online
+ * approval link: the actor is the staff member who created the link, and the
+ * audit says the decision was the customer's, not staff-recorded.
+ */
+export type CustomerWorkCommandOptions = {
+  tx?: CustomerWorkTx;
+  customerApproval?: { approvalId: string; decision: "approved" | "declined" };
+};
 export async function updateCustomerWorkEstimate(
   org: string,
   actor: CustomerWorkActor,
   id: string,
   raw: unknown,
+  options: CustomerWorkCommandOptions = {},
 ): Promise<CustomerWorkEstimateMutation> {
   const input = updateCustomerWorkEstimateSchema.parse(raw);
   return runCommand(org, actor, "estimate_updated", input, id, async (tx) => {
@@ -455,7 +470,7 @@ export async function updateCustomerWorkEstimate(
       version: row.workVersion!,
       previousEstimate: locked,
     };
-  }) as Promise<CustomerWorkEstimateMutation>;
+  }, options) as Promise<CustomerWorkEstimateMutation>;
 }
 async function schedule(
   tx: CustomerWorkTx,

@@ -20,6 +20,7 @@ import {
 } from '@workspace/api-client-react';
 import { Loader2, Plus, Trash2, Edit, FileText, Send, CheckCircle, XCircle, HardHat, X } from 'lucide-react';
 import { EstimateDelivery } from '@/components/estimate-delivery';
+import { EstimateApprovalPanel } from '@/components/estimate-approval-panel';
 import { EstimateMarginPanel, PriceBookPicker } from '@/components/estimate-margin-panel';
 import LeadSelect from '@/components/lead-select';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
@@ -243,7 +244,7 @@ function EstimatesContent({ me, scopeKey }: { me: MemberProfile; scopeKey: strin
                         <span className="opacity-40">•</span>
                         <span>{estimate.lineItems.length} line item{estimate.lineItems.length === 1 ? '' : 's'}</span>
                       </div>
-                      {returningEstimate(estimate) && <p className="mt-2 text-sm">Existing customer work · {returningEstimate(estimate)!.propertyLabel || 'No property linked'} · Staff-recorded status, not signature or delivery. <Link className="inline-flex min-h-11 items-center underline" href={customerWorkspacePath(returningEstimate(estimate)!.contactId, me.organization!.id, 'estimates')!}>Customer history</Link></p>}
+                      {returningEstimate(estimate) && <p className="mt-2 text-sm">Existing customer work · {returningEstimate(estimate)!.propertyLabel || 'No property linked'} · Status is staff-recorded unless the customer approves online. <Link className="inline-flex min-h-11 items-center underline" href={customerWorkspacePath(returningEstimate(estimate)!.contactId, me.organization!.id, 'estimates')!}>Customer history</Link></p>}
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[10px] md:text-[11px] font-mono text-muted-foreground uppercase tracking-wider mt-3 bg-muted/20 p-2 rounded-lg border border-border/50 inline-flex">
                         <span>Created {format(new Date(estimate.createdAt), 'MMM d, yy')}</span>
                         {estimate.sentAt && <><span className="opacity-30">|</span><span>Sent {format(new Date(estimate.sentAt), 'MMM d, yy')}</span></>}
@@ -265,6 +266,7 @@ function EstimatesContent({ me, scopeKey }: { me: MemberProfile; scopeKey: strin
                 </div>
                 <EstimateDelivery estimate={estimate} organizationId={me.organization!.id} authorityScope={scopeKey} canSend={canEdit && ["office", "admin", "owner"].includes(me.role)} />
                 <p className="mt-3 text-xs text-muted-foreground">External send records are staff-reported status, separate from provider evidence.</p>
+                <EstimateApprovalPanel key={`${estimate.id}:${estimate.updatedAt}`} estimateId={estimate.id} canManage={canEdit} />
                 {(canEdit || canDel) && (
                   <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-border">
                     {canEdit && !returningEstimate(estimate) && estimate.status === 'draft' && (

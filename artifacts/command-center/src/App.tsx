@@ -18,8 +18,10 @@ import { NotificationLeadGuard, TenantMobileBoundary } from '@/components/mobile
 // Pages
 import Dashboard from '@/pages/dashboard';
 import Today from '@/pages/today';
+import TechDay from '@/pages/tech';
 import Invoices from '@/pages/invoices';
 import FinancialMigrations from '@/pages/financial-migrations';
+import MoveFromHousecall from '@/pages/move-from-housecall';
 import Assistant from '@/pages/assistant';
 import Pipeline from '@/pages/pipeline';
 import Insights from '@/pages/insights';
@@ -46,6 +48,7 @@ import Onboarding from '@/pages/onboarding';
 import Platform from '@/pages/platform';
 import Bie from '@/pages/bie';
 import ProjectRoom from '@/pages/project-room';
+import EstimateApproval from '@/pages/estimate-approval';
 import EvidenceIntelligence from '@/pages/evidence-intelligence';
 import Account from '@/pages/account';
 import AgentTeam from '@/pages/agent-team';
@@ -500,7 +503,9 @@ function Router() {
   const [isPaymentComplete] = useRoute('/pay/complete');
   const [isPaymentCanceled] = useRoute('/pay/canceled');
   const [isProjectRoom, projectParams] = useRoute('/project-room/:workspace/:leadId');
+  const [isEstimateApproval, approvalParams] = useRoute('/approve/:token');
   if (isPaymentComplete || isPaymentCanceled) return <PaymentReturn canceled={isPaymentCanceled} />;
+  if (isEstimateApproval && approvalParams) return <EstimateApproval key={approvalParams.token} token={approvalParams.token} />;
   if (isProjectRoom && projectParams) return <ProjectRoom key={`${projectParams.workspace}:${projectParams.leadId}`} workspace={projectParams.workspace} leadId={projectParams.leadId} />;
 
   if (isLoading) {
@@ -595,6 +600,7 @@ function AuthedApp({ authUserId }: { authUserId: string }) {
           </Route>
           <Route path="/" component={Today} />
           <Route path="/today" component={Today} />
+          <Route path="/tech" component={TechDay} />
           <Route path="/bie" component={Bie} />
           <Route path="/agent-team">
             <AgentTeam />
@@ -617,6 +623,7 @@ function AuthedApp({ authUserId }: { authUserId: string }) {
           <Route path="/invoices/:id" component={Invoices} />
           <Route path="/invoices" component={Invoices} />
           <Route path="/financial-migrations" component={FinancialMigrations} />
+          <Route path="/move-from-housecall-pro" component={MoveFromHousecall} />
           <Route path="/audit" component={AuditLog} />
           <Route path="/settings" component={Settings} />
           <Route path="/account" component={Account} />

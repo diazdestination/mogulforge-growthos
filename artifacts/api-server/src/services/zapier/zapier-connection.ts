@@ -14,6 +14,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { decryptSecret, encryptSecret } from "../../lib/token-encryption";
 import { recordAudit } from "../audit";
+import { CALLIE_TEXTBACK_CAPABILITY, describeCallieTextBackSettings, getCallieTextBackSettings, type CallieTextBackView } from "../callie-text-back";
 import {
   detectServerMode,
   sha256Hex,
@@ -54,7 +55,13 @@ export type ZapierConnectionStatus = {
   lastErrorAt: string | null;
   lastErrorCode: string | null;
   lastToolsRefreshedAt: string | null;
+  /** Scheduled reads spend at most one Zapier task per capability per window. */
+  pollIntervalMinutes: number;
+  pollIntervalChoices: readonly number[];
 };
+
+export const ZAPIER_POLL_INTERVAL_CHOICES = [60, 120, 240, 360, 720, 1440] as const;
+export const ZAPIER_DEFAULT_POLL_INTERVAL_MINUTES = 240;
 
 export async function getZapierConnection(organizationId: string, reader: Pick<typeof db, "select"> = db): Promise<ZapierMcpConnection | null> {
   const [row] = await reader
@@ -83,7 +90,42 @@ export async function getZapierStatus(organizationId: string): Promise<ZapierCon
     lastErrorAt: connection?.lastErrorAt?.toISOString() ?? null,
     lastErrorCode: connection?.lastErrorCode ?? null,
     lastToolsRefreshedAt: connection?.lastToolsRefreshedAt?.toISOString() ?? null,
+    pollIntervalMinutes: connection?.pollIntervalMinutes ?? ZAPIER_DEFAULT_POLL_INTERVAL_MINUTES,
+    pollIntervalChoices: ZAPIER_POLL_INTERVAL_CHOICES,
   };
+}
+
+/**
+ * Start of the current scheduled-read window for this company. Read flows use
+ * it in their idempotency keys, so every scheduler pass (and any manual sync)
+ * inside one window reuses the same ledger receipt instead of a Zapier task.
+ */
+export async function zapierPollWindow(organizationId: string, now = new Date()): Promise<string> {
+  const connection = await getZapierConnection(organizationId);
+  const minutes = connection?.pollIntervalMinutes ?? ZAPIER_DEFAULT_POLL_INTERVAL_MINUTES;
+  const size = Math.max(15, minutes) * 60_000;
+  return new Date(Math.floor(now.getTime() / size) * size).toISOString();
+}
+
+export async function setZapierPollInterval(input: { organizationId: string; userId: string; minutes: number }): Promise<ZapierConnectionStatus> {
+  if (!(ZAPIER_POLL_INTERVAL_CHOICES as readonly number[]).includes(input.minutes)) {
+    throw new ZapierBindingError(`Choose a sync interval of ${ZAPIER_POLL_INTERVAL_CHOICES.join(", ")} minutes.`);
+  }
+  const rows = await db
+    .update(zapierMcpConnectionsTable)
+    .set({ pollIntervalMinutes: input.minutes })
+    .where(and(eq(zapierMcpConnectionsTable.organizationId, input.organizationId), isNull(zapierMcpConnectionsTable.revokedAt)))
+    .returning({ id: zapierMcpConnectionsTable.id });
+  if (rows.length === 0) throw new ZapierBindingError("Connect Zapier before choosing a sync interval.");
+  await recordAudit({
+    organizationId: input.organizationId,
+    actorUserId: input.userId,
+    action: "integration.zapier_poll_interval_changed",
+    entityType: "zapier_mcp_connection",
+    entityId: rows[0]!.id,
+    metadata: { pollIntervalMinutes: input.minutes },
+  });
+  return getZapierStatus(input.organizationId);
 }
 
 /** Decrypt the tenant's server URL. Internal to the Zapier services only. */
@@ -339,6 +381,8 @@ export type ZapierCapabilityView = {
   direction: "read" | "write";
   label: string;
   description: string;
+  /** The mode Settings recommends when the owner turns this flow on. Every flow starts off until they do. */
+  recommendedMode: "approve" | "auto";
   candidates: { app: string; appName: string; action: string; actionName: string; configFields: { key: string; label: string; required: boolean }[] }[];
   binding: {
     app: string;
@@ -351,6 +395,8 @@ export type ZapierCapabilityView = {
     verifiedAt: string | null;
   } | null;
   policy: { mode: ZapierPolicyMode; dailyBudget: number; updatedAt: string | null };
+  /** CALLIE text-back only: the company's messaging-registration confirmation and caller window. */
+  textBack?: CallieTextBackView;
 };
 
 export function defaultPolicyFor(definition: ZapierCapabilityDefinition): { mode: ZapierPolicyMode; dailyBudget: number } {
@@ -364,6 +410,7 @@ export async function listZapierCapabilities(organizationId: string): Promise<Za
   ]);
   const bindingByKey = new Map(bindings.map((row) => [row.capability, row]));
   const policyByKey = new Map(policies.map((row) => [row.capability, row]));
+  const textBack = await describeCallieTextBackSettings(organizationId);
   return ZAPIER_CAPABILITIES.map((definition) => {
     const binding = bindingByKey.get(definition.key) ?? null;
     const policy = policyByKey.get(definition.key) ?? null;
@@ -373,6 +420,7 @@ export async function listZapierCapabilities(organizationId: string): Promise<Za
       direction: definition.direction,
       label: definition.label,
       description: definition.description,
+      recommendedMode: definition.defaultMode,
       candidates: definition.candidates.map((candidate) => ({
         app: candidate.app,
         appName: candidate.appName,
@@ -395,6 +443,7 @@ export async function listZapierCapabilities(organizationId: string): Promise<Za
       policy: policy
         ? { mode: policy.mode, dailyBudget: policy.dailyBudget, updatedAt: policy.updatedAt.toISOString() }
         : { ...defaultPolicyFor(definition), updatedAt: null },
+      ...(definition.key === CALLIE_TEXTBACK_CAPABILITY ? { textBack } : {}),
     };
   });
 }
@@ -563,6 +612,9 @@ export async function setZapierPolicy(input: {
     throw new ZapierBindingError("Policy mode must be off, approve, or auto.");
   }
   const mode = input.mode as ZapierPolicyMode;
+  if (definition.key === CALLIE_TEXTBACK_CAPABILITY && mode !== "off" && !(await getCallieTextBackSettings(input.organizationId)).messagingRegistered) {
+    throw new ZapierBindingError("Confirm that your texting setup is registered (Twilio A2P 10DLC or Quo business texting) before turning on missed-call text-back.");
+  }
   const dailyBudget = Math.min(Math.max(Math.trunc(input.dailyBudget ?? definition.defaultDailyBudget), 0), 500);
   const values = {
     organizationId: input.organizationId,

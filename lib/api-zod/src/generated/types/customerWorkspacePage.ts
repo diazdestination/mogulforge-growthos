@@ -371,7 +371,7 @@ export type CustomerWorkspacePage = {
   createdAt: Date;
   kind: 'activity';
   category: 'note' | 'lead' | 'appointment' | 'service' | 'task' | 'communication' | 'invoice';
-  label: 'Note recorded' | 'Opportunity updated' | 'Visit updated' | 'Service updated' | 'Task updated' | 'Communication event recorded' | 'Customer response recorded' | 'Invoice updated';
+  label: 'Note recorded' | 'Opportunity updated' | 'Visit updated' | 'Service updated' | 'Task updated' | 'Communication event recorded' | 'Customer response recorded' | 'Invoice updated' | 'Housecall Pro job imported' | 'Housecall Pro estimate imported';
   occurredAt: Date;
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   leadId: string | null;

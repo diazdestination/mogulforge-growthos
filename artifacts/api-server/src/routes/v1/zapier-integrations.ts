@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type RequestHandler, type Response } from "express";
 import { z } from "zod";
 
+import { FieldCollectError } from "../../services/field-collect";
 import { requireMember } from "../../middlewares/requireMember";
 import { ZAPIER_EXECUTION_STATES, type ZapierExecutionState } from "@workspace/db";
 import {
@@ -13,6 +14,7 @@ import {
   registerZapierServerUrl,
   searchZapierActions,
   setZapierPolicy,
+  setZapierPollInterval,
   unbindZapierCapability,
   ZapierBindingError,
 } from "../../services/zapier/zapier-connection";
@@ -24,17 +26,29 @@ import {
   ZapierExecutionError,
 } from "../../services/zapier/zapier-executions";
 import { ZapierMcpError } from "../../services/zapier/zapier-mcp-client";
+import { CallieTextBackSettingsError, describeCallieTextBackSettings, saveCallieTextBackSettings } from "../../services/callie-text-back";
 import {
   apptPushAppointmentToCalendar,
+  apptRequestOnMyWayText,
   apptRequestReminderText,
+  billRequestPayLinkText,
   callieRequestTextBack,
   callieSyncCalls,
+  estiRequestApprovalLinkText,
   invoPushInvoiceToAccounting,
   maintainRequestServiceText,
   schedSendCrewDaySheet,
   scoutSyncMarketplaceLeads,
   scoutSyncReviews,
 } from "../../services/zapier/zapier-specialist-flows";
+import {
+  estiRequestMailboxEstimateEmail,
+  invoRequestAccountingPayment,
+  invoRequestMailboxInvoiceEmail,
+  scoutRequestReviewText,
+  scoutSyncInboxReplies,
+  callieSyncSmsReplies,
+} from "../../services/zapier/zapier-owned-app-flows";
 
 /**
  * Zapier Connected Apps. Mirrors the Gmail/Microsoft integration surface:
@@ -64,6 +78,10 @@ function fail(res: Response, error: unknown): void {
     res.status(409).json({ error: error.message });
     return;
   }
+  if (error instanceof FieldCollectError) {
+    res.status(error.status).json({ error: error.message, code: error.code });
+    return;
+  }
   if (error instanceof ZapierExecutionError) {
     const status = error.code === "not_found" ? 404 : error.code === "conflict" || error.code === "not_pending" ? 409 : 400;
     res.status(status).json({ error: error.message, code: error.code });
@@ -85,9 +103,13 @@ const bindingBody = z.object({
   config: z.record(z.string(), z.unknown()).optional(),
 });
 const policyBody = z.object({ mode: z.enum(["off", "approve", "auto"]), dailyBudget: z.number().int().min(0).max(500).optional() });
+const recordId = z.string().uuid();
+const pollIntervalBody = z.object({ minutes: z.number().int() });
 const rejectBody = z.object({ reason: z.string().max(500).optional() });
 const daySheetBody = z.object({ userId: z.string().min(1).max(120), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
-const textBackBody = z.object({ taskId: z.string().uuid(), toPhone: z.string().regex(/^\+?[1-9]\d{6,14}$/).optional() });
+// The caller number comes only from the recorded missed call, never from the request.
+const textBackBody = z.object({ taskId: z.string().uuid() });
+const textBackSettingsBody = z.object({ messagingRegistered: z.boolean(), windowHours: z.number().int().min(1).max(168).optional() });
 
 // ---------- connection ----------
 
@@ -121,6 +143,20 @@ router.delete(
   sessionOnly,
   async (req: Request, res: Response): Promise<void> => {
     res.json({ disconnected: await disconnectZapier(req.member!.organizationId, req.member!.user.id) });
+  },
+);
+
+router.put(
+  "/integrations/zapier/poll-interval",
+  requireMember("settings.manage"),
+  sessionOnly,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const body = pollIntervalBody.parse(req.body);
+      res.json(await setZapierPollInterval({ organizationId: req.member!.organizationId, userId: req.member!.user.id, minutes: body.minutes }));
+    } catch (error) {
+      fail(res, error);
+    }
   },
 );
 
@@ -227,6 +263,30 @@ router.put(
   },
 );
 
+router.put(
+  "/integrations/zapier/callie/text-back-settings",
+  requireMember("settings.manage"),
+  sessionOnly,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const body = textBackSettingsBody.parse(req.body);
+      const saved = await saveCallieTextBackSettings({
+        organizationId: req.member!.organizationId,
+        userId: req.member!.user.id,
+        messagingRegistered: body.messagingRegistered,
+        windowHours: body.windowHours,
+      });
+      res.json({ textBack: await describeCallieTextBackSettings(req.member!.organizationId, saved) });
+    } catch (error) {
+      if (error instanceof CallieTextBackSettingsError) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+      fail(res, error);
+    }
+  },
+);
+
 // ---------- execution ledger ----------
 
 router.get("/integrations/zapier/executions", requireMember("crm.read"), async (req: Request, res: Response): Promise<void> => {
@@ -320,7 +380,6 @@ router.post("/integrations/zapier/flows/callie/text-back", requireMember("crm.wr
         organizationId: req.member!.organizationId,
         taskId: body.taskId,
         actorUserId: req.member!.user.id,
-        toPhone: body.toPhone,
       }),
     );
   } catch (error) {
@@ -364,6 +423,67 @@ router.post(
   },
 );
 
+const onMyWayBody = z.object({ etaMinutes: z.number().int().min(1).max(240).nullable().optional() }).strict();
+
+router.post(
+  "/integrations/zapier/flows/appointments/:id/on-my-way",
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const body = onMyWayBody.parse(req.body ?? {});
+      res.json(
+        await apptRequestOnMyWayText({
+          organizationId: req.member!.organizationId,
+          appointmentId: z.string().uuid().parse(String(req.params.id)),
+          actorUserId: req.member!.user.id,
+          etaMinutes: body.etaMinutes ?? null,
+        }),
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+router.post(
+  "/integrations/zapier/flows/invoices/:id/pay-link-text",
+  requireMember("invoices.manage"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(
+        await billRequestPayLinkText({
+          organizationId: req.member!.organizationId,
+          invoiceId: z.string().uuid().parse(String(req.params.id)),
+          actorUserId: req.member!.user.id,
+        }),
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+// Field collection: a tech texts the pay link for an invoice linked to their own assigned job.
+router.post(
+  "/integrations/zapier/flows/appointments/:appointmentId/invoices/:id/pay-link-text",
+  requireMember("payments.collect"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      z.object({}).strict().parse(req.body ?? {});
+      res.json(
+        await billRequestPayLinkText({
+          organizationId: req.member!.organizationId,
+          invoiceId: z.string().uuid().parse(String(req.params.id)),
+          actorUserId: req.member!.user.id,
+          field: { appointmentId: z.string().uuid().parse(String(req.params.appointmentId)), effectiveRole: req.member!.role },
+        }),
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
 router.post(
   "/integrations/zapier/flows/services/:id/reminder-text",
   requireMember("crm.write"),
@@ -373,6 +493,24 @@ router.post(
         await maintainRequestServiceText({
           organizationId: req.member!.organizationId,
           obligationId: String(req.params.id),
+          actorUserId: req.member!.user.id,
+        }),
+      );
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+router.post(
+  "/integrations/zapier/flows/estimates/:id/approval-text",
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(
+        await estiRequestApprovalLinkText({
+          organizationId: req.member!.organizationId,
+          estimateId: String(req.params.id),
           actorUserId: req.member!.user.id,
         }),
       );
@@ -415,5 +553,71 @@ router.post("/integrations/zapier/flows/sched/day-sheet", requireMember("crm.wri
     fail(res, error);
   }
 });
+
+router.post("/integrations/zapier/flows/scout/inbox", requireMember("crm.write"), async (req: Request, res: Response): Promise<void> => {
+  try {
+    res.json(await scoutSyncInboxReplies({ organizationId: req.member!.organizationId, actorUserId: req.member!.user.id }));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+router.post("/integrations/zapier/flows/callie/sms-replies", requireMember("crm.write"), async (req: Request, res: Response): Promise<void> => {
+  try {
+    res.json(await callieSyncSmsReplies({ organizationId: req.member!.organizationId, actorUserId: req.member!.user.id }));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+router.post(
+  "/integrations/zapier/flows/invoices/:id/email",
+  requireMember("invoices.manage"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(await invoRequestMailboxInvoiceEmail({ organizationId: req.member!.organizationId, invoiceId: recordId.parse(req.params.id), actorUserId: req.member!.user.id }));
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+router.post(
+  "/integrations/zapier/flows/invoices/:id/receipts/:allocationId/accounting",
+  requireMember("invoices.manage"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(await invoRequestAccountingPayment({ organizationId: req.member!.organizationId, invoiceId: recordId.parse(req.params.id), allocationId: recordId.parse(req.params.allocationId), actorUserId: req.member!.user.id }));
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+router.post(
+  "/integrations/zapier/flows/estimates/:id/email",
+  requireMember("crm.write"),
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      res.json(await estiRequestMailboxEstimateEmail({ organizationId: req.member!.organizationId, estimateId: recordId.parse(req.params.id), actorUserId: req.member!.user.id }));
+    } catch (error) {
+      fail(res, error);
+    }
+  },
+);
+
+for (const [path, kind] of [["appointments", "appointment"], ["projects", "project"]] as const) {
+  router.post(
+    `/integrations/zapier/flows/${path}/:id/review-request`,
+    requireMember("crm.write"),
+    async (req: Request, res: Response): Promise<void> => {
+      try {
+        res.json(await scoutRequestReviewText({ organizationId: req.member!.organizationId, kind, id: recordId.parse(req.params.id), actorUserId: req.member!.user.id }));
+      } catch (error) {
+        fail(res, error);
+      }
+    },
+  );
+}
 
 export default router;

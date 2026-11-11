@@ -583,6 +583,7 @@ export * from './listInvoiceDeliveryWorklistStatus';
 export * from './listInvoicesParams';
 export * from './listInvoicesStatus';
 export * from './listLeadMailboxRepliesParams';
+export * from './listLeadsImportedHistory';
 export * from './listLeadsParams';
 export * from './listPlatformIdentityDeliveriesParams';
 export * from './listProjectsParams';

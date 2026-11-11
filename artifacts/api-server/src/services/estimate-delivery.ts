@@ -36,6 +36,11 @@ import {
   ESTIMATE_EMAIL_PROOF_ACTION,
 } from "./estimate-delivery-execution";
 import { sendEmailForUser } from "./user-email";
+import { approvalLinkForEstimateEmail } from "./estimate-approvals";
+import {
+  hasApprovalLinkPlaceholder,
+  renderApprovalLinkForSend,
+} from "./estimate-delivery-contract";
 import { EmailDispatchBlockedError } from "./email-dispatch-guard";
 
 function parse<T>(schema: z.ZodType<T>, raw: unknown): T {
@@ -173,12 +178,25 @@ export async function sendEstimateEmail(
   let finalizationFailed = false;
   try {
     const s = claim.snapshot;
+    // The reviewed, digested and retained body holds only the placeholder. The
+    // capability link is rendered here, in memory, for the provider hand-off.
+    const body = hasApprovalLinkPlaceholder(s.message.body)
+      ? renderApprovalLinkForSend(
+          s.message.body,
+          await approvalLinkForEstimateEmail(
+            s.organizationId,
+            s.estimateId,
+            s.actorUserId,
+            s.document,
+          ),
+        )
+      : s.message.body;
     const receipt = await sendEmailForUser({
       organizationId: s.organizationId,
       userId: s.sender.userId,
       to: s.message.recipient,
       subject: s.message.subject,
-      body: s.message.body,
+      body,
       expectedSender: {
         provider: s.sender.provider,
         senderEmail: s.sender.senderEmail,

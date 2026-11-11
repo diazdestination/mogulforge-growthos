@@ -405,6 +405,275 @@ const withQueryKey = <T extends object, K>(
   return result;
 };
 
+export const getGetCustomerWorkspaceUrl = (id: string) => {
+  return `/api/v1/contacts/${id}/workspace`;
+};
+
+/**
+ * Read-only canonical customer records for current accepted staff. Company comes only from the session. No writes, financial totals, raw activity/mailbox contents or inferred parent links. Sending holds do not block historical reading. Section pages contain at most 25 valid rows in created-descending order, using company/customer/section-bound keyset cursors; not a frozen export.
+ * @summary Read a canonical customer header and available sections
+ */
+export const getCustomerWorkspace = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<CustomerWorkspaceHeader> => {
+  return customFetch<CustomerWorkspaceHeader>(getGetCustomerWorkspaceUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCustomerWorkspaceQueryKey = (id: string) => {
+  return [`/api/v1/contacts/${id}/workspace`] as const;
+};
+
+export const getGetCustomerWorkspaceQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCustomerWorkspace>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCustomerWorkspace>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetCustomerWorkspaceQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCustomerWorkspace>>
+  > = ({ signal }) => getCustomerWorkspace(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: id !== null && id !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCustomerWorkspace>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCustomerWorkspaceQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCustomerWorkspace>>
+>;
+export type GetCustomerWorkspaceQueryError = ErrorType<void>;
+
+/**
+ * @summary Read a canonical customer header and available sections
+ */
+
+export function useGetCustomerWorkspace<
+  TData = Awaited<ReturnType<typeof getCustomerWorkspace>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCustomerWorkspace>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCustomerWorkspaceQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getGetCustomerWorkspaceSectionUrl = (
+  id: string,
+  section:
+    | "properties"
+    | "appointments"
+    | "services"
+    | "leads"
+    | "projects"
+    | "estimates"
+    | "invoices"
+    | "tasks"
+    | "activity",
+  params?: GetCustomerWorkspaceSectionParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/contacts/${id}/workspace/${section}?${stringifiedParams}`
+    : `/api/v1/contacts/${id}/workspace/${section}`;
+};
+
+/**
+ * Read-only canonical customer records for current accepted staff. Company comes only from the session. No writes, financial totals, raw activity/mailbox contents or inferred parent links. Sending holds do not block historical reading. Section pages contain at most 25 valid rows in created-descending order, using company/customer/section-bound keyset cursors; not a frozen export.
+ * @summary Read one bounded canonical customer record section
+ */
+export const getCustomerWorkspaceSection = async (
+  id: string,
+  section:
+    | "properties"
+    | "appointments"
+    | "services"
+    | "leads"
+    | "projects"
+    | "estimates"
+    | "invoices"
+    | "tasks"
+    | "activity",
+  params?: GetCustomerWorkspaceSectionParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<CustomerWorkspacePage> => {
+  return customFetch<CustomerWorkspacePage>(
+    getGetCustomerWorkspaceSectionUrl(id, section, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetCustomerWorkspaceSectionQueryKey = (
+  id: string,
+  section:
+    | "properties"
+    | "appointments"
+    | "services"
+    | "leads"
+    | "projects"
+    | "estimates"
+    | "invoices"
+    | "tasks"
+    | "activity",
+  params?: GetCustomerWorkspaceSectionParams,
+) => {
+  return [
+    `/api/v1/contacts/${id}/workspace/${section}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetCustomerWorkspaceSectionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCustomerWorkspaceSection>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  section:
+    | "properties"
+    | "appointments"
+    | "services"
+    | "leads"
+    | "projects"
+    | "estimates"
+    | "invoices"
+    | "tasks"
+    | "activity",
+  params?: GetCustomerWorkspaceSectionParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCustomerWorkspaceSection>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetCustomerWorkspaceSectionQueryKey(id, section, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCustomerWorkspaceSection>>
+  > = ({ signal }) =>
+    getCustomerWorkspaceSection(id, section, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      id !== null &&
+      id !== undefined &&
+      section !== null &&
+      section !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCustomerWorkspaceSection>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCustomerWorkspaceSectionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCustomerWorkspaceSection>>
+>;
+export type GetCustomerWorkspaceSectionQueryError = ErrorType<void>;
+
+/**
+ * @summary Read one bounded canonical customer record section
+ */
+
+export function useGetCustomerWorkspaceSection<
+  TData = Awaited<ReturnType<typeof getCustomerWorkspaceSection>>,
+  TError = ErrorType<void>,
+>(
+  id: string,
+  section:
+    | "properties"
+    | "appointments"
+    | "services"
+    | "leads"
+    | "projects"
+    | "estimates"
+    | "invoices"
+    | "tasks"
+    | "activity",
+  params?: GetCustomerWorkspaceSectionParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCustomerWorkspaceSection>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCustomerWorkspaceSectionQueryOptions(
+    id,
+    section,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
 export const getExplainSchedulingConflictUrl = () => {
   return `/api/v1/scheduling/conflict-explanation`;
 };
@@ -1259,275 +1528,6 @@ export const useCreateCustomerWorkEstimate = <
 > => {
   return useMutation(getCreateCustomerWorkEstimateMutationOptions(options));
 };
-
-export const getGetCustomerWorkspaceUrl = (id: string) => {
-  return `/api/v1/contacts/${id}/workspace`;
-};
-
-/**
- * Read-only canonical customer records for current accepted staff. Company comes only from the session. No writes, financial totals, raw activity/mailbox contents or inferred parent links. Sending holds do not block historical reading. Section pages contain at most 25 valid rows in created-descending order, using company/customer/section-bound keyset cursors; not a frozen export.
- * @summary Read a canonical customer header and available sections
- */
-export const getCustomerWorkspace = async (
-  id: string,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<CustomerWorkspaceHeader> => {
-  return customFetch<CustomerWorkspaceHeader>(getGetCustomerWorkspaceUrl(id), {
-    ...options,
-    method: "GET",
-  });
-};
-
-export const getGetCustomerWorkspaceQueryKey = (id: string) => {
-  return [`/api/v1/contacts/${id}/workspace`] as const;
-};
-
-export const getGetCustomerWorkspaceQueryOptions = <
-  TData = Awaited<ReturnType<typeof getCustomerWorkspace>>,
-  TError = ErrorType<void>,
->(
-  id: string,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getCustomerWorkspace>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ?? getGetCustomerWorkspaceQueryKey(id);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getCustomerWorkspace>>
-  > = ({ signal }) => getCustomerWorkspace(id, { signal, ...requestOptions });
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: id !== null && id !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getCustomerWorkspace>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type GetCustomerWorkspaceQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getCustomerWorkspace>>
->;
-export type GetCustomerWorkspaceQueryError = ErrorType<void>;
-
-/**
- * @summary Read a canonical customer header and available sections
- */
-
-export function useGetCustomerWorkspace<
-  TData = Awaited<ReturnType<typeof getCustomerWorkspace>>,
-  TError = ErrorType<void>,
->(
-  id: string,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getCustomerWorkspace>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetCustomerWorkspaceQueryOptions(id, options);
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-export const getGetCustomerWorkspaceSectionUrl = (
-  id: string,
-  section:
-    | "properties"
-    | "appointments"
-    | "services"
-    | "leads"
-    | "projects"
-    | "estimates"
-    | "invoices"
-    | "tasks"
-    | "activity",
-  params?: GetCustomerWorkspaceSectionParams,
-) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? "null" : String(value));
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0
-    ? `/api/v1/contacts/${id}/workspace/${section}?${stringifiedParams}`
-    : `/api/v1/contacts/${id}/workspace/${section}`;
-};
-
-/**
- * Read-only canonical customer records for current accepted staff. Company comes only from the session. No writes, financial totals, raw activity/mailbox contents or inferred parent links. Sending holds do not block historical reading. Section pages contain at most 25 valid rows in created-descending order, using company/customer/section-bound keyset cursors; not a frozen export.
- * @summary Read one bounded canonical customer record section
- */
-export const getCustomerWorkspaceSection = async (
-  id: string,
-  section:
-    | "properties"
-    | "appointments"
-    | "services"
-    | "leads"
-    | "projects"
-    | "estimates"
-    | "invoices"
-    | "tasks"
-    | "activity",
-  params?: GetCustomerWorkspaceSectionParams,
-  options?: Parameters<typeof customFetch>[1],
-): Promise<CustomerWorkspacePage> => {
-  return customFetch<CustomerWorkspacePage>(
-    getGetCustomerWorkspaceSectionUrl(id, section, params),
-    {
-      ...options,
-      method: "GET",
-    },
-  );
-};
-
-export const getGetCustomerWorkspaceSectionQueryKey = (
-  id: string,
-  section:
-    | "properties"
-    | "appointments"
-    | "services"
-    | "leads"
-    | "projects"
-    | "estimates"
-    | "invoices"
-    | "tasks"
-    | "activity",
-  params?: GetCustomerWorkspaceSectionParams,
-) => {
-  return [
-    `/api/v1/contacts/${id}/workspace/${section}`,
-    ...(params ? [params] : []),
-  ] as const;
-};
-
-export const getGetCustomerWorkspaceSectionQueryOptions = <
-  TData = Awaited<ReturnType<typeof getCustomerWorkspaceSection>>,
-  TError = ErrorType<void>,
->(
-  id: string,
-  section:
-    | "properties"
-    | "appointments"
-    | "services"
-    | "leads"
-    | "projects"
-    | "estimates"
-    | "invoices"
-    | "tasks"
-    | "activity",
-  params?: GetCustomerWorkspaceSectionParams,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getCustomerWorkspaceSection>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey =
-    queryOptions?.queryKey ??
-    getGetCustomerWorkspaceSectionQueryKey(id, section, params);
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getCustomerWorkspaceSection>>
-  > = ({ signal }) =>
-    getCustomerWorkspaceSection(id, section, params, {
-      signal,
-      ...requestOptions,
-    });
-
-  return {
-    queryKey,
-    queryFn,
-    enabled:
-      id !== null &&
-      id !== undefined &&
-      section !== null &&
-      section !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getCustomerWorkspaceSection>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type GetCustomerWorkspaceSectionQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getCustomerWorkspaceSection>>
->;
-export type GetCustomerWorkspaceSectionQueryError = ErrorType<void>;
-
-/**
- * @summary Read one bounded canonical customer record section
- */
-
-export function useGetCustomerWorkspaceSection<
-  TData = Awaited<ReturnType<typeof getCustomerWorkspaceSection>>,
-  TError = ErrorType<void>,
->(
-  id: string,
-  section:
-    | "properties"
-    | "appointments"
-    | "services"
-    | "leads"
-    | "projects"
-    | "estimates"
-    | "invoices"
-    | "tasks"
-    | "activity",
-  params?: GetCustomerWorkspaceSectionParams,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getCustomerWorkspaceSection>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetCustomerWorkspaceSectionQueryOptions(
-    id,
-    section,
-    params,
-    options,
-  );
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
 
 export const getGetWorkdayAssetsUrl = (
   contactId: string,

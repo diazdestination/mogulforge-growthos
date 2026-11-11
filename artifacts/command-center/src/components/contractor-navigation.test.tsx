@@ -51,6 +51,20 @@ describe("Contractor daily navigation", () => {
     ).toBe("page");
     expect(screen.queryByText("Subscription")).toBeNull();
   });
+  it("gives field roles a My day destination in the phone bar and keeps it off the office menu", async () => {
+    renderShell("production");
+    await screen.findAllByText("Painless");
+    const daily = within(
+      screen.getByRole("navigation", { name: "Daily work", exact: true }),
+    );
+    expect(daily.getByRole("link", { name: "My day" }).getAttribute("href")).toBe("/tech");
+    const quick = within(screen.getByRole("navigation", { name: "Quick navigation" }));
+    expect(quick.getByRole("link", { name: "My day" })).toBeTruthy();
+    cleanup();
+    renderShell("office");
+    await screen.findAllByText("Painless");
+    expect(screen.queryByRole("link", { name: "My day" })).toBeNull();
+  });
   it.each(["viewer", "sales_rep", "inspector", "production"])(
     "keeps invoice and admin destinations out of search for %s",
     async (role) => {

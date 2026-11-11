@@ -55,7 +55,7 @@ it('creates a payment link for the balance and shows it for copying', async () =
 it('points to Settings until Stripe can take charges, and hides when payments are not configured', async () => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => (url === '/api/v1/payments/stripe' ? json({ configured: true, connected: true, chargesEnabled: false }) : json({ links: [] }))));
   render(<InvoicePaymentLinks invoice={invoice} canManage />);
-  expect(await screen.findByText(/Connect and finish your Stripe account/)).toBeTruthy();
+  expect(await screen.findByText(/Stripe setup is not finished, so pay links are off/)).toBeTruthy();
   expect(screen.queryByRole('button', { name: /Create payment link/ })).toBeNull();
   cleanup();
 
@@ -64,4 +64,31 @@ it('points to Settings until Stripe can take charges, and hides when payments ar
   const { container } = render(<InvoicePaymentLinks invoice={invoice} canManage />);
   await waitFor(() => expect(off).toHaveBeenCalled());
   expect(container.textContent).toBe('');
+});
+
+it('shows live mode and flags a refund or dispute for office review without offering a new link', async () => {
+  const paid = { id: 'p1', invoiceVersion: 2, amountCents: 25_000, state: 'paid', url: null, detail: 'Paid through Stripe and recorded on the invoice.', mode: 'live', createdAt: '2026-10-30T00:00:00Z',
+    review: [
+      { kind: 'refund', stripeId: 'ch_1', amountCents: 5_000, status: 'partial', reason: null },
+      { kind: 'dispute', stripeId: 'dp_1', amountCents: 25_000, status: 'needs_response', reason: 'product_not_received' },
+    ] };
+  const paidInvoice = { ...invoice, balanceDueCents: 0 } as unknown as InvoiceDetail;
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/v1/payments/stripe' ? json({ configured: true, connected: true, chargesEnabled: true, mode: 'live', onboarding: 'ready' }) : json({ links: [paid] })));
+  render(<InvoicePaymentLinks invoice={paidInvoice} canManage />);
+  expect(await screen.findByText('Paid and recorded')).toBeTruthy();
+  expect(screen.getByText('Live')).toBeTruthy();
+  const notes = screen.getAllByRole('note').map(note => note.textContent);
+  expect(notes[0]).toMatch(/Stripe refunded \$50\.00\. The invoice balance was not changed/);
+  expect(notes[1]).toMatch(/disputed \$250\.00 \(product not received\)\. Respond in Stripe/);
+  expect(screen.queryByRole('button', { name: /Create payment link/ })).toBeNull();
+});
+
+it('explains a paused Stripe account and a refused create plainly', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/v1/payments/stripe'
+    ? json({ configured: true, connected: true, chargesEnabled: false, mode: 'live', onboarding: 'restricted' })
+    : json({ links: [{ id: 'f1', invoiceVersion: 2, amountCents: 25_000, state: 'failed', url: null, mode: 'live', detail: 'Stripe refused the request before creating a link, so nothing was created. Stripe is busy right now.', createdAt: '2026-10-30T00:00:00Z' }] })));
+  render(<InvoicePaymentLinks invoice={invoice} canManage />);
+  expect(await screen.findByText(/Stripe has paused payments for this company/)).toBeTruthy();
+  expect(screen.getByText(/nothing was created/)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: /Check original payment/ })).toBeNull();
 });

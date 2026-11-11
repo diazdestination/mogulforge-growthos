@@ -1,0 +1,37 @@
+diff --git a/bin.cjs b/bin.cjs
+index 07274ea6f53fd54a129b3d338892feda6e995cff..0ccba2e471c7413c7642b226931560c92fa18893 100755
+--- a/bin.cjs
++++ b/bin.cjs
+@@ -17737,7 +17737,15 @@ WHERE
+       JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
+       JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema
+         AND tc.table_name = c.table_name AND ccu.column_name = c.column_name
+-      WHERE tc.table_name = '${tableName}' and constraint_schema = '${tableSchema}';`
++      WHERE tc.table_name = '${tableName}' and constraint_schema = '${tableSchema}'
++      ORDER BY constraint_name, (
++        SELECT array_position(pc.conkey, pa.attnum)
++        FROM pg_catalog.pg_constraint pc
++        JOIN pg_catalog.pg_attribute pa ON pa.attrelid = pc.conrelid AND pa.attname = c.column_name
++        WHERE pc.conname = tc.constraint_name
++          AND pc.conrelid = format('%I.%I', tc.table_schema, tc.table_name)::regclass
++        LIMIT 1
++      );`
+             );
+             const tableChecks = await db.query(`SELECT 
+ 						tc.constraint_name,
+@@ -17798,12 +17806,13 @@ WHERE
+               AND att.attrelid = con.conrelid
+             LEFT JOIN pg_catalog.pg_class frel ON frel.oid = con.confrelid
+             LEFT JOIN pg_catalog.pg_namespace fnsp ON fnsp.oid = frel.relnamespace
+-            LEFT JOIN pg_catalog.pg_attribute fatt ON fatt.attnum = ANY (con.confkey)
++            LEFT JOIN pg_catalog.pg_attribute fatt ON fatt.attnum = con.confkey[array_position(con.conkey, att.attnum)]
+               AND fatt.attrelid = con.confrelid
+           WHERE
+             nsp.nspname = '${tableSchema}'
+             AND rel.relname = '${tableName}'
+-            AND con.contype IN ('f');`
++            AND con.contype IN ('f')
++          ORDER BY con.conname, array_position(con.conkey, att.attnum);`
+             );
+             foreignKeysCount += tableForeignKeys.length;
+             if (progressCallback) {

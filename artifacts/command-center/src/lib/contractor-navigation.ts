@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Settings2,
   Shield,
+  Smartphone,
   Sparkles,
   TrendingUp,
   Trello,
@@ -31,6 +32,7 @@ import {
   canManageSettings,
   canReadInvoices,
   canViewAuditLog,
+  isFieldRole,
 } from "./permissions";
 
 export type NavigationGroup =
@@ -43,7 +45,7 @@ export interface ContractorNavigationItem {
   group: NavigationGroup;
   keywords: string;
   matches?: string[];
-  access?: "settings" | "audit" | "platform" | "invoices";
+  access?: "settings" | "audit" | "platform" | "invoices" | "field";
 }
 
 const items: ContractorNavigationItem[] = [
@@ -54,6 +56,14 @@ const items: ContractorNavigationItem[] = [
     group: "Daily work",
     keywords: "home daily assigned due appointments",
     matches: ["/", "/today"],
+  },
+  {
+    title: "My day",
+    href: "/tech",
+    icon: Smartphone,
+    group: "Daily work",
+    keywords: "tech field my jobs on my way directions collect payment phone",
+    access: "field",
   },
   {
     title: "Customers & Jobs",
@@ -278,6 +288,7 @@ export function contractorNavigation({
     if (item.access === "settings") return canManageSettings(role);
     if (item.access === "audit") return canViewAuditLog(role);
     if (item.access === "invoices") return canReadInvoices(role);
+    if (item.access === "field") return isFieldRole(role);
     return true;
   });
   if (showSetup && canManageSettings(role))

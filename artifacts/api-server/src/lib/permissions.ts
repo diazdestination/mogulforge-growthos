@@ -6,6 +6,7 @@ export type Permission =
   | "crm.delete"
   | "invoices.read"
   | "invoices.manage"
+  | "payments.collect"
   | "audit.read"
   | "users.read"
   | "users.manage"
@@ -40,6 +41,9 @@ const PERMISSION_MATRIX: Record<Permission, UserRole[]> = {
   "crm.delete": ["owner", "admin", "sales_manager"],
   "invoices.read": ["owner", "admin", "office", "sales_manager"],
   "invoices.manage": ["owner", "admin", "office"],
+  // Narrow field collection: only invoices linked to the member's own assigned
+  // appointment (enforced in services/field-collect.ts), never invoice lists or edits.
+  "payments.collect": ["owner", "admin", "office", "sales_rep", "inspector", "production"],
   "audit.read": ADMIN_ROLES,
   "users.read": ALL_ROLES,
   "users.manage": ADMIN_ROLES,

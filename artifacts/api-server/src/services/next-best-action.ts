@@ -4,6 +4,7 @@ import {
   contactsTable,
   db,
   emailResponseReviewsTable,
+  estimatesTable,
   leadsTable,
   nextActionFeedbackTable,
   type Lead,
@@ -59,6 +60,12 @@ const OUTREACH_STATUSES = [
   "nurture",
 ];
 const QUEUE_STATUSES = [...OUTREACH_STATUSES, "estimate_sent", "claim_pending"];
+/**
+ * Stages before the customer decides. A lead here with an estimate marked
+ * sent is awaiting the customer's answer even when nobody moved the pipeline
+ * stage to estimate_sent, so it still gets an estimate follow-up.
+ */
+const PRE_DECISION_STATUSES = [...QUEUE_STATUSES, "inspection_scheduled", "inspection_completed", "estimate_preparing"];
 
 interface LeadSignals {
   hasCustomerReplyHold: boolean;
@@ -68,6 +75,7 @@ interface LeadSignals {
   contactName: string | null;
   hasPhone: boolean;
   hasEmail: boolean;
+  hasUndecidedEstimate: boolean;
 }
 
 /** Suppressions in effect for a lead: actionType → why it's hidden. */
@@ -108,7 +116,7 @@ async function loadSignals(
   const leadIds = leads.map((l) => l.id);
   const contactIds = [...new Set(leads.map((l) => l.contactId))];
 
-  const [activityRows, apptRows, contactRows, replyRows] = await Promise.all([
+  const [activityRows, apptRows, contactRows, replyRows, estimateRows] = await Promise.all([
     db
       .select({
         leadId: activitiesTable.leadId,
@@ -157,12 +165,17 @@ async function loadSignals(
       .from(emailResponseReviewsTable)
       .where(and(eq(emailResponseReviewsTable.organizationId, organizationId),
         inArray(emailResponseReviewsTable.leadId, leadIds), eq(emailResponseReviewsTable.holdActive, true))),
+    db.select({ leadId: estimatesTable.leadId })
+      .from(estimatesTable)
+      .where(and(eq(estimatesTable.organizationId, organizationId),
+        inArray(estimatesTable.leadId, leadIds), eq(estimatesTable.status, "sent"))),
   ]);
 
   const activityByLead = new Map(activityRows.map((r) => [r.leadId, r]));
   const upcoming = new Set(apptRows.map((r) => r.leadId));
   const contactById = new Map(contactRows.map((r) => [r.id, r]));
   const replyHeld = new Set(replyRows.map(row => row.leadId));
+  const undecided = new Set(estimateRows.map(row => row.leadId));
 
   for (const lead of leads) {
     const act = activityByLead.get(lead.id);
@@ -177,6 +190,7 @@ async function loadSignals(
         : null,
       hasPhone: Boolean(contact?.phone),
       hasEmail: Boolean(contact?.email),
+      hasUndecidedEstimate: undecided.has(lead.id),
     });
   }
   return map;
@@ -253,17 +267,18 @@ function rankLeadCandidates(
     });
   }
 
-  if (lead.status === "estimate_sent" || lead.status === "claim_pending") {
+  const awaitingEstimate = lead.status === "estimate_sent" || (signals.hasUndecidedEstimate && lead.status !== "claim_pending");
+  if (awaitingEstimate || lead.status === "claim_pending") {
     candidates.push({
       ...base,
       actionType: "follow_up_estimate",
       title:
-        lead.status === "estimate_sent"
+        awaitingEstimate
           ? "Follow up on the estimate"
           : "Check in on the insurance claim",
       channel: signals.hasEmail ? "email" : signals.hasPhone ? "phone" : "email",
       reasons: [
-        lead.status === "estimate_sent"
+        awaitingEstimate
           ? "Estimate is out — a nudge now keeps it top of mind"
           : "Claim is pending — a check-in keeps the job moving",
         quietDays > 0 ? `No activity in ${quietDays} day${quietDays === 1 ? "" : "s"}` : "Stay ahead while it's fresh",
@@ -434,9 +449,18 @@ export async function listTodayActions(
     .where(
       and(
         eq(leadsTable.organizationId, organizationId),
-        inArray(
-          leadsTable.status,
-          QUEUE_STATUSES as (typeof leadsTable.$inferSelect.status)[],
+        or(
+          inArray(
+            leadsTable.status,
+            QUEUE_STATUSES as (typeof leadsTable.$inferSelect.status)[],
+          ),
+          and(
+            inArray(
+              leadsTable.status,
+              PRE_DECISION_STATUSES as (typeof leadsTable.$inferSelect.status)[],
+            ),
+            sql`EXISTS (SELECT 1 FROM ${estimatesTable} WHERE ${estimatesTable.organizationId} = ${organizationId} AND ${estimatesTable.leadId} = ${leadsTable.id} AND ${estimatesTable.status} = 'sent')`,
+          ),
         ),
       ),
     )

@@ -19,7 +19,8 @@ import {
   valueEntriesTable as entries,
   type UserRole,
 } from "@workspace/db";
-import { hasPermission } from "../lib/permissions";
+import { hasPermission, type Permission } from "../lib/permissions";
+import { configuredStripeMode } from "./stripe-mode";
 import { lockContractorSchedule } from "./contractor-scheduling";
 import { invoiceEquipment } from "./invoice-equipment";
 import { assertCustomerWorkActive, assertCustomerWorkReader, createCustomerWorkRoot, customerWorkActor, customerWorkHash, lockCustomerWork, readNativeWorkLineage } from "./customer-work-lineage";
@@ -72,6 +73,7 @@ async function actor(
   userId: string,
   manage: boolean,
   effectiveRole?: UserRole,
+  permission: Permission = manage ? "invoices.manage" : "invoices.read",
 ) {
   const query = reader
     .select({ id: usersTable.id, role: usersTable.role })
@@ -86,8 +88,8 @@ async function actor(
   const [user] = await (manage ? query.for("share") : query);
   if (
     !user ||
-    !hasPermission(user.role, manage ? "invoices.manage" : "invoices.read") ||
-    !hasPermission(effectiveRole ?? user!.role, manage ? "invoices.manage" : "invoices.read")
+    !hasPermission(user.role, permission) ||
+    !hasPermission(effectiveRole ?? user!.role, permission)
   ) {
     throw new InvoiceError(
       403,
@@ -543,12 +545,14 @@ export async function getInvoice(
 }
 
 /** No nested transaction/pool read: the caller retains its own exact admission locks. */
-export async function readInvoiceDetail(reader:Reader,org:string,userId:string,id:string,options:{effectiveRole?:UserRole;lockRows?:boolean}={}) {
+/** `readAs: "payments.collect"` is only for field-collect.ts, after it has proven the invoice is linked to the member's own assigned job. */
+export async function readInvoiceDetail(reader:Reader,org:string,userId:string,id:string,options:{effectiveRole?:UserRole;lockRows?:boolean;readAs?:"payments.collect"}={}) {
   const locked=options.lockRows === true;
+  const permission:Permission=options.readAs ?? "invoices.read";
   assertCustomerWorkReader(reader,locked);
-  await actor(reader,org,userId,false,options.effectiveRole);
+  await actor(reader,org,userId,false,options.effectiveRole,permission);
   const row=await load(reader,org,id,locked);
-  if (row.customerWorkId) await customerWorkActor(reader,org,{userId,effectiveRole:options.effectiveRole},"invoices.read",locked);
+  if (row.customerWorkId) await customerWorkActor(reader,org,{userId,effectiveRole:options.effectiveRole},permission,locked);
   return detail(reader,org,row);
 }
 
@@ -707,6 +711,8 @@ async function mutate(
     if (!providerReceipt) {
       const [collecting] = await tx.select({ id: invoicePaymentLinksTable.id }).from(invoicePaymentLinksTable).where(and(
         eq(invoicePaymentLinksTable.organizationId, org), eq(invoicePaymentLinksTable.invoiceId, id),
+        // A live deployment never waits on a Stripe test-mode collection (no real money).
+        configuredStripeMode() === "live" ? eq(invoicePaymentLinksTable.mode, "live") : undefined,
         or(inArray(invoicePaymentLinksTable.state, ["open", "processing"]), and(eq(invoicePaymentLinksTable.state, "needs_reconciliation"), isNull(invoicePaymentLinksTable.paidAt))),
       )).limit(1);
       if (collecting) return conflict("invoice_collection_pending", "Resolve the outstanding Stripe collection before changing this invoice or its recorded balance.");
@@ -994,7 +1000,7 @@ export async function recordInvoicePayment(
   id: string,
   raw: unknown,
   effectiveRole?: UserRole,
-  options: { evidence?: "staff_recorded" | "stripe_checkout" } = {},
+  options: { evidence?: "staff_recorded" | "stripe_checkout"; stripeMode?: "test" | "live" } = {},
 ) {
   const parsed = invoicePaymentSchema.parse(raw);
   const input = {
@@ -1065,6 +1071,7 @@ export async function recordInvoicePayment(
         invoiceId: row.id,
         kind: "payment",
         evidence: options.evidence ?? "staff_recorded",
+        ...(options.stripeMode ? { stripeMode: options.stripeMode } : {}),
         providerEffect: false,
       },
     });

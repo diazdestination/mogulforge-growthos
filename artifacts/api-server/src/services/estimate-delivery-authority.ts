@@ -27,6 +27,7 @@ import { assertOutboundDeliveryAllowed } from "./outbound-hold";
 import {
   assertEstimateInitialDraft,
   renderEstimateEmail,
+  estimateOffersApprovalLink,
   assertEstimateEmailMessageFits,
   estimateDeliveryFingerprint,
   estimateEmailSnapshotSchema,
@@ -188,9 +189,12 @@ async function assemble(
     totalCents: estimate.totalCents,
     notes: estimate.notes,
   };
+  // Whether the email offers online approval follows from the saved estimate
+  // alone, so the reviewed fingerprint does not depend on link state.
   const message = renderEstimateEmail(
     document,
     lineage.contact.email?.trim().toLowerCase() ?? "",
+    { approvalLink: estimateOffersApprovalLink(estimate) },
   );
   assertEstimateEmailMessageFits(selected.sender.provider, message);
   const senderIdentitySha256 = estimateDeliveryFingerprint({
@@ -251,6 +255,20 @@ export async function assertEstimateEmailEligibility(
     held(
       "estimate_email_held",
       "The original recipient is unavailable or changed.",
+    );
+  const { zapierEstimateEmailOwner } = await import(
+    "./zapier/zapier-owned-app-flows"
+  );
+  if (
+    await zapierEstimateEmailOwner(
+      snapshot.organizationId,
+      snapshot.estimateId,
+      reader,
+    )
+  )
+    held(
+      "estimate_email_held",
+      "This estimate has an email request through your connected mailbox (Zapier). Review it in Settings > Connections first.",
     );
   try {
     assertOutboundDeliveryAllowed({

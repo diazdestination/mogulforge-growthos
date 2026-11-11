@@ -228,9 +228,17 @@ export default function Onboarding() {
                   </div>
                 )}
                 {step.key === 'import-customers' && (
-                  <HousecallCustomerImport
-                    onImported={() => update.mutate({ data: { completeSteps: ['import-customers'] } })}
-                  />
+                  <>
+                    <HousecallCustomerImport
+                      onImported={() => update.mutate({ data: { completeSteps: ['import-customers'] } })}
+                    />
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Also moving jobs, invoices and open balances?{' '}
+                      <Link href="/move-from-housecall-pro" className="font-medium text-primary underline">
+                        Move from Housecall Pro
+                      </Link>
+                    </p>
+                  </>
                 )}
                 {isInviteTeam && (
                   <div className="mt-3 space-y-3">

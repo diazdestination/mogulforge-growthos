@@ -204,9 +204,14 @@ function InvoiceIndex({ actor }: { actor: Actor }) {
           </div>
           <div className="flex flex-wrap gap-2">
             {actor.migrate && (
-              <Link href="/financial-migrations" className={invoiceButton}>
-                Import invoice history
-              </Link>
+              <>
+                <Link href="/move-from-housecall-pro" className={invoiceButton}>
+                  Move from Housecall Pro
+                </Link>
+                <Link href="/financial-migrations" className={invoiceButton}>
+                  Import invoice history
+                </Link>
+              </>
             )}
             {actor.manage && !creating && (
               <button

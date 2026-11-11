@@ -38,3 +38,13 @@ export function canReadInvoices(role?: UserRole | null): boolean {
 export function canManageInvoices(role?: UserRole | null): boolean {
   return !!role && ['owner', 'admin', 'office'].includes(role);
 }
+
+/** Field collection on the member's own assigned jobs (server: payments.collect). */
+export function canCollectPayments(role?: UserRole | null): boolean {
+  return !!role && ['owner', 'admin', 'office', 'sales_rep', 'inspector', 'production'].includes(role);
+}
+
+/** Roles that go out to jobs and get the phone-first "My day" screen. Office staff and viewers do not. */
+export function isFieldRole(role?: UserRole | null): boolean {
+  return !!role && ['owner', 'admin', 'sales_manager', 'sales_rep', 'inspector', 'production'].includes(role);
+}

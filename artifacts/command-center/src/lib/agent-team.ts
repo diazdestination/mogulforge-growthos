@@ -23,9 +23,9 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
         "reality": "Prepare quantities, prices and line items in the estimate workspace. Your team reviews the scope and totals."
       },
       {
-        "title": "Estimate status & follow-up",
+        "title": "Customer approval & signature",
         "stage": "workspace",
-        "reality": "Track drafts, decisions and follow-up. Changing a status does not itself deliver a proposal or contact a customer."
+        "reality": "Share a secure approval link for an estimate, or include it in the reviewed estimate email. The customer reviews it, signs and approves or declines; the signed record and estimate status update together. Creating a link or changing a status does not contact the customer; your team shares the link, emails it with the estimate, or requests a text that waits for approval. A draft can also be emailed, without the approval link, from your own Gmail or Outlook connected through Zapier, after your approval."
       },
       {
         "title": "Returning-customer estimates",
@@ -67,7 +67,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Card & bank collection",
         "stage": "setup",
-        "reality": "Test invoice Checkout in a configured Stripe sandbox. Confirmed test payments are recorded on the invoice; live collection is unavailable and no real money moves."
+        "reality": "Invoice Checkout on your own Stripe account (test mode by default; live once your deployment is switched and Stripe setup is finished in Settings). On the job, a tech can create the pay link for an invoice linked to their own assigned job, show it as a QR code, or text it from your own business number through Zapier to a customer who agreed to texts (sent on the tech's tap, or after office approval if you choose Approve each). Confirmed payments are recorded on the invoice; refunds and disputes are flagged for office review. In test mode no real money moves."
       }
     ]
   },
@@ -84,17 +84,17 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Draft & issue invoices",
         "stage": "workspace",
-        "reality": "Authorized staff can prepare a draft, review its saved details and issue a customer invoice. Issued document history is retained."
+        "reality": "Authorized staff can prepare a draft, review the customer, job and line items, and issue a customer invoice. Issued document history is retained."
       },
       {
-        "title": "Document & customer review",
-        "stage": "workspace",
-        "reality": "Review the customer, job, line items and issued document before choosing the next action."
+        "title": "Accounting export",
+        "stage": "setup",
+        "reality": "Send an issued invoice, and each payment recorded against it, to QuickBooks Online or Xero through your own Zapier connection. Drafts are never exported. The connection starts switched off; with approval on, an authorized staff member approves each export."
       },
       {
         "title": "Invoice email delivery",
         "stage": "setup",
-        "reality": "The delivery worklist exposes pending and uncertain attempts. Sending requires an approved mailbox, recipient and company delivery setup; uncertain sends are not retried automatically."
+        "reality": "Each invoice keeps its delivery history, and the delivery worklist shows failed, pending and uncertain attempts. Sending requires an approved mailbox, a previewed recipient and company delivery setup; uncertain sends are not retried automatically. You can instead email an issued invoice from your own Gmail or Outlook through Zapier; each invoice uses one path, not both."
       },
       {
         "title": "Exceptions & audit history",
@@ -121,12 +121,12 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Workday coordination",
         "stage": "workspace",
-        "reality": "Review scheduled visits and their saved status. Required structured work must be completed through its work record."
+        "reality": "Review each day's visits with their working windows, assigned crew and saved status. Required structured work is completed through its work record, and an uncertain change is never repeated automatically."
       },
       {
-        "title": "Change review",
-        "stage": "workspace",
-        "reality": "Review the current appointment when a change is uncertain; no reschedule is repeated automatically."
+        "title": "Crew day sheets",
+        "stage": "setup",
+        "reality": "Text a crew member their day's stops from your own business number through Zapier. Each crew member's number is saved on the connection, and the text waits for staff approval unless an owner switches the connection to automatic."
       },
       {
         "title": "Route planning & optimization",
@@ -158,7 +158,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Customer confirmations",
         "stage": "setup",
-        "reality": "Appointment reminders go by email, or by text to customers who agreed to texts: through GrowthOS texting, or from your own business number once your phone app is connected through Zapier. A draft or staff booking alone does not send a message."
+        "reality": "Appointment reminders go by email, or by text to customers who agreed to texts: through GrowthOS texting, or from your own business number once your phone app is connected through Zapier. From My day, a tech can also request one On My Way text per job per day with an ETA; Settings recommends sending it on the tech's tap (Automatic); choose Approve each to have the office approve it first. A draft or staff booking alone does not send a message, and other business-number texts wait for staff approval unless an owner switches that connection to automatic."
       },
       {
         "title": "Add bookings to your calendar",
@@ -180,12 +180,12 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Call & callback review",
         "stage": "workspace",
-        "reality": "Review call records and callback outcomes, then assign the appropriate staff follow-up."
+        "reality": "Review call records and callback outcomes, assign staff follow-up, and connect reviewed call details to an opportunity once the customer’s need is confirmed. With your phone app connected through Zapier, customer text replies are logged for follow-up and STOP replies stop GrowthOS texts to that number."
       },
       {
-        "title": "Reviewed opportunity intake",
-        "stage": "workspace",
-        "reality": "Staff can connect reviewed call details to an opportunity when the customer’s need is confirmed."
+        "title": "Missed-call callbacks",
+        "stage": "setup",
+        "reality": "With your phone system (Quo or CallRail) connected through Zapier, each missed inbound call becomes a high-priority callback task with the caller’s name and number. An optional text-back sends one informational text from your number that names your business and ends with “Reply STOP to opt out”, at most once per caller in your window (24 hours by default) and only 8am to 9pm company time. It stays off until you confirm your texting registration in Settings, can wait for staff approval, and skips opted-out, suppressed, landline or invalid numbers with the reason shown on Calls. Built to support texting rules; a missed call is not permission for other texts."
       },
       {
         "title": "Keypad or voice intake",
@@ -217,7 +217,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Equipment & checklists",
         "stage": "workspace",
-        "reality": "Review company equipment and configurable checklists, and keep visit completion evidence with its work record."
+        "reality": "Record installed equipment at each customer property with its install date and warranty terms, use configurable checklists, and keep visit completion evidence with its work record."
       },
       {
         "title": "Standing service work",
@@ -227,7 +227,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Customer service reminders",
         "stage": "setup",
-        "reality": "A due service can get one reminder by email or text to customers who agreed to it, including a text from your own business number through Zapier. Staff follow-up tasks do not send customer reminders themselves."
+        "reality": "A due service can get one reminder by email or text to customers who agreed to it, including a text from your own business number through Zapier. Staff follow-up tasks do not send customer reminders themselves. Replies and STOP messages to GrowthOS texting are recorded automatically; replies to a text from your own number arrive in your phone app, so record an opt-out on the customer and later reminders are refused."
       }
     ]
   },
@@ -242,9 +242,9 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
     "workspaceLabel": "Open Revenue Desk",
     "tasks": [
       {
-        "title": "Revenue Desk priorities",
+        "title": "Today & Revenue Desk priorities",
         "stage": "workspace",
-        "reality": "Review unowned inquiries, overdue follow-up and estimates awaiting a decision, with supporting records."
+        "reality": "Today ranks one next action per opportunity, such as following up an estimate awaiting the customer’s answer or checking in on a quiet lead, and records what your team did with it. The Revenue Desk groups unowned inquiries, overdue follow-up and stalled estimates. Recommendations support a staff decision and send nothing."
       },
       {
         "title": "Existing lead recovery",
@@ -252,14 +252,14 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
         "reality": "Use reviewed imports, segments and source records to organize opportunities already in the business."
       },
       {
-        "title": "Recorded activity & insights",
-        "stage": "workspace",
-        "reality": "Inspect pipeline and activity reports. Recommendations support a staff decision; they do not prove additional revenue by themselves."
+        "title": "Marketplace leads & reviews",
+        "stage": "setup",
+        "reality": "Through Zapier, new leads from Facebook Lead Ads, Housecall Pro or Jobber become opportunities once each, and new Google or Facebook reviews become follow-up tasks, with one- and two-star reviews marked high priority. Customer email replies from a mailbox connected through Zapier are logged on the customer record with a follow-up task; mail from unknown senders is ignored. SCOUT only reads these connections; it never posts a review reply."
       },
       {
         "title": "Consented outreach",
         "stage": "setup",
-        "reality": "Campaign and delivery controls require approved providers, consent and company setup before customer contact. Your team reviews the action."
+        "reality": "Campaign and delivery controls require approved providers, consent and company setup before customer contact. Your team reviews the action. A review request can be texted from your own number once per finished visit or job, only to customers who agreed to texts."
       }
     ]
   }

@@ -34,8 +34,19 @@ describe("parseCsvPreview", () => {
 describe("suggestCustomerMapping", () => {
   it("suggests only clear generic header matches and never reuses a column", () => {
     expect(suggestCustomerMapping(["ID", "First Name", "Last Name", "Mobile Number", "Email", "Company", "Notes"])).toEqual({
-      externalCustomerId: 0, firstName: 1, lastName: 2, phone: 3, email: 4,
+      externalCustomerId: 0, firstName: 1, lastName: 2, phone: 3, email: 4, notes: 6,
     });
     expect(suggestCustomerMapping(["Customer", "Contact info"])).toEqual({});
+  });
+  it("maps the published Housecall Pro customer export, including a repeated second address block", () => {
+    const header = ["First Name", "Last Name", "Mobile Number", "Email", "Company", "Job Title", "Work Number", "Tags", "Notes", "ID",
+      "Address_1 Street Line 1", "Address_1 Street Line 2", "Address_1 City", "Address_1 State", "Address_1 Postal Code", "Address_1 Billing?", "Address_1 Notes",
+      "Address_1 Street Line 1", "Address_1 Street Line 2", "Address_1 City", "Address_1 State", "Address_1 Postal Code", "Address_1 Billing?", "Address_1 Notes"];
+    expect(suggestCustomerMapping(header)).toEqual({
+      firstName: 0, lastName: 1, phone: 2, email: 3, tags: 7, notes: 8, externalCustomerId: 9,
+      addressLine1: 10, addressLine2: 11, city: 12, state: 13, postalCode: 14,
+      address2Line1: 17, address2Line2: 18, address2City: 19, address2State: 20, address2PostalCode: 21,
+    });
+    expect(suggestCustomerMapping(["First Name", "Address_2 City", "Address_1 City"])).toEqual({ firstName: 0, city: 2, address2City: 1 });
   });
 });

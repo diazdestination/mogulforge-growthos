@@ -334,7 +334,7 @@ describe("importLeads", () => {
 
   it("refuses pipeline fields in a customer import", async () => {
     const result = await importLeads(orgId, { csv: "First,Email,Status\nAl,al@example.com,won", mapping: { firstName: 0, email: 1, status: 2 }, mode: "customers" });
-    expect(result).toMatchObject({ error: expect.stringMatching(/only uses name, email, phone and customer ID/) });
+    expect(result).toMatchObject({ error: expect.stringMatching(/only uses name, email, phone, customer ID/) });
   });
 
   it("rejects a mapping without email or phone", async () => {

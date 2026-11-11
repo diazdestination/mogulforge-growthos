@@ -278,6 +278,8 @@ export const customerWorkspaceActivitySchema = z
       "Communication event recorded",
       "Customer response recorded",
       "Invoice updated",
+      "Housecall Pro job imported",
+      "Housecall Pro estimate imported",
     ]),
     occurredAt: time,
     leadId: id.nullable(),
