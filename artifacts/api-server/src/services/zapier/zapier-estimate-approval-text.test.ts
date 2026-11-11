@@ -19,6 +19,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { encryptSecret } from "../../lib/token-encryption";
 import { deleteTestOrgs } from "../../test-helpers/delete-test-orgs";
 import { createEstimate, updateEstimate } from "../crm";
+import { createCustomerWorkEstimate } from "../returning-customer";
 import { approveEstimate, createEstimateApprovalLink, revokeEstimateApprovalLink } from "../estimate-approvals";
 import { getZapierCapability } from "./zapier-capabilities";
 import { approveZapierAction } from "./zapier-executions";
@@ -124,6 +125,24 @@ describe("ESTI approval-link texts", () => {
     await expect(buildEstimateApprovalTextInput(decided.orgId, decided.estimate.id)).rejects.toMatchObject({ code: "invalid_input" });
 
     await expect(buildEstimateApprovalTextInput(noConsent.orgId, f.estimate.id)).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("texts a returning-customer estimate's link to its work root's customer", async () => {
+    const [org] = await db.insert(organizationsTable).values({ name: "Synthetic Returning Texts", slug: `test-esti-text-rc-${randomUUID()}` }).returning();
+    orgs.push(org!.id);
+    await db.insert(orgSettingsTable).values({ organizationId: org!.id, sendingHours: { quietHoursEnabled: false } });
+    const [owner] = await db.insert(usersTable).values({ organizationId: org!.id, role: "owner", emailVerifiedAt: new Date(), isActive: true }).returning();
+    const [contact] = await db.insert(contactsTable).values({ organizationId: org!.id, firstName: "Robin", phone: "+14045550199" }).returning();
+    await db.insert(consentRecordsTable).values({ organizationId: org!.id, contactId: contact!.id, channel: "sms", granted: true, disclosureVersion: "test" });
+    const { estimate } = await createCustomerWorkEstimate(org!.id, { userId: owner!.id }, {
+      requestId: randomUUID(), confirmed: true, source: { kind: "existing_customer", contactId: contact!.id, propertyId: null },
+      title: "Spring service", lineItems: [{ description: "Tune-up", quantity: 1, unitPriceCents: 19900 }], taxCents: 0, notes: null,
+    });
+    const link = await createEstimateApprovalLink(org!.id, estimate.id, owner!.id);
+    const built = await buildEstimateApprovalTextInput(org!.id, estimate.id);
+    expect(built.input.toPhone).toBe("+14045550199");
+    expect(built.input.body).toContain(link.url);
+    expect(built.input.body.startsWith("Hi Robin, ")).toBe(true);
   });
 
   it("parks for approval by default and sends exactly the re-derived text once approved", async () => {

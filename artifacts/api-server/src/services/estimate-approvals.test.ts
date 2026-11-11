@@ -5,6 +5,7 @@ import {
   contactsTable,
   crmTasksTable,
   customerLifecycleTable,
+  customerWorkCommandsTable,
   db,
   estimateApprovalsTable,
   estimatesTable,
@@ -16,6 +17,8 @@ import { and, eq } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { deleteTestOrgs } from "../test-helpers/delete-test-orgs";
+import { returningCustomerFixture, returningEstimateDraft } from "../test-helpers/returning-customer-fixture";
+import { createCustomerWorkEstimate, updateCustomerWorkEstimate } from "./returning-customer";
 import { createEstimate, deleteEstimate, updateEstimate } from "./crm";
 import {
   approveEstimate,
@@ -219,5 +222,61 @@ describe("estimate approval links", () => {
     const empty = await createEstimate(f.orgId, { leadId: f.lead.id, title: "Empty", lineItems: [] }, { userId: f.owner.id });
     await expect(createEstimateApprovalLink(f.orgId, empty!.id, f.owner.id)).rejects.toMatchObject({ code: "estimate_approval_empty" });
     expect((await getEstimateApprovalStatus(f.orgId, empty!.id)).eligible).toBe(false);
+  });
+});
+
+describe("returning-customer estimate approval", () => {
+  async function returning(withQuantity = 2.125) {
+    const f = await returningCustomerFixture();
+    orgs.push(f.org);
+    const draft = returningEstimateDraft(f);
+    draft.lineItems = [{ description: "Agreed repair scope", quantity: withQuantity, unitPriceCents: 1234 }];
+    const { estimate } = await createCustomerWorkEstimate(f.org, f.actor, draft);
+    const link = await createEstimateApprovalLink(f.org, estimate.id, f.office.id);
+    return { f, estimate, link };
+  }
+
+  it("records the approval through the versioned command with the link creator and customer provenance", async () => {
+    const { f, estimate, link } = await returning();
+    expect(link.approval.state).toBe("waiting");
+    const [frozen] = await db.select().from(estimateApprovalsTable).where(eq(estimateApprovalsTable.estimateId, estimate.id));
+    expect(frozen!.snapshot.customerName).toBe("Synthetic Returning Customer");
+    expect(await approveEstimate(tokenOf(link.url), { signerName: "Sam Returning", signatureDataUrl: SIGNATURE, consent: true }, META)).toMatchObject({ state: "approved" });
+
+    const [row] = await db.select().from(estimatesTable).where(eq(estimatesTable.id, estimate.id));
+    expect(row).toMatchObject({ status: "accepted", workVersion: estimate.workVersion! + 1, totalCents: estimate.totalCents });
+    expect(row!.acceptedAt).not.toBeNull();
+    const [command] = await db.select().from(customerWorkCommandsTable).where(eq(customerWorkCommandsTable.requestId, link.approval.id));
+    expect(command).toMatchObject({ action: "estimate_updated", actorUserId: f.office.id, estimateId: estimate.id, resultVersion: row!.workVersion });
+    const audits = await db.select().from(auditEventsTable).where(eq(auditEventsTable.entityId, estimate.id));
+    expect(audits.find((a) => a.action === "customer_work.estimate_updated" && (a.metadata as { requestId?: string }).requestId === link.approval.id)!.metadata).toMatchObject({
+      staffRecorded: false,
+      customerApproval: { approvalId: link.approval.id, decision: "approved" },
+    });
+    expect(audits.some((a) => a.action === "estimate.customer_approved")).toBe(true);
+    const [task] = await db.select().from(crmTasksTable).where(eq(crmTasksTable.sourceEvent, `estimate.approved:${estimate.id}`));
+    expect(task).toMatchObject({ leadId: null, contactId: f.contact.id, assignedUserId: f.office.id });
+  });
+
+  it("declines a returning estimate, and refuses a link outdated by a new version", async () => {
+    const declined = await returning();
+    await declineEstimate(tokenOf(declined.link.url), { reason: "Waiting until spring" }, META);
+    const [row] = await db.select().from(estimatesTable).where(eq(estimatesTable.id, declined.estimate.id));
+    expect(row).toMatchObject({ status: "declined", workVersion: declined.estimate.workVersion! + 1 });
+
+    const { f, estimate, link } = await returning();
+    const { source: _source, ...edit } = returningEstimateDraft(f);
+    await updateCustomerWorkEstimate(f.org, f.actor, estimate.id, { ...edit, requestId: randomUUID(), expectedWorkVersion: estimate.workVersion, status: "draft" });
+    await expect(approveEstimate(tokenOf(link.url), { signerName: "Sam Returning", signatureDataUrl: SIGNATURE, consent: true }, META)).rejects.toMatchObject({ code: "estimate_approval_outdated" });
+  });
+
+  it("records nothing when the link creator can no longer act for the company", async () => {
+    const { f, estimate, link } = await returning();
+    await db.update(usersTable).set({ isActive: false }).where(eq(usersTable.id, f.office.id));
+    await expect(approveEstimate(tokenOf(link.url), { signerName: "Sam Returning", signatureDataUrl: SIGNATURE, consent: true }, META)).rejects.toMatchObject({ code: "estimate_approval_unrecordable", status: 409 });
+    const [row] = await db.select().from(estimatesTable).where(eq(estimatesTable.id, estimate.id));
+    expect(row).toMatchObject({ status: "draft", workVersion: estimate.workVersion });
+    const [approval] = await db.select().from(estimateApprovalsTable).where(eq(estimateApprovalsTable.id, link.approval.id));
+    expect(approval!.decision).toBeNull();
   });
 });

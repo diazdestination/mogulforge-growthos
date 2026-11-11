@@ -25,7 +25,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Customer approval & signature",
         "stage": "workspace",
-        "reality": "Share a secure approval link for an opportunity estimate. The customer reviews it, signs and approves or declines; the signed record and estimate status update together. Creating a link does not contact the customer; your team shares it or requests a text that waits for approval."
+        "reality": "Share a secure approval link for an estimate, or include it in the reviewed estimate email. The customer reviews it, signs and approves or declines; the signed record and estimate status update together. Creating a link does not contact the customer; your team shares it, emails it with the estimate, or requests a text that waits for approval."
       },
       {
         "title": "Returning-customer estimates",

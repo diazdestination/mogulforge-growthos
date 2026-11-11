@@ -238,9 +238,58 @@ export function assertEstimateSavedAmounts(estimate: Estimate): void {
       "Saved estimate amounts do not match the source's rounding rule.",
     );
 }
+/**
+ * Reviewed and retained estimate emails carry this stable placeholder, never
+ * the approval link: the link is a bearer capability, so it is rendered only
+ * by the send step, immediately before the provider adapter, and never stored.
+ */
+export const ESTIMATE_APPROVAL_LINK_PLACEHOLDER =
+  "[Secure approval link: added when this email is sent]";
+const APPROVAL_LINK_SUFFIX = `\n\nReview, sign and approve this estimate online:\n${ESTIMATE_APPROVAL_LINK_PLACEHOLDER}`;
+/** Room reserved for the rendered link when checking provider size limits. */
+const APPROVAL_LINK_RESERVE = 512;
+/** Same rule as the approval service: an open draft/sent estimate with priced lines. */
+export function estimateOffersApprovalLink(
+  estimate: Pick<
+    Estimate,
+    "leadId" | "customerWorkId" | "workVersion" | "status" | "lineItems" | "totalCents"
+  >,
+): boolean {
+  const source =
+    (estimate.leadId !== null && estimate.customerWorkId === null) ||
+    (estimate.leadId === null &&
+      estimate.customerWorkId !== null &&
+      Number.isInteger(estimate.workVersion) &&
+      (estimate.workVersion ?? 0) > 0);
+  return (
+    source &&
+    ["draft", "sent"].includes(estimate.status) &&
+    estimate.lineItems.length > 0 &&
+    estimate.totalCents > 0
+  );
+}
+export function hasApprovalLinkPlaceholder(body: string): boolean {
+  return body.endsWith(APPROVAL_LINK_SUFFIX);
+}
+/**
+ * Send-time rendering only. The placeholder is the body's fixed final line, so
+ * customer-entered text that happens to contain it is never replaced. With no
+ * usable link the whole approval block is removed and the reviewed estimate
+ * itself is sent unchanged.
+ */
+export function renderApprovalLinkForSend(
+  body: string,
+  url: string | null,
+): string {
+  if (!hasApprovalLinkPlaceholder(body)) return body;
+  if (url && /^https?:\/\/[^\s]+$/.test(url))
+    return body.slice(0, -ESTIMATE_APPROVAL_LINK_PLACEHOLDER.length) + url;
+  return body.slice(0, -APPROVAL_LINK_SUFFIX.length);
+}
 export function renderEstimateEmail(
   document: EstimateEmailDocument,
   recipient: string,
+  options: { approvalLink?: boolean } = {},
 ): EstimateEmailMessage {
   const parsed = estimateEmailDocumentSchema.safeParse(document);
   if (!parsed.success || !mailbox.safeParse(recipient).success)
@@ -276,7 +325,7 @@ export function renderEstimateEmail(
       ...(document.notes !== null
         ? ["", "Customer-facing notes", document.notes]
         : []),
-    ].join("\n"),
+    ].join("\n") + (options.approvalLink ? APPROVAL_LINK_SUFFIX : ""),
   };
 }
 export function assertEstimateEmailMessageFits(
@@ -291,7 +340,10 @@ export function assertEstimateEmailMessageFits(
     );
   if (
     selectedProvider === "microsoft" &&
-    (message.subject.length > 1000 || message.body.length > 1000000)
+    (message.subject.length > 1000 ||
+      message.body.length +
+        (hasApprovalLinkPlaceholder(message.body) ? APPROVAL_LINK_RESERVE : 0) >
+        1000000)
   )
     throw new EstimateDeliveryError(
       422,

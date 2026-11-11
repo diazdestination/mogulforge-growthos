@@ -736,9 +736,11 @@ export async function buildEstimateApprovalTextInput(organizationId: string, est
   if (expectedApprovalId && open.approval.id !== expectedApprovalId) {
     throw new ZapierExecutionError("The approval link changed after this text was requested. Request a new text.", "invalid_input");
   }
-  if (!open.lead || !open.contact) invalidReminderParents();
-  const contact = await reminderContact(reader, organizationId, { leadId: open.lead.id, contactId: open.contact.id });
-  const gate = await checkSendEligibility({ organizationId, leadId: open.lead.id, contact, channel: "sms", kind: "transactional" }, reader);
+  // An opportunity estimate texts its lead's contact; a returning estimate its work root's contact.
+  if (!open.contact || (open.estimate.leadId && !open.lead)) invalidReminderParents();
+  const leadId = open.lead?.id ?? null;
+  const contact = await reminderContact(reader, organizationId, { leadId, contactId: open.contact!.id });
+  const gate = await checkSendEligibility({ organizationId, leadId, contact, channel: "sms", kind: "transactional" }, reader);
   if (!gate.ok) textBlocked(gate.reason);
   const toPhone = phoneE164(contact.phone ?? "");
   if (!toPhone) textBlocked("invalid_phone");

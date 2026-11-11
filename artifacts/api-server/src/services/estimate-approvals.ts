@@ -4,6 +4,7 @@ import {
   auditEventsTable,
   contactsTable,
   crmTasksTable,
+  customerWorkRootsTable,
   db,
   estimateApprovalsTable,
   estimatesTable,
@@ -16,6 +17,9 @@ import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 
 import { updateEstimateInTransaction } from "./crm";
 import { customerWorkHash, lockCustomerWork } from "./customer-work-lineage";
+import { CustomerWorkError } from "./returning-customer-contract";
+import { estimateOffersApprovalLink } from "./estimate-delivery-contract";
+import { updateCustomerWorkEstimate } from "./returning-customer";
 import { assertCustomerLifecycleActive } from "./customer-lifecycle";
 import { publicBaseUrl } from "./send-gate";
 import { getBusinessName } from "./settings";
@@ -108,21 +112,33 @@ async function readEstimate(reader: Reader, organizationId: string, estimateId: 
   return estimate ?? null;
 }
 
-async function estimateCustomer(reader: Reader, organizationId: string, leadId: string | null) {
-  if (!leadId) return null;
+/** The estimate's customer: its opportunity's contact, or the returning-work root's contact. */
+async function estimateParty(reader: Reader, organizationId: string, estimate: Pick<Estimate, "leadId" | "customerWorkId">) {
+  if (estimate.leadId) {
+    const [row] = await reader
+      .select({ lead: leadsTable, contact: contactsTable })
+      .from(leadsTable)
+      .leftJoin(contactsTable, and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, leadsTable.contactId)))
+      .where(and(eq(leadsTable.organizationId, organizationId), eq(leadsTable.id, estimate.leadId)));
+    return { lead: row?.lead ?? null, contact: row?.contact ?? null };
+  }
+  if (!estimate.customerWorkId) return { lead: null, contact: null };
   const [row] = await reader
-    .select({ lead: leadsTable, contact: contactsTable })
-    .from(leadsTable)
-    .leftJoin(contactsTable, and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, leadsTable.contactId)))
-    .where(and(eq(leadsTable.organizationId, organizationId), eq(leadsTable.id, leadId)));
-  return row ?? null;
+    .select({ contact: contactsTable })
+    .from(customerWorkRootsTable)
+    .innerJoin(contactsTable, and(eq(contactsTable.organizationId, organizationId), eq(contactsTable.id, customerWorkRootsTable.contactId)))
+    .where(and(eq(customerWorkRootsTable.organizationId, organizationId), eq(customerWorkRootsTable.id, estimate.customerWorkId)));
+  return { lead: null, contact: row?.contact ?? null };
 }
+
+/** Opportunity estimates, or versioned returning-customer estimates. */
+const approvalSource = (estimate: Estimate) =>
+  (estimate.leadId !== null && estimate.customerWorkId === null) ||
+  (estimate.leadId === null && estimate.customerWorkId !== null && Number.isInteger(estimate.workVersion) && (estimate.workVersion ?? 0) > 0);
 
 function assertLinkable(estimate: Estimate | null): asserts estimate is Estimate {
   if (!estimate) fail(404, "estimate_not_found", "Estimate not found.");
-  if (estimate!.customerWorkId || !estimate!.leadId) {
-    fail(409, "estimate_approval_unsupported", "Customer approval links are available for opportunity estimates. Record a returning-customer decision on its versioned estimate.");
-  }
+  if (!approvalSource(estimate!)) fail(409, "estimate_approval_unsupported", "This estimate's customer source is unavailable.");
   if (!["draft", "sent"].includes(estimate!.status)) {
     fail(409, "estimate_already_decided", "This estimate is already accepted or declined.");
   }
@@ -174,7 +190,7 @@ export async function getEstimateApprovalStatus(organizationId: string, estimate
   const estimate = await readEstimate(db, organizationId, estimateId);
   if (!estimate) fail(404, "estimate_not_found", "Estimate not found.");
   const approval = await latestApproval(db, organizationId, estimateId);
-  const eligible = !estimate!.customerWorkId && !!estimate!.leadId && ["draft", "sent"].includes(estimate!.status) && estimate!.lineItems.length > 0 && estimate!.totalCents > 0;
+  const eligible = estimateOffersApprovalLink(estimate!);
   return { estimateId, eligible, approval: approval ? staffView(approval, estimate) : null };
 }
 
@@ -183,7 +199,12 @@ export async function getEstimateApprovalStatus(organizationId: string, estimate
  * existing open link when it still matches. A stale or expired open link is
  * revoked first so only one link is ever open per estimate.
  */
-export async function createEstimateApprovalLink(organizationId: string, estimateId: string, actorUserId: string) {
+export async function createEstimateApprovalLink(
+  organizationId: string,
+  estimateId: string,
+  actorUserId: string,
+  source: "staff" | "estimate_email" = "staff",
+) {
   signingKey();
   // Settings reads take the company lifecycle lock in their own transaction; read first.
   const companyName = await getBusinessName(organizationId);
@@ -222,7 +243,7 @@ export async function createEstimateApprovalLink(organizationId: string, estimat
         metadata: { approvalId: open.id, reason: open.snapshotSha256 === contentSha ? "expired" : "estimate_changed" },
       });
     }
-    const customer = await estimateCustomer(tx, organizationId, estimate!.leadId);
+    const customer = await estimateParty(tx, organizationId, estimate!);
     const customerName = customer?.contact ? [customer.contact.firstName, customer.contact.lastName].filter(Boolean).join(" ").trim() || null : null;
     const snapshot: EstimateApprovalSnapshot = {
       formatVersion: 1,
@@ -255,10 +276,37 @@ export async function createEstimateApprovalLink(organizationId: string, estimat
       action: "estimate.approval_link_created",
       entityType: "estimate",
       entityId: estimateId,
-      metadata: { approvalId: id, snapshotSha256: contentSha, expiresAt: row!.expiresAt.toISOString(), customerContacted: false },
+      metadata: { approvalId: id, snapshotSha256: contentSha, expiresAt: row!.expiresAt.toISOString(), customerContacted: false, source },
     });
     return { approval: staffView(row!, estimate!), url: estimateApprovalUrl(id), reused: false };
   });
+}
+
+/**
+ * Send-time only: the approval link for a reviewed estimate email. Reuses the
+ * open link, or creates one when none is open, then re-checks at this moment
+ * that the link is waiting and freezes exactly the content being emailed.
+ * Returns null (send the estimate without the link) instead of throwing, so a
+ * link problem never strands an email whose delivery is already claimed.
+ */
+export async function approvalLinkForEstimateEmail(
+  organizationId: string,
+  estimateId: string,
+  actorUserId: string,
+  emailed: Pick<Estimate, "title" | "lineItems" | "subtotalCents" | "taxCents" | "totalCents" | "notes">,
+): Promise<string | null> {
+  try {
+    const { approval, url } = await createEstimateApprovalLink(organizationId, estimateId, actorUserId, "estimate_email");
+    const [row] = await db
+      .select()
+      .from(estimateApprovalsTable)
+      .where(and(eq(estimateApprovalsTable.organizationId, organizationId), eq(estimateApprovalsTable.id, approval.id)));
+    const estimate = await readEstimate(db, organizationId, estimateId);
+    if (!row || estimateApprovalState(row, estimate) !== "waiting" || row.snapshotSha256 !== estimateContentSha256(emailed)) return null;
+    return url;
+  } catch {
+    return null;
+  }
 }
 
 export async function revokeEstimateApprovalLink(organizationId: string, estimateId: string, actorUserId: string) {
@@ -315,8 +363,8 @@ export async function readWaitingApprovalForText(reader: Reader, organizationId:
   if (state !== "waiting") {
     fail(409, `estimate_approval_${state}`, state === "outdated" ? "The estimate changed after its approval link was created. Create a new link." : "The approval link expired. Create a new link.");
   }
-  const customer = await estimateCustomer(reader, organizationId, estimate!.leadId);
-  return { estimate: estimate!, approval: open!, lead: customer?.lead ?? null, contact: customer?.contact ?? null, url: estimateApprovalUrl(open!.id) };
+  const customer = await estimateParty(reader, organizationId, estimate!);
+  return { estimate: estimate!, approval: open!, lead: customer.lead, contact: customer.contact, url: estimateApprovalUrl(open!.id) };
 }
 
 // ---------- public, token-authenticated ----------
@@ -387,7 +435,9 @@ export function validateSignatureDataUrl(value: string): string {
 async function lockWaiting(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], token: string) {
   const found = await findByToken(token, tx);
   if (!found) fail(404, "estimate_approval_not_found", "This approval link is not valid.");
-  await lockCustomerWork(tx, found!.organizationId);
+  // The versioned returning-estimate command also takes the invoices lock; take
+  // it here, before any row lock, so both estimate kinds share one lock order.
+  await lockCustomerWork(tx, found!.organizationId, true);
   const [approval] = await tx.select().from(estimateApprovalsTable).where(eq(estimateApprovalsTable.id, found!.id)).for("update");
   const [estimate] = await tx
     .select()
@@ -412,12 +462,12 @@ async function followUp(
   detail: string,
 ) {
   const org = approval.organizationId;
-  const customer = await estimateCustomer(tx, org, estimate.leadId);
+  const customer = await estimateParty(tx, org, estimate);
   const who = approval.signerName ?? approval.snapshot.customerName ?? "The customer";
   await tx.insert(activitiesTable).values({
     organizationId: org,
     leadId: estimate.leadId,
-    contactId: customer?.lead.contactId ?? null,
+    contactId: customer.contact?.id ?? null,
     type: decision === "approved" ? "estimate_approved" : "estimate_declined",
     title: decision === "approved" ? `${who} approved and signed "${estimate.title}"` : `Customer declined "${estimate.title}"`,
     body: detail || null,
@@ -426,14 +476,66 @@ async function followUp(
   await tx.insert(crmTasksTable).values({
     organizationId: org,
     leadId: estimate.leadId,
-    contactId: customer?.lead.contactId ?? null,
-    assignedUserId: customer?.lead.assignedUserId ?? approval.createdByUserId,
+    contactId: customer.contact?.id ?? null,
+    assignedUserId: customer.lead?.assignedUserId ?? approval.createdByUserId,
     title: decision === "approved" ? "Estimate approved — schedule the work" : "Estimate declined — follow up",
     description: decision === "approved" ? `${who} signed "${estimate.title}". Review the signed record and schedule the work.` : `The customer declined "${estimate.title}".${detail ? ` Reason: ${detail}` : ""}`,
     sourceEvent: `estimate.${decision}:${estimate.id}`,
     priority: decision === "approved" ? "high" : "normal",
     dueAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
   });
+}
+
+/**
+ * Move the estimate to the customer's decision through its own writer: the
+ * opportunity transition, or the versioned returning-customer command. A
+ * returning command needs a staff actor; it records the staff member who
+ * created the link, with explicit customer-approval provenance in its audit.
+ */
+async function recordDecisionStatus(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  approval: EstimateApproval,
+  estimate: Estimate,
+  status: "accepted" | "declined",
+): Promise<Estimate> {
+  const org = approval.organizationId;
+  const outdated = () => fail(409, "estimate_approval_outdated", "This estimate was updated. Ask the company for a new approval link.");
+  if (!estimate.customerWorkId) {
+    const row = await updateEstimateInTransaction(tx, org, estimate.id, { status }, { userId: null });
+    if (!row || row.status !== status) outdated();
+    return row!;
+  }
+  try {
+    await updateCustomerWorkEstimate(
+      org,
+      { userId: approval.createdByUserId },
+      estimate.id,
+      {
+        requestId: approval.id,
+        confirmed: true,
+        expectedWorkVersion: estimate.workVersion,
+        title: estimate.title,
+        notes: estimate.notes ?? null,
+        lineItems: estimate.lineItems.map((line) => ({ description: line.description, quantity: line.quantity, unitPriceCents: line.unitPriceCents })),
+        taxCents: estimate.taxCents,
+        status,
+      },
+      { tx, customerApproval: { approvalId: approval.id, decision: status === "accepted" ? "approved" : "declined" } },
+    );
+  } catch (error) {
+    if (error instanceof CustomerWorkError && error.code === "customer_work_access_denied") {
+      fail(409, "estimate_approval_unrecordable", "This company can't record a response on this link right now. Contact them directly.");
+    }
+    if (error instanceof CustomerWorkError) outdated();
+    throw error;
+  }
+  const [row] = await tx
+    .select()
+    .from(estimatesTable)
+    .where(and(eq(estimatesTable.organizationId, org), eq(estimatesTable.id, estimate.id)));
+  // The command recomputes totals; the decided content must be exactly what the customer saw.
+  if (!row || row.status !== status || estimateContentSha256(row) !== approval.snapshotSha256) outdated();
+  return row!;
 }
 
 export async function approveEstimate(
@@ -451,9 +553,8 @@ export async function approveEstimate(
   return db.transaction(async (tx) => {
     const { approval, estimate } = await lockWaiting(tx, token);
     const org = approval.organizationId;
-    // Reuse the existing estimate transition (status, acceptedAt, saved-state chain, audit).
-    const accepted = await updateEstimateInTransaction(tx, org, estimate.id, { status: "accepted" }, { userId: null });
-    if (!accepted || accepted.status !== "accepted") fail(409, "estimate_approval_outdated", "This estimate was updated. Ask the company for a new approval link.");
+    // Reuse the estimate's own transition (status, acceptedAt, saved-state chain, audit).
+    const accepted = await recordDecisionStatus(tx, approval, estimate, "accepted");
     const signatureSha256 = sha256(signature);
     const [decided] = await tx
       .update(estimateApprovalsTable)
@@ -499,8 +600,7 @@ export async function declineEstimate(token: string, input: { reason?: string | 
   return db.transaction(async (tx) => {
     const { approval, estimate } = await lockWaiting(tx, token);
     const org = approval.organizationId;
-    const declined = await updateEstimateInTransaction(tx, org, estimate.id, { status: "declined" }, { userId: null });
-    if (!declined || declined.status !== "declined") fail(409, "estimate_approval_outdated", "This estimate was updated. Ask the company for a new approval link.");
+    const declined = await recordDecisionStatus(tx, approval, estimate, "declined");
     const [decided] = await tx
       .update(estimateApprovalsTable)
       .set({

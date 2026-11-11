@@ -27,6 +27,7 @@ import { assertOutboundDeliveryAllowed } from "./outbound-hold";
 import {
   assertEstimateInitialDraft,
   renderEstimateEmail,
+  estimateOffersApprovalLink,
   assertEstimateEmailMessageFits,
   estimateDeliveryFingerprint,
   estimateEmailSnapshotSchema,
@@ -188,9 +189,12 @@ async function assemble(
     totalCents: estimate.totalCents,
     notes: estimate.notes,
   };
+  // Whether the email offers online approval follows from the saved estimate
+  // alone, so the reviewed fingerprint does not depend on link state.
   const message = renderEstimateEmail(
     document,
     lineage.contact.email?.trim().toLowerCase() ?? "",
+    { approvalLink: estimateOffersApprovalLink(estimate) },
   );
   assertEstimateEmailMessageFits(selected.sender.provider, message);
   const senderIdentitySha256 = estimateDeliveryFingerprint({
