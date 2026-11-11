@@ -103,7 +103,7 @@ it('rejects a forged record selection and omits call sync that could trigger tex
   fireEvent.change(screen.getByLabelText('Appointment'), { target: { value: 'foreign' } });
   expect((screen.getByRole('button', { name: 'Create calendar event' }) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.queryByRole('button', { name: /calls|text-back/i })).toBeNull();
-  expect(screen.getByText(/Call sync can also request missed-call texts/)).toBeTruthy();
+  expect(screen.getByText(/Missed-call text-back runs from CALLIE's scheduled call sync, not from this panel/)).toBeTruthy();
   expect(s.fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
 });
 

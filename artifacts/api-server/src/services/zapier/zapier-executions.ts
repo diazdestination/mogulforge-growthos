@@ -65,6 +65,18 @@ export class ZapierExecutionError extends Error {
   }
 }
 
+/**
+ * A compliance check said this send must not happen (opted out, over the
+ * frequency cap, quiet hours, ...). Unlike a stale request, a skip is recorded
+ * on the ledger as `blocked` with `errorCode` = reason so staff can see why.
+ */
+export class ZapierSendSkipped extends ZapierExecutionError {
+  constructor(message: string, readonly reason: string) {
+    super(message, "invalid_input");
+    this.name = "ZapierSendSkipped";
+  }
+}
+
 type PreparedRequest = {
   definition: ZapierCapabilityDefinition;
   app: string;
@@ -401,6 +413,25 @@ async function execute(
     return { execution: blocked ?? (await readExecution(organizationId, execution.id)) };
   }
 
+  if (PRE_DISPATCH_SKIP_CHECK.has(execution.capability)) {
+    // Re-check compliance right before the send, before any receipt exists,
+    // so a skip is a clean `blocked` row and never an ambiguous outcome.
+    const { rebuildZapierRequestInput } = await import("./zapier-specialist-flows");
+    try {
+      await rebuildZapierRequestInput(execution);
+    } catch (error) {
+      const skipped = error instanceof ZapierSendSkipped;
+      const blocked = await transition(organizationId, execution.id, ["executing"], {
+        state: "blocked",
+        detail: (skipped ? error.message : `Stopped before dispatch: ${error instanceof ZapierExecutionError ? error.message : "the record could not be re-checked."}`).slice(0, 1000),
+        errorCode: skipped ? error.reason : "stale_request",
+        completedAt: new Date(),
+      });
+      if (blocked && skipped) await auditSkip(blocked, error.reason, actorUserId);
+      return { execution: blocked ?? (await readExecution(organizationId, execution.id)) };
+    }
+  }
+
   let value: unknown = undefined;
   let digest: string | null = null;
   let failure: ZapierMcpError | null = null;
@@ -513,6 +544,16 @@ async function execute(
     entityId: execution.id,
     metadata: { capability: prepared.definition.key, app: prepared.app, action: prepared.action, errorCode: failure ? (failure as ZapierMcpError).code : null },
   });
+  if (execution.capability === "callie.sms.send" && execution.linkedEntityType === "crm_task") {
+    await recordAudit({
+      organizationId,
+      actorUserId,
+      action: finalState === "succeeded" ? "callie.textback_sent" : `callie.textback_${finalState}`,
+      entityType: "crm_task",
+      entityId: execution.linkedEntityId,
+      metadata: { executionId: execution.id, reason: "missed_call_basis", outcome: finalState, acceptance: finalState === "succeeded" ? "phone_app_accepted" : null },
+    });
+  }
   const final = updated ?? (await readExecution(organizationId, execution.id));
   if (OWNED_APP_DISPATCH_RECHECK.has(final.capability)) {
     try {
@@ -540,7 +581,15 @@ export async function approveZapierAction(input: {
   // that created it; the ledger stores only digests. Approval therefore
   // re-prepares through the flow registry.
   const { rebuildZapierRequestInput } = await import("./zapier-specialist-flows");
-  const rebuilt = await rebuildZapierRequestInput(existing);
+  let rebuilt: unknown;
+  try {
+    rebuilt = await rebuildZapierRequestInput(existing);
+  } catch (error) {
+    if (!(error instanceof ZapierSendSkipped)) throw error;
+    // Re-checked at approval: state changed since the request (STOP, cap,
+    // quiet hours, registration). Skip it on the ledger; nothing was sent.
+    return (await skipPending(existing, error, input.userId)) ?? existing;
+  }
   const prepared = await prepareRequest(input.organizationId, existing.capability, rebuilt);
   if ("blocked" in prepared) {
     const blocked = await transition(input.organizationId, existing.id, ["pending_approval"], {
@@ -630,7 +679,90 @@ export async function getZapierExecution(organizationId: string, id: string): Pr
 }
 
 /** Customer texts are serialized under the nurture locks and re-derived from GrowthOS records right before dispatch. */
-const CUSTOMER_TEXT_CAPABILITIES = new Set(["appt.sms.send", "maintain.sms.send", "appt.sms.on_my_way", "bill.sms.payment_link", "esti.sms.approval_link"]);
+const CUSTOMER_TEXT_CAPABILITIES = new Set(["appt.sms.send", "maintain.sms.send", "appt.sms.on_my_way", "bill.sms.payment_link", "esti.sms.approval_link", "callie.sms.send"]);
+/** Flows whose builder can raise ZapierSendSkipped; re-checked before a durable receipt is opened. */
+const PRE_DISPATCH_SKIP_CHECK = new Set(["callie.sms.send"]);
+
+async function auditSkip(execution: ZapierActionExecution, reason: string, actorUserId: string | null) {
+  await recordAudit({
+    organizationId: execution.organizationId,
+    actorUserId,
+    action: "zapier.action_skipped",
+    entityType: "zapier_action_execution",
+    entityId: execution.id,
+    metadata: { capability: execution.capability, reason, linkedEntityType: execution.linkedEntityType, linkedEntityId: execution.linkedEntityId },
+  });
+  if (execution.capability === "callie.sms.send" && execution.linkedEntityType === "crm_task") {
+    await recordAudit({
+      organizationId: execution.organizationId,
+      actorUserId,
+      action: "callie.textback_skipped",
+      entityType: "crm_task",
+      entityId: execution.linkedEntityId,
+      metadata: { executionId: execution.id, reason },
+    });
+  }
+}
+
+async function skipPending(existing: ZapierActionExecution, error: ZapierSendSkipped, actorUserId: string | null) {
+  const blocked = await transition(existing.organizationId, existing.id, ["pending_approval"], {
+    state: "blocked",
+    detail: error.message.slice(0, 1000),
+    errorCode: error.reason,
+    completedAt: new Date(),
+  });
+  if (blocked) await auditSkip(blocked, error.reason, actorUserId);
+  return blocked;
+}
+
+/**
+ * Record a compliance skip on the ledger (state `blocked`, errorCode = reason)
+ * and in the audit log. Nothing is sent. A request already waiting for
+ * approval is skipped in place; a row that may have reached Zapier is never
+ * changed.
+ */
+export async function recordZapierSkip(input: {
+  organizationId: string;
+  capability: string;
+  idempotencyKey: string;
+  reason: string;
+  detail: string;
+  requestedByUserId?: string | null;
+  linkedEntityType?: string | null;
+  linkedEntityId?: string | null;
+  requestSummary?: Record<string, unknown>;
+}): Promise<ZapierActionExecution> {
+  const definition = getZapierCapability(input.capability);
+  if (!definition) throw new ZapierExecutionError("Unknown Zapier capability.", "invalid_input");
+  const idempotencyKey = input.idempotencyKey.trim().slice(0, 200);
+  const [existing] = await db.select().from(zapierActionExecutionsTable).where(and(eq(zapierActionExecutionsTable.organizationId, input.organizationId), eq(zapierActionExecutionsTable.idempotencyKey, idempotencyKey)));
+  if (existing && existing.state === "pending_approval") {
+    return (await skipPending(existing, new ZapierSendSkipped(input.detail, input.reason), input.requestedByUserId ?? null)) ?? (await readExecution(input.organizationId, existing.id));
+  }
+  if (existing && existing.state !== "blocked") return existing;
+  const binding = await getZapierBinding(input.organizationId, definition.key);
+  const values = {
+    app: binding?.zapierApp ?? "unbound",
+    action: binding?.zapierAction ?? "unbound",
+    requestDigest: sha256Hex(canonicalJson({ capability: definition.key, skipped: input.reason })),
+    requestSummary: input.requestSummary ?? {},
+  };
+  let row: ZapierActionExecution;
+  if (existing) {
+    const [updated] = await db
+      .update(zapierActionExecutionsTable)
+      .set({ ...{ zapierApp: values.app, zapierAction: values.action, requestDigest: values.requestDigest, requestSummary: values.requestSummary }, detail: input.detail.slice(0, 1000), errorCode: input.reason, completedAt: new Date() })
+      .where(and(eq(zapierActionExecutionsTable.id, existing.id), eq(zapierActionExecutionsTable.state, "blocked")))
+      .returning();
+    row = updated ?? (await readExecution(input.organizationId, existing.id));
+  } else {
+    row = (await insertOrReuse({ organizationId: input.organizationId, capability: definition.key, input: {}, idempotencyKey, requestedByUserId: input.requestedByUserId, linkedEntityType: input.linkedEntityType, linkedEntityId: input.linkedEntityId }, definition, idempotencyKey, {
+      ...values, state: "blocked", detail: input.detail.slice(0, 1000), errorCode: input.reason,
+    })).execution;
+  }
+  if (row.state === "blocked" && row.errorCode === input.reason) await auditSkip(row, input.reason, input.requestedByUserId ?? null);
+  return row;
+}
 function isCustomerText(capability: string) { return CUSTOMER_TEXT_CAPABILITIES.has(capability); }
 function originalScheduledAction(execution: ZapierActionExecution) { const value = execution.requestSummary.appointmentReminderScheduledActionId; return typeof value === "string" ? value : undefined; }
 async function serviceTextTouch(reader: Pick<typeof db, "select">, execution: ZapierActionExecution, input: unknown) {

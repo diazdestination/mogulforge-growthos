@@ -166,7 +166,7 @@ export function ZapierFlowActions({ capabilities, canManage, disabled: setupBusy
         <p className="text-xs text-muted-foreground">Texts this member's schedule for the chosen company date to their saved crew phone number.</p>
         <Button type="button" className="h-auto whitespace-normal" disabled={disabled(KEYS.crew) || !member || !validDate(date)} onClick={() => { if (validDate(date)) void request(KEYS.crew, 'sched/day-sheet', { userId: member, date }); }}>Send crew day sheet by text</Button>
       </div>}
-      {capabilities.some(capability => capability.key === 'callie.calls.list' || capability.key === 'callie.sms.send') && <p className="text-xs text-muted-foreground">Call sync can also request missed-call texts. Call sync and text-back requests are not available from this panel while callback eligibility and send consent cannot be reviewed here.</p>}
+      {capabilities.some(capability => capability.key === 'callie.calls.list' || capability.key === 'callie.sms.send') && <p className="text-xs text-muted-foreground">Missed-call text-back runs from CALLIE's scheduled call sync, not from this panel: each missed inbound call gets at most one informational text, after the checks set above. See why any text-back did not go in CALLIE's text-back activity on Calls.</p>}
       {result && <p role="status" className="break-words text-sm">{result}</p>}
     </section>
   );

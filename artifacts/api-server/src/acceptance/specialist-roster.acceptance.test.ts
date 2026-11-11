@@ -27,6 +27,7 @@ import {
   organizationsTable,
   orgSettingsTable,
   propertiesTable,
+  suppressionsTable,
   usersTable,
   valueEntriesTable,
   zapierActionExecutionsTable,
@@ -674,23 +675,38 @@ describe("APPT: bookings & visit details", () => {
 // CALLIE — missed calls become callback tasks; text-back is connected + reviewed
 // =====================================================================
 describe("CALLIE: calls & intake", () => {
-  const calls = {
+  const calls = () => ({
     results: [
-      { id: "call-missed-1", customer_name: "Pat Caller", from: "+14045550177", status: "missed" },
-      { id: "call-answered-2", customer_name: "Answered Caller", from: "+14045550178", answered: true },
+      { id: "call-missed-1", customer_name: "Pat Caller", from: "+14045550177", to: "+14045550100", createdAt: new Date().toISOString(), status: "missed" },
+      { id: "call-answered-2", customer_name: "Answered Caller", from: "+14045550178", to: "+14045550100", createdAt: new Date().toISOString(), answered: true },
     ],
+  });
+  /** A fixed-offset zone where it is currently mid-day, so the 8am-9pm text window is open. */
+  const daytimeZone = () => {
+    for (let offset = -12; offset <= 14; offset++) {
+      const zone = offset === 0 ? "Etc/GMT" : offset > 0 ? `Etc/GMT-${offset}` : `Etc/GMT+${-offset}`;
+      const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", hourCycle: "h23" }).format(new Date()));
+      if (hour >= 10 && hour <= 18) return zone;
+    }
+    throw new Error("no daytime zone");
   };
+  async function textBackReady(f: Company) {
+    await db.update(organizationsTable).set({ timezone: daytimeZone() }).where(eq(organizationsTable.id, f.org));
+    const registered = await put(f.owner.sid, "/integrations/zapier/callie/text-back-settings", { messagingRegistered: true });
+    expect(registered.status, registered.text).toBe(200);
+  }
 
   it("turns missed calls into callback tasks with caller details and parks the text-back for review", async () => {
     const f = await company("callie");
+    await textBackReady(f);
     await connectZapier(f, [
       { capability: "callie.calls.list", app: "OpenPhoneCLIAPI", action: "call_completed", mode: "auto" },
       { capability: "callie.sms.send", ...QUO_SMS, mode: "approve" },
     ]);
-    zap.reads["OpenPhoneCLIAPI:call_completed"] = calls;
+    zap.reads["OpenPhoneCLIAPI:call_completed"] = calls();
     const synced = await post(f.office.sid, "/integrations/zapier/flows/callie/calls");
     expect(synced.status, synced.text).toBe(200);
-    expect(synced.body).toMatchObject({ received: 2, created: 2, textbacksRequested: 1 });
+    expect(synced.body).toMatchObject({ received: 2, created: 2, textbacksRequested: 1, textbacksSkipped: 0 });
     const tasks = (await get(f.office.sid, "/tasks")).body as unknown as Json[];
     const missed = tasks.find((task) => String(task.title).startsWith("Return missed call"))!;
     expect(missed).toMatchObject({ title: "Return missed call: Pat Caller (+14045550177)", priority: "high" });
@@ -711,10 +727,51 @@ describe("CALLIE: calls & intake", () => {
     expect(((await get(other.office.sid, "/tasks")).body as unknown as Json[]).some((task) => task.id === missed.id)).toBe(false);
   });
 
+  it("sends one approved, branded text-back with the opt-out line, then skips a STOPped caller", async () => {
+    const f = await company("callie-send");
+    await textBackReady(f);
+    await connectZapier(f, [
+      { capability: "callie.calls.list", app: "OpenPhoneCLIAPI", action: "call_completed", mode: "auto" },
+      { capability: "callie.sms.send", ...QUO_SMS, mode: "approve" },
+    ]);
+    zap.reads["OpenPhoneCLIAPI:call_completed"] = calls();
+    expect((await post(f.office.sid, "/integrations/zapier/flows/callie/calls")).body).toMatchObject({ textbacksRequested: 1 });
+    const [pending] = (await get(f.office.sid, "/integrations/zapier/executions?capability=callie.sms.send")).body.executions as Json[];
+    const approved = await post(f.office.sid, `/integrations/zapier/executions/${pending!.id}/approve`);
+    expect(approved.status, approved.text).toBe(200);
+    expect(approved.body.execution.state).toBe("succeeded");
+    expect(writeCalls()).toHaveLength(1);
+    expect(writeCalls()[0]!.args.params).toMatchObject({
+      from: "+14045550100",
+      to_number: "+14045550177",
+      body: `Hi, this is ${f.name}. Sorry we missed your call. Reply here with a good time and we will call you back. Reply STOP to opt out.`,
+    });
+    // A STOP from a different caller, then that caller's missed call: skipped with the reason.
+    await db.insert(suppressionsTable).values({ organizationId: f.org, channel: "sms", value: "4045550179", reason: "stop_keyword", source: "synthetic" });
+    zap.reads["OpenPhoneCLIAPI:call_completed"] = { results: [{ id: "call-missed-3", from: "+14045550179", to: "+14045550100", createdAt: new Date().toISOString(), status: "missed" }] };
+    await db.update(zapierActionExecutionsTable).set({ idempotencyKey: `old-${randomUUID()}` }).where(and(eq(zapierActionExecutionsTable.organizationId, f.org), eq(zapierActionExecutionsTable.capability, "callie.calls.list")));
+    expect((await post(f.office.sid, "/integrations/zapier/flows/callie/calls")).body).toMatchObject({ textbacksRequested: 0, textbacksSkipped: 1 });
+    const rows = (await get(f.office.sid, "/integrations/zapier/executions?capability=callie.sms.send")).body.executions as Json[];
+    expect(rows.find((row) => row.state === "blocked")).toMatchObject({ errorCode: "opted_out", detail: expect.stringMatching(/opted out/) });
+    expect(writeCalls()).toHaveLength(1);
+  });
+
+  it("refuses to switch text-back on until the texting registration is confirmed", async () => {
+    const f = await company("callie-unregistered");
+    await connectZapier(f, [{ capability: "callie.sms.send", ...QUO_SMS, mode: "off" }]);
+    const refused = await put(f.owner.sid, "/integrations/zapier/capabilities/callie.sms.send/policy", { mode: "approve" });
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).toMatch(/registered/);
+    expect((await put(f.office.sid, "/integrations/zapier/callie/text-back-settings", { messagingRegistered: true })).status).toBe(403);
+    expect((await put(f.owner.sid, "/integrations/zapier/callie/text-back-settings", { messagingRegistered: true })).status).toBe(200);
+    expect((await put(f.owner.sid, "/integrations/zapier/capabilities/callie.sms.send/policy", { mode: "approve" })).status).toBe(200);
+  });
+
   it("does not text a missed caller back without a verified business-number connection", async () => {
     const f = await company("callie-nosms");
+    await textBackReady(f);
     await connectZapier(f, [{ capability: "callie.calls.list", app: "OpenPhoneCLIAPI", action: "call_completed", mode: "auto" }]);
-    zap.reads["OpenPhoneCLIAPI:call_completed"] = calls;
+    zap.reads["OpenPhoneCLIAPI:call_completed"] = calls();
     expect((await post(f.office.sid, "/integrations/zapier/flows/callie/calls")).body).toMatchObject({ created: 2 });
     const textbacks = (await get(f.office.sid, "/integrations/zapier/executions?capability=callie.sms.send")).body.executions as Json[];
     expect(textbacks).toHaveLength(1);

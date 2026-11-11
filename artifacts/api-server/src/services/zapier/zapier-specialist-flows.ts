@@ -12,6 +12,7 @@ import {
   invoicesTable,
   leadsTable,
   organizationsTable,
+  orgSettingsTable,
   propertiesTable,
   serviceObligationsTable,
   auditEventsTable,
@@ -39,7 +40,18 @@ import { readStandingService, standingLineage, standingCompanyProjection } from 
 import { phoneE164, twilioForOrganization } from "../twilio-controls";
 import { getZapierCapability } from "./zapier-capabilities";
 import { defaultPolicyFor, getZapierBinding, getZapierPolicy, zapierPollWindow } from "./zapier-connection";
-import { requestZapierAction, ZapierExecutionError, type ZapierActionOutcome } from "./zapier-executions";
+import { recordZapierSkip, requestZapierAction, ZapierExecutionError, ZapierSendSkipped, type ZapierActionOutcome } from "./zapier-executions";
+import {
+  businessLineE164,
+  callerCannotText,
+  checkTextBackEligibility,
+  isTextBackSkipReason,
+  readMissedCallBasis,
+  recordMissedCallBasis,
+  TEXTBACK_SKIP_DETAIL,
+  usMobileCapableE164,
+  type TextBackSkipReason,
+} from "../callie-text-back";
 import { sha256Hex } from "./zapier-mcp-client";
 
 /**
@@ -320,21 +332,42 @@ export async function scoutSyncReviews(input: {
   return { execution: outcome.execution, received: records.length, created, skipped };
 }
 
-// ---------- CALLIE: phone-system calls -> callback tasks + approved text-back ----------
+// ---------- CALLIE: phone-system calls -> callback tasks + compliant text-back ----------
 
 export const CALLIE_TEXTBACK_ENTITY = "crm_task";
 
+function isOutboundCall(record: InboundRecord): boolean {
+  const direction = (pick(record, ["direction", "call_direction", "Direction"]) ?? "").toLowerCase();
+  return /out/.test(direction);
+}
+
 function isMissedCall(record: InboundRecord): boolean {
+  // An unanswered outbound call (staff calling a customer) is not a missed call
+  // and gives no basis for a text-back.
+  if (isOutboundCall(record)) return false;
   const answered = record.answered ?? record.Answered;
   if (typeof answered === "boolean") return !answered;
   const status = (pick(record, ["status", "disposition", "call_status"]) ?? "").toLowerCase();
   return /missed|no.?answer|voicemail|abandon/.test(status);
 }
 
+function callTimeOf(record: InboundRecord): Date | null {
+  const raw = pick(record, ["start_time", "started_at", "startTime", "createdAt", "created_at", "completedAt", "completed_at", "date", "call_time", "timestamp"]);
+  if (!raw) return null;
+  const at = /^\d{10,13}$/.test(raw) ? new Date(raw.length === 10 ? Number(raw) * 1000 : Number(raw)) : new Date(raw);
+  return Number.isNaN(at.getTime()) ? null : at;
+}
+
+function businessNumberOf(record: InboundRecord): string | null {
+  return businessLineE164(pick(record, ["tracking_phone_number", "trackingPhoneNumber", "business_phone_number", "businessPhoneNumber", "to", "to_number", "toNumber", "called_number", "dialed_number"]));
+}
+
+export type CallieSyncSummary = ScoutSyncSummary & { textbacksRequested: number; textbacksSkipped: number };
+
 export async function callieSyncCalls(input: {
   organizationId: string;
   actorUserId: string | null;
-}): Promise<ScoutSyncSummary & { textbacksRequested: number }> {
+}): Promise<CallieSyncSummary> {
   const binding = await getZapierBinding(input.organizationId, "callie.calls.list");
   const stamp = await zapierPollWindow(input.organizationId);
   const outcome = await requestZapierAction({
@@ -348,6 +381,7 @@ export async function callieSyncCalls(input: {
   let created = 0;
   let skipped = 0;
   let textbacksRequested = 0;
+  let textbacksSkipped = 0;
   const base = `zapier.call:${binding?.zapierAppName ?? "unknown"}`;
   for (const record of records) {
     const externalId = externalIdOf(record, `${stamp}:${records.indexOf(record)}`);
@@ -361,7 +395,9 @@ export async function callieSyncCalls(input: {
       skipped += 1;
       continue;
     }
-    const caller = pick(record, ["customer_phone_number", "from", "from_number", "caller_number", "phone"]);
+    const caller = isOutboundCall(record)
+      ? pick(record, ["customer_phone_number", "to", "to_number", "phone"])
+      : pick(record, ["customer_phone_number", "from", "from_number", "caller_number", "phone"]);
     const callerName = pick(record, ["customer_name", "caller_name", "name"]) ?? "Unknown caller";
     const missed = isMissedCall(record);
     const task = await createTask(input.organizationId, {
@@ -376,49 +412,113 @@ export async function callieSyncCalls(input: {
       continue;
     }
     created += 1;
-    if (missed && caller && /^\+?[1-9]\d{6,14}$/.test(caller.replace(/[^\d+]/g, ""))) {
-      await callieRequestTextBack({ organizationId: input.organizationId, taskId: task.id, actorUserId: input.actorUserId, toPhone: caller.replace(/[^\d+]/g, "") });
-      textbacksRequested += 1;
+    if (!missed || !caller) continue;
+    // Data-level checks first: these never record a basis.
+    const phone = usMobileCapableE164(caller);
+    const calledAt = callTimeOf(record);
+    const businessNumber = businessNumberOf(record);
+    const dataSkip: TextBackSkipReason | null = !phone ? "invalid_number" : callerCannotText(record) ? "landline" : !calledAt || !businessNumber ? "missing_call_details" : null;
+    if (dataSkip) {
+      await recordZapierSkip({
+        organizationId: input.organizationId,
+        capability: "callie.sms.send",
+        idempotencyKey: callieTextBackKey(task.id),
+        reason: dataSkip,
+        detail: TEXTBACK_SKIP_DETAIL[dataSkip],
+        requestedByUserId: input.actorUserId,
+        linkedEntityType: CALLIE_TEXTBACK_ENTITY,
+        linkedEntityId: task.id,
+      });
+      textbacksSkipped += 1;
+      continue;
     }
+    // The missed inbound call is the basis for one informational reply only.
+    await recordMissedCallBasis(input.organizationId, task.id, { phone: phone!, calledAt: calledAt!.toISOString(), businessNumber: businessNumber!, callRef: sourceEvent });
+    const requested = await callieRequestTextBack({ organizationId: input.organizationId, taskId: task.id, actorUserId: input.actorUserId });
+    if (requested.execution.state === "blocked" && isTextBackSkipReason(requested.execution.errorCode)) textbacksSkipped += 1;
+    else textbacksRequested += 1;
   }
-  return { execution: outcome.execution, received: records.length, created, skipped, textbacksRequested };
+  return { execution: outcome.execution, received: records.length, created, skipped, textbacksRequested, textbacksSkipped };
 }
 
-export function textBackBody(organizationName: string): string {
-  return `Hi, this is ${organizationName}. Sorry we missed your call. Reply here or let us know a good time to call you back.`;
+/** Locked template: business name, informational only, opt-out line. No promotion, links or custom copy. */
+export function textBackBody(businessName: string): string {
+  const name = businessName.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) || "our office";
+  return withOptOut(`Hi, this is ${name}. Sorry we missed your call. Reply here with a good time and we will call you back.`);
 }
 
-export async function buildCallieTextBackInput(organizationId: string, taskId: string, toPhone?: string) {
-  const [row] = await db
-    .select({ task: crmTasksTable, organization: organizationsTable })
+export const callieTextBackKey = (taskId: string) => `callie-textback:${taskId}`;
+
+async function textBackBusinessName(reader: Pick<typeof db, "select">, organizationId: string): Promise<string> {
+  const [row] = await reader
+    .select({ name: organizationsTable.name, profile: orgSettingsTable.businessProfile })
+    .from(organizationsTable)
+    .leftJoin(orgSettingsTable, eq(orgSettingsTable.organizationId, organizationsTable.id))
+    .where(eq(organizationsTable.id, organizationId));
+  return row?.profile?.businessName?.trim() || row?.name?.trim() || "";
+}
+
+/**
+ * Build the one text-back for a callback task from its recorded missed-call
+ * basis. Throws ZapierSendSkipped (with the reason) when it must not be sent
+ * now; used at request, at approval and right before dispatch.
+ */
+export async function buildCallieTextBackInput(organizationId: string, taskId: string, options: { reader?: Pick<typeof db, "select">; now?: Date } = {}) {
+  const reader = options.reader ?? db;
+  const [task] = await reader
+    .select({ id: crmTasksTable.id })
     .from(crmTasksTable)
-    .innerJoin(organizationsTable, eq(organizationsTable.id, crmTasksTable.organizationId))
     .where(and(eq(crmTasksTable.organizationId, organizationId), eq(crmTasksTable.id, taskId)));
-  if (!row) throw new ZapierExecutionError("Callback task not found.", "not_found");
-  const phone = toPhone ?? row.task.title.match(/\((\+?\d{7,15})\)/)?.[1];
-  if (!phone) throw new ZapierExecutionError("The callback task has no caller number.", "invalid_input");
+  if (!task) throw new ZapierExecutionError("Callback task not found.", "not_found");
+  const idempotencyKey = callieTextBackKey(task.id);
+  const basis = await readMissedCallBasis(reader, organizationId, task.id);
+  if (!basis) throw new ZapierSendSkipped(TEXTBACK_SKIP_DETAIL.no_basis, "no_basis");
+  const verdict = await checkTextBackEligibility(reader, { organizationId, phone: basis.phone, calledAt: new Date(basis.calledAt), exceptKey: idempotencyKey, now: options.now });
+  if (!verdict.ok) throw new ZapierSendSkipped(verdict.detail, verdict.reason);
   return {
-    idempotencyKey: `callie-textback:${row.task.id}`,
-    input: { toPhone: phone, body: textBackBody(row.organization.name) },
+    idempotencyKey,
+    input: { toPhone: basis.phone, body: textBackBody(await textBackBusinessName(reader, organizationId)) },
+    basis,
   };
 }
 
+/**
+ * Request the missed-call text-back for a callback task. A compliance skip is
+ * recorded on the ledger (blocked, errorCode = reason) and returned, never
+ * thrown, so CALLIE's activity shows why no text went.
+ */
 export async function callieRequestTextBack(input: {
   organizationId: string;
   taskId: string;
   actorUserId: string | null;
-  toPhone?: string;
 }): Promise<ZapierActionOutcome> {
-  const built = await buildCallieTextBackInput(input.organizationId, input.taskId, input.toPhone);
-  return requestZapierAction({
-    organizationId: input.organizationId,
-    capability: "callie.sms.send",
-    input: built.input,
-    idempotencyKey: built.idempotencyKey,
-    requestedByUserId: input.actorUserId,
-    linkedEntityType: CALLIE_TEXTBACK_ENTITY,
-    linkedEntityId: input.taskId,
+  const skipped = async (error: ZapierSendSkipped) => ({
+    execution: await recordZapierSkip({
+      organizationId: input.organizationId,
+      capability: "callie.sms.send",
+      idempotencyKey: callieTextBackKey(input.taskId),
+      reason: error.reason,
+      detail: error.message,
+      requestedByUserId: input.actorUserId,
+      linkedEntityType: CALLIE_TEXTBACK_ENTITY,
+      linkedEntityId: input.taskId,
+    }),
   });
+  try {
+    const built = await buildCallieTextBackInput(input.organizationId, input.taskId);
+    return await requestZapierAction({
+      organizationId: input.organizationId,
+      capability: "callie.sms.send",
+      input: built.input,
+      idempotencyKey: built.idempotencyKey,
+      requestedByUserId: input.actorUserId,
+      linkedEntityType: CALLIE_TEXTBACK_ENTITY,
+      linkedEntityId: input.taskId,
+    });
+  } catch (error) {
+    if (error instanceof ZapierSendSkipped) return skipped(error);
+    throw error;
+  }
 }
 
 // ---------- SCHED: crew day sheets ----------
@@ -1004,7 +1104,7 @@ export async function rebuildZapierRequestInput(execution: ZapierActionExecution
       return (await buildInvoiceAccountingInput(execution.organizationId, execution.linkedEntityId)).input;
     }
     case "callie.sms.send": {
-      if (!execution.linkedEntityId) throw new ZapierExecutionError("Missing linked callback task.", "invalid_input");
+      if (!execution.linkedEntityId || execution.idempotencyKey !== callieTextBackKey(execution.linkedEntityId)) throw new ZapierExecutionError("Text-back request is not rebuildable.", "invalid_input");
       return (await buildCallieTextBackInput(execution.organizationId, execution.linkedEntityId)).input;
     }
     case "sched.sms.send": {
@@ -1147,6 +1247,12 @@ export async function assertCustomerTextOwnership(reader: ReminderReader, input:
     if (phoneE164(contact.phone ?? "") !== input.expectedPhone) throw new ZapierExecutionError("The customer number changed before dispatch.", "conflict");
     const gate = await checkSendEligibility({ organizationId: org, leadId: invoice.leadId, contact, channel: "sms", kind: "transactional" }, reader);
     if (!gate.ok) textBlocked(gate.reason);
+  } else if (input.capability === "callie.sms.send") {
+    // Serialized under the customer-text locks: the frequency cap and opt-out
+    // checks see every other text-back row before this one is inserted/sent.
+    if (input.idempotencyKey !== callieTextBackKey(id)) invalidReminderParents();
+    const built = await buildCallieTextBackInput(org, id, { reader });
+    if (built.input.toPhone !== input.expectedPhone) throw new ZapierExecutionError("The caller number changed before dispatch.", "conflict");
   } else if (input.capability === "esti.sms.approval_link") {
     const match = input.idempotencyKey.match(ESTI_APPROVAL_KEY);
     if (!match || match[1] !== id) invalidReminderParents();

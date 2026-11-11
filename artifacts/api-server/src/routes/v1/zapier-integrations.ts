@@ -26,6 +26,7 @@ import {
   ZapierExecutionError,
 } from "../../services/zapier/zapier-executions";
 import { ZapierMcpError } from "../../services/zapier/zapier-mcp-client";
+import { CallieTextBackSettingsError, describeCallieTextBackSettings, saveCallieTextBackSettings } from "../../services/callie-text-back";
 import {
   apptPushAppointmentToCalendar,
   apptRequestOnMyWayText,
@@ -106,7 +107,9 @@ const recordId = z.string().uuid();
 const pollIntervalBody = z.object({ minutes: z.number().int() });
 const rejectBody = z.object({ reason: z.string().max(500).optional() });
 const daySheetBody = z.object({ userId: z.string().min(1).max(120), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
-const textBackBody = z.object({ taskId: z.string().uuid(), toPhone: z.string().regex(/^\+?[1-9]\d{6,14}$/).optional() });
+// The caller number comes only from the recorded missed call, never from the request.
+const textBackBody = z.object({ taskId: z.string().uuid() });
+const textBackSettingsBody = z.object({ messagingRegistered: z.boolean(), windowHours: z.number().int().min(1).max(168).optional() });
 
 // ---------- connection ----------
 
@@ -260,6 +263,30 @@ router.put(
   },
 );
 
+router.put(
+  "/integrations/zapier/callie/text-back-settings",
+  requireMember("settings.manage"),
+  sessionOnly,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const body = textBackSettingsBody.parse(req.body);
+      const saved = await saveCallieTextBackSettings({
+        organizationId: req.member!.organizationId,
+        userId: req.member!.user.id,
+        messagingRegistered: body.messagingRegistered,
+        windowHours: body.windowHours,
+      });
+      res.json({ textBack: await describeCallieTextBackSettings(req.member!.organizationId, saved) });
+    } catch (error) {
+      if (error instanceof CallieTextBackSettingsError) {
+        res.status(400).json({ error: error.message });
+        return;
+      }
+      fail(res, error);
+    }
+  },
+);
+
 // ---------- execution ledger ----------
 
 router.get("/integrations/zapier/executions", requireMember("crm.read"), async (req: Request, res: Response): Promise<void> => {
@@ -353,7 +380,6 @@ router.post("/integrations/zapier/flows/callie/text-back", requireMember("crm.wr
         organizationId: req.member!.organizationId,
         taskId: body.taskId,
         actorUserId: req.member!.user.id,
-        toPhone: body.toPhone,
       }),
     );
   } catch (error) {

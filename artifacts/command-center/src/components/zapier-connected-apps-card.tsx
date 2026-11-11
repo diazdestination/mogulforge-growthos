@@ -5,6 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -62,7 +63,19 @@ type Capability = {
     boundAt: string;
   } | null;
   policy: { mode: 'off' | 'approve' | 'auto'; dailyBudget: number; updatedAt: string | null };
+  /** Only on CALLIE's missed-call text-back. */
+  textBack?: TextBackSettings;
 };
+
+type TextBackSettings = {
+  messagingRegistered: boolean;
+  registeredByName: string | null;
+  registeredAt: string | null;
+  windowHours: number;
+  windowChoices: number[];
+};
+
+const CALLIE_TEXTBACK_KEY = 'callie.sms.send';
 
 type Execution = {
   id: string;
@@ -342,6 +355,22 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
     }
   };
 
+  const setTextBack = async (body: { messagingRegistered: boolean; windowHours?: number }) => {
+    if (mutationRef.current || !canManage) return;
+    mutationRef.current = true;
+    setBusy('textback');
+    try {
+      await api('/integrations/zapier/callie/text-back-settings', { method: 'PUT', body: JSON.stringify(body) });
+      toast({ title: body.messagingRegistered ? 'Text-back settings saved' : 'Registration unconfirmed · missed-call text-back is Off' });
+      await load();
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : 'Could not save text-back settings', variant: 'destructive' });
+    } finally {
+      mutationRef.current = false;
+      setBusy(null);
+    }
+  };
+
   const setPollInterval = async (minutes: number) => {
     if (mutationRef.current || !canManage || !connectedRef.current) return;
     mutationRef.current = true;
@@ -522,6 +551,8 @@ export function ZapierConnectedAppsCard({ signUp, canManage }: ZapierConnectedAp
                   onBound={load}
                   onUnbind={() => void unbind(capability)}
                   onPolicy={(mode, budget) => void setPolicy(capability, mode, budget)}
+                  onTextBack={(body) => void setTextBack(body)}
+                  canManageSettings={canManage}
                   onSaving={(saving) => { mutationRef.current = saving; setBusy(saving ? `bind:${capability.key}` : null); }}
                 />
               ))}
@@ -563,9 +594,12 @@ type CapabilityRowProps = {
   onUnbind: () => void;
   onPolicy: (mode: Capability['policy']['mode'], dailyBudget?: number) => void;
   onSaving: (saving: boolean) => void;
+  onTextBack?: (body: { messagingRegistered: boolean; windowHours?: number }) => void;
+  /** Settings managers may confirm registration even before Zapier is connected. */
+  canManageSettings?: boolean;
 };
 
-function CapabilityRow({ capability, actions, canManage, busy, onBound, onUnbind, onPolicy, onSaving }: CapabilityRowProps) {
+function CapabilityRow({ capability, actions, canManage, busy, onBound, onUnbind, onPolicy, onSaving, onTextBack, canManageSettings = canManage }: CapabilityRowProps) {
   const { toast } = useToast();
   const [selected, setSelected] = useState<string>(() => capability.binding ? `${capability.binding.app}::${capability.binding.action}` : '');
   const [config, setConfig] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(capability.binding?.config ?? {}).filter((entry): entry is [string, string] => typeof entry[1] === 'string')));
@@ -632,6 +666,9 @@ function CapabilityRow({ capability, actions, canManage, busy, onBound, onUnbind
       {CUSTOMER_TEXT_KEYS.includes(capability.key) && (
         <p className="text-xs text-muted-foreground">Texts go only to customers who agreed to receive them and end with "Reply STOP to opt out." Replies and STOP requests arrive in your phone app. Set up "Log customer text replies and opt-outs" so GrowthOS records STOPs too; until then, mark a customer who opts out do not text on their record.</p>
       )}
+      {capability.key === CALLIE_TEXTBACK_KEY && capability.textBack && (
+        <TextBackControls id={id} settings={capability.textBack} canManage={canManageSettings} disabled={busy !== null || saving} onSave={(body) => onTextBack?.(body)} />
+      )}
       {CUSTOMER_EMAIL_KEYS.includes(capability.key) && (
         <p className="text-xs text-muted-foreground">Sends from your own mailbox as plain text, only to customers who can be emailed. "Accepted" means your mail app took the message, not that it was delivered. Replies arrive in your mailbox; customer email reply logging can record them here.</p>
       )}
@@ -645,7 +682,7 @@ function CapabilityRow({ capability, actions, canManage, busy, onBound, onUnbind
           <Select
             value={capability.policy.mode}
             onValueChange={(value) => onPolicy(value as Capability['policy']['mode'])}
-            disabled={!canManage || !configured || busy !== null || saving}
+            disabled={!canManage || !configured || busy !== null || saving || (capability.key === CALLIE_TEXTBACK_KEY && !capability.textBack?.messagingRegistered)}
           >
             <SelectTrigger id={`${id}-policy`} className="w-40 max-w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -776,6 +813,57 @@ function CrewPhones({ config, onChange, disabled }: { config: Record<string, str
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">Include the country code, for example +14045551234. Changes apply when you save this flow.</p>
+    </div>
+  );
+}
+
+const TEXTBACK_HOURS_LABEL = (hours: number) => hours % 24 === 0 ? `${hours / 24 === 1 ? '24 hours' : `${hours / 24} days`}` : `${hours} hours`;
+
+/**
+ * CALLIE missed-call text-back: the registration confirmation (required before
+ * the policy can leave Off) and the one-text-per-caller window.
+ */
+function TextBackControls({ id, settings, canManage, disabled, onSave }: { id: string; settings: TextBackSettings; canManage: boolean; disabled: boolean; onSave: (body: { messagingRegistered: boolean; windowHours?: number }) => void }) {
+  const choices = settings.windowChoices.includes(settings.windowHours) ? settings.windowChoices : [...settings.windowChoices, settings.windowHours].sort((a, b) => a - b);
+  return (
+    <div className="space-y-3 rounded-md border border-dashed p-3">
+      <div className="flex items-start gap-2">
+        <Checkbox
+          id={`${id}-registered`}
+          checked={settings.messagingRegistered}
+          disabled={!canManage || disabled}
+          aria-required="true"
+          aria-describedby={`${id}-registered-help`}
+          onCheckedChange={(checked) => onSave({ messagingRegistered: checked === true })}
+          className="mt-0.5"
+        />
+        <div className="min-w-0 space-y-1">
+          <Label htmlFor={`${id}-registered`} className="text-sm">Our business texting is registered (required)</Label>
+          <p id={`${id}-registered-help`} className="text-xs text-muted-foreground">
+            Tick this only if the number CALLIE texts from has an approved A2P 10DLC brand and campaign (Twilio) or completed Quo business-texting registration; GrowthOS records who confirmed it and when, but cannot check it for you.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {settings.messagingRegistered && settings.registeredAt
+              ? `Confirmed by ${settings.registeredByName ?? 'a team member'} on ${new Date(settings.registeredAt).toLocaleString()}.`
+              : 'Not confirmed · missed-call text-back stays Off until it is.'}
+          </p>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor={`${id}-window`} className="text-xs">Text-back window</Label>
+        <select
+          id={`${id}-window`}
+          className="h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 text-sm"
+          value={settings.windowHours}
+          disabled={!canManage || disabled}
+          onChange={(event) => onSave({ messagingRegistered: settings.messagingRegistered, windowHours: Number(event.target.value) })}
+        >
+          {choices.map((hours) => <option key={hours} value={hours}>{`At most one text per caller every ${TEXTBACK_HOURS_LABEL(hours)}`}</option>)}
+        </select>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Built to support texting rules, not a guarantee of legal compliance: CALLIE sends one informational reply that names your business and ends with "Reply STOP to opt out", only after a recorded missed inbound call, only between 8am and 9pm in your company time zone (a caller's own time zone is not known), and never to a number that opted out, is suppressed, is a landline or is not a valid US mobile number. Each skip is shown in CALLIE's text-back activity on Calls. A missed call is not permission for review requests, reminders or marketing texts.
+      </p>
     </div>
   );
 }

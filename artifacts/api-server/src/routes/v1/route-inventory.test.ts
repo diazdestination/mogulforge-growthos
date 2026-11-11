@@ -402,6 +402,7 @@ const EXPECTED_PERMISSIONS: Record<string, Permission> = {
   "PUT /integrations/zapier/capabilities/:capability/binding": "settings.manage",
   "DELETE /integrations/zapier/capabilities/:capability/binding": "settings.manage",
   "PUT /integrations/zapier/capabilities/:capability/policy": "settings.manage",
+  "PUT /integrations/zapier/callie/text-back-settings": "settings.manage",
   "GET /integrations/zapier/executions": "crm.read",
   "GET /integrations/zapier/executions/:id": "crm.read",
   "POST /integrations/zapier/executions/:id/approve": "crm.write",

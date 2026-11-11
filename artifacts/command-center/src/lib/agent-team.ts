@@ -185,7 +185,7 @@ export const AGENT_TEAM: readonly AgentProfile[] = [
       {
         "title": "Missed-call callbacks",
         "stage": "setup",
-        "reality": "With your phone system (Quo or CallRail) connected through Zapier, each missed call becomes a high-priority callback task with the caller’s name and number. An optional text-back from your business number waits for staff review; without that connection no text is sent."
+        "reality": "With your phone system (Quo or CallRail) connected through Zapier, each missed inbound call becomes a high-priority callback task with the caller’s name and number. An optional text-back sends one informational text from your number that names your business and ends with “Reply STOP to opt out”, at most once per caller in your window (24 hours by default) and only 8am to 9pm company time. It stays off until you confirm your texting registration in Settings, can wait for staff approval, and skips opted-out, suppressed, landline or invalid numbers with the reason shown on Calls. Built to support texting rules; a missed call is not permission for other texts."
       },
       {
         "title": "Keypad or voice intake",
