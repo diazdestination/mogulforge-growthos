@@ -660,7 +660,7 @@ describe('native appointment scheduling consumer', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Schedule appointment' }),
     );
-    fireEvent.change(screen.getByLabelText('Appointment notes'), {
+    fireEvent.change(await screen.findByLabelText('Appointment notes'), {
       target: { value: 'Other actor draft' },
     });
     const reads = s.fetch.mock.calls.filter(([url]) =>

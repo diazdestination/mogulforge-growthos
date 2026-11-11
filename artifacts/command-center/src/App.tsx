@@ -18,6 +18,7 @@ import { NotificationLeadGuard, TenantMobileBoundary } from '@/components/mobile
 // Pages
 import Dashboard from '@/pages/dashboard';
 import Today from '@/pages/today';
+import CommandCenter from '@/pages/command-center';
 import TechDay from '@/pages/tech';
 import Invoices from '@/pages/invoices';
 import FinancialMigrations from '@/pages/financial-migrations';
@@ -504,9 +505,11 @@ function Router() {
   const [isPaymentCanceled] = useRoute('/pay/canceled');
   const [isProjectRoom, projectParams] = useRoute('/project-room/:workspace/:leadId');
   const [isEstimateApproval, approvalParams] = useRoute('/approve/:token');
+  const [isEmailVerification] = useRoute('/verify-email');
   if (isPaymentComplete || isPaymentCanceled) return <PaymentReturn canceled={isPaymentCanceled} />;
   if (isEstimateApproval && approvalParams) return <EstimateApproval key={approvalParams.token} token={approvalParams.token} />;
   if (isProjectRoom && projectParams) return <ProjectRoom key={`${projectParams.workspace}:${projectParams.leadId}`} workspace={projectParams.workspace} leadId={projectParams.leadId} />;
+  if (isEmailVerification) return <IdentityActionScreen kind="verify" />;
 
   if (isLoading) {
     return (
@@ -598,7 +601,7 @@ function AuthedApp({ authUserId }: { authUserId: string }) {
           <Route path="/verify-email">
             <Redirect to="/" replace />
           </Route>
-          <Route path="/" component={Today} />
+          <Route path="/" component={CommandCenter} />
           <Route path="/today" component={Today} />
           <Route path="/tech" component={TechDay} />
           <Route path="/bie" component={Bie} />

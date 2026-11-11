@@ -241,7 +241,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             tabIndex={-1}
             className="relative z-0 flex min-w-0 flex-1 flex-col pb-16 focus:outline-none md:pb-0"
           >
-            <SpecialistContext location={location} />
+            {location !== "/" && <SpecialistContext location={location} />}
             {children}
           </main>
         </div>

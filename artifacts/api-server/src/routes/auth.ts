@@ -873,7 +873,7 @@ router.post(
       .from(usersTable)
       .where(eq(usersTable.email, email));
 
-    if (user?.isActive && user.passwordHash && !user.emailVerifiedAt) {
+    if (user?.isActive && !user.id.startsWith('invite:') && !user.emailVerifiedAt) {
       try {
         const { token, tokenRecordId } = await issueIdentityTokenRecord({
           userId: user.id,

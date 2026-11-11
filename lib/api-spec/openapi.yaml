@@ -6443,6 +6443,9 @@ components:
           $ref: "#/components/schemas/UserRole"
         isActive:
           type: boolean
+        emailVerified:
+          type: boolean
+          description: Whether this member has confirmed ownership of their email address.
         organization:
           oneOf:
             - $ref: "#/components/schemas/Organization"

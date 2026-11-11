@@ -10818,6 +10818,7 @@ export const GetMeResponse = zod.object({
   "lastName": zod.string().nullable(),
   "role": zod.enum(['owner', 'admin', 'sales_manager', 'sales_rep', 'inspector', 'production', 'office', 'viewer']),
   "isActive": zod.boolean(),
+  "emailVerified": zod.boolean().optional().describe('Whether this member has confirmed ownership of their email address.'),
   "organization": zod.union([zod.object({
   "id": zod.uuid(),
   "name": zod.string(),

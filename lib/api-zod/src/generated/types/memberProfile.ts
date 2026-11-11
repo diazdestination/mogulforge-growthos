@@ -18,5 +18,7 @@ export interface MemberProfile {
   lastName: string | null;
   role: UserRole;
   isActive: boolean;
+  /** Whether this member has confirmed ownership of their email address. */
+  emailVerified?: boolean;
   organization: Organization | null;
 }

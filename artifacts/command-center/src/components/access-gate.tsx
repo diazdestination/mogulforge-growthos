@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getGetMeQueryKey, useGetMe } from '@workspace/api-client-react';
 import { useAuth } from '@workspace/replit-auth-web';
 import { Loader2, ShieldOff } from 'lucide-react';
@@ -18,6 +18,9 @@ function errorStatus(error: unknown): number | undefined {
  */
 export function AccessGate({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
+  const [sending, setSending] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
   const { data: me, error, isLoading } = useGetMe({
     query: {
       queryKey: getGetMeQueryKey(),
@@ -74,6 +77,43 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen w-full flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
+    );
+  }
+
+  if (me?.emailVerified === false) {
+    const resend = async () => {
+      setSending(true);
+      setNotice(null);
+      setSendError(null);
+      try {
+        const response = await fetch('/api/auth/resend-verification', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: me.email }),
+        });
+        if (!response.ok) throw new Error('We could not request your verification email. Please try again.');
+        setNotice('Verification requested. Check your inbox and spam folder for a link from GrowthOS, then open it to confirm your email.');
+      } catch {
+        setSendError('We could not request your verification email. Please try again.');
+      } finally {
+        setSending(false);
+      }
+    };
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background text-foreground p-6">
+        <div className="max-w-md space-y-5">
+          <h1 className="text-2xl font-bold">Verify your email to open your workspace</h1>
+          <p>Confirm {me.email || 'your account email'} so GrowthOS can give you secure access to your company’s work.</p>
+          {notice && <p role="status">{notice}</p>}
+          {sendError && <p role="alert">{sendError}</p>}
+          <button className="min-h-11 rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50" disabled={sending || !!notice || !me.email} onClick={() => void resend()}>
+            {sending ? 'Requesting email…' : 'Send verification email'}
+          </button>
+          <p>Already confirmed? <button className="min-h-11 underline" onClick={() => window.location.reload()}>Check again</button></p>
+          <button className="min-h-11 underline" onClick={logout}>Sign out</button>
+        </div>
+      </main>
     );
   }
 
