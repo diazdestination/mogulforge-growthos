@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useGetMe } from '@workspace/api-client-react';
 import { canWrite } from '@/lib/permissions';
 import { CallieDesk } from '@/components/callie-desk';
+import { CallieTextBackActivity } from '@/components/callie-textback-activity';
 import { memberAuthorityScope } from '@/lib/member-authority-scope';
 
 export default function Calls() {
@@ -19,6 +20,7 @@ export default function Calls() {
       : (!me?.isActive || !me.organization) && <p role="alert">Active company access is required to open calls.</p>}
     {!isError && me?.isActive && me.organization && <div key={memberAuthorityScope(me)} className="min-w-0 space-y-4">
       <CallieDesk refreshToken={refreshToken} />
+      <CallieTextBackActivity refreshToken={refreshToken} />
       <details className="min-w-0 rounded-lg border bg-card p-4"><summary className="cursor-pointer font-semibold">Business calls and individually reviewed recovery</summary><div className="mt-4 min-w-0 space-y-4">
         <VoiceDesk canEdit={canWrite(me.role)} onReviewed={() => setRefreshToken((value) => value + 1)} />
         <MissedCallCareDesk refreshToken={refreshToken} />

@@ -24,7 +24,7 @@ apps a contractor already uses, through the contractor's own Zapier account:
 | ESTI | `esti.email.send` — draft estimate emailed from the contractor's own Gmail/Outlook | write | off |
 | CALLIE | `callie.calls.list` — phone-system calls become callback tasks | read | off |
 | CALLIE | `callie.sms.inbox.list` — texts received on the contractor's number: known-customer replies logged, STOP/START applied to text consent | read | off |
-| CALLIE | `callie.sms.send` — text back a missed caller through the existing governed path | write | off |
+| CALLIE | `callie.sms.send` — one informational text-back to a missed inbound caller (requires confirmed texting registration; see below) | write | off |
 | SCHED | `sched.sms.send` — selected company-date day sheet texted to a crew member | write | off |
 | MAINTAIN | `maintain.sms.send` — service-due reminder texted to a consented customer | write | off |
 | APPT | `appt.sms.on_my_way` — On My Way text (tech name, company, optional ETA) to a consented customer, once per appointment per company day | write | off |
@@ -142,10 +142,73 @@ Settings; Settings recommends Automatic and the owner can choose Approve each
 Status on My day reads Sending, Sent to Zapier (the phone app accepted it, not
 that the customer read it) or Waiting for approval.
 
-CALLIE's existing phone-sync/text-back path is separate. The client action panel
-does not expose it while callback eligibility and customer-consent review are
-unavailable there; the APPT/MAINTAIN footer and send-gate claims above must not be
-applied to that legacy path.
+### CALLIE missed-call text-back (`callie.sms.send`)
+
+Built to support US texting rules (conversational consent, opt-out, quiet
+hours, frequency and carrier registration). It does not guarantee legal
+compliance; the company remains responsible for its registration and content.
+Code: `services/callie-text-back.ts` (eligibility),
+`zapier-specialist-flows.ts` (`callieSyncCalls`, `buildCallieTextBackInput`),
+`zapier-executions.ts` (approval and pre-dispatch re-checks).
+
+- **Trigger.** Only CALLIE's call sync (`callie.calls.list`, scheduled or the
+  manual sync route) requests a text-back, once per new missed **inbound**
+  call. Outbound no-answer calls are logged, not texted. The request route
+  takes only `{ taskId }`; the number always comes from the recorded call.
+- **Basis, not consent.** A missed call records an `audit_events` row
+  `consent.missed_call_basis` on the callback task (`source: "missed_call"`,
+  call time, business number called, caller number, scope `callie.sms.send`).
+  It is deliberately not a `consent_records` row, so `hasChannelConsent` and
+  the outreach send gate (SCOUT review requests, reactivation, MAINTAIN, APPT
+  and every other text) never see it. No new table.
+- **Content.** Locked template, no free text: "Hi, this is {business name}.
+  Sorry we missed your call. Reply here with a good time and we will call you
+  back. Reply STOP to opt out." The name is the business profile name (else the
+  company name), whitespace-collapsed and capped at 60 characters.
+- **Registration gate.** `org_settings.callie_text_back` stores
+  `messagingRegistered`, `registeredByUserId`, `registeredAt` and
+  `windowHours`. Settings shows a required checkbox (A2P 10DLC brand and
+  campaign for Twilio, or Quo business-texting registration); GrowthOS records
+  who confirmed it and when but cannot verify it. The policy cannot leave Off
+  until it is confirmed (409), un-confirming switches the policy Off in the
+  same transaction, and every send re-checks it.
+  Route: `PUT /integrations/zapier/callie/text-back-settings`
+  (`settings.manage`, body `{ messagingRegistered, windowHours? }`).
+- **Checks, first failing reason wins:** `invalid_number` (not a valid US
+  mobile-capable E.164; N11, toll-free and 900 refused) → `not_registered` →
+  `customer_lifecycle_paused` → `opted_out` (STOP suppression, contact do not
+  text, or revoked SMS consent) / `suppressed` (any other suppression or do not
+  contact) → `call_too_old` (over 24 hours) → `over_cap` → `quiet_hours`.
+  `landline` (the phone system reports a landline or not SMS-capable) and
+  `missing_call_details` (no call time or business number) are decided when
+  the call is read, before any basis is recorded.
+- **Frequency cap.** At most one text-back per caller per company per window
+  (default 24 hours; Settings offers 12/24/48/72, the API accepts 1–168). It
+  counts ledger rows that are pending, executing, succeeded, indeterminate or
+  failed to that number, plus native missed-call-care Twilio dispatches.
+  Idempotency key `callie-textback:<task id>`; requests are serialized under
+  the nurture locks; an indeterminate send is never retried.
+- **Quiet hours: skip, not hold.** 8:00–21:00 in the company time zone. A
+  missed caller's own time zone is unknown, so the company zone is used (a
+  caller in another zone may receive it outside their local window). A text
+  outside the window is skipped, not queued, because a late "sorry we missed
+  you" is no longer timely; the callback task stays open for staff. The native
+  Twilio missed-call-care path keeps its existing hold-and-resume behaviour
+  and now also applies the same 8–21 company-zone window and shared cap.
+- **Re-checked three times.** At request, again at approval (a skip moves the
+  pending row to blocked with the reason), and again right before dispatch
+  under the lock, before the durable receipt. STOPs arriving through
+  `callie.sms.inbox.list` reach GrowthOS at the next poll; native Twilio STOPs
+  apply immediately.
+- **Audit and visibility.** Every skip writes `zapier.action_skipped` and
+  `callie.textback_skipped` (on the callback task, with the reason); every send
+  writes `callie.textback_sent`. Staff see each text-back and the plain reason
+  it did not go under Calls → "CALLIE · Missed-call text-back activity".
+- **Unverified live.** The call-record field names used for call time,
+  business number (`to`, `tracking_phone_number`, …) and line type
+  (`line_type`, `phone_type`, `sms_capable`) are unverified against live Quo and
+  CallRail Zapier output; a record without a time or business number is
+  skipped as `missing_call_details`.
 
 The registry lives in
 `artifacts/api-server/src/services/zapier/zapier-capabilities.ts`. Each

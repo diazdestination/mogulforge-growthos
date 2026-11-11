@@ -18,9 +18,13 @@ import { callieSyncSmsReplies, scoutSyncInboxReplies } from "./zapier-owned-app-
  * through the execution ledger, so the 60-second scheduler cadence never
  * spends more than one Zapier read per capability per window.
  *
- * Writes are never started from here: APPT, INVO, ESTI, SCOUT review texts,
- * CALLIE text-back and SCHED day sheets originate from a human action or an
- * approved request.
+ * Writes are never started from here: APPT, INVO, ESTI, SCOUT review texts
+ * and SCHED day sheets originate from a human action or an approved request.
+ * The one exception is CALLIE's call sync, which may REQUEST one missed-call
+ * text-back per new missed inbound call. That request goes through the
+ * `callie.sms.send` policy (Off by default, cannot leave Off until texting
+ * registration is confirmed) and every text-back eligibility check, at
+ * request, at approval and again right before dispatch.
  */
 
 const READ_SYNCS = {

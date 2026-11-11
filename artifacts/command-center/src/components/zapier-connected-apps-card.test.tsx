@@ -110,6 +110,52 @@ describe('client Zapier setup', () => {
     expect(screen.getAllByText(/Configured · Off|Select and configure a supported action/).length).toBeGreaterThan(0);
   });
 
+  it('requires the texting registration checkbox before CALLIE text-back can leave Off, and saves who confirmed it', async () => {
+    const quo = [{ app: 'OpenPhoneCLIAPI', appName: 'Quo', action: 'send_message', actionName: 'Send Message', configFields: [] }];
+    let registered = false;
+    const textBack = () => ({ messagingRegistered: registered, registeredByName: registered ? 'Test Owner' : null, registeredAt: registered ? '2026-11-10T15:00:00.000Z' : null, windowHours: 24, windowChoices: [12, 24, 48, 72] });
+    const callie = () => ({ ...capability, key: 'callie.sms.send', specialistId: 'callie', label: 'Text back missed callers', candidates: quo, binding: { app: 'OpenPhoneCLIAPI', appName: 'Quo', action: 'send_message', actionName: 'Send Message', config: {}, boundAt: '2026-11-10T00:00:00Z' }, textBack: textBack() });
+    const base = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (url: any, init?: RequestInit) => {
+      const path = String(url);
+      if (path.endsWith('/capabilities')) return response({ capabilities: [callie()] });
+      if (path.endsWith('/callie/text-back-settings')) { registered = JSON.parse(String(init!.body)).messagingRegistered; return response({ textBack: textBack() }); }
+      return base(url, init);
+    });
+    render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
+    const box = await screen.findByRole('checkbox', { name: /business texting is registered \(required\)/i });
+    expect(box.getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByText(/A2P 10DLC brand and campaign \(Twilio\) or completed Quo business-texting registration/)).toBeTruthy();
+    expect(screen.getByText(/Not confirmed · missed-call text-back stays Off/)).toBeTruthy();
+    expect(screen.getByText(/Built to support texting rules, not a guarantee of legal compliance/)).toBeTruthy();
+    expect(screen.queryByText(/guarantees? legal compliance\b(?!,)/)).toBeNull();
+    // Policy stays locked at Off until registration is confirmed.
+    const policy = screen.getAllByLabelText('Action or policy').find(select => (select as HTMLSelectElement).value === 'off') as HTMLSelectElement;
+    expect(policy.disabled).toBe(true);
+    fireEvent.click(box);
+    await waitFor(() => expect(calls('/callie/text-back-settings')).toHaveLength(1));
+    expect(calls('/callie/text-back-settings')[0]![1]).toMatchObject({ method: 'PUT', body: JSON.stringify({ messagingRegistered: true }) });
+    expect(await screen.findByText(/Confirmed by Test Owner on/)).toBeTruthy();
+    await waitFor(() => expect((screen.getAllByLabelText('Action or policy').find(select => (select as HTMLSelectElement).value === 'off') as HTMLSelectElement).disabled).toBe(false));
+    const windowSelect = screen.getByLabelText('Text-back window') as HTMLSelectElement;
+    expect(Array.from(windowSelect.options).map(option => option.textContent)).toEqual(['At most one text per caller every 12 hours', 'At most one text per caller every 24 hours', 'At most one text per caller every 2 days', 'At most one text per caller every 3 days']);
+    fireEvent.change(windowSelect, { target: { value: '48' } });
+    await waitFor(() => expect(calls('/callie/text-back-settings')).toHaveLength(2));
+    expect(calls('/callie/text-back-settings')[1]![1]).toMatchObject({ body: JSON.stringify({ messagingRegistered: true, windowHours: 48 }) });
+  });
+
+  it('shows the CALLIE registration state read-only to members who cannot manage settings', async () => {
+    const callie = { ...capability, key: 'callie.sms.send', specialistId: 'callie', label: 'Text back missed callers', textBack: { messagingRegistered: false, registeredByName: null, registeredAt: null, windowHours: 24, windowChoices: [12, 24, 48, 72] } };
+    const base = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (url: any, init?: RequestInit) => String(url).endsWith('/capabilities') ? response({ capabilities: [callie] }) : base(url, init));
+    render(<ZapierConnectedAppsCard signUp={signUp} canManage={false} />);
+    const box = await screen.findByRole('checkbox', { name: /business texting is registered/i });
+    expect((box as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Text-back window') as HTMLSelectElement).disabled).toBe(true);
+    fireEvent.click(box);
+    expect(calls('/callie/text-back-settings')).toHaveLength(0);
+  });
+
   it('shows supported app/action and missing setup guidance even before connection', async () => {
     connected = false;
     render(<ZapierConnectedAppsCard signUp={signUp} canManage />);
